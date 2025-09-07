@@ -181,14 +181,14 @@ class BillingAlertFactory:
 
     @staticmethod
     def create_token_alert(
-        user_billing_id: uuid.UUID,
+        user_id: uuid.UUID,
         threshold_percent: int,
         name: Optional[str] = None,
     ) -> BillingAlert:
         """Create a token usage alert."""
         return BillingAlert(
             id=uuid.uuid4(),
-            user_billing_id=user_billing_id,
+            user_id=user_id,
             name=name or f"{threshold_percent}% Token Usage Alert",
             alert_type="token_usage",
             threshold_percent=threshold_percent,
@@ -197,14 +197,14 @@ class BillingAlertFactory:
 
     @staticmethod
     def create_cost_alert(
-        user_billing_id: uuid.UUID,
+        user_id: uuid.UUID,
         threshold_percent: int,
         name: Optional[str] = None,
     ) -> BillingAlert:
         """Create a cost usage alert."""
         return BillingAlert(
             id=uuid.uuid4(),
-            user_billing_id=user_billing_id,
+            user_id=user_id,
             name=name or f"{threshold_percent}% Cost Usage Alert",
             alert_type="cost_usage",
             threshold_percent=threshold_percent,
@@ -212,17 +212,17 @@ class BillingAlertFactory:
         )
 
     @staticmethod
-    def create_standard_alerts(user_billing_id: uuid.UUID) -> List[BillingAlert]:
+    def create_standard_alerts(user_id: uuid.UUID) -> List[BillingAlert]:
         """Create a standard set of alerts (50%, 75%, 90%, 100%)."""
         thresholds = [50, 75, 90, 100]
         alerts = []
 
         for threshold in thresholds:
             alerts.append(
-                BillingAlertFactory.create_token_alert(user_billing_id, threshold)
+                BillingAlertFactory.create_token_alert(user_id, threshold)
             )
             alerts.append(
-                BillingAlertFactory.create_cost_alert(user_billing_id, threshold)
+                BillingAlertFactory.create_cost_alert(user_id, threshold)
             )
 
         return alerts
@@ -387,7 +387,7 @@ def user_with_professional_billing(test_db_session, client_user, professional_pl
 def user_with_alerts(test_db_session, user_with_professional_billing):
     """Create a user with standard billing alerts."""
     user, user_billing = user_with_professional_billing
-    alerts = BillingAlertFactory.create_standard_alerts(user_billing.id)
+    alerts = BillingAlertFactory.create_standard_alerts(user.id)
 
     for alert in alerts:
         test_db_session.add(alert)
