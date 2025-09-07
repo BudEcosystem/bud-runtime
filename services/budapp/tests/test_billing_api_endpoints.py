@@ -378,8 +378,22 @@ class TestUserBillingEndpoints:
         # Mock no existing billing
         mock_service.get_user_billing.return_value = None
 
-        # Mock create billing
+        # Mock create billing with all required fields
         new_user_billing = MagicMock(spec=UserBilling)
+        new_user_billing.id = uuid.uuid4()
+        new_user_billing.user_id = uuid.uuid4()
+        new_user_billing.billing_plan_id = uuid.uuid4()
+        new_user_billing.billing_period_start = datetime.now(timezone.utc)
+        new_user_billing.billing_period_end = datetime.now(timezone.utc) + timedelta(days=30)
+        new_user_billing.custom_token_quota = 75000
+        new_user_billing.custom_cost_quota = Decimal("150.00")
+        new_user_billing.enable_email_notifications = True
+        new_user_billing.enable_in_app_notifications = True
+        new_user_billing.is_active = True
+        new_user_billing.is_suspended = False
+        new_user_billing.suspension_reason = None
+        new_user_billing.created_at = datetime.now(timezone.utc)
+        new_user_billing.modified_at = datetime.now(timezone.utc)
         mock_service.create_user_billing.return_value = new_user_billing
 
         from budapp.commons.dependencies import get_current_active_user, get_session
@@ -419,8 +433,22 @@ class TestUserBillingEndpoints:
         mock_plan.is_active = True
         mock_service.get_billing_plan.return_value = mock_plan
 
-        # Mock existing user billing
+        # Mock existing user billing with all required fields
         mock_user_billing = MagicMock(spec=UserBilling)
+        mock_user_billing.id = uuid.uuid4()
+        mock_user_billing.user_id = uuid.uuid4()
+        mock_user_billing.billing_plan_id = uuid.uuid4()
+        mock_user_billing.billing_period_start = datetime.now(timezone.utc)
+        mock_user_billing.billing_period_end = datetime.now(timezone.utc) + timedelta(days=30)
+        mock_user_billing.custom_token_quota = 50000
+        mock_user_billing.custom_cost_quota = Decimal("100.00")
+        mock_user_billing.enable_email_notifications = True
+        mock_user_billing.enable_in_app_notifications = True
+        mock_user_billing.is_active = True
+        mock_user_billing.is_suspended = False
+        mock_user_billing.suspension_reason = None
+        mock_user_billing.created_at = datetime.now(timezone.utc)
+        mock_user_billing.modified_at = datetime.now(timezone.utc)
         mock_service.get_user_billing.return_value = mock_user_billing
 
         from budapp.commons.dependencies import get_current_active_user, get_session
