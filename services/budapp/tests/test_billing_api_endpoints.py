@@ -47,7 +47,9 @@ class TestBillingPlanEndpoints:
     def test_get_billing_plans_success(self, mock_db_session):
         """Test successful retrieval of billing plans."""
 
-        # Mock billing plans
+        from datetime import datetime, timezone
+        
+        # Mock billing plans with all required fields for BillingPlanSchema
         mock_plans = [
             MagicMock(
                 spec=BillingPlan,
@@ -56,18 +58,30 @@ class TestBillingPlanEndpoints:
                 description="Basic free tier",
                 monthly_token_quota=10000,
                 monthly_cost_quota=Decimal("10.00"),
+                max_projects=5,
+                max_endpoints_per_project=10,
                 base_monthly_price=Decimal("0.00"),
+                overage_token_price=Decimal("0.001"),
+                features={"api_rate_limit": 100, "support": "community"},
                 is_active=True,
+                created_at=datetime.now(timezone.utc),
+                modified_at=datetime.now(timezone.utc),
             ),
             MagicMock(
                 spec=BillingPlan,
                 id=uuid.uuid4(),
-                name="Pro Plan",
+                name="Pro Plan", 
                 description="Professional tier",
                 monthly_token_quota=100000,
                 monthly_cost_quota=Decimal("200.00"),
+                max_projects=50,
+                max_endpoints_per_project=100,
                 base_monthly_price=Decimal("99.00"),
+                overage_token_price=Decimal("0.0008"),
+                features={"api_rate_limit": 1000, "support": "email", "custom_models": True},
                 is_active=True,
+                created_at=datetime.now(timezone.utc),
+                modified_at=datetime.now(timezone.utc),
             ),
         ]
 
@@ -92,6 +106,11 @@ class TestBillingPlanEndpoints:
         finally:
             # Clean up the override
             app.dependency_overrides.clear()
+
+        # Debug: Print response details if there's an error
+        if response.status_code != 200:
+            print(f"Response status: {response.status_code}")
+            print(f"Response body: {response.text}")
 
         # Verify the mock was called
         mock_db_session.query.assert_called_once()
