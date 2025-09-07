@@ -287,15 +287,11 @@ class TestCurrentUsageEndpoints:
 class TestUserBillingEndpoints:
     """Test user billing management endpoints."""
 
-    @patch('budapp.billing_ops.routes.get_current_active_user')
-    @patch('budapp.billing_ops.routes.get_session')
     @patch('budapp.billing_ops.routes.BillingService')
     def test_get_user_billing_info_admin_success(
-        self, mock_billing_service_class, mock_get_session, mock_get_user, mock_admin_user, mock_db_session
+        self, mock_billing_service_class, mock_admin_user, mock_db_session
     ):
         """Test admin retrieving user billing info."""
-        mock_get_user.return_value = mock_admin_user
-        mock_get_session.return_value = mock_db_session
 
         target_user_id = uuid.uuid4()
 
@@ -312,32 +308,43 @@ class TestUserBillingEndpoints:
         mock_service.get_user_billing.return_value = mock_user_billing
 
         from budapp.main import app
+        from budapp.commons.dependencies import get_session, get_current_active_user
+
+        # Override the dependencies
+        app.dependency_overrides[get_session] = lambda: mock_db_session
+        app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
 
         client = TestClient(app)
-        response = client.get(f"/billing/user/{target_user_id}")
+        
+        try:
+            response = client.get(f"/billing/user/{target_user_id}")
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
 
-    @patch('budapp.billing_ops.routes.get_current_active_user')
     def test_get_user_billing_info_non_admin_forbidden(
-        self, mock_get_user, mock_current_user, mock_db_session
+        self, mock_current_user, mock_db_session
     ):
         """Test non-admin cannot retrieve other user's billing info."""
-        mock_get_user.return_value = mock_current_user  # Non-admin user
-
+        
         target_user_id = uuid.uuid4()
 
         from budapp.main import app
-        from budapp.commons.dependencies import get_session
+        from budapp.commons.dependencies import get_session, get_current_active_user
 
-        # Override the dependency
+        # Override the dependencies
         app.dependency_overrides[get_session] = lambda: mock_db_session
+        app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
 
         client = TestClient(app)
-        response = client.get(f"/billing/user/{target_user_id}")
-
-        # Clean up the override
-        app.dependency_overrides.clear()
+        
+        try:
+            response = client.get(f"/billing/user/{target_user_id}")
+        finally:
+            # Clean up the overrides
+            app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
