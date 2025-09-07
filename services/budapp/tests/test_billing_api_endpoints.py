@@ -64,7 +64,7 @@ class TestBillingPlanEndpoints:
         plan1.is_active = True
         plan1.created_at = datetime.now(timezone.utc)
         plan1.modified_at = datetime.now(timezone.utc)
-        
+
         plan2 = BillingPlan()
         plan2.id = uuid.uuid4()
         plan2.name = "Pro Plan"
@@ -79,7 +79,7 @@ class TestBillingPlanEndpoints:
         plan2.is_active = True
         plan2.created_at = datetime.now(timezone.utc)
         plan2.modified_at = datetime.now(timezone.utc)
-        
+
         mock_plans = [plan1, plan2]
 
         mock_query = MagicMock()
@@ -107,7 +107,7 @@ class TestBillingPlanEndpoints:
         # Debug: Always print response details for debugging
         print(f"Response status: {response.status_code}")
         print(f"Response body: {response.text}")
-        
+
         # Also print if mocks were called
         print(f"Mock query called: {mock_db_session.query.called}")
         print(f"Mock filter_by called: {mock_query.filter_by.called}")
