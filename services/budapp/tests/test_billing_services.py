@@ -330,6 +330,8 @@ class TestBillingService:
         mock_user_billing.billing_period_start = datetime.now(timezone.utc).replace(day=1)
         mock_user_billing.billing_period_end = datetime.now(timezone.utc).replace(month=12)
         mock_user_billing.created_at = datetime.now(timezone.utc)
+        mock_user_billing.is_suspended = False
+        mock_user_billing.suspension_reason = None
 
         mock_execute = MagicMock()
         mock_execute.scalar_one_or_none.return_value = mock_user_billing
@@ -356,7 +358,6 @@ class TestBillingService:
 
             result = await billing_service.check_usage_limits(user_id)
 
-            print(f"DEBUG: result = {result}")  # Debug print
             assert result["allowed"] is True
             assert result["status"] == "allowed"
 
@@ -378,6 +379,8 @@ class TestBillingService:
         mock_user_billing.billing_period_start = datetime.now(timezone.utc).replace(day=1)
         mock_user_billing.billing_period_end = datetime.now(timezone.utc).replace(month=12)
         mock_user_billing.created_at = datetime.now(timezone.utc)
+        mock_user_billing.is_suspended = False
+        mock_user_billing.suspension_reason = None
 
         mock_execute = MagicMock()
         mock_execute.scalar_one_or_none.return_value = mock_user_billing
@@ -468,8 +471,9 @@ class TestBillingService:
             }
 
             # Mock notification service
-            with patch.object(billing_service, '_send_alert_notification') as mock_send:
-                mock_send.return_value = None
+            with patch('budapp.billing_ops.notification_service.BillingNotificationService') as MockNotificationService:
+                mock_notification_service = MockNotificationService.return_value
+                mock_notification_service.send_usage_alert = AsyncMock()
 
                 result = await billing_service.check_and_trigger_alerts(user_id)
 
