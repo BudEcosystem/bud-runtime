@@ -442,6 +442,7 @@ class TestBillingService:
         mock_alert_50.threshold_percent = 50
         mock_alert_50.is_active = True
         mock_alert_50.last_triggered_at = None
+        mock_alert_50.last_triggered_value = None
         mock_alert_50.name = "50% Token Alert"
 
         mock_alert_75 = MagicMock(spec=BillingAlert)
@@ -450,25 +451,46 @@ class TestBillingService:
         mock_alert_75.threshold_percent = 75
         mock_alert_75.is_active = True
         mock_alert_75.last_triggered_at = None
+        mock_alert_75.last_triggered_value = None
         mock_alert_75.name = "75% Cost Alert"
 
-        # Setup mock returns
-        mock_execute1 = MagicMock()
-        mock_execute1.scalar_one_or_none.return_value = mock_user_billing
+        # Mock a user object since the service queries for user details
+        from budapp.user_ops.models import User
+        mock_user = MagicMock(spec=User)
+        mock_user.email = "test@example.com"
+        mock_user.first_name = "Test"
+        mock_user.last_name = "User"
 
-        mock_execute2 = MagicMock()
-        mock_execute2.scalars.return_value.all.return_value = [mock_alert_50, mock_alert_75]
+        # Setup mock returns - use side_effect to return different objects for different queries
+        def mock_execute_side_effect(*args, **kwargs):
+            mock_result = MagicMock()
+            # Return user for User queries, user_billing for UserBilling queries
+            mock_result.scalar_one_or_none.return_value = mock_user
+            mock_result.scalars.return_value.all.return_value = [mock_alert_50, mock_alert_75]
+            return mock_result
 
-        mock_session.execute.side_effect = [mock_execute1, mock_execute2]
+        mock_session.execute.side_effect = mock_execute_side_effect
 
         # Mock ClickHouse usage (triggers 50% token alert and 75% cost alert)
-        with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
-            mock_get_usage.return_value = {
-                "total_tokens": 60000,  # 60% of 100000
-                "total_cost": 160.00,  # 80% of 200.00
-                "request_count": 1500,
-                "success_rate": 99.0,
+        with patch.object(billing_service, 'get_current_usage') as mock_get_current_usage, \
+             patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_billing_alerts') as mock_get_alerts:
+            # Mock the get_current_usage method response
+            mock_get_current_usage.return_value = {
+                "has_billing": True,
+                "usage": {
+                    "tokens_used": 60000,  # 60% of 100000
+                    "tokens_quota": 100000,
+                    "tokens_usage_percent": 60.0,
+                    "cost_used": 160.00,  # 80% of 200.00
+                    "cost_quota": 200.0,
+                    "cost_usage_percent": 80.0,
+                }
             }
+
+            # Mock other service methods
+            mock_get_user_billing.return_value = mock_user_billing
+            mock_get_alerts.return_value = [mock_alert_50, mock_alert_75]
 
             # Mock notification service
             with patch('budapp.billing_ops.notification_service.BillingNotificationService') as MockNotificationService:
@@ -479,12 +501,20 @@ class TestBillingService:
 
                 # Should trigger both alerts
                 assert len(result) == 2
-                assert "50% Token Alert" in result
-                assert "75% Cost Alert" in result
 
-                # Verify alerts were updated
-                assert mock_alert_50.last_triggered_at is not None
-                assert mock_alert_75.last_triggered_at is not None
+                # Check alert details in the returned dictionaries
+                alert_names = [alert["alert_name"] for alert in result]
+                assert "50% Token Alert" in alert_names
+                assert "75% Cost Alert" in alert_names
+
+                # Check alert details
+                token_alert = next(alert for alert in result if alert["alert_type"] == "token_usage")
+                assert token_alert["current_percent"] == 60.0
+                assert token_alert["current_value"] == 60000
+
+                cost_alert = next(alert for alert in result if alert["alert_type"] == "cost_usage")
+                assert cost_alert["current_percent"] == 80.0
+                assert cost_alert["current_value"] == 160.0
 
     @pytest.mark.asyncio
     async def test_get_usage_history(self, billing_service, mock_session):
