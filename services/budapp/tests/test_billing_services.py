@@ -9,9 +9,6 @@ import httpx
 import pytest
 from sqlalchemy.orm import Session
 
-from budapp.billing_ops.models import BillingAlert, BillingPlan, UserBilling
-from budapp.billing_ops.services import BillingService
-
 
 class TestBillingService:
     """Test BillingService methods."""
@@ -24,6 +21,7 @@ class TestBillingService:
     @pytest.fixture
     def billing_service(self, mock_session):
         """Create a BillingService instance with mock session."""
+        from budapp.billing_ops.services import BillingService
         return BillingService(mock_session)
 
     @pytest.mark.asyncio
@@ -47,9 +45,9 @@ class TestBillingService:
             mock_async_client = AsyncMock()
             mock_client.return_value.__aenter__.return_value = mock_async_client
 
-            mock_response_obj = AsyncMock()
+            mock_response_obj = MagicMock()
             mock_response_obj.json.return_value = mock_response
-            mock_response_obj.raise_for_status = AsyncMock()
+            mock_response_obj.raise_for_status.return_value = None
             mock_async_client.get.return_value = mock_response_obj
 
             result = await billing_service.get_usage_from_clickhouse(
@@ -82,9 +80,9 @@ class TestBillingService:
             mock_async_client = AsyncMock()
             mock_client.return_value.__aenter__.return_value = mock_async_client
 
-            mock_response_obj = AsyncMock()
+            mock_response_obj = MagicMock()
             mock_response_obj.json.return_value = mock_response
-            mock_response_obj.raise_for_status = AsyncMock()
+            mock_response_obj.raise_for_status.return_value = None
             mock_async_client.get.return_value = mock_response_obj
 
             await billing_service.get_usage_from_clickhouse(
@@ -120,6 +118,7 @@ class TestBillingService:
 
     def test_get_user_billing(self, billing_service, mock_session):
         """Test retrieving user billing information."""
+        from budapp.billing_ops.models import UserBilling
         user_id = uuid.uuid4()
         mock_user_billing = MagicMock(spec=UserBilling)
 
@@ -134,6 +133,7 @@ class TestBillingService:
 
     def test_get_billing_plan(self, billing_service, mock_session):
         """Test retrieving billing plan."""
+        from budapp.billing_ops.models import BillingPlan
         plan_id = uuid.uuid4()
         mock_plan = MagicMock(spec=BillingPlan)
 
@@ -173,6 +173,7 @@ class TestBillingService:
 
     def test_get_billing_alerts(self, billing_service, mock_session):
         """Test retrieving billing alerts for a user."""
+        from budapp.billing_ops.models import BillingAlert, UserBilling
         user_id = uuid.uuid4()
         user_billing_id = uuid.uuid4()
 
@@ -204,6 +205,7 @@ class TestBillingService:
     @pytest.mark.asyncio
     async def test_get_current_usage(self, billing_service, mock_session):
         """Test getting current billing period usage."""
+        from budapp.billing_ops.models import BillingPlan, UserBilling
         user_id = uuid.uuid4()
         plan_id = uuid.uuid4()
 
@@ -268,6 +270,7 @@ class TestBillingService:
     @pytest.mark.asyncio
     async def test_check_usage_limits_within_limits(self, billing_service, mock_session):
         """Test checking usage limits when within limits."""
+        from budapp.billing_ops.models import BillingPlan, UserBilling
         user_id = uuid.uuid4()
 
         # Mock user billing and plan
@@ -281,10 +284,18 @@ class TestBillingService:
         mock_user_billing.custom_cost_quota = None
         mock_user_billing.billing_period_start = datetime.now(timezone.utc).replace(day=1)
         mock_user_billing.billing_period_end = datetime.now(timezone.utc).replace(month=12)
+        mock_user_billing.created_at = datetime.now(timezone.utc)
 
         mock_execute = MagicMock()
         mock_execute.scalar_one_or_none.return_value = mock_user_billing
         mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = mock_user_billing
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
 
         # Mock ClickHouse usage (below limits)
         with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
@@ -297,13 +308,13 @@ class TestBillingService:
 
             result = await billing_service.check_usage_limits(user_id)
 
-            assert result["within_limits"] is True
-            assert result["token_limit_exceeded"] is False
-            assert result["cost_limit_exceeded"] is False
+            assert result["allowed"] is True
+            assert result["status"] == "allowed"
 
     @pytest.mark.asyncio
     async def test_check_usage_limits_exceeded(self, billing_service, mock_session):
         """Test checking usage limits when exceeded."""
+        from budapp.billing_ops.models import BillingPlan, UserBilling
         user_id = uuid.uuid4()
 
         # Mock user billing and plan
@@ -317,10 +328,18 @@ class TestBillingService:
         mock_user_billing.custom_cost_quota = None
         mock_user_billing.billing_period_start = datetime.now(timezone.utc).replace(day=1)
         mock_user_billing.billing_period_end = datetime.now(timezone.utc).replace(month=12)
+        mock_user_billing.created_at = datetime.now(timezone.utc)
 
         mock_execute = MagicMock()
         mock_execute.scalar_one_or_none.return_value = mock_user_billing
         mock_session.execute.return_value = mock_execute
+
+        # Mock the session.query() method that the service actually uses
+        mock_query = MagicMock()
+        mock_filter_by = MagicMock()
+        mock_filter_by.first.return_value = mock_user_billing
+        mock_query.filter_by.return_value = mock_filter_by
+        mock_session.query.return_value = mock_query
 
         # Mock ClickHouse usage (exceeds limits)
         with patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
@@ -333,15 +352,15 @@ class TestBillingService:
 
             result = await billing_service.check_usage_limits(user_id)
 
-            assert result["within_limits"] is False
-            assert result["token_limit_exceeded"] is True
-            assert result["cost_limit_exceeded"] is True
+            assert result["allowed"] is False
+            assert result["status"] == "token_limit_exceeded"
             assert result["tokens_used"] == 150000
             assert result["tokens_quota"] == 100000
 
     @pytest.mark.asyncio
     async def test_check_and_trigger_alerts(self, billing_service, mock_session):
         """Test checking and triggering billing alerts."""
+        from budapp.billing_ops.models import BillingAlert, BillingPlan, UserBilling
         user_id = uuid.uuid4()
         user_billing_id = uuid.uuid4()
 
@@ -359,6 +378,7 @@ class TestBillingService:
         mock_user_billing.custom_cost_quota = None
         mock_user_billing.billing_period_start = datetime.now(timezone.utc).replace(day=1)
         mock_user_billing.billing_period_end = datetime.now(timezone.utc).replace(month=12)
+        mock_user_billing.created_at = datetime.now(timezone.utc)
 
         # Mock alerts
         mock_alert_50 = MagicMock(spec=BillingAlert)
@@ -441,9 +461,9 @@ class TestBillingService:
             mock_async_client = AsyncMock()
             mock_client.return_value.__aenter__.return_value = mock_async_client
 
-            mock_response_obj = AsyncMock()
+            mock_response_obj = MagicMock()
             mock_response_obj.json.return_value = mock_response
-            mock_response_obj.raise_for_status = AsyncMock()
+            mock_response_obj.raise_for_status.return_value = None
             mock_async_client.get.return_value = mock_response_obj
 
             result = await billing_service.get_usage_history(
