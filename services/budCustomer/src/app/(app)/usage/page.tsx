@@ -428,7 +428,6 @@ export default function UsagePage() {
                   ? ((metrics.totalSpend - metrics.previousSpend) / metrics.previousSpend) * 100
                   : 0
               }
-              subtitle={'test'}
             />
             <MetricCard
               title="Total tokens"
