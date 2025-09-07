@@ -104,23 +104,33 @@ class TestBillingPlanEndpoints:
             # Clean up the override
             app.dependency_overrides.clear()
 
-        # Debug: Always print response details for debugging
+        # Debug: Always print response details for debugging  
+        print(f"\n=== DEBUG INFO ===")
         print(f"Response status: {response.status_code}")
-        print(f"Response body: {response.text}")
+        print(f"Response headers: {dict(response.headers)}")
+        try:
+            response_body = response.text
+            print(f"Response body: {response_body}")
+        except Exception as e:
+            print(f"Error reading response body: {e}")
 
         # Also print if mocks were called
         print(f"Mock query called: {mock_db_session.query.called}")
         print(f"Mock filter_by called: {mock_query.filter_by.called}")
+        print(f"=== END DEBUG ===\n")
 
-        # Check response status first before asserting mocks
-        if response.status_code != 200:
-            # Don't assert mocks if the request failed, let's see the error first
-            assert False, f"Request failed with {response.status_code}: {response.text}"
-
-        # Verify the mock was called
+        # Verify the mock was called before checking status
         mock_db_session.query.assert_called_once()
         mock_query.filter_by.assert_called_once_with(is_active=True)
         mock_query.filter_by.return_value.all.assert_called_once()
+
+        # Now check the response status with better error message
+        if response.status_code != 200:
+            try:
+                error_detail = response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text
+            except:
+                error_detail = response.text
+            assert False, f"Expected 200 OK but got {response.status_code}. Error: {error_detail}"
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
