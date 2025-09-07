@@ -26,8 +26,14 @@ from fastapi import APIRouter, Response, status
 from fastapi.responses import StreamingResponse
 
 from ..commons.exceptions import ClientException
-from .schemas import PromptExecuteRequest, PromptExecuteResponse, PromptSchemaRequest
-from .services import PromptConfigurationService, PromptExecutorService
+from .schemas import (
+    PromptConfigRequest,
+    PromptConfigResponse,
+    PromptExecuteRequest,
+    PromptExecuteResponse,
+    PromptSchemaRequest,
+)
+from .services import PromptConfigurationService, PromptExecutorService, PromptService
 from .workflows import PromptSchemaWorkflow
 
 
@@ -112,7 +118,7 @@ async def execute_prompt(
         ).to_http_response()
 
 
-@prompt_router.post("/schema")
+@prompt_router.post("/prompt-schema")
 @pubsub_api_endpoint(request_model=PromptSchemaRequest)
 async def perform_prompt_schema(request: PromptSchemaRequest) -> Response:
     """Run a prompt schema validation workflow.
@@ -139,3 +145,56 @@ async def perform_prompt_schema(request: PromptSchemaRequest) -> Response:
         response = await PromptSchemaWorkflow().__call__(request)
 
     return response.to_http_response()
+
+
+@prompt_router.post(
+    "/prompt-config",
+    response_model=Union[PromptConfigResponse, ErrorResponse],
+    summary="Save or update prompt configuration",
+    description="Save or update prompt configuration in Redis with partial updates support",
+    responses={
+        200: {
+            "description": "Configuration saved successfully",
+            "model": PromptConfigResponse,
+        },
+        400: {"description": "Invalid request"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def save_prompt_config(
+    request: PromptConfigRequest,
+) -> Union[PromptConfigResponse, ErrorResponse]:
+    """Save or update prompt configuration.
+
+    Args:
+        request: The prompt configuration request
+
+    Returns:
+        The prompt configuration response with prompt_id
+
+    Raises:
+        HTTPException: If the request is invalid or saving fails
+    """
+    try:
+        logger.info(f"Received prompt configuration request for prompt_id: {request.prompt_id}")
+
+        # Create service instance
+        prompt_service = PromptService()
+
+        # Save the configuration
+        result = await prompt_service.save_prompt_config(request)
+
+        return result.to_http_response()
+
+    except ClientException as e:
+        return ErrorResponse(
+            code=e.status_code,
+            message=e.message,
+            param=e.params,
+        ).to_http_response()
+    except Exception as e:
+        logger.error(f"Unexpected error during prompt configuration: {str(e)}")
+        return ErrorResponse(
+            code=500,
+            message="An unexpected error occurred during prompt configuration",
+        ).to_http_response()

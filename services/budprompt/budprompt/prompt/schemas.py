@@ -342,3 +342,42 @@ class PromptConfigurationData(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
+
+
+class PromptConfigRequest(BaseModel):
+    """Request model for prompt configuration.
+
+    This request allows clients to save or update prompt configurations in Redis.
+    Configurations can be partially updated - only provided fields will be updated.
+    """
+
+    prompt_id: Optional[str] = Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        description="Unique identifier for the prompt configuration. If not provided, will be auto-generated.",
+    )
+    deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
+    model_settings: Optional[ModelSettings] = Field(None, description="Model settings configuration")
+    stream: Optional[bool] = Field(None, description="Enable streaming response")
+    messages: Optional[List[Message]] = Field(
+        None, description="Conversation messages (can include system/developer messages)"
+    )
+    llm_retry_limit: Optional[int] = Field(
+        None, ge=0, description="Number of LLM retries when validation fails (non-streaming only)"
+    )
+    enable_tools: Optional[bool] = Field(
+        None, description="Enable tool calling capability (requires allow_multiple_calls=true)"
+    )
+    allow_multiple_calls: Optional[bool] = Field(
+        None,
+        description="Allow multiple LLM calls for retries and tool usage. When false, only a single LLM call is made",
+    )
+    system_prompt_role: Optional[Literal["system", "developer", "user"]] = Field(
+        None,
+        description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
+    )
+
+
+class PromptConfigResponse(SuccessResponse):
+    """Response model for prompt configuration."""
+
+    prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")

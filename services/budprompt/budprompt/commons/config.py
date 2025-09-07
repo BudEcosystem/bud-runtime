@@ -42,6 +42,9 @@ class AppConfig(BaseAppConfig):
     bud_gateway_base_url: str = Field(..., alias="BUD_GATEWAY_BASE_URL")
     bud_default_model_name: str = Field(..., alias="BUD_DEFAULT_MODEL_NAME")
 
+    # Redis TTL Configuration
+    prompt_config_redis_ttl: int = Field(default=86400, alias="PROMPT_CONFIG_REDIS_TTL")
+
 
 class SecretsConfig(BaseSecretsConfig):
     name: str = __version__.split("@")[0]

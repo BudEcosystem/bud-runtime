@@ -37,13 +37,21 @@ from budprompt.commons.exceptions import (
     TemplateRenderingException,
 )
 
+from ..commons.config import app_settings
 from ..commons.exceptions import ClientException
 from ..commons.helpers import run_async
 from ..shared.redis_service import RedisService
 from .executors import SimplePromptExecutor
 from .revised_code.dynamic_model_creation import json_schema_to_pydantic_model
 from .revised_code.field_validation import generate_validation_function
-from .schemas import PromptConfigurationData, PromptExecuteRequest, PromptSchemaRequest, PromptSchemaResponse
+from .schemas import (
+    PromptConfigRequest,
+    PromptConfigResponse,
+    PromptConfigurationData,
+    PromptExecuteRequest,
+    PromptSchemaRequest,
+    PromptSchemaResponse,
+)
 from .utils import clean_model_cache
 
 
@@ -387,7 +395,7 @@ class PromptConfigurationService:
             redis_service = RedisService()
 
             # Construct Redis key
-            redis_key = f"prompt:{prompt_id}"
+            redis_key = f"run:{prompt_id}"
 
             # Fetch existing data if it exists
             existing_data_json = run_async(redis_service.get(redis_key))
@@ -416,9 +424,9 @@ class PromptConfigurationService:
                 if validation_codes:
                     config_data.output_validation = validation_codes
 
-            # Convert to JSON and store in Redis with 24-hour TTL
+            # Convert to JSON and store in Redis with configured TTL
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
-            run_async(redis_service.set(redis_key, config_json, ex=86400))  # 24 hours = 86400 seconds
+            run_async(redis_service.set(redis_key, config_json, ex=app_settings.prompt_config_redis_ttl))
 
             logger.debug(f"Stored prompt configuration for prompt_id: {prompt_id}, type: {schema_type}")
 
@@ -628,3 +636,93 @@ class PromptConfigurationService:
         )
 
         return response
+
+
+class PromptService:
+    """Service for managing prompt configurations.
+
+    This service handles saving and updating prompt configurations
+    that include model settings and runtime parameters.
+    """
+
+    def __init__(self):
+        """Initialize the PromptService."""
+        self.redis_service = RedisService()
+
+    async def save_prompt_config(self, request: PromptConfigRequest) -> PromptConfigResponse:
+        """Save or update prompt configuration in Redis.
+
+        This method stores/updates prompt configuration including model settings,
+        messages, and other runtime parameters. It performs partial updates,
+        only modifying fields provided by the client.
+
+        Args:
+            request: The prompt configuration request containing settings to save
+
+        Returns:
+            PromptConfigResponse with the prompt_id
+
+        Raises:
+            RedisException: If Redis operation fails
+        """
+        try:
+            # Construct Redis key
+            redis_key = f"run:{request.prompt_id}"
+
+            # Fetch existing data if it exists
+            existing_data_json = await self.redis_service.get(redis_key)
+            if existing_data_json:
+                existing_data = json.loads(existing_data_json)
+                config_data = PromptConfigurationData.model_validate(existing_data)
+            else:
+                config_data = PromptConfigurationData()
+
+            # Update configuration with provided fields (partial update)
+            if request.deployment_name:
+                config_data.deployment_name = request.deployment_name
+
+            if request.model_settings:
+                config_data.model_settings = request.model_settings
+
+            if request.stream is not None:
+                config_data.stream = request.stream
+
+            if request.messages is not None:
+                config_data.messages = request.messages
+
+            if request.llm_retry_limit is not None:
+                config_data.llm_retry_limit = request.llm_retry_limit
+
+            if request.enable_tools is not None:
+                config_data.enable_tools = request.enable_tools
+
+            if request.allow_multiple_calls is not None:
+                config_data.allow_multiple_calls = request.allow_multiple_calls
+
+            if request.system_prompt_role is not None:
+                config_data.system_prompt_role = request.system_prompt_role
+
+            # Convert to JSON and store in Redis with configured TTL
+            config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
+            await self.redis_service.set(redis_key, config_json, ex=app_settings.prompt_config_redis_ttl)
+
+            logger.debug(f"Stored prompt configuration for prompt_id: {request.prompt_id}")
+
+            return PromptConfigResponse(
+                code=200,
+                message="Prompt configuration saved successfully",
+                prompt_id=request.prompt_id,
+            )
+
+        except json.JSONDecodeError as e:
+            logger.exception(f"Failed to parse existing Redis data for prompt_id {request.prompt_id}: {str(e)}")
+            raise ClientException(
+                status_code=500,
+                message=f"Invalid data format in Redis for prompt_id {request.prompt_id}",
+            ) from e
+        except Exception as e:
+            logger.exception(f"Failed to store prompt configuration: {str(e)}")
+            raise ClientException(
+                status_code=500,
+                message="Failed to store prompt configuration",
+            ) from e
