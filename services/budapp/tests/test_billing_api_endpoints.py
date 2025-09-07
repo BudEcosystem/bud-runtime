@@ -44,10 +44,8 @@ def mock_db_session():
 class TestBillingPlanEndpoints:
     """Test billing plan endpoints."""
 
-    @patch('budapp.billing_ops.routes.get_session')
-    def test_get_billing_plans_success(self, mock_get_session, mock_db_session):
+    def test_get_billing_plans_success(self, mock_db_session):
         """Test successful retrieval of billing plans."""
-        mock_get_session.return_value = mock_db_session
 
         # Mock billing plans
         mock_plans = [
@@ -83,22 +81,30 @@ class TestBillingPlanEndpoints:
 
         # Override the dependency
         app.dependency_overrides[get_session] = lambda: mock_db_session
-
-        client = TestClient(app)
-        response = client.get("/billing/plans")
         
-        # Clean up the override
-        app.dependency_overrides.clear()
+        # Verify the override is set
+        assert get_session in app.dependency_overrides
+        
+        client = TestClient(app)
+        
+        try:
+            response = client.get("/billing/plans")
+        finally:
+            # Clean up the override
+            app.dependency_overrides.clear()
+
+        # Verify the mock was called
+        mock_db_session.query.assert_called_once()
+        mock_query.filter_by.assert_called_once_with(is_active=True)
+        mock_query.filter_by.return_value.all.assert_called_once()
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "result" in data
         assert len(data["result"]) == 2
 
-    @patch('budapp.billing_ops.routes.get_session')
-    def test_get_billing_plans_error(self, mock_get_session, mock_db_session):
+    def test_get_billing_plans_error(self, mock_db_session):
         """Test error handling in billing plans retrieval."""
-        mock_get_session.return_value = mock_db_session
         mock_db_session.query.side_effect = Exception("Database error")
 
         from budapp.main import app
@@ -239,13 +245,11 @@ class TestUserBillingEndpoints:
         assert response.status_code == status.HTTP_200_OK
 
     @patch('budapp.billing_ops.routes.get_current_active_user')
-    @patch('budapp.billing_ops.routes.get_session')
     def test_get_user_billing_info_non_admin_forbidden(
-        self, mock_get_session, mock_get_user, mock_current_user, mock_db_session
+        self, mock_get_user, mock_current_user, mock_db_session
     ):
         """Test non-admin cannot retrieve other user's billing info."""
         mock_get_user.return_value = mock_current_user  # Non-admin user
-        mock_get_session.return_value = mock_db_session
 
         target_user_id = uuid.uuid4()
 
