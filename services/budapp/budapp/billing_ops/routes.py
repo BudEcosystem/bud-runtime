@@ -365,29 +365,13 @@ async def create_billing_alert(
 ) -> SingleResponse[BillingAlertSchema]:
     """Create a new billing alert for the authenticated user."""
     try:
-        from sqlalchemy import select
-
-        from budapp.billing_ops.models import BillingAlert
-
-        # Check if alert with same name already exists for this user
-        existing_alert_stmt = select(BillingAlert).where(
-            BillingAlert.user_id == current_user.id, BillingAlert.name == request.name
-        )
-        existing_alert = db.execute(existing_alert_stmt).scalar_one_or_none()
-
-        if existing_alert:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An alert with this name already exists")
-
-        alert = BillingAlert(
+        service = BillingService(db)
+        alert = service.create_billing_alert(
             user_id=current_user.id,
             name=request.name,
             alert_type=request.alert_type,
             threshold_percent=request.threshold_percent,
         )
-
-        db.add(alert)
-        db.commit()
-        db.refresh(alert)
 
         return SingleResponse(
             result=BillingAlertSchema.from_orm(alert),

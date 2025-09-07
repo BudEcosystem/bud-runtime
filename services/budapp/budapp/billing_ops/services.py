@@ -555,6 +555,43 @@ class BillingService(DataManagerUtils):
         self.session.commit()
         logger.info(f"Reset {len(alerts)} alerts for user_id {user_id}")
 
+    def create_billing_alert(
+        self,
+        user_id: UUID,
+        name: str,
+        alert_type: str,
+        threshold_percent: int
+    ) -> BillingAlert:
+        """Create a new billing alert with validation."""
+        from fastapi import HTTPException, status
+
+        # Check if alert with same name already exists for this user
+        existing_alert_stmt = select(BillingAlert).where(
+            BillingAlert.user_id == user_id,
+            BillingAlert.name == name
+        )
+        existing_alert = self.session.execute(existing_alert_stmt).scalar_one_or_none()
+
+        if existing_alert:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An alert with this name already exists"
+            )
+
+        # Create the new alert
+        alert = BillingAlert(
+            user_id=user_id,
+            name=name,
+            alert_type=alert_type,
+            threshold_percent=threshold_percent,
+        )
+
+        self.session.add(alert)
+        self.session.commit()
+        self.session.refresh(alert)
+
+        return alert
+
     def update_billing_period(self, user_billing: UserBilling) -> None:
         """Update billing period to next month."""
         user_billing.billing_period_start = user_billing.billing_period_end
