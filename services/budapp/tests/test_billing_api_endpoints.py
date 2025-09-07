@@ -215,6 +215,24 @@ class TestCurrentUsageEndpoints:
             # Clean up the overrides
             app.dependency_overrides.clear()
 
+        # Debug: Print response details for troubleshooting
+        print(f"\n=== CURRENT USAGE DEBUG ===")
+        print(f"Response status: {response.status_code}")
+        print(f"Response headers: {dict(response.headers)}")
+        try:
+            response_body = response.text
+            print(f"Response body: {response_body}")
+        except Exception as e:
+            print(f"Error reading response body: {e}")
+        print(f"=== END DEBUG ===\n")
+
+        if response.status_code != 200:
+            try:
+                error_detail = response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text
+            except:
+                error_detail = response.text
+            assert False, f"Expected 200 OK but got {response.status_code}. Error: {error_detail}"
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["result"]["has_billing"] is True
