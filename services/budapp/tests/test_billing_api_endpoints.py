@@ -315,7 +315,7 @@ class TestUserBillingEndpoints:
         app.dependency_overrides[get_current_active_user] = lambda: mock_admin_user
 
         client = TestClient(app)
-        
+
         try:
             response = client.get(f"/billing/user/{target_user_id}")
         finally:
@@ -328,7 +328,7 @@ class TestUserBillingEndpoints:
         self, mock_current_user, mock_db_session
     ):
         """Test non-admin cannot retrieve other user's billing info."""
-        
+
         target_user_id = uuid.uuid4()
 
         from budapp.main import app
@@ -339,7 +339,7 @@ class TestUserBillingEndpoints:
         app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
 
         client = TestClient(app)
-        
+
         try:
             response = client.get(f"/billing/user/{target_user_id}")
         finally:
