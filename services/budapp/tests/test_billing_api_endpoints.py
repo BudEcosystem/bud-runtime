@@ -183,6 +183,7 @@ class TestCurrentUsageEndpoints:
             "billing_period_start": "2024-01-01T00:00:00Z",
             "billing_period_end": "2024-01-31T23:59:59Z",
             "plan_name": "Standard Plan",
+            "billing_plan_id": str(uuid.uuid4()),  # Added missing field
             "base_monthly_price": 49.00,
             "usage": {
                 "tokens_used": 25000,
@@ -253,6 +254,7 @@ class TestCurrentUsageEndpoints:
             "billing_period_start": None,
             "billing_period_end": None,
             "plan_name": None,
+            "billing_plan_id": None,  # Added missing field
             "base_monthly_price": None,
             "usage": None,
             "is_suspended": None,
