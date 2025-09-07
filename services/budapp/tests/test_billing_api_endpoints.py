@@ -478,14 +478,10 @@ class TestUserBillingEndpoints:
 class TestBillingAlertEndpoints:
     """Test billing alert endpoints."""
 
-    @patch('budapp.billing_ops.routes.BillingService')
     def test_get_billing_alerts_success(
-        self, mock_billing_service_class, mock_current_user, mock_db_session
+        self, mock_current_user, mock_db_session
     ):
         """Test retrieving billing alerts."""
-        mock_service = MagicMock()
-        mock_billing_service_class.return_value = mock_service
-
         # Mock alerts with all required fields for BillingAlertSchema
         mock_alerts = []
         for name, threshold in [("50% Alert", 50), ("75% Alert", 75)]:
@@ -505,7 +501,10 @@ class TestBillingAlertEndpoints:
             alert.modified_at = datetime.now(timezone.utc)
             mock_alerts.append(alert)
 
-        mock_service.get_billing_alerts.return_value = mock_alerts
+        # Mock the database execute method to return our alerts
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = mock_alerts
+        mock_db_session.execute.return_value = mock_result
 
         from budapp.commons.dependencies import get_current_active_user, get_session
         from budapp.main import app
