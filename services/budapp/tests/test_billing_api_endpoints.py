@@ -49,41 +49,38 @@ class TestBillingPlanEndpoints:
 
         from datetime import datetime, timezone
 
-        # Mock billing plans with all required fields for BillingPlanSchema
-        mock_plans = [
-            MagicMock(
-                spec=BillingPlan,
-                id=uuid.uuid4(),
-                name="Free Plan",
-                description="Basic free tier",
-                monthly_token_quota=10000,
-                monthly_cost_quota=Decimal("10.00"),
-                max_projects=5,
-                max_endpoints_per_project=10,
-                base_monthly_price=Decimal("0.00"),
-                overage_token_price=Decimal("0.001"),
-                features={"api_rate_limit": 100, "support": "community"},
-                is_active=True,
-                created_at=datetime.now(timezone.utc),
-                modified_at=datetime.now(timezone.utc),
-            ),
-            MagicMock(
-                spec=BillingPlan,
-                id=uuid.uuid4(),
-                name="Pro Plan",
-                description="Professional tier",
-                monthly_token_quota=100000,
-                monthly_cost_quota=Decimal("200.00"),
-                max_projects=50,
-                max_endpoints_per_project=100,
-                base_monthly_price=Decimal("99.00"),
-                overage_token_price=Decimal("0.0008"),
-                features={"api_rate_limit": 1000, "support": "email", "custom_models": True},
-                is_active=True,
-                created_at=datetime.now(timezone.utc),
-                modified_at=datetime.now(timezone.utc),
-            ),
-        ]
+        # Create real BillingPlan instances instead of mocks for Pydantic compatibility
+        plan1 = BillingPlan()
+        plan1.id = uuid.uuid4()
+        plan1.name = "Free Plan"
+        plan1.description = "Basic free tier"
+        plan1.monthly_token_quota = 10000
+        plan1.monthly_cost_quota = Decimal("10.00")
+        plan1.max_projects = 5
+        plan1.max_endpoints_per_project = 10
+        plan1.base_monthly_price = Decimal("0.00")
+        plan1.overage_token_price = Decimal("0.001")
+        plan1.features = {"api_rate_limit": 100, "support": "community"}
+        plan1.is_active = True
+        plan1.created_at = datetime.now(timezone.utc)
+        plan1.modified_at = datetime.now(timezone.utc)
+        
+        plan2 = BillingPlan()
+        plan2.id = uuid.uuid4()
+        plan2.name = "Pro Plan"
+        plan2.description = "Professional tier"
+        plan2.monthly_token_quota = 100000
+        plan2.monthly_cost_quota = Decimal("200.00")
+        plan2.max_projects = 50
+        plan2.max_endpoints_per_project = 100
+        plan2.base_monthly_price = Decimal("99.00")
+        plan2.overage_token_price = Decimal("0.0008")
+        plan2.features = {"api_rate_limit": 1000, "support": "email", "custom_models": True}
+        plan2.is_active = True
+        plan2.created_at = datetime.now(timezone.utc)
+        plan2.modified_at = datetime.now(timezone.utc)
+        
+        mock_plans = [plan1, plan2]
 
         mock_query = MagicMock()
         mock_query.filter_by.return_value.all.return_value = mock_plans
@@ -107,10 +104,18 @@ class TestBillingPlanEndpoints:
             # Clean up the override
             app.dependency_overrides.clear()
 
-        # Debug: Print response details if there's an error
+        # Debug: Always print response details for debugging
+        print(f"Response status: {response.status_code}")
+        print(f"Response body: {response.text}")
+        
+        # Also print if mocks were called
+        print(f"Mock query called: {mock_db_session.query.called}")
+        print(f"Mock filter_by called: {mock_query.filter_by.called}")
+
+        # Check response status first before asserting mocks
         if response.status_code != 200:
-            print(f"Response status: {response.status_code}")
-            print(f"Response body: {response.text}")
+            # Don't assert mocks if the request failed, let's see the error first
+            assert False, f"Request failed with {response.status_code}: {response.text}"
 
         # Verify the mock was called
         mock_db_session.query.assert_called_once()
