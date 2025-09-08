@@ -564,3 +564,98 @@ async def reset_expired_cycles(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to reset expired cycles",
         )
+
+
+@router.get("/history", response_model=SingleResponse[List[UserBillingSchema]])
+async def get_billing_history(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[List[UserBillingSchema]]:
+    """Get billing cycle history for the current user."""
+    try:
+        service = BillingService(db)
+        history = service.get_user_billing_history(current_user.id)
+
+        return SingleResponse(
+            result=[UserBillingSchema.from_orm(billing) for billing in history],
+            message=f"Retrieved {len(history)} billing cycle records",
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving billing history: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve billing history",
+        )
+
+
+@router.get("/history/{user_id}", response_model=SingleResponse[List[UserBillingSchema]])
+async def get_user_billing_history(
+    user_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[List[UserBillingSchema]]:
+    """Get billing cycle history for a specific user (admin only)."""
+    try:
+        # Check if current user is admin or requesting their own history
+        if current_user.user_type != UserTypeEnum.ADMIN and current_user.id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can view other users' billing history",
+            )
+
+        service = BillingService(db)
+        history = service.get_user_billing_history(user_id)
+
+        return SingleResponse(
+            result=[UserBillingSchema.from_orm(billing) for billing in history],
+            message=f"Retrieved {len(history)} billing cycle records for user",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving billing history for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve billing history",
+        )
+
+
+@router.get("/history/period", response_model=SingleResponse[UserBillingSchema])
+async def get_billing_for_period(
+    date: str,  # ISO format date string
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[UserBillingSchema]:
+    """Get billing record that was active during a specific date."""
+    try:
+        from datetime import datetime
+
+        # Parse the date
+        target_date = datetime.fromisoformat(date.replace("Z", "+00:00"))
+
+        service = BillingService(db)
+        billing = service.get_user_billing_for_period(current_user.id, target_date)
+
+        if not billing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No billing record found for date {date}",
+            )
+
+        return SingleResponse(
+            result=UserBillingSchema.from_orm(billing),
+            message=f"Retrieved billing record for {date}",
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid date format: {e}",
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving billing for period {date}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve billing record for period",
+        )

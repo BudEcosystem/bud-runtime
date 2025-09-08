@@ -29,16 +29,30 @@ def calculate_billing_cycle(
     if created_at.tzinfo is None:
         created_at = created_at.replace(tzinfo=timezone.utc)
 
-    # Calculate months since creation
+    # Calculate which billing cycle we're in
+    # Start from the creation date and find the cycle that contains reference_date
+
+    # Calculate rough months since creation to get close to the right cycle
     months_since_start = (reference_date.year - created_at.year) * 12 + (reference_date.month - created_at.month)
+
+    # Handle the case where reference_date's day is before created_at's day
+    if reference_date.day < created_at.day:
+        months_since_start -= 1
 
     # Find the start of current billing cycle
     cycle_start = created_at + relativedelta(months=months_since_start)
     cycle_end = cycle_start + relativedelta(months=1)
 
+    # Verify we're in the right cycle - if reference_date is before cycle_start, go back one cycle
+    if reference_date < cycle_start:
+        months_since_start -= 1
+        cycle_start = created_at + relativedelta(months=months_since_start)
+        cycle_end = cycle_start + relativedelta(months=1)
+
     # If we've passed the cycle end, move to next cycle
-    if reference_date >= cycle_end:
-        cycle_start = cycle_end
+    elif reference_date >= cycle_end:
+        months_since_start += 1
+        cycle_start = created_at + relativedelta(months=months_since_start)
         cycle_end = cycle_start + relativedelta(months=1)
 
     return cycle_start.isoformat(), cycle_end.isoformat()

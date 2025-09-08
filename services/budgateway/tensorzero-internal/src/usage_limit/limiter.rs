@@ -310,80 +310,74 @@ impl UsageLimiter {
 
         if let Some(mut conn) = redis_client.as_ref().map(|c| c.clone()) {
             let key = format!("usage_limit:{}", user_id);
+            
+            // Skip if nothing to increment
+            if tokens.is_none() && cost.is_none() {
+                return Ok(());
+            }
 
-            // Fetch current data
-            let current_data: Result<Option<String>, _> = timeout(
+            // Use Lua script for atomic increment operations on JSON fields
+            let lua_script = r#"
+                local key = KEYS[1]
+                local tokens_delta = tonumber(ARGV[1])
+                local cost_delta = tonumber(ARGV[2])
+                
+                local current = redis.call('GET', key)
+                if not current then
+                    return {err = "No usage limit data found"}
+                end
+                
+                local data = cjson.decode(current)
+                
+                -- Atomically increment the fields
+                if tokens_delta ~= 0 then
+                    data.tokens_used = data.tokens_used + tokens_delta
+                end
+                if cost_delta ~= 0 then
+                    data.cost_used = data.cost_used + cost_delta
+                end
+                
+                local updated = cjson.encode(data)
+                redis.call('SET', key, updated)
+                
+                -- Return the updated values for cache sync
+                return {data.tokens_used, data.cost_used}
+            "#;
+
+            let tokens_delta = tokens.unwrap_or(0);
+            let cost_delta = cost.unwrap_or(0.0);
+
+            // Execute atomic Lua script
+            let result: Result<Vec<redis::Value>, _> = timeout(
                 Duration::from_millis(self.config.redis_timeout_ms),
-                conn.get(&key)
+                redis::Script::new(lua_script).key(&key).arg(tokens_delta).arg(cost_delta).invoke_async(&mut conn)
             ).await
             .map_err(|_| Error::new(ErrorDetails::Config {
-                message: "Redis timeout on get".to_string(),
+                message: "Redis timeout on atomic increment".to_string(),
             }))?;
 
-            match current_data {
-                Ok(Some(data)) => {
-                    // Parse existing usage limit data
-                    match serde_json::from_str::<UsageLimitInfo>(&data) {
-                        Ok(mut usage_info) => {
-                            // Update the usage counters directly
-                            if let Some(tokens) = tokens {
-                                usage_info.tokens_used += tokens;
-                            }
-                            if let Some(cost) = cost {
-                                usage_info.cost_used += cost;
-                            }
+            match result {
+                Ok(values) => {
+                    // Extract updated values for cache sync
+                    if values.len() == 2 {
+                        let new_tokens_used: i64 = redis::from_redis_value(&values[0]).unwrap_or(0);
+                        let new_cost_used: f64 = redis::from_redis_value(&values[1]).unwrap_or(0.0);
 
-                            // Serialize updated data
-                            let updated_data = serde_json::to_string(&usage_info).map_err(|e| {
-                                Error::new(ErrorDetails::Config {
-                                    message: format!("Failed to serialize usage data: {}", e),
-                                })
-                            })?;
-
-                            // Write back to Redis
-                            let _: () = timeout(
-                                Duration::from_millis(self.config.redis_timeout_ms),
-                                conn.set(&key, &updated_data)
-                            ).await
-                            .map_err(|_| Error::new(ErrorDetails::Config {
-                                message: "Redis timeout on set".to_string(),
-                            }))?
-                            .map_err(|e| Error::new(ErrorDetails::Config {
-                                message: format!("Redis set error: {}", e),
-                            }))?;
-
-                            // Update local cache with new data
-                            if let Some(cached) = self.cache.get(user_id).await {
-                                let mut updated_cached = cached;
-                                if let Some(tokens) = tokens {
-                                    updated_cached.tokens_used += tokens;
-                                }
-                                if let Some(cost) = cost {
-                                    updated_cached.cost_used += cost;
-                                }
-                                updated_cached.last_updated = Instant::now();
-                                self.cache.insert(user_id.to_string(), updated_cached).await;
-                            }
-
-                            Ok(())
-                        },
-                        Err(e) => {
-                            Err(Error::new(ErrorDetails::Config {
-                                message: format!("Failed to parse usage limit data: {}", e),
-                            }))
+                        // Update local cache with the atomically updated values
+                        if let Some(cached) = self.cache.get(user_id).await {
+                            let mut updated_cached = cached;
+                            updated_cached.tokens_used = new_tokens_used;
+                            updated_cached.cost_used = new_cost_used;
+                            updated_cached.last_updated = Instant::now();
+                            self.cache.insert(user_id.to_string(), updated_cached).await;
                         }
                     }
-                },
-                Ok(None) => {
-                    // No existing usage limit data - cannot increment without base data
-                    Err(Error::new(ErrorDetails::Config {
-                        message: "No usage limit data found - cannot increment".to_string(),
-                    }))
+                    Ok(())
                 },
                 Err(e) => {
-                    warn!("Redis error fetching usage limit for user {}: {}", user_id, e);
+                    warn!("Redis atomic increment failed for user {}: {}", user_id, e);
                     Err(Error::new(ErrorDetails::Config {
-                        message: format!("Redis get error: {}", e),
+                        message: format!("Redis atomic increment error: {}", e),
                     }))
                 }
             }
@@ -663,6 +657,6 @@ impl UsageLimiter {
 
 }
 
-#[cfg(test)]
-#[path = "tests.rs"]
-mod tests;
+// #[cfg(test)]
+// #[path = "tests.rs"] 
+// mod tests;

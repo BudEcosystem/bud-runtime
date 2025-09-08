@@ -44,6 +44,13 @@ class UserBillingSchema(BaseModel):
     is_active: bool
     is_suspended: bool
     suspension_reason: Optional[str]
+
+    # Historical tracking fields
+    is_current: bool
+    cycle_number: int
+    superseded_at: Optional[datetime] = None
+    superseded_by_id: Optional[UUID] = None
+
     created_at: datetime
     modified_at: datetime
 

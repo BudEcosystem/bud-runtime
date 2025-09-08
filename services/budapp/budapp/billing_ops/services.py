@@ -85,8 +85,27 @@ class BillingService(DataManagerUtils):
             }
 
     def get_user_billing(self, user_id: UUID) -> Optional[UserBilling]:
-        """Get user billing information."""
-        stmt = select(UserBilling).where(UserBilling.user_id == user_id)
+        """Get current user billing information."""
+        stmt = select(UserBilling).where(UserBilling.user_id == user_id, UserBilling.is_current, UserBilling.is_active)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    def get_user_billing_history(self, user_id: UUID) -> List[UserBilling]:
+        """Get all billing history for a user, ordered by creation date."""
+        stmt = (
+            select(UserBilling)
+            .where(UserBilling.user_id == user_id, UserBilling.is_active)
+            .order_by(UserBilling.created_at.desc())
+        )
+        return list(self.session.execute(stmt).scalars().all())
+
+    def get_user_billing_for_period(self, user_id: UUID, date: datetime) -> Optional[UserBilling]:
+        """Get user billing record that was active during a specific date."""
+        stmt = select(UserBilling).where(
+            UserBilling.user_id == user_id,
+            UserBilling.billing_period_start <= date,
+            UserBilling.billing_period_end > date,
+            UserBilling.is_active,
+        )
         return self.session.execute(stmt).scalar_one_or_none()
 
     def get_billing_plan(self, plan_id: UUID) -> Optional[BillingPlan]:
@@ -259,7 +278,7 @@ class BillingService(DataManagerUtils):
             from budapp.billing_ops.models import UserBilling
             from budapp.billing_ops.utils import calculate_billing_cycle
 
-            user_billing = self.session.query(UserBilling).filter_by(user_id=user_id).first()
+            user_billing = self.get_user_billing(user_id)
             if user_billing and user_billing.created_at:
                 billing_cycle_start, billing_cycle_end = calculate_billing_cycle(user_billing.created_at)
 
@@ -275,6 +294,32 @@ class BillingService(DataManagerUtils):
                 cost_used = 0.0
                 # prev_tokens_used and prev_cost_used already set from existing data above
                 logger.info(f"Billing cycle reset for user {user_id}: new cycle starts {billing_cycle_start}")
+
+                # Also create new billing cycle if needed
+                user_billing = self.get_user_billing(user_id)
+                if user_billing and billing_cycle_start and billing_cycle_end:
+                    try:
+                        from datetime import datetime, timezone
+
+                        cycle_start_dt = datetime.fromisoformat(billing_cycle_start.replace("Z", "+00:00"))
+                        cycle_end_dt = datetime.fromisoformat(billing_cycle_end.replace("Z", "+00:00"))
+
+                        # Ensure timezone aware
+                        if cycle_start_dt.tzinfo is None:
+                            cycle_start_dt = cycle_start_dt.replace(tzinfo=timezone.utc)
+                        if cycle_end_dt.tzinfo is None:
+                            cycle_end_dt = cycle_end_dt.replace(tzinfo=timezone.utc)
+
+                        # Create new billing cycle if database is behind
+                        if (
+                            user_billing.billing_period_start != cycle_start_dt
+                            or user_billing.billing_period_end != cycle_end_dt
+                        ):
+                            # Create new billing cycle entry (preserves history)
+                            self.create_next_billing_cycle(user_id)
+                            logger.info(f"Synchronized database billing period for user {user_id}")
+                    except Exception as e:
+                        logger.warning(f"Failed to update database billing period for user {user_id}: {e}")
 
         # Determine usage limit status with new format
         usage_limit_info = {
@@ -519,15 +564,25 @@ class BillingService(DataManagerUtils):
         custom_cost_quota: Optional[Decimal] = None,
     ) -> UserBilling:
         """Create billing configuration for a user."""
-        # Calculate billing period (monthly)
-        now = datetime.now(timezone.utc)
-        billing_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        from dateutil.relativedelta import relativedelta
 
-        # Get next month
-        if billing_period_start.month == 12:
-            billing_period_end = billing_period_start.replace(year=billing_period_start.year + 1, month=1)
+        # Calculate billing period (monthly) - start from current time
+        now = datetime.now(timezone.utc)
+        billing_period_start = now
+        billing_period_end = now + relativedelta(months=1)
+
+        # Check if there's an existing current billing record
+        existing_current = self.get_user_billing(user_id)
+
+        # Determine cycle number
+        if existing_current:
+            # This should not happen normally, but handle it
+            cycle_number = existing_current.cycle_number + 1
+            logger.warning(f"Creating new billing record for user {user_id} while current record exists")
         else:
-            billing_period_end = billing_period_start.replace(month=billing_period_start.month + 1)
+            # Check for any historical records to get the next cycle number
+            history = self.get_user_billing_history(user_id)
+            cycle_number = (max(b.cycle_number for b in history) + 1) if history else 1
 
         user_billing = UserBilling(
             user_id=user_id,
@@ -536,11 +591,18 @@ class BillingService(DataManagerUtils):
             billing_period_end=billing_period_end,
             custom_token_quota=custom_token_quota,
             custom_cost_quota=custom_cost_quota,
+            is_current=True,
+            cycle_number=cycle_number,
         )
 
         self.session.add(user_billing)
         self.session.commit()
         self.session.refresh(user_billing)
+
+        logger.info(
+            f"Created billing record for user {user_id}, cycle {cycle_number}: "
+            f"{billing_period_start.isoformat()} to {billing_period_end.isoformat()}"
+        )
 
         return user_billing
 
@@ -559,21 +621,80 @@ class BillingService(DataManagerUtils):
         self.session.commit()
         logger.info(f"Reset {len(alerts)} alerts for user_billing_id {user_billing_id}")
 
-    def update_billing_period(self, user_billing: UserBilling) -> None:
-        """Update billing period to next month."""
-        user_billing.billing_period_start = user_billing.billing_period_end
+    def create_next_billing_cycle(self, user_id: UUID) -> UserBilling:
+        """Create a new billing cycle entry for a user, preserving the previous one as history."""
+        from datetime import datetime, timezone
 
-        # Calculate next period end
-        if user_billing.billing_period_end.month == 12:
-            user_billing.billing_period_end = user_billing.billing_period_end.replace(
-                year=user_billing.billing_period_end.year + 1, month=1
-            )
-        else:
-            user_billing.billing_period_end = user_billing.billing_period_end.replace(
-                month=user_billing.billing_period_end.month + 1
-            )
+        from budapp.billing_ops.utils import calculate_billing_cycle
 
-        # Reset alerts when billing period updates
-        self.reset_user_alerts(user_billing.id)
+        # Get current billing record
+        current_billing = self.get_user_billing(user_id)
+        if not current_billing:
+            raise ValueError(f"No current billing record found for user {user_id}")
 
+        # Calculate the next billing cycle
+        now = datetime.now(timezone.utc)
+        cycle_start_str, cycle_end_str = calculate_billing_cycle(current_billing.created_at, reference_date=now)
+
+        if not cycle_start_str or not cycle_end_str:
+            raise ValueError(f"Failed to calculate next billing cycle for user {user_id}")
+
+        # Parse cycle dates
+        cycle_start = datetime.fromisoformat(cycle_start_str.replace("Z", "+00:00"))
+        cycle_end = datetime.fromisoformat(cycle_end_str.replace("Z", "+00:00"))
+
+        # Ensure timezone aware
+        if cycle_start.tzinfo is None:
+            cycle_start = cycle_start.replace(tzinfo=timezone.utc)
+        if cycle_end.tzinfo is None:
+            cycle_end = cycle_end.replace(tzinfo=timezone.utc)
+
+        # Create new billing cycle entry
+        new_billing = UserBilling(
+            user_id=user_id,
+            billing_plan_id=current_billing.billing_plan_id,
+            billing_period_start=cycle_start,
+            billing_period_end=cycle_end,
+            custom_token_quota=current_billing.custom_token_quota,  # Inherit current settings
+            custom_cost_quota=current_billing.custom_cost_quota,
+            enable_email_notifications=current_billing.enable_email_notifications,
+            enable_in_app_notifications=current_billing.enable_in_app_notifications,
+            is_active=True,
+            is_suspended=current_billing.is_suspended,
+            suspension_reason=current_billing.suspension_reason,
+            is_current=True,
+            cycle_number=current_billing.cycle_number + 1,
+        )
+
+        # Mark the current billing as superseded
+        superseded_at = datetime.now(timezone.utc)
+        current_billing.is_current = False
+        current_billing.superseded_at = superseded_at
+        # We'll set superseded_by_id after we get the new record ID
+
+        # Add new record to session
+        self.session.add(new_billing)
+        self.session.flush()  # Get the ID without committing
+
+        # Now set the superseded_by reference
+        current_billing.superseded_by_id = new_billing.id
+
+        # Reset alerts for the new billing cycle
+        self.reset_user_alerts(new_billing.id)
+
+        # Commit all changes
         self.session.commit()
+        self.session.refresh(new_billing)
+
+        logger.info(
+            f"Created new billing cycle for user {user_id}, cycle {new_billing.cycle_number}: "
+            f"{cycle_start.isoformat()} to {cycle_end.isoformat()}"
+        )
+        logger.info(f"Superseded previous cycle {current_billing.cycle_number} at {superseded_at.isoformat()}")
+
+        return new_billing
+
+    def update_billing_period(self, user_billing: UserBilling) -> None:
+        """Deprecated method - use create_next_billing_cycle instead."""
+        logger.warning("update_billing_period is deprecated, use create_next_billing_cycle instead")
+        self.create_next_billing_cycle(user_billing.user_id)

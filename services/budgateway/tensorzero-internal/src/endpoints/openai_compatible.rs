@@ -176,9 +176,6 @@ pub async fn inference_handler(
     // Check usage limits BEFORE processing the request
     if let Some(usage_limiter) = &usage_limiter {
         if let Some(user_id) = headers.get("x-tensorzero-user-id").and_then(|v| v.to_str().ok()) {
-            // Force fresh data by clearing cache for this user to avoid stale data
-            usage_limiter.clear_user_cache(user_id).await;
-
             let usage_decision = usage_limiter.check_usage(user_id, None, None).await;
 
             if !usage_decision.is_allowed() {
