@@ -133,7 +133,7 @@ class UsageResetService:
 
             from budapp.billing_ops.models import UserBilling
 
-            stmt = select(UserBilling).where(UserBilling.is_current, ~UserBilling.is_suspended, UserBilling.is_active)
+            stmt = select(UserBilling).where(UserBilling.is_current, UserBilling.is_suspended.is_(False), UserBilling.is_active)
             active_billings = self.session.execute(stmt).scalars().all()
 
             reset_count = 0
@@ -169,7 +169,7 @@ class UsageResetService:
 
             from budapp.billing_ops.models import UserBilling
 
-            stmt = select(UserBilling).where(UserBilling.is_current, ~UserBilling.is_suspended, UserBilling.is_active)
+            stmt = select(UserBilling).where(UserBilling.is_current, UserBilling.is_suspended.is_(False), UserBilling.is_active)
             active_billings = self.session.execute(stmt).scalars().all()
 
             for billing in active_billings:
