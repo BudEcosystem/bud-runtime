@@ -1,4 +1,5 @@
-import { notification, Space } from "antd";
+import { Space } from "antd";
+import type { NotificationInstance } from "antd/es/notification/interface";
 import { PrimaryButton, SecondaryButton } from "../ui/bud/form/Buttons";
 import { Text_12_400_757575, Text_14_400_EEEEEE } from "../ui/text";
 
@@ -8,6 +9,7 @@ interface openWarningProps {
   deleteDisabled?: boolean;
   onDelete?: () => void;
   onCancel?: () => void;
+  notification: NotificationInstance;
 }
 
 export const openWarning = ({
@@ -16,10 +18,14 @@ export const openWarning = ({
   onDelete,
   onCancel,
   deleteDisabled = false,
+  notification,
 }: openWarningProps) => {
   const key = `${title}-delete-notification`;
 
   const updateNotificationMessage = (newDescription: string) => {
+    // Check if light theme is active
+    const isLightTheme = document.documentElement.getAttribute('data-theme') === 'light';
+
     notification.open({
       key,
       message: (
@@ -35,8 +41,20 @@ export const openWarning = ({
             }}
           />
           <div className="flex flex-col gap-y-[12px] pt-[5px]">
-            <Text_14_400_EEEEEE>{title}</Text_14_400_EEEEEE>
-            <Text_12_400_757575>{newDescription}</Text_12_400_757575>
+            <div style={{
+              color: isLightTheme ? '#1A1A1A' : '#EEEEEE',
+              fontSize: '14px',
+              fontWeight: 400
+            }}>
+              {title}
+            </div>
+            <div style={{
+              color: isLightTheme ? '#666666' : '#757575',
+              fontSize: '12px',
+              fontWeight: 400
+            }}>
+              {newDescription}
+            </div>
           </div>
         </div>
       ),
@@ -45,12 +63,12 @@ export const openWarning = ({
       closeIcon: null,
       style: {
         width: "30.9375rem",
-        background: "#101010",
+        background: isLightTheme ? '#FFFFFF' : '#101010',
         borderRadius: 6,
-        border: "1px solid #1F1F1F",
+        border: isLightTheme ? '1px solid #E0E0E0' : '1px solid #1F1F1F',
         backdropFilter: "blur(10px)",
       },
-      btn: (
+      actions: (
         <Space>
           <SecondaryButton
             text="Cancel"

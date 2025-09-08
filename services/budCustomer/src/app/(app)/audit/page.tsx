@@ -776,7 +776,7 @@ export default function AuditPage() {
               prefix={<SearchOutlined className="text-bud-text-disabled" />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="w-80 bg-bud-bg-tertiary border-bud-border-secondary"
+              className="w-80 bg-bud-bg-tertiary border-bud-border-secondary text-bud-text-primary placeholder:text-bud-text-disabled"
               allowClear
             />
             <ConfigProvider theme={themeConfig}>

@@ -434,14 +434,10 @@ class BillingService(DataManagerUtils):
 
     def get_billing_alerts(self, user_id: UUID) -> List[BillingAlert]:
         """Get all billing alerts for a user, ordered by threshold percent."""
-        user_billing = self.get_user_billing(user_id)
-        if not user_billing:
-            return []
-
         stmt = (
             select(BillingAlert)
             .where(
-                BillingAlert.user_billing_id == user_billing.id,
+                BillingAlert.user_id == user_id,
                 BillingAlert.is_active,
             )
             .order_by(BillingAlert.threshold_percent)
@@ -606,9 +602,9 @@ class BillingService(DataManagerUtils):
 
         return user_billing
 
-    def reset_user_alerts(self, user_billing_id: UUID) -> None:
-        """Reset all alerts for a user billing (used when billing cycle resets or quota changes)."""
-        stmt = select(BillingAlert).where(BillingAlert.user_billing_id == user_billing_id, BillingAlert.is_active)
+    def reset_user_alerts(self, user_id: UUID) -> None:
+        """Reset all alerts for a user (used when billing cycle resets or quota changes)."""
+        stmt = select(BillingAlert).where(BillingAlert.user_id == user_id, BillingAlert.is_active)
         alerts = self.session.execute(stmt).scalars().all()
 
         for alert in alerts:
@@ -619,7 +615,32 @@ class BillingService(DataManagerUtils):
             alert.last_notification_error = None
 
         self.session.commit()
-        logger.info(f"Reset {len(alerts)} alerts for user_billing_id {user_billing_id}")
+        logger.info(f"Reset {len(alerts)} alerts for user_id {user_id}")
+
+    def create_billing_alert(self, user_id: UUID, name: str, alert_type: str, threshold_percent: int) -> BillingAlert:
+        """Create a new billing alert with validation."""
+        from fastapi import HTTPException, status
+
+        # Check if alert with same name already exists for this user
+        existing_alert_stmt = select(BillingAlert).where(BillingAlert.user_id == user_id, BillingAlert.name == name)
+        existing_alert = self.session.execute(existing_alert_stmt).scalar_one_or_none()
+
+        if existing_alert:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An alert with this name already exists")
+
+        # Create the new alert
+        alert = BillingAlert(
+            user_id=user_id,
+            name=name,
+            alert_type=alert_type,
+            threshold_percent=threshold_percent,
+        )
+
+        self.session.add(alert)
+        self.session.commit()
+        self.session.refresh(alert)
+
+        return alert
 
     def create_next_billing_cycle(self, user_id: UUID) -> UserBilling:
         """Create a new billing cycle entry for a user, preserving the previous one as history."""

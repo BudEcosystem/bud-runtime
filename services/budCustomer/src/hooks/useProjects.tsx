@@ -117,9 +117,9 @@ export const useProjects = create<{
   getProjects: async (page: any, limit: any, search?: string) => {
     let url;
     if (search) {
-      url = `/projects/?page=${page}&limit=${limit}&search=true&name=${search}&order_by=-created_at`;
+      url = `/projects/?page=${page}&limit=${limit}&project_type=client_app&search=true&name=${search}&order_by=-created_at`;
     } else {
-      url = `/projects/?page=${page}&limit=${limit}&search=false&order_by=-created_at`;
+      url = `/projects/?page=${page}&limit=${limit}&project_type=client_app&search=false&order_by=-created_at`;
     }
     set({ loading: true });
     try {

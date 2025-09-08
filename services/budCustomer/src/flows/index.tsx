@@ -3,7 +3,7 @@ import CreateBatchJob from "./BatchJob/CreateBatchJob";
 import CreateBatchJobSuccess from "./BatchJob/CreateBatchJobSuccess";
 import NewProject from "./NewProject";
 import EditProject from "./EditProject";
-import DeleteProject from "./DeleteProject";
+// import DeleteProject from "./DeleteProject"; // Removed - now using notification warning approach
 import AddNewKey from "./ApiKeys/AddNewKey";
 import ApiKeySuccess from "./ApiKeys/ApiKeySuccess";
 import ViewApiKey from "./ApiKeys/ViewApiKey";
@@ -162,7 +162,7 @@ StepComponents["create-batch-job"] = CreateBatchJob;
 StepComponents["create-batch-job-success"] = CreateBatchJobSuccess;
 StepComponents["new-project"] = NewProject;
 StepComponents["edit-project"] = EditProject;
-StepComponents["delete-project"] = DeleteProject;
+// StepComponents["delete-project"] = DeleteProject; // Removed - now using notification warning approach
 StepComponents["add-new-key"] = AddNewKey;
 StepComponents["api-key-success"] = ApiKeySuccess;
 StepComponents["project-success"] = ProjectSuccess;
