@@ -398,6 +398,11 @@ class TestUserBillingEndpoints:
         new_user_billing.is_active = True
         new_user_billing.is_suspended = False
         new_user_billing.suspension_reason = None
+        # Historical tracking fields (required by UserBillingSchema)
+        new_user_billing.is_current = True
+        new_user_billing.cycle_number = 1
+        new_user_billing.superseded_at = None
+        new_user_billing.superseded_by_id = None
         new_user_billing.created_at = datetime.now(timezone.utc)
         new_user_billing.modified_at = datetime.now(timezone.utc)
         mock_service.create_user_billing.return_value = new_user_billing
@@ -453,6 +458,11 @@ class TestUserBillingEndpoints:
         mock_user_billing.is_active = True
         mock_user_billing.is_suspended = False
         mock_user_billing.suspension_reason = None
+        # Historical tracking fields (required by UserBillingSchema)
+        mock_user_billing.is_current = True
+        mock_user_billing.cycle_number = 1
+        mock_user_billing.superseded_at = None
+        mock_user_billing.superseded_by_id = None
         mock_user_billing.created_at = datetime.now(timezone.utc)
         mock_user_billing.modified_at = datetime.now(timezone.utc)
         mock_service.get_user_billing.return_value = mock_user_billing
