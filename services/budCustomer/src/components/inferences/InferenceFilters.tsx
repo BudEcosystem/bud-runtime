@@ -332,7 +332,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({ projectId, onFilter
               <div style={{ marginLeft: '16px', display: 'inline-flex', alignItems: 'center' }}>
                 <span className="text-[black] dark:text-[#EEEEEE]" style={{ marginRight: '8px' }}>Show only successful:</span>
                 <Form.Item name="isSuccess" valuePropName="checked" noStyle>
-                  <Switch className="bg-[#1F1F1F]" />
+                  <Switch />
                 </Form.Item>
               </div>
             </Space>

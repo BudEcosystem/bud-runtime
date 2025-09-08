@@ -1359,6 +1359,46 @@ class ClickHouseClient:
             # Execute the insert with data
             await cursor.execute(query, data)
 
+    @staticmethod
+    def rows_to_dicts(rows: list[tuple], column_descriptions: Any) -> list[dict[str, Any]]:
+        """Convert query result rows to dictionaries using column descriptions.
+
+        Args:
+            rows: List of tuples from execute_query result
+            column_descriptions: Column descriptions from cursor.description
+
+        Returns:
+            List of dictionaries with column names as keys
+        """
+        if not rows or not column_descriptions:
+            return []
+
+        # Extract column names from descriptions
+        # cursor.description format: [(name, type_code, display_size, internal_size, precision, scale, null_ok), ...]
+        column_names = [desc[0] for desc in column_descriptions]
+
+        # Convert each row to dictionary
+        return [dict(zip(column_names, row, strict=True)) for row in rows]
+
+    @staticmethod
+    def row_to_dict(row: tuple, column_descriptions: Any) -> dict[str, Any]:
+        """Convert single query result row to dictionary using column descriptions.
+
+        Args:
+            row: Single tuple from execute_query result
+            column_descriptions: Column descriptions from cursor.description
+
+        Returns:
+            Dictionary with column names as keys
+        """
+        if not row or not column_descriptions:
+            return {}
+
+        # Extract column names from descriptions
+        column_names = [desc[0] for desc in column_descriptions]
+
+        return dict(zip(column_names, row, strict=True))
+
     async def get_pool_stats(self) -> dict[str, Any]:
         """Get connection pool statistics."""
         if not self._pool:

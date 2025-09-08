@@ -29,6 +29,7 @@ export interface BudInputProps {
 function CustomSelect(props: BudInputProps) {
   const { effectiveTheme } = useTheme();
   const isLight = effectiveTheme === "light";
+
   return (
     <div
       className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0] hover:bg-[#FFFFFF08] ${props.ClassNames}`}
@@ -57,11 +58,12 @@ function CustomSelect(props: BudInputProps) {
           </div>
         </div>
       )}
-      <div className="custom-select-two w-full rounded-[6px] relative">
+      <div className="custom-select-two bud-custom-select w-full rounded-[6px] relative">
         <ConfigProvider
           theme={{
             token: {
               colorTextPlaceholder: '#808080',
+              colorText: isLight ? '#1a1a1a' : '#EEEEEE',
             },
           }}
         >
@@ -77,11 +79,12 @@ function CustomSelect(props: BudInputProps) {
             }}
             value={props.value || null}
             size="large"
-            className={`drawerInp !bg-[transparent] text-[black] dark:text-[#EEEEEE] font-[300] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#CFCFCF] focus:border-[#CFCFCF] active:border-[#CFCFCF] ${props.InputClasses}`}
+            className={`drawerInp !bg-[transparent] !text-[#1a1a1a] dark:!text-[#EEEEEE] font-[300] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#CFCFCF] focus:border-[#CFCFCF] active:border-[#CFCFCF] ${props.InputClasses}`}
             options={props.selectOptions}
             onChange={(value) => {
               props.onChange?.(value)
             }}
+            popupClassName="bud-custom-select-dropdown"
             suffixIcon={
               <img
                 src={`/icons/customArrow.png`}

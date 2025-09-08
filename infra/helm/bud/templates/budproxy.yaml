@@ -6,12 +6,17 @@ data:
   tensorzero.toml: |
     [gateway]
     bind_address = "0.0.0.0:3000"
+    debug = true
 
     [gateway.rate_limits]
     enabled = true
 
+    [gateway.blocking]
+    enabled = true
+
     [gateway.analytics]
     enabled = true
+    geoip_db_path = "/app/geo/GeoLite2-City.mmdb"
 
     [gateway.observability.kafka]
     enabled = true
@@ -50,7 +55,7 @@ spec:
       containers:
         - name: budproxy
           image: {{ .Values.microservices.budproxy.image }}
-          imagePullPolicy: Always
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           command: ["gateway"]
           args:
             - --config-file=/app/config/tensorzero.toml

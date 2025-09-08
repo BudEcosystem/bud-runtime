@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import UserColorEnum, UserRoleEnum, UserStatusEnum
+from budapp.commons.constants import UserColorEnum, UserRoleEnum, UserStatusEnum, UserTypeEnum
 from budapp.commons.database import engine
 from budapp.commons.keycloak import KeycloakManager
 from budapp.initializers.base_seeder import BaseSeeder
@@ -181,6 +181,7 @@ class BaseKeycloakSeeder(BaseSeeder):
                     first_login=True,
                     status=UserStatusEnum.ACTIVE.value,
                     role=UserRoleEnum.SUPER_ADMIN.value,
+                    user_type=UserTypeEnum.ADMIN.value,
                 )
                 db_user = await UserDataManager(session).insert_one(db_user)
                 logger.info(f"::KEYCLOAK::User created in DB with ID {db_user.id}")

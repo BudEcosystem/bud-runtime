@@ -51,7 +51,7 @@ function DeploymentListTable() {
     const [searchValue, setSearchValue] = useState('');
     const router = useRouter()
     const { projectId } = router.query; // Access the dynamic part of the route
-    const { endPoints, getEndPoints, deleteEndPoint, loading, getEndpointClusterDetails, setPageSource, publishEndpoint } = useEndPoints();
+    const { endPoints, getEndPoints, deleteEndPoint, loading, getEndpointClusterDetails, setPageSource } = useEndPoints();
     const [order, setOrder] = useState<'-' | ''>('');
     const [orderBy, setOrderBy] = useState<string>('created_at');
     const { hasProjectPermission, hasPermission } = useUser();
@@ -229,23 +229,8 @@ function DeploymentListTable() {
                                                     return;
                                                 }
 
-                                                try {
-                                                    // Publish the endpoint
-                                                    await publishEndpoint(record.id, {
-                                                        action: "publish",
-                                                        pricing: {
-                                                            input_cost: 0,
-                                                            output_cost: 0,
-                                                            currency: "USD",
-                                                            per_tokens: 1000
-                                                        }
-                                                    });
-                                                    // Refresh the data to get updated is_published status
-                                                    await getData();
-                                                    successToast('Endpoint published successfully');
-                                                } catch (error) {
-                                                    errorToast('Failed to publish endpoint');
-                                                }
+                                                // Open the publish drawer with the endpoint details
+                                                openDrawer('publish-endpoint', { endpoint: record });
                                             }}
                                         >
                                             {record.is_deprecated ? 'Deprecated' : 'Publish'}

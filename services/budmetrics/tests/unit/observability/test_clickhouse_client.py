@@ -286,3 +286,144 @@ class TestClickHouseClient:
         assert call_args[0][0] == "test_async_operation"
         assert isinstance(call_args[0][1], float)  # Execution time
         assert call_args[0][1] >= 0.01  # Should be at least the sleep time
+
+
+class TestClickHouseClientHelpers:
+    """Test cases for ClickHouseClient helper methods."""
+
+    def test_row_to_dict_basic(self):
+        """Test basic row to dict conversion."""
+        # Mock column descriptions (name, type_code, display_size, internal_size, precision, scale, null_ok)
+        column_descriptions = [
+            ("id", "UUID", None, None, None, None, True),
+            ("name", "String", None, None, None, None, True),
+            ("count", "UInt32", None, None, None, None, False)
+        ]
+
+        # Test row
+        row = ("123e4567-e89b-12d3-a456-426614174000", "test_name", 42)
+
+        # Convert to dict
+        result = ClickHouseClient.row_to_dict(row, column_descriptions)
+
+        expected = {
+            "id": "123e4567-e89b-12d3-a456-426614174000",
+            "name": "test_name",
+            "count": 42
+        }
+
+        assert result == expected
+
+    def test_row_to_dict_empty_row(self):
+        """Test row to dict conversion with empty row."""
+        column_descriptions = [("id", "UUID", None, None, None, None, True)]
+
+        result = ClickHouseClient.row_to_dict((), column_descriptions)
+        assert result == {}
+
+        result = ClickHouseClient.row_to_dict(None, column_descriptions)
+        assert result == {}
+
+    def test_row_to_dict_empty_descriptions(self):
+        """Test row to dict conversion with empty column descriptions."""
+        row = ("test", 123)
+
+        result = ClickHouseClient.row_to_dict(row, [])
+        assert result == {}
+
+        result = ClickHouseClient.row_to_dict(row, None)
+        assert result == {}
+
+    def test_rows_to_dicts_multiple_rows(self):
+        """Test conversion of multiple rows to dictionaries."""
+        column_descriptions = [
+            ("id", "UUID", None, None, None, None, True),
+            ("name", "String", None, None, None, None, True),
+            ("active", "Bool", None, None, None, None, False)
+        ]
+
+        rows = [
+            ("id1", "name1", True),
+            ("id2", "name2", False),
+            ("id3", "name3", None)
+        ]
+
+        result = ClickHouseClient.rows_to_dicts(rows, column_descriptions)
+
+        expected = [
+            {"id": "id1", "name": "name1", "active": True},
+            {"id": "id2", "name": "name2", "active": False},
+            {"id": "id3", "name": "name3", "active": None}
+        ]
+
+        assert result == expected
+
+    def test_rows_to_dicts_empty_input(self):
+        """Test rows to dicts conversion with empty input."""
+        column_descriptions = [("id", "UUID", None, None, None, None, True)]
+
+        result = ClickHouseClient.rows_to_dicts([], column_descriptions)
+        assert result == []
+
+        result = ClickHouseClient.rows_to_dicts(None, column_descriptions)
+        assert result == []
+
+    def test_row_to_dict_with_nulls(self):
+        """Test row to dict conversion with null values."""
+        column_descriptions = [
+            ("id", "UUID", None, None, None, None, False),
+            ("optional_field", "String", None, None, None, None, True),
+            ("nullable_int", "Nullable(Int32)", None, None, None, None, True)
+        ]
+
+        row = ("123", None, None)
+
+        result = ClickHouseClient.row_to_dict(row, column_descriptions)
+
+        expected = {
+            "id": "123",
+            "optional_field": None,
+            "nullable_int": None
+        }
+
+        assert result == expected
+
+    def test_gateway_analytics_column_structure(self):
+        """Test that helper functions work with realistic GatewayAnalytics-like data."""
+        # Simulate the column structure from our actual query
+        column_descriptions = [
+            ("inference_id", "UUID", None, None, None, None, False),
+            ("timestamp", "DateTime", None, None, None, None, False),
+            ("model_name", "String", None, None, None, None, True),
+            ("endpoint_type", "String", None, None, None, None, True),
+            ("client_ip", "String", None, None, None, None, True),
+            ("country_code", "Nullable(String)", None, None, None, None, True),
+            ("user_agent", "Nullable(String)", None, None, None, None, True),
+            ("gateway_processing_ms", "Nullable(UInt32)", None, None, None, None, True),
+            ("tags", "Map(String, String)", None, None, None, None, True)
+        ]
+
+        row = (
+            "123e4567-e89b-12d3-a456-426614174000",
+            "2025-01-15 10:30:00",
+            "gpt-4",
+            "chat",
+            "192.168.1.1",
+            "US",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            150,
+            {"env": "prod", "version": "1.0"}
+        )
+
+        result = ClickHouseClient.row_to_dict(row, column_descriptions)
+
+        # Test that we can access fields by name instead of index
+        assert result["inference_id"] == "123e4567-e89b-12d3-a456-426614174000"
+        assert result["endpoint_type"] == "chat"
+        assert result["client_ip"] == "192.168.1.1"
+        assert result["country_code"] == "US"
+        assert result["gateway_processing_ms"] == 150
+        assert result["tags"]["env"] == "prod"
+
+        # This demonstrates the robustness - we can access by name
+        # even if column order changes or new columns are added

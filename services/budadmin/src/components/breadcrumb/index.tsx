@@ -1,17 +1,17 @@
-import { ChevronLeftIcon, SlashIcon } from '@radix-ui/react-icons';
-import { Flex } from '@radix-ui/themes';
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
-import { Text_14_400_5B6168, Text_14_400_965CDE } from '../ui/text';
+import { ChevronLeftIcon, SlashIcon } from "@radix-ui/react-icons";
+import { Flex } from "@radix-ui/themes";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import { Text_14_400_5B6168, Text_14_400_965CDE } from "../ui/text";
 
 type Props = {
   previousRoute?: string;
 };
 
 const routeNameMapping: { [key: string]: string } = {
-  modelRepo: 'Models',
-  benchmarkHistory: 'Benchmark history',
-  benchmarkResult: 'Benchmark Result',
+  modelRepo: "Models",
+  benchmarkHistory: "Benchmark history",
+  benchmarkResult: "Benchmark Result",
 };
 const Breadcrumb = ({ previousRoute }: Props) => {
   const [breadcrumbs, setBreadcrumbs] = useState<
@@ -20,15 +20,15 @@ const Breadcrumb = ({ previousRoute }: Props) => {
   const router = useRouter();
 
   useEffect(() => {
-    const pathWithoutQuery = router.asPath.split('?')[0];
+    const pathWithoutQuery = router.asPath.split("?")[0];
     const pathSegments = pathWithoutQuery
-      .split('/')
+      .split("/")
       .filter((segment) => segment);
     const breadcrumbs = pathSegments.map((segment, index) => {
-      const href = '/' + pathSegments.slice(0, index + 1).join('/');
+      const href = "/" + pathSegments.slice(0, index + 1).join("/");
       let text =
         routeNameMapping[segment] ||
-        segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
+        segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " ");
       return { href, text };
     });
 

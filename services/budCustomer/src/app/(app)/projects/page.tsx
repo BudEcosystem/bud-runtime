@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Card, Row, Col, Flex, Dropdown, Button, Spin } from "antd";
+import { Card, Row, Col, Flex, Dropdown, Button, Spin, App } from "antd";
 import { Typography } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
 import { PrimaryButton } from "@/components/ui/button";
@@ -12,6 +12,11 @@ import { useProjects } from "@/hooks/useProjects";
 import { useDrawer } from "@/hooks/useDrawer";
 import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
 import SearchHeaderInput from "@/flows/components/SearchHeaderInput";
+import styles from "./projects.module.scss";
+import { motion } from "framer-motion";
+import { useEndPoints } from "@/hooks/useEndPoint";
+import { openWarning } from "@/components/warningMessage";
+import { useOverlay } from "@/context/overlayContext";
 
 const { Text, Title } = Typography;
 
@@ -131,10 +136,13 @@ const ProjectCard = React.memo(({
 ProjectCard.displayName = "ProjectCard";
 
 export default function ProjectsPage() {
-  const { globalProjects, getGlobalProjects, loading, getGlobalProject } =
+  const { globalProjects, getGlobalProjects, loading, getGlobalProject, deleteProject } =
     useProjects();
 
   const { openDrawer } = useDrawer();
+  const { getEndPoints, endPointsCount } = useEndPoints();
+  const { notification } = App.useApp();
+  const { setOverlayVisible } = useOverlay();
   const [searchValue, setSearchValue] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
@@ -215,23 +223,66 @@ export default function ProjectsPage() {
   }, [getGlobalProject, openDrawer]);
 
   const handleDeleteProject = useCallback(async (project: ContextProject) => {
+    console.log("Delete clicked for project:", project);
+
     try {
-      // Fetch the full project data from API
-      const projectData = globalProjects.find(
-        (p) => p.project.id === project.id,
-      );
-      if (projectData) {
-        // Set the selected project for deletion
-        await getGlobalProject(project.id);
-        // Open the delete drawer after project is fetched
-        setTimeout(() => {
-          openDrawer("delete-project", {});
-        }, 100);
-      }
+      // Set the selected project for deletion
+      await getGlobalProject(project.id);
+
+      // Get endpoints count for this project
+      await getEndPoints({ id: project.id, page: 1, limit: 1 });
+
+      // Set overlay visible first
+      setOverlayVisible(true);
+
+      // Wait a bit for the state to update
+      setTimeout(() => {
+        const count = endPointsCount || 0;
+        console.log("Endpoints count:", count);
+
+        let description =
+          count > 0
+            ? "This project has active resources. Please pause or delete all resources before deleting the project."
+            : "You can safely delete this project.";
+
+        let title =
+          count > 0
+            ? `You're not allowed to delete "${project.name}"`
+            : `You're about to delete "${project.name}"`;
+
+        const updateNotificationMessage = openWarning({
+          title: title,
+          description: description,
+          deleteDisabled: count > 0,
+          notification: notification,
+          onDelete: () => {
+            deleteProject(project.id, null).then((result) => {
+              if (result) {
+                setOverlayVisible(false);
+                notification.destroy(`${title}-delete-notification`);
+                // Refresh the project list
+                getGlobalProjects(currentPage, pageSize, searchValue);
+              } else {
+                updateNotificationMessage("An unknown error occurred.");
+                setOverlayVisible(false);
+              }
+            }).catch((error) => {
+              console.error("Error deleting project:", error);
+              updateNotificationMessage("An unknown error occurred.");
+              setOverlayVisible(false);
+            });
+          },
+          onCancel: () => {
+            setOverlayVisible(false);
+          },
+        });
+      }, 500); // Give time for endpoint count to update
+
     } catch (error) {
-      console.error("Failed to open delete project:", error);
+      console.error("Failed to handle delete project:", error);
+      setOverlayVisible(false);
     }
-  }, [globalProjects, getGlobalProject, openDrawer]);
+  }, [notification, getGlobalProject, getEndPoints, endPointsCount, deleteProject, setOverlayVisible, currentPage, pageSize, searchValue, getGlobalProjects]);
 
   // Filter to only show active projects or all if status is not available
   const activeProjects = projects.filter(
@@ -274,8 +325,34 @@ export default function ProjectsPage() {
 
           {/* Loading State */}
           {loading && activeProjects.length === 0 && (
-            <div className="flex justify-center items-center h-64">
-              <Spin size="large" />
+            <div className="flex justify-center items-center">
+              <div className="w-full flex flex-col gap-6">
+              {[0, 1].map((row) => (
+                <div key={row} className="flex gap-6">
+                {[0, 1, 2].map((col) => (
+                  <div
+                  key={col}
+                  className="flex-1 h-[200px] rounded-lg bg-bud-bg-secondary border-bud-border relative overflow-hidden"
+                  style={{ minWidth: 0 }}
+                  >
+                  {/* Animated light pass */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    <motion.div
+                      className={styles.loadingBar}
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{
+                        duration: 1.5,
+                        ease: "easeInOut",
+                        repeat: Infinity,
+                      }}
+                    />
+                  </div>
+                  </div>
+                ))}
+                </div>
+              ))}
+              </div>
             </div>
           )}
 

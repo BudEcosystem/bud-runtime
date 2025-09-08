@@ -11,6 +11,7 @@ import ansible_runner
 import yaml
 
 from budeval.commons.logging import logging
+from budeval.commons.storage_config import StorageConfig
 
 
 logger = logging.getLogger(__name__)
@@ -112,6 +113,15 @@ class AnsibleOrchestrator:
 
         files, extravars = self._parse_kubeconfig(kubeconfig, temp_id)
 
+        # Ensure namespace is provided to the playbook
+        try:
+            from budeval.commons.storage_config import StorageConfig
+
+            extravars["namespace"] = StorageConfig.get_current_namespace()
+        except Exception:
+            # Fallback to 'default' if storage config is unavailable
+            extravars.setdefault("namespace", "default")
+
         try:
             self._run_ansible_playbook(playbook, temp_id, files, extravars)
             logger.info("::: EVAL Ansible ::: Ansible-based cluster verification succeeded for %s", temp_id)
@@ -127,7 +137,7 @@ class AnsibleOrchestrator:
         kubeconfig: Optional[str],
         engine_args: Dict[str, Any],
         docker_image: str,
-        namespace: str = "budeval",
+        namespace: Optional[str] = None,
         ttl_seconds: int = 600,
     ):
         """Run a job using the specified runner type.
@@ -150,6 +160,11 @@ class AnsibleOrchestrator:
         playbook = playbook_map.get(runner_type.lower())
         if not playbook:
             raise ValueError(f"Unsupported runner_type: {runner_type}")
+
+        # Resolve namespace if not provided
+        if namespace is None:
+            namespace = StorageConfig.get_current_namespace()
+            logger.debug(f"Auto-detected namespace: {namespace}")
 
         job_yaml = self._render_job_yaml(uuid, docker_image, engine_args, namespace, ttl_seconds)
 
@@ -176,7 +191,7 @@ class AnsibleOrchestrator:
         kubeconfig: Optional[str],
         engine_args: Dict[str, Any],
         docker_image: str,
-        namespace: str = "budeval",
+        namespace: Optional[str] = None,
         ttl_seconds: int = 600,
         output_volume_size: str = "5Gi",
     ):
@@ -201,6 +216,11 @@ class AnsibleOrchestrator:
         playbook = playbook_map.get(runner_type.lower())
         if not playbook:
             raise ValueError(f"Unsupported runner_type: {runner_type}")
+
+        # Resolve namespace if not provided
+        if namespace is None:
+            namespace = StorageConfig.get_current_namespace()
+            logger.debug(f"Auto-detected namespace: {namespace}")
 
         # Generate YAML manifest for Job only (no separate output PVC needed)
         job_yaml = self._render_job_with_volumes_yaml(uuid, docker_image, engine_args, namespace, ttl_seconds)
@@ -227,7 +247,7 @@ class AnsibleOrchestrator:
         uuid: str,
         kubeconfig: Optional[str],
         job_config: Dict[str, Any],
-        namespace: str = "budeval",
+        namespace: Optional[str] = None,
     ):
         """Run a job using generic configuration from transformer.
 
@@ -256,6 +276,11 @@ class AnsibleOrchestrator:
         playbook = playbook_map.get(runner_type.lower())
         if not playbook:
             raise ValueError(f"Unsupported runner_type: {runner_type}")
+
+        # Resolve namespace if not provided
+        if namespace is None:
+            namespace = StorageConfig.get_current_namespace()
+            logger.debug(f"Auto-detected namespace: {namespace}")
 
         # Generate YAML manifest for Job only (no separate output PVC needed)
         job_yaml = self._render_generic_job_yaml(uuid, job_config, namespace)
@@ -292,7 +317,7 @@ class AnsibleOrchestrator:
         self,
         uuid: str,
         kubeconfig: Optional[str],
-        namespace: str = "budeval",
+        namespace: Optional[str] = None,
         eval_request_id: Optional[str] = None,
     ):
         """Clean up job resources including volumes and ConfigMaps.
@@ -304,6 +329,11 @@ class AnsibleOrchestrator:
             eval_request_id: Optional evaluation request ID for ConfigMap cleanup.
         """
         playbook = "cleanup_job_resources_k8s.yml"
+
+        # Resolve namespace if not provided
+        if namespace is None:
+            namespace = StorageConfig.get_current_namespace()
+            logger.debug(f"Auto-detected namespace: {namespace}")
 
         files = {}
         extravars = {
@@ -339,7 +369,7 @@ class AnsibleOrchestrator:
         self,
         uuid: str,
         kubeconfig: Optional[str],
-        namespace: str = "budeval",
+        namespace: Optional[str] = None,
     ) -> dict:
         """Get job status.
 
@@ -352,6 +382,11 @@ class AnsibleOrchestrator:
             Dict containing job status information.
         """
         playbook = "get_job_status_k8s.yml"
+
+        # Resolve namespace if not provided
+        if namespace is None:
+            namespace = StorageConfig.get_current_namespace()
+            logger.debug(f"Auto-detected namespace: {namespace}")
 
         files = {}
         extravars = {

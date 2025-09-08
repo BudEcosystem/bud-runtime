@@ -39,6 +39,8 @@ class UserBillingSchema(BaseModel):
     billing_period_end: datetime
     custom_token_quota: Optional[int]
     custom_cost_quota: Optional[Decimal]
+    enable_email_notifications: bool = True
+    enable_in_app_notifications: bool = True
     is_active: bool
     is_suspended: bool
     suspension_reason: Optional[str]
@@ -53,12 +55,15 @@ class BillingAlertSchema(BaseModel):
     """Billing alert schema."""
 
     id: UUID
-    user_billing_id: UUID
+    user_id: UUID
     name: str
     alert_type: str
     threshold_percent: int
     last_triggered_at: Optional[datetime]
     last_triggered_value: Optional[Decimal]
+    last_notification_sent_at: Optional[datetime] = None
+    notification_failure_count: int = 0
+    last_notification_error: Optional[str] = None
     is_active: bool
     created_at: datetime
     modified_at: datetime
@@ -87,6 +92,7 @@ class CurrentUsageSchema(BaseModel):
     billing_period_start: Optional[str]
     billing_period_end: Optional[str]
     plan_name: Optional[str]
+    billing_plan_id: Optional[UUID]
     base_monthly_price: Optional[float]
     usage: Optional[UsageSummarySchema]
     is_suspended: Optional[bool]
@@ -136,3 +142,16 @@ class UsageHistoryRequest(BaseModel):
     end_date: datetime
     granularity: str = Field(default="daily", pattern="^(hourly|daily|weekly|monthly)$")
     project_id: Optional[UUID] = None
+
+
+class UpdateNotificationPreferencesRequest(BaseModel):
+    """Request to update notification preferences."""
+
+    enable_email_notifications: Optional[bool] = None
+    enable_in_app_notifications: Optional[bool] = None
+
+
+class UpdateBillingAlertStatusRequest(BaseModel):
+    """Request to update billing alert status (enable/disable)."""
+
+    is_active: bool

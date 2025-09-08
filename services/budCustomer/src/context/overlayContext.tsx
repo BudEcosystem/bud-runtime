@@ -1,10 +1,10 @@
+"use client";
+
 import React, { createContext, useContext, useState, ReactNode } from "react";
 
 interface OverlayContextType {
-  isOverlayVisible: boolean;
-  showOverlay: () => void;
-  hideOverlay: () => void;
-  toggleOverlay: () => void;
+  isVisible: boolean;
+  setOverlayVisible: (isVisible: boolean) => void;
 }
 
 const OverlayContext = createContext<OverlayContextType | undefined>(undefined);
@@ -24,17 +24,15 @@ interface OverlayProviderProps {
 export const OverlayProvider: React.FC<OverlayProviderProps> = ({
   children,
 }) => {
-  const [isOverlayVisible, setIsOverlayVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
-  const showOverlay = () => setIsOverlayVisible(true);
-  const hideOverlay = () => setIsOverlayVisible(false);
-  const toggleOverlay = () => setIsOverlayVisible((prev) => !prev);
+  const setOverlayVisible = (visible: boolean) => {
+    setIsVisible(visible);
+  };
 
   const value: OverlayContextType = {
-    isOverlayVisible,
-    showOverlay,
-    hideOverlay,
-    toggleOverlay,
+    isVisible,
+    setOverlayVisible,
   };
 
   return (

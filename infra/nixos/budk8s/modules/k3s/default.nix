@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, pkgs, ... }:
 {
   # k3s ingress
   networking.firewall = {
@@ -21,7 +21,13 @@
 
   sops.secrets."k3s_server_token".sopsFile = ./secrets.yaml;
 
+  environment = {
+    variables.KUBECONFIG = "/etc/rancher/k3s/k3s.yaml";
+    systemPackages = [ pkgs.kubernetes-helm ];
+  };
+
   services.k3s = {
+    gracefulNodeShutdown.enable = true;
     enable = true;
     role = "server";
     tokenFile = config.sops.secrets."k3s_server_token".path;
@@ -30,6 +36,7 @@
     extraFlags = [
       "--write-kubeconfig-group users"
       "--write-kubeconfig-mode 0640"
+      "--disable local-storage"
     ];
   };
 }

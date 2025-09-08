@@ -7,14 +7,22 @@
     - kubernetes.core
 
   tasks:
-    - name: List Kubernetes namespaces to verify connectivity
-      kubernetes.core.k8s_info:
-        kind: Namespace
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-      register: ns
-
-    - name: Assert that namespaces were listed successfully
+    - name: Ensure required namespace variable is provided
       assert:
         that:
-          - ns.resources is defined
-        fail_msg: "Failed to connect to Kubernetes cluster: unable to list namespaces"
+          - namespace is defined
+          - namespace | length > 0
+        fail_msg: "Parameter 'namespace' is required and must be non-empty"
+
+    - name: List Pods in target namespace to verify connectivity
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ namespace }}"
+      register: pods
+
+    - name: Assert that pods were listed successfully
+      assert:
+        that:
+          - pods.resources is defined
+        fail_msg: "Failed to connect to Kubernetes cluster: unable to list pods in namespace {{ namespace }}"

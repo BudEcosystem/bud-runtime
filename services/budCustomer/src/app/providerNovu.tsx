@@ -145,11 +145,16 @@ export function NovuCustomProvider({
 }) {
   const { user, getUser: fetchUser } = useUser();
 
+  // Don't initialize Novu until we have a user
+  if (!user?.id) {
+    return <>{children}</>;
+  }
+
   return (
     <NovuProvider
       backendUrl={novuBackendUrl}
       socketUrl={novuSocketUrl}
-      subscriberId={user?.id}
+      subscriberId={String(user.id)}  // Ensure it's a string
       applicationIdentifier={novuAppId || ""}
       styles={styles}
     >

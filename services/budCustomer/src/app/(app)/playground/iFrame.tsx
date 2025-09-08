@@ -3,28 +3,22 @@ import { playGroundUrl, askBudModel, askBudUrl } from "@/config/environment";
 import React, { useEffect, useRef, useState } from "react";
 
 const EmbeddedIframe = ({ singleChat = false }: { singleChat?: boolean }) => {
-  const [accessToken, setAccessToken] = useState("");
   const [refreshToken, setRefreshToken] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  let iframeUrl = `${playGroundUrl}/login?embedded=true&access_token=${accessToken}&refresh_token=${refreshToken}&is_single_chat=${singleChat}`;
+  let iframeUrl = `${playGroundUrl}/login?embedded=true&refresh_token=${refreshToken}&is_single_chat=${singleChat}`;
 
   if (singleChat) {
-    iframeUrl = `${playGroundUrl}/chat?embedded=true&access_token=${accessToken}&refresh_token=${refreshToken}&is_single_chat=${singleChat}`;
+    iframeUrl = `${playGroundUrl}/chat?embedded=true&refresh_token=${refreshToken}&is_single_chat=${singleChat}`;
     iframeUrl += `&model=${askBudModel}&base_url=${askBudUrl}&storage=ask-bud`;
   }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const token =
-        localStorage.getItem("auth_token") ||
-        localStorage.getItem("access_token") ||
-        "";
       const refresh = localStorage.getItem("refresh_token") || "";
 
-      setAccessToken(token);
       setRefreshToken(refresh);
       setIsLoading(false);
 
@@ -56,7 +50,7 @@ const EmbeddedIframe = ({ singleChat = false }: { singleChat?: boolean }) => {
     );
   }
 
-  if (!accessToken) {
+  if (!refreshToken) {
     return (
       <div className="w-full h-full flex items-center justify-center">
         <div className="text-center">
