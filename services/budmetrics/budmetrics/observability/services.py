@@ -665,8 +665,15 @@ class ObservabilityMetricsService:
 
         # Support filtering by api_key_project_id (for CLIENT users)
         if hasattr(request, "filters") and request.filters and "api_key_project_id" in request.filters:
-            where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
-            params["api_key_project_id"] = str(request.filters["api_key_project_id"])
+            api_key_project_ids = request.filters["api_key_project_id"]
+            if isinstance(api_key_project_ids, list):
+                placeholders = [f"%(api_key_project_{i})s" for i in range(len(api_key_project_ids))]
+                where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                for i, val in enumerate(api_key_project_ids):
+                    params[f"api_key_project_{i}"] = str(val)
+            else:
+                where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                params["api_key_project_id"] = str(api_key_project_ids)
 
         if request.endpoint_id:
             where_conditions.append("mid.endpoint_id = %(endpoint_id)s")

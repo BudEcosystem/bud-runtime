@@ -5,7 +5,7 @@ ingress:
 microservices:
     budmodel:
         storageSize: "1024Gi"
-
-minio:
-    persistence:
-        size: "1024Gi"
+# TODO: do strageClass migration before enabling this
+# minio:
+#     persistence:
+#         size: "1024Gi"

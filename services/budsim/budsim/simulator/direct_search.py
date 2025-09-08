@@ -368,6 +368,10 @@ class DirectSearchOptimizer:
             "memory_in_GB": self.device_config.get(
                 "mem_per_GPU_in_GB", 0
             ),  # Memory field expected by heuristic calculator
+            # Preserve device identification fields for hardware matching
+            "device_model": self.device_config.get("device_model", ""),
+            "device_name": self.device_config.get("device_name", ""),
+            "raw_name": self.device_config.get("raw_name", ""),
             **model_data,  # Include all ModelAnalysis results
         }
 

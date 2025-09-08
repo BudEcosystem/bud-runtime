@@ -20,14 +20,18 @@ pub struct UsageLimitInfo {
     pub tokens_used: i64,
     pub cost_quota: Option<f64>,
     pub cost_used: f64,
-    pub prev_tokens_used: i64,
-    pub prev_cost_used: f64,
+    #[serde(default)]
+    pub update_id: u64,  // Incremented by budapp on each update
     pub reason: Option<String>,
     pub reset_at: Option<String>,
     pub last_updated: Option<String>,
+    #[serde(default)]
     pub billing_cycle_start: Option<String>,  // Track billing cycle
+    #[serde(default)]
     pub billing_cycle_end: Option<String>,    // When cycle ends
 }
+
+// RealtimeUsage struct removed - we now update the main usage_limit key directly
 
 /// Configuration for usage limiter
 #[derive(Debug, Clone)]
@@ -148,35 +152,61 @@ impl UsageLimiter {
         Ok(limiter)
     }
 
+    /// Check if current usage is within quotas
+    fn check_quotas(&self, status: &UsageLimitStatus) -> bool {
+        // If already marked as not allowed, respect that
+        if !status.allowed {
+            return false;
+        }
+
+        // Check token quota
+        if let Some(token_quota) = status.tokens_quota {
+            if status.tokens_used > token_quota {
+                return false;
+            }
+        }
+
+        // Check cost quota
+        if let Some(cost_quota) = status.cost_quota {
+            if status.cost_used > cost_quota {
+                return false;
+            }
+        }
+
+        true
+    }
+
     /// Check usage limits for a user with optional consumption tracking
     pub async fn check_usage(&self, user_id: &str, tokens_to_consume: Option<i64>, cost_to_consume: Option<f64>) -> UsageLimitDecision {
         // Check local cache first
-
         if let Some(mut cached) = self.cache.get(user_id).await {
             self.metrics.record_cache_hit();
 
-            // If consuming, update local tracking
-            if let Some(tokens) = tokens_to_consume {
-                cached.local_tokens_consumed += tokens;
-                cached.tokens_used += tokens;
-            }
-            if let Some(cost) = cost_to_consume {
-                cached.local_cost_consumed += cost;
-                cached.cost_used += cost;
-            }
-
-            // Check against quotas
-            let allowed = self.check_quotas(&cached);
-
-            debug!("Usage limit cache hit for user {}: allowed={}, tokens_used={}, cost_used={}",
-                   user_id, allowed, cached.tokens_used, cached.cost_used);
-
-            // Update cache with new consumption
+            // If consuming, write atomic increments to Redis immediately
             if tokens_to_consume.is_some() || cost_to_consume.is_some() {
+                if let Err(e) = self.increment_realtime_usage(user_id, tokens_to_consume, cost_to_consume).await {
+                    warn!("Failed to increment realtime usage for user {}: {}", user_id, e);
+                    // Continue with local tracking as fallback
+                }
+
+                // Update local cache optimistically
+                if let Some(tokens) = tokens_to_consume {
+                    cached.tokens_used += tokens;
+                    cached.realtime_tokens += tokens;
+                }
+                if let Some(cost) = cost_to_consume {
+                    cached.cost_used += cost;
+                    cached.realtime_cost += cost;
+                }
                 self.cache.insert(user_id.to_string(), cached.clone()).await;
             }
 
-            let decision = if allowed {
+            // Check against quotas
+            let quota_allowed = self.check_quotas(&cached);
+            let overall_allowed = cached.allowed && quota_allowed;
+
+
+            let decision = if overall_allowed {
                 self.metrics.record_allowed();
                 UsageLimitDecision::Allow
             } else {
@@ -190,11 +220,13 @@ impl UsageLimiter {
 
         // Cache miss, try to fetch from Redis
         self.metrics.record_cache_miss();
-        debug!("Usage limit cache miss for user {}, fetching from Redis", user_id);
 
         match self.fetch_usage_limit(user_id).await {
             Ok(Some(limit_info)) => {
-                // Create status for caching with usage tracking
+                // Since we now update the main usage_limit key directly,
+                // no need to fetch and combine realtime usage
+
+                // Create status for caching directly from limit_info
                 let status = UsageLimitStatus {
                     user_id: user_id.to_string(),
                     allowed: limit_info.allowed,
@@ -208,14 +240,15 @@ impl UsageLimiter {
                     billing_cycle_start: limit_info.billing_cycle_start.clone(),
                     billing_cycle_end: limit_info.billing_cycle_end.clone(),
                     last_updated: Instant::now(),
-                    local_tokens_consumed: 0,
-                    local_cost_consumed: 0.0,
+                    last_seen_update_id: limit_info.update_id,
+                    realtime_tokens: 0, // No longer using separate realtime tracking
+                    realtime_cost: 0.0, // No longer using separate realtime tracking
                 };
 
                 // Insert into cache
                 self.cache.insert(user_id.to_string(), status.clone()).await;
 
-                let decision = if limit_info.allowed {
+                let decision = if limit_info.allowed && self.check_quotas(&status) {
                     self.metrics.record_allowed();
                     UsageLimitDecision::Allow
                 } else {
@@ -245,8 +278,9 @@ impl UsageLimiter {
                     billing_cycle_start: None,
                     billing_cycle_end: None,
                     last_updated: Instant::now(),
-                    local_tokens_consumed: 0,
-                    local_cost_consumed: 0.0,
+                    last_seen_update_id: 0,
+                    realtime_tokens: 0,
+                    realtime_cost: 0.0,
                 };
                 self.cache.insert(user_id.to_string(), status).await;
 
@@ -269,6 +303,92 @@ impl UsageLimiter {
             }
         }
     }
+
+    /// Update usage counters directly in the main usage_limit key
+    async fn increment_realtime_usage(&self, user_id: &str, tokens: Option<i64>, cost: Option<f64>) -> Result<(), Error> {
+        let redis_client = self.redis_client.read().await;
+
+        if let Some(mut conn) = redis_client.as_ref().map(|c| c.clone()) {
+            let key = format!("usage_limit:{}", user_id);
+
+            // Skip if nothing to increment
+            if tokens.is_none() && cost.is_none() {
+                return Ok(());
+            }
+
+            // Use Lua script for atomic increment operations on JSON fields
+            let lua_script = r#"
+                local key = KEYS[1]
+                local tokens_delta = tonumber(ARGV[1])
+                local cost_delta = tonumber(ARGV[2])
+
+                local current = redis.call('GET', key)
+                if not current then
+                    return {err = "No usage limit data found"}
+                end
+
+                local data = cjson.decode(current)
+
+                -- Atomically increment the fields
+                if tokens_delta ~= 0 then
+                    data.tokens_used = data.tokens_used + tokens_delta
+                end
+                if cost_delta ~= 0 then
+                    data.cost_used = data.cost_used + cost_delta
+                end
+
+                local updated = cjson.encode(data)
+                redis.call('SET', key, updated)
+
+                -- Return the updated values for cache sync
+                return {data.tokens_used, data.cost_used}
+            "#;
+
+            let tokens_delta = tokens.unwrap_or(0);
+            let cost_delta = cost.unwrap_or(0.0);
+
+            // Execute atomic Lua script
+            let result: Result<Vec<redis::Value>, _> = timeout(
+                Duration::from_millis(self.config.redis_timeout_ms),
+                redis::Script::new(lua_script).key(&key).arg(tokens_delta).arg(cost_delta).invoke_async(&mut conn)
+            ).await
+            .map_err(|_| Error::new(ErrorDetails::Config {
+                message: "Redis timeout on atomic increment".to_string(),
+            }))?;
+
+            match result {
+                Ok(values) => {
+                    // Extract updated values for cache sync
+                    if values.len() == 2 {
+                        let new_tokens_used: i64 = redis::from_redis_value(&values[0]).unwrap_or(0);
+                        let new_cost_used: f64 = redis::from_redis_value(&values[1]).unwrap_or(0.0);
+
+                        // Update local cache with the atomically updated values
+                        if let Some(cached) = self.cache.get(user_id).await {
+                            let mut updated_cached = cached;
+                            updated_cached.tokens_used = new_tokens_used;
+                            updated_cached.cost_used = new_cost_used;
+                            updated_cached.last_updated = Instant::now();
+                            self.cache.insert(user_id.to_string(), updated_cached).await;
+                        }
+                    }
+                    Ok(())
+                },
+                Err(e) => {
+                    warn!("Redis atomic increment failed for user {}: {}", user_id, e);
+                    Err(Error::new(ErrorDetails::Config {
+                        message: format!("Redis atomic increment error: {}", e),
+                    }))
+                }
+            }
+        } else {
+            Err(Error::new(ErrorDetails::Config {
+                message: "No Redis connection available".to_string(),
+            }))
+        }
+    }
+
+    // fetch_realtime_usage function removed - we now update the main usage_limit key directly
 
     /// Fetch usage limit from Redis
     async fn fetch_usage_limit(&self, user_id: &str) -> Result<Option<UsageLimitInfo>, Error> {
@@ -423,71 +543,31 @@ impl UsageLimiter {
                                 for key in keys {
                                     // Extract user_id from key
                                     if let Some(user_id) = key.strip_prefix("usage_limit:") {
-                                        // Fetch the value
+                                        // Fetch the main usage limit value
                                         match timeout(redis_timeout, conn.get::<_, Option<String>>(&key)).await {
                                             Ok(Ok(Some(data))) => {
                                                 if let Ok(info) = serde_json::from_str::<UsageLimitInfo>(&data) {
-                                                    // Get existing cache entry if it exists
-                                                    if let Some(mut cached) = cache.get(user_id).await {
-                                                        // Check for billing cycle reset
-                                                        let cycle_reset = cached.billing_cycle_start != info.billing_cycle_start;
+                                                    // No need to fetch realtime usage - main key contains everything
 
-                                                        if cycle_reset {
-                                                            // Billing cycle has reset - use new values directly
-                                                            debug!("Billing cycle reset detected for user {}", user_id);
-                                                            cached.tokens_used = info.tokens_used;
-                                                            cached.cost_used = info.cost_used;
-                                                            cached.local_tokens_consumed = 0;
-                                                            cached.local_cost_consumed = 0.0;
-                                                        } else {
-                                                            // Normal delta reconciliation
-                                                            let token_delta = info.tokens_used - info.prev_tokens_used;
-                                                            let cost_delta = info.cost_used - info.prev_cost_used;
-
-                                                            // Apply deltas plus local consumption
-                                                            let new_tokens = cached.tokens_used + token_delta + cached.local_tokens_consumed;
-                                                            let new_cost = cached.cost_used + cost_delta + cached.local_cost_consumed;
-
-                                                            // Use higher value (Redis or calculated)
-                                                            cached.tokens_used = new_tokens.max(info.tokens_used);
-                                                            cached.cost_used = f64::max(new_cost, info.cost_used);
-
-                                                            // Reset local consumption after applying it
-                                                            cached.local_tokens_consumed = 0;
-                                                            cached.local_cost_consumed = 0.0;
-                                                        }
-
-                                                        // Update other fields
-                                                        cached.tokens_quota = info.tokens_quota;
-                                                        cached.cost_quota = info.cost_quota;
-                                                        cached.status = info.status;
-                                                        cached.reason = info.reason;
-                                                        cached.reset_at = info.reset_at;
-                                                        cached.billing_cycle_start = info.billing_cycle_start.clone();
-                                                        cached.billing_cycle_end = info.billing_cycle_end.clone();
-                                                        cached.last_updated = Instant::now();
-
-                                                        cache.insert(user_id.to_string(), cached).await;
-                                                    } else {
-                                                        // No existing cache, create new entry
-                                                        let status = UsageLimitStatus {
-                                                            user_id: user_id.to_string(),
-                                                            allowed: info.allowed,
-                                                            status: info.status,
-                                                            tokens_quota: info.tokens_quota,
-                                                            tokens_used: info.tokens_used,
-                                                            cost_quota: info.cost_quota,
-                                                            cost_used: info.cost_used,
-                                                            reason: info.reason,
-                                                            reset_at: info.reset_at,
-                                                            billing_cycle_start: info.billing_cycle_start,
-                                                            billing_cycle_end: info.billing_cycle_end,
-                                                            last_updated: Instant::now(),
-                                                            local_tokens_consumed: 0,
-                                                            local_cost_consumed: 0.0,
-                                                        };
-                                                        cache.insert(user_id.to_string(), status).await;
-                                                    }
+                                                    // Simplified sync - just update cache with main usage_limit data
+                                                    let status = UsageLimitStatus {
+                                                        user_id: user_id.to_string(),
+                                                        allowed: info.allowed,
+                                                        status: info.status,
+                                                        tokens_quota: info.tokens_quota,
+                                                        tokens_used: info.tokens_used,
+                                                        cost_quota: info.cost_quota,
+                                                        cost_used: info.cost_used,
+                                                        reason: info.reason,
+                                                        reset_at: info.reset_at,
+                                                        billing_cycle_start: info.billing_cycle_start,
+                                                        billing_cycle_end: info.billing_cycle_end,
+                                                        last_updated: Instant::now(),
+                                                        last_seen_update_id: info.update_id,
+                                                        realtime_tokens: 0, // No longer using separate realtime tracking
+                                                        realtime_cost: 0.0, // No longer using separate realtime tracking
+                                                    };
+                                                    cache.insert(user_id.to_string(), status).await;
                                                     refreshed_count += 1;
                                                 }
                                             }
@@ -526,6 +606,7 @@ impl UsageLimiter {
         self.cache.invalidate_all();
     }
 
+
     /// Get metrics
     pub fn get_metrics(&self) -> UsageLimiterMetrics {
         UsageLimiterMetrics {
@@ -543,58 +624,8 @@ impl UsageLimiter {
         self.cache.entry_count()
     }
 
-    /// Check if usage is within quotas
-    fn check_quotas(&self, status: &UsageLimitStatus) -> bool {
-        // Check token quota
-        if let Some(quota) = status.tokens_quota {
-            if status.tokens_used >= quota {
-                return false;
-            }
-        }
-
-        // Check cost quota
-        if let Some(quota) = status.cost_quota {
-            if status.cost_used >= quota {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    /// Update cache entry with new data from Redis using delta logic
-    fn reconcile_cache_with_redis(&self, cached: &mut UsageLimitStatus, redis_info: &UsageLimitInfo) {
-        // Calculate deltas from Redis
-        let token_delta = redis_info.tokens_used - redis_info.prev_tokens_used;
-        let cost_delta = redis_info.cost_used - redis_info.prev_cost_used;
-
-        // Apply deltas to cached values
-        let new_tokens_used = cached.tokens_used + token_delta;
-        let new_cost_used = cached.cost_used + cost_delta;
-
-        // Reconciliation: if calculated value is less than Redis value, use Redis value
-        cached.tokens_used = if new_tokens_used < redis_info.tokens_used {
-            redis_info.tokens_used
-        } else {
-            new_tokens_used
-        };
-
-        cached.cost_used = if new_cost_used < redis_info.cost_used {
-            redis_info.cost_used
-        } else {
-            new_cost_used
-        };
-
-        // Update quotas and other fields
-        cached.tokens_quota = redis_info.tokens_quota;
-        cached.cost_quota = redis_info.cost_quota;
-        cached.status = redis_info.status.clone();
-        cached.reason = redis_info.reason.clone();
-        cached.reset_at = redis_info.reset_at.clone();
-
-        // Reset local consumption tracking after sync
-        cached.local_tokens_consumed = 0;
-        cached.local_cost_consumed = 0.0;
-        cached.last_updated = Instant::now();
-    }
 }
+
+// #[cfg(test)]
+// #[path = "tests.rs"]
+// mod tests;

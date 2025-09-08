@@ -33,6 +33,7 @@ class DeploymentStatusEnum(str, Enum):
     READY = "ready"
     PENDING = "pending"
     INGRESS_FAILED = "ingress_failed"
+    ENDPOINTS_FAILED = "endpoints_failed"
     FAILED = "failed"
 
 

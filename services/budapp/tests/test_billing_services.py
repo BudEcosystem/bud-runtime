@@ -153,8 +153,18 @@ class TestBillingService:
         custom_token_quota = 75000
         custom_cost_quota = Decimal("150.00")
 
-        # Mock the UserBilling constructor to avoid SQLAlchemy model resolution issues
-        with patch('budapp.billing_ops.services.UserBilling') as MockUserBilling:
+        # Mock the service methods that are called by create_user_billing
+        with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_user_billing_history') as mock_get_history, \
+             patch('budapp.billing_ops.services.UserBilling') as MockUserBilling:
+
+            # Mock no existing current billing
+            mock_get_user_billing.return_value = None
+
+            # Mock empty billing history (first billing record)
+            mock_get_history.return_value = []
+
+            # Mock the UserBilling constructor
             mock_user_billing = MagicMock(spec=UserBilling)
             mock_user_billing.user_id = user_id
             mock_user_billing.billing_plan_id = plan_id
@@ -162,6 +172,8 @@ class TestBillingService:
             mock_user_billing.custom_cost_quota = custom_cost_quota
             mock_user_billing.is_active = True
             mock_user_billing.is_suspended = False
+            mock_user_billing.is_current = True
+            mock_user_billing.cycle_number = 1
             MockUserBilling.return_value = mock_user_billing
 
             result = billing_service.create_user_billing(
@@ -171,6 +183,12 @@ class TestBillingService:
                 custom_cost_quota=custom_cost_quota,
             )
 
+            # Verify get_user_billing was called to check for existing billing
+            mock_get_user_billing.assert_called_once_with(user_id)
+
+            # Verify get_user_billing_history was called to determine cycle number
+            mock_get_history.assert_called_once_with(user_id)
+
             # Verify UserBilling was created with correct parameters
             MockUserBilling.assert_called_once()
             call_args = MockUserBilling.call_args[1]
@@ -178,6 +196,8 @@ class TestBillingService:
             assert call_args['billing_plan_id'] == plan_id
             assert call_args['custom_token_quota'] == custom_token_quota
             assert call_args['custom_cost_quota'] == custom_cost_quota
+            assert call_args['is_current'] is True
+            assert call_args['cycle_number'] == 1
 
             # Verify returned object has expected attributes
             assert result.user_id == user_id
@@ -186,6 +206,8 @@ class TestBillingService:
             assert result.custom_cost_quota == custom_cost_quota
             assert result.is_active is True
             assert result.is_suspended is False
+            assert result.is_current is True
+            assert result.cycle_number == 1
 
             # Verify it was added to session
             mock_session.add.assert_called_once_with(mock_user_billing)
