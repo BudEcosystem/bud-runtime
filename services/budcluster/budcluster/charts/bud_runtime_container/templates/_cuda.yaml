@@ -22,6 +22,29 @@
     value: {{ $value | quote }}
   {{- end }}
   {{- end }}
+  {{- if gt (.device.pp_size | int) 1 }}
+  command: ["/bin/bash", "-c"]
+  args:
+    - >
+      ulimit -n 65536 &&
+      apt update && apt install -y wget net-tools && pip3 install ray[default] pyarrow pandas &&
+      echo "[INFO] Starting Ray head node..." &&
+      eval "$KUBERAY_GEN_RAY_START_CMD" &
+
+      echo "[INFO] Waiting for Ray dashboard to be ready..." &&
+      until curl --max-time 5 --fail http://127.0.0.1:8265 > /dev/null 2>&1; do
+        echo "[WAITING] $(date -u +'%Y-%m-%dT%H:%M:%SZ') - Ray dashboard not ready yet...";
+        sleep 2;
+      done &&
+      echo "[SUCCESS] Ray dashboard is available!" &&
+
+      vllm serve \
+        --distributed-executor-backend ray \
+        --uvicorn-log-level warning \
+        {{- range $key, $value := .device.args }}
+        {{ $value }} \
+        {{- end }}
+  {{- else }}
   command:
   - python3
   - -m
@@ -33,6 +56,7 @@
   {{- end }}
   - --uvicorn-log-level
   - warning
+  {{- end }}
   {{- end }}
   livenessProbe:
     httpGet:
