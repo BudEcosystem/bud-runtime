@@ -167,7 +167,7 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
               <div className="flex items-center gap-4 px-[1.4rem] py-[1rem]">
                 {/* <div className="text-4xl">{project.icon || "📁"}</div> */}
                 <div className="flex-1">
-                  <Title level={4} className="!mb-1 text-white">
+                  <Title level={4} className="!mb-1 text-black dark:text-[#EEEEEE]">
                     {project.name}
                   </Title>
                   <Text className="text-gray-400">{project.description}</Text>

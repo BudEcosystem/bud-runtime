@@ -1872,26 +1872,7 @@ const deleteCluster: DrawerFlowType = {
   ],
 };
 
-const deleteProject: DrawerFlowType = {
-  title: "Delete Project",
-  description: "Delete a project",
-  totalSteps: 1,
-  steps: [
-    {
-      navigation: () => ["Project", "Delete Project"],
-      confirmClose: false,
-      id: "delete-project",
-      step: 1,
-      component: StepComponents["delete-project"],
-      progress: [
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Delete Project",
-        },
-      ],
-    },
-  ],
-};
+// Delete project flow removed - now using notification warning approach
 
 const deletingEndpoint: DrawerFlowType = {
   title: "Deleting Deployment",
@@ -3519,7 +3500,7 @@ const flows = {
   "worker-details": workerDetails,
   "use-model": useModel,
   "delete-cluster": deleteCluster,
-  "delete-project": deleteProject,
+  // "delete-project": removed - now using notification warning approach
   "deleting-endpoint": deletingEndpoint,
   "deleting-cluster": deletingCluster,
   "add-credentials": addCredentials,

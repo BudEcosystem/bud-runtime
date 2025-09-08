@@ -219,8 +219,13 @@ function LoginContent() {
       console.log("response", response);
       successToast(response.data.message);
       hideLoader();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Reset password error:", error);
+      const errorMessage =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Failed to send reset email. Please try again.";
+      errorToast(errorMessage);
       hideLoader();
     }
   }

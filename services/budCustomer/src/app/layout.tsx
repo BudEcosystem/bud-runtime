@@ -7,6 +7,7 @@ import "../styles/globals.scss";
 import { AuthNavigationProvider, LoaderProvider } from "@/context/authContext";
 import { ThemeProvider } from "@/context/themeContext";
 import { ProjectProvider } from "@/context/projectContext";
+import { OverlayProvider } from "@/context/overlayContext";
 import { NotificationProvider } from "@/components/NotificationProvider";
 import { AppInitializer } from "@/components/AppInitializer";
 import AuthGuard from "@/components/auth/AuthGuard";
@@ -48,16 +49,18 @@ export default function RootLayout({
           <ThemeProvider>
             <AntdRegistry>
               <App>
-                <NotificationProvider>
-                  <AppInitializer />
-                  <AuthNavigationProvider>
-                    <LoaderProvider>
-                      <NovuCustomProvider>
-                        <ProjectProvider>{children}</ProjectProvider>
-                      </NovuCustomProvider>
-                    </LoaderProvider>
-                  </AuthNavigationProvider>
-                </NotificationProvider>
+                <OverlayProvider>
+                  <NotificationProvider>
+                    <AppInitializer />
+                    <AuthNavigationProvider>
+                      <LoaderProvider>
+                        <NovuCustomProvider>
+                          <ProjectProvider>{children}</ProjectProvider>
+                        </NovuCustomProvider>
+                      </LoaderProvider>
+                    </AuthNavigationProvider>
+                  </NotificationProvider>
+                </OverlayProvider>
               </App>
             </AntdRegistry>
           </ThemeProvider>
