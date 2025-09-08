@@ -21,9 +21,8 @@ import json
 from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID, uuid4
 
-from fastapi import HTTPException
 from fastapi import status as HTTPStatus
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -42,7 +41,7 @@ from budapp.commons.constants import (
     WorkflowTypeEnum,
 )
 from budapp.commons.db_utils import SessionMixin
-from budapp.commons.exceptions import ClientException
+from budapp.commons.exceptions import ClientException, DatabaseException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse, Tag
 from budapp.core.schemas import NotificationResult
 from budapp.credential_ops.crud import ProprietaryCredentialDataManager
@@ -72,8 +71,10 @@ from budapp.guardrails.schemas import (
     GuardrailDeploymentWorkflowSteps,
     GuardrailProbeDetailResponse,
     GuardrailProbeResponse,
+    GuardrailProbeRuleSelection,
     GuardrailProfileDetailResponse,
     GuardrailProfileProbeResponse,
+    GuardrailProfileProbeSelection,
     GuardrailProfileResponse,
     GuardrailProfileRuleResponse,
     GuardrailRuleDetailResponse,
@@ -543,7 +544,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         db_provider = await ProviderDataManager(self.session).retrieve_by_fields(Provider, {"id": provider_id})
 
         for db_deployment in db_deployments:
-            await self.add_guardrail_to_proxy_cache(
+            await self.add_guardrail_deployment_to_proxy_cache(
                 endpoint_id=db_deployment.endpoint_id,
                 profile_id=db_deployment.profile_id,
                 provider_type=db_provider.type,
@@ -558,7 +559,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
 
         return db_deployments
 
-    async def add_guardrail_to_proxy_cache(
+    async def add_guardrail_deployment_to_proxy_cache(
         self,
         endpoint_id: UUID,
         profile_id: UUID,
@@ -631,7 +632,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             json.dumps({str(endpoint_id): model_config.model_dump(exclude_none=True)}),
         )
 
-    async def delete_model_from_proxy_cache(self, endpoint_id: UUID) -> None:
+    async def delete_guardrail_deployment_from_proxy_cache(self, endpoint_id: UUID) -> None:
         """Delete model from proxy cache for a project."""
         redis_service = RedisService()
         await redis_service.delete_keys_by_pattern(f"guardrail_table:{endpoint_id}*")
@@ -887,12 +888,12 @@ class GuardrailProbeRuleService(SessionMixin):
 
         # Check if probe is a preset probe (no creator)
         if db_probe.created_by is None:
-            raise HTTPException(status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="Preset probes cannot be edited")
+            raise ClientException(status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="Preset probes cannot be edited")
 
         # Check if user has permission to edit (must be the creator)
         if user_id and db_probe.created_by != user_id:
-            raise HTTPException(
-                status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="You do not have permission to edit this probe"
+            raise ClientException(
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="You do not have permission to edit this probe"
             )
 
         # Prepare update data
@@ -941,12 +942,12 @@ class GuardrailProbeRuleService(SessionMixin):
 
         # Check if probe is a preset probe (no creator)
         if db_probe.created_by is None:
-            raise HTTPException(status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="Preset probes cannot be deleted")
+            raise ClientException(status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="Preset probes cannot be deleted")
 
         # Check if user has permission to delete (must be the creator)
         if user_id and db_probe.created_by != user_id:
-            raise HTTPException(
-                status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="You do not have permission to delete this probe"
+            raise ClientException(
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="You do not have permission to delete this probe"
             )
 
         # Soft delete the probe and its rules
@@ -1051,12 +1052,12 @@ class GuardrailProbeRuleService(SessionMixin):
 
         # Check if rule is a preset rule (no creator)
         if db_rule.created_by is None:
-            raise HTTPException(status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="Preset rules cannot be edited")
+            raise ClientException(status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="Preset rules cannot be edited")
 
         # Check if user has permission to edit (must be the creator)
         if user_id and db_rule.created_by != user_id:
-            raise HTTPException(
-                status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="You do not have permission to edit this rule"
+            raise ClientException(
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="You do not have permission to edit this rule"
             )
 
         # Prepare update data
@@ -1106,12 +1107,12 @@ class GuardrailProbeRuleService(SessionMixin):
 
         # Check if rule is a preset rule (no creator)
         if db_rule.created_by is None:
-            raise HTTPException(status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="Preset rules cannot be deleted")
+            raise ClientException(status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="Preset rules cannot be deleted")
 
         # Check if user has permission to delete (must be the creator)
         if user_id and db_rule.created_by != user_id:
-            raise HTTPException(
-                status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="You do not have permission to delete this rule"
+            raise ClientException(
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="You do not have permission to delete this rule"
             )
 
         # Soft delete the rule
@@ -1223,79 +1224,6 @@ class GuardrailProfileDeploymentService(SessionMixin):
             code=HTTPStatus.HTTP_201_CREATED,
         )
 
-    async def edit_profile(
-        self,
-        profile_id: UUID,
-        user_id: UUID,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        tags: Optional[list[Tag]] = None,
-        status: Optional[GuardrailStatusEnum] = None,
-        severity_threshold: Optional[float] = None,
-        guard_types: Optional[list[str]] = None,
-    ) -> GuardrailProfileDetailResponse:
-        """Edit an existing guardrail profile.
-
-        Users can only edit profiles they created.
-        Preset profiles (created_by is None) cannot be edited.
-        """
-        # Retrieve the profile
-        db_profile = await GuardrailsDeploymentDataManager(self.session).retrieve_by_fields(
-            GuardrailProfile, {"id": profile_id}
-        )
-
-        # Check if profile is a preset profile (no creator)
-        if db_profile.created_by is None:
-            raise HTTPException(status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="Preset profiles cannot be edited")
-
-        # Check if user has permission to edit (must be the creator)
-        if user_id and db_profile.created_by != user_id:
-            raise HTTPException(
-                status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="You do not have permission to edit this profile"
-            )
-
-        # Prepare update data
-        update_data = {}
-        if name is not None:
-            update_data["name"] = name
-        if description is not None:
-            update_data["description"] = description
-        if tags is not None:
-            update_data["tags"] = [{"name": tag.name, "color": tag.color} for tag in tags]
-        if status is not None:
-            update_data["status"] = status
-        if severity_threshold is not None:
-            update_data["severity_threshold"] = severity_threshold
-        if guard_types is not None:
-            update_data["guard_types"] = guard_types
-
-        # Update the profile
-        if update_data:
-            updated_profile = await GuardrailsDeploymentDataManager(self.session).update_by_fields(
-                db_profile, update_data
-            )
-            # Update the cache after profile update
-            await GuardrailDeploymentWorkflowService(self.session).update_guardrail_profile_cache(profile_id)
-        else:
-            updated_profile = db_profile
-
-        # Retrieve updated profile with probe count
-        # updated_profile = await GuardrailsDeploymentDataManager(self.session).retrieve_by_fields(
-        #     GuardrailProfile, {"id": profile_id}
-        # )
-
-        # Get probe count (enabled probes for this profile)
-        db_probe_count = await GuardrailsDeploymentDataManager(self.session).get_count_by_fields(
-            GuardrailProfileProbe, fields={"profile_id": profile_id}
-        )
-
-        return GuardrailProfileDetailResponse(
-            profile=GuardrailProfileResponse.model_validate(updated_profile),
-            probe_count=db_probe_count,
-            message="Profile updated successfully",
-            code=HTTPStatus.HTTP_200_OK,
-        )
-
     async def delete_profile(self, profile_id: UUID, user_id: UUID) -> dict:
         """Delete (soft delete) a guardrail profile.
 
@@ -1309,16 +1237,22 @@ class GuardrailProfileDeploymentService(SessionMixin):
 
         # Check if profile is a preset profile (no creator)
         if db_profile.created_by is None:
-            raise HTTPException(status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="Preset profiles cannot be deleted")
+            raise ClientException(
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="Preset profiles cannot be deleted"
+            )
 
         # Check if user has permission to delete (must be the creator)
         if user_id and db_profile.created_by != user_id:
-            raise HTTPException(
-                status_code=HTTPStatus.HTTP_403_FORBIDDEN, detail="You do not have permission to delete this profile"
+            raise ClientException(
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="You do not have permission to delete this profile"
             )
 
         # Soft delete the profile
-        await GuardrailsDeploymentDataManager(self.session).soft_delete_profile(profile_id)
+        try:
+            await GuardrailsDeploymentDataManager(self.session).soft_delete_profile(profile_id)
+        except ValueError as e:
+            # Convert DatabaseException to ClientException for proper API error handling
+            raise ClientException(message=getattr(e, "message", str(e)), status_code=HTTPStatus.HTTP_403_FORBIDDEN)
 
         # Delete profile cache
         await GuardrailDeploymentWorkflowService(self.session).delete_guardrail_profile_cache(profile_id)
@@ -1326,6 +1260,248 @@ class GuardrailProfileDeploymentService(SessionMixin):
         return SuccessResponse(
             message="Profile deleted successfully", code=HTTPStatus.HTTP_200_OK, object="guardrail.profile.delete"
         )
+
+    async def update_profile_with_probes(
+        self,
+        profile_id: UUID,
+        user_id: UUID,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        tags: Optional[list[Tag]] = None,
+        severity_threshold: Optional[float] = None,
+        guard_types: Optional[list[str]] = None,
+        probe_selections: Optional[list[GuardrailProfileProbeSelection]] = None,
+    ) -> GuardrailProfileDetailResponse:
+        """Update a guardrail profile with probe selections.
+
+        This method updates both profile fields and probe/rule selections.
+        Users can only update profiles they created.
+        Preset profiles (created_by is None) cannot be edited.
+        """
+        # Retrieve the profile
+        db_profile = await GuardrailsDeploymentDataManager(self.session).retrieve_by_fields(
+            GuardrailProfile, {"id": profile_id}
+        )
+
+        # Check if profile is a preset profile (no creator)
+        if db_profile.created_by is None:
+            raise ClientException(
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="Preset profiles cannot be edited"
+            )
+
+        # Check if user has permission to edit (must be the creator)
+        if user_id and db_profile.created_by != user_id:
+            raise ClientException(
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="You do not have permission to edit this profile"
+            )
+
+        # Start a transaction
+        savepoint = self.session.begin_nested()
+
+        try:
+            # Update basic profile fields
+            update_data = {}
+            if name is not None:
+                update_data["name"] = name
+            if description is not None:
+                update_data["description"] = description
+            if tags is not None:
+                update_data["tags"] = [{"name": tag.name, "color": tag.color} for tag in tags]
+            if severity_threshold is not None:
+                update_data["severity_threshold"] = severity_threshold
+            if guard_types is not None:
+                update_data["guard_types"] = guard_types
+
+            # Update the profile if there are changes
+            if update_data:
+                # Don't use update_by_fields as it commits and breaks the savepoint
+                for field, value in update_data.items():
+                    setattr(db_profile, field, value)
+                updated_profile = db_profile
+            else:
+                updated_profile = db_profile
+
+            # Handle probe selections if provided
+            if probe_selections is not None:
+                # Get existing profile probes
+                existing_probes_stmt = select(GuardrailProfileProbe).where(
+                    GuardrailProfileProbe.profile_id == profile_id
+                )
+                existing_probes = self.session.execute(existing_probes_stmt).scalars().all()
+                existing_probe_ids = {probe.probe_id: probe for probe in existing_probes}
+
+                # Get new probe IDs from selections
+                new_probe_ids = {selection.id for selection in probe_selections}
+
+                # Delete probes that are no longer selected
+                probes_to_delete = set(existing_probe_ids.keys()) - new_probe_ids
+                if probes_to_delete:
+                    # Delete associated rules first
+                    for probe_id in probes_to_delete:
+                        profile_probe = existing_probe_ids[probe_id]
+                        delete_rules_stmt = delete(GuardrailProfileRule).where(
+                            GuardrailProfileRule.profile_probe_id == profile_probe.id
+                        )
+                        self.session.execute(delete_rules_stmt)
+
+                    # Delete the profile probes
+                    delete_probes_stmt = (
+                        delete(GuardrailProfileProbe)
+                        .where(GuardrailProfileProbe.profile_id == profile_id)
+                        .where(GuardrailProfileProbe.probe_id.in_(probes_to_delete))
+                    )
+                    self.session.execute(delete_probes_stmt)
+
+                # Process each probe selection
+                for probe_selection in probe_selections:
+                    probe_id = probe_selection.id
+
+                    if probe_id in existing_probe_ids:
+                        # Update existing probe
+                        profile_probe = existing_probe_ids[probe_id]
+                        probe_update = {}
+                        if probe_selection.severity_threshold is not None:
+                            probe_update["severity_threshold"] = probe_selection.severity_threshold
+                        if probe_selection.guard_types is not None:
+                            probe_update["guard_types"] = probe_selection.guard_types
+
+                        if probe_update:
+                            # Don't use update_by_fields as it commits and breaks the savepoint
+                            for field, value in probe_update.items():
+                                setattr(profile_probe, field, value)
+
+                        # Handle rule updates for this probe
+                        if probe_selection.rules:
+                            await self._update_profile_probe_rules(profile_probe.id, probe_selection.rules, user_id)
+                    else:
+                        # Add new probe
+                        db_profile_probe = GuardrailProfileProbe(
+                            profile_id=profile_id,
+                            probe_id=probe_id,
+                            severity_threshold=probe_selection.severity_threshold,
+                            guard_types=probe_selection.guard_types,
+                            created_by=user_id,
+                        )
+                        self.session.add(db_profile_probe)
+                        self.session.flush()
+
+                        # Add rule overrides if specified
+                        if probe_selection.rules:
+                            for rule_selection in probe_selection.rules:
+                                # Only create rule override if it has specific settings
+                                if (
+                                    rule_selection.status == GuardrailStatusEnum.DISABLED
+                                    or rule_selection.severity_threshold is not None
+                                    or rule_selection.guard_types is not None
+                                ):
+                                    db_profile_rule = GuardrailProfileRule(
+                                        profile_probe_id=db_profile_probe.id,
+                                        rule_id=rule_selection.id,
+                                        status=rule_selection.status,
+                                        severity_threshold=rule_selection.severity_threshold,
+                                        guard_types=rule_selection.guard_types,
+                                        created_by=user_id,
+                                    )
+                                    self.session.add(db_profile_rule)
+
+            # Commit the transaction
+            savepoint.commit()
+
+            # Update the cache after profile update
+            await GuardrailDeploymentWorkflowService(self.session).update_guardrail_profile_cache(profile_id)
+
+            # Get probe count
+            db_probe_count = await GuardrailsDeploymentDataManager(self.session).get_count_by_fields(
+                GuardrailProfileProbe, fields={"profile_id": profile_id}
+            )
+
+            return GuardrailProfileDetailResponse(
+                profile=GuardrailProfileResponse.model_validate(updated_profile),
+                probe_count=db_probe_count,
+                message="Profile updated successfully",
+                code=HTTPStatus.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            # Rollback on error
+            if savepoint and savepoint.is_active:
+                savepoint.rollback()
+            logger.exception(f"Failed to update profile with probes: {e}")
+            raise ClientException(
+                status_code=HTTPStatus.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update profile"
+            )
+
+    async def _update_profile_probe_rules(
+        self,
+        profile_probe_id: UUID,
+        rule_selections: List[GuardrailProbeRuleSelection],
+        user_id: UUID,
+    ) -> None:
+        """Update rules for a specific probe in a profile."""
+        # Get existing rules for this profile probe
+        existing_rules_stmt = select(GuardrailProfileRule).where(
+            GuardrailProfileRule.profile_probe_id == profile_probe_id
+        )
+        existing_rules = self.session.execute(existing_rules_stmt).scalars().all()
+        existing_rule_ids = {rule.rule_id: rule for rule in existing_rules}
+
+        # Get new rule IDs
+        new_rule_ids = {selection.id for selection in rule_selections}
+
+        # Delete rules that are no longer overridden
+        rules_to_delete = set(existing_rule_ids.keys()) - new_rule_ids
+        if rules_to_delete:
+            delete_rules_stmt = (
+                delete(GuardrailProfileRule)
+                .where(GuardrailProfileRule.profile_probe_id == profile_probe_id)
+                .where(GuardrailProfileRule.rule_id.in_(rules_to_delete))
+            )
+            self.session.execute(delete_rules_stmt)
+
+        # Process each rule selection
+        for rule_selection in rule_selections:
+            rule_id = rule_selection.id
+
+            # Only process if rule has specific overrides
+            if (
+                rule_selection.status == GuardrailStatusEnum.DISABLED
+                or rule_selection.severity_threshold is not None
+                or rule_selection.guard_types is not None
+            ):
+                if rule_id in existing_rule_ids:
+                    # Update existing rule override
+                    rule_override = existing_rule_ids[rule_id]
+                    rule_update = {}
+                    if rule_selection.status is not None:
+                        rule_update["status"] = rule_selection.status
+                    if rule_selection.severity_threshold is not None:
+                        rule_update["severity_threshold"] = rule_selection.severity_threshold
+                    if rule_selection.guard_types is not None:
+                        rule_update["guard_types"] = rule_selection.guard_types
+
+                    if rule_update:
+                        # Don't use update_by_fields as it commits and breaks the savepoint
+                        for field, value in rule_update.items():
+                            setattr(rule_override, field, value)
+                else:
+                    # Add new rule override
+                    db_profile_rule = GuardrailProfileRule(
+                        profile_probe_id=profile_probe_id,
+                        rule_id=rule_id,
+                        status=rule_selection.status,
+                        severity_threshold=rule_selection.severity_threshold,
+                        guard_types=rule_selection.guard_types,
+                        created_by=user_id,
+                    )
+                    self.session.add(db_profile_rule)
+            elif rule_id in existing_rule_ids:
+                # Remove rule override if it no longer has specific settings
+                delete_rule_stmt = (
+                    delete(GuardrailProfileRule)
+                    .where(GuardrailProfileRule.profile_probe_id == profile_probe_id)
+                    .where(GuardrailProfileRule.rule_id == rule_id)
+                )
+                self.session.execute(delete_rule_stmt)
 
     async def retrieve_profile(self, profile_id: UUID) -> GuardrailProfileDetailResponse:
         """Retrieve a specific profile by ID."""
@@ -1475,4 +1651,99 @@ class GuardrailProfileDeploymentService(SessionMixin):
             deployment=db_deployment,
             message="Deployment retrieved successfully",
             code=HTTPStatus.HTTP_200_OK,
+        )
+
+    async def edit_deployment(
+        self,
+        deployment_id: UUID,
+        user_id: UUID,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        severity_threshold: Optional[float] = None,
+        guard_types: Optional[list[str]] = None,
+    ) -> GuardrailDeploymentDetailResponse:
+        """Edit an existing guardrail deployment.
+
+        Users can only edit deployments they created.
+        Only specific fields can be updated: name, description, severity_threshold, guard_types
+        """
+        # Retrieve the deployment
+        db_deployment = await GuardrailsDeploymentDataManager(self.session).retrieve_by_fields(
+            GuardrailDeployment, {"id": deployment_id}, exclude_fields={"status": GuardrailStatusEnum.DELETED}
+        )
+
+        if not db_deployment:
+            raise ClientException(message="Deployment not found", status_code=HTTPStatus.HTTP_404_NOT_FOUND)
+
+        # Check if user has permission to edit (must be the creator)
+        if user_id and db_deployment.created_by != user_id:
+            raise ClientException(
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN, message="You do not have permission to edit this deployment"
+            )
+
+        # Prepare update data
+        update_data = {}
+        if name is not None:
+            update_data["name"] = name
+        if description is not None:
+            update_data["description"] = description
+        if severity_threshold is not None:
+            update_data["severity_threshold"] = severity_threshold
+        if guard_types is not None:
+            update_data["guard_types"] = guard_types
+
+        # Update the deployment
+        if update_data:
+            updated_deployment = await GuardrailsDeploymentDataManager(self.session).update_by_fields(
+                db_deployment, update_data
+            )
+            # Update the cache after deployment update
+            await GuardrailDeploymentWorkflowService(self.session).update_guardrail_profile_cache(
+                db_deployment.profile_id
+            )
+        else:
+            updated_deployment = db_deployment
+
+        return GuardrailDeploymentDetailResponse(
+            deployment=updated_deployment,
+            message="Deployment updated successfully",
+            code=HTTPStatus.HTTP_200_OK,
+        )
+
+    async def delete_deployment(self, deployment_id: UUID, user_id: UUID) -> dict:
+        """Delete (soft delete) a guardrail deployment.
+
+        Users can only delete deployments they created.
+        """
+        # Retrieve the deployment
+        db_deployment = await GuardrailsDeploymentDataManager(self.session).retrieve_by_fields(
+            GuardrailDeployment, {"id": deployment_id}, exclude_fields={"status": GuardrailStatusEnum.DELETED}
+        )
+
+        if not db_deployment:
+            raise ClientException(message="Deployment not found", status_code=HTTPStatus.HTTP_404_NOT_FOUND)
+
+        # Check if user has permission to delete (must be the creator)
+        if user_id and db_deployment.created_by != user_id:
+            raise ClientException(
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN,
+                message="You do not have permission to delete this deployment",
+            )
+
+        # Soft delete the deployment
+        await GuardrailsDeploymentDataManager(self.session).soft_delete_deployment(deployment_id)
+
+        # Delete from proxy cache
+        if db_deployment.endpoint_id:
+            await GuardrailDeploymentWorkflowService(self.session).delete_guardrail_deployment_from_proxy_cache(
+                db_deployment.endpoint_id
+            )
+
+        # Delete profile cache
+        await GuardrailDeploymentWorkflowService(self.session).delete_guardrail_profile_cache(db_deployment.profile_id)
+
+        return SuccessResponse(
+            message="Deployment deleted successfully",
+            code=HTTPStatus.HTTP_200_OK,
+            object="guardrail.deployment.delete",
         )

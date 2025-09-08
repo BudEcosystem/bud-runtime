@@ -180,7 +180,27 @@ class GuardrailProfileUpdate(BaseModel):
     tags: Optional[list[Tag]] = None
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
-    status: Optional[GuardrailStatusEnum] = None
+    # status: Optional[GuardrailStatusEnum] = None
+
+
+class GuardrailProbeRuleSelection(BaseModel):
+    id: UUID4
+    status: GuardrailStatusEnum
+    severity_threshold: Optional[float] = None
+    guard_types: Optional[list[str]] = None
+
+
+class GuardrailProfileProbeSelection(BaseModel):
+    id: UUID4
+    rules: Optional[list[GuardrailProbeRuleSelection]] = None
+    severity_threshold: Optional[float] = None
+    guard_types: Optional[list[str]] = None
+
+
+class GuardrailProfileUpdateWithProbes(GuardrailProfileUpdate):
+    """Schema for updating a guardrail profile with probe selections."""
+
+    probe_selections: Optional[list[GuardrailProfileProbeSelection]] = None
 
 
 class GuardrailProfileResponse(BaseModel):
@@ -281,7 +301,7 @@ class GuardrailDeploymentUpdate(BaseModel):
 
     name: Optional[str] = None
     description: Optional[str] = None
-    status: Optional[GuardrailDeploymentStatusEnum] = None
+    # status: Optional[GuardrailDeploymentStatusEnum] = None
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
 
@@ -316,20 +336,6 @@ class GuardrailDeploymentPaginatedResponse(PaginatedSuccessResponse):
 class GuardrailDeploymentDetailResponse(SuccessResponse):
     deployment: GuardrailDeploymentResponse
     object: str = "guardrail.deployment"
-
-
-class GuardrailProbeRuleSelection(BaseModel):
-    id: UUID4
-    status: GuardrailStatusEnum
-    severity_threshold: Optional[float] = None
-    guard_types: Optional[list[str]] = None
-
-
-class GuardrailProfileProbeSelection(BaseModel):
-    id: UUID4
-    rules: Optional[list[GuardrailProbeRuleSelection]] = None
-    severity_threshold: Optional[float] = None
-    guard_types: Optional[list[str]] = None
 
 
 class GuardrailDeploymentWorkflowRequest(BaseModel):

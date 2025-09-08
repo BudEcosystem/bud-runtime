@@ -19,7 +19,7 @@
 from typing import Optional, Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -32,6 +32,7 @@ from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.guardrails.schemas import (
     GuardrailDeploymentDetailResponse,
     GuardrailDeploymentPaginatedResponse,
+    GuardrailDeploymentUpdate,
     GuardrailDeploymentWorkflowRequest,
     GuardrailFilter,
     GuardrailProbeCreate,
@@ -42,6 +43,8 @@ from budapp.guardrails.schemas import (
     GuardrailProfilePaginatedResponse,
     GuardrailProfileProbeResponse,
     GuardrailProfileRuleResponse,
+    GuardrailProfileUpdate,
+    GuardrailProfileUpdateWithProbes,
     GuardrailRuleCreate,
     GuardrailRuleDetailResponse,
     GuardrailRulePaginatedResponse,
@@ -174,8 +177,8 @@ async def create_probe(
             tags=request.tags,
         )
         return result.to_http_response()
-    except HTTPException as e:
-        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to create probe: {e}")
         return ErrorResponse(
@@ -276,8 +279,8 @@ async def edit_probe(
             status=request.status,
         )
         return result.to_http_response()
-    except HTTPException as e:
-        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to update probe: {e}")
         return ErrorResponse(
@@ -300,8 +303,8 @@ async def delete_probe(
     try:
         result = await GuardrailProbeRuleService(session).delete_probe(probe_id, current_user.id)
         return result.to_http_response()
-    except HTTPException as e:
-        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to delete probe: {e}")
         return ErrorResponse(
@@ -360,8 +363,8 @@ async def create_rule(
             examples=request.examples,
         )
         return result.to_http_response()
-    except HTTPException as e:
-        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to create rule: {e}")
         return ErrorResponse(
@@ -395,8 +398,8 @@ async def edit_rule(
             examples=request.examples,
         )
         return result.to_http_response()
-    except HTTPException as e:
-        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to update rule: {e}")
         return ErrorResponse(
@@ -419,8 +422,8 @@ async def delete_rule(
     try:
         result = await GuardrailProbeRuleService(session).delete_rule(rule_id, current_user.id)
         return result.to_http_response()
-    except HTTPException as e:
-        return ErrorResponse(code=e.status_code, message=e.detail).to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to delete rule: {e}")
         return ErrorResponse(
@@ -637,6 +640,72 @@ async def get_profile_probe_rules(
     ).to_http_response()
 
 
+@router.put(
+    "/profile/{profile_id}",
+    response_model=GuardrailProfileDetailResponse,
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def update_profile_with_probes(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    profile_id: UUID,
+    request: GuardrailProfileUpdateWithProbes,
+) -> Union[GuardrailProfileDetailResponse, ErrorResponse]:
+    """Update a guardrail profile with probe selections.
+
+    This endpoint allows updating both profile fields and probe/rule selections.
+    Probe selections can:
+    - Add new probes to the profile
+    - Remove existing probes from the profile
+    - Update probe-specific overrides (severity_threshold, guard_types)
+    - Update rule-specific overrides within each probe
+    """
+    try:
+        result = await GuardrailProfileDeploymentService(session).update_profile_with_probes(
+            profile_id=profile_id,
+            user_id=current_user.id,
+            name=request.name,
+            description=request.description,
+            tags=request.tags,
+            severity_threshold=request.severity_threshold,
+            guard_types=request.guard_types,
+            probe_selections=request.probe_selections,
+        )
+        return result.to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to update profile with probes: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to update profile",
+        ).to_http_response()
+
+
+@router.delete(
+    "/profile/{profile_id}",
+    response_model=SuccessResponse,
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def delete_profile(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    profile_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete (soft delete) a guardrail profile."""
+    try:
+        result = await GuardrailProfileDeploymentService(session).delete_profile(profile_id, current_user.id)
+        return result.to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete profile: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to delete profile",
+        ).to_http_response()
+
+
 @router.post(
     "/deploy-workflow",
     responses={
@@ -754,4 +823,67 @@ async def retrieve_deployment(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to retrieve deployment details",
+        ).to_http_response()
+
+
+@router.put(
+    "/deployment/{deployment_id}",
+    response_model=GuardrailDeploymentDetailResponse,
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def edit_deployment(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    deployment_id: UUID,
+    request: GuardrailDeploymentUpdate,
+) -> Union[GuardrailDeploymentDetailResponse, ErrorResponse]:
+    """Update a guardrail deployment.
+
+    Only the following fields can be updated:
+    - name
+    - description
+    - severity_threshold
+    - guard_types
+    """
+    try:
+        result = await GuardrailProfileDeploymentService(session).edit_deployment(
+            deployment_id=deployment_id,
+            user_id=current_user.id,
+            name=request.name,
+            description=request.description,
+            severity_threshold=request.severity_threshold,
+            guard_types=request.guard_types,
+        )
+        return result.to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to update deployment: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to update deployment",
+        ).to_http_response()
+
+
+@router.delete(
+    "/deployment/{deployment_id}",
+    response_model=SuccessResponse,
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def delete_deployment(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    deployment_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete (soft delete) a guardrail deployment."""
+    try:
+        result = await GuardrailProfileDeploymentService(session).delete_deployment(deployment_id, current_user.id)
+        return result.to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete deployment: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to delete deployment",
         ).to_http_response()

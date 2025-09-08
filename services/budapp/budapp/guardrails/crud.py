@@ -28,7 +28,7 @@ from sqlalchemy.sql import select
 from budapp.commons import logging
 from budapp.commons.constants import GuardrailDeploymentStatusEnum, GuardrailStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
-from budapp.commons.exceptions import ClientException, DatabaseException
+from budapp.commons.exceptions import DatabaseException
 from budapp.guardrails.models import (
     GuardrailDeployment,
     GuardrailProbe,
@@ -621,9 +621,8 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
 
         if active_deployment_count > 0:
             logger.error(f"Cannot delete profile {profile_id}: {active_deployment_count} active deployment(s) found")
-            raise ClientException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                message=f"Cannot delete guardrail profile because it has {active_deployment_count} active deployment(s). Please delete or update the deployments first.",
+            raise ValueError(
+                f"Cannot delete guardrail profile because it has {active_deployment_count} active deployment(s). Please delete or update the deployments first."
             )
 
         try:
