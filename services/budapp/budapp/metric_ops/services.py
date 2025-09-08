@@ -243,12 +243,30 @@ class BudMetricService(SessionMixin):
         request_data = request.model_dump(mode="json")
 
         # For CLIENT users, we need to filter by api_key_project_id instead of project_id
-        if current_user.user_type == UserTypeEnum.CLIENT and request.project_id:
-            # Convert project_id filter to api_key_project_id for CLIENT users
-            request_data["filters"] = request_data.get("filters", {})
-            request_data["filters"]["api_key_project_id"] = str(request.project_id)
-            # Remove the project_id from top-level (it will be in filters)
-            request_data.pop("project_id", None)
+        if current_user.user_type == UserTypeEnum.CLIENT:
+            if request.project_id:
+                # Convert project_id filter to api_key_project_id for CLIENT users
+                if request_data.get("filters") is None:
+                    request_data["filters"] = {}
+                request_data["filters"]["api_key_project_id"] = str(request.project_id)
+                # Remove the project_id from top-level (it will be in filters)
+                request_data.pop("project_id", None)
+            else:
+                # If no project_id provided, restrict to user's accessible api_key_project_ids
+                from ..project_ops.services import ProjectService
+
+                project_service = ProjectService(self.session)
+                user_projects, _ = await project_service.get_all_active_projects(
+                    current_user, offset=0, limit=1000, filters={}, order_by=[], search=False
+                )
+                user_project_ids = [str(project.project.id) for project in user_projects]
+
+                # Apply restriction using api_key_project_id for CLIENT users
+                if request_data.get("filters") is None:
+                    request_data["filters"] = {}
+                request_data["filters"]["api_key_project_id"] = user_project_ids
+                # Remove the project_id from top-level if it exists
+                request_data.pop("project_id", None)
 
         # Proxy request to budmetrics
         metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/inferences/list"
