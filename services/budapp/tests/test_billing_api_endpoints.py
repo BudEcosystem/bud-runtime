@@ -318,6 +318,12 @@ class TestUserBillingEndpoints:
             "custom_token_quota": None,
             "custom_cost_quota": None,
             "suspension_reason": None,
+            "enable_email_notifications": True,
+            "enable_in_app_notifications": True,
+            "is_current": True,
+            "cycle_number": 1,
+            "superseded_at": None,
+            "superseded_by_id": None,
             "created_at": datetime.now(timezone.utc),
             "modified_at": datetime.now(timezone.utc),
         }
