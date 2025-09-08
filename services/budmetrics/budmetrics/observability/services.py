@@ -1297,9 +1297,9 @@ class ObservabilityMetricsService:
 
             return EnhancedInferenceDetailResponse(
                 object="inference_detail",
-                inference_id=safe_uuid(row_dict.get("inference_id")),
-                timestamp=row_dict.get("timestamp"),
-                model_name=str(row_dict.get("model_name")) if row_dict.get("model_name") else "",
+                inference_id=safe_uuid(row_dict.get("mi.inference_id")),
+                timestamp=row_dict.get("mi.timestamp"),
+                model_name=str(row_dict.get("mi.model_name")) if row_dict.get("mi.model_name") else "",
                 model_provider=str(row_dict.get("model_provider_name"))
                 if row_dict.get("model_provider_name")
                 else "unknown",
@@ -1322,8 +1322,8 @@ class ObservabilityMetricsService:
                 if row_dict.get("processing_time_ms")
                 else None,
                 request_ip=str(row_dict.get("request_ip")) if row_dict.get("request_ip") else None,
-                request_arrival_time=row_dict.get("request_arrival_time"),
-                request_forward_time=row_dict.get("request_forward_time"),
+                request_arrival_time=row_dict.get("request_arrival_time") or row_dict.get("mi.timestamp"),
+                request_forward_time=row_dict.get("request_forward_time") or row_dict.get("mi.timestamp"),
                 project_id=safe_uuid(row_dict.get("mid.project_id")),
                 api_key_project_id=safe_uuid(row_dict.get("api_key_project_id")),
                 endpoint_id=safe_uuid(row_dict.get("mid.endpoint_id")),
