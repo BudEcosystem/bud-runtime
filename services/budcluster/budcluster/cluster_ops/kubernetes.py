@@ -752,7 +752,7 @@ class KubernetesHandler(BaseClusterHandler):
                     elif endpoint == "/v1/chat/completions":
                         payload = {
                             "model": namespace,
-                            "messages": [{"role": "user", "content": "test"}],
+                            "messages": [{"role": "user", "content": "who are you?"}],
                             "max_tokens": 1,
                         }
                     else:  # /v1/completions
@@ -766,6 +766,7 @@ class KubernetesHandler(BaseClusterHandler):
 
                 # Check if endpoint is supported (200 OK or other success codes)
                 supported_endpoints[endpoint] = response.status_code in [200, 201, 202, 204]
+                logger.debug(f"Endpoint {endpoint} returned  {response.text}")
                 logger.debug(f"Endpoint {endpoint} returned status code {response.status_code}")
 
             except requests.RequestException as err:
@@ -896,7 +897,7 @@ class KubernetesHandler(BaseClusterHandler):
                                 cores=int(pod["spec"]["containers"][0]["resources"]["requests"].get("cpu", 0)),
                                 memory=pod["spec"]["containers"][0]["resources"]["requests"].get("memory", "0"),
                                 deployment_name=deploy_info["metadata"]["name"],
-                                concurrency=pod["metadata"]["labels"].get("concurrency", 100),
+                                concurrency=int(pod["metadata"]["labels"].get("concurrency") or 100),
                                 reason=reason,
                             )
                             worker_data_list.append(worker_data.model_dump(mode="json", exclude_none=True))
@@ -956,6 +957,10 @@ class KubernetesHandler(BaseClusterHandler):
 
     def get_deployment_status(self, values: dict, cloud_model: bool = False, ingress_health: bool = True) -> str:
         """Get the status of a deployment on the Kubernetes cluster."""
+        logger.info(
+            f"get_deployment_status called for {values.get('namespace', 'unknown')}: "
+            f"cloud_model={cloud_model}, ingress_health={ingress_health}"
+        )
         if not self.ingress_url:
             raise KubernetesException("Ingress URL is not set")
 
@@ -993,20 +998,100 @@ class KubernetesHandler(BaseClusterHandler):
             else:
                 break
 
-        ingress_health = (
-            self.verify_ingress_health(values["namespace"], cloud_model=cloud_model) if ingress_health else True
+        # Phase 2: Bounded ingress/endpoint validation
+        # if not worker_data_list:
+        #     pod_status["status"] = DeploymentStatusEnum.FAILED
+        #     return {
+        #         "status": DeploymentStatusEnum.FAILED,
+        #         "replicas": pod_status,
+        #         "ingress_health": False,
+        #         "worker_data_list": worker_data_list,
+        #         "supported_endpoints": {},
+        #     }
+
+        # Only perform ingress/endpoint validation if explicitly requested
+        if not ingress_health:
+            return {
+                "status": pod_status["status"],
+                "replicas": pod_status,
+                "ingress_health": True,
+                "worker_data_list": worker_data_list,
+                "supported_endpoints": {},
+            }
+
+        # Bounded retry for ingress and endpoint validation
+        max_retries = app_settings.max_endpoint_retry_attempts
+        retry_interval = app_settings.endpoint_retry_interval
+        retry_count = 0
+
+        logger.info(
+            f"Starting endpoint validation retry loop for {values['namespace']}: "
+            f"max_retries={max_retries}, interval={retry_interval}s, total_timeout={max_retries * retry_interval}s"
         )
-        # ingress health can be checked only if workers are available
-        if not ingress_health and worker_data_list:
-            pod_status["status"] = DeploymentStatusEnum.INGRESS_FAILED
+
+        while retry_count < max_retries:
+            logger.info(f"Attempt {retry_count + 1}/{max_retries} for {values['namespace']}")
+
+            # Check ingress health (/v1/models endpoint)
+            ingress_healthy = self.verify_ingress_health(values["namespace"], cloud_model=cloud_model)
+            logger.debug(f"Ingress health check result: {ingress_healthy}")
+
+            if ingress_healthy:
+                # Check endpoint functionality (/v1/embeddings, /v1/chat/completions)
+                endpoints_status = self.identify_supported_endpoints(values["namespace"], cloud_model)
+                functional_endpoints = [ep for ep, supported in endpoints_status.items() if supported]
+                logger.debug(f"Endpoint status: {endpoints_status}, functional: {functional_endpoints}")
+
+                if functional_endpoints:
+                    # SUCCESS: Both ingress and endpoints are ready
+                    logger.info(
+                        f"✓ Deployment ready for {values['namespace']} after {retry_count + 1} attempts "
+                        f"with endpoints: {functional_endpoints}"
+                    )
+                    return {
+                        "status": pod_status["status"],
+                        "replicas": pod_status,
+                        "ingress_health": True,
+                        "worker_data_list": worker_data_list,
+                        "supported_endpoints": endpoints_status,
+                    }
+                else:
+                    logger.info(f"Endpoints not ready for {values['namespace']} (ingress OK)")
+            else:
+                logger.info(f"Ingress not ready for {values['namespace']}")
+
+            retry_count += 1
+            if retry_count < max_retries:
+                logger.info(f"Waiting {retry_interval}s before next attempt...")
+                time.sleep(retry_interval)
+
+        # TIMEOUT: Max retries exceeded - determine final status based on original logic
+        logger.error(
+            f"Endpoints/ingress failed to become ready after {max_retries} attempts for {values['namespace']}"
+        )
+
+        # Check final ingress health state for status determination
+        final_ingress_healthy = False
+        try:
+            final_ingress_healthy = self.verify_ingress_health(values["namespace"], cloud_model=cloud_model)
+        except Exception as e:
+            logger.warning(f"Final ingress health check failed: {e}")
+
+        # Apply original status logic: ingress health can be checked only if workers are available
+        if not final_ingress_healthy and worker_data_list:
+            final_status = DeploymentStatusEnum.INGRESS_FAILED
         elif not worker_data_list:
-            pod_status["status"] = DeploymentStatusEnum.FAILED
+            final_status = DeploymentStatusEnum.FAILED
+        else:
+            # New case: ingress is healthy but endpoints failed (timeout)
+            final_status = DeploymentStatusEnum.ENDPOINTS_FAILED
 
         return {
-            "status": pod_status["status"],
+            "status": final_status,
             "replicas": pod_status,
-            "ingress_health": ingress_health,
+            "ingress_health": final_ingress_healthy,
             "worker_data_list": worker_data_list,
+            "supported_endpoints": endpoints_status if "endpoints_status" in locals() else {},
         }
 
     def apply_security_context(self, namespace: str) -> None:

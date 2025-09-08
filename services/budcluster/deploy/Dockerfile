@@ -26,9 +26,9 @@ RUN pip install --no-cache-dir ansible-core==2.15.* ansible-runner \
     && rm -rf /root/.cache/pip/*
 
 # Install CPU-only PyTorch to save ~8GB (CUDA version is ~10GB, CPU-only is ~2GB)
-RUN pip install --no-cache-dir \
-    torch==2.2.0+cpu torchvision==0.17.0+cpu \
-    -f https://download.pytorch.org/whl/torch_stable.html
+# RUN pip install --no-cache-dir \
+#     torch==2.2.0+cpu torchvision==0.17.0+cpu \
+#     -f https://download.pytorch.org/whl/torch_stable.html
 
 # Install llm-benchmark directly from git (not editable mode, saves space)
 RUN pip install --no-cache-dir git+https://github.com/BudEcosystem/llm-benchmark.git

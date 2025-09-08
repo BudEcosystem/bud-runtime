@@ -2,14 +2,16 @@ locals {
   environments = [
     "stage", # strictly follows stable git branch, this is our current prod
     "dev",   # strictly follows master git branch
+  ]
 
-    # personal dev environment
+  # personal dev environment
+  environments_pde = [
     "sinan",
     "ditto",
     "adarsh"
   ]
+
   # a service can be only removed if it's not required by all the environments
-  # there's no need for separating them now
   services = [
     "admin",
     "customer",
@@ -20,13 +22,28 @@ locals {
     "api.novu",
     "ws.novu",
   ]
-  services_with_envs = toset(flatten([
-    for env in local.environments : [
-      for srv in local.services :
-      srv == "" ? "${env}.${var.zone_domain}" : "${srv}.${env}.${var.zone_domain}"
-    ]
-  ]))
 
+  # place holder domains for new pde services
+  # that are not yet merged upstream
+  services_pde = [
+    "temp",
+  ]
+
+  services_with_envs = toset(concat(
+    flatten([
+      for env in local.environments : [
+        for srv in local.services :
+        srv == "" ? "${env}.${var.zone_domain}" : "${srv}.${env}.${var.zone_domain}"
+      ]
+    ])
+    ,
+    flatten([
+      for env in local.environments_pde : [
+        for srv in concat(local.services_pde, local.services) :
+        srv == "" ? "${env}.${var.zone_domain}" : "${srv}.${env}.${var.zone_domain}"
+      ]
+    ])
+  ))
   ingress_ipv4 = { for ip in toset(concat(
     [for _, ip in module.azure.ip.ingress.v4 : ip],
     [module.azure.ip.primary.v4]

@@ -70,6 +70,9 @@ class InferenceListRequest(BaseModel):
         ]
     ] = None
 
+    # Additional filters for complex queries (e.g., {"api_key_project_id": ["uuid1", "uuid2"]})
+    filters: Optional[Dict[str, Any]] = None
+
     # Sorting
     sort_by: Literal["timestamp", "tokens", "latency", "cost"] = "timestamp"
     sort_order: Literal["asc", "desc"] = "desc"

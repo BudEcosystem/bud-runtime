@@ -643,6 +643,11 @@ class Evolution:
             "intra_node_bandwidth": self.device_config.get("intra_node_bandwidth_in_GB_per_sec", 300),
             "pp_communication_overhead": self._calculate_pp_overhead(pp_size),
             "nodes_used": min(pp_size, cluster_topology.get("total_nodes", 1)),
+            # Device identification fields for hardware matching
+            "device_model": self.device_config.get("device_model", ""),
+            "device_name": self.device_config.get("device_name", ""),
+            "raw_name": self.device_config.get("raw_name", ""),
+            **model_data,  # Include all ModelAnalysis results
         }
         # print(f"Data: {data}")
         return data
