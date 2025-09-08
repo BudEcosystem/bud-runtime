@@ -1764,8 +1764,7 @@ fn prepare_serialized_openai_compatible_events_with_usage_tracking(
                     let tokens_to_consume = total_usage.total_tokens as i64;
                     let cost_to_consume = if total_usage.total_tokens > 0 {
                         // Use default pricing for streaming: $0.01 per 1K input tokens, $0.03 per 1K output tokens
-                        // Since we don't have exact input/output breakdown, use average: $0.02 per 1K tokens
-                        let cost = total_usage.total_tokens as f64 * 0.00002;
+                        let cost = (total_usage.prompt_tokens as f64 * 0.00001) + (total_usage.completion_tokens as f64 * 0.00003);
                         (cost * 10000.0).round() / 10000.0
                     } else {
                         0.0
