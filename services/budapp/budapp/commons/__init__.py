@@ -42,6 +42,7 @@ from budapp.project_ops.models import Project as Project
 from budapp.router_ops.models import Router as Router
 from budapp.router_ops.models import RouterEndpoint as RouterEndpoint
 from budapp.user_ops.models import User as User
+from budapp.user_ops.oauth_models import UserOAuthProvider as UserOAuthProvider
 from budapp.workflow_ops.models import Workflow as Workflow
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStep
 

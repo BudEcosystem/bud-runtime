@@ -24,7 +24,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model
 
 from budapp.cluster_ops.schemas import ClusterResponse
 from budapp.commons.constants import AdapterStatusEnum, EndpointStatusEnum, ModelEndpointEnum, ProxyProviderEnum
-from budapp.commons.schemas import PaginatedSuccessResponse, ProxyGuardrailConfig, SuccessResponse
+from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.model_ops.schemas import ModelDetailResponse, ModelResponse
 
 
@@ -473,7 +473,6 @@ class ProxyModelConfig(BaseModel):
     endpoints: list[str]
     api_key: Optional[str] = None
     pricing: Optional[ProxyModelPricing] = None
-    guardrails: Optional[ProxyGuardrailConfig] = None
 
 
 class RateLimitConfig(BaseModel):

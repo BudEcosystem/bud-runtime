@@ -670,6 +670,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     ADAPTER_DEPLOYMENT_EVENTS = "adapter_deployment_events"
     ADAPTER_DELETE_EVENTS = "adapter_delete_events"
     EVALUATION_EVENTS = "evaluation_events"
+    GUARDRAIL_DEPLOYMENT_EVENTS = "guardrail_deployment_events"
 
 
 # Mapping between payload types and workflow step event names.
@@ -789,6 +790,7 @@ class ProxyProviderEnum(StrEnum):
     MISTRAL = "mistral"
     TOGETHER = "together"
     XAI = "xai"
+    BUD_SENTINEL = "bud-sentinel"
 
 
 # class ModelTemplateTypeEnum(StrEnum):
@@ -2884,6 +2886,7 @@ class NotificationTypeEnum(StrEnum):
     ADAPTER_DELETION_SUCCESS = auto()
     PROJECT_INVITATION_SUCCESS = auto()
     EVALUATION_SUCCESS = auto()
+    GUARDRAIL_DEPLOYMENT_SUCCESS = auto()
 
 
 BENCHMARK_FIELDS_TYPE_MAPPER = {

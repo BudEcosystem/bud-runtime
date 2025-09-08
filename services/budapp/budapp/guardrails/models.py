@@ -264,12 +264,12 @@ class GuardrailProfileRule(Base, TimestampMixin):
     )
     status: Mapped[str] = mapped_column(
         Enum(
-            GuardrailDeploymentStatusEnum,
+            GuardrailStatusEnum,
             name="guardrail_deployment_status",
             values_callable=lambda x: [e.value for e in x],
         ),
         nullable=False,
-        default=GuardrailDeploymentStatusEnum.RUNNING.value,
+        default=GuardrailStatusEnum.ACTIVE,
     )
     severity_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     guard_types: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
@@ -297,12 +297,13 @@ class GuardrailDeployment(Base, TimestampMixin):
             values_callable=lambda x: [e.value for e in x],
         ),
         nullable=False,
-        default=GuardrailDeploymentStatusEnum.RUNNING.value,
+        default=GuardrailDeploymentStatusEnum.RUNNING,
     )
 
     created_by: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id"), nullable=False)
     project_id: Mapped[UUID] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
-    endpoint_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("endpoint.id", ondelete="CASCADE"), nullable=False)
+    endpoint_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("endpoint.id", ondelete="CASCADE"), nullable=True)
+    credential_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("proprietary_credential.id"), nullable=True)
 
     # Override fields from profile
     severity_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

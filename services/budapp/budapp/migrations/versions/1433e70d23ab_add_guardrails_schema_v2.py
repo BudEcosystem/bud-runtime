@@ -16,7 +16,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "1433e70d23ab"
-down_revision: Union[str, None] = "e5b3d2a8f92c"
+down_revision: Union[str, None] = "a1b2c3d4e5f6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -149,7 +149,8 @@ def upgrade() -> None:
         ),
         sa.Column("created_by", sa.Uuid(), nullable=False),
         sa.Column("project_id", sa.Uuid(), nullable=False),
-        sa.Column("endpoint_id", sa.Uuid(), nullable=False),
+        sa.Column("endpoint_id", sa.Uuid(), nullable=True),
+        sa.Column("credential_id", sa.Uuid(), nullable=True),
         sa.Column("severity_threshold", sa.Float(), nullable=True),
         sa.Column("guard_types", postgresql.ARRAY(sa.String()), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -170,17 +171,7 @@ def upgrade() -> None:
         sa.Column("rule_id", sa.Uuid(), nullable=False),
         sa.Column(
             "status",
-            postgresql.ENUM(
-                "running",
-                "failure",
-                "deploying",
-                "unhealthy",
-                "deleting",
-                "deleted",
-                "pending",
-                name="guardrail_deployment_status",
-                create_type=False,
-            ),
+            postgresql.ENUM("active", "disabled", "deleted", name="guardrail_status_enum", create_type=False),
             nullable=False,
         ),
         sa.Column("severity_threshold", sa.Float(), nullable=True),
