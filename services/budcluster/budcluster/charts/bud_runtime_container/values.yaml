@@ -6,10 +6,10 @@ hfToken: "" # will be replaced by the deployment handler
 containerPort: "8000" # will be replaced by the deployment handler
 ingressHost: "bud-runtime-inference.apps.partner.lab.com" # will be replaced by the deployment handler
 
-volumeType: "nfs" # nfs, local
+volumeType: "local" # nfs, local
 pvcName: "models-pvc"
 nfs:
-  server: "10.43.126.65"
+  server: ""
   path: "/exports"
 
 nodes: [] # will be replaced by the deployment handler

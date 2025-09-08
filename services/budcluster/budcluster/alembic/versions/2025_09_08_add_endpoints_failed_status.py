@@ -26,7 +26,30 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade the database."""
-    # Note: PostgreSQL doesn't support removing enum values directly
-    # This would require recreating the enum type and updating all references
-    # For now, we'll leave the enum value in place during downgrade
-    pass
+    # IMPORTANT: PostgreSQL doesn't support removing enum values directly.
+    # This migration is designed to be non-reversible for production safety.
+    #
+    # If you need to remove 'endpoints_failed' status in development:
+    # 1. Ensure no records use this status value
+    # 2. Manually recreate the enum without this value:
+    #    - CREATE TYPE deployment_status_enum_new AS ENUM ('ready', 'pending', 'ingress_failed', 'failed');
+    #    - ALTER TABLE deployment ALTER COLUMN deployment_status TYPE deployment_status_enum_new USING deployment_status::text::deployment_status_enum_new;
+    #    - DROP TYPE deployment_status_enum;
+    #    - ALTER TYPE deployment_status_enum_new RENAME TO deployment_status_enum;
+    #
+    # For production environments, consider this a forward-only migration.
+
+    # Check if any records use the 'endpoints_failed' status
+    from sqlalchemy import text
+
+    result = (
+        op.get_bind()
+        .execute(text("SELECT COUNT(*) FROM deployment WHERE deployment_status = 'endpoints_failed'"))
+        .scalar()
+    )
+
+    if result > 0:
+        raise Exception(
+            f"Cannot downgrade: {result} deployment(s) currently have 'endpoints_failed' status. "
+            "Please update these records before downgrading."
+        )
