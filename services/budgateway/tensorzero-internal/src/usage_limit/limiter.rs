@@ -310,7 +310,7 @@ impl UsageLimiter {
 
         if let Some(mut conn) = redis_client.as_ref().map(|c| c.clone()) {
             let key = format!("usage_limit:{}", user_id);
-            
+
             // Skip if nothing to increment
             if tokens.is_none() && cost.is_none() {
                 return Ok(());
@@ -321,14 +321,14 @@ impl UsageLimiter {
                 local key = KEYS[1]
                 local tokens_delta = tonumber(ARGV[1])
                 local cost_delta = tonumber(ARGV[2])
-                
+
                 local current = redis.call('GET', key)
                 if not current then
                     return {err = "No usage limit data found"}
                 end
-                
+
                 local data = cjson.decode(current)
-                
+
                 -- Atomically increment the fields
                 if tokens_delta ~= 0 then
                     data.tokens_used = data.tokens_used + tokens_delta
@@ -336,10 +336,10 @@ impl UsageLimiter {
                 if cost_delta ~= 0 then
                     data.cost_used = data.cost_used + cost_delta
                 end
-                
+
                 local updated = cjson.encode(data)
                 redis.call('SET', key, updated)
-                
+
                 -- Return the updated values for cache sync
                 return {data.tokens_used, data.cost_used}
             "#;
@@ -606,37 +606,6 @@ impl UsageLimiter {
         self.cache.invalidate_all();
     }
 
-    /// Reset realtime counters for a user (called by budapp after incorporating them)
-    pub async fn reset_realtime_counters(&self, user_id: &str, new_update_id: u64) -> Result<(), Error> {
-        let redis_client = self.redis_client.read().await;
-
-        if let Some(mut conn) = redis_client.as_ref().map(|c| c.clone()) {
-            let key = format!("usage:realtime:{}", user_id);
-
-            // Reset counters with new update_id
-            let mut pipe = redis::pipe();
-            pipe.hset(&key, "tokens", 0)
-                .hset(&key, "cost", 0.0)
-                .hset(&key, "since_update_id", new_update_id);
-
-            let _: () = timeout(
-                Duration::from_millis(self.config.redis_timeout_ms),
-                pipe.query_async(&mut conn)
-            ).await
-            .map_err(|_| Error::new(ErrorDetails::Config {
-                message: "Redis timeout on reset".to_string(),
-            }))?
-            .map_err(|e| Error::new(ErrorDetails::Config {
-                message: format!("Redis reset error: {}", e),
-            }))?;
-
-            Ok(())
-        } else {
-            Err(Error::new(ErrorDetails::Config {
-                message: "No Redis connection available".to_string(),
-            }))
-        }
-    }
 
     /// Get metrics
     pub fn get_metrics(&self) -> UsageLimiterMetrics {
@@ -658,5 +627,5 @@ impl UsageLimiter {
 }
 
 // #[cfg(test)]
-// #[path = "tests.rs"] 
+// #[path = "tests.rs"]
 // mod tests;

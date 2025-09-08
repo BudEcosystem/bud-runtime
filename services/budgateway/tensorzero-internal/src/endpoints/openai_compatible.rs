@@ -9,6 +9,8 @@
 //! and then convert the response into the OpenAI-compatible format.
 
 use std::collections::HashMap;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::debug_handler;
@@ -1570,221 +1572,192 @@ fn process_chat_content_chunk(
     (content_str, tool_calls, reasoning_content)
 }
 
+/// Shared stream processor for OpenAI-compatible events with optional usage tracking
+struct OpenAICompatibleStreamProcessor {
+    stream: InferenceStream,
+    model_name: String,
+    stream_options: Option<OpenAICompatibleStreamOptions>,
+    usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
+    headers: Option<HeaderMap>,
+}
+
+impl OpenAICompatibleStreamProcessor {
+    fn new(
+        stream: InferenceStream,
+        model_name: String,
+        stream_options: Option<OpenAICompatibleStreamOptions>,
+    ) -> Self {
+        Self {
+            stream,
+            model_name,
+            stream_options,
+            usage_limiter: None,
+            headers: None,
+        }
+    }
+
+    fn with_usage_tracking(
+        stream: InferenceStream,
+        model_name: String,
+        stream_options: Option<OpenAICompatibleStreamOptions>,
+        usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
+        headers: HeaderMap,
+    ) -> Self {
+        Self {
+            stream,
+            model_name,
+            stream_options,
+            usage_limiter,
+            headers: Some(headers),
+        }
+    }
+}
+
+impl Stream for OpenAICompatibleStreamProcessor {
+    type Item = Result<Event, Error>;
+
+    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // This will be implemented using async_stream::stream! macro
+        // For now, we'll use a helper method
+        unimplemented!("Use process_stream() method instead")
+    }
+}
+
+impl OpenAICompatibleStreamProcessor {
+    fn process_stream(mut self) -> impl Stream<Item = Result<Event, Error>> {
+        async_stream::stream! {
+            let mut tool_id_to_index = HashMap::new();
+            let mut is_first_chunk = true;
+            let mut total_usage = OpenAICompatibleUsage {
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                total_tokens: 0,
+            };
+            let mut inference_id = None;
+            let mut _episode_id = None;
+
+            // Process all chunks and accumulate usage
+            while let Some(chunk) = tokio_stream::StreamExt::next(&mut self.stream).await {
+                let Ok(chunk) = chunk else {
+                    continue;
+                };
+                inference_id = Some(chunk.inference_id());
+                _episode_id = Some(chunk.episode_id());
+                let chunk_usage = match &chunk {
+                    InferenceResponseChunk::Chat(c) => &c.usage,
+                    InferenceResponseChunk::Json(c) => &c.usage,
+                };
+                if let Some(chunk_usage) = chunk_usage {
+                    total_usage.prompt_tokens += chunk_usage.input_tokens;
+                    total_usage.completion_tokens += chunk_usage.output_tokens;
+                    total_usage.total_tokens += chunk_usage.input_tokens + chunk_usage.output_tokens;
+                }
+                let openai_compatible_chunks = convert_inference_response_chunk_to_openai_compatible(
+                    chunk,
+                    &mut tool_id_to_index,
+                    &self.model_name,
+                );
+                for chunk in openai_compatible_chunks {
+                    let mut chunk_json = serde_json::to_value(chunk).map_err(|e| {
+                        Error::new(ErrorDetails::Inference {
+                            message: format!("Failed to convert chunk to JSON: {e}"),
+                        })
+                    })?;
+                    if is_first_chunk {
+                        chunk_json["choices"][0]["delta"]["role"] = Value::String("assistant".to_string());
+                        is_first_chunk = false;
+                    }
+
+                    yield Ok(Event::default().json_data(chunk_json).map_err(|e| {
+                        Error::new(ErrorDetails::Inference {
+                            message: format!("Failed to convert Value to Event: {e}"),
+                        })
+                    })?);
+                }
+            }
+
+            // Handle final usage message if stream_options.include_usage is true
+            if let Some(ref options) = self.stream_options {
+                if options.include_usage {
+                    let final_usage_message = serde_json::json!({
+                        "id": format!("chatcmpl-{}", inference_id.unwrap_or(Uuid::new_v4())),
+                        "choices": [],
+                        "created": std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs(),
+                        "model": self.model_name,
+                        "system_fingerprint": serde_json::Value::Null,
+                        "object": "chat.completion.chunk",
+                        "usage": total_usage
+                    });
+
+                    yield Ok(Event::default().json_data(final_usage_message).map_err(|e| {
+                        Error::new(ErrorDetails::Inference {
+                            message: format!("Failed to convert final usage to Event: {e}"),
+                        })
+                    })?);
+                }
+            }
+
+            // Send [DONE] to signal the end of the stream
+            yield Ok(Event::default().data("[DONE]"));
+
+            // Handle usage tracking if enabled
+            if let (Some(usage_limiter), Some(headers)) = (self.usage_limiter, self.headers) {
+                if let Some(user_id) = headers.get("x-tensorzero-user-id").and_then(|v| v.to_str().ok()) {
+                    if total_usage.total_tokens > 0 {
+                        // Calculate estimated cost (using same logic as non-streaming)
+                        let tokens_to_consume = total_usage.total_tokens as i64;
+                        let cost_to_consume = if total_usage.total_tokens > 0 {
+                            // Use default pricing for streaming: $0.01 per 1K input tokens, $0.03 per 1K output tokens
+                            // Since we don't have exact input/output breakdown, use average: $0.02 per 1K tokens
+                            let cost = total_usage.total_tokens as f64 * 0.00002;
+                            (cost * 10000.0).round() / 10000.0
+                        } else {
+                            0.0
+                        };
+
+                        // Record the consumption (fire and forget - don't block response)
+                        let usage_limiter_clone = usage_limiter.clone();
+                        let user_id_clone = user_id.to_string();
+                        tokio::spawn(async move {
+                            let _result = usage_limiter_clone
+                                .check_usage(&user_id_clone, Some(tokens_to_consume), Some(cost_to_consume))
+                                .await;
+                        });
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Prepares an Event for SSE on the way out of the gateway
 /// When None is passed in, we send "[DONE]" to the client to signal the end of the stream
 fn prepare_serialized_openai_compatible_events(
-    mut stream: InferenceStream,
+    stream: InferenceStream,
     model_name: String,
     stream_options: Option<OpenAICompatibleStreamOptions>,
 ) -> impl Stream<Item = Result<Event, Error>> {
-    async_stream::stream! {
-        let mut tool_id_to_index = HashMap::new();
-        let mut is_first_chunk = true;
-        let mut total_usage = OpenAICompatibleUsage {
-            prompt_tokens: 0,
-            completion_tokens: 0,
-            total_tokens: 0,
-        };
-        let mut inference_id = None;
-        let mut episode_id = None;
-        while let Some(chunk) = tokio_stream::StreamExt::next(&mut stream).await {
-            // NOTE - in the future, we may want to end the stream early if we get an error
-            // For now, we just ignore the error and try to get more chunks
-            let Ok(chunk) = chunk else {
-                continue;
-            };
-            inference_id = Some(chunk.inference_id());
-            episode_id = Some(chunk.episode_id());
-            let chunk_usage = match &chunk {
-                InferenceResponseChunk::Chat(c) => {
-                    &c.usage
-                }
-                InferenceResponseChunk::Json(c) => {
-                    &c.usage
-                }
-            };
-            if let Some(chunk_usage) = chunk_usage {
-                total_usage.prompt_tokens += chunk_usage.input_tokens;
-                total_usage.completion_tokens += chunk_usage.output_tokens;
-                total_usage.total_tokens += chunk_usage.input_tokens + chunk_usage.output_tokens;
-            }
-            let openai_compatible_chunks = convert_inference_response_chunk_to_openai_compatible(chunk, &mut tool_id_to_index, &model_name);
-            for chunk in openai_compatible_chunks {
-                let mut chunk_json = serde_json::to_value(chunk).map_err(|e| {
-                    Error::new(ErrorDetails::Inference {
-                        message: format!("Failed to convert chunk to JSON: {e}"),
-                    })
-                })?;
-                if is_first_chunk {
-                    // OpenAI includes "assistant" role in the first chunk but not in the subsequent chunks
-                    chunk_json["choices"][0]["delta"]["role"] = Value::String("assistant".to_string());
-                    is_first_chunk = false;
-                }
-
-                yield Event::default().json_data(chunk_json).map_err(|e| {
-                    Error::new(ErrorDetails::Inference {
-                        message: format!("Failed to convert Value to Event: {e}"),
-                    })
-                })
-            }
-        }
-        if stream_options.map(|s| s.include_usage).unwrap_or(false) {
-            let episode_id = episode_id.ok_or_else(|| {
-                Error::new(ErrorDetails::Inference {
-                    message: "Cannot find episode_id - no chunks were produced by TensorZero".to_string(),
-                })
-            })?;
-            let inference_id = inference_id.ok_or_else(|| {
-                Error::new(ErrorDetails::Inference {
-                    message: "Cannot find inference_id - no chunks were produced by TensorZero".to_string(),
-                })
-            })?;
-            let usage_chunk = OpenAICompatibleResponseChunk {
-                id: inference_id.to_string(),
-                episode_id: episode_id.to_string(),
-                choices: vec![],
-                created: current_timestamp() as u32,
-                model: model_name.clone(),
-                system_fingerprint: "".to_string(),
-                object: "chat.completion.chunk".to_string(),
-                service_tier: "".to_string(),
-                usage: Some(OpenAICompatibleUsage {
-                    prompt_tokens: total_usage.prompt_tokens,
-                    completion_tokens: total_usage.completion_tokens,
-                    total_tokens: total_usage.total_tokens,
-                }),
-            };
-            yield Event::default().json_data(
-                usage_chunk)
-                .map_err(|e| {
-                    Error::new(ErrorDetails::Inference {
-                        message: format!("Failed to convert usage chunk to JSON: {e}"),
-                    })
-                });
-        }
-        yield Ok(Event::default().data("[DONE]"));
-    }
+    OpenAICompatibleStreamProcessor::new(stream, model_name, stream_options).process_stream()
 }
 
 /// Enhanced version of prepare_serialized_openai_compatible_events that includes usage tracking
 fn prepare_serialized_openai_compatible_events_with_usage_tracking(
-    mut stream: InferenceStream,
+    stream: InferenceStream,
     model_name: String,
     stream_options: Option<OpenAICompatibleStreamOptions>,
     usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
     headers: HeaderMap,
 ) -> impl Stream<Item = Result<Event, Error>> {
-    async_stream::stream! {
-        let mut tool_id_to_index = HashMap::new();
-        let mut is_first_chunk = true;
-        let mut total_usage = OpenAICompatibleUsage {
-            prompt_tokens: 0,
-            completion_tokens: 0,
-            total_tokens: 0,
-        };
-        let mut inference_id = None;
-        let mut episode_id = None;
-
-        // Process all chunks and accumulate usage
-        while let Some(chunk) = tokio_stream::StreamExt::next(&mut stream).await {
-            let Ok(chunk) = chunk else {
-                continue;
-            };
-            inference_id = Some(chunk.inference_id());
-            episode_id = Some(chunk.episode_id());
-            let chunk_usage = match &chunk {
-                InferenceResponseChunk::Chat(c) => &c.usage,
-                InferenceResponseChunk::Json(c) => &c.usage,
-            };
-            if let Some(chunk_usage) = chunk_usage {
-                total_usage.prompt_tokens += chunk_usage.input_tokens;
-                total_usage.completion_tokens += chunk_usage.output_tokens;
-                total_usage.total_tokens += chunk_usage.input_tokens + chunk_usage.output_tokens;
-            }
-            let openai_compatible_chunks = convert_inference_response_chunk_to_openai_compatible(chunk, &mut tool_id_to_index, &model_name);
-            for chunk in openai_compatible_chunks {
-                let mut chunk_json = serde_json::to_value(chunk).map_err(|e| {
-                    Error::new(ErrorDetails::Inference {
-                        message: format!("Failed to convert chunk to JSON: {e}"),
-                    })
-                })?;
-                if is_first_chunk {
-                    chunk_json["choices"][0]["delta"]["role"] = Value::String("assistant".to_string());
-                    is_first_chunk = false;
-                }
-
-                yield Event::default().json_data(chunk_json).map_err(|e| {
-                    Error::new(ErrorDetails::Inference {
-                        message: format!("Failed to convert Value to Event: {e}"),
-                    })
-                })
-            }
-        }
-
-        // Send usage chunk if requested
-        if stream_options.map(|s| s.include_usage).unwrap_or(false) {
-            let episode_id = episode_id.ok_or_else(|| {
-                Error::new(ErrorDetails::Inference {
-                    message: "Cannot find episode_id - no chunks were produced by TensorZero".to_string(),
-                })
-            })?;
-            let inference_id = inference_id.ok_or_else(|| {
-                Error::new(ErrorDetails::Inference {
-                    message: "Cannot find inference_id - no chunks were produced by TensorZero".to_string(),
-                })
-            })?;
-            let usage_chunk = OpenAICompatibleResponseChunk {
-                id: inference_id.to_string(),
-                episode_id: episode_id.to_string(),
-                choices: vec![],
-                created: current_timestamp() as u32,
-                model: model_name.clone(),
-                system_fingerprint: "".to_string(),
-                object: "chat.completion.chunk".to_string(),
-                service_tier: "".to_string(),
-                usage: Some(OpenAICompatibleUsage {
-                    prompt_tokens: total_usage.prompt_tokens,
-                    completion_tokens: total_usage.completion_tokens,
-                    total_tokens: total_usage.total_tokens,
-                }),
-            };
-            yield Event::default().json_data(usage_chunk).map_err(|e| {
-                Error::new(ErrorDetails::Inference {
-                    message: format!("Failed to convert usage chunk to JSON: {e}"),
-                })
-            });
-        }
-
-        // Track usage consumption after stream completes (fire and forget)
-        if let Some(usage_limiter) = usage_limiter {
-            if let Some(user_id) = headers.get("x-tensorzero-user-id").and_then(|v| v.to_str().ok()) {
-                if total_usage.total_tokens > 0 {
-
-                    // Calculate estimated cost (using same logic as non-streaming)
-                    let tokens_to_consume = total_usage.total_tokens as i64;
-                    let cost_to_consume = if total_usage.total_tokens > 0 {
-                        // Use default pricing for streaming: $0.01 per 1K input tokens, $0.03 per 1K output tokens
-                        // Since we don't have exact input/output breakdown, use average: $0.02 per 1K tokens
-                        let cost = total_usage.total_tokens as f64 * 0.00002;
-                        (cost * 10000.0).round() / 10000.0
-                    } else {
-                        0.0
-                    };
-
-                    // Fire and forget usage tracking
-                    let usage_limiter_clone = usage_limiter.clone();
-                    let user_id_clone = user_id.to_string();
-                    tokio::spawn(async move {
-                        let _result = usage_limiter_clone
-                            .check_usage(&user_id_clone, Some(tokens_to_consume), Some(cost_to_consume))
-                            .await;
-                    });
-                }
-            }
-        }
-
-        yield Ok(Event::default().data("[DONE]"));
-    }
+    OpenAICompatibleStreamProcessor::with_usage_tracking(
+        stream,
+        model_name,
+        stream_options,
+        usage_limiter,
+        headers,
+    ).process_stream()
 }
 
 impl From<ToolCallChunk> for OpenAICompatibleToolCall {
