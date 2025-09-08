@@ -11,7 +11,13 @@ import { errorToast } from "@/components/toast";
 import TextInput from "@/components/ui/bud/dataEntry/TextInput";
 import CustomSelect from "@/components/ui/bud/dataEntry/CustomSelect";
 
-function AddKeyForm({ setApiKeyData, apiKeyData }: { setApiKeyData: (data: any) => void; apiKeyData: any }) {
+function AddKeyForm({
+  setApiKeyData,
+  apiKeyData,
+}: {
+  setApiKeyData: (data: any) => void;
+  apiKeyData: any;
+}) {
   const { form } = useContext(BudFormContext);
   const [projectData, setProjectData] = useState<any>([]);
   const { projects, getProjects } = useProjects();
@@ -122,18 +128,22 @@ export default function AddNewKey() {
       if (response && response.status >= 200 && response.status < 300) {
         // Store the API key for display in success screen
         // Handle different possible response structures
-        const apiKey = response.data?.key ||
-                      response.data?.api_key ||
-                      response.data?.credential?.key ||
-                      response.data?.credential?.api_key ||
-                      "";
+        const apiKey =
+          response.data?.key ||
+          response.data?.api_key ||
+          response.data?.credential?.key ||
+          response.data?.credential?.api_key ||
+          "";
 
         if (apiKey) {
           localStorage.setItem("temp_api_key", apiKey);
           openDrawerWithStep("api-key-success");
         } else {
           // Success response but no API key in response
-          console.warn("API key created but key not found in response:", response.data);
+          console.warn(
+            "API key created but key not found in response:",
+            response.data,
+          );
           // Still navigate to success screen as the creation was successful
           localStorage.setItem("temp_api_key", "");
           openDrawerWithStep("api-key-success");
@@ -151,8 +161,8 @@ export default function AddNewKey() {
       } else {
         errorToast(
           error?.response?.data?.detail ||
-          error?.response?.data?.message ||
-          "Failed to create API key. Please try again.",
+            error?.response?.data?.message ||
+            "Failed to create API key. Please try again.",
         );
       }
       // Ensure we don't navigate to success screen on error
@@ -165,7 +175,12 @@ export default function AddNewKey() {
   return (
     <BudForm
       data={{}}
-      disableNext={!apiKeyData.name || !apiKeyData.project_id || !apiKeyData.expiry || isSubmitting}
+      disableNext={
+        !apiKeyData.name ||
+        !apiKeyData.project_id ||
+        !apiKeyData.expiry ||
+        isSubmitting
+      }
       onNext={handleSubmit}
       nextText={isSubmitting ? "Creating..." : "Create"}
       backText="Cancel"

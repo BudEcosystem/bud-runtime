@@ -50,8 +50,14 @@ export default function IconRender({
       // Only use assetBaseUrl if it's configured
       iconImage = `${assetBaseUrl}${icon.startsWith("/") ? icon : "/" + icon}`;
     }
-  } else if ((type === "hugging_face" || type === "cloud_model") && model?.provider?.icon) {
-    if (model.provider.icon.startsWith("http://") || model.provider.icon.startsWith("https://")) {
+  } else if (
+    (type === "hugging_face" || type === "cloud_model") &&
+    model?.provider?.icon
+  ) {
+    if (
+      model.provider.icon.startsWith("http://") ||
+      model.provider.icon.startsWith("https://")
+    ) {
       iconImage = model.provider.icon;
     } else if (model.provider.icon.startsWith("/")) {
       iconImage = model.provider.icon;
@@ -61,7 +67,8 @@ export default function IconRender({
   }
 
   // Fallback to local images if no icon URL
-  const fallbackImage = type === "url" ? "/images/drawer/url-2.png" : "/images/drawer/disk-2.png";
+  const fallbackImage =
+    type === "url" ? "/images/drawer/url-2.png" : "/images/drawer/disk-2.png";
 
   return (
     <div
@@ -130,8 +137,14 @@ export function IconOnlyRender({
       // Only use assetBaseUrl if it's configured
       iconImage = `${assetBaseUrl}${icon.startsWith("/") ? icon : "/" + icon}`;
     }
-  } else if ((type === "hugging_face" || type === "cloud_model") && model?.provider?.icon) {
-    if (model.provider.icon.startsWith("http://") || model.provider.icon.startsWith("https://")) {
+  } else if (
+    (type === "hugging_face" || type === "cloud_model") &&
+    model?.provider?.icon
+  ) {
+    if (
+      model.provider.icon.startsWith("http://") ||
+      model.provider.icon.startsWith("https://")
+    ) {
       iconImage = model.provider.icon;
     } else if (model.provider.icon.startsWith("/")) {
       iconImage = model.provider.icon;
@@ -141,7 +154,8 @@ export function IconOnlyRender({
   }
 
   // Fallback to local images if no icon URL
-  const fallbackImage = type === "url" ? "/images/drawer/url-2.png" : "/images/drawer/disk-2.png";
+  const fallbackImage =
+    type === "url" ? "/images/drawer/url-2.png" : "/images/drawer/disk-2.png";
 
   return (
     <div className="w-full h-full rounded-[.4rem]  flex items-center justify-center">

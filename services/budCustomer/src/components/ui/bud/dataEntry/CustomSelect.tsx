@@ -43,7 +43,8 @@ function CustomSelect(props: BudInputProps) {
               color: isLight ? "#1a1a1a" : "#EEEEEE",
             }}
           >
-            {props.label} {props.required && <b className="text-[#FF4D4F]">*</b>}
+            {props.label}{" "}
+            {props.required && <b className="text-[#FF4D4F]">*</b>}
             {props.info && (
               <CustomPopover title={props.info}>
                 <Image
@@ -62,8 +63,8 @@ function CustomSelect(props: BudInputProps) {
         <ConfigProvider
           theme={{
             token: {
-              colorTextPlaceholder: '#808080',
-              colorText: isLight ? '#1a1a1a' : '#EEEEEE',
+              colorTextPlaceholder: "#808080",
+              colorText: isLight ? "#1a1a1a" : "#EEEEEE",
             },
           }}
         >
@@ -73,23 +74,23 @@ function CustomSelect(props: BudInputProps) {
               backgroundColor: "transparent",
               border: "0.5px solid #757575",
               width: "100%",
-              paddingTop: '.6rem',
-              paddingBottom: '.6rem',
-              fontSize: '.75rem'
+              paddingTop: ".6rem",
+              paddingBottom: ".6rem",
+              fontSize: ".75rem",
             }}
             value={props.value || null}
             size="large"
             className={`drawerInp !bg-[transparent] !text-[#1a1a1a] dark:!text-[#EEEEEE] font-[300] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#CFCFCF] focus:border-[#CFCFCF] active:border-[#CFCFCF] ${props.InputClasses}`}
             options={props.selectOptions}
             onChange={(value) => {
-              props.onChange?.(value)
+              props.onChange?.(value);
             }}
             popupClassName="bud-custom-select-dropdown"
             suffixIcon={
               <img
                 src={`/icons/customArrow.png`}
                 alt="custom arrow"
-                style={{ width: '10px', height: '7px' }}
+                style={{ width: "10px", height: "7px" }}
               />
             }
           />

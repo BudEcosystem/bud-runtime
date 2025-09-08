@@ -458,7 +458,7 @@ select:-webkit-autofill:focus {
 .logs-table .ant-table {
   background: transparent;
 }
-.ant-table-wrapper .ant-table-tbody>tr.ant-table-placeholder {
+.ant-table-wrapper .ant-table-tbody > tr.ant-table-placeholder {
   background: var(--bg-primary) !important;
 }
 .logs-table .ant-table-thead > tr > th {

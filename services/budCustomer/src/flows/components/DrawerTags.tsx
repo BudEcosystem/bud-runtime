@@ -43,7 +43,7 @@ const Tags: React.FC<TagsProps> = ({
   if (name !== undefined && name !== null) {
     const tagContent = (
       <div
-        className={`flex items-center px-2 py-1 rounded text-white ${textClass} ${onTagClick ? 'cursor-pointer' : ''}`}
+        className={`flex items-center px-2 py-1 rounded text-white ${textClass} ${onTagClick ? "cursor-pointer" : ""}`}
         style={{ backgroundColor: color }}
         onClick={onTagClick}
       >
@@ -53,11 +53,7 @@ const Tags: React.FC<TagsProps> = ({
     );
 
     if (showTooltip && tooltipText) {
-      return (
-        <Tooltip title={tooltipText}>
-          {tagContent}
-        </Tooltip>
-      );
+      return <Tooltip title={tooltipText}>{tagContent}</Tooltip>;
     }
 
     return tagContent;

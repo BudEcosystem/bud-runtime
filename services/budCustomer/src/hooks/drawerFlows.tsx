@@ -1547,12 +1547,11 @@ const editProject: DrawerFlowType = {
       navigation: () => {
         const state = useProjects.getState();
         const project = state.globalSelectedProject;
-        const projectName = (project as any)?.project?.name || (project as any)?.name || "Project";
-        return [
-          "Projects",
-          projectName,
-          "Edit Project",
-        ];
+        const projectName =
+          (project as any)?.project?.name ||
+          (project as any)?.name ||
+          "Project";
+        return ["Projects", projectName, "Edit Project"];
       },
       id: "edit-project",
       confirmClose: false,
@@ -1573,12 +1572,11 @@ const editProject: DrawerFlowType = {
       navigation: () => {
         const state = useProjects.getState();
         const project = state.globalSelectedProject;
-        const projectName = (project as any)?.project?.name || (project as any)?.name || "Project";
-        return [
-          "Projects",
-          projectName,
-          "Success",
-        ];
+        const projectName =
+          (project as any)?.project?.name ||
+          (project as any)?.name ||
+          "Project";
+        return ["Projects", projectName, "Success"];
       },
       id: "project-edit-success",
       confirmClose: false,

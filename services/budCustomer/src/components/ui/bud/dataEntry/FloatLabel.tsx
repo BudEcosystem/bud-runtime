@@ -20,7 +20,9 @@ const FloatLabel = (props: FloatLabelProps) => {
       onFocus={() => setFocus(true)}
     >
       {children}
-      <label className={`text-nowrap ${labelClass} ${classNames}`}>{label}</label>
+      <label className={`text-nowrap ${labelClass} ${classNames}`}>
+        {label}
+      </label>
     </div>
   );
 };

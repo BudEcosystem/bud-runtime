@@ -3,7 +3,13 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import React, { useContext, useState } from "react";
-import { Text_10_400_757575, Text_12_400_757575, Text_12_400_B3B3B3, Text_12_600_EEEEEE, Text_14_400_EEEEEE } from "@/components/ui/text";
+import {
+  Text_10_400_757575,
+  Text_12_400_757575,
+  Text_12_400_B3B3B3,
+  Text_12_600_EEEEEE,
+  Text_14_400_EEEEEE,
+} from "@/components/ui/text";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { Select, Form, Input, ConfigProvider } from "antd";
 import { useDrawer } from "@/hooks/useDrawer";
@@ -27,7 +33,11 @@ export default function CreateBatchJob() {
   });
   const { openDrawerWithStep } = useDrawer();
 
-  const isFormValid = batchJobData.name && batchJobData.model && batchJobData.completionWindow && batchJobData.file;
+  const isFormValid =
+    batchJobData.name &&
+    batchJobData.model &&
+    batchJobData.completionWindow &&
+    batchJobData.file;
 
   return (
     <BudForm
@@ -44,7 +54,9 @@ export default function CreateBatchJob() {
         openDrawerWithStep(""); // Close drawer
       }}
     >
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         /* Drawer title and description text colors for light theme */
         [data-theme="light"] .text-sm {
           color: #000000 !important;
@@ -136,7 +148,9 @@ export default function CreateBatchJob() {
         [data-theme="light"] .ant-upload-dragger span {
           color: #000000 !important;
         }
-      ` }} />
+      `,
+        }}
+      />
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
@@ -152,7 +166,10 @@ export default function CreateBatchJob() {
               className={`flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]`}
             >
               <div className="w-full">
-                <ThemedLabel text="Job Name" info="Enter a descriptive name for your batch job" />
+                <ThemedLabel
+                  text="Job Name"
+                  info="Enter a descriptive name for your batch job"
+                />
               </div>
               <Input
                 placeholder="e.g., Product Descriptions Generation"
@@ -179,7 +196,10 @@ export default function CreateBatchJob() {
               className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
             >
               <div className="w-full">
-                <ThemedLabel text="Select Model" info="Choose the model to process your batch requests" />
+                <ThemedLabel
+                  text="Select Model"
+                  info="Choose the model to process your batch requests"
+                />
               </div>
               <div className="model-select-wrapper w-full">
                 <ConfigProvider
@@ -206,7 +226,10 @@ export default function CreateBatchJob() {
                       { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
                       { value: "claude-3-opus", label: "Claude 3 Opus" },
                       { value: "claude-3-sonnet", label: "Claude 3 Sonnet" },
-                      { value: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+                      {
+                        value: "claude-3.5-sonnet",
+                        label: "Claude 3.5 Sonnet",
+                      },
                     ]}
                     onChange={(value) => {
                       form.setFieldsValue({ model: value });
@@ -221,12 +244,17 @@ export default function CreateBatchJob() {
             {/* Completion Window Selection */}
             <Form.Item
               hasFeedback
-              rules={[{ required: true, message: "Please select completion window!" }]}
+              rules={[
+                { required: true, message: "Please select completion window!" },
+              ]}
               name={"completionWindow"}
               className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}
             >
               <div className="w-full">
-                <ThemedLabel text="Completion Window" info="Choose the maximum time for batch processing" />
+                <ThemedLabel
+                  text="Completion Window"
+                  info="Choose the maximum time for batch processing"
+                />
               </div>
               <div className="model-select-wrapper w-full">
                 <ConfigProvider
@@ -258,7 +286,10 @@ export default function CreateBatchJob() {
                     onChange={(value) => {
                       form.setFieldsValue({ completionWindow: value });
                       form.validateFields(["completionWindow"]);
-                      setBatchJobData({ ...batchJobData, completionWindow: value });
+                      setBatchJobData({
+                        ...batchJobData,
+                        completionWindow: value,
+                      });
                     }}
                   />
                 </ConfigProvider>
@@ -268,7 +299,7 @@ export default function CreateBatchJob() {
             {/* File Upload with FileInput component */}
             <FileInput
               name="jsonl_file"
-              acceptedFileTypes={['.jsonl', '.json']}
+              acceptedFileTypes={[".jsonl", ".json"]}
               label="Upload JSONL File"
               placeholder=""
               infoText="Upload the JSONL file containing your batch requests"
@@ -276,16 +307,23 @@ export default function CreateBatchJob() {
               text={
                 <div className="flex justify-center items-center w-[100%]">
                   <Text_12_400_B3B3B3>Drag & Drop or </Text_12_400_B3B3B3>&nbsp;
-                  <Text_12_600_EEEEEE className="text-[black] dark:text-[#EEEEE]">Choose file</Text_12_600_EEEEEE>&nbsp;
+                  <Text_12_600_EEEEEE className="text-[black] dark:text-[#EEEEE]">
+                    Choose file
+                  </Text_12_600_EEEEEE>
+                  &nbsp;
                   <Text_12_400_B3B3B3> to upload</Text_12_400_B3B3B3>
                 </div>
               }
               hint={
                 <>
-                  <Text_10_400_757575>Supported format: JSONL (Maximum file size: 100MB)</Text_10_400_757575>
+                  <Text_10_400_757575>
+                    Supported format: JSONL (Maximum file size: 100MB)
+                  </Text_10_400_757575>
                 </>
               }
-              rules={[{ required: true, message: "Please upload a JSONL file" }]}
+              rules={[
+                { required: true, message: "Please upload a JSONL file" },
+              ]}
               onChange={(value) => {
                 if (value) {
                   setBatchJobData({

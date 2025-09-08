@@ -24,7 +24,8 @@ export const openWarning = ({
 
   const updateNotificationMessage = (newDescription: string) => {
     // Check if light theme is active
-    const isLightTheme = document.documentElement.getAttribute('data-theme') === 'light';
+    const isLightTheme =
+      document.documentElement.getAttribute("data-theme") === "light";
 
     notification.open({
       key,
@@ -41,18 +42,22 @@ export const openWarning = ({
             }}
           />
           <div className="flex flex-col gap-y-[12px] pt-[5px]">
-            <div style={{
-              color: isLightTheme ? '#1A1A1A' : '#EEEEEE',
-              fontSize: '14px',
-              fontWeight: 400
-            }}>
+            <div
+              style={{
+                color: isLightTheme ? "#1A1A1A" : "#EEEEEE",
+                fontSize: "14px",
+                fontWeight: 400,
+              }}
+            >
               {title}
             </div>
-            <div style={{
-              color: isLightTheme ? '#666666' : '#757575',
-              fontSize: '12px',
-              fontWeight: 400
-            }}>
+            <div
+              style={{
+                color: isLightTheme ? "#666666" : "#757575",
+                fontSize: "12px",
+                fontWeight: 400,
+              }}
+            >
               {newDescription}
             </div>
           </div>
@@ -63,9 +68,9 @@ export const openWarning = ({
       closeIcon: null,
       style: {
         width: "30.9375rem",
-        background: isLightTheme ? '#FFFFFF' : '#101010',
+        background: isLightTheme ? "#FFFFFF" : "#101010",
         borderRadius: 6,
-        border: isLightTheme ? '1px solid #E0E0E0' : '1px solid #1F1F1F',
+        border: isLightTheme ? "1px solid #E0E0E0" : "1px solid #1F1F1F",
         backdropFilter: "blur(10px)",
       },
       actions: (

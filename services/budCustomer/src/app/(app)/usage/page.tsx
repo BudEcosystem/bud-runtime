@@ -1,7 +1,18 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Flex, Select, Button, ConfigProvider, Tabs, Skeleton, Card, Switch, Modal, Input } from "antd";
+import {
+  Flex,
+  Select,
+  Button,
+  ConfigProvider,
+  Tabs,
+  Skeleton,
+  Card,
+  Switch,
+  Modal,
+  Input,
+} from "antd";
 import { Typography } from "antd";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import styles from "./usage.module.scss";
@@ -61,7 +72,14 @@ interface BillingAlert {
 
 export default function UsagePage() {
   const { globalProjects, getGlobalProjects, loading } = useProjects();
-  const { alerts, loading: alertsLoading, getBillingAlerts, createBillingAlert, updateBillingAlertStatus, deleteBillingAlert } = useBillingAlerts();
+  const {
+    alerts,
+    loading: alertsLoading,
+    getBillingAlerts,
+    createBillingAlert,
+    updateBillingAlertStatus,
+    deleteBillingAlert,
+  } = useBillingAlerts();
   const notification = useNotification();
   const [timeRange, setTimeRange] = useState("30d");
   const [selectedProject, setSelectedProject] = useState("all");
@@ -102,7 +120,9 @@ export default function UsagePage() {
   const [usageData, setUsageData] = useState<UsageData[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [showAlertModal, setShowAlertModal] = useState(false);
-  const [alertType, setAlertType] = useState<"token_usage" | "cost_usage">("cost_usage");
+  const [alertType, setAlertType] = useState<"token_usage" | "cost_usage">(
+    "cost_usage",
+  );
   const [alertThreshold, setAlertThreshold] = useState(75);
   const [alertName, setAlertName] = useState("");
 
@@ -155,9 +175,9 @@ export default function UsagePage() {
     const end = dayjs(endDate);
     let current = start;
 
-    while (current.isBefore(end) || current.isSame(end, 'day')) {
-      dates.push(current.format('YYYY-MM-DD'));
-      current = current.add(1, 'day');
+    while (current.isBefore(end) || current.isSame(end, "day")) {
+      dates.push(current.format("YYYY-MM-DD"));
+      current = current.add(1, "day");
     }
     return dates;
   };
@@ -171,23 +191,26 @@ export default function UsagePage() {
 
       // Generate complete date range
       const allDates = generateDateRange(
-        params.start_date.split(' ')[0],
-        params.end_date.split(' ')[0]
+        params.start_date.split(" ")[0],
+        params.end_date.split(" ")[0],
       );
 
       // Create a map of existing data
       const dataMap = new Map();
       data.forEach((item: UsageData) => {
-        const dateKey = dayjs(item.date).format('YYYY-MM-DD');
+        const dateKey = dayjs(item.date).format("YYYY-MM-DD");
         dataMap.set(dateKey, item);
       });
 
       // Fill in missing dates with zero values
-      const completeData = allDates.map(date => {
+      const completeData = allDates.map((date) => {
         const existingData = dataMap.get(date);
         if (existingData) {
           // Only mark as hasData: true if there's actual usage (cost > 0)
-          const hasUsage = existingData.cost > 0 || existingData.tokens > 0 || existingData.requests > 0;
+          const hasUsage =
+            existingData.cost > 0 ||
+            existingData.tokens > 0 ||
+            existingData.requests > 0;
           return {
             date: existingData.date,
             displayDate: dayjs(existingData.date).format("MMM DD"),
@@ -307,14 +330,14 @@ export default function UsagePage() {
   const handleExport = () => {
     // Export functionality
     const dataStr = JSON.stringify(usageData, null, 2);
-    const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+    const dataUri =
+      "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
     const exportFileDefaultName = `usage-data-${dayjs().format("YYYY-MM-DD")}.json`;
     const linkElement = document.createElement("a");
     linkElement.setAttribute("href", dataUri);
     linkElement.setAttribute("download", exportFileDefaultName);
     linkElement.click();
   };
-
 
   const handleCreateAlert = async () => {
     if (!alertName.trim()) {
@@ -324,7 +347,7 @@ export default function UsagePage() {
 
     // Check if alert with same name already exists
     const existingAlert = alerts.find(
-      alert => alert.name.toLowerCase() === alertName.trim().toLowerCase()
+      (alert) => alert.name.toLowerCase() === alertName.trim().toLowerCase(),
     );
     if (existingAlert) {
       notification.errorToast("An alert with this name already exists");
@@ -342,14 +365,18 @@ export default function UsagePage() {
       setAlertThreshold(75);
       setAlertName("");
     } catch (error: any) {
-      notification.errorToast(error.message || "Failed to create billing alert");
+      notification.errorToast(
+        error.message || "Failed to create billing alert",
+      );
     }
   };
 
   const toggleAlert = async (id: string, currentStatus: boolean) => {
     try {
       await updateBillingAlertStatus(id, !currentStatus);
-      notification.successToast(`Alert ${!currentStatus ? 'enabled' : 'disabled'} successfully`);
+      notification.successToast(
+        `Alert ${!currentStatus ? "enabled" : "disabled"} successfully`,
+      );
     } catch (error: any) {
       notification.errorToast(error.message || "Failed to update alert status");
     }
@@ -432,7 +459,9 @@ export default function UsagePage() {
               loading={isLoading}
               trend={
                 metrics.previousSpend
-                  ? ((metrics.totalSpend - metrics.previousSpend) / metrics.previousSpend) * 100
+                  ? ((metrics.totalSpend - metrics.previousSpend) /
+                      metrics.previousSpend) *
+                    100
                   : 0
               }
             />
@@ -446,7 +475,9 @@ export default function UsagePage() {
               loading={isLoading}
               trend={
                 metrics.previousTokens
-                  ? ((metrics.totalTokens - metrics.previousTokens) / metrics.previousTokens) * 100
+                  ? ((metrics.totalTokens - metrics.previousTokens) /
+                      metrics.previousTokens) *
+                    100
                   : 0
               }
             />
@@ -456,7 +487,9 @@ export default function UsagePage() {
               loading={isLoading}
               trend={
                 metrics.previousRequests
-                  ? ((metrics.totalRequests - metrics.previousRequests) / metrics.previousRequests) * 100
+                  ? ((metrics.totalRequests - metrics.previousRequests) /
+                      metrics.previousRequests) *
+                    100
                   : 0
               }
             />
@@ -472,7 +505,10 @@ export default function UsagePage() {
                 ) : (
                   <>
                     <div className={styles.planName}>
-                      <Icon icon="ph:crown-simple" className={styles.planIcon} />
+                      <Icon
+                        icon="ph:crown-simple"
+                        className={styles.planIcon}
+                      />
                       <Text className={styles.planTitle}>Free</Text>
                     </div>
                     <Text className={styles.planPrice}>$0/month</Text>
@@ -521,7 +557,9 @@ export default function UsagePage() {
                 </div>
               ) : alerts.length === 0 ? (
                 <div className="text-center py-[2rem]">
-                  <Text className="text-bud-text-muted">No billing alerts configured</Text>
+                  <Text className="text-bud-text-muted">
+                    No billing alerts configured
+                  </Text>
                 </div>
               ) : (
                 alerts.map((alert) => (
@@ -537,11 +575,17 @@ export default function UsagePage() {
                           </Text>
                         </div>
                         <Text className="text-bud-text-muted text-[12px] block">
-                          {alert.alert_type === "cost_usage" ? "Cost" : "Token Usage"} Alert - Triggers at {alert.threshold_percent}%
+                          {alert.alert_type === "cost_usage"
+                            ? "Cost"
+                            : "Token Usage"}{" "}
+                          Alert - Triggers at {alert.threshold_percent}%
                         </Text>
                         {alert.last_triggered_at && (
                           <Text className="text-bud-text-disabled text-[11px] block mt-[0.25rem]">
-                            Last triggered: {new Date(alert.last_triggered_at).toLocaleDateString()}
+                            Last triggered:{" "}
+                            {new Date(
+                              alert.last_triggered_at,
+                            ).toLocaleDateString()}
                           </Text>
                         )}
                       </div>
@@ -555,14 +599,14 @@ export default function UsagePage() {
                             : "var(--border-secondary)",
                         }}
                       />
-		      <Button
-                            type="text"
-                            size="small"
-                            danger
-                            icon={<Icon icon="ph:trash" />}
-                            onClick={() => handleDeleteAlert(alert.id)}
-                            className="text-red-400 hover:text-red-300"
-                          />
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<Icon icon="ph:trash" />}
+                        onClick={() => handleDeleteAlert(alert.id)}
+                        className="text-red-400 hover:text-red-300"
+                      />
                     </Flex>
                   </div>
                 ))
