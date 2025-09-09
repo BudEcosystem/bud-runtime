@@ -128,7 +128,7 @@ class PasswordResetTokenService:
         """
         try:
             key = self._get_token_key(token)
-            response = self.dapr_client.get_state(store_name=app_settings.statestore_name, key=key)
+            response = await self.dapr_client.get_state(store_name=app_settings.statestore_name, key=key)
 
             if not response.data:
                 return {
