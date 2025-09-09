@@ -23,8 +23,6 @@ export default function TokenResetPassword() {
   const [error, setError] = useState("");
   const [isFormValid, setIsFormValid] = useState(false);
   const [isTokenValid, setIsTokenValid] = useState<boolean | null>(null);
-  const [userEmail, setUserEmail] = useState("");
-  const [expiresAt, setExpiresAt] = useState("");
   const [isShowNewPassword, setIsShowNewPassword] = useState(false);
   const [isShowConfirmPassword, setIsShowConfirmPassword] = useState(false);
   const [isTouched, setIsTouched] = useState({
@@ -68,8 +66,6 @@ export default function TokenResetPassword() {
 
       if (response.data.is_valid) {
         setIsTokenValid(true);
-        setUserEmail(response.data.email);
-        setExpiresAt(response.data.expires_at);
         setError("");
       } else {
         setIsTokenValid(false);
@@ -137,16 +133,6 @@ export default function TokenResetPassword() {
 
   const handleBlur = (field: string) => {
     setIsTouched({ ...isTouched, [field]: true });
-  };
-
-  const formatExpiryTime = (isoString: string) => {
-    if (!isoString) return "";
-    try {
-      const date = new Date(isoString);
-      return date.toLocaleString();
-    } catch {
-      return "";
-    }
   };
 
   const handleRequestNewReset = () => {

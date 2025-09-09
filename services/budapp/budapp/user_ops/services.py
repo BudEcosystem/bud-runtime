@@ -474,7 +474,7 @@ class UserService(SessionMixin):
             "expires_at": validation_result["expires_at"],
         }
 
-    async def reset_password_with_token(self, request: ResetPasswordWithTokenRequest, request_obj: Request = None):
+    async def reset_password_with_token(self, request: ResetPasswordWithTokenRequest):
         """Reset password using a valid token."""
         # Validate token
         validation_result = await self.password_reset_service.validate_token(request.token)

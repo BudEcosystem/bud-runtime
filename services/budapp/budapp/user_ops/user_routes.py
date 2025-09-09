@@ -257,12 +257,11 @@ async def validate_reset_token(
 )
 async def reset_password_with_token(
     request: ResetPasswordWithTokenRequest,
-    request_obj: Request,
     session: Session = Depends(get_session),
 ) -> Union[ResetPasswordWithTokenResponse, ErrorResponse]:
     """Reset password using a valid reset token."""
     try:
-        response = await UserService(session).reset_password_with_token(request, request_obj)
+        response = await UserService(session).reset_password_with_token(request)
         logger.info("Password reset completed successfully")
 
         return ResetPasswordWithTokenResponse(
