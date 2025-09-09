@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 from pydantic import BaseModel, Field, ValidationError, conlist
 from typing import List, Optional, Set
-from dynamic_model_creation import json_schema_to_pydantic_model
+from .dynamic_model_creation import json_schema_to_pydantic_model
 
 
 class Tag(BaseModel):

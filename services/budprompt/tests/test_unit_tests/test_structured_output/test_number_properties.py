@@ -10,7 +10,7 @@ import pytest
 from pydantic import BaseModel, Field, ValidationError, conint, confloat
 from typing import Optional
 from decimal import Decimal
-from test_openai_structured_output.dynamic_model_creation import json_schema_to_pydantic_model
+from .dynamic_model_creation import json_schema_to_pydantic_model
 
 
 class NumberPropertiesModel(BaseModel):

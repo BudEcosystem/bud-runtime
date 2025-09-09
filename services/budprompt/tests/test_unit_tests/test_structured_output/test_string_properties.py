@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, ValidationError, EmailStr, constr, IPvAny
 from ipaddress import IPv4Address, IPv6Address
 from datetime import datetime, date, time, timedelta
 from typing import Optional
-from test_openai_structured_output.dynamic_model_creation import json_schema_to_pydantic_model
+from .dynamic_model_creation import json_schema_to_pydantic_model
 from uuid import UUID
 
 

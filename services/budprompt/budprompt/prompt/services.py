@@ -41,8 +41,8 @@ from ..commons.exceptions import (
 from ..commons.helpers import run_async
 from ..shared.redis_service import RedisService
 from .executors import SimplePromptExecutor
-from .revised_code.dynamic_model_creation import json_schema_to_pydantic_model
 from .revised_code.field_validation import generate_validation_function
+from .schema_builder import ModelGeneratorFactory
 from .schemas import (
     PromptConfigGetResponse,
     PromptConfigRequest,
@@ -525,7 +525,7 @@ class PromptConfigurationService:
             # Validate schema if present
             if schema is not None:
                 model_name = f"{schema_type.capitalize()}Schema"
-                model = run_async(json_schema_to_pydantic_model(schema, model_name))
+                model = run_async(ModelGeneratorFactory.create_model(schema, model_name))
 
                 # Validate field references in validations
                 if validations:

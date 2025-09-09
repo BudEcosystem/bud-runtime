@@ -10,7 +10,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 from typing import Optional, List, Union, Literal
 from enum import Enum
-from test_openai_structured_output.dynamic_model_creation import json_schema_to_pydantic_model
+from .dynamic_model_creation import json_schema_to_pydantic_model
 
 
 # Define comprehensive model with all supported types
