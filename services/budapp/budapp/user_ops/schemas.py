@@ -183,3 +183,39 @@ class ResetPasswordRequest(BaseModel):
         None,
         description="The ID of the tenant. If not provided, the user will be considered in to the first tenant they belong to.",
     )
+
+
+class ValidateResetTokenRequest(BaseModel):
+    """Validate reset token request schema."""
+
+    token: str = Field(min_length=1, max_length=255, description="Reset token")
+
+
+class ValidateResetTokenResponse(SuccessResponse):
+    """Validate reset token response schema."""
+
+    is_valid: bool
+    email: str | None = None
+    expires_at: datetime | None = None
+
+
+class ResetPasswordWithTokenRequest(BaseModel):
+    """Reset password with token request schema."""
+
+    token: str = Field(min_length=1, max_length=255, description="Reset token")
+    new_password: str = Field(min_length=8, max_length=128, description="New password")
+    confirm_password: str = Field(min_length=8, max_length=128, description="Confirm new password")
+
+    @field_validator("confirm_password")
+    @classmethod
+    def passwords_match(cls, v, info):
+        """Validate that passwords match."""
+        if "new_password" in info.data and v != info.data["new_password"]:
+            raise ValueError("Passwords do not match")
+        return v
+
+
+class ResetPasswordWithTokenResponse(SuccessResponse):
+    """Reset password with token response schema."""
+
+    pass

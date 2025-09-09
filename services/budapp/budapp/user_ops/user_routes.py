@@ -19,7 +19,7 @@
 from typing import Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated, List, Optional
 
@@ -40,6 +40,8 @@ from budapp.user_ops.schemas import (
     MyPermissions,
     ResetPasswordRequest,
     ResetPasswordResponse,
+    ResetPasswordWithTokenRequest,
+    ResetPasswordWithTokenResponse,
     User,
     UserCreate,
     UserListFilter,
@@ -47,6 +49,8 @@ from budapp.user_ops.schemas import (
     UserPermissions,
     UserResponse,
     UserUpdate,
+    ValidateResetTokenRequest,
+    ValidateResetTokenResponse,
 )
 from budapp.user_ops.services import UserService
 
@@ -158,11 +162,12 @@ async def complete_user_onboarding(
 )
 async def reset_password(
     request: ResetPasswordRequest,
+    request_obj: Request,
     session: Session = Depends(get_session),
 ) -> Union[ResetPasswordResponse, ErrorResponse]:
-    """Trigger a reset password email notification."""
+    """Trigger a reset password email notification with token."""
     try:
-        response = await UserService(session).reset_password_email(request)
+        response = await UserService(session).reset_password_email(request, request_obj)
         logger.debug("Email notification triggered for reset password. %s", response)
 
         return ResetPasswordResponse(
@@ -180,6 +185,98 @@ async def reset_password(
         logger.exception(f"Failed to trigger reset password email: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to trigger reset password email"
+        ).to_http_response()
+
+
+@user_router.post(
+    "/validate-reset-token",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ValidateResetTokenResponse,
+            "description": "Token validation result",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Validate a password reset token",
+)
+async def validate_reset_token(
+    request: ValidateResetTokenRequest,
+    session: Session = Depends(get_session),
+) -> Union[ValidateResetTokenResponse, ErrorResponse]:
+    """Validate a password reset token."""
+    try:
+        response = await UserService(session).validate_reset_token(request)
+        logger.debug("Reset token validation completed. %s", response)
+
+        return ValidateResetTokenResponse(
+            object="user.validate-reset-token",
+            code=status.HTTP_200_OK,
+            message="Token validation completed",
+            is_valid=response["is_valid"],
+            email=response["email"],
+            expires_at=response["expires_at"],
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to validate reset token: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to validate reset token: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to validate reset token"
+        ).to_http_response()
+
+
+@user_router.post(
+    "/reset-password-with-token",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ResetPasswordWithTokenResponse,
+            "description": "Password reset successfully",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid token or password validation failed",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "User not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Reset password using a valid reset token",
+)
+async def reset_password_with_token(
+    request: ResetPasswordWithTokenRequest,
+    request_obj: Request,
+    session: Session = Depends(get_session),
+) -> Union[ResetPasswordWithTokenResponse, ErrorResponse]:
+    """Reset password using a valid reset token."""
+    try:
+        response = await UserService(session).reset_password_with_token(request, request_obj)
+        logger.info("Password reset completed successfully")
+
+        return ResetPasswordWithTokenResponse(
+            object="user.reset-password-with-token",
+            code=status.HTTP_200_OK,
+            message=response["message"],
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to reset password with token: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to reset password with token: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to reset password"
         ).to_http_response()
 
 

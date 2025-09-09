@@ -68,9 +68,27 @@
                     "variables": [
                         {
                             "type": "String",
-                            "name": "content.password",
+                            "name": "content.reset_url",
                             "defaultValue": "",
                             "required": true
+                        },
+                        {
+                            "type": "String",
+                            "name": "content.user_name",
+                            "defaultValue": "User",
+                            "required": false
+                        },
+                        {
+                            "type": "Number",
+                            "name": "content.expires_in_minutes",
+                            "defaultValue": 60,
+                            "required": true
+                        },
+                        {
+                            "type": "String",
+                            "name": "content.token",
+                            "defaultValue": "",
+                            "required": false
                         }
                     ],
                     "preheader": "",
