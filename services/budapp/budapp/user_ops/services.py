@@ -376,12 +376,10 @@ class UserService(SessionMixin):
             logger.warning(f"Password reset attempted for deleted user: {request.email}")
             return {"acknowledged": True, "status": "success", "transaction_id": secrets.token_hex(16)}
 
-        # Check user is super admin
+        # Security: Return same success response for superusers to prevent account enumeration
         if db_user.is_superuser:
             logger.warning(f"Password reset attempted for superuser: {request.email}")
-            raise ClientException(
-                message="Super user not allowed to reset password", status_code=status.HTTP_400_BAD_REQUEST
-            )
+            return {"acknowledged": True, "status": "success", "transaction_id": secrets.token_hex(16)}
 
         # Check max reset password attempts exceeded
         if db_user.reset_password_attempt >= 5:  # Increased limit
