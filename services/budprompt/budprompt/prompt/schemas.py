@@ -381,3 +381,13 @@ class PromptConfigResponse(SuccessResponse):
     """Response model for prompt configuration."""
 
     prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")
+
+
+class PromptConfigGetResponse(SuccessResponse):
+    """Response model for getting prompt configuration.
+
+    Returns the complete prompt configuration data stored in Redis.
+    """
+
+    prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")
+    data: PromptConfigurationData = Field(..., description="The prompt configuration data")

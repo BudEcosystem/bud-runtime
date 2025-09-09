@@ -45,6 +45,7 @@ from .executors import SimplePromptExecutor
 from .revised_code.dynamic_model_creation import json_schema_to_pydantic_model
 from .revised_code.field_validation import generate_validation_function
 from .schemas import (
+    PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
     PromptConfigurationData,
@@ -725,4 +726,61 @@ class PromptService:
             raise ClientException(
                 status_code=500,
                 message="Failed to store prompt configuration",
+            ) from e
+
+    async def get_prompt_config(self, prompt_id: str) -> PromptConfigGetResponse:
+        """Get prompt configuration from Redis.
+
+        This method retrieves the prompt configuration stored in Redis
+        for the given prompt_id.
+
+        Args:
+            prompt_id: The unique identifier of the prompt configuration
+
+        Returns:
+            PromptConfigGetResponse with the configuration data
+
+        Raises:
+            ClientException: If configuration not found or Redis operation fails
+        """
+        try:
+            # Construct Redis key
+            redis_key = f"run:{prompt_id}"
+
+            # Fetch data from Redis
+            config_json = await self.redis_service.get(redis_key)
+
+            if not config_json:
+                logger.debug(f"Prompt configuration not found for prompt_id: {prompt_id}")
+                raise ClientException(
+                    status_code=404,
+                    message=f"Prompt configuration not found for prompt_id: {prompt_id}",
+                )
+
+            # Parse and validate the data
+            config_data = PromptConfigurationData.model_validate_json(config_json)
+
+            logger.debug(f"Retrieved prompt configuration for prompt_id: {prompt_id}")
+
+            return PromptConfigGetResponse(
+                code=200,
+                message="Prompt configuration retrieved successfully",
+                prompt_id=prompt_id,
+                data=config_data,
+            )
+
+        except ClientException:
+            # Re-raise client exceptions as-is
+            raise
+        except json.JSONDecodeError as e:
+            logger.exception(f"Failed to parse Redis data for prompt_id {prompt_id}: {str(e)}")
+            raise ClientException(
+                status_code=500,
+                message=f"Invalid data format in Redis for prompt_id {prompt_id}",
+            ) from e
+        except Exception as e:
+            logger.exception(f"Failed to retrieve prompt configuration: {str(e)}")
+            raise ClientException(
+                status_code=500,
+                message="Failed to retrieve prompt configuration",
             ) from e

@@ -27,6 +27,7 @@ from fastapi.responses import StreamingResponse
 
 from ..commons.exceptions import ClientException
 from .schemas import (
+    PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
     PromptExecuteRequest,
@@ -197,4 +198,57 @@ async def save_prompt_config(
         return ErrorResponse(
             code=500,
             message="An unexpected error occurred during prompt configuration",
+        ).to_http_response()
+
+
+@prompt_router.get(
+    "/prompt-config/{prompt_id}",
+    response_model=Union[PromptConfigGetResponse, ErrorResponse],
+    summary="Get prompt configuration",
+    description="Retrieve prompt configuration from Redis by prompt_id",
+    responses={
+        200: {
+            "description": "Configuration retrieved successfully",
+            "model": PromptConfigGetResponse,
+        },
+        404: {"description": "Configuration not found"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def get_prompt_config(
+    prompt_id: str,
+) -> Union[PromptConfigGetResponse, ErrorResponse]:
+    """Get prompt configuration by ID.
+
+    Args:
+        prompt_id: The unique identifier of the prompt configuration
+
+    Returns:
+        The prompt configuration data
+
+    Raises:
+        HTTPException: If configuration not found or retrieval fails
+    """
+    try:
+        logger.info(f"Retrieving prompt configuration for prompt_id: {prompt_id}")
+
+        # Create service instance
+        prompt_service = PromptService()
+
+        # Get the configuration
+        result = await prompt_service.get_prompt_config(prompt_id)
+
+        return result.to_http_response()
+
+    except ClientException as e:
+        return ErrorResponse(
+            code=e.status_code,
+            message=e.message,
+            param=e.params,
+        ).to_http_response()
+    except Exception as e:
+        logger.error(f"Unexpected error during prompt configuration retrieval: {str(e)}")
+        return ErrorResponse(
+            code=500,
+            message="An unexpected error occurred during prompt configuration retrieval",
         ).to_http_response()
