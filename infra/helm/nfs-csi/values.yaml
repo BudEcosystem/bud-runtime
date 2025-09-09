@@ -1,0 +1,6 @@
+nfs:
+  server: 10.177.2.69
+  path: /budk8s-nfs-csi
+
+csi-driver-nfs:
+  enabled: true
