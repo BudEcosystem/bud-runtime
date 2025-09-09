@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthLayout from "@/components/auth/AuthLayout";
 import { useLoader } from "@/context/authContext";
@@ -13,7 +13,7 @@ import {
 import { PrimaryButton } from "@/components/ui/button";
 import { successToast, errorToast } from "@/components/toast";
 
-export default function TokenResetPassword() {
+function TokenResetPasswordContent() {
   const { showLoader, hideLoader } = useLoader();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -382,5 +382,19 @@ export default function TokenResetPassword() {
         </div>
       </div>
     </AuthLayout>
+  );
+}
+
+export default function TokenResetPassword() {
+  return (
+    <Suspense fallback={
+      <AuthLayout>
+        <div className="flex flex-col justify-center items-center h-full">
+          <Text_14_400_B3B3B3>Loading...</Text_14_400_B3B3B3>
+        </div>
+      </AuthLayout>
+    }>
+      <TokenResetPasswordContent />
+    </Suspense>
   );
 }
