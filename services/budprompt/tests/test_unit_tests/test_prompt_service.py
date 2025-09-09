@@ -100,13 +100,15 @@ class TestSavePromptConfig(TestPromptService):
         assert result.prompt_id == "test-prompt-123"
 
         # Verify Redis interactions
-        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123")
-        mock_redis_service.set.assert_called_once()
+        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123:v1")
+        assert mock_redis_service.set.call_count == 2  # Main data + default_version
 
         # Verify the stored data
-        call_args = mock_redis_service.set.call_args
-        assert call_args[0][0] == "prompt:test-prompt-123"
-        assert call_args[1]["ex"] == 86400
+        call_args_list = mock_redis_service.set.call_args_list
+        assert call_args_list[0][0][0] == "prompt:test-prompt-123:v1"
+        assert call_args_list[1][0][0] == "prompt:test-prompt-123:default_version"
+        assert call_args_list[1][0][1] == "prompt:test-prompt-123:v1"
+        assert call_args_list[0][1]["ex"] == 86400
 
     @pytest.mark.asyncio
     async def test_update_existing_config_success(self, prompt_service, mock_redis_service, sample_config_data):
@@ -133,8 +135,8 @@ class TestSavePromptConfig(TestPromptService):
         assert result.prompt_id == "test-prompt-123"
 
         # Verify Redis was called correctly
-        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123")
-        mock_redis_service.set.assert_called_once()
+        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123:v1")
+        assert mock_redis_service.set.call_count == 2  # Main data + default_version
 
     @pytest.mark.asyncio
     async def test_save_config_redis_error(self, prompt_service, mock_redis_service, sample_request):
@@ -168,11 +170,16 @@ class TestGetPromptConfig(TestPromptService):
 
     @pytest.mark.asyncio
     async def test_get_config_success(self, prompt_service, mock_redis_service, sample_config_data):
-        """Test successful retrieval of configuration."""
+        """Test successful retrieval of configuration via default version."""
         # Arrange
         prompt_id = "test-prompt-123"
         config_json = sample_config_data.model_dump_json(exclude_none=True)
-        mock_redis_service.get.return_value = config_json
+
+        # Mock the default_version lookup to return v1 key
+        mock_redis_service.get.side_effect = [
+            "prompt:test-prompt-123:v1",  # First call returns the default version key
+            config_json  # Second call returns the actual data
+        ]
 
         # Act
         result = await prompt_service.get_prompt_config(prompt_id)
@@ -186,31 +193,37 @@ class TestGetPromptConfig(TestPromptService):
         assert len(result.data.messages) == 2
 
         # Verify Redis was called correctly
-        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123")
+        assert mock_redis_service.get.call_count == 2
+        mock_redis_service.get.assert_any_call("prompt:test-prompt-123:default_version")
+        mock_redis_service.get.assert_any_call("prompt:test-prompt-123:v1")
 
     @pytest.mark.asyncio
     async def test_get_config_not_found(self, prompt_service, mock_redis_service):
-        """Test retrieval when configuration doesn't exist."""
+        """Test retrieval when default version doesn't exist."""
         # Arrange
         prompt_id = "non-existent-id"
-        mock_redis_service.get.return_value = None
+        mock_redis_service.get.return_value = None  # Default version not found
 
         # Act & Assert
         with pytest.raises(ClientException) as exc_info:
             await prompt_service.get_prompt_config(prompt_id)
 
         assert exc_info.value.status_code == 404
-        assert f"Prompt configuration not found for prompt_id: {prompt_id}" in exc_info.value.message
+        assert f"Default version not found for prompt_id: {prompt_id}" in exc_info.value.message
 
         # Verify Redis was called
-        mock_redis_service.get.assert_called_once_with("prompt:non-existent-id")
+        mock_redis_service.get.assert_called_once_with("prompt:non-existent-id:default_version")
 
     @pytest.mark.asyncio
     async def test_get_config_invalid_json(self, prompt_service, mock_redis_service):
         """Test handling of invalid JSON data from Redis."""
         # Arrange
         prompt_id = "test-prompt-123"
-        mock_redis_service.get.return_value = "invalid json {{"
+        # First call returns default version key, second returns invalid JSON
+        mock_redis_service.get.side_effect = [
+            "prompt:test-prompt-123:v1",  # Default version key
+            "invalid json {{"  # Invalid JSON data
+        ]
 
         # Act & Assert
         with pytest.raises(ClientException) as exc_info:
@@ -244,7 +257,12 @@ class TestGetPromptConfig(TestPromptService):
             stream=False,
         )
         config_json = partial_config.model_dump_json(exclude_none=True)
-        mock_redis_service.get.return_value = config_json
+
+        # Mock default version lookup
+        mock_redis_service.get.side_effect = [
+            "prompt:test-prompt-123:v1",  # Default version key
+            config_json  # Actual data
+        ]
 
         # Act
         result = await prompt_service.get_prompt_config(prompt_id)
@@ -256,6 +274,91 @@ class TestGetPromptConfig(TestPromptService):
         assert result.data.stream == False
         assert result.data.model_settings is None
         assert result.data.messages is None
+
+
+class TestGetPromptConfigVersioning(TestPromptService):
+    """Test cases for versioned retrieval of prompt configuration."""
+
+    @pytest.mark.asyncio
+    async def test_get_specific_version_success(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test successful retrieval of specific version."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+        version = 1
+        config_json = sample_config_data.model_dump_json(exclude_none=True)
+
+        # When requesting specific version, only one Redis call is made
+        mock_redis_service.get.return_value = config_json
+
+        # Act
+        result = await prompt_service.get_prompt_config(prompt_id, version=version)
+
+        # Assert
+        assert result.code == 200
+        assert result.message == "Prompt configuration retrieved successfully"
+        assert result.prompt_id == prompt_id
+        assert result.data.deployment_name == "gpt-4"
+
+        # Verify Redis was called correctly with version-specific key
+        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123:v1")
+
+    @pytest.mark.asyncio
+    async def test_get_specific_version_not_found(self, prompt_service, mock_redis_service):
+        """Test retrieval when specific version doesn't exist."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+        version = 2
+        mock_redis_service.get.return_value = None  # Version not found
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            await prompt_service.get_prompt_config(prompt_id, version=version)
+
+        assert exc_info.value.status_code == 404
+        assert f"Version {version} not found for prompt_id: {prompt_id}" in exc_info.value.message
+
+        # Verify Redis was called with version-specific key
+        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123:v2")
+
+    @pytest.mark.asyncio
+    async def test_get_default_version_when_data_missing(self, prompt_service, mock_redis_service):
+        """Test retrieval when default version points to non-existent data."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+
+        # Default version exists but points to non-existent data
+        mock_redis_service.get.side_effect = [
+            "prompt:test-prompt-123:v1",  # Default version key exists
+            None  # But the actual data doesn't exist
+        ]
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            await prompt_service.get_prompt_config(prompt_id)
+
+        assert exc_info.value.status_code == 404
+        assert f"Configuration not found for prompt_id: {prompt_id}" in exc_info.value.message
+
+        # Verify both Redis calls were made
+        assert mock_redis_service.get.call_count == 2
+        mock_redis_service.get.assert_any_call("prompt:test-prompt-123:default_version")
+        mock_redis_service.get.assert_any_call("prompt:test-prompt-123:v1")
+
+    @pytest.mark.asyncio
+    async def test_get_higher_version(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test retrieval of a higher version number."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+        version = 5
+        config_json = sample_config_data.model_dump_json(exclude_none=True)
+        mock_redis_service.get.return_value = config_json
+
+        # Act
+        result = await prompt_service.get_prompt_config(prompt_id, version=version)
+
+        # Assert
+        assert result.code == 200
+        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123:v5")
 
 
 class TestPromptServiceIntegration(TestPromptService):
@@ -293,11 +396,14 @@ class TestPromptServiceIntegration(TestPromptService):
         assert save_result.code == 200
         assert save_result.prompt_id == prompt_id
 
-        # Get the saved data from the set call
-        saved_json = mock_redis_service.set.call_args[0][1]
+        # Get the saved data from the first set call (the actual data, not the default_version pointer)
+        saved_json = mock_redis_service.set.call_args_list[0][0][1]
 
-        # Mock Redis for get operation
-        mock_redis_service.get.return_value = saved_json
+        # Mock Redis for get operation - need to mock the versioning flow
+        mock_redis_service.get.side_effect = [
+            f"prompt:{prompt_id}:v1",  # Default version lookup
+            saved_json  # Actual data
+        ]
 
         # Act - Get configuration
         get_result = await prompt_service.get_prompt_config(prompt_id)
@@ -341,11 +447,14 @@ class TestPromptServiceIntegration(TestPromptService):
             mock_settings.prompt_config_redis_ttl = 86400
             update_result = await prompt_service.save_prompt_config(update_request)
 
-        # Get the updated data from the set call
-        updated_json = mock_redis_service.set.call_args[0][1]
+        # Get the updated data from the first set call (the actual data, not the default_version pointer)
+        updated_json = mock_redis_service.set.call_args_list[0][0][1]
 
-        # Mock Redis for get operation
-        mock_redis_service.get.return_value = updated_json
+        # Mock Redis for get operation - need to mock the versioning flow
+        mock_redis_service.get.side_effect = [
+            f"prompt:{prompt_id}:v1",  # Default version lookup
+            updated_json  # Actual data
+        ]
 
         # Act - Get updated configuration
         get_result = await prompt_service.get_prompt_config(prompt_id)

@@ -18,11 +18,11 @@
 
 import logging
 import uuid
-from typing import Union
+from typing import Optional, Union
 
 from budmicroframe.commons.api_utils import pubsub_api_endpoint
 from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Query, Response, status
 from fastapi.responses import StreamingResponse
 
 from ..commons.exceptions import ClientException
@@ -226,11 +226,13 @@ async def save_prompt_config(
 )
 async def get_prompt_config(
     prompt_id: str,
+    version: Optional[int] = Query(None, description="Version of the configuration to retrieve", ge=1),
 ) -> Union[PromptConfigGetResponse, ErrorResponse]:
     """Get prompt configuration by ID.
 
     Args:
         prompt_id: The unique identifier of the prompt configuration
+        version: Optional version number to retrieve specific version
 
     Returns:
         The prompt configuration data
@@ -239,13 +241,13 @@ async def get_prompt_config(
         HTTPException: If configuration not found or retrieval fails
     """
     try:
-        logger.info(f"Retrieving prompt configuration for prompt_id: {prompt_id}")
+        logger.info(f"Retrieving prompt configuration for prompt_id: {prompt_id}, version: {version}")
 
         # Create service instance
         prompt_service = PromptService()
 
         # Get the configuration
-        result = await prompt_service.get_prompt_config(prompt_id)
+        result = await prompt_service.get_prompt_config(prompt_id, version)
 
         return result.to_http_response()
 

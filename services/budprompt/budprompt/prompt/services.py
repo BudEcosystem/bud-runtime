@@ -395,8 +395,8 @@ class PromptConfigurationService:
             # Create Redis service instance
             redis_service = RedisService()
 
-            # Construct Redis key with prompt: prefix
-            redis_key = f"prompt:{prompt_id}"
+            # Construct Redis key with prompt: prefix and v1 version
+            redis_key = f"prompt:{prompt_id}:v1"
 
             # Fetch existing data if it exists
             existing_data_json = run_async(redis_service.get(redis_key))
@@ -428,6 +428,10 @@ class PromptConfigurationService:
             # Convert to JSON and store in Redis with configured TTL
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
             run_async(redis_service.set(redis_key, config_json, ex=app_settings.prompt_config_redis_ttl))
+
+            # Also set default version pointer
+            default_version_key = f"prompt:{prompt_id}:default_version"
+            run_async(redis_service.set(default_version_key, redis_key, ex=app_settings.prompt_config_redis_ttl))
 
             logger.debug(f"Stored prompt configuration for prompt_id: {prompt_id}, type: {schema_type}")
 
@@ -667,8 +671,8 @@ class PromptService:
             RedisException: If Redis operation fails
         """
         try:
-            # Construct Redis key with prompt: prefix
-            redis_key = f"prompt:{request.prompt_id}"
+            # Construct Redis key with prompt: prefix and v1 version
+            redis_key = f"prompt:{request.prompt_id}:v1"
 
             # Fetch existing data if it exists
             existing_data_json = await self.redis_service.get(redis_key)
@@ -707,6 +711,10 @@ class PromptService:
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
             await self.redis_service.set(redis_key, config_json, ex=app_settings.prompt_config_redis_ttl)
 
+            # Also set default version pointer
+            default_version_key = f"prompt:{request.prompt_id}:default_version"
+            await self.redis_service.set(default_version_key, redis_key, ex=app_settings.prompt_config_redis_ttl)
+
             logger.debug(f"Stored prompt configuration for prompt_id: {request.prompt_id}")
 
             return PromptConfigResponse(
@@ -728,14 +736,15 @@ class PromptService:
                 message="Failed to store prompt configuration",
             ) from e
 
-    async def get_prompt_config(self, prompt_id: str) -> PromptConfigGetResponse:
+    async def get_prompt_config(self, prompt_id: str, version: Optional[int] = None) -> PromptConfigGetResponse:
         """Get prompt configuration from Redis.
 
         This method retrieves the prompt configuration stored in Redis
-        for the given prompt_id.
+        for the given prompt_id and optional version.
 
         Args:
             prompt_id: The unique identifier of the prompt configuration
+            version: Optional version number to retrieve specific version
 
         Returns:
             PromptConfigGetResponse with the configuration data
@@ -744,23 +753,38 @@ class PromptService:
             ClientException: If configuration not found or Redis operation fails
         """
         try:
-            # Construct Redis key with prompt: prefix
-            redis_key = f"prompt:{prompt_id}"
+            # Determine which Redis key to use based on version
+            if version:
+                # Get specific version
+                redis_key = f"prompt:{prompt_id}:v{version}"
+            else:
+                # Get default version
+                default_key = f"prompt:{prompt_id}:default_version"
+                redis_key = await self.redis_service.get(default_key)
 
-            # Fetch data from Redis
+                if not redis_key:
+                    logger.debug(f"Default version not found for prompt_id: {prompt_id}")
+                    raise ClientException(
+                        status_code=404,
+                        message=f"Default version not found for prompt_id: {prompt_id}",
+                    )
+
+            # Fetch data from Redis using the determined key
             config_json = await self.redis_service.get(redis_key)
 
             if not config_json:
-                logger.debug(f"Prompt configuration not found for prompt_id: {prompt_id}")
+                if version:
+                    message = f"Version {version} not found for prompt_id: {prompt_id}"
+                else:
+                    message = f"Configuration not found for prompt_id: {prompt_id}"
+                logger.debug(message)
                 raise ClientException(
                     status_code=404,
-                    message=f"Prompt configuration not found for prompt_id: {prompt_id}",
+                    message=message,
                 )
 
             # Parse and validate the data
             config_data = PromptConfigurationData.model_validate_json(config_json)
-
-            logger.debug(f"Retrieved prompt configuration for prompt_id: {prompt_id}")
 
             return PromptConfigGetResponse(
                 code=200,
