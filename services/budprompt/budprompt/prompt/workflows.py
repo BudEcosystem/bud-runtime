@@ -122,7 +122,7 @@ class PromptSchemaWorkflow:
             retry_policy=retry_policy,
         )
 
-        redis_key = yield ctx.call_activity(
+        redis_key = yield ctx.call_activity(  # noqa: F841
             PromptSchemaWorkflow.store_prompt_configuration,
             input={
                 "workflow_id": workflow_id,
@@ -137,7 +137,7 @@ class PromptSchemaWorkflow:
             retry_policy=retry_policy,
         )
 
-        response = PromptSchemaResponse(workflow_id=workflow_id, prompt_id=redis_key)
+        response = PromptSchemaResponse(workflow_id=workflow_id, prompt_id=request.prompt_id)
 
         notification_request.payload.event = "results"
         notification_request.payload.content = NotificationContent(

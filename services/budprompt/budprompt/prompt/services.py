@@ -395,11 +395,8 @@ class PromptConfigurationService:
             # Create Redis service instance
             redis_service = RedisService()
 
-            # Construct Redis key
-            if not prompt_id.startswith("run:"):
-                prompt_id = f"run:{prompt_id}"
-
-            redis_key = prompt_id
+            # Construct Redis key with prompt: prefix
+            redis_key = f"prompt:{prompt_id}"
 
             # Fetch existing data if it exists
             existing_data_json = run_async(redis_service.get(redis_key))
@@ -446,7 +443,7 @@ class PromptConfigurationService:
                 target_name=target_name,
             )
 
-            return redis_key
+            return prompt_id
 
         except json.JSONDecodeError as e:
             logger.exception(f"Failed to parse existing Redis data for prompt_id {prompt_id}: {str(e)}")
@@ -611,7 +608,7 @@ class PromptConfigurationService:
         )
 
         # Store prompt configuration in Redis
-        redis_key = self.store_prompt_configuration(
+        redis_key = self.store_prompt_configuration(  # noqa: F841
             workflow_id,
             notification_request,
             request.prompt_id,
@@ -622,7 +619,7 @@ class PromptConfigurationService:
             request.source,
         )
 
-        response = PromptSchemaResponse(workflow_id=workflow_id, prompt_id=redis_key)
+        response = PromptSchemaResponse(workflow_id=workflow_id, prompt_id=request.prompt_id)
 
         notification_request.payload.event = "results"
         notification_request.payload.content = NotificationContent(
@@ -670,11 +667,8 @@ class PromptService:
             RedisException: If Redis operation fails
         """
         try:
-            # Construct Redis key
-            if not request.prompt_id.startswith("run:"):
-                request.prompt_id = f"run:{request.prompt_id}"
-
-            redis_key = request.prompt_id
+            # Construct Redis key with prompt: prefix
+            redis_key = f"prompt:{request.prompt_id}"
 
             # Fetch existing data if it exists
             existing_data_json = await self.redis_service.get(redis_key)
@@ -713,12 +707,12 @@ class PromptService:
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
             await self.redis_service.set(redis_key, config_json, ex=app_settings.prompt_config_redis_ttl)
 
-            logger.debug(f"Stored prompt configuration for prompt_id: {redis_key}")
+            logger.debug(f"Stored prompt configuration for prompt_id: {request.prompt_id}")
 
             return PromptConfigResponse(
                 code=200,
                 message="Prompt configuration saved successfully",
-                prompt_id=redis_key,
+                prompt_id=request.prompt_id,
             )
 
         except json.JSONDecodeError as e:
@@ -750,23 +744,23 @@ class PromptService:
             ClientException: If configuration not found or Redis operation fails
         """
         try:
-            # Use prompt_id directly as Redis key
-            redis_key = prompt_id
+            # Construct Redis key with prompt: prefix
+            redis_key = f"prompt:{prompt_id}"
 
             # Fetch data from Redis
             config_json = await self.redis_service.get(redis_key)
 
             if not config_json:
-                logger.debug(f"Prompt configuration not found for key: {redis_key}")
+                logger.debug(f"Prompt configuration not found for prompt_id: {prompt_id}")
                 raise ClientException(
                     status_code=404,
-                    message=f"Prompt configuration not found for key: {redis_key}",
+                    message=f"Prompt configuration not found for prompt_id: {prompt_id}",
                 )
 
             # Parse and validate the data
             config_data = PromptConfigurationData.model_validate_json(config_json)
 
-            logger.debug(f"Retrieved prompt configuration for key: {redis_key}")
+            logger.debug(f"Retrieved prompt configuration for prompt_id: {prompt_id}")
 
             return PromptConfigGetResponse(
                 code=200,
