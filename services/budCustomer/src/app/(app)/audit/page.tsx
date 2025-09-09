@@ -729,163 +729,168 @@ export default function AuditPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
           <Card className="bg-bud-bg-secondary border-bud-border">
-            {isStatsLoading ?
-              <Skeleton active paragraph={{ rows: 2 }} />:
+            {isStatsLoading ? (
+              <Skeleton active paragraph={{ rows: 2 }} />
+            ) : (
               <div className="flex items-center justify-between">
-              <div>
-                <Text className="text-bud-text-disabled text-xs block mb-1">
-                  Today&apos;s Events
-                </Text>
-                <Text className="text-bud-text-primary text-2xl font-semibold">
-                  {statistics.totalEvents}
-                </Text>
+                <div>
+                  <Text className="text-bud-text-disabled text-xs block mb-1">
+                    Today&apos;s Events
+                  </Text>
+                  <Text className="text-bud-text-primary text-2xl font-semibold">
+                    {statistics.totalEvents}
+                  </Text>
+                </div>
+                <CalendarOutlined className="text-2xl text-bud-purple" />
               </div>
-              <CalendarOutlined className="text-2xl text-bud-purple" />
-              </div>
-          }
+            )}
           </Card>
 
           <Card className="bg-bud-bg-secondary border-bud-border">
-            {isStatsLoading ?
-              <Skeleton active paragraph={{ rows: 2 }} />:
+            {isStatsLoading ? (
+              <Skeleton active paragraph={{ rows: 2 }} />
+            ) : (
               <div className="flex items-center justify-between">
-              <div>
-                <Text className="text-bud-text-disabled text-xs block mb-1">
-                  Failed Actions
-                </Text>
-                <Text className="text-bud-text-primary text-2xl font-semibold">
-                  {statistics.failedActions}
-                </Text>
+                <div>
+                  <Text className="text-bud-text-disabled text-xs block mb-1">
+                    Failed Actions
+                  </Text>
+                  <Text className="text-bud-text-primary text-2xl font-semibold">
+                    {statistics.failedActions}
+                  </Text>
+                </div>
+                <Icon
+                  icon="ph:warning-circle"
+                  className="text-2xl text-red-500"
+                />
               </div>
-              <Icon
-                icon="ph:warning-circle"
-                className="text-2xl text-red-500"
-              />
-              </div>
-            }
+            )}
           </Card>
 
           <Card className="bg-bud-bg-secondary border-bud-border hidden">
-            {isStatsLoading ?
-              <Skeleton active paragraph={{ rows: 2 }} />:
+            {isStatsLoading ? (
+              <Skeleton active paragraph={{ rows: 2 }} />
+            ) : (
               <div className="flex items-center justify-between">
-              <div>
-                <Text className="text-bud-text-disabled text-xs block mb-1">
-                  Active Users
-                </Text>
-                <Text className="text-bud-text-primary text-2xl font-semibold">
-                  {statistics.resourcesModified}
-                </Text>
+                <div>
+                  <Text className="text-bud-text-disabled text-xs block mb-1">
+                    Active Users
+                  </Text>
+                  <Text className="text-bud-text-primary text-2xl font-semibold">
+                    {statistics.resourcesModified}
+                  </Text>
+                </div>
+                <UserOutlined className="text-2xl text-blue-500" />
               </div>
-              <UserOutlined className="text-2xl text-blue-500" />
-              </div>
-            }
+            )}
           </Card>
 
           <Card className="bg-bud-bg-secondary border-bud-border">
-            {isStatsLoading ?
-              <Skeleton active paragraph={{ rows: 2 }} />:
+            {isStatsLoading ? (
+              <Skeleton active paragraph={{ rows: 2 }} />
+            ) : (
               <div className="flex items-center justify-between">
-              <div>
-                <Text className="text-bud-text-disabled text-xs block mb-1">
-                  Resources Modified
-                </Text>
-                <Text className="text-bud-text-primary text-2xl font-semibold">
-                  {
-                    filteredLogs.filter((log) =>
-                      [
-                        AuditAction.CREATE,
-                        AuditAction.UPDATE,
-                        AuditAction.DELETE,
-                      ].includes(log.action),
-                    ).length
-                  }
-                </Text>
+                <div>
+                  <Text className="text-bud-text-disabled text-xs block mb-1">
+                    Resources Modified
+                  </Text>
+                  <Text className="text-bud-text-primary text-2xl font-semibold">
+                    {
+                      filteredLogs.filter((log) =>
+                        [
+                          AuditAction.CREATE,
+                          AuditAction.UPDATE,
+                          AuditAction.DELETE,
+                        ].includes(log.action),
+                      ).length
+                    }
+                  </Text>
+                </div>
+                <Icon icon="ph:database" className="text-2xl text-green-500" />
               </div>
-              <Icon icon="ph:database" className="text-2xl text-green-500" />
-              </div>
-            }
+            )}
           </Card>
         </div>
 
         {/* Filters */}
         <Card className="bg-bud-bg-secondary border-bud-border mb-6">
-          {isStatsLoading ?
-            <Skeleton active paragraph={{ rows: 2 }} />:
+          {isStatsLoading ? (
+            <Skeleton active paragraph={{ rows: 2 }} />
+          ) : (
             <div className="flex items-center gap-4">
-          <Input
-            placeholder="Search by resources"
-            prefix={<SearchOutlined className="text-bud-text-disabled" />}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="w-80 bg-bud-bg-tertiary border-bud-border-secondary text-bud-text-primary placeholder:text-bud-text-disabled"
-            allowClear
-          />
-          <ConfigProvider theme={themeConfig}>
-            <Select
-              placeholder="Filter by action"
-              value={selectedAction}
-              onChange={setSelectedAction}
-              className="w-48"
-              allowClear
-              options={Object.values(AuditAction)
-                .filter(
-                  (action) =>
-                    action !== AuditAction.REGENERATE &&
-                    action !== AuditAction.LOGOUT,
-                )
-                .map((action) => ({
-                  label: getActionDisplay(action).label,
-                  value:
-                    action === AuditAction.ACCESS
-                      ? "access_granted"
-                      : action === AuditAction.EXPORT
-                        ? "data_export"
-                        : action,
-                }))}
-            />
-          </ConfigProvider>
-          <ConfigProvider theme={themeConfig}>
-            <Select
-              placeholder="Filter by resource"
-              value={selectedResource}
-              onChange={setSelectedResource}
-              className="w-48"
-              allowClear
-              options={Object.values(ResourceType).map((type) => ({
-                label: type.replace("_", " ").toUpperCase(),
-                value: type,
-              }))}
-            />
-          </ConfigProvider>
+              <Input
+                placeholder="Search by resources"
+                prefix={<SearchOutlined className="text-bud-text-disabled" />}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-80 bg-bud-bg-tertiary border-bud-border-secondary text-bud-text-primary placeholder:text-bud-text-disabled"
+                allowClear
+              />
+              <ConfigProvider theme={themeConfig}>
+                <Select
+                  placeholder="Filter by action"
+                  value={selectedAction}
+                  onChange={setSelectedAction}
+                  className="w-48"
+                  allowClear
+                  options={Object.values(AuditAction)
+                    .filter(
+                      (action) =>
+                        action !== AuditAction.REGENERATE &&
+                        action !== AuditAction.LOGOUT,
+                    )
+                    .map((action) => ({
+                      label: getActionDisplay(action).label,
+                      value:
+                        action === AuditAction.ACCESS
+                          ? "access_granted"
+                          : action === AuditAction.EXPORT
+                            ? "data_export"
+                            : action,
+                    }))}
+                />
+              </ConfigProvider>
+              <ConfigProvider theme={themeConfig}>
+                <Select
+                  placeholder="Filter by resource"
+                  value={selectedResource}
+                  onChange={setSelectedResource}
+                  className="w-48"
+                  allowClear
+                  options={Object.values(ResourceType).map((type) => ({
+                    label: type.replace("_", " ").toUpperCase(),
+                    value: type,
+                  }))}
+                />
+              </ConfigProvider>
 
-          <RangePicker
-            value={dateRange}
-            onChange={(dates) => setDateRange(dates)}
-            className="bg-bud-bg-tertiary border-bud-border-secondary"
-            format="YYYY-MM-DD"
-          />
+              <RangePicker
+                value={dateRange}
+                onChange={(dates) => setDateRange(dates)}
+                className="bg-bud-bg-tertiary border-bud-border-secondary"
+                format="YYYY-MM-DD"
+              />
 
-          {hasActiveFilters && (
-            <Button
-              onClick={clearFilters}
-              className="text-bud-text-muted border-bud-border"
-            >
-              Clear Filters
-            </Button>
-          )}
+              {hasActiveFilters && (
+                <Button
+                  onClick={clearFilters}
+                  className="text-bud-text-muted border-bud-border"
+                >
+                  Clear Filters
+                </Button>
+              )}
 
-          <div className="ml-auto">
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={exportToCSV}
-              className="bg-bud-purple text-white border-bud-purple hover:bg-bud-purple-hover"
-            >
-              Export CSV
-            </Button>
-          </div>
+              <div className="ml-auto">
+                <Button
+                  icon={<DownloadOutlined />}
+                  onClick={exportToCSV}
+                  className="bg-bud-purple text-white border-bud-purple hover:bg-bud-purple-hover"
+                >
+                  Export CSV
+                </Button>
+              </div>
             </div>
-          }
+          )}
         </Card>
 
         {/* Audit Table */}
@@ -902,55 +907,59 @@ export default function AuditPage() {
               };
 
               return ( */}
-            {loading ? <div className="p-8"><Skeleton active paragraph={{ rows: 8 }} /></div> : 
-            <div>
-              <div className="flex items-center gap-2 mb-3 hidden">
-                <ClockCircleOutlined className="text-bud-text-disabled" />
-                {dayFilter.map((item: any) => (
-                  <Tag
-                    key={item.value}
-                    onClick={() => setCurrentDayFilter(item.value)}
-                    color={item.active ? "green-inverse" : "red"}
-                    className="flex items-center gap-1 w-fit"
-                  >
-                    {item.label}
-                  </Tag>
-                ))}
-                {/* <Text className="text-bud-text-primary font-medium">
+            {loading ? (
+              <div className="p-8">
+                <Skeleton active paragraph={{ rows: 8 }} />
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center gap-2 mb-3 hidden">
+                  <ClockCircleOutlined className="text-bud-text-disabled" />
+                  {dayFilter.map((item: any) => (
+                    <Tag
+                      key={item.value}
+                      onClick={() => setCurrentDayFilter(item.value)}
+                      color={item.active ? "green-inverse" : "red"}
+                      className="flex items-center gap-1 w-fit"
+                    >
+                      {item.label}
+                    </Tag>
+                  ))}
+                  {/* <Text className="text-bud-text-primary font-medium">
                       {groupLabels[group as keyof typeof groupLabels]}
                     </Text>
                     <Badge count={logs.length} className="bg-bud-bg-tertiary" /> */}
-              </div>
+                </div>
 
-              <Table
-                columns={columns}
-                dataSource={auditLogs}
-                rowKey="id"
-                pagination={false}
-                size="small"
-                className={styles.auditTable}
-                rowSelection={{
-                  selectedRowKeys,
-                  onChange: setSelectedRowKeys,
-                }}
-                rowClassName={(record) =>
-                  record.status === "failed" ? "bg-red-500/5" : ""
-                }
-              />
-              {/* Pagination */}
-              <div className="flex justify-end my-4 px-3  CommonCustomPagination">
-                <Pagination
-                  className="small-pagination"
-                  current={currentPage}
-                  pageSize={pageSize}
-                  total={totalNumber}
-                  onChange={handlePageChange}
-                  showSizeChanger
-                  pageSizeOptions={["5", "10", "20", "50"]}
+                <Table
+                  columns={columns}
+                  dataSource={auditLogs}
+                  rowKey="id"
+                  pagination={false}
+                  size="small"
+                  className={styles.auditTable}
+                  rowSelection={{
+                    selectedRowKeys,
+                    onChange: setSelectedRowKeys,
+                  }}
+                  rowClassName={(record) =>
+                    record.status === "failed" ? "bg-red-500/5" : ""
+                  }
                 />
+                {/* Pagination */}
+                <div className="flex justify-end my-4 px-3  CommonCustomPagination">
+                  <Pagination
+                    className="small-pagination"
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={totalNumber}
+                    onChange={handlePageChange}
+                    showSizeChanger
+                    pageSizeOptions={["5", "10", "20", "50"]}
+                  />
+                </div>
               </div>
-            </div>
-            }
+            )}
 
             {/* {filteredLogs.length === 0 && (
               <Empty
