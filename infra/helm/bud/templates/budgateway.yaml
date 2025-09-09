@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Release.Name }}-budproxy-config
+  name: {{ .Release.Name }}-budgateway-config
 data:
   tensorzero.toml: |
     [gateway]
@@ -35,7 +35,7 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-budproxy
+  name: {{ .Release.Name }}-budgateway
   annotations:
     {{- range $key, $value := .Values.deploymentAnnotations }}
     {{ $key }}: {{ $value | quote }}
@@ -44,17 +44,17 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-budproxy
+      app: {{ .Release.Name }}-budgateway
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}-budproxy
+        app: {{ .Release.Name }}-budgateway
       annotations:
         date: "{{ now }}"
     spec:
       containers:
-        - name: budproxy
-          image: {{ .Values.microservices.budproxy.image }}
+        - name: budgateway
+          image: {{ .Values.microservices.budgateway.image }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           command: ["gateway"]
           args:
@@ -74,7 +74,7 @@ spec:
                   name: {{ .Release.Name }}-rsa-keys
                   key: private-key-password
           volumeMounts:
-            - name: {{ .Release.Name }}-budproxy-config
+            - name: {{ .Release.Name }}-budgateway-config
               mountPath: /app/config
             - name: rsa-keys
               mountPath: /app/keys
@@ -86,9 +86,9 @@ spec:
               cpu: 2000m
               memory: 4096Mi
       volumes:
-        - name: {{ .Release.Name }}-budproxy-config
+        - name: {{ .Release.Name }}-budgateway-config
           configMap:
-            name: {{ .Release.Name }}-budproxy-config
+            name: {{ .Release.Name }}-budgateway-config
         - name: rsa-keys
           secret:
             secretName: {{ .Release.Name }}-rsa-keys
@@ -97,10 +97,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-budproxy
+  name: {{ .Release.Name }}-budgateway
 spec:
   selector:
-    app: {{ .Release.Name }}-budproxy
+    app: {{ .Release.Name }}-budgateway
   ports:
     - protocol: TCP
       port: 3000

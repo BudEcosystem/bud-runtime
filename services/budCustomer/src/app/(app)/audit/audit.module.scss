@@ -23,7 +23,7 @@ $primary-color: var(--color-purple);
           font-size: 12px;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          padding: 1rem .5rem !important;
+          padding: 1rem 0.5rem !important;
           &:first-child {
             padding-left: 1.5rem !important;
           }
@@ -41,7 +41,7 @@ $primary-color: var(--color-purple);
         > tr {
           > td {
             border-bottom: 1px solid $border-color;
-            padding: 1rem .5rem !important;
+            padding: 1rem 0.5rem !important;
             &:first-child {
               padding-left: 1.5rem !important;
             }

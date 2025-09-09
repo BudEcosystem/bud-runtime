@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -45,9 +45,21 @@ class UserBilling(Base, TimestampMixin):
     """User billing configuration and status."""
 
     __tablename__ = "user_billing"
+    __table_args__ = (
+        # Index for finding current billing record for a user
+        Index("ix_user_billing_user_current", "user_id", "is_current"),
+        # Index for finding active billing records
+        Index("ix_user_billing_active", "user_id", "is_active"),
+        # Index for billing period queries
+        Index("ix_user_billing_period", "user_id", "billing_period_start", "billing_period_end"),
+        # Index for historical queries
+        Index("ix_user_billing_created_current", "created_at", "is_current"),
+    )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("user.id"), unique=True, nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=False
+    )  # Removed unique constraint
     billing_plan_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("billing_plans.id"), nullable=False)
 
     # Current period
@@ -62,10 +74,16 @@ class UserBilling(Base, TimestampMixin):
     enable_email_notifications: Mapped[bool] = mapped_column(Boolean, default=True)
     enable_in_app_notifications: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    # Status
+    # Status flags
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
     suspension_reason: Mapped[Optional[str]] = mapped_column(String(500))
+
+    # Historical tracking - NEW FIELDS
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    cycle_number: Mapped[int] = mapped_column(nullable=False, default=1)  # Track which billing cycle this is
+    superseded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))  # When this cycle was replaced
+    superseded_by_id: Mapped[Optional[UUID]] = mapped_column(PGUUID(as_uuid=True), ForeignKey("user_billing.id"))
 
     # Relationships
     billing_plan: Mapped["BillingPlan"] = relationship(back_populates="user_billings")

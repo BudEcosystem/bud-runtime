@@ -665,8 +665,15 @@ class ObservabilityMetricsService:
 
         # Support filtering by api_key_project_id (for CLIENT users)
         if hasattr(request, "filters") and request.filters and "api_key_project_id" in request.filters:
-            where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
-            params["api_key_project_id"] = str(request.filters["api_key_project_id"])
+            api_key_project_ids = request.filters["api_key_project_id"]
+            if isinstance(api_key_project_ids, list):
+                placeholders = [f"%(api_key_project_{i})s" for i in range(len(api_key_project_ids))]
+                where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                for i, val in enumerate(api_key_project_ids):
+                    params[f"api_key_project_{i}"] = str(val)
+            else:
+                where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                params["api_key_project_id"] = str(api_key_project_ids)
 
         if request.endpoint_id:
             where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
@@ -1297,9 +1304,9 @@ class ObservabilityMetricsService:
 
             return EnhancedInferenceDetailResponse(
                 object="inference_detail",
-                inference_id=safe_uuid(row_dict.get("inference_id")),
-                timestamp=row_dict.get("timestamp"),
-                model_name=str(row_dict.get("model_name")) if row_dict.get("model_name") else "",
+                inference_id=safe_uuid(row_dict.get("mi.inference_id")),
+                timestamp=row_dict.get("mi.timestamp"),
+                model_name=str(row_dict.get("mi.model_name")) if row_dict.get("mi.model_name") else "",
                 model_provider=str(row_dict.get("model_provider_name"))
                 if row_dict.get("model_provider_name")
                 else "unknown",
@@ -1322,8 +1329,8 @@ class ObservabilityMetricsService:
                 if row_dict.get("processing_time_ms")
                 else None,
                 request_ip=str(row_dict.get("request_ip")) if row_dict.get("request_ip") else None,
-                request_arrival_time=row_dict.get("request_arrival_time"),
-                request_forward_time=row_dict.get("request_forward_time"),
+                request_arrival_time=row_dict.get("request_arrival_time") or row_dict.get("mi.timestamp"),
+                request_forward_time=row_dict.get("request_forward_time") or row_dict.get("mi.timestamp"),
                 project_id=safe_uuid(row_dict.get("mid.project_id")),
                 api_key_project_id=safe_uuid(row_dict.get("api_key_project_id")),
                 endpoint_id=safe_uuid(row_dict.get("mid.endpoint_id")),

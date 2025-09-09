@@ -84,7 +84,7 @@ export function OAuthButtons({ onAuthStart, className }: OAuthButtonsProps) {
         process.env.NEXT_PUBLIC_API_URL ||
         process.env.NEXT_PUBLIC_BASE_URL ||
         "http://localhost:8005";
-      const redirectUri = `${window.location.origin}/login`;
+      const redirectUri = `${window.location.origin}/auth/login`;
 
       // Construct the OAuth URL with query parameters
       const params = new URLSearchParams({

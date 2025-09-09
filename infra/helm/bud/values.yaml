@@ -34,8 +34,8 @@ microservices:
             NODE_TLS_REJECT_UNAUTHORIZED: "0"
 
     # backend exposed services
-    budproxy:
-        image: budstudio/budproxy:nightly
+    budgateway:
+        image: budstudio/budgateway:nightly
     askbud:
         image: budstudio/askbud:nightly
         daprid: askbud
@@ -127,6 +127,7 @@ microservices:
         image: budstudio/budmodel:nightly
         daprid: budmodel
         storageClassName: nfs-csi
+        storageSize: "32Gi"
         env:
             LOG_LEVEL: INFO
 
