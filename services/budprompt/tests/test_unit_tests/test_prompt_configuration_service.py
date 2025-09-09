@@ -561,8 +561,8 @@ class TestGenerateValidationCodes:
 class TestPromptIdGeneration:
     """Test cases for prompt_id auto-generation."""
 
-    def test_prompt_id_auto_generated_when_not_provided(self):
-        """Test that prompt_id is auto-generated when not provided."""
+    def test_prompt_id_is_none_when_not_provided(self):
+        """Test that prompt_id defaults to None when not provided in the schema."""
         # Create request without prompt_id
         request_data = {
             "schema": {
@@ -572,19 +572,11 @@ class TestPromptIdGeneration:
             "type": "input"
         }
 
-        # Create the request - prompt_id should be auto-generated
+        # Create the request - prompt_id should be None (UUID generation happens in router)
         request = PromptSchemaRequest(**request_data)
 
-        # Assert prompt_id exists and is a valid UUID
-        assert request.prompt_id is not None
-        assert len(request.prompt_id) == 36  # UUID4 string length
-
-        # Verify it's a valid UUID
-        import uuid
-        try:
-            uuid.UUID(request.prompt_id)
-        except ValueError:
-            assert False, "prompt_id is not a valid UUID"
+        # Assert prompt_id is None when not provided
+        assert request.prompt_id is None
 
     def test_prompt_id_preserved_when_provided(self):
         """Test that provided prompt_id is preserved."""

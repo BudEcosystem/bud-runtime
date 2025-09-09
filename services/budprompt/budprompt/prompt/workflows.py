@@ -72,7 +72,7 @@ class PromptSchemaWorkflow:
 
     @dapr_workflow.register_activity
     @staticmethod
-    def store_prompt_configuration(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> None:
+    def store_prompt_configuration(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> str:
         """Store the prompt configuration."""
         notification_request = NotificationRequest(**kwargs.pop("notification_request"))
         return PromptConfigurationService.store_prompt_configuration(
@@ -122,7 +122,7 @@ class PromptSchemaWorkflow:
             retry_policy=retry_policy,
         )
 
-        _ = yield ctx.call_activity(
+        redis_key = yield ctx.call_activity(
             PromptSchemaWorkflow.store_prompt_configuration,
             input={
                 "workflow_id": workflow_id,
@@ -137,7 +137,7 @@ class PromptSchemaWorkflow:
             retry_policy=retry_policy,
         )
 
-        response = PromptSchemaResponse(workflow_id=workflow_id, prompt_id=request.prompt_id)
+        response = PromptSchemaResponse(workflow_id=workflow_id, prompt_id=redis_key)
 
         notification_request.payload.event = "results"
         notification_request.payload.content = NotificationContent(

@@ -97,7 +97,7 @@ class TestSavePromptConfig(TestPromptService):
         # Assert
         assert result.code == 200
         assert result.message == "Prompt configuration saved successfully"
-        assert result.prompt_id == "test-prompt-123"
+        assert result.prompt_id == "run:test-prompt-123"
 
         # Verify Redis interactions
         mock_redis_service.get.assert_called_once_with("run:test-prompt-123")
@@ -130,7 +130,7 @@ class TestSavePromptConfig(TestPromptService):
 
         # Assert
         assert result.code == 200
-        assert result.prompt_id == "test-prompt-123"
+        assert result.prompt_id == "run:test-prompt-123"
 
         # Verify Redis was called correctly
         mock_redis_service.get.assert_called_once_with("run:test-prompt-123")
@@ -170,7 +170,7 @@ class TestGetPromptConfig(TestPromptService):
     async def test_get_config_success(self, prompt_service, mock_redis_service, sample_config_data):
         """Test successful retrieval of configuration."""
         # Arrange
-        prompt_id = "test-prompt-123"
+        prompt_id = "run:test-prompt-123"
         config_json = sample_config_data.model_dump_json(exclude_none=True)
         mock_redis_service.get.return_value = config_json
 
@@ -192,7 +192,7 @@ class TestGetPromptConfig(TestPromptService):
     async def test_get_config_not_found(self, prompt_service, mock_redis_service):
         """Test retrieval when configuration doesn't exist."""
         # Arrange
-        prompt_id = "non-existent-id"
+        prompt_id = "run:non-existent-id"
         mock_redis_service.get.return_value = None
 
         # Act & Assert
@@ -200,16 +200,16 @@ class TestGetPromptConfig(TestPromptService):
             await prompt_service.get_prompt_config(prompt_id)
 
         assert exc_info.value.status_code == 404
-        assert f"Prompt configuration not found for prompt_id: {prompt_id}" in exc_info.value.message
+        assert f"Prompt configuration not found for key: {prompt_id}" in exc_info.value.message
 
         # Verify Redis was called
-        mock_redis_service.get.assert_called_once_with(f"run:{prompt_id}")
+        mock_redis_service.get.assert_called_once_with("run:non-existent-id")
 
     @pytest.mark.asyncio
     async def test_get_config_invalid_json(self, prompt_service, mock_redis_service):
         """Test handling of invalid JSON data from Redis."""
         # Arrange
-        prompt_id = "test-prompt-123"
+        prompt_id = "run:test-prompt-123"
         mock_redis_service.get.return_value = "invalid json {{"
 
         # Act & Assert
@@ -224,7 +224,7 @@ class TestGetPromptConfig(TestPromptService):
     async def test_get_config_redis_error(self, prompt_service, mock_redis_service):
         """Test handling of Redis connection errors."""
         # Arrange
-        prompt_id = "test-prompt-123"
+        prompt_id = "run:test-prompt-123"
         mock_redis_service.get.side_effect = Exception("Redis connection failed")
 
         # Act & Assert
@@ -238,7 +238,7 @@ class TestGetPromptConfig(TestPromptService):
     async def test_get_config_with_partial_data(self, prompt_service, mock_redis_service):
         """Test retrieval of configuration with partial fields."""
         # Arrange
-        prompt_id = "test-prompt-123"
+        prompt_id = "run:test-prompt-123"
         partial_config = PromptConfigurationData(
             deployment_name="gpt-4",
             stream=False,
@@ -291,7 +291,7 @@ class TestPromptServiceIntegration(TestPromptService):
 
         # Assert save operation
         assert save_result.code == 200
-        assert save_result.prompt_id == prompt_id
+        assert save_result.prompt_id == f"run:{prompt_id}"
 
         # Get the saved data from the set call
         saved_json = mock_redis_service.set.call_args[0][1]
@@ -300,11 +300,11 @@ class TestPromptServiceIntegration(TestPromptService):
         mock_redis_service.get.return_value = saved_json
 
         # Act - Get configuration
-        get_result = await prompt_service.get_prompt_config(prompt_id)
+        get_result = await prompt_service.get_prompt_config(f"run:{prompt_id}")
 
         # Assert get operation
         assert get_result.code == 200
-        assert get_result.prompt_id == prompt_id
+        assert get_result.prompt_id == f"run:{prompt_id}"
         assert get_result.data.deployment_name == "gpt-4"
         assert get_result.data.model_settings.temperature == 0.8
         assert get_result.data.stream == True
@@ -348,7 +348,7 @@ class TestPromptServiceIntegration(TestPromptService):
         mock_redis_service.get.return_value = updated_json
 
         # Act - Get updated configuration
-        get_result = await prompt_service.get_prompt_config(prompt_id)
+        get_result = await prompt_service.get_prompt_config(f"run:{prompt_id}")
 
         # Assert
         assert get_result.code == 200

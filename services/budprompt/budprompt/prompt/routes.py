@@ -135,6 +135,11 @@ async def perform_prompt_schema(request: PromptSchemaRequest) -> Response:
         HTTP response containing the prompt schema validation results.
     """
     response: Union[SuccessResponse, ErrorResponse]
+
+    # Set default uuid
+    if request.prompt_id is None:
+        request.prompt_id = str(uuid.uuid4())
+
     if request.debug:
         try:
             logger.info("Running prompt schema validation in debug mode", request.model_dump())
@@ -176,6 +181,10 @@ async def save_prompt_config(
     Raises:
         HTTPException: If the request is invalid or saving fails
     """
+    # Set default uuid
+    if request.prompt_id is None:
+        request.prompt_id = str(uuid.uuid4())
+
     try:
         logger.info(f"Received prompt configuration request for prompt_id: {request.prompt_id}")
 

@@ -17,7 +17,6 @@
 """Pydantic schemas for the prompt module."""
 
 import time
-import uuid
 from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
@@ -286,9 +285,7 @@ class PromptSchemaRequest(CloudEventBase):
     The type field specifies whether this is an input or output schema.
     """
 
-    prompt_id: str = Field(
-        default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for the prompt configuration"
-    )
+    prompt_id: Optional[str] = Field(None, description="Unique identifier for the prompt configuration")
     schema: Optional[SchemaBase] = Field(
         None, description="JSON schema for structured input/output (None for unstructured)"
     )
@@ -352,7 +349,7 @@ class PromptConfigRequest(BaseModel):
     """
 
     prompt_id: Optional[str] = Field(
-        default_factory=lambda: str(uuid.uuid4()),
+        None,
         description="Unique identifier for the prompt configuration. If not provided, will be auto-generated.",
     )
     deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
