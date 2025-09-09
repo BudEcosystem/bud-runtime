@@ -34,7 +34,7 @@ from budprompt.commons.exceptions import SchemaGenerationException
 logger = logging.get_logger(__name__)
 
 
-class PydanticModelGenerator:
+class DataModelGenerator:
     """Generator for creating Pydantic models from JSON schemas.
 
     This class encapsulates all logic for converting JSON schemas into
@@ -133,7 +133,7 @@ class PydanticModelGenerator:
 
         except Exception as e:
             logger.error("Failed to generate Pydantic code: %s", str(e))
-            raise SchemaGenerationException("Invalid JSON schema format")
+            raise SchemaGenerationException("Invalid JSON schema format") from e
 
         finally:
             # Clean up temporary files
@@ -212,4 +212,4 @@ class PydanticModelGenerator:
             raise
         except Exception as e:
             logger.error("Failed to load Pydantic model from code: %s", str(e))
-            raise SchemaGenerationException("Unable to process schema")
+            raise SchemaGenerationException("Unable to process schema") from e

@@ -43,7 +43,7 @@ from budprompt.commons.exceptions import (
 )
 from budprompt.shared.providers import BudServeProvider
 
-from .schema_builder import PydanticModelGenerator
+from .schema_builder import DataModelGenerator
 from .schemas import Message, ModelSettings
 from .streaming_executors import execute_streaming_validation
 from .streaming_validation import add_field_validator_to_model
@@ -65,7 +65,7 @@ class SimplePromptExecutor:
     def __init__(self):
         """Initialize the SimplePromptExecutor."""
         self.provider = BudServeProvider()
-        self.model_generator = PydanticModelGenerator()
+        self.model_generator = DataModelGenerator()
 
     async def execute(
         self,
