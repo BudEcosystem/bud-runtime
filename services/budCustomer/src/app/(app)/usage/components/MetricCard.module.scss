@@ -71,6 +71,27 @@
         letter-spacing: -0.02em;
       }
 
+      .stackedValue {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+
+        .value {
+          font-size: 24px;
+          font-weight: 600;
+          color: var(--text-primary);
+          line-height: 1;
+          letter-spacing: -0.02em;
+        }
+
+        .quotaValue {
+          font-size: 14px;
+          font-weight: 400;
+          color: var(--text-muted);
+          line-height: 1.2;
+        }
+      }
+
       .trend {
         display: flex;
         align-items: center;

@@ -29,19 +29,14 @@ import { useLoaderOnLoading } from "@/hooks/useLoaderOnLoading";
 import {
   Text_11_400_808080,
   Text_12_400_B3B3B3,
-  Text_12_400_EEEEEE,
   Text_12_600_EEEEEE,
   Text_14_600_EEEEEE,
-  Text_16_600_FFFFFF,
-  Text_20_400_FFFFFF,
-  Text_26_600_FFFFFF,
 } from "@/components/ui/text";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import ProjectTags from "@/flows/components/ProjectTags";
-import { endpointStatusMapping } from "@/lib/colorMapping";
 
-const { Title, Text, Paragraph } = Typography;
+const { Paragraph } = Typography;
 
 interface GatewayMetadata {
   // Network & Request Info
@@ -238,10 +233,21 @@ export default function ObservabilityDetailPage({
       <Flex align="center" justify="between">
         {isMounted && (
           <Flex align="center" justify="start">
-            <PrimaryButton onClick={goBack} className="mr-4">
-              <ArrowLeftOutlined /> Back
-            </PrimaryButton>
-            <Text_26_600_FFFFFF>Observability Details</Text_26_600_FFFFFF>
+            <Button
+              onClick={goBack}
+              type="text"
+              shape="circle"
+              icon={<ArrowLeftOutlined />}
+              className="mr-4 !w-10 !h-10 !flex !items-center !justify-center hover:!bg-[var(--bg-hover)] !border-[var(--border-color)] text-[var(--text-primary)]"
+            />
+            <span
+              className="text-2xl font-semibold"
+              style={{
+                color: "var(--text-primary)",
+              }}
+            >
+              Observability Details
+            </span>
           </Flex>
         )}
       </Flex>
@@ -265,13 +271,18 @@ export default function ObservabilityDetailPage({
           <HeaderContent />
           <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 mt-8 bg-[var(--bg-tertiary)] text-center">
             <div className="py-12">
-              <Text_16_600_FFFFFF className="text-red-500 mb-4">
+              <span className="text-base font-semibold text-red-500 mb-4 block">
                 {error || "Failed to load observability details"}
-              </Text_16_600_FFFFFF>
-              <Text_12_400_EEEEEE className="text-gray-400 mb-6">
+              </span>
+              <span
+                className="mb-6 block"
+                style={{
+                  color: "var(--text-muted)",
+                }}
+              >
                 The observability details could not be loaded. This might be due
                 to a temporary service issue.
-              </Text_12_400_EEEEEE>
+              </span>
               <PrimaryButton onClick={() => fetchInferenceDetail(id as string)}>
                 Try Again
               </PrimaryButton>
@@ -290,18 +301,18 @@ export default function ObservabilityDetailPage({
         {/* Overview & Details - Combined Section */}
         <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6 mt-8">
           <div className="w-full">
-            <Text_14_600_EEEEEE className="!text-[var(--text-primary)] mb-4">
+            <Text_14_600_EEEEEE className="text-[var(--text-primary)] mb-4">
               Overview
             </Text_14_600_EEEEEE>
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                   Inference ID
                 </Text_12_400_B3B3B3>
                 <div className="flex items-center gap-2">
                   <Text_12_600_EEEEEE
-                    className="truncate max-w-[200px] !text-[var(--text-primary)]"
+                    className="truncate max-w-[200px] text-[var(--text-primary)]"
                     title={inferenceData.inference_id}
                   >
                     {inferenceData.inference_id}
@@ -320,32 +331,32 @@ export default function ObservabilityDetailPage({
                           "inference_id",
                         )
                       }
-                      className="!text-[var(--text-muted)] hover:!text-[var(--text-primary)] min-w-[24px]"
+                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] min-w-[24px]"
                     />
                   </Tooltip>
                 </div>
               </div>
 
               <div>
-                <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                   Model
                 </Text_12_400_B3B3B3>
-                <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                   {inferenceData.model_display_name || inferenceData.model_name}
                 </Text_12_600_EEEEEE>
               </div>
 
               <div>
-                <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                   Endpoint
                 </Text_12_400_B3B3B3>
-                <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                   {inferenceData.endpoint_name || "Unknown Endpoint"}
                 </Text_12_600_EEEEEE>
               </div>
 
               <div>
-                <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                   Type
                 </Text_12_400_B3B3B3>
                 <Tag
@@ -360,25 +371,25 @@ export default function ObservabilityDetailPage({
               </div>
 
               <div>
-                <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                   Project
                 </Text_12_400_B3B3B3>
-                <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                   {inferenceData.project_name || "Unknown Project"}
                 </Text_12_600_EEEEEE>
               </div>
 
               <div>
-                <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                   Timestamp
                 </Text_12_400_B3B3B3>
-                <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                   {formatTimestampWithTZ(inferenceData.timestamp)}
                 </Text_12_600_EEEEEE>
               </div>
 
               <div>
-                <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                   Cached
                 </Text_12_400_B3B3B3>
                 <div>
@@ -390,23 +401,27 @@ export default function ObservabilityDetailPage({
 
               {inferenceData.finish_reason && (
                 <div>
-                  <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                  <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                     Finish Reason
                   </Text_12_400_B3B3B3>
-                  <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                  <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                     {inferenceData.finish_reason}
                   </Text_12_600_EEEEEE>
                 </div>
               )}
 
               <div>
-                <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                   Status
                 </Text_12_400_B3B3B3>
                 <div>
                   <ProjectTags
                     name={inferenceData.is_success ? "Success" : "Failed"}
-                    color={inferenceData.is_success ? "#22c55e" : "#ef4444"}
+                    color={
+                      inferenceData.is_success
+                        ? "var(--color-success)"
+                        : "var(--color-error)"
+                    }
                     textClass="text-[.75rem]"
                   />
                 </div>
@@ -419,7 +434,7 @@ export default function ObservabilityDetailPage({
         {inferenceData.gateway_metadata && (
           <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6">
             <div className="w-full">
-              <Text_14_600_EEEEEE className="!text-[var(--text-primary)] mb-4">
+              <Text_14_600_EEEEEE className="text-[var(--text-primary)] mb-4">
                 Request Metadata
               </Text_14_600_EEEEEE>
 
@@ -427,17 +442,17 @@ export default function ObservabilityDetailPage({
                 {/* Network Information */}
                 {inferenceData.gateway_metadata.client_ip && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       Client IP
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                       {inferenceData.gateway_metadata.client_ip}
                     </Text_12_600_EEEEEE>
                   </div>
                 )}
                 {inferenceData.gateway_metadata.method && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       Method
                     </Text_12_400_B3B3B3>
                     <Tag
@@ -453,27 +468,27 @@ export default function ObservabilityDetailPage({
                 )}
                 {inferenceData.gateway_metadata.path && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       Path
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="font-mono text-xs !text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="font-mono text-xs text-[var(--text-primary)]">
                       {inferenceData.gateway_metadata.path}
                     </Text_12_600_EEEEEE>
                   </div>
                 )}
                 {inferenceData.gateway_metadata.protocol_version && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       Protocol
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                       {inferenceData.gateway_metadata.protocol_version}
                     </Text_12_600_EEEEEE>
                   </div>
                 )}
                 {inferenceData.gateway_metadata.status_code && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       Status Code
                     </Text_12_400_B3B3B3>
                     <Tag
@@ -492,7 +507,7 @@ export default function ObservabilityDetailPage({
                 {/* Client Information */}
                 {inferenceData.gateway_metadata.device_type && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       Device Type
                     </Text_12_400_B3B3B3>
                     <Tag
@@ -515,10 +530,10 @@ export default function ObservabilityDetailPage({
                 )}
                 {inferenceData.gateway_metadata.browser_name && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       Browser
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                       {inferenceData.gateway_metadata.browser_name}
                       {inferenceData.gateway_metadata.browser_version &&
                         ` v${inferenceData.gateway_metadata.browser_version}`}
@@ -527,10 +542,10 @@ export default function ObservabilityDetailPage({
                 )}
                 {inferenceData.gateway_metadata.os_name && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       Operating System
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                       {inferenceData.gateway_metadata.os_name}
                       {inferenceData.gateway_metadata.os_version &&
                         ` v${inferenceData.gateway_metadata.os_version}`}
@@ -543,10 +558,10 @@ export default function ObservabilityDetailPage({
                   inferenceData.gateway_metadata.region ||
                   inferenceData.gateway_metadata.country_name) && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       Location
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                       {[
                         inferenceData.gateway_metadata.city,
                         inferenceData.gateway_metadata.region,
@@ -561,30 +576,30 @@ export default function ObservabilityDetailPage({
                 )}
                 {inferenceData.gateway_metadata.timezone && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       Timezone
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                       {inferenceData.gateway_metadata.timezone}
                     </Text_12_600_EEEEEE>
                   </div>
                 )}
                 {inferenceData.gateway_metadata.isp && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       ISP
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                       {inferenceData.gateway_metadata.isp}
                     </Text_12_600_EEEEEE>
                   </div>
                 )}
                 {inferenceData.gateway_metadata.asn && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       AS Number
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                       AS{inferenceData.gateway_metadata.asn}
                     </Text_12_600_EEEEEE>
                   </div>
@@ -593,30 +608,30 @@ export default function ObservabilityDetailPage({
                 {/* Authentication Information */}
                 {inferenceData.gateway_metadata.auth_method && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       Auth Method
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="!text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="text-[var(--text-primary)]">
                       {inferenceData.gateway_metadata.auth_method}
                     </Text_12_600_EEEEEE>
                   </div>
                 )}
                 {inferenceData.gateway_metadata.api_key_id && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       API Key ID
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="font-mono text-xs !text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="font-mono text-xs text-[var(--text-primary)]">
                       {inferenceData.gateway_metadata.api_key_id}
                     </Text_12_600_EEEEEE>
                   </div>
                 )}
                 {inferenceData.gateway_metadata.user_id && (
                   <div>
-                    <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                       User ID
                     </Text_12_400_B3B3B3>
-                    <Text_12_600_EEEEEE className="font-mono text-xs !text-[var(--text-primary)]">
+                    <Text_12_600_EEEEEE className="font-mono text-xs text-[var(--text-primary)]">
                       {inferenceData.gateway_metadata.user_id}
                     </Text_12_600_EEEEEE>
                   </div>
@@ -626,11 +641,11 @@ export default function ObservabilityDetailPage({
               {/* User Agent - full width at the bottom if exists */}
               {inferenceData.gateway_metadata.user_agent && (
                 <div className="mt-4">
-                  <Text_12_400_B3B3B3 className="mb-1 !text-[var(--text-muted)]">
+                  <Text_12_400_B3B3B3 className="mb-1 text-[var(--text-muted)]">
                     User Agent
                   </Text_12_400_B3B3B3>
                   <div className="bg-[var(--bg-secondary)] p-2 rounded">
-                    <Text_12_400_B3B3B3 className="font-mono text-xs break-all !text-[var(--text-muted)]">
+                    <Text_12_400_B3B3B3 className="font-mono text-xs break-all text-[var(--text-muted)]">
                       {inferenceData.gateway_metadata.user_agent}
                     </Text_12_400_B3B3B3>
                   </div>
@@ -643,7 +658,7 @@ export default function ObservabilityDetailPage({
         {/* Performance Metrics */}
         <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6">
           <div className="w-full">
-            <Text_14_600_EEEEEE className="!text-[var(--text-primary)] mb-4">
+            <Text_14_600_EEEEEE className="text-[var(--text-primary)] mb-4">
               Performance Metrics
             </Text_14_600_EEEEEE>
 
@@ -656,31 +671,40 @@ export default function ObservabilityDetailPage({
                 inferenceData.endpoint_type !== "moderation" && (
                   <>
                     <div className="text-center">
-                      <div className="text-[1.25rem] font-[600] text-[#3b82f6] mb-1">
+                      <div
+                        className="text-[1.25rem] font-[600] mb-1"
+                        style={{ color: "#3b82f6" }}
+                      >
                         {inferenceData.input_tokens.toLocaleString()}
                       </div>
-                      <Text_12_400_B3B3B3 className="!text-[var(--text-muted)]">
+                      <Text_12_400_B3B3B3 className="text-[var(--text-muted)]">
                         Input Tokens
                       </Text_12_400_B3B3B3>
                     </div>
 
                     <div className="text-center">
-                      <div className="text-[1.25rem] font-[600] text-[#3b82f6] mb-1">
+                      <div
+                        className="text-[1.25rem] font-[600] mb-1"
+                        style={{ color: "#3b82f6" }}
+                      >
                         {inferenceData.output_tokens.toLocaleString()}
                       </div>
-                      <Text_12_400_B3B3B3 className="!text-[var(--text-muted)]">
+                      <Text_12_400_B3B3B3 className="text-[var(--text-muted)]">
                         Output Tokens
                       </Text_12_400_B3B3B3>
                     </div>
 
                     <div className="text-center">
-                      <div className="text-[1.25rem] font-[600] text-[#8b5cf6] mb-1">
+                      <div
+                        className="text-[1.25rem] font-[600] mb-1"
+                        style={{ color: "#8b5cf6" }}
+                      >
                         {(
                           inferenceData.input_tokens +
                           inferenceData.output_tokens
                         ).toLocaleString()}
                       </div>
-                      <Text_12_400_B3B3B3 className="!text-[var(--text-muted)]">
+                      <Text_12_400_B3B3B3 className="text-[var(--text-muted)]">
                         Total Tokens
                       </Text_12_400_B3B3B3>
                     </div>
@@ -689,19 +713,25 @@ export default function ObservabilityDetailPage({
 
               {inferenceData.ttft_ms && (
                 <div className="text-center">
-                  <div className="text-[1.25rem] font-[600] text-[#06b6d4] mb-1">
+                  <div
+                    className="text-[1.25rem] font-[600] mb-1"
+                    style={{ color: "#06b6d4" }}
+                  >
                     {formatDuration(inferenceData.ttft_ms)}
                   </div>
-                  <Text_12_400_B3B3B3 className="!text-[var(--text-muted)]">
+                  <Text_12_400_B3B3B3 className="text-[var(--text-muted)]">
                     TTFT
                   </Text_12_400_B3B3B3>
                 </div>
               )}
               <div className="text-center">
-                <div className="text-[1.25rem] font-[600] text-[#22c55e] mb-1">
+                <div
+                  className="text-[1.25rem] font-[600] mb-1"
+                  style={{ color: "#22c55e" }}
+                >
                   {formatDuration(inferenceData.response_time_ms)}
                 </div>
-                <Text_12_400_B3B3B3 className="!text-[var(--text-muted)]">
+                <Text_12_400_B3B3B3 className="text-[var(--text-muted)]">
                   End to End Latency
                 </Text_12_400_B3B3B3>
               </div>
@@ -715,7 +745,7 @@ export default function ObservabilityDetailPage({
           <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6">
             <div className="w-full">
               <div className="flex justify-between items-center mb-4">
-                <Text_14_600_EEEEEE className="!text-[var(--text-primary)]">
+                <Text_14_600_EEEEEE className="text-[var(--text-primary)]">
                   Conversation
                 </Text_14_600_EEEEEE>
                 <Button
@@ -724,7 +754,7 @@ export default function ObservabilityDetailPage({
                   onClick={() =>
                     downloadJson(inferenceData.messages, "conversation")
                   }
-                  className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] !text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
+                  className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
                 >
                   Download
                 </Button>
@@ -736,11 +766,11 @@ export default function ObservabilityDetailPage({
                     key={index}
                     className={`border rounded-md p-3 ${
                       message.role === "system"
-                        ? "bg-purple-900/10 border-purple-800/30"
+                        ? "bg-[var(--role-system-bg)] border-[var(--role-system-border)]"
                         : message.role === "user"
-                          ? "bg-blue-900/10 border-blue-800/30"
+                          ? "bg-[var(--role-user-bg)] border-[var(--role-user-border)]"
                           : message.role === "assistant"
-                            ? "bg-green-900/10 border-green-800/30"
+                            ? "bg-[var(--role-assistant-bg)] border-[var(--role-assistant-border)]"
                             : "bg-[var(--bg-secondary)] border-[var(--border-color)]"
                     }`}
                   >
@@ -797,16 +827,16 @@ export default function ObservabilityDetailPage({
                             }
                             copyToClipboard(textToCopy, `message_${index}`);
                           }}
-                          className="!text-[var(--text-muted)] hover:!text-[var(--text-primary)]"
+                          className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                         />
                       </Tooltip>
                     </div>
-                    <div className="!text-[var(--text-primary)]">
+                    <div className="text-[var(--text-primary)]">
                       {(() => {
                         // Handle different content formats
                         if (typeof message.content === "string") {
                           return (
-                            <Paragraph className="mb-0 whitespace-pre-wrap text-sm !text-[var(--text-primary)]">
+                            <Paragraph className="mb-0 whitespace-pre-wrap text-sm text-[var(--text-primary)]">
                               {message.content}
                             </Paragraph>
                           );
@@ -826,7 +856,7 @@ export default function ObservabilityDetailPage({
                             .join("\n\n");
 
                           return (
-                            <Paragraph className="mb-0 whitespace-pre-wrap text-sm !text-[var(--text-primary)]">
+                            <Paragraph className="mb-0 whitespace-pre-wrap text-sm text-[var(--text-primary)]">
                               {textParts}
                             </Paragraph>
                           );
@@ -834,7 +864,7 @@ export default function ObservabilityDetailPage({
                           // Fallback for other formats
                           return (
                             <pre className="bg-[var(--bg-secondary)] p-3 rounded overflow-x-auto text-sm">
-                              <code className="!text-[var(--text-primary)]">
+                              <code className="text-[var(--text-primary)]">
                                 {JSON.stringify(message.content, null, 2)}
                               </code>
                             </pre>
@@ -854,7 +884,7 @@ export default function ObservabilityDetailPage({
           <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6">
             <div className="w-full">
               <div className="flex justify-between items-center mb-4">
-                <Text_14_600_EEEEEE className="!text-[var(--text-primary)]">
+                <Text_14_600_EEEEEE className="text-[var(--text-primary)]">
                   Raw Request
                 </Text_14_600_EEEEEE>
                 <div className="flex gap-2">
@@ -882,7 +912,7 @@ export default function ObservabilityDetailPage({
                           );
                         }
                       }}
-                      className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] !text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
+                      className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
                     >
                       Copy
                     </Button>
@@ -903,14 +933,14 @@ export default function ObservabilityDetailPage({
                         );
                       }
                     }}
-                    className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] !text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
+                    className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
                   >
                     Download
                   </Button>
                 </div>
               </div>
               <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-md p-3 overflow-x-auto">
-                <pre className="!text-[var(--text-muted)] mb-0 text-sm">
+                <pre className="text-[var(--text-muted)] mb-0 text-sm">
                   <code>
                     {(() => {
                       try {
@@ -935,7 +965,7 @@ export default function ObservabilityDetailPage({
           <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6">
             <div className="w-full">
               <div className="flex justify-between items-center mb-4">
-                <Text_14_600_EEEEEE className="!text-[var(--text-primary)]">
+                <Text_14_600_EEEEEE className="text-[var(--text-primary)]">
                   Raw Response
                 </Text_14_600_EEEEEE>
                 <div className="flex gap-2">
@@ -963,7 +993,7 @@ export default function ObservabilityDetailPage({
                           );
                         }
                       }}
-                      className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] !text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
+                      className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
                     >
                       Copy
                     </Button>
@@ -984,14 +1014,14 @@ export default function ObservabilityDetailPage({
                         );
                       }
                     }}
-                    className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] !text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
+                    className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
                   >
                     Download
                   </Button>
                 </div>
               </div>
               <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-md p-3 overflow-x-auto">
-                <pre className="!text-[var(--text-muted)] mb-0 text-sm">
+                <pre className="text-[var(--text-muted)] mb-0 text-sm">
                   <code>
                     {(() => {
                       try {

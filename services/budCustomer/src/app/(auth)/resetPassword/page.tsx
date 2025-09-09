@@ -69,7 +69,7 @@ export default function ResetPassword() {
     try {
       const response = await AppRequest.Patch(`/users/${userId}`, payload);
       successToast(response.data.message || "Password reset successfully");
-      router.push("/auth/login");
+      router.push("/login");
       localStorage.clear();
       hideLoader();
     } catch (error: any) {

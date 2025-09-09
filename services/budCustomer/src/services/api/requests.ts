@@ -53,7 +53,7 @@ let isRedirecting = false;
 if (typeof window !== "undefined") {
   Token = localStorage.getItem("access_token");
   // Reset isRedirecting flag if we're on the login page
-  if (window.location.pathname === "/auth/login") {
+  if (window.location.pathname === "/login") {
     isRedirecting = false;
   }
 }
@@ -102,12 +102,12 @@ axiosInstance.interceptors.request.use(
       // Prevent redirect loop
       if (
         typeof window !== "undefined" &&
-        window.location.pathname !== "/auth/login"
+        window.location.pathname !== "/login"
       ) {
         if (!isRedirecting) {
           isRedirecting = true;
           localStorage.clear();
-          window.location.replace("/auth/login");
+          window.location.replace("/login");
         }
       }
       return Promise.reject(new Error("No access token found"));
@@ -196,7 +196,7 @@ const handleErrorResponse = (err: any) => {
     if (!isRedirecting) {
       isRedirecting = true;
       localStorage.clear();
-      window.location.replace("/auth/login");
+      window.location.replace("/login");
     }
     return false;
   }
@@ -204,7 +204,7 @@ const handleErrorResponse = (err: any) => {
     if (!isRedirecting) {
       isRedirecting = true;
       localStorage.clear();
-      window.location.replace("/auth/login");
+      window.location.replace("/login");
       return false;
     }
   }
@@ -288,7 +288,7 @@ const refreshToken = async () => {
     if (!isRedirecting) {
       isRedirecting = true;
       localStorage.clear();
-      window.location.replace("/auth/login");
+      window.location.replace("/login");
     }
     throw err;
   }

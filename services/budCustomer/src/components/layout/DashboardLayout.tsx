@@ -152,22 +152,29 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     try {
       const userData: any = await fetchUser();
       if (!userData && pathname !== "/login") {
-        return router.push("/login");
+        return router.replace("/login");
       }
       if (
         userData?.data?.result?.status === "invited" &&
         pathname !== "/login"
       ) {
         console.log("User needs to complete registration");
-        return router.push("/login");
+        return router.replace("/login");
       }
     } catch (error) {
       console.error("Error fetching user", error);
-      return router.push("/login");
+      return router.replace("/login");
     }
   };
+
   useEffect(() => {
-    if (!user?.id) {
+    // Only fetch user if we don't have user data AND we have a token
+    // This prevents duplicate fetches since AuthGuard already handles initial auth
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("access_token")
+        : null;
+    if (!user?.id && token) {
       getUser();
     }
   }, [pathname]); // Re-run on pathname change like budadmin
