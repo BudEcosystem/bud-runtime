@@ -227,7 +227,7 @@ class ModelTemplateFilter(BaseModel):
 class NotificationResult(BaseModel):
     """Notification result schema."""
 
-    target_type: Literal["model", "cluster", "endpoint", "project", "workflow", "user"] | None = None
+    target_type: Literal["model", "cluster", "endpoint", "project", "guardrail", "workflow", "user"] | None = None
     target_id: UUID4 | None = None
 
 

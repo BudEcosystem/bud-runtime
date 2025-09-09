@@ -54,6 +54,9 @@ class ProviderDataManager(DataManagerUtils):
         search: bool = False,
     ) -> Tuple[List[ProviderModel], int]:
         """Get all providers from the database."""
+        if "capabilities" in filters and not isinstance(filters["capabilities"], list):
+            filters["capabilities"] = [filters["capabilities"]]
+
         await self.validate_fields(ProviderModel, filters)
 
         # Generate statements according to search or filters
