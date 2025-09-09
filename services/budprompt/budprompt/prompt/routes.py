@@ -45,7 +45,7 @@ prompt_service = PromptExecutorService()
 
 # Prompt Router
 prompt_router = APIRouter(
-    prefix="/prompt",
+    prefix="/v1/prompt",
     tags=["prompt"],
 )
 
