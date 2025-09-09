@@ -164,6 +164,86 @@ class TestSavePromptConfig(TestPromptService):
         assert exc_info.value.status_code == 500
         assert "Invalid data format" in exc_info.value.message
 
+    @pytest.mark.asyncio
+    async def test_save_config_tools_require_multiple_calls(self, prompt_service, mock_redis_service):
+        """Test validation that enable_tools=True requires allow_multiple_calls=True."""
+        # Arrange - Create request with enable_tools=True but allow_multiple_calls=False
+        invalid_request = PromptConfigRequest(
+            prompt_id="test-prompt-tools",
+            deployment_name="gpt-4",
+            enable_tools=True,
+            allow_multiple_calls=False  # This should cause validation error
+        )
+
+        # Mock Redis to return None (new config)
+        mock_redis_service.get.return_value = None
+        mock_redis_service.set.return_value = True
+
+        # Act & Assert - Should raise ClientException with status 400
+        with pytest.raises(ClientException) as exc_info:
+            with patch('budprompt.prompt.services.app_settings') as mock_settings:
+                mock_settings.prompt_config_redis_ttl = 86400
+                await prompt_service.save_prompt_config(invalid_request)
+
+        # Verify the correct exception and message
+        assert exc_info.value.status_code == 400
+        assert "Enabling tools requires multiple LLM calls." == exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_save_config_tools_require_multiple_calls_existing_config(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test validation with existing config where enable_tools=True and allow_multiple_calls=False."""
+        # Arrange - Modify existing config to have conflicting settings
+        existing_config = sample_config_data.model_copy(deep=True)
+        existing_config.enable_tools = False  # Start with valid settings
+        existing_config.allow_multiple_calls = True
+        existing_config_json = existing_config.model_dump_json(exclude_none=True)
+
+        # Create request that updates to conflicting settings
+        update_request = PromptConfigRequest(
+            prompt_id="test-prompt-existing",
+            enable_tools=True,  # Enable tools
+            allow_multiple_calls=False  # But disallow multiple calls - should fail
+        )
+
+        # Mock Redis to return existing config
+        mock_redis_service.get.return_value = existing_config_json
+        mock_redis_service.set.return_value = True
+
+        # Act & Assert - Should raise ClientException with status 400
+        with pytest.raises(ClientException) as exc_info:
+            with patch('budprompt.prompt.services.app_settings') as mock_settings:
+                mock_settings.prompt_config_redis_ttl = 86400
+                await prompt_service.save_prompt_config(update_request)
+
+        # Verify the correct exception and message
+        assert exc_info.value.status_code == 400
+        assert "Enabling tools requires multiple LLM calls." == exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_save_config_tools_with_multiple_calls_allowed(self, prompt_service, mock_redis_service):
+        """Test that enable_tools=True with allow_multiple_calls=True is accepted."""
+        # Arrange - Create request with valid combination
+        valid_request = PromptConfigRequest(
+            prompt_id="test-prompt-valid-tools",
+            deployment_name="gpt-4",
+            enable_tools=True,
+            allow_multiple_calls=True  # Valid combination
+        )
+
+        # Mock Redis to return None (new config)
+        mock_redis_service.get.return_value = None
+        mock_redis_service.set.return_value = True
+
+        # Act - Should not raise an exception
+        with patch('budprompt.prompt.services.app_settings') as mock_settings:
+            mock_settings.prompt_config_redis_ttl = 86400
+            result = await prompt_service.save_prompt_config(valid_request)
+
+        # Assert - Should succeed
+        assert result.code == 200
+        assert result.message == "Prompt configuration saved successfully"
+        assert result.prompt_id == "test-prompt-valid-tools"
+
 
 class TestGetPromptConfig(TestPromptService):
     """Test cases for get_prompt_config method."""

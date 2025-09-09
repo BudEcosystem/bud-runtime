@@ -31,14 +31,13 @@ from budmicroframe.commons.schemas import (
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 from pydantic import ValidationError
 
-from budprompt.commons.exceptions import (
+from ..commons.config import app_settings
+from ..commons.exceptions import (
+    ClientException,
     PromptExecutionException,
     SchemaGenerationException,
     TemplateRenderingException,
 )
-
-from ..commons.config import app_settings
-from ..commons.exceptions import ClientException
 from ..commons.helpers import run_async
 from ..shared.redis_service import RedisService
 from .executors import SimplePromptExecutor
@@ -519,6 +518,10 @@ class PromptConfigurationService:
         )
 
         try:
+            if schema and "properties" in schema and "content" not in schema["properties"]:
+                logger.error("Schema is invalid: missing content field")
+                raise SchemaGenerationException("Schema must contain a 'content' field")
+
             # Validate schema if present
             if schema is not None:
                 model_name = f"{schema_type.capitalize()}Schema"
@@ -709,6 +712,15 @@ class PromptService:
 
             # Convert to JSON and store in Redis with configured TTL
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
+
+            # Validation
+            if config_data.enable_tools is True and config_data.allow_multiple_calls is False:
+                raise ClientException(
+                    status_code=400,
+                    message="Enabling tools requires multiple LLM calls.",
+                )
+
+            # Store in Redis
             await self.redis_service.set(redis_key, config_json, ex=app_settings.prompt_config_redis_ttl)
 
             # Also set default version pointer
@@ -729,6 +741,9 @@ class PromptService:
                 status_code=500,
                 message=f"Invalid data format in Redis for prompt_id {request.prompt_id}",
             ) from e
+        except ClientException:
+            # Re-raise client exceptions as-is
+            raise
         except Exception as e:
             logger.exception(f"Failed to store prompt configuration: {str(e)}")
             raise ClientException(

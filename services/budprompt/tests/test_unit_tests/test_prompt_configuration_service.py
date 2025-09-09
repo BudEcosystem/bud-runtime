@@ -49,11 +49,12 @@ class TestValidateSchema:
         return {
             "type": "object",
             "properties": {
+                "content": {"type": "string"},
                 "name": {"type": "string"},
                 "age": {"type": "integer"},
                 "email": {"type": "string"},
             },
-            "required": ["name", "age"],
+            "required": ["content", "name", "age"],
         }
 
     @pytest.fixture
@@ -62,6 +63,7 @@ class TestValidateSchema:
         return {
             "type": "object",
             "properties": {
+                "content": {"type": "string"},
                 "user": {
                     "type": "object",
                     "properties": {
@@ -78,7 +80,7 @@ class TestValidateSchema:
                     },
                 },
             },
-            "required": ["user"],
+            "required": ["content", "user"],
         }
 
     @patch('budprompt.prompt.services.time.sleep')
@@ -243,6 +245,7 @@ class TestValidateSchema:
         # Schema without explicit type field - should still be handled
         flexible_schema = {
             "properties": {
+                "content": {"type": "string"},
                 "name": {"type": "string"},
                 "value": {"type": "integer"}
             }
@@ -405,6 +408,92 @@ class TestValidateSchema:
         assert isinstance(last_content, NotificationContent)
         assert last_content.title == "Successfully validated schemas"
         assert last_content.status == WorkflowStatus.COMPLETED
+
+    @patch('budprompt.prompt.services.time.sleep')
+    @patch('budprompt.prompt.services.dapr_workflow')
+    def test_validate_schema_missing_content_field(
+        self, mock_dapr_workflow, mock_sleep, mock_notification_request
+    ):
+        """Test validation fails when schema has properties but missing content field."""
+        # Arrange
+        workflow_id = str(uuid.uuid4())
+
+        # Schema with properties but no 'content' field
+        schema_without_content = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "integer"}
+            }
+        }
+
+        request = PromptSchemaRequest(
+            prompt_id="test_prompt_missing_content",
+            schema=SchemaBase(
+                schema=schema_without_content,
+                validations={}
+            ),
+            type="input",
+        )
+
+        # Act & Assert - Should raise SchemaGenerationException
+        with pytest.raises(Exception) as exc_info:
+            PromptConfigurationService.validate_schema(
+                workflow_id=workflow_id,
+                notification_request=mock_notification_request,
+                schema=request.schema.schema,
+                validations=request.schema.validations,
+                schema_type=request.type,
+            )
+
+        # Verify the correct exception and message
+        assert "Schema must contain a 'content' field" in str(exc_info.value)
+
+        # Should publish start and failure notifications
+        assert mock_dapr_workflow.publish_notification.call_count == 2
+
+    @patch('budprompt.prompt.services.time.sleep')
+    @patch('budprompt.prompt.services.dapr_workflow')
+    def test_validate_schema_missing_content_field_output_schema(
+        self, mock_dapr_workflow, mock_sleep, mock_notification_request
+    ):
+        """Test validation fails for output schema missing content field."""
+        # Arrange
+        workflow_id = str(uuid.uuid4())
+
+        # Schema with properties but no 'content' field
+        schema_without_content = {
+            "type": "object",
+            "properties": {
+                "result": {"type": "string"},
+                "status": {"type": "string"}
+            }
+        }
+
+        request = PromptSchemaRequest(
+            prompt_id="test_output_missing_content",
+            schema=SchemaBase(
+                schema=schema_without_content,
+                validations={}
+            ),
+            type="output",
+        )
+
+        # Act & Assert - Should raise SchemaGenerationException
+        with pytest.raises(Exception) as exc_info:
+            PromptConfigurationService.validate_schema(
+                workflow_id=workflow_id,
+                notification_request=mock_notification_request,
+                schema=request.schema.schema,
+                validations=request.schema.validations,
+                schema_type=request.type,
+            )
+
+        # Verify the correct exception and message
+        assert "Schema must contain a 'content' field" in str(exc_info.value)
+
+        # Should publish start and failure notifications
+        assert mock_dapr_workflow.publish_notification.call_count == 2
 
 class TestGenerateValidationCodes:
     """Test cases for the generate_validation_codes method."""
