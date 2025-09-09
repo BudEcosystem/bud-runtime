@@ -92,6 +92,8 @@ axiosInstance.interceptors.request.use(
       config.url?.includes("auth/login") ||
       config.url?.includes("auth/register") ||
       config.url?.includes("users/reset-password") ||
+      config.url?.includes("users/validate-reset-token") ||
+      config.url?.includes("users/reset-password-with-token") ||
       config.url?.includes("auth/refresh-token") ||
       config.url?.includes("auth/oauth/callback") ||
       config.url?.includes("auth/token/exchange") ||
@@ -237,6 +239,8 @@ const handleErrorResponse = (err: any) => {
     const skipErrorToastEndpoints = [
       "/credentials/",
       "users/reset-password",
+      "users/validate-reset-token",
+      "users/reset-password-with-token",
       "/auth/login",
     ];
 

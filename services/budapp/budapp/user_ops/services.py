@@ -16,10 +16,12 @@
 
 """The user ops package, containing essential business logic, services, and routing configurations for the user ops."""
 
+import secrets
+from datetime import UTC, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, status
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings, secrets_settings
@@ -28,11 +30,17 @@ from budapp.commons.exceptions import BudNotifyException, ClientException
 from budapp.commons.keycloak import KeycloakManager
 from budapp.commons.security import HashManager
 from budapp.core.schemas import SubscriberCreate, SubscriberUpdate
-from budapp.shared.notification_service import BudNotifyHandler
+from budapp.shared.notification_service import BudNotifyHandler, BudNotifyService, NotificationBuilder
+from budapp.shared.password_reset_token_service import PasswordResetTokenService
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping
 from budapp.user_ops.models import User as UserModel
-from budapp.user_ops.schemas import ResetPasswordRequest, TenantClientSchema
+from budapp.user_ops.schemas import (
+    ResetPasswordRequest,
+    ResetPasswordWithTokenRequest,
+    TenantClientSchema,
+    ValidateResetTokenRequest,
+)
 
 from ..commons.constants import BUD_RESET_PASSWORD_WORKFLOW, EndpointStatusEnum, NotificationCategory, UserStatusEnum
 from ..commons.helpers import generate_valid_password, validate_password_string
@@ -346,43 +354,38 @@ class UserService(SessionMixin):
 
         return await UserDataManager(self.session).update_by_fields(db_user, data)
 
-    async def reset_password_email(self, request: ResetPasswordRequest):
-        """Trigger a reset password email notification."""
-        # Check if user exists
+    def __init__(self, session):
+        """Initialize UserService with Dapr-based token service."""
+        super().__init__(session)
+        self.password_reset_service = PasswordResetTokenService()
+
+    async def reset_password_email(self, request: ResetPasswordRequest, request_obj: Request = None):
+        """Trigger a reset password email notification with reset token."""
+        # Check if user exists - Always return the same response for security
         db_user = await UserDataManager(self.session).retrieve_by_fields(
             UserModel, {"email": request.email}, missing_ok=True
         )
 
+        # Security: Always return success response to prevent email enumeration
         if not db_user:
-            raise ClientException(message="Email not registered", status_code=status.HTTP_404_NOT_FOUND)
+            logger.warning(f"Password reset attempted for non-existent email: {request.email}")
+            return {"acknowledged": True, "status": "success", "transaction_id": secrets.token_hex(16)}
 
         # Check if user is active
         if db_user.status == UserStatusEnum.DELETED:
-            raise ClientException(
-                message="Inactive user not allowed to reset password", status_code=status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning(f"Password reset attempted for deleted user: {request.email}")
+            return {"acknowledged": True, "status": "success", "transaction_id": secrets.token_hex(16)}
 
-        # Check user is super admin
+        # Security: Return same success response for superusers to prevent account enumeration
         if db_user.is_superuser:
-            raise ClientException(
-                message="Super user not allowed to reset password", status_code=status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning(f"Password reset attempted for superuser: {request.email}")
+            return {"acknowledged": True, "status": "success", "transaction_id": secrets.token_hex(16)}
 
         # Check max reset password attempts exceeded
-        if db_user.reset_password_attempt == 3:
+        if db_user.reset_password_attempt >= 5:  # Increased limit
             raise ClientException(
-                message="Reset password attempt limit exceeded", status_code=status.HTTP_400_BAD_REQUEST
+                message="Reset password attempt limit exceeded", status_code=status.HTTP_429_TOO_MANY_REQUESTS
             )
-
-        # Generate a temporary password
-        temp_password = ""
-        while True:
-            logger.debug("Generating temporary password")
-            temp_password = generate_valid_password()
-            is_valid, message = validate_password_string(temp_password)
-            if is_valid:
-                break
-            logger.debug(f"Temp password invalid: {message}")
 
         # Get tenant information
         tenant = None
@@ -409,31 +412,27 @@ class UserService(SessionMixin):
 
         logger.debug(f"::USER:: Tenant: {tenant.realm_name}")
 
-        if not tenant:
-            raise ClientException("User does not belong to any tenant")
+        # Get request metadata for security
+        ip_address = None
+        user_agent = None
+        if request_obj:
+            ip_address = request_obj.client.host if request_obj.client else None
+            user_agent = request_obj.headers.get("user-agent")
 
-        # Update user password in Keycloak
-        keycloak_manager = KeycloakManager()
-        await keycloak_manager.update_user_password(
-            db_user.auth_id,
-            temp_password,
-            tenant.realm_name,  # default realm name,
+        # Create reset token using Dapr state store
+        reset_token = await self.password_reset_service.create_reset_token(
+            user_id=db_user.id, email=db_user.email, ip_address=ip_address, user_agent=user_agent
         )
 
-        # Increment reset password attempt
-        fields = {}
-        reset_password_attempt = db_user.reset_password_attempt
-        fields["reset_password_attempt"] = reset_password_attempt + 1
+        # Increment reset password attempt counter
+        fields = {"reset_password_attempt": db_user.reset_password_attempt + 1}
+        await UserDataManager(self.session).update_by_fields(db_user, fields)
 
-        # User need to change password after next login
-        fields["is_reset_password"] = True
-
-        # Update in database
-        db_user = await UserDataManager(self.session).update_by_fields(db_user, fields)
-        logger.debug("Temporary password updated in database")
+        # Create reset URL
+        reset_url = f"{app_settings.frontend_url}/auth/reset-password?token={reset_token}"
 
         # Send email notification to user
-        content = {"password": temp_password}
+        content = {"reset_url": reset_url, "token": reset_token, "expires_in_minutes": 60, "user_name": db_user.name}
         notification_request = (
             NotificationBuilder()
             .set_content(content=content)
@@ -441,7 +440,13 @@ class UserService(SessionMixin):
             .set_notification_request(subscriber_ids=[str(db_user.id)], name=BUD_RESET_PASSWORD_WORKFLOW)
             .build()
         )
-        notification_request.payload.content = content
+
+        # Ensure content is preserved in the final payload
+        if hasattr(notification_request.payload, "content"):
+            notification_request.payload.content = content
+
+        # Debug: Log the final payload structure
+        logger.debug(f"Final notification payload: {notification_request.model_dump(exclude_none=True, mode='json')}")
 
         try:
             response = await BudNotifyService().send_notification(notification_request)
@@ -451,10 +456,78 @@ class UserService(SessionMixin):
                     message="Failed to send email", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
                 ) from None
 
-            logger.debug(f"Sent email notification to {db_user.id}")
+            logger.info(f"Sent password reset email to user {db_user.id}")
             return response
         except BudNotifyException as err:
             logger.error(f"Failed to send notification {err.message}")
             raise ClientException(
                 message="Failed to send email", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from None
+
+    async def validate_reset_token(self, request: ValidateResetTokenRequest):
+        """Validate a password reset token."""
+        validation_result = await self.password_reset_service.validate_token(request.token)
+
+        return {
+            "is_valid": validation_result["is_valid"],
+            "email": validation_result["email"],
+            "expires_at": validation_result["expires_at"],
+        }
+
+    async def reset_password_with_token(self, request: ResetPasswordWithTokenRequest):
+        """Reset password using a valid token."""
+        # Validate token
+        validation_result = await self.password_reset_service.validate_token(request.token)
+
+        if not validation_result["is_valid"]:
+            raise ClientException(message="Invalid or expired reset token", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Get user
+        user_id = validation_result["user_id"]
+        db_user = await UserDataManager(self.session).retrieve_by_fields(UserModel, {"id": user_id})
+
+        if not db_user or db_user.status == UserStatusEnum.DELETED:
+            raise ClientException(message="User not found or inactive", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Validate new password
+        is_valid, validation_message = validate_password_string(request.new_password)
+        if not is_valid:
+            raise ClientException(
+                message=f"Password validation failed: {validation_message}", status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get tenant information for Keycloak update
+        tenant_mapping = await UserDataManager(self.session).retrieve_by_fields(
+            TenantUserMapping, {"user_id": db_user.id}, missing_ok=True
+        )
+
+        if tenant_mapping:
+            tenant = await UserDataManager(self.session).retrieve_by_fields(Tenant, {"id": tenant_mapping.tenant_id})
+        else:
+            # Use default tenant
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"realm_name": app_settings.default_realm_name}
+            )
+
+        if not tenant:
+            raise ClientException("Unable to determine user tenant")
+
+        # Update password in Keycloak
+        keycloak_manager = KeycloakManager()
+        await keycloak_manager.update_user_password(db_user.auth_id, request.new_password, tenant.realm_name)
+
+        # Mark token as used
+        await self.password_reset_service.use_token(request.token)
+
+        # Reset user flags
+        fields = {"is_reset_password": False, "reset_password_attempt": 0, "first_login": False}
+        await UserDataManager(self.session).update_by_fields(db_user, fields)
+
+        logger.info(f"Password successfully reset for user {db_user.id} using token")
+
+        return {"message": "Password reset successfully", "status": "success"}
+
+    async def cleanup_expired_tokens(self) -> int:
+        """Clean up expired reset tokens."""
+        # With Dapr state store TTL, cleanup is automatic
+        return await self.password_reset_service.cleanup_expired_tokens()
