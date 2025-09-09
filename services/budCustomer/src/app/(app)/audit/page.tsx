@@ -17,6 +17,7 @@ import {
   Empty,
   ConfigProvider,
   Pagination,
+  Skeleton,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -225,6 +226,8 @@ export default function AuditPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalNumber, setTotalNumber] = useState(0);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const setCurrentDayFilter = (val: any) => {
     setDayFilter(
@@ -375,6 +378,7 @@ export default function AuditPage() {
   };
 
   const getAuditList = async () => {
+    setLoading(true);
     try {
       const params = {
         page: currentPage,
@@ -400,6 +404,7 @@ export default function AuditPage() {
     } catch (error) {
       console.error("Failed to fetch usage data:", error);
     } finally {
+      setLoading(false);
     }
   };
 
@@ -409,6 +414,7 @@ export default function AuditPage() {
     resourcesModified: 0,
   });
   const getAuditSummary = async () => {
+    setIsStatsLoading(true);
     try {
       // const params = {
       //   start_date: dateRange?.[0] ? formatDateString(dateRange[0]?.toDate(), false) : undefined,
@@ -423,6 +429,7 @@ export default function AuditPage() {
     } catch (error) {
       console.error("Failed to fetch usage data:", error);
     } finally {
+      setIsStatsLoading(false);
     }
   };
   // Table columns
@@ -722,7 +729,9 @@ export default function AuditPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
           <Card className="bg-bud-bg-secondary border-bud-border">
-            <div className="flex items-center justify-between">
+            {isStatsLoading ?
+              <Skeleton active paragraph={{ rows: 2 }} />:
+              <div className="flex items-center justify-between">
               <div>
                 <Text className="text-bud-text-disabled text-xs block mb-1">
                   Today&apos;s Events
@@ -732,11 +741,14 @@ export default function AuditPage() {
                 </Text>
               </div>
               <CalendarOutlined className="text-2xl text-bud-purple" />
-            </div>
+              </div>
+          }
           </Card>
 
           <Card className="bg-bud-bg-secondary border-bud-border">
-            <div className="flex items-center justify-between">
+            {isStatsLoading ?
+              <Skeleton active paragraph={{ rows: 2 }} />:
+              <div className="flex items-center justify-between">
               <div>
                 <Text className="text-bud-text-disabled text-xs block mb-1">
                   Failed Actions
@@ -749,11 +761,14 @@ export default function AuditPage() {
                 icon="ph:warning-circle"
                 className="text-2xl text-red-500"
               />
-            </div>
+              </div>
+            }
           </Card>
 
           <Card className="bg-bud-bg-secondary border-bud-border hidden">
-            <div className="flex items-center justify-between">
+            {isStatsLoading ?
+              <Skeleton active paragraph={{ rows: 2 }} />:
+              <div className="flex items-center justify-between">
               <div>
                 <Text className="text-bud-text-disabled text-xs block mb-1">
                   Active Users
@@ -763,11 +778,14 @@ export default function AuditPage() {
                 </Text>
               </div>
               <UserOutlined className="text-2xl text-blue-500" />
-            </div>
+              </div>
+            }
           </Card>
 
           <Card className="bg-bud-bg-secondary border-bud-border">
-            <div className="flex items-center justify-between">
+            {isStatsLoading ?
+              <Skeleton active paragraph={{ rows: 2 }} />:
+              <div className="flex items-center justify-between">
               <div>
                 <Text className="text-bud-text-disabled text-xs block mb-1">
                   Resources Modified
@@ -785,85 +803,89 @@ export default function AuditPage() {
                 </Text>
               </div>
               <Icon icon="ph:database" className="text-2xl text-green-500" />
-            </div>
+              </div>
+            }
           </Card>
         </div>
 
         {/* Filters */}
         <Card className="bg-bud-bg-secondary border-bud-border mb-6">
-          <div className="flex items-center gap-4">
-            <Input
-              placeholder="Search by resources"
-              prefix={<SearchOutlined className="text-bud-text-disabled" />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="w-80 bg-bud-bg-tertiary border-bud-border-secondary text-bud-text-primary placeholder:text-bud-text-disabled"
+          {isStatsLoading ?
+            <Skeleton active paragraph={{ rows: 2 }} />:
+            <div className="flex items-center gap-4">
+          <Input
+            placeholder="Search by resources"
+            prefix={<SearchOutlined className="text-bud-text-disabled" />}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="w-80 bg-bud-bg-tertiary border-bud-border-secondary text-bud-text-primary placeholder:text-bud-text-disabled"
+            allowClear
+          />
+          <ConfigProvider theme={themeConfig}>
+            <Select
+              placeholder="Filter by action"
+              value={selectedAction}
+              onChange={setSelectedAction}
+              className="w-48"
               allowClear
-            />
-            <ConfigProvider theme={themeConfig}>
-              <Select
-                placeholder="Filter by action"
-                value={selectedAction}
-                onChange={setSelectedAction}
-                className="w-48"
-                allowClear
-                options={Object.values(AuditAction)
-                  .filter(
-                    (action) =>
-                      action !== AuditAction.REGENERATE &&
-                      action !== AuditAction.LOGOUT,
-                  )
-                  .map((action) => ({
-                    label: getActionDisplay(action).label,
-                    value:
-                      action === AuditAction.ACCESS
-                        ? "access_granted"
-                        : action === AuditAction.EXPORT
-                          ? "data_export"
-                          : action,
-                  }))}
-              />
-            </ConfigProvider>
-            <ConfigProvider theme={themeConfig}>
-              <Select
-                placeholder="Filter by resource"
-                value={selectedResource}
-                onChange={setSelectedResource}
-                className="w-48"
-                allowClear
-                options={Object.values(ResourceType).map((type) => ({
-                  label: type.replace("_", " ").toUpperCase(),
-                  value: type,
+              options={Object.values(AuditAction)
+                .filter(
+                  (action) =>
+                    action !== AuditAction.REGENERATE &&
+                    action !== AuditAction.LOGOUT,
+                )
+                .map((action) => ({
+                  label: getActionDisplay(action).label,
+                  value:
+                    action === AuditAction.ACCESS
+                      ? "access_granted"
+                      : action === AuditAction.EXPORT
+                        ? "data_export"
+                        : action,
                 }))}
-              />
-            </ConfigProvider>
-
-            <RangePicker
-              value={dateRange}
-              onChange={(dates) => setDateRange(dates)}
-              className="bg-bud-bg-tertiary border-bud-border-secondary"
-              format="YYYY-MM-DD"
             />
+          </ConfigProvider>
+          <ConfigProvider theme={themeConfig}>
+            <Select
+              placeholder="Filter by resource"
+              value={selectedResource}
+              onChange={setSelectedResource}
+              className="w-48"
+              allowClear
+              options={Object.values(ResourceType).map((type) => ({
+                label: type.replace("_", " ").toUpperCase(),
+                value: type,
+              }))}
+            />
+          </ConfigProvider>
 
-            {hasActiveFilters && (
-              <Button
-                onClick={clearFilters}
-                className="text-bud-text-muted border-bud-border"
-              >
-                Clear Filters
-              </Button>
-            )}
+          <RangePicker
+            value={dateRange}
+            onChange={(dates) => setDateRange(dates)}
+            className="bg-bud-bg-tertiary border-bud-border-secondary"
+            format="YYYY-MM-DD"
+          />
 
-            <div className="ml-auto">
-              <Button
-                icon={<DownloadOutlined />}
-                onClick={exportToCSV}
-                className="bg-bud-purple text-white border-bud-purple hover:bg-bud-purple-hover"
-              >
-                Export CSV
-              </Button>
-            </div>
+          {hasActiveFilters && (
+            <Button
+              onClick={clearFilters}
+              className="text-bud-text-muted border-bud-border"
+            >
+              Clear Filters
+            </Button>
+          )}
+
+          <div className="ml-auto">
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={exportToCSV}
+              className="bg-bud-purple text-white border-bud-purple hover:bg-bud-purple-hover"
+            >
+              Export CSV
+            </Button>
           </div>
+            </div>
+          }
         </Card>
 
         {/* Audit Table */}
@@ -880,6 +902,7 @@ export default function AuditPage() {
               };
 
               return ( */}
+            {loading ? <div className="p-8"><Skeleton active paragraph={{ rows: 8 }} /></div> : 
             <div>
               <div className="flex items-center gap-2 mb-3 hidden">
                 <ClockCircleOutlined className="text-bud-text-disabled" />
@@ -927,6 +950,7 @@ export default function AuditPage() {
                 />
               </div>
             </div>
+            }
 
             {/* {filteredLogs.length === 0 && (
               <Empty
