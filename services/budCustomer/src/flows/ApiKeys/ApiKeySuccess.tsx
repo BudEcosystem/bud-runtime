@@ -43,7 +43,8 @@ const ApiKeySuccess = () => {
       nextText="Ok"
       onNext={() => {
         closeDrawer();
-      }}>
+      }}
+    >
       <BudWraperBox center={true}>
         <BudDrawerLayout>
           <div className="flex flex-col justify-start items-center p-[2.5rem]">

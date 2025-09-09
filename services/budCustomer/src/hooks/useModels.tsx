@@ -543,7 +543,7 @@ export const useModels = create<{
       }
 
       const response: any = await AppRequest.Get(`/models/catalog`, {
-      // const response: any = await AppRequest.Get(`/models/`, {
+        // const response: any = await AppRequest.Get(`/models/`, {
         params: requestParams,
       });
 

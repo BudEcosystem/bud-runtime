@@ -416,31 +416,31 @@ export default function ModelsPage() {
           {loading && models.length === 0 ? (
             <div className="flex justify-center items-center">
               <div className="w-full flex flex-col gap-6">
-              {[0, 1].map((row) => (
-                <div key={row} className="flex gap-6">
-                {[0, 1, 2].map((col) => (
-                  <div
-                  key={col}
-                  className="flex-1 h-[200px] rounded-lg bg-bud-bg-secondary border-bud-border relative overflow-hidden"
-                  style={{ minWidth: 0 }}
-                  >
-                  {/* Animated light pass */}
-                  <div className="absolute inset-0 pointer-events-none">
-                    <motion.div
-                      className={styles.loadingBar}
-                      initial={{ width: "0%" }}
-                      animate={{ width: "100%" }}
-                      transition={{
-                        duration: 1.5,
-                        ease: "easeInOut",
-                        repeat: Infinity,
-                      }}
-                    />
-                  </div>
+                {[0, 1].map((row) => (
+                  <div key={row} className="flex gap-6">
+                    {[0, 1, 2].map((col) => (
+                      <div
+                        key={col}
+                        className="flex-1 h-[200px] rounded-lg bg-bud-bg-secondary border-bud-border relative overflow-hidden"
+                        style={{ minWidth: 0 }}
+                      >
+                        {/* Animated light pass */}
+                        <div className="absolute inset-0 pointer-events-none">
+                          <motion.div
+                            className={styles.loadingBar}
+                            initial={{ width: "0%" }}
+                            animate={{ width: "100%" }}
+                            transition={{
+                              duration: 1.5,
+                              ease: "easeInOut",
+                              repeat: Infinity,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))}
-                </div>
-              ))}
               </div>
             </div>
           ) : models.length === 0 ? (
@@ -520,8 +520,10 @@ export default function ModelsPage() {
                           model={{
                             ...model,
                             endpoints_count: model.supported_endpoints
-                              ? Object.values(model.supported_endpoints).filter((e: any) => e.enabled).length
-                              : model.endpoints_count
+                              ? Object.values(model.supported_endpoints).filter(
+                                  (e: any) => e.enabled,
+                                ).length
+                              : model.endpoints_count,
                           }}
                           maxTags={3}
                           limit={true}

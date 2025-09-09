@@ -35,7 +35,7 @@ const ThemedLabel: React.FC<ThemedLabelProps> = ({
             src="/images/info.png"
             preview={false}
             alt="info"
-            style={{ width: '.75rem', height: '.75rem' }}
+            style={{ width: ".75rem", height: ".75rem" }}
           />
         </CustomPopover>
       )}

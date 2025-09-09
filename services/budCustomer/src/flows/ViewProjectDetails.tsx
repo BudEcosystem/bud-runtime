@@ -8,7 +8,8 @@ const ViewProjectDetails: React.FC = () => {
   const { closeDrawer } = useDrawer();
 
   // Handle both nested and direct project structure
-  const projectId = globalSelectedProject?.project?.id || (globalSelectedProject as any)?.id;
+  const projectId =
+    globalSelectedProject?.project?.id || (globalSelectedProject as any)?.id;
 
   if (!projectId) {
     return <div>No project selected</div>;

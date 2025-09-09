@@ -48,7 +48,8 @@ export default function EditProject() {
   }, [projectTags]);
 
   // Get the current project data
-  const currentProject: any = globalSelectedProject?.project || globalSelectedProject;
+  const currentProject: any =
+    globalSelectedProject?.project || globalSelectedProject;
 
   useEffect(() => {
     getProjectTags();
@@ -64,7 +65,7 @@ export default function EditProject() {
       const existingTags = currentProject.tags
         ? currentProject.tags.map((tag: any) => {
             // Handle both string and object tag formats
-            if (typeof tag === 'string') {
+            if (typeof tag === "string") {
               return { name: tag, color: "#89C0F2" };
             }
             return {
@@ -117,7 +118,7 @@ export default function EditProject() {
   const existingTags = currentProject?.tags
     ? currentProject.tags.map((tag: any) => {
         // Handle both string and object tag formats
-        if (typeof tag === 'string') {
+        if (typeof tag === "string") {
           return { name: tag, color: "#89C0F2" };
         }
         return {

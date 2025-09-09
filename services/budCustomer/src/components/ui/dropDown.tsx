@@ -70,7 +70,9 @@ const CustomDropdownMenu: React.FC<DropDownProps> = ({
                 key={index}
                 onSelect={() => handleSelect(item)}
               >
-                <Text_12_400_FFFFFF className="text-[var(--text-primary)]">{item}</Text_12_400_FFFFFF>
+                <Text_12_400_FFFFFF className="text-[var(--text-primary)]">
+                  {item}
+                </Text_12_400_FFFFFF>
               </DropdownMenu.Item>
             ))}
           </>

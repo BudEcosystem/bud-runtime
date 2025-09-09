@@ -44,7 +44,11 @@ export function CustomBreadcrumb({
     //   }
     // />
     <Breadcrumb
-      separator={<Text_12_400_5B6168 className="mx-2 text-gray-400 dark:text-[#5B6168]">/</Text_12_400_5B6168>}
+      separator={
+        <Text_12_400_5B6168 className="mx-2 text-gray-400 dark:text-[#5B6168]">
+          /
+        </Text_12_400_5B6168>
+      }
       items={
         data?.map((item, index) => {
           const isLast = index === data.length - 1;
@@ -80,7 +84,11 @@ export function DeawerCustomBreadcrumb({
 }) {
   return (
     <Breadcrumb
-      separator={<Text_12_400_5B6168 className="mx-2 text-gray-400 dark:text-[#5B6168]">/</Text_12_400_5B6168>}
+      separator={
+        <Text_12_400_5B6168 className="mx-2 text-gray-400 dark:text-[#5B6168]">
+          /
+        </Text_12_400_5B6168>
+      }
       items={
         data?.map((item, index) => ({
           // Remove href to prevent nested <a> tags

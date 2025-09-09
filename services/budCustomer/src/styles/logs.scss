@@ -104,7 +104,7 @@
   }
   /* Fix Secondary Button */
   button[class*="bg-\[\#1F1F1F\]"] {
-    background: var(--bg-secondary) ;
+    background: var(--bg-secondary);
     border-color: var(--border-secondary) !important;
   }
   button[class*="bg-\[\#1F1F1F\]"]:hover {
@@ -113,7 +113,7 @@
   }
   [data-theme="dark"] button[class*="bg-\[\#1F1F1F\]"] span,
   [data-theme="dark"] button[class*="bg-\[\#1F1F1F\]"] .anticon {
-    color: #EEEEEE !important;
+    color: #eeeeee !important;
   }
   [data-theme="light"] button[class*="bg-\[\#1F1F1F\]"] span,
   [data-theme="light"] button[class*="bg-\[\#1F1F1F\]"] .anticon {
@@ -320,8 +320,14 @@
   }
 
   /* Ensure all inline text elements near switches are visible */
-  [data-theme="light"] .filter-section-bg div[style*="display: inline-flex"] span,
-  [data-theme="light"] .filter-section-bg div[style*="display:inline-flex"] span {
+  [data-theme="light"]
+    .filter-section-bg
+    div[style*="display: inline-flex"]
+    span,
+  [data-theme="light"]
+    .filter-section-bg
+    div[style*="display:inline-flex"]
+    span {
     color: #000000 !important;
   }
 
@@ -863,10 +869,28 @@
   }
 
   /* Maximum specificity override */
-  body[data-theme="light"] .logs-page-styles .ant-select .ant-select-selector .ant-select-selection-item,
-  body[data-theme="light"] .logs-page-styles .ant-select .ant-select-selector .ant-select-selection-item *,
-  body[data-theme="light"] .logs-page-styles .ant-select .ant-select-selector .ant-select-selection-item span,
-  body[data-theme="light"] .logs-page-styles .ant-select .ant-select-selector .ant-select-selection-item-content {
+  body[data-theme="light"]
+    .logs-page-styles
+    .ant-select
+    .ant-select-selector
+    .ant-select-selection-item,
+  body[data-theme="light"]
+    .logs-page-styles
+    .ant-select
+    .ant-select-selector
+    .ant-select-selection-item
+    *,
+  body[data-theme="light"]
+    .logs-page-styles
+    .ant-select
+    .ant-select-selector
+    .ant-select-selection-item
+    span,
+  body[data-theme="light"]
+    .logs-page-styles
+    .ant-select
+    .ant-select-selector
+    .ant-select-selection-item-content {
     color: #000000 !important;
   }
 
@@ -878,8 +902,14 @@
   }
 
   /* Target the actual rendered text node */
-  .logs-page-styles .ant-select-single .ant-select-selector .ant-select-selection-item,
-  .logs-page-styles .ant-select-single .ant-select-selector .ant-select-selection-placeholder {
+  .logs-page-styles
+    .ant-select-single
+    .ant-select-selector
+    .ant-select-selection-item,
+  .logs-page-styles
+    .ant-select-single
+    .ant-select-selector
+    .ant-select-selection-placeholder {
     color: #000000 !important;
 
     * {

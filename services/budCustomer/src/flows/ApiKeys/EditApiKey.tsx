@@ -29,25 +29,31 @@ interface Project {
   name: string;
 }
 
-function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: boolean) => void; form: any }) {
+function EditApiKeyForm({
+  setDisableNext,
+  form,
+}: {
+  setDisableNext: (value: boolean) => void;
+  form: any;
+}) {
   const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [formData, setFormData] = useState({
-    name: '',
-    project_id: '',
-    expiry: ''
+    name: "",
+    project_id: "",
+    expiry: "",
   });
 
   // Fetch projects
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await AppRequest.Get('/projects/');
+        const response = await AppRequest.Get("/projects/");
         if (response?.data?.projects) {
           setProjects(response.data.projects);
         }
       } catch (error) {
-        console.error('Failed to fetch projects:', error);
+        console.error("Failed to fetch projects:", error);
       }
     };
     fetchProjects();
@@ -60,23 +66,23 @@ function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: bool
       const keyData = JSON.parse(storedKey);
       setSelectedApiKey(keyData);
       setFormData({
-        name: keyData.name || '',
-        project_id: keyData.project?.id || '',
-        expiry: keyData.expiry || ''
+        name: keyData.name || "",
+        project_id: keyData.project?.id || "",
+        expiry: keyData.expiry || "",
       });
 
       // Set form values
       form.setFieldsValue({
         name: keyData.name,
         project_id: keyData.project?.id,
-        expiry: keyData.expiry
+        expiry: keyData.expiry,
       });
     }
   }, [form]);
 
   // Validate form and enable/disable next button
   useEffect(() => {
-    const isValid = formData.name.trim() !== '' && formData.project_id !== '';
+    const isValid = formData.name.trim() !== "" && formData.project_id !== "";
     setDisableNext(!isValid);
   }, [formData, setDisableNext]);
 
@@ -103,8 +109,8 @@ function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: bool
           onChange={(e) => {
             const value = e.target.value;
             form.setFieldsValue({ name: value });
-            form.validateFields(['name']);
-            setFormData(prev => ({ ...prev, name: value }));
+            form.validateFields(["name"]);
+            setFormData((prev) => ({ ...prev, name: value }));
           }}
           className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem] px-[1rem] py-[1rem]"
         />
@@ -123,8 +129,8 @@ function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: bool
           <ConfigProvider
             theme={{
               token: {
-                colorTextPlaceholder: '#808080',
-                boxShadowSecondary: 'none',
+                colorTextPlaceholder: "#808080",
+                boxShadowSecondary: "none",
               },
             }}
           >
@@ -140,14 +146,14 @@ function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: bool
               }}
               size="large"
               className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.5rem] outline-none"
-              options={projects.map(project => ({
+              options={projects.map((project) => ({
                 label: project.name,
-                value: project.id
+                value: project.id,
               }))}
               onChange={(value) => {
                 form.setFieldsValue({ project_id: value });
-                form.validateFields(['project_id']);
-                setFormData(prev => ({ ...prev, project_id: value }));
+                form.validateFields(["project_id"]);
+                setFormData((prev) => ({ ...prev, project_id: value }));
               }}
             />
           </ConfigProvider>
@@ -160,14 +166,17 @@ function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: bool
         className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]"
       >
         <div className="w-full">
-          <ThemedLabel text="Set Expiry" info="Set when this API key should expire" />
+          <ThemedLabel
+            text="Set Expiry"
+            info="Set when this API key should expire"
+          />
         </div>
         <div className="custom-select-two w-full rounded-[6px] relative">
           <ConfigProvider
             theme={{
               token: {
-                colorTextPlaceholder: '#808080',
-                boxShadowSecondary: 'none',
+                colorTextPlaceholder: "#808080",
+                boxShadowSecondary: "none",
               },
             }}
           >
@@ -191,8 +200,8 @@ function EditApiKeyForm({ setDisableNext, form }: { setDisableNext: (value: bool
               ]}
               onChange={(value) => {
                 form.setFieldsValue({ expiry: value });
-                form.validateFields(['expiry']);
-                setFormData(prev => ({ ...prev, expiry: value || '' }));
+                form.validateFields(["expiry"]);
+                setFormData((prev) => ({ ...prev, expiry: value || "" }));
               }}
             />
           </ConfigProvider>
@@ -234,7 +243,10 @@ export default function EditApiKey() {
             expiry: values.expiry || null,
           };
 
-          const response = await AppRequest.Put(`/credentials/${selectedApiKey?.id}`, payload);
+          const response = await AppRequest.Put(
+            `/credentials/${selectedApiKey?.id}`,
+            payload,
+          );
 
           if (response?.status === 200 || response?.data) {
             successToast("API key updated successfully");
@@ -244,7 +256,9 @@ export default function EditApiKey() {
           }
         } catch (error: any) {
           console.error("Error updating API key:", error);
-          errorToast(error?.response?.data?.message || "Failed to update API key");
+          errorToast(
+            error?.response?.data?.message || "Failed to update API key",
+          );
         } finally {
           setLoading(false);
         }
@@ -260,16 +274,23 @@ export default function EditApiKey() {
         <BudDrawerLayout>
           <div className="px-[1.4rem] pb-[.9rem] rounded-ss-lg rounded-se-lg pt-[1.1rem] border-b-[.5px] border-b-[#1F1F1F]">
             <div className="flex justify-between align-center">
-              <div className={`p-0 pt-[.4rem] m-0 text-[1rem] font-medium ${isLight ? "text-[#1a1a1a]" : "text-[#EEEEEE]"}`}>
+              <div
+                className={`p-0 pt-[.4rem] m-0 text-[1rem] font-medium ${isLight ? "text-[#1a1a1a]" : "text-[#EEEEEE]"}`}
+              >
                 Edit API Key
               </div>
             </div>
-            <div className={`pt-[.55rem] leading-[1.05rem] ${isLight ? "text-[#666666]" : "text-[#757575]"}`}>
+            <div
+              className={`pt-[.55rem] leading-[1.05rem] ${isLight ? "text-[#666666]" : "text-[#757575]"}`}
+            >
               Update API key details
             </div>
           </div>
           <div>
-            <EditApiKeyForm setDisableNext={setDisableNext} form={context.form} />
+            <EditApiKeyForm
+              setDisableNext={setDisableNext}
+              form={context.form}
+            />
           </div>
         </BudDrawerLayout>
       </BudWraperBox>
