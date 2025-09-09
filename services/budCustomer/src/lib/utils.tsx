@@ -1,4 +1,11 @@
-import { differenceInDays, differenceInHours, format, formatDistance, isToday, isYesterday } from "date-fns";
+import {
+  differenceInDays,
+  differenceInHours,
+  format,
+  formatDistance,
+  isToday,
+  isYesterday,
+} from "date-fns";
 import { Tooltip } from "antd";
 import { JSX } from "react";
 
@@ -34,6 +41,10 @@ export function formdateDateTime(notificationDate: Date) {
           ? format(notificationDate, "MMM dd")
           : format(notificationDate, "MMM dd, yyyy");
 
-  return <Tooltip title={format(notificationDate, "MMM dd, yyyy HH:mm:ss")}>{time}</Tooltip>;
+  return (
+    <Tooltip title={format(notificationDate, "MMM dd, yyyy HH:mm:ss")}>
+      {time}
+    </Tooltip>
+  );
   // +" " + formatDate(notificationDate) + " " + differenceInDays(today, notificationDate);
 }

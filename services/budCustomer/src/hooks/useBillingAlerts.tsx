@@ -30,8 +30,13 @@ export const useBillingAlerts = create<{
 
   // Actions
   getBillingAlerts: () => Promise<BillingAlert[]>;
-  createBillingAlert: (data: CreateBillingAlertRequest) => Promise<BillingAlert>;
-  updateBillingAlertStatus: (alertId: string, isActive: boolean) => Promise<BillingAlert>;
+  createBillingAlert: (
+    data: CreateBillingAlertRequest,
+  ) => Promise<BillingAlert>;
+  updateBillingAlertStatus: (
+    alertId: string,
+    isActive: boolean,
+  ) => Promise<BillingAlert>;
   deleteBillingAlert: (alertId: string) => Promise<boolean>;
   clearError: () => void;
 }>((set, get) => ({
@@ -47,7 +52,10 @@ export const useBillingAlerts = create<{
       set({ alerts: alertsData, loading: false });
       return alertsData;
     } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to fetch billing alerts";
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch billing alerts";
       set({ error: errorMessage, loading: false, alerts: [] });
       console.error("Error fetching billing alerts:", error);
       throw new Error(errorMessage);
@@ -68,7 +76,10 @@ export const useBillingAlerts = create<{
       set({ loading: false });
       return newAlert;
     } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to create billing alert";
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to create billing alert";
       set({ error: errorMessage, loading: false });
       console.error("Error creating billing alert:", error);
       throw new Error(errorMessage);
@@ -78,14 +89,16 @@ export const useBillingAlerts = create<{
   updateBillingAlertStatus: async (alertId: string, isActive: boolean) => {
     set({ loading: true, error: null });
     try {
-      const response = await AppRequest.Put(`/billing/alerts/${alertId}`, { is_active: isActive });
+      const response = await AppRequest.Put(`/billing/alerts/${alertId}`, {
+        is_active: isActive,
+      });
       const updatedAlert = response.data.result;
 
       if (updatedAlert) {
         // Update the specific alert in the list
         const currentAlerts = get().alerts;
-        const updatedAlerts = currentAlerts.map(alert =>
-          alert.id === alertId ? { ...alert, is_active: isActive } : alert
+        const updatedAlerts = currentAlerts.map((alert) =>
+          alert.id === alertId ? { ...alert, is_active: isActive } : alert,
         );
         set({ alerts: updatedAlerts });
       }
@@ -93,7 +106,10 @@ export const useBillingAlerts = create<{
       set({ loading: false });
       return updatedAlert;
     } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to update billing alert status";
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update billing alert status";
       set({ error: errorMessage, loading: false });
       console.error("Error updating billing alert status:", error);
       throw new Error(errorMessage);
@@ -107,12 +123,17 @@ export const useBillingAlerts = create<{
 
       // Remove the alert from the list
       const currentAlerts = get().alerts;
-      const updatedAlerts = currentAlerts.filter(alert => alert.id !== alertId);
+      const updatedAlerts = currentAlerts.filter(
+        (alert) => alert.id !== alertId,
+      );
       set({ alerts: updatedAlerts, loading: false });
 
       return true;
     } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to delete billing alert";
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete billing alert";
       set({ error: errorMessage, loading: false });
       console.error("Error deleting billing alert:", error);
       throw new Error(errorMessage);

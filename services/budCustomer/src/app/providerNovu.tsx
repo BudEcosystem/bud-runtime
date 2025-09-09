@@ -154,7 +154,7 @@ export function NovuCustomProvider({
     <NovuProvider
       backendUrl={novuBackendUrl}
       socketUrl={novuSocketUrl}
-      subscriberId={String(user.id)}  // Ensure it's a string
+      subscriberId={String(user.id)} // Ensure it's a string
       applicationIdentifier={novuAppId || ""}
       styles={styles}
     >

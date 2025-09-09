@@ -228,11 +228,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
           itemLinkColor: "var(--text-primary)",
           itemHoverBg: "var(--bg-hover)",
           itemHoverColor: "var(--text-primary)",
-          colorTextDescription: "var(--text-secondary)"
+          colorTextDescription: "var(--text-secondary)",
         },
         Notification: {
-          colorBgElevated: "var(--bg-tertiary)",   // background
-          colorText: "var(--text-primary)",        // main text
+          colorBgElevated: "var(--bg-tertiary)", // background
+          colorText: "var(--text-primary)", // main text
           colorTextHeading: "var(--text-primary)", // title
           colorTextDescription: "var(--text-primary)", // description
           boxShadow: "0 4px 12px rgba(0,0,0,0.2)", // custom shadow

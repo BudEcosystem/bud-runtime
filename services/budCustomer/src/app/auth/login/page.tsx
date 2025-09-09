@@ -34,8 +34,8 @@ function LoginContent() {
   useEffect(() => {
     const handleOAuthCallback = async () => {
       // Check for OAuth error parameters
-      const error = searchParams.get('error');
-      const errorDescription = searchParams.get('error_description');
+      const error = searchParams.get("error");
+      const errorDescription = searchParams.get("error_description");
 
       if (error) {
         AppRequest.OAuth.handleOAuthError(error, errorDescription || undefined);
@@ -43,10 +43,10 @@ function LoginContent() {
       }
 
       // Check for OAuth success parameters
-      const code = searchParams.get('code');
-      const state = searchParams.get('state');
-      const provider = searchParams.get('provider');
-      const exchangeToken = searchParams.get('exchange_token');
+      const code = searchParams.get("code");
+      const state = searchParams.get("state");
+      const provider = searchParams.get("provider");
+      const exchangeToken = searchParams.get("exchange_token");
 
       // Handle token exchange flow
       if (exchangeToken) {
@@ -55,7 +55,8 @@ function LoginContent() {
 
         try {
           // Poll for token exchange completion
-          const result = await AppRequest.OAuth.pollTokenExchange(exchangeToken);
+          const result =
+            await AppRequest.OAuth.pollTokenExchange(exchangeToken);
 
           // Store tokens
           localStorage.setItem("access_token", result.access_token);
@@ -75,7 +76,9 @@ function LoginContent() {
           router.push("/models");
         } catch (error: any) {
           console.error("OAuth token exchange error:", error);
-          errorToast(error.message || "Authentication failed. Please try again.");
+          errorToast(
+            error.message || "Authentication failed. Please try again.",
+          );
         } finally {
           hideLoader();
           setOauthProcessing(false);
@@ -90,7 +93,11 @@ function LoginContent() {
         showLoader();
 
         try {
-          const result = await AppRequest.OAuth.handleCallback(provider, code, state);
+          const result = await AppRequest.OAuth.handleCallback(
+            provider,
+            code,
+            state,
+          );
 
           // Store tokens
           localStorage.setItem("access_token", result.access_token);
@@ -110,7 +117,9 @@ function LoginContent() {
           router.push("/models");
         } catch (error: any) {
           console.error("OAuth callback error:", error);
-          errorToast(error.message || "Authentication failed. Please try again.");
+          errorToast(
+            error.message || "Authentication failed. Please try again.",
+          );
         } finally {
           hideLoader();
           setOauthProcessing(false);
@@ -228,7 +237,7 @@ function LoginContent() {
       errorToast(errorMessage);
       hideLoader();
     }
-  }
+  };
 
   return (
     <AuthLayout>
@@ -245,12 +254,16 @@ function LoginContent() {
             {oauthProcessing ? (
               <div className="flex flex-col items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bud-purple"></div>
-                <p className="mt-4 text-sm text-bud-text-muted">Completing authentication...</p>
+                <p className="mt-4 text-sm text-bud-text-muted">
+                  Completing authentication...
+                </p>
               </div>
             ) : (
               <>
                 {activePage === 1 && <LoginForm onSubmit={handleLogin} />}
-                {activePage === 4 && <ContactAdmin onSubmit={handleForgetPassword} />}
+                {activePage === 4 && (
+                  <ContactAdmin onSubmit={handleForgetPassword} />
+                )}
                 {/* Other pages can be added here - reset password, contact admin, etc. */}
               </>
             )}
@@ -263,14 +276,16 @@ function LoginContent() {
 
 export default function Login() {
   return (
-    <Suspense fallback={
-      <AuthLayout>
-        <div className="flex flex-col justify-center items-center h-full">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bud-purple"></div>
-          <p className="mt-4 text-sm text-bud-text-muted">Loading...</p>
-        </div>
-      </AuthLayout>
-    }>
+    <Suspense
+      fallback={
+        <AuthLayout>
+          <div className="flex flex-col justify-center items-center h-full">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bud-purple"></div>
+            <p className="mt-4 text-sm text-bud-text-muted">Loading...</p>
+          </div>
+        </AuthLayout>
+      }
+    >
       <LoginContent />
     </Suspense>
   );

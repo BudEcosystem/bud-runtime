@@ -240,8 +240,8 @@ const handleErrorResponse = (err: any) => {
       "/auth/login",
     ];
 
-    const shouldShowErrorToast = !skipErrorToastEndpoints.some(endpoint =>
-      url.includes(endpoint)
+    const shouldShowErrorToast = !skipErrorToastEndpoints.some((endpoint) =>
+      url.includes(endpoint),
     );
 
     if (shouldShowErrorToast && err && localStorage.getItem("access_token")) {

@@ -235,21 +235,26 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
               style={{ backgroundColor: "#965CDE" }}
             >
               <div className="flex items-center gap-3">
-                <div className={`${isCollapsed ? "w-6 h-6" : "w-8 h-8"
-                  } bg-bud-purple rounded flex items-center justify-center`}>
+                <div
+                  className={`${
+                    isCollapsed ? "w-6 h-6" : "w-8 h-8"
+                  } bg-bud-purple rounded flex items-center justify-center`}
+                >
                   <Icon
                     icon="heroicons-outline:bell"
                     className="text-white text-lg"
                   />
                 </div>
-                {!isCollapsed && (<div>
-                  <Text className="text-bud-text-disabled text-xs block">
-                    88 New
-                  </Text>
-                  <Text className="text-bud-text-primary text-sm">
-                    Notifications
-                  </Text>
-                </div>)}
+                {!isCollapsed && (
+                  <div>
+                    <Text className="text-bud-text-disabled text-xs block">
+                      88 New
+                    </Text>
+                    <Text className="text-bud-text-primary text-sm">
+                      Notifications
+                    </Text>
+                  </div>
+                )}
               </div>
             </Badge>
           </div>
@@ -378,7 +383,9 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       </div>
 
       {/* Overlay for notifications */}
-      <div className={`dashboardOverlay absolute w-full h-full top-0 left-0 z-[1200] ${isVisible ? 'block' : 'hidden'}`}></div>
+      <div
+        className={`dashboardOverlay absolute w-full h-full top-0 left-0 z-[1200] ${isVisible ? "block" : "hidden"}`}
+      ></div>
     </div>
   );
 };

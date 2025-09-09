@@ -127,7 +127,7 @@ export const useProjects = create<{
       set({
         projects: response.data.projects,
         totalProjects: response.data.total_record,
-        totalPages: response.data.total_pages
+        totalPages: response.data.total_pages,
       });
       return response.data;
     } catch (error) {
@@ -190,7 +190,10 @@ export const useProjects = create<{
 
   updateProject: async (projectId: string, data: any) => {
     try {
-      const response: any = await AppRequest.Patch(`/projects/${projectId}`, data);
+      const response: any = await AppRequest.Patch(
+        `/projects/${projectId}`,
+        data,
+      );
       return response.data.project;
     } catch (error) {
       console.error("Error updating project:", error);
@@ -211,7 +214,9 @@ export const useProjects = create<{
     try {
       const response: any = await AppRequest.Get(`/projects/${projectId}`);
       // Check if response has nested structure or direct project
-      const projectData = response.data.project?.project ? response.data.project : response.data;
+      const projectData = response.data.project?.project
+        ? response.data.project
+        : response.data;
       set({ globalSelectedProject: projectData });
       return projectData;
     } catch (error) {
@@ -223,7 +228,9 @@ export const useProjects = create<{
     try {
       const response: any = await AppRequest.Get(`/projects/${projectId}`);
       // Check if response has nested structure or direct project
-      const projectData = response.data.project?.project ? response.data.project : response.data;
+      const projectData = response.data.project?.project
+        ? response.data.project
+        : response.data;
       set({ selectedProject: projectData });
       return projectData;
     } catch (error) {
