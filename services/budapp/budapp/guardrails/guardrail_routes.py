@@ -486,6 +486,7 @@ async def list_all_profiles(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[GuardrailFilter, Depends()],
+    project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=0),
     order_by: Optional[list[str]] = Depends(parse_ordering_fields),
@@ -497,6 +498,8 @@ async def list_all_profiles(
 
     # Construct filters
     filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
+    if project_id:
+        filters_dict["project_id"] = project_id
 
     try:
         db_profiles, count = await GuardrailProfileDeploymentService(session).list_active_profiles(

@@ -70,6 +70,7 @@ def upgrade() -> None:
             postgresql.ENUM("active", "disabled", "deleted", name="guardrail_status_enum", create_type=False),
             nullable=False,
         ),
+        sa.Column("project_id", sa.Uuid(), nullable=True),
         sa.Column("created_by", sa.Uuid(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("modified_at", sa.DateTime(timezone=True), nullable=False),
@@ -77,6 +78,7 @@ def upgrade() -> None:
             ["created_by"],
             ["user.id"],
         ),
+        sa.ForeignKeyConstraint(["project_id"], ["project.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(

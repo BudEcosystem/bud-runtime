@@ -450,6 +450,7 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
         severity_threshold: Optional[float] = None,
         guard_types: Optional[List[str]] = None,
         status: GuardrailStatusEnum = GuardrailStatusEnum.ACTIVE,
+        project_id: Optional[UUID] = None,
     ) -> GuardrailProfile:
         """Create guardrail profile with probe and rule selections atomically.
 
@@ -492,6 +493,7 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
                 tags=tags,
                 severity_threshold=severity_threshold,
                 guard_types=guard_types,
+                project_id=project_id,
             )
             self.session.add(db_profile)
 

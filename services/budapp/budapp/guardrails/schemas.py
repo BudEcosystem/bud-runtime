@@ -170,6 +170,7 @@ class GuardrailProfileCreate(BaseModel):
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
     status: GuardrailStatusEnum = GuardrailStatusEnum.ACTIVE
+    project_id: Optional[UUID4] = None
 
 
 class GuardrailProfileUpdate(BaseModel):
@@ -216,6 +217,7 @@ class GuardrailProfileResponse(BaseModel):
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
     created_by: Optional[UUID4] = None
+    project_id: Optional[UUID4] = None
     created_at: datetime
     modified_at: datetime
 

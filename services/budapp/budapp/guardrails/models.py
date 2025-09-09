@@ -225,8 +225,10 @@ class GuardrailProfile(Base, TimestampMixin):
         default=GuardrailStatusEnum.ACTIVE,
     )
     created_by: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id"), nullable=True)
+    project_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), nullable=True)
 
     created_user: Mapped["User"] = relationship(foreign_keys=[created_by])  # back_populates="created_guardrails"
+    project: Mapped[Optional["Project"]] = relationship("Project")
     probe_profiles: Mapped[List["GuardrailProfileProbe"]] = relationship(
         "GuardrailProfileProbe", back_populates="profile"
     )

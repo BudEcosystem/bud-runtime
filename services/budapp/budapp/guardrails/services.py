@@ -432,6 +432,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                     tags=data.get("tags"),
                     severity_threshold=data.get("severity_threshold"),
                     guard_types=data.get("guard_types"),
+                    project_id=data.get("project_id"),
                 )
                 execution_status_data["profile_id"] = str(db_profile.id)
             except Exception as e:
@@ -1199,6 +1200,7 @@ class GuardrailProfileDeploymentService(SessionMixin):
         tags: Optional[list[Tag]] = None,
         severity_threshold: Optional[float] = None,
         guard_types: Optional[list[str]] = None,
+        project_id: Optional[UUID] = None,
     ) -> GuardrailProfileDetailResponse:
         """Create a new guardrail profile."""
         # Convert tags to dict format for storage
@@ -1214,6 +1216,7 @@ class GuardrailProfileDeploymentService(SessionMixin):
                 tags=tags_data,
                 severity_threshold=severity_threshold,
                 guard_types=guard_types,
+                project_id=project_id,
             )
         )
 
