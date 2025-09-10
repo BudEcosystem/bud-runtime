@@ -9,9 +9,11 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from budapp.billing_ops.models import UserBilling
+from budapp.commons.constants import UserTypeEnum
 from budapp.commons.dependencies import get_session
 from budapp.commons.logging import get_logger
 from budapp.shared.redis_service import RedisService
+from budapp.user_ops.models import User as UserModel
 
 
 logger = get_logger(__name__)
@@ -40,6 +42,10 @@ class UsageResetService:
             from budapp.billing_ops.services import BillingService
 
             billing_service = BillingService(self.session)
+
+            # Get user information to determine user type
+            user = self.session.query(UserModel).filter(UserModel.id == user_id).first()
+            user_type = user.user_type if user else UserTypeEnum.CLIENT
 
             user_billing = billing_service.get_user_billing(user_id)
             if not user_billing:
@@ -87,25 +93,34 @@ class UsageResetService:
             # Create reset usage data
             usage_limit_info = {
                 "user_id": str(user_id),
+                "user_type": user_type.value if user_type else "client",
                 "allowed": True,
-                "status": "allowed",
+                "status": "admin_unlimited" if user_type == UserTypeEnum.ADMIN else "allowed",
                 "tokens_quota": tokens_quota,
                 "tokens_used": 0,  # Reset to 0
                 "cost_quota": float(cost_quota) if cost_quota else None,
                 "cost_used": 0.0,  # Reset to 0
                 "prev_tokens_used": 0,
                 "prev_cost_used": 0.0,
-                "reason": reason,
+                "reason": reason if user_type != UserTypeEnum.ADMIN else "Admin user - unlimited access",
                 "reset_at": billing_cycle_end,
                 "last_updated": now.isoformat(),
                 "billing_cycle_start": billing_cycle_start,
                 "billing_cycle_end": billing_cycle_end,
             }
 
-            # Publish to Redis
+            # Publish to Redis with dual-TTL strategy for reset scenario
             redis_service = RedisService()
-            key = f"usage_limit:{user_id}"
-            await redis_service.set(key, json.dumps(usage_limit_info), ex=3600)  # 1 hour TTL for reset
+            primary_key = f"usage_limit:{user_id}"
+            fallback_key = f"usage_limit_fallback:{user_id}"
+            data = json.dumps(usage_limit_info)
+
+            # For billing reset, use longer TTL to ensure gateway gets the update
+            primary_ttl = 1800  # 30 minutes (longer for reset events)
+            fallback_ttl = 3600  # 1 hour (ensure reset persists)
+
+            await redis_service.set(primary_key, data, ex=primary_ttl)
+            await redis_service.set(fallback_key, data, ex=fallback_ttl)
 
             # Also clear any cached data in gateway by publishing a clear command
             clear_key = f"usage_limit_clear:{user_id}"

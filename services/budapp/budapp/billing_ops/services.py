@@ -1,20 +1,28 @@
 """Billing service for usage tracking and quota management."""
 
 import asyncio
+import json
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import httpx
+from dateutil.relativedelta import relativedelta
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from budapp.billing_ops.models import BillingAlert, BillingPlan, UserBilling
+from budapp.billing_ops.notification_service import BillingNotificationService
+from budapp.billing_ops.utils import calculate_billing_cycle
 from budapp.commons.config import app_settings
+from budapp.commons.constants import UserTypeEnum
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.logging import get_logger
+from budapp.shared.redis_service import RedisService
 from budapp.user_ops.models import User
+from budapp.user_ops.models import User as UserModel
 
 
 logger = get_logger(__name__)
@@ -83,6 +91,351 @@ class BillingService(DataManagerUtils):
                 "request_count": 0,
                 "success_rate": 0.0,
             }
+
+    async def get_bulk_usage_from_clickhouse(
+        self,
+        user_ids: List[UUID],
+        start_date: datetime,
+        end_date: datetime,
+        project_id: Optional[UUID] = None,
+    ) -> Dict[str, Dict[str, Any]]:
+        """Get usage data for multiple users from ClickHouse via budmetrics bulk API.
+
+        This method is significantly more efficient than calling get_usage_from_clickhouse
+        for each user individually. It makes a single API call to fetch usage data for
+        all requested users.
+
+        Args:
+            user_ids: List of user UUIDs to get usage for
+            start_date: Start of the usage period
+            end_date: End of the usage period
+            project_id: Optional project filter
+
+        Returns:
+            Dict mapping user_id strings to usage data dicts
+        """
+        try:
+            # Limit batch size for safety
+            if len(user_ids) > 1000:
+                logger.warning(f"Bulk usage request for {len(user_ids)} users exceeds recommended limit of 1000")
+
+            # Use Dapr invoke pattern for service-to-service communication
+            dapr_url = f"{app_settings.dapr_base_url}/v1.0/invoke/budmetrics/method/observability/usage/summary/bulk"
+
+            payload = {
+                "user_ids": [str(uid) for uid in user_ids],
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            }
+
+            if project_id:
+                payload["project_id"] = str(project_id)
+
+            async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for bulk requests
+                response = await client.post(dapr_url, json=payload)
+                response.raise_for_status()
+                result = response.json()
+
+                # Process the bulk response
+                if result and "param" in result and "users" in result["param"]:
+                    users_data = result["param"]["users"]
+
+                    # Create lookup dict by user_id
+                    usage_lookup = {}
+                    for user_data in users_data:
+                        user_id = user_data["user_id"]
+                        usage_lookup[user_id] = {
+                            "total_tokens": user_data.get("total_tokens", 0),
+                            "total_cost": user_data.get("total_cost", 0.0),
+                            "request_count": user_data.get("request_count", 0),
+                            "success_rate": user_data.get("success_rate", 0.0),
+                        }
+
+                    # Ensure we have entries for all requested users (even if they have no usage)
+                    for user_id in user_ids:
+                        user_id_str = str(user_id)
+                        if user_id_str not in usage_lookup:
+                            usage_lookup[user_id_str] = {
+                                "total_tokens": 0,
+                                "total_cost": 0.0,
+                                "request_count": 0,
+                                "success_rate": 0.0,
+                            }
+
+                    return usage_lookup
+                else:
+                    # Return empty usage for all users if no data
+                    return {
+                        str(user_id): {
+                            "total_tokens": 0,
+                            "total_cost": 0.0,
+                            "request_count": 0,
+                            "success_rate": 0.0,
+                        }
+                        for user_id in user_ids
+                    }
+
+        except Exception as e:
+            logger.error(f"Error fetching bulk usage from ClickHouse: {e}")
+            # Return empty usage for all users on error
+            return {
+                str(user_id): {
+                    "total_tokens": 0,
+                    "total_cost": 0.0,
+                    "request_count": 0,
+                    "success_rate": 0.0,
+                }
+                for user_id in user_ids
+            }
+
+    async def check_bulk_usage_limits(self, user_ids: List[UUID]) -> Dict[str, Dict[str, Any]]:
+        """Check usage limits for multiple users efficiently using bulk API.
+
+        This method is significantly more efficient than calling check_usage_limits
+        for each user individually. It makes a single bulk API call and processes
+        the results for all users at once.
+
+        Args:
+            user_ids: List of user UUIDs to check limits for
+
+        Returns:
+            Dict mapping user_id strings to usage limit results
+        """
+        if not user_ids:
+            return {}
+
+        result_dict = {}
+
+        try:
+            # Get user information for all users at once
+            users_stmt = select(UserModel).where(UserModel.id.in_(user_ids))
+            users = self.session.execute(users_stmt).scalars().all()
+            user_lookup = {user.id: user for user in users}
+
+            # Get billing information for all users
+            billing_stmt = select(UserBilling).where(
+                UserBilling.user_id.in_(user_ids), UserBilling.is_current, UserBilling.is_active
+            )
+            billings = self.session.execute(billing_stmt).scalars().all()
+            billing_lookup = {billing.user_id: billing for billing in billings}
+
+            # Get billing plans for all users
+            plan_ids = [b.billing_plan_id for b in billings if b.billing_plan_id]
+            if plan_ids:
+                plans_stmt = select(BillingPlan).where(BillingPlan.id.in_(plan_ids))
+                plans = self.session.execute(plans_stmt).scalars().all()
+                plan_lookup = {plan.id: plan for plan in plans}
+            else:
+                plan_lookup = {}
+
+            # Separate users into those with and without billing
+            users_with_billing = []
+            users_without_billing = []
+
+            for user_id in user_ids:
+                if user_id in billing_lookup:
+                    users_with_billing.append(user_id)
+                else:
+                    users_without_billing.append(user_id)
+
+            # Get bulk usage data for users with billing
+            if users_with_billing:
+                # Calculate date range for usage query
+                now = datetime.now(timezone.utc)
+                billing_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                if billing_period_start.month == 12:
+                    billing_period_end = billing_period_start.replace(
+                        year=billing_period_start.year + 1, month=1
+                    ) - timedelta(seconds=1)
+                else:
+                    billing_period_end = billing_period_start.replace(
+                        month=billing_period_start.month + 1
+                    ) - timedelta(seconds=1)
+
+                # Get bulk usage data
+                bulk_usage_data = await self.get_bulk_usage_from_clickhouse(
+                    users_with_billing, billing_period_start, billing_period_end
+                )
+
+                # Process each user with billing
+                for user_id in users_with_billing:
+                    user_id_str = str(user_id)
+                    user = user_lookup.get(user_id)
+                    billing = billing_lookup[user_id]
+                    plan = plan_lookup.get(billing.billing_plan_id) if billing.billing_plan_id else None
+                    usage_data = bulk_usage_data.get(
+                        user_id_str, {"total_tokens": 0, "total_cost": 0.0, "request_count": 0, "success_rate": 0.0}
+                    )
+
+                    # Check if admin user (unlimited access)
+                    user_type = user.user_type if user else UserTypeEnum.CLIENT
+                    if user_type == UserTypeEnum.ADMIN:
+                        usage_limit_info = {
+                            "user_id": user_id_str,
+                            "user_type": user_type.value,
+                            "allowed": True,
+                            "status": "admin_unlimited",
+                            "tokens_quota": None,
+                            "tokens_used": usage_data["total_tokens"],
+                            "cost_quota": None,
+                            "cost_used": usage_data["total_cost"],
+                            "prev_tokens_used": 0,
+                            "prev_cost_used": 0.0,
+                            "reason": "Admin user - unlimited access",
+                            "reset_at": billing_period_end.isoformat() if billing else None,
+                            "last_updated": now.isoformat(),
+                            "billing_cycle_start": billing_period_start.isoformat() if billing else None,
+                            "billing_cycle_end": billing_period_end.isoformat() if billing else None,
+                        }
+                        result_dict[user_id_str] = usage_limit_info
+                        continue
+
+                    # Regular user processing
+                    tokens_used = usage_data["total_tokens"]
+                    cost_used = usage_data["total_cost"]
+
+                    # Get quotas
+                    tokens_quota = billing.custom_token_quota or (plan.monthly_token_quota if plan else None)
+                    cost_quota = billing.custom_cost_quota or (plan.monthly_cost_quota if plan else None)
+
+                    # Check limits
+                    allowed = True
+                    status = "allowed"
+                    reason = None
+
+                    # Check suspension
+                    if billing.is_suspended:
+                        allowed = False
+                        status = "suspended"
+                        reason = billing.suspension_reason or "Account suspended"
+                    # Check token limits
+                    elif tokens_quota and tokens_used >= tokens_quota:
+                        allowed = False
+                        status = "token_limit_exceeded"
+                        reason = f"Token limit exceeded: {tokens_used}/{tokens_quota}"
+                    # Check cost limits
+                    elif cost_quota and cost_used >= cost_quota:
+                        allowed = False
+                        status = "cost_limit_exceeded"
+                        reason = f"Cost limit exceeded: ${cost_used:.2f}/${cost_quota:.2f}"
+
+                    usage_limit_info = {
+                        "user_id": user_id_str,
+                        "user_type": user_type.value,
+                        "allowed": allowed,
+                        "status": status,
+                        "tokens_quota": tokens_quota,
+                        "tokens_used": tokens_used,
+                        "cost_quota": float(cost_quota) if cost_quota else None,
+                        "cost_used": cost_used,
+                        "prev_tokens_used": 0,
+                        "prev_cost_used": 0.0,
+                        "reason": reason,
+                        "reset_at": billing.billing_period_end.isoformat() if billing.billing_period_end else None,
+                        "last_updated": now.isoformat(),
+                        "billing_cycle_start": billing.billing_period_start.isoformat()
+                        if billing.billing_period_start
+                        else None,
+                        "billing_cycle_end": billing.billing_period_end.isoformat()
+                        if billing.billing_period_end
+                        else None,
+                    }
+
+                    result_dict[user_id_str] = usage_limit_info
+
+            # Process users without billing (freemium)
+            if users_without_billing:
+                # For freemium users, get usage data separately
+                now = datetime.now(timezone.utc)
+                billing_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                if billing_period_start.month == 12:
+                    billing_period_end = billing_period_start.replace(
+                        year=billing_period_start.year + 1, month=1
+                    ) - timedelta(seconds=1)
+                else:
+                    billing_period_end = billing_period_start.replace(
+                        month=billing_period_start.month + 1
+                    ) - timedelta(seconds=1)
+
+                freemium_usage_data = await self.get_bulk_usage_from_clickhouse(
+                    users_without_billing, billing_period_start, billing_period_end
+                )
+
+                free_plan = self._get_default_free_plan()
+                token_quota = free_plan.get("monthly_token_quota", 100000)
+
+                for user_id in users_without_billing:
+                    user_id_str = str(user_id)
+                    user = user_lookup.get(user_id)
+                    user_type = user.user_type if user else UserTypeEnum.CLIENT
+                    usage_data = freemium_usage_data.get(
+                        user_id_str, {"total_tokens": 0, "total_cost": 0.0, "request_count": 0, "success_rate": 0.0}
+                    )
+
+                    # Check if admin user (unlimited access)
+                    if user_type == UserTypeEnum.ADMIN:
+                        usage_limit_info = {
+                            "user_id": user_id_str,
+                            "user_type": user_type.value,
+                            "allowed": True,
+                            "status": "admin_unlimited",
+                            "tokens_quota": None,
+                            "tokens_used": usage_data["total_tokens"],
+                            "cost_quota": None,
+                            "cost_used": usage_data["total_cost"],
+                            "prev_tokens_used": 0,
+                            "prev_cost_used": 0.0,
+                            "reason": "Admin user - unlimited access",
+                            "reset_at": None,
+                            "last_updated": now.isoformat(),
+                            "billing_cycle_start": None,
+                            "billing_cycle_end": None,
+                        }
+                        result_dict[user_id_str] = usage_limit_info
+                        continue
+
+                    usage_limit_info = {
+                        "user_id": user_id_str,
+                        "user_type": user_type.value,
+                        "allowed": True,
+                        "status": "no_billing_plan",
+                        "tokens_quota": token_quota,
+                        "tokens_used": usage_data["total_tokens"],
+                        "cost_quota": None,
+                        "cost_used": usage_data["total_cost"],
+                        "prev_tokens_used": 0,
+                        "prev_cost_used": 0.0,
+                        "reason": "No billing plan - freemium user",
+                        "reset_at": None,
+                        "last_updated": now.isoformat(),
+                        "billing_cycle_start": None,
+                        "billing_cycle_end": None,
+                    }
+
+                    result_dict[user_id_str] = usage_limit_info
+
+            # Bulk publish to Redis with smart TTL
+            redis_service = RedisService()
+
+            for user_id_str, usage_limit_info in result_dict.items():
+                # Calculate smart TTL based on usage patterns
+                primary_ttl, fallback_ttl = await self._calculate_smart_ttl(usage_limit_info)
+
+                # Publish to Redis with dual-TTL strategy
+                primary_key = f"usage_limit:{user_id_str}"
+                fallback_key = f"usage_limit_fallback:{user_id_str}"
+                data = json.dumps(usage_limit_info)
+
+                await redis_service.set(primary_key, data, ex=primary_ttl)
+                await redis_service.set(fallback_key, data, ex=fallback_ttl)
+
+            logger.info(f"Bulk checked usage limits for {len(result_dict)} users")
+            return result_dict
+
+        except Exception as e:
+            logger.error(f"Error in bulk usage limits check: {e}")
+            # Return empty results for all users on error
+            return {str(user_id): {} for user_id in user_ids}
 
     def get_user_billing(self, user_id: UUID) -> Optional[UserBilling]:
         """Get current user billing information."""
@@ -235,12 +588,63 @@ class BillingService(DataManagerUtils):
             "suspension_reason": user_billing.suspension_reason,
         }
 
+    async def _calculate_smart_ttl(self, usage_limit_info: Dict[str, Any]) -> tuple[int, int]:
+        """Calculate smart TTL values based on user activity patterns.
+
+        Args:
+            usage_limit_info: Usage limit information containing last_updated timestamp
+
+        Returns:
+            Tuple of (primary_ttl, fallback_ttl) in seconds
+        """
+        try:
+            # Parse last activity from usage info
+            last_updated_str = usage_limit_info.get("last_updated")
+            if last_updated_str:
+                last_updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
+                now = datetime.now(timezone.utc)
+                inactive_minutes = (now - last_updated).total_seconds() / 60
+            else:
+                # No activity data, treat as inactive
+                inactive_minutes = 60
+
+            # Calculate TTL based on activity level
+            if inactive_minutes < 5:
+                # Very active users - short TTL, rely on frequent incremental sync
+                primary_ttl = 120  # 2 minutes
+                fallback_ttl = 1200  # 20 minutes
+            elif inactive_minutes < 30:
+                # Moderately active - medium TTL
+                primary_ttl = 300  # 5 minutes
+                fallback_ttl = 1200  # 20 minutes
+            else:
+                # Inactive users - TTL until next full sync + buffer
+                # Full sync every 15 minutes, so max wait is 15 minutes
+                now = datetime.now(timezone.utc)
+                minutes_since_quarter_hour = now.minute % 15
+                minutes_to_next_full_sync = 15 - minutes_since_quarter_hour
+
+                primary_ttl = max(300, (minutes_to_next_full_sync + 2) * 60)  # Buffer for next full sync
+                fallback_ttl = 1200  # 20 minutes (longer than full sync interval)
+
+            logger.debug(
+                f"Smart TTL for user {usage_limit_info.get('user_id')}: "
+                f"inactive_minutes={inactive_minutes:.1f}, primary_ttl={primary_ttl}, fallback_ttl={fallback_ttl}"
+            )
+
+            return primary_ttl, fallback_ttl
+
+        except Exception as e:
+            logger.warning(f"Error calculating smart TTL, using defaults: {e}")
+            # Safe defaults
+            return 120, 1200  # 2 minutes primary, 20 minutes fallback
+
     async def check_usage_limits(self, user_id: UUID) -> Dict[str, Any]:
         """Check if user has exceeded usage limits and publish to Redis."""
-        import json
-        from datetime import datetime, timezone
-
-        from budapp.shared.redis_service import RedisService
+        # Get user information to determine user type
+        user = self.session.query(UserModel).filter(UserModel.id == user_id).first()
+        user_type = user.user_type if user else UserTypeEnum.CLIENT
+        is_admin_user = user_type == UserTypeEnum.ADMIN
 
         """Check if user has exceeded usage limits."""
         usage = await self.get_current_usage(user_id)
@@ -275,9 +679,6 @@ class BillingService(DataManagerUtils):
         billing_cycle_end = None
         if usage.get("has_billing"):
             # Get billing cycle from user billing record
-            from budapp.billing_ops.models import UserBilling
-            from budapp.billing_ops.utils import calculate_billing_cycle
-
             user_billing = self.get_user_billing(user_id)
             if user_billing and user_billing.created_at:
                 billing_cycle_start, billing_cycle_end = calculate_billing_cycle(user_billing.created_at)
@@ -299,8 +700,6 @@ class BillingService(DataManagerUtils):
                 user_billing = self.get_user_billing(user_id)
                 if user_billing and billing_cycle_start and billing_cycle_end:
                     try:
-                        from datetime import datetime, timezone
-
                         cycle_start_dt = datetime.fromisoformat(billing_cycle_start.replace("Z", "+00:00"))
                         cycle_end_dt = datetime.fromisoformat(billing_cycle_end.replace("Z", "+00:00"))
 
@@ -324,6 +723,7 @@ class BillingService(DataManagerUtils):
         # Determine usage limit status with new format
         usage_limit_info = {
             "user_id": str(user_id),
+            "user_type": user_type.value if user_type else "client",
             "allowed": True,
             "status": "allowed",
             "tokens_quota": tokens_quota,
@@ -340,7 +740,16 @@ class BillingService(DataManagerUtils):
             "plan_name": usage.get("plan_name", "Free"),
         }
 
-        if not usage.get("has_billing"):
+        if is_admin_user:
+            # Admin users always have unlimited access regardless of billing status
+            usage_limit_info.update(
+                {
+                    "allowed": True,
+                    "status": "admin_unlimited",
+                    "reason": "Admin user - unlimited access",
+                }
+            )
+        elif not usage.get("has_billing"):
             # No billing plan means freemium user - allow with no limits
             usage_limit_info.update(
                 {
@@ -382,12 +791,22 @@ class BillingService(DataManagerUtils):
                 }
             )
 
-        # Publish to Redis for gateway consumption
+        # Publish to Redis for gateway consumption with dual-TTL fallback strategy
         try:
             redis_service = RedisService()
-            key = f"usage_limit:{user_id}"
-            # Store with 60 second TTL - ensures data availability between sync intervals (30s)
-            await redis_service.set(key, json.dumps(usage_limit_info), ex=60)
+            primary_key = f"usage_limit:{user_id}"
+            fallback_key = f"usage_limit_fallback:{user_id}"
+            data = json.dumps(usage_limit_info)
+
+            # Calculate smart TTL based on user activity
+            primary_ttl, fallback_ttl = await self._calculate_smart_ttl(usage_limit_info)
+
+            # Store primary key with smart TTL
+            await redis_service.set(primary_key, data, ex=primary_ttl)
+
+            # Store fallback key with longer TTL for Redis miss protection
+            await redis_service.set(fallback_key, data, ex=fallback_ttl)
+
         except Exception as e:
             logger.warning(f"Failed to publish usage limit to Redis: {e}")
 
@@ -446,8 +865,6 @@ class BillingService(DataManagerUtils):
 
     async def check_and_trigger_alerts(self, user_id: UUID) -> List[Dict[str, Any]]:
         """Check usage against alert thresholds and return triggered alerts."""
-        from budapp.billing_ops.notification_service import BillingNotificationService
-
         usage = await self.get_current_usage(user_id)
         if not usage.get("has_billing"):
             return []
@@ -560,8 +977,6 @@ class BillingService(DataManagerUtils):
         custom_cost_quota: Optional[Decimal] = None,
     ) -> UserBilling:
         """Create billing configuration for a user."""
-        from dateutil.relativedelta import relativedelta
-
         # Calculate billing period (monthly) - start from current time
         now = datetime.now(timezone.utc)
         billing_period_start = now
@@ -619,8 +1034,6 @@ class BillingService(DataManagerUtils):
 
     def create_billing_alert(self, user_id: UUID, name: str, alert_type: str, threshold_percent: int) -> BillingAlert:
         """Create a new billing alert with validation."""
-        from fastapi import HTTPException, status
-
         # Check if alert with same name already exists for this user
         existing_alert_stmt = select(BillingAlert).where(BillingAlert.user_id == user_id, BillingAlert.name == name)
         existing_alert = self.session.execute(existing_alert_stmt).scalar_one_or_none()
@@ -644,10 +1057,6 @@ class BillingService(DataManagerUtils):
 
     def create_next_billing_cycle(self, user_id: UUID) -> UserBilling:
         """Create a new billing cycle entry for a user, preserving the previous one as history."""
-        from datetime import datetime, timezone
-
-        from budapp.billing_ops.utils import calculate_billing_cycle
-
         # Get current billing record
         current_billing = self.get_user_billing(user_id)
         if not current_billing:

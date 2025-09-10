@@ -77,6 +77,67 @@ class CredentialUsageResponse(ResponseBase):
     """The time window used for the query (since and until)."""
 
 
+class MetricsSyncRequest(BaseModel):
+    """Unified request for credential usage and user usage sync."""
+
+    sync_mode: Literal["incremental", "full"] = "incremental"
+    """Whether to return only active entities or all entities."""
+
+    activity_threshold_minutes: int = 5
+    """For incremental mode: how many minutes back to consider 'recent activity'."""
+
+    credential_sync: bool = True
+    """Whether to include credential usage data."""
+
+    user_usage_sync: bool = True
+    """Whether to include user usage data."""
+
+    user_ids: Optional[List[UUID]] = None
+    """For full mode: specific user IDs to sync. If None, syncs all users."""
+
+
+class UserUsageItem(BaseModel):
+    """User usage information for sync."""
+
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+
+    user_id: UUID
+    """The user ID."""
+
+    last_activity_at: datetime
+    """The most recent timestamp when this user made a request."""
+
+    usage_data: Dict[str, Any]
+    """Usage data including tokens, cost, request count, success rate."""
+
+
+class MetricsSyncResponse(ResponseBase):
+    """Unified response containing both credential and user data."""
+
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+
+    object: str = "metrics_sync"
+    """The type of response object."""
+
+    sync_mode: str
+    """The sync mode used (incremental or full)."""
+
+    activity_threshold_minutes: int
+    """The activity threshold used for incremental mode."""
+
+    query_timestamp: datetime
+    """When this sync was performed."""
+
+    credential_usage: List[CredentialUsageItem]
+    """List of credential usage information."""
+
+    user_usage: List[UserUsageItem]
+    """List of user usage information."""
+
+    stats: Dict[str, int]
+    """Statistics about the sync (active_credentials, active_users, total_users_checked)."""
+
+
 MetricType = Literal[
     "request_count",
     "success_request",

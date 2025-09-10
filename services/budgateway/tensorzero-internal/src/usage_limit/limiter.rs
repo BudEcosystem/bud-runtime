@@ -14,6 +14,8 @@ use tracing::{debug, warn, error, info};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageLimitInfo {
     pub user_id: String,
+    #[serde(default = "default_user_type")]
+    pub user_type: String,  // "admin" or "client"
     pub allowed: bool,
     pub status: String,
     pub tokens_quota: Option<i64>,
@@ -29,6 +31,10 @@ pub struct UsageLimitInfo {
     pub billing_cycle_start: Option<String>,  // Track billing cycle
     #[serde(default)]
     pub billing_cycle_end: Option<String>,    // When cycle ends
+}
+
+fn default_user_type() -> String {
+    "client".to_string()
 }
 
 // RealtimeUsage struct removed - we now update the main usage_limit key directly
@@ -51,7 +57,7 @@ pub struct UsageLimiterConfig {
 impl Default for UsageLimiterConfig {
     fn default() -> Self {
         Self {
-            cache_ttl_ms: 30000,    // 30 seconds cache (matches budapp sync interval)
+            cache_ttl_ms: 60000,    // 60 seconds cache (matches incremental sync interval)
             sync_interval_ms: 2000, // Sync every 2 seconds from Redis
             redis_timeout_ms: 100,  // 100ms Redis timeout
             fail_open: true,        // Allow on errors
@@ -182,6 +188,13 @@ impl UsageLimiter {
         if let Some(mut cached) = self.cache.get(user_id).await {
             self.metrics.record_cache_hit();
 
+            // Check if user is admin - admins have unlimited access
+            if cached.user_type == "admin" {
+                debug!("Admin user {} allowed - unlimited access", user_id);
+                self.metrics.record_allowed();
+                return UsageLimitDecision::Allow;
+            }
+
             // If consuming, write atomic increments to Redis immediately
             if tokens_to_consume.is_some() || cost_to_consume.is_some() {
                 if let Err(e) = self.increment_realtime_usage(user_id, tokens_to_consume, cost_to_consume).await {
@@ -229,6 +242,7 @@ impl UsageLimiter {
                 // Create status for caching directly from limit_info
                 let status = UsageLimitStatus {
                     user_id: user_id.to_string(),
+                    user_type: limit_info.user_type.clone(),
                     allowed: limit_info.allowed,
                     status: limit_info.status.clone(),
                     tokens_quota: limit_info.tokens_quota,
@@ -247,6 +261,13 @@ impl UsageLimiter {
 
                 // Insert into cache
                 self.cache.insert(user_id.to_string(), status.clone()).await;
+
+                // Check if user is admin - admins have unlimited access
+                if limit_info.user_type == "admin" {
+                    debug!("Admin user {} allowed - unlimited access", user_id);
+                    self.metrics.record_allowed();
+                    return UsageLimitDecision::Allow;
+                }
 
                 let decision = if limit_info.allowed && self.check_quotas(&status) {
                     self.metrics.record_allowed();
@@ -267,6 +288,7 @@ impl UsageLimiter {
                 // Cache the allow decision for freemium user
                 let status = UsageLimitStatus {
                     user_id: user_id.to_string(),
+                    user_type: "client".to_string(),  // Default to client for freemium
                     allowed: true,
                     status: "no_billing_plan".to_string(),
                     tokens_quota: None,
@@ -390,19 +412,20 @@ impl UsageLimiter {
 
     // fetch_realtime_usage function removed - we now update the main usage_limit key directly
 
-    /// Fetch usage limit from Redis
+    /// Fetch usage limit from Redis with fallback key support
     async fn fetch_usage_limit(&self, user_id: &str) -> Result<Option<UsageLimitInfo>, Error> {
         self.metrics.record_redis_fetch();
 
         let redis_client = self.redis_client.read().await;
 
         if let Some(mut conn) = redis_client.as_ref().map(|c| c.clone()) {
-            let key = format!("usage_limit:{}", user_id);
+            let primary_key = format!("usage_limit:{}", user_id);
+            let fallback_key = format!("usage_limit_fallback:{}", user_id);
 
-            // Use timeout for Redis operation
+            // Try primary key first
             let result = timeout(
                 Duration::from_millis(self.config.redis_timeout_ms),
-                conn.get::<_, Option<String>>(&key)
+                conn.get::<_, Option<String>>(&primary_key)
             ).await;
 
             match result {
@@ -410,29 +433,63 @@ impl UsageLimiter {
                     // Parse the JSON data
                     match serde_json::from_str::<UsageLimitInfo>(&data) {
                         Ok(info) => {
-                            debug!("Fetched usage limit for user {}: allowed={}", user_id, info.allowed);
+                            debug!("Fetched usage limit from primary key for user {}: allowed={}", user_id, info.allowed);
+                            return Ok(Some(info));
+                        },
+                        Err(e) => {
+                            error!("Failed to parse usage limit data from primary key for user {}: {}", user_id, e);
+                            // Continue to try fallback key
+                        }
+                    }
+                }
+                Ok(Ok(None)) => {
+                    debug!("No usage limit found in primary key for user {}, trying fallback", user_id);
+                    // Continue to try fallback key
+                },
+                Ok(Err(e)) => {
+                    warn!("Redis error fetching usage limit from primary key for user {}: {}, trying fallback", user_id, e);
+                    // Continue to try fallback key
+                }
+                Err(_) => {
+                    warn!("Redis timeout fetching usage limit from primary key for user {}, trying fallback", user_id);
+                    // Continue to try fallback key
+                }
+            }
+
+            // Try fallback key
+            let fallback_result = timeout(
+                Duration::from_millis(self.config.redis_timeout_ms),
+                conn.get::<_, Option<String>>(&fallback_key)
+            ).await;
+
+            match fallback_result {
+                Ok(Ok(Some(data))) => {
+                    // Parse the JSON data from fallback
+                    match serde_json::from_str::<UsageLimitInfo>(&data) {
+                        Ok(info) => {
+                            debug!("Fetched usage limit from fallback key for user {}: allowed={}", user_id, info.allowed);
                             Ok(Some(info))
                         },
                         Err(e) => {
-                            error!("Failed to parse usage limit data for user {}: {}", user_id, e);
+                            error!("Failed to parse usage limit data from fallback key for user {}: {}", user_id, e);
                             Ok(None)
                         }
                     }
                 }
                 Ok(Ok(None)) => {
-                    debug!("No usage limit found in Redis for user {}", user_id);
+                    debug!("No usage limit found in both primary and fallback keys for user {}", user_id);
                     Ok(None)
                 },
                 Ok(Err(e)) => {
-                    warn!("Redis error fetching usage limit for user {}: {}", user_id, e);
+                    warn!("Redis error fetching usage limit from fallback for user {}: {}", user_id, e);
                     Err(Error::new(ErrorDetails::Config {
-                        message: format!("Redis error: {}", e),
+                        message: format!("Redis error on fallback: {}", e),
                     }))
                 }
                 Err(_) => {
-                    warn!("Redis timeout fetching usage limit for user {}", user_id);
+                    warn!("Redis timeout fetching usage limit from fallback for user {}", user_id);
                     Err(Error::new(ErrorDetails::Config {
-                        message: "Redis timeout".to_string(),
+                        message: "Redis timeout on fallback".to_string(),
                     }))
                 }
             }
@@ -552,6 +609,7 @@ impl UsageLimiter {
                                                     // Simplified sync - just update cache with main usage_limit data
                                                     let status = UsageLimitStatus {
                                                         user_id: user_id.to_string(),
+                                                        user_type: info.user_type,
                                                         allowed: info.allowed,
                                                         status: info.status,
                                                         tokens_quota: info.tokens_quota,

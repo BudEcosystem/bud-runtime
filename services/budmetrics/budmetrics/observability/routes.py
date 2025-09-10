@@ -25,6 +25,8 @@ from budmetrics.observability.schemas import (
     InferenceListResponse,
     LatencyDistributionRequest,
     LatencyDistributionResponse,
+    MetricsSyncRequest,
+    MetricsSyncResponse,
     ObservabilityMetricsRequest,
     ObservabilityMetricsResponse,
     TimeSeriesRequest,
@@ -617,5 +619,36 @@ async def get_credential_usage(request: CredentialUsageRequest) -> Response:
     except Exception as e:
         logger.error(f"Error getting credential usage: {e}")
         response = ErrorResponse(message=f"Error getting credential usage: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.post("/metrics-sync", tags=["Observability"])
+async def get_metrics_sync(request: MetricsSyncRequest) -> Response:
+    """Get unified metrics sync data for both credentials and users.
+
+    This endpoint provides a unified way to sync both credential usage and user usage data.
+    It supports two modes:
+    - incremental: Returns only entities with recent activity (based on threshold)
+    - full: Returns all entities regardless of activity
+
+    Used by budapp to efficiently sync both credential and user usage data in a single call.
+
+    Args:
+        request (MetricsSyncRequest): Request with sync mode and parameters.
+
+    Returns:
+        HTTP response containing unified metrics sync data.
+    """
+    response: Union[MetricsSyncResponse, ErrorResponse]
+
+    try:
+        response = await service.get_metrics_sync(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting metrics sync: {e}")
+        response = ErrorResponse(message=f"Error getting metrics sync: {str(e)}")
 
     return response.to_http_response()
