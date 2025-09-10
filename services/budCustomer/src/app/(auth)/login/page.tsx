@@ -221,7 +221,7 @@ function LoginContent() {
   const handleForgetPassword = async (email: string) => {
     showLoader();
     try {
-      const response = await AppRequest.Post(`users/reset-password`, {
+      const response = await AppRequest.Post(`/users/reset-password`, {
         email,
       });
       if (response) {

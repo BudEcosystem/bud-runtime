@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { use, useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   Flex,
@@ -153,6 +153,10 @@ export default function UsagePage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    console.log("Updated metrics:", metrics);
+  }, [metrics]);
 
   const generateDateRange = (startDate: string, endDate: string) => {
     const dates = [];

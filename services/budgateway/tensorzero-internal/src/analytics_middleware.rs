@@ -152,7 +152,6 @@ pub async fn analytics_middleware(
 
 /// Extract client IP from headers only (when ConnectInfo is not available)
 fn get_client_ip_fallback(headers: &HeaderMap) -> String {
-    tracing::debug!("Extracting client IP from headers");
 
     // Check X-Forwarded-For first
     if let Some(forwarded_for) = headers.get("x-forwarded-for") {
@@ -160,29 +159,17 @@ fn get_client_ip_fallback(headers: &HeaderMap) -> String {
             tracing::debug!("Found X-Forwarded-For header: {}", forwarded_str);
             // X-Forwarded-For can contain multiple IPs, take the first one
             if let Some(first_ip) = forwarded_str.split(',').next() {
-                let client_ip = first_ip.trim().to_string();
-                tracing::debug!("Extracted client IP from X-Forwarded-For: {}", client_ip);
-                return client_ip;
+                return first_ip.trim().to_string();
             }
-        } else {
-            tracing::debug!("X-Forwarded-For header present but not valid UTF-8");
         }
-    } else {
-        tracing::debug!("No X-Forwarded-For header found");
     }
 
     // Check X-Real-IP
     if let Some(real_ip) = headers.get("x-real-ip") {
         if let Ok(ip_str) = real_ip.to_str() {
             tracing::debug!("Found X-Real-IP header: {}", ip_str);
-            let client_ip = ip_str.to_string();
-            tracing::debug!("Using client IP from X-Real-IP: {}", client_ip);
-            return client_ip;
-        } else {
-            tracing::debug!("X-Real-IP header present but not valid UTF-8");
+            return ip_str.to_string();
         }
-    } else {
-        tracing::debug!("No X-Real-IP header found");
     }
 
     // Fallback to unknown
