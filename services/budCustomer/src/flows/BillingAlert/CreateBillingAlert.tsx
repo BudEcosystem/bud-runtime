@@ -57,7 +57,7 @@ export default function CreateBillingAlert() {
       data={{}}
       drawerLoading={loading}
     >
-      <BudWraperBox>
+      <BudWraperBox >
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Create Billing Alert"
@@ -151,30 +151,6 @@ export default function CreateBillingAlert() {
                   You&apos;ll be notified when usage reaches {alertThreshold}%
                   of your quota
                 </Text_12_400_B3B3B3>
-              </div>
-
-              {/* Info Box */}
-              <div className="mt-4 p-4 bg-[#EEEEEE] dark:bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg">
-                <div className="flex items-start gap-3">
-                  <span className="text-[#965CDE] text-lg">ℹ️</span>
-                  <div className="flex flex-col gap-1">
-                    <Text_14_400_EEEEEE>How alerts work</Text_14_400_EEEEEE>
-                    <Text_12_400_B3B3B3>
-                      • Alerts are checked periodically throughout your billing
-                      cycle
-                    </Text_12_400_B3B3B3>
-                    <Text_12_400_B3B3B3>
-                      • You&apos;ll receive notifications via email when
-                      thresholds are reached
-                    </Text_12_400_B3B3B3>
-                    <Text_12_400_B3B3B3>
-                      • Each alert triggers only once per billing period
-                    </Text_12_400_B3B3B3>
-                    <Text_12_400_B3B3B3>
-                      • You can enable/disable alerts at any time
-                    </Text_12_400_B3B3B3>
-                  </div>
-                </div>
               </div>
             </div>
           </DrawerCard>
