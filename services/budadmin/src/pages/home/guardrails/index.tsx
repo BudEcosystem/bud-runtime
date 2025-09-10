@@ -43,6 +43,10 @@ import { Spin } from "antd";
 function GuardRailCard({ item, index }: { item: Probe; index: number }) {
   const { openDrawer, openDrawerWithStep } = useDrawer();
   const { setSelectedProbe } = useGuardrails();
+  const [descriptionPopoverOpen, setDescriptionPopoverOpen] = useState(false);
+
+  // Check if description is long enough to need "See more" (approximately 3 lines worth)
+  const needsSeeMore = item.description && item.description.length > 150;
 
   const getTypeIcon = (providerType: string) => {
     switch (providerType?.toLowerCase()) {
@@ -102,9 +106,56 @@ function GuardRailCard({ item, index }: { item: Probe; index: number }) {
         </div>
       )}
       {item.description && (
-        <Text_13_400_B3B3B3 className="mb-[1.25rem] line-clamp-3 leading-[1.4]">
-          {item.description}
-        </Text_13_400_B3B3B3>
+        <div className="mb-[1.25rem] relative">
+          <div
+            className="line-clamp-3 overflow-hidden"
+            style={{
+              display: "-webkit-box",
+              WebkitBoxOrient: "vertical",
+              WebkitLineClamp: 3
+            }}
+          >
+            <Text_13_400_B3B3B3 className="leading-[1.4]">
+              {item.description}
+            </Text_13_400_B3B3B3>
+          </div>
+          {needsSeeMore && (
+            <ConfigProvider
+              theme={{
+                token: {
+                  sizePopupArrow: 0,
+                },
+              }}
+            >
+              <Popover
+                content={
+                  <div className="max-w-[400px] p-[1rem] bg-[#111113] border border-[#1F1F1F] rounded-[6px]">
+                    <Text_13_400_B3B3B3 className="leading-[1.4] whitespace-pre-wrap">
+                      {item.description}
+                    </Text_13_400_B3B3B3>
+                  </div>
+                }
+                trigger="click"
+                open={descriptionPopoverOpen}
+                onOpenChange={setDescriptionPopoverOpen}
+                placement="top"
+                rootClassName="guardrail-description-popover"
+                getPopupContainer={(trigger) =>
+                  (trigger.parentNode as HTMLElement) || document.body
+                }
+              >
+                <Text_12_600_EEEEEE
+                  className="cursor-pointer mt-[0.5rem] inline-block hover:text-[#965CDE] transition-colors"
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                  }}
+                >
+                  See more
+                </Text_12_600_EEEEEE>
+              </Popover>
+            </ConfigProvider>
+          )}
+        </div>
       )}
 
       <div className="flex items-center justify-between mt-auto pt-[1rem] border-t border-[#1F1F1F]">
