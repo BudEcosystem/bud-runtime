@@ -2739,6 +2739,16 @@ class EndpointService(SessionMixin):
 
         # Handle pricing for publish action
         if is_published and pricing:
+            # Validate pricing values before database operation
+            input_cost = float(pricing.get("input_cost", 0))
+            output_cost = float(pricing.get("output_cost", 0))
+
+            if input_cost >= 10000 or output_cost >= 10000:
+                raise ClientException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Pricing values must be less than 10000. Got input_cost: {input_cost}, output_cost: {output_cost}",
+                )
+
             # Begin transaction to ensure atomicity
             try:
                 # Update previous pricing records to not current
