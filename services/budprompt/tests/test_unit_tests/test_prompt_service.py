@@ -244,6 +244,121 @@ class TestSavePromptConfig(TestPromptService):
         assert result.message == "Prompt configuration saved successfully"
         assert result.prompt_id == "test-prompt-valid-tools"
 
+    @pytest.mark.asyncio
+    async def test_update_config_with_null_values(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test that fields can be updated to null values using model_dump(exclude_unset=True)."""
+        # Arrange - Start with existing config that has values
+        existing_data = sample_config_data.model_dump_json(exclude_none=True)
+        mock_redis_service.get.return_value = existing_data
+        mock_redis_service.set.return_value = True
+
+        # Create update request setting some fields to null
+        update_request = PromptConfigRequest(
+            prompt_id="test-null-update",
+            deployment_name="gpt-3.5-turbo",  # Keep deployment_name
+            model_settings=None,  # Set to null
+            messages=None,  # Set to null
+            llm_retry_limit=None,  # Set to null
+        )
+
+        # Act
+        with patch('budprompt.prompt.services.app_settings') as mock_settings:
+            mock_settings.prompt_config_redis_ttl = 86400
+            result = await prompt_service.save_prompt_config(update_request)
+
+        # Assert
+        assert result.code == 200
+        assert result.prompt_id == "test-null-update"
+
+        # Get the saved data and verify nulls were applied
+        saved_json = mock_redis_service.set.call_args_list[0][0][1]
+        saved_data = json.loads(saved_json)
+
+        assert saved_data["deployment_name"] == "gpt-3.5-turbo"
+        assert saved_data.get("model_settings") is None
+        assert saved_data.get("messages") is None
+        assert saved_data.get("llm_retry_limit") is None
+
+    @pytest.mark.asyncio
+    async def test_deployment_name_cannot_be_null(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test that deployment_name cannot be set to null."""
+        # Arrange - Start with existing config
+        existing_data = sample_config_data.model_dump_json(exclude_none=True)
+        mock_redis_service.get.return_value = existing_data
+
+        # Try to set deployment_name to null
+        update_request = PromptConfigRequest(
+            prompt_id="test-deployment-null",
+            deployment_name=None,  # This should be rejected
+            llm_retry_limit=5,
+        )
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            with patch('budprompt.prompt.services.app_settings') as mock_settings:
+                mock_settings.prompt_config_redis_ttl = 86400
+                await prompt_service.save_prompt_config(update_request)
+
+        assert exc_info.value.status_code == 400
+        assert "deployment_name cannot be set to null" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_partial_update_preserves_unset_fields(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test that partial updates only modify explicitly set fields."""
+        # Arrange - Start with full config
+        existing_data = sample_config_data.model_dump_json(exclude_none=True)
+        mock_redis_service.get.return_value = existing_data
+        mock_redis_service.set.return_value = True
+
+        # Update only specific fields
+        update_request = PromptConfigRequest(
+            prompt_id="test-partial-update",
+            llm_retry_limit=10,  # Only update this field
+        )
+
+        # Act
+        with patch('budprompt.prompt.services.app_settings') as mock_settings:
+            mock_settings.prompt_config_redis_ttl = 86400
+            result = await prompt_service.save_prompt_config(update_request)
+
+        # Assert
+        assert result.code == 200
+
+        # Get the saved data and verify only llm_retry_limit was changed
+        saved_json = mock_redis_service.set.call_args_list[0][0][1]
+        saved_data = json.loads(saved_json)
+
+        # Original values should be preserved
+        assert saved_data["deployment_name"] == sample_config_data.deployment_name
+        assert saved_data["stream"] == sample_config_data.stream
+        assert saved_data["enable_tools"] == sample_config_data.enable_tools
+        assert saved_data["allow_multiple_calls"] == sample_config_data.allow_multiple_calls
+
+        # Only this should be updated
+        assert saved_data["llm_retry_limit"] == 10
+
+    @pytest.mark.asyncio
+    async def test_new_config_with_deployment_name_null_rejected(self, prompt_service, mock_redis_service):
+        """Test that creating new config with null deployment_name is rejected."""
+        # Arrange - No existing config
+        mock_redis_service.get.return_value = None
+
+        # Try to create new config with null deployment_name
+        invalid_request = PromptConfigRequest(
+            prompt_id="test-new-null-deployment",
+            deployment_name=None,  # This should be rejected
+            model_settings=ModelSettings(temperature=0.7),
+        )
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            with patch('budprompt.prompt.services.app_settings') as mock_settings:
+                mock_settings.prompt_config_redis_ttl = 86400
+                await prompt_service.save_prompt_config(invalid_request)
+
+        assert exc_info.value.status_code == 400
+        assert "deployment_name cannot be set to null" in exc_info.value.message
+
 
 class TestGetPromptConfig(TestPromptService):
     """Test cases for get_prompt_config method."""

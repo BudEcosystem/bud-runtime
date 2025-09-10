@@ -798,30 +798,17 @@ class PromptService:
             else:
                 config_data = PromptConfigurationData()
 
+            # Get only the fields that were explicitly set in the request
+            updates = request.model_dump(exclude_unset=True)
+
+            # Validate that deployment_name is not being set to null
+            if "deployment_name" in updates and updates["deployment_name"] is None:
+                raise ClientException(status_code=400, message="deployment_name cannot be set to null.")
+
             # Update configuration with provided fields (partial update)
-            if request.deployment_name:
-                config_data.deployment_name = request.deployment_name
-
-            if request.model_settings:
-                config_data.model_settings = request.model_settings
-
-            if request.stream is not None:
-                config_data.stream = request.stream
-
-            if request.messages is not None:
-                config_data.messages = request.messages
-
-            if request.llm_retry_limit is not None:
-                config_data.llm_retry_limit = request.llm_retry_limit
-
-            if request.enable_tools is not None:
-                config_data.enable_tools = request.enable_tools
-
-            if request.allow_multiple_calls is not None:
-                config_data.allow_multiple_calls = request.allow_multiple_calls
-
-            if request.system_prompt_role is not None:
-                config_data.system_prompt_role = request.system_prompt_role
+            for field_name, value in updates.items():
+                if field_name != "prompt_id":  # Skip prompt_id as it's not part of config_data
+                    setattr(config_data, field_name, value)
 
             # Convert to JSON and store in Redis with configured TTL
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
