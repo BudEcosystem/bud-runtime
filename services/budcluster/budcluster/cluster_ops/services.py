@@ -1203,9 +1203,11 @@ class ClusterOpsService:
             asyncio.run(ClusterOpsService.delete_node_info_from_statestore(str(cluster_id)))
         # cleanup resources create deployment workflow
         if "namespace" in workflow_status_dict:
+            from ..commons.constants import ClusterPlatformEnum
             from ..deployment.handler import DeploymentHandler
 
-            platform = workflow_status_dict.get("platform")
+            platform_str = workflow_status_dict.get("platform")
+            platform = ClusterPlatformEnum(platform_str) if platform_str else None
             deployment_handler = DeploymentHandler(config=workflow_status_dict["cluster_config_dict"])
             deployment_handler.delete(workflow_status_dict["namespace"], platform)
         return SuccessResponse(message="Create deployment resources cleaned up")
@@ -1477,11 +1479,36 @@ class ClusterService(SessionMixin):
 
                 # Check if there's still a blocking cluster
                 if registering_cluster:
-                    return ErrorResponse(
-                        message="This cluster is already registering. Please try again later.",
-                        code=status.HTTP_400_BAD_REQUEST,
-                        param={"cluster_id": str(registering_cluster.id)},
-                    )
+                    # Check if REGISTERING cluster is stuck (older than 15 minutes)
+                    from datetime import datetime, timedelta, timezone
+
+                    registration_timeout_minutes = 15  # Timeout for stuck registrations
+                    timeout_threshold = datetime.now(timezone.utc) - timedelta(minutes=registration_timeout_minutes)
+
+                    if registering_cluster.created_at < timeout_threshold:
+                        # Cluster has been in REGISTERING state too long, clean it up
+                        logger.warning(
+                            f"Found stuck REGISTERING cluster {registering_cluster.id} created at {registering_cluster.created_at}, "
+                            f"cleaning up for re-registration (timeout: {registration_timeout_minutes} minutes)"
+                        )
+                        try:
+                            await ClusterDataManager(self.session).delete_cluster(registering_cluster.id)
+                            logger.info(f"Successfully deleted stuck REGISTERING cluster {registering_cluster.id}")
+                            # Continue with registration since blocking cluster is removed
+                        except Exception as e:
+                            logger.error(f"Failed to delete stuck REGISTERING cluster {registering_cluster.id}: {e}")
+                            # Fall through to return the original error
+                            return ErrorResponse(
+                                message="This cluster is already registering. Please try again later.",
+                                code=status.HTTP_400_BAD_REQUEST,
+                                param={"cluster_id": str(registering_cluster.id)},
+                            )
+                    else:
+                        return ErrorResponse(
+                            message="This cluster is already registering. Please try again later.",
+                            code=status.HTTP_400_BAD_REQUEST,
+                            param={"cluster_id": str(registering_cluster.id)},
+                        )
                 elif available_cluster:
                     return ErrorResponse(
                         message="This cluster is already registered. Please delete it and try again.",
@@ -1496,6 +1523,28 @@ class ClusterService(SessionMixin):
             # Single cluster found, handle as before
             db_cluster = db_clusters[0]
             if db_cluster.status == ClusterStatusEnum.REGISTERING:
+                # Check if REGISTERING cluster is stuck (older than 15 minutes)
+                from datetime import datetime, timedelta, timezone
+
+                registration_timeout_minutes = 15  # Timeout for stuck registrations
+                timeout_threshold = datetime.now(timezone.utc) - timedelta(minutes=registration_timeout_minutes)
+
+                if db_cluster.created_at < timeout_threshold:
+                    # Cluster has been in REGISTERING state too long, clean it up
+                    logger.warning(
+                        f"Found stuck REGISTERING cluster {db_cluster.id} created at {db_cluster.created_at}, "
+                        f"cleaning up for re-registration (timeout: {registration_timeout_minutes} minutes)"
+                    )
+                    try:
+                        await ClusterDataManager(self.session).delete_cluster(db_cluster.id)
+                        logger.info(f"Successfully deleted stuck REGISTERING cluster {db_cluster.id}")
+                        return SuccessResponse(
+                            message="Cleaned up stuck registration, proceeding with new registration"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to delete stuck REGISTERING cluster {db_cluster.id}: {e}")
+                        # Fall through to return the original error
+
                 return ErrorResponse(
                     message="This cluster is already registering. Please try again later.",
                     code=status.HTTP_400_BAD_REQUEST,

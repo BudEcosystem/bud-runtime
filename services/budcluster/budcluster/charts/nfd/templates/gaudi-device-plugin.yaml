@@ -1,4 +1,4 @@
-{{- if .Values.intelDevicePlugin.gaudiEnabled }}
+{{- if and .Values.intelDevicePlugin.enabled .Values.intelDevicePlugin.gaudiEnabled }}
 ---
 apiVersion: deviceplugin.intel.com/v1
 kind: GaudiDevicePlugin
