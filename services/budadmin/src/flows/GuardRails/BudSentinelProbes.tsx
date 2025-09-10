@@ -36,26 +36,13 @@ export default function BudSentinelProbes() {
     setSelectedProbe: setSelectedProbeInStore,
     updateWorkflow,
     workflowLoading,
-    currentWorkflow,
-    getWorkflow,
+    selectedProvider,
   } = useGuardrails();
-
-  // Fetch workflow if not available on mount
-  useEffect(() => {
-    if (!currentWorkflow) {
-      console.log("No currentWorkflow found, attempting to fetch...");
-      // If there's a workflow ID stored somewhere (e.g., in localStorage or session), fetch it
-      // For now, we'll just log this issue
-    }
-  }, []);
 
   // Fetch probes on component mount and when search changes
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      // Debug: Log the current workflow to see what data we have
-      console.log("Current workflow in BudSentinelProbes:", currentWorkflow);
-
-      // Build filter payload with provider_id from workflow
+      // Build filter payload
       const filterPayload: any = {
         page: 1,
         page_size: 100, // Fetch all probes for now
@@ -66,20 +53,13 @@ export default function BudSentinelProbes() {
         filterPayload.search = searchTerm;
       }
 
-      // Add provider_id filter from the current workflow if available
-      if (currentWorkflow?.provider_id) {
-        filterPayload.provider_id = currentWorkflow.provider_id;
-        console.log("Adding provider_id to filter:", currentWorkflow.provider_id);
-      } else {
-        console.log("No provider_id found in currentWorkflow");
-      }
-
-      console.log("Final filterPayload:", filterPayload);
+      // The provider_id will be automatically added from selectedProvider in the fetchProbes function
+      // since we updated useGuardrails to use selectedProvider internally
       fetchProbes(filterPayload);
     }, 300); // Debounce search
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, currentWorkflow?.provider_id]);
+  }, [searchTerm, selectedProvider?.id]);
 
   const getCategoryIcon = (category: string) => {
     switch (category.toLowerCase()) {

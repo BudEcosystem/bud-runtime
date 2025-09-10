@@ -81,6 +81,10 @@ interface GuardrailsState {
   selectedProviderId: string | null;
   selectedProviderType: string | null;
 
+  // Step data management (similar to useModels)
+  selectedProvider: any | null;
+  setSelectedProvider: (provider: any) => void;
+
   // Actions
   fetchProbes: (params?: {
     tags?: string[];
@@ -161,6 +165,9 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   selectedProject: null,
   selectedDeployment: null,
 
+  // Step data management
+  selectedProvider: null,
+
   // Workflow state
   currentWorkflow: null,
   workflowLoading: false,
@@ -186,8 +193,11 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       if (params?.tags && params.tags.length > 0) {
         queryParams.tags = params.tags.join(",");
       }
-      if (params?.provider_id) {
-        queryParams.provider_id = params.provider_id;
+
+      // Use provider_id from params or from selectedProvider in store
+      const providerId = params?.provider_id || get().selectedProvider?.id;
+      if (providerId) {
+        queryParams.provider_id = providerId;
       }
       if (params?.provider_type) {
         queryParams.provider_type = params.provider_type;
@@ -303,6 +313,11 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
     set({ selectedDeployment: deployment });
   },
 
+  // Set selected provider (for step data management)
+  setSelectedProvider: (provider: any) => {
+    set({ selectedProvider: provider });
+  },
+
   // Create workflow
   createWorkflow: async (providerId: string) => {
     set({ workflowLoading: true, workflowError: null });
@@ -407,6 +422,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       selectedProbe: null,
       selectedProject: null,
       selectedDeployment: null,
+      selectedProvider: null,
     });
   },
 

@@ -68,7 +68,7 @@ export default function SelectProvider() {
   } = useCloudProviders();
 
   // Use guardrails hook for workflow
-  const { createWorkflow, workflowLoading } = useGuardrails();
+  const { createWorkflow, workflowLoading, setSelectedProvider: setSelectedProviderInStore } = useGuardrails();
 
   // Fetch providers on mount
   useEffect(() => {
@@ -78,6 +78,8 @@ export default function SelectProvider() {
   const handleProviderSelect = (providerId: string, providerData?: any) => {
     setSelectedProvider(providerId);
     setSelectedProviderData(providerData);
+    // Save provider to store for use in other steps
+    setSelectedProviderInStore(providerData || { id: providerId });
   };
 
   const handleNext = async () => {
