@@ -37,23 +37,44 @@ export default function BudSentinelProbes() {
     updateWorkflow,
     workflowLoading,
     currentWorkflow,
+    getWorkflow,
   } = useGuardrails();
+
+  // Fetch workflow if not available on mount
+  useEffect(() => {
+    if (!currentWorkflow) {
+      console.log("No currentWorkflow found, attempting to fetch...");
+      // If there's a workflow ID stored somewhere (e.g., in localStorage or session), fetch it
+      // For now, we'll just log this issue
+    }
+  }, []);
 
   // Fetch probes on component mount and when search changes
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
+      // Debug: Log the current workflow to see what data we have
+      console.log("Current workflow in BudSentinelProbes:", currentWorkflow);
+
       // Build filter payload with provider_id from workflow
       const filterPayload: any = {
-        search: searchTerm || undefined,
         page: 1,
         page_size: 100, // Fetch all probes for now
       };
 
+      // Add search filter if present
+      if (searchTerm) {
+        filterPayload.search = searchTerm;
+      }
+
       // Add provider_id filter from the current workflow if available
       if (currentWorkflow?.provider_id) {
         filterPayload.provider_id = currentWorkflow.provider_id;
+        console.log("Adding provider_id to filter:", currentWorkflow.provider_id);
+      } else {
+        console.log("No provider_id found in currentWorkflow");
       }
 
+      console.log("Final filterPayload:", filterPayload);
       fetchProbes(filterPayload);
     }, 300); // Debounce search
 

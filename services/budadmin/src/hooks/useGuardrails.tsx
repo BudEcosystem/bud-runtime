@@ -309,7 +309,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
 
     try {
       const response = await AppRequest.Post(
-        "/guardrails/deployment-workflow",
+        "/guardrails/deploy-workflow",
         {
           provider_id: providerId,
           step_number: 1,
@@ -351,7 +351,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       };
 
       const response = await AppRequest.Post(
-        "/guardrails/deployment-workflow",
+        "/guardrails/deploy-workflow",
         payload,
       );
 
