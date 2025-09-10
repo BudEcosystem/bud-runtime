@@ -191,14 +191,56 @@ class PromptConfigurationService:
             ValueError: If a field is not found in the model
         """
         for model_name, field_validations in validations.items():
-            # Check if this model exists (could be nested)
-            if hasattr(model, "model_fields"):
-                model_fields = set(model.model_fields.keys())
+            # First, try to find the model to validate against
+            target_model = None
+
+            # Check if model_name matches the main model's name
+            if (
+                hasattr(model, "__name__")
+                and model.__name__ == model_name
+                or model_name in ["root", ""]
+                or model_name == getattr(model, "__name__", None)
+            ):
+                target_model = model
+            else:
+                # Try to find nested model by inspecting field annotations
+                if hasattr(model, "model_fields"):
+                    for _field_name, field_info in model.model_fields.items():
+                        # Get the field's annotation/type
+                        field_type = field_info.annotation
+
+                        # Handle Optional types
+                        import typing
+
+                        origin = typing.get_origin(field_type)
+                        if origin is Union:
+                            # Get the non-None type from Optional
+                            args = typing.get_args(field_type)
+                            field_type = next((arg for arg in args if arg is not type(None)), field_type)
+
+                        # Check if this field's type matches the model_name we're looking for
+                        if (
+                            hasattr(field_type, "__name__")
+                            and field_type.__name__ == model_name
+                            or hasattr(field_type, "__name__")
+                            and model_name in field_type.__name__
+                        ):
+                            target_model = field_type
+                            break
+
+            # If we found a target model, validate the fields
+            if target_model and hasattr(target_model, "model_fields"):
+                model_fields = set(target_model.model_fields.keys())
                 for field_name in field_validations:
                     if field_name not in model_fields:
                         raise ValueError(
                             f"{schema_type.capitalize()} schema: Field '{field_name}' not found in model '{model_name}'"
                         )
+            else:
+                # If model not found, raise an error
+                raise ValueError(
+                    f"{schema_type.capitalize()} schema: Model '{model_name}' not found in schema structure."
+                )
 
     @staticmethod
     async def _generate_codes_async(

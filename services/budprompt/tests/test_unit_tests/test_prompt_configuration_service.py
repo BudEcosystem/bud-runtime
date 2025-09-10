@@ -17,7 +17,7 @@
 """Unit tests for PromptConfigurationService validate_schema method."""
 
 import uuid
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from budmicroframe.commons.constants import WorkflowStatus
@@ -494,6 +494,207 @@ class TestValidateSchema:
 
         # Should publish start and failure notifications
         assert mock_dapr_workflow.publish_notification.call_count == 2
+
+    @patch('budprompt.prompt.services.ModelGeneratorFactory')
+    @patch('budprompt.prompt.services.dapr_workflow')
+    def test_validate_schema_with_refs_and_defs(
+        self, mock_dapr_workflow, mock_factory, mock_notification_request
+    ):
+        """Test schema validation with $defs and $ref works correctly."""
+        # Arrange
+        workflow_id = str(uuid.uuid4())
+
+        schema_with_refs = {
+            "$defs": {
+                "Person": {
+                    "properties": {
+                        "name": {"type": "string"},
+                        "age": {"type": "integer"},
+                        "email": {"format": "email", "type": "string"}
+                    },
+                    "required": ["name", "age", "email"],
+                    "title": "Person",
+                    "type": "object"
+                }
+            },
+            "properties": {
+                "content": {"$ref": "#/$defs/Person"}
+            },
+            "required": ["content"],
+            "title": "Schema",
+            "type": "object"
+        }
+
+        validations = {
+            "Person": {
+                "name": "Name must be at least 3 characters",
+                "age": "Age must be between 18 and 100"
+            }
+        }
+
+        # Create a mock model that simulates the structure created by CustomModelGenerator
+        mock_person_model = Mock()
+        mock_person_model.__name__ = "Person"
+        mock_person_model.model_fields = {
+            "name": Mock(annotation=str),
+            "age": Mock(annotation=int),
+            "email": Mock(annotation=str)
+        }
+
+        mock_main_model = Mock()
+        mock_main_model.__name__ = "DynamicInputschema"
+        mock_main_model.model_fields = {
+            "content": Mock(annotation=mock_person_model)
+        }
+
+        mock_factory.create_model = AsyncMock(return_value=mock_main_model)
+
+        # Act & Assert - should not raise any exception
+        PromptConfigurationService.validate_schema(
+            workflow_id=workflow_id,
+            notification_request=mock_notification_request,
+            schema=schema_with_refs,
+            validations=validations,
+            schema_type="input"
+        )
+
+        # Should publish start and success notifications
+        assert mock_dapr_workflow.publish_notification.call_count == 2
+
+    @patch('budprompt.prompt.services.ModelGeneratorFactory')
+    @patch('budprompt.prompt.services.dapr_workflow')
+    def test_validate_schema_with_invalid_ref_field(
+        self, mock_dapr_workflow, mock_factory, mock_notification_request
+    ):
+        """Test schema validation fails when validation references non-existent field in $ref model."""
+        # Arrange
+        workflow_id = str(uuid.uuid4())
+
+        schema_with_refs = {
+            "$defs": {
+                "Person": {
+                    "properties": {
+                        "name": {"type": "string"},
+                        "age": {"type": "integer"}
+                    },
+                    "required": ["name", "age"],
+                    "title": "Person",
+                    "type": "object"
+                }
+            },
+            "properties": {
+                "content": {"$ref": "#/$defs/Person"}
+            },
+            "required": ["content"],
+            "title": "Schema",
+            "type": "object"
+        }
+
+        # Validation references a field that doesn't exist in Person
+        validations = {
+            "Person": {
+                "name": "Name must be at least 3 characters",
+                "email": "Must be a valid email"  # This field doesn't exist in Person
+            }
+        }
+
+        # Create a mock model
+        mock_person_model = Mock()
+        mock_person_model.__name__ = "Person"
+        mock_person_model.model_fields = {
+            "name": Mock(annotation=str),
+            "age": Mock(annotation=int)
+            # Note: no email field
+        }
+
+        mock_main_model = Mock()
+        mock_main_model.__name__ = "DynamicInputschema"
+        mock_main_model.model_fields = {
+            "content": Mock(annotation=mock_person_model)
+        }
+
+        mock_factory.create_model = AsyncMock(return_value=mock_main_model)
+
+        # Act & Assert
+        with pytest.raises(ValueError) as exc_info:
+            PromptConfigurationService.validate_schema(
+                workflow_id=workflow_id,
+                notification_request=mock_notification_request,
+                schema=schema_with_refs,
+                validations=validations,
+                schema_type="input"
+            )
+
+        # Verify the error message
+        assert "Field 'email' not found in model 'Person'" in str(exc_info.value)
+
+    @patch('budprompt.prompt.services.ModelGeneratorFactory')
+    @patch('budprompt.prompt.services.dapr_workflow')
+    def test_validate_schema_with_invalid_model_name_in_validations(
+        self, mock_dapr_workflow, mock_factory, mock_notification_request
+    ):
+        """Test schema validation fails when validation references non-existent model (typo in model name)."""
+        # Arrange
+        workflow_id = str(uuid.uuid4())
+
+        schema_with_refs = {
+            "$defs": {
+                "Person": {  # Model is named "Person"
+                    "properties": {
+                        "name": {"type": "string"},
+                        "age": {"type": "integer"},
+                        "email": {"format": "email", "type": "string"}
+                    },
+                    "required": ["name", "age", "email"],
+                    "title": "Person",
+                    "type": "object"
+                }
+            },
+            "properties": {
+                "content": {"$ref": "#/$defs/Person"}
+            },
+            "required": ["content"],
+            "title": "Schema",
+            "type": "object"
+        }
+
+        # Validation uses wrong model name "Persons" instead of "Person"
+        validations = {
+            "Persons": {  # This is a typo - should be "Person"
+                "name": "Name must be at least 3 characters",
+                "age": "Age must be between 18 and 100"
+            }
+        }
+
+        # Create a mock model
+        mock_person_model = Mock()
+        mock_person_model.__name__ = "Person"
+        mock_person_model.model_fields = {
+            "name": Mock(annotation=str),
+            "age": Mock(annotation=int),
+            "email": Mock(annotation=str)
+        }
+
+        mock_main_model = Mock()
+        mock_main_model.__name__ = "DynamicInputschema"
+        mock_main_model.model_fields = {
+            "content": Mock(annotation=mock_person_model)
+        }
+
+        mock_factory.create_model = AsyncMock(return_value=mock_main_model)
+
+        # Act & Assert
+        with pytest.raises(ValueError) as exc_info:
+            PromptConfigurationService.validate_schema(
+                workflow_id=workflow_id,
+                notification_request=mock_notification_request,
+                schema=schema_with_refs,
+                validations=validations,
+                schema_type="input"
+            )
+
+        # Verify the error message
+        assert "Model 'Persons' not found in schema structure" in str(exc_info.value)
 
 class TestGenerateValidationCodes:
     """Test cases for the generate_validation_codes method."""

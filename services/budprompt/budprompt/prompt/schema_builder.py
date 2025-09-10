@@ -278,9 +278,7 @@ class CustomModelGenerator:
                         existing_models[def_name] = Union[tuple(Literal[v] for v in enum_values)]
                 else:
                     # It's a regular model
-                    nested_model = await self.from_json_schema(
-                        def_schema, f"Dynamic{def_name}", validators, existing_models
-                    )
+                    nested_model = await self.from_json_schema(def_schema, def_name, validators, existing_models)
                     existing_models[def_name] = nested_model
 
         # Build field definitions for create_model
