@@ -459,8 +459,8 @@ ProviderConfig = Union[
 class ProxyModelPricing(BaseModel):
     """Pricing configuration for proxy models."""
 
-    input_cost: float = Field(..., description="Cost per input tokens")
-    output_cost: float = Field(..., description="Cost per output tokens")
+    input_cost: float = Field(..., ge=0, lt=10000, description="Cost per input tokens (max 9999.999999)")
+    output_cost: float = Field(..., ge=0, lt=10000, description="Cost per output tokens (max 9999.999999)")
     currency: str = Field(default="USD", description="Currency code")
     per_tokens: int = Field(default=1000, description="Number of tokens for the pricing unit")
 
@@ -575,8 +575,12 @@ class UserSummary(BaseModel):
 class DeploymentPricingInput(BaseModel):
     """Input schema for deployment pricing."""
 
-    input_cost: Decimal = Field(..., decimal_places=6, ge=0, description="Cost per input tokens")
-    output_cost: Decimal = Field(..., decimal_places=6, ge=0, description="Cost per output tokens")
+    input_cost: Decimal = Field(
+        ..., decimal_places=6, ge=0, lt=10000, description="Cost per input tokens (max 9999.999999)"
+    )
+    output_cost: Decimal = Field(
+        ..., decimal_places=6, ge=0, lt=10000, description="Cost per output tokens (max 9999.999999)"
+    )
     currency: str = Field(default="USD", max_length=3, description="Currency code (ISO 4217)")
     per_tokens: int = Field(default=1000, gt=0, description="Number of tokens for the pricing unit")
 
