@@ -84,7 +84,7 @@ async def execute_prompt(
         logger.info("Received prompt execution request")
 
         # Execute the prompt (handles both streaming and non-streaming)
-        result = await prompt_service.execute_prompt(request)
+        result = await prompt_service.execute_prompt_deprecated(request)
 
         # Check if streaming is requested
         if request.stream:

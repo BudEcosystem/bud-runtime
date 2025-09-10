@@ -20,11 +20,10 @@ import logging
 from typing import Union
 
 from budmicroframe.commons.schemas import ErrorResponse
-from fastapi import APIRouter, status
+from fastapi import APIRouter
 
-from budprompt.commons.exceptions import ClientException
-
-from .schemas import ResponseCreateRequest, ResponsePromptResponse
+from ..prompt.schemas import PromptExecuteResponse
+from .schemas import ResponseCreateRequest
 from .services import ResponsesService
 
 
@@ -39,13 +38,13 @@ responses_router = APIRouter(
 
 @responses_router.post(
     "/",
-    response_model=Union[ResponsePromptResponse, ErrorResponse],
+    response_model=Union[PromptExecuteResponse, ErrorResponse],
     summary="Create response using prompt template",
     description="Execute a prompt template with variables (OpenAI-compatible)",
     responses={
         200: {
             "description": "Prompt executed successfully",
-            "model": ResponsePromptResponse,
+            "model": PromptExecuteResponse,
         },
         400: {"description": "Bad request - invalid parameters"},
         404: {"description": "Prompt template not found"},
@@ -54,7 +53,7 @@ responses_router = APIRouter(
 )
 async def create_response(
     request: ResponseCreateRequest,
-) -> Union[ResponsePromptResponse, ErrorResponse]:
+) -> Union[PromptExecuteResponse, ErrorResponse]:
     """Create a response using a prompt template.
 
     This endpoint is compatible with OpenAI's responses API format.
@@ -65,35 +64,17 @@ async def create_response(
         request: The prompt request containing id, variables, and optional version
 
     Returns:
-        ResponsePromptResponse with execution result or ErrorResponse on failure
+        PromptExecuteResponse with execution result or ErrorResponse on failure
     """
-    try:
-        logger.info(f"Received response creation request for prompt: {request.prompt.id}")
+    logger.info(f"Received response creation request for prompt: {request.prompt.id}")
 
-        # Create service instance
-        service = ResponsesService()
+    # Create service instance
+    service = ResponsesService()
 
-        # Execute the prompt
-        result = await service.execute_prompt(
-            prompt_params=request.prompt,
-            input=request.input,
-        )
+    # Execute the prompt
+    result = await service.execute_prompt(
+        prompt_params=request.prompt,
+        input=request.input,
+    )
 
-        return ResponsePromptResponse(
-            code=status.HTTP_200_OK, message="Prompt executed successfully", data=result
-        ).to_http_response()
-
-    except ClientException as e:
-        logger.warning(f"Client error during response creation: {e.message}")
-        return ErrorResponse(
-            code=e.status_code,
-            message=e.message,
-            param=e.params,
-        ).to_http_response()
-
-    except Exception as e:
-        logger.error(f"Unexpected error during response creation: {str(e)}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message="An unexpected error occurred during response creation",
-        ).to_http_response()
+    return result

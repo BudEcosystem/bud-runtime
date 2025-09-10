@@ -40,7 +40,7 @@ async def execute_streaming_validation(
     enhanced_model: Any,  # The model with validators already added
     pydantic_schema: dict,
     prompt: str,
-    validation_prompt: Dict[str, Dict[str, Dict[str, str]]],
+    validation_prompt: str,
     deployment_name: str,
     model_settings: Optional[Dict[str, Any]] = None,
     llm_retry_limit: int = 3,
@@ -59,7 +59,7 @@ async def execute_streaming_validation(
         enhanced_model: The Pydantic model with validators already added (NativeOutput wrapper)
         pydantic_schema: JSON schema for the output structure
         prompt: User prompt for generation
-        validation_prompt: Validation rules dict with model/field/prompt structure
+        validation_prompt: Natural language validation requirement
         deployment_name: Model deployment name to use
         model_settings: Optional model settings
         llm_retry_limit: Maximum number of retries
@@ -69,32 +69,6 @@ async def execute_streaming_validation(
     Yields:
         SSE-formatted string chunks with validation events
     """
-
-    # Helper function to get specific field validation
-    def get_field_validation_prompt(model_name: str, field_name: str) -> str:
-        """Get validation prompt for a specific field."""
-        # First try the specific model name
-        if model_name in validation_prompt and field_name in validation_prompt[model_name]:
-            return validation_prompt[model_name][field_name].get("prompt", "")
-
-        # If not found, try to find in any model (for cases where model name isn't exact)
-        # for model_fields in validation_prompt.values():
-        #     if field_name in model_fields:
-        #         return model_fields[field_name].get("prompt", "")
-
-        return ""
-
-    # Helper to format validation prompts for a specific model
-    def format_all_validation_prompts(model_name: str) -> str:
-        """Format validation prompts for a specific model."""
-        prompts = []
-        if model_name in validation_prompt:
-            fields = validation_prompt[model_name]
-            for field_name, field_validation in fields.items():
-                if "prompt" in field_validation:
-                    prompts.append(f"- {field_name}: {field_validation['prompt']}")
-        return "\n".join(prompts) if prompts else f"No validation requirements for {model_name}"
-
     # Extract the actual model from NativeOutput wrapper if needed
     if hasattr(enhanced_model, "outputs"):
         # It's a NativeOutput wrapper, extract the actual model
@@ -193,9 +167,6 @@ async def execute_streaming_validation(
                     failed_field = field_match.group(1)
                     invalid_value = partial_data.get(failed_field, "unknown")
 
-                    # Get the specific validation prompt for this field
-                    field_validation_prompt = get_field_validation_prompt(model_name, failed_field)
-
                     enhanced_prompt = f"""The previously generated data failed validation.
 
 Invalid data generated:
@@ -203,7 +174,7 @@ Invalid data generated:
 
 SPECIFIC ISSUE: The {failed_field} field with value "{invalid_value}" does not satisfy the validation requirement.
 
-Validation requirement for {failed_field}: {field_validation_prompt}
+Validation requirement: {validation_prompt}
 
 IMPORTANT: Generate a COMPLETE {model_name} object with ALL required fields:
 {fields_description}
@@ -211,7 +182,7 @@ IMPORTANT: Generate a COMPLETE {model_name} object with ALL required fields:
 Original request: {prompt}
 
 Requirements:
-1. Ensure the {failed_field} field satisfies the specific requirement: "{field_validation_prompt}"
+1. Ensure the {failed_field} field satisfies the validation requirement
 2. Include ALL required fields with actual, meaningful data
 3. For array fields, populate with actual items (DO NOT leave arrays empty)
 4. Follow the original request intent to create meaningful data
@@ -225,7 +196,7 @@ Invalid data generated:
 {json.dumps(partial_data, indent=2)}
 
 Validation error: {error_summary}
-Validation requirement: {format_all_validation_prompts(model_name)}
+Validation requirement: {validation_prompt}
 
 IMPORTANT: Generate a COMPLETE {model_name} object with ALL required fields:
 {fields_description}
@@ -303,7 +274,7 @@ Current data:
 
 Missing fields that need to be added: {fields_str}
 
-Validation requirement: {format_all_validation_prompts(model_name)}
+Validation requirement: {validation_prompt}
 
 IMPORTANT: Generate a COMPLETE {model_name} object with ALL required fields:
 {fields_description}
@@ -327,7 +298,7 @@ Current data:
 
 Validation error: {error_summary}
 
-Validation requirement: {format_all_validation_prompts(model_name)}
+Validation requirement: {validation_prompt}
 
 IMPORTANT: Generate a CORRECTED {model_name} with ALL fields properly populated:
 {fields_description}
@@ -439,7 +410,7 @@ Generate the corrected object with all fields properly populated:"""
                                     "type": "complete",
                                     "status": "success",
                                     "retry_count": retry_count,
-                                    # "validation_prompts": validation_prompt,
+                                    "validation_prompt": validation_prompt,
                                 }
                                 yield f"data: {json.dumps(complete_msg)}\n\n"
                                 complete_sent = True

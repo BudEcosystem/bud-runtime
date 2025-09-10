@@ -20,9 +20,15 @@ import json
 import logging
 from typing import Any, Dict, Optional
 
+from budmicroframe.commons.schemas import ErrorResponse
+from fastapi import status
+from fastapi.responses import StreamingResponse
+
 from budprompt.commons.exceptions import ClientException
 from budprompt.shared.redis_service import RedisService
 
+from ..prompt.schemas import PromptExecuteData, PromptExecuteResponse
+from ..prompt.services import PromptExecutorService
 from .schemas import ResponsePromptParam
 
 
@@ -54,6 +60,12 @@ class ResponsesService:
             ClientException: If prompt template not found or execution fails
         """
         try:
+            if prompt_params.variables and input:
+                raise ClientException(
+                    status_code=400,
+                    message="Please provide either variables or input.",
+                )
+
             # Extract parameters
             prompt_id = prompt_params.id
             version = prompt_params.version
@@ -88,31 +100,45 @@ class ResponsesService:
                 logger.error(f"Failed to parse prompt configuration: {str(e)}")
                 raise ClientException(status_code=500, message="Invalid prompt configuration format") from e
 
-            # For now, return success message with basic info
-            # In future, this will perform actual prompt execution with variable substitution
-            result = {
-                "status": "success",
-                "prompt_id": prompt_id,
-                "version": version or "default",
-                "message": "Prompt template retrieved successfully",
-                "template_info": {
-                    "deployment_name": config_data.get("deployment_name"),
-                    "has_messages": bool(config_data.get("messages")),
-                    "has_input_schema": bool(config_data.get("input_schema")),
-                    "has_output_schema": bool(config_data.get("output_schema")),
-                    "variables_provided": list(prompt_params.variables.keys()) if prompt_params.variables else [],
-                    "input_provided": bool(input),
-                },
-            }
+            # Execute the prompt
+            prompt_execute_data = PromptExecuteData.model_validate(config_data)
+            logger.debug(f"Config data for prompt: {prompt_id}: {prompt_execute_data}")
+
+            input_data = prompt_params.variables if prompt_params.variables else input
+
+            result = await PromptExecutorService().execute_prompt(prompt_execute_data, input_data)
 
             # Log successful execution
             logger.info(f"Successfully executed prompt: {prompt_id}")
 
-            return result
+            if prompt_execute_data.stream:
+                logger.info("Streaming response requested")
+                return StreamingResponse(
+                    result,
+                    media_type="text/event-stream",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "Connection": "keep-alive",
+                        "X-Accel-Buffering": "no",  # Disable Nginx buffering
+                    },
+                )
+            else:
+                return PromptExecuteResponse(
+                    code=status.HTTP_200_OK,
+                    message="Prompt executed successfully",
+                    data=result,
+                ).to_http_response()
 
-        except ClientException:
-            # Re-raise client exceptions as-is
-            raise
+        except ClientException as e:
+            logger.warning(f"Client error during response creation: {e.message}")
+            return ErrorResponse(
+                code=e.status_code,
+                message=e.message,
+                param=e.params,
+            ).to_http_response()
         except Exception as e:
-            logger.exception(f"Unexpected error executing prompt: {str(e)}")
-            raise ClientException(status_code=500, message="Failed to execute prompt template") from e
+            logger.error(f"Unexpected error during prompt execution: {str(e)}")
+            return ErrorResponse(
+                code=500,
+                message="An unexpected error occurred during prompt execution",
+            ).to_http_response()

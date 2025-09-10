@@ -341,6 +341,45 @@ class PromptConfigurationData(BaseModel):
     )
 
 
+class PromptExecuteData(BaseModel):
+    """Schema for prompt configuration."""
+
+    deployment_name: str = Field(..., min_length=1, description="Model deployment name")
+    model_settings: ModelSettings = Field(default_factory=ModelSettings)
+    stream: bool = Field(default=False, description="Enable streaming response")
+    input_schema: Optional[Dict[str, Any]] = Field(
+        None, description="JSON schema for structured input (None for unstructured)"
+    )
+    input_validation: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Generated validation codes for input schema",
+    )
+    output_schema: Optional[Dict[str, Any]] = Field(
+        None, description="JSON schema for structured output (None for unstructured)"
+    )
+    output_validation: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Generated validation codes for output schema",
+    )
+    messages: List[Message] = Field(
+        default_factory=list, description="Conversation messages (can include system/developer messages)"
+    )
+    llm_retry_limit: Optional[int] = Field(
+        default=3, ge=0, description="Number of LLM retries when validation fails (non-streaming only)"
+    )
+    enable_tools: bool = Field(
+        default=False, description="Enable tool calling capability (requires allow_multiple_calls=true)"
+    )
+    allow_multiple_calls: bool = Field(
+        default=True,
+        description="Allow multiple LLM calls for retries and tool usage. When false, only a single LLM call is made",
+    )
+    system_prompt_role: Optional[Literal["system", "developer", "user"]] = Field(
+        None,
+        description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
+    )
+
+
 class PromptConfigRequest(BaseModel):
     """Request model for prompt configuration.
 

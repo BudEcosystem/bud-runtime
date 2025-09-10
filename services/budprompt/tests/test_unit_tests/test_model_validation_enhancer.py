@@ -206,25 +206,15 @@ class TestModelValidationEnhancer:
 
     @pytest.mark.asyncio
     async def test_enhance_all_models(self, enhancer, nested_schema):
-        """Test enhancing multiple models with enhance_all_models method."""
-        # Create models from schema
+        """Test enhancing multiple models with enhance_all_models method using real models."""
+        # Create real models from schema using CustomModelGenerator
         main_model = await ModelGeneratorFactory.create_model(
             schema=nested_schema,
             model_name="MainSchema",
             generator_type="custom"
         )
 
-        # Get the Person model
-        content_field = main_model.model_fields.get('content')
-        person_model = content_field.annotation
-
-        # Create models dictionary
-        all_models = {
-            "Person": person_model,
-            "MainSchema": main_model
-        }
-
-        # Create validations for multiple models
+        # Create validations for the Person model
         all_validations = {
             "Person": {
                 "name": {
@@ -238,12 +228,9 @@ class TestModelValidationEnhancer:
             }
         }
 
-        # Mock module
-        mock_module = Mock()
-
-        # Enhance all models
+        # Enhance all models using the refactored method (no all_models dict needed)
         enhanced_models = await enhancer.enhance_all_models(
-            all_models, all_validations, mock_module
+            main_model, all_validations
         )
 
         # Verify Person model was enhanced
@@ -265,6 +252,121 @@ class TestModelValidationEnhancer:
                 age=25,
                 email="al@example.com"
             )
+
+    @pytest.mark.asyncio
+    async def test_extract_models_from_complex_schema(self, enhancer):
+        """Test extracting and enhancing models from a complex nested schema."""
+        # Create a complex schema with multiple nested models
+        complex_schema = {
+            "$defs": {
+                "Address": {
+                    "properties": {
+                        "street": {"type": "string"},
+                        "city": {"type": "string"},
+                        "zipcode": {"type": "string"}
+                    },
+                    "required": ["street", "city", "zipcode"],
+                    "type": "object"
+                },
+                "Person": {
+                    "properties": {
+                        "name": {"type": "string"},
+                        "age": {"type": "integer"},
+                        "address": {"$ref": "#/$defs/Address"}
+                    },
+                    "required": ["name", "age", "address"],
+                    "type": "object"
+                }
+            },
+            "properties": {
+                "company_name": {"type": "string"},
+                "employees": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/Person"}
+                }
+            },
+            "required": ["company_name", "employees"],
+            "type": "object"
+        }
+
+        # Create models from complex schema
+        root_model = await ModelGeneratorFactory.create_model(
+            schema=complex_schema,
+            model_name="Company",
+            generator_type="custom"
+        )
+
+        # Define validations for nested models
+        all_validations = {
+            "Address": {
+                "zipcode": {
+                    "prompt": "Zipcode must be 5 digits",
+                    "code": "def validate_zipcode(value):\n    if len(value) == 5 and value.isdigit():\n        return True\n    else:\n        return False"
+                }
+            },
+            "Person": {
+                "age": {
+                    "prompt": "Age must be between 18 and 65",
+                    "code": "def validate_age(value):\n    if 18 <= value <= 65:\n        return True\n    else:\n        return False"
+                }
+            }
+        }
+
+        # Extract all models from root and enhance them
+        enhanced_models = await enhancer.enhance_all_models(
+            root_model, all_validations
+        )
+
+        # Verify all models were extracted
+        assert "Company" in enhanced_models
+        assert "Person" in enhanced_models
+        assert "Address" in enhanced_models
+
+        # Get enhanced models
+        enhanced_address = enhanced_models["Address"]
+        enhanced_person = enhanced_models["Person"]
+
+        # Test Address validation
+        valid_address = enhanced_address(
+            street="123 Main St",
+            city="New York",
+            zipcode="12345"
+        )
+        assert valid_address.zipcode == "12345"
+
+        # Test invalid zipcode
+        with pytest.raises(ValidationError) as exc_info:
+            enhanced_address(
+                street="123 Main St",
+                city="New York",
+                zipcode="123"  # Too short
+            )
+        assert "Zipcode must be 5 digits" in str(exc_info.value)
+
+        # Test Person with nested Address validation
+        valid_person = enhanced_person(
+            name="John Doe",
+            age=30,
+            address={
+                "street": "456 Oak Ave",
+                "city": "Boston",
+                "zipcode": "54321"
+            }
+        )
+        assert valid_person.age == 30
+
+        # Test invalid age
+        with pytest.raises(ValidationError) as exc_info:
+            enhanced_person(
+                name="Jane Doe",
+                age=70,  # Too old
+                address={
+                    "street": "789 Pine St",
+                    "city": "Chicago",
+                    "zipcode": "67890"
+                }
+            )
+        assert "Age must be between 18 and 65" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_validation_with_multiple_fields(self, enhancer):

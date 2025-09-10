@@ -48,6 +48,7 @@ from .schemas import (
     PromptConfigRequest,
     PromptConfigResponse,
     PromptConfigurationData,
+    PromptExecuteData,
     PromptExecuteRequest,
     PromptSchemaRequest,
     PromptSchemaResponse,
@@ -71,7 +72,7 @@ class PromptExecutorService:
         """Initialize the PromptExecutorService."""
         self.executor = SimplePromptExecutor()
 
-    async def execute_prompt(
+    async def execute_prompt_deprecated(
         self, request: PromptExecuteRequest
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt based on the request.
@@ -165,6 +166,76 @@ class PromptExecutorService:
         finally:
             # Always clean up temporary modules
             clean_model_cache()
+
+    async def execute_prompt(
+        self, request: PromptExecuteData, input_data: Optional[Union[Dict[str, Any], str]]
+    ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
+        """Execute a prompt based on the request.
+
+        Args:
+            request: Prompt execution request
+
+        Returns:
+            The result of the prompt execution or a generator for streaming
+
+        Raises:
+            ClientException: If validation or execution fails
+        """
+        try:
+            # Execute the prompt with input_data from request and stream parameter
+            result = await self.executor.execute(
+                deployment_name=request.deployment_name,
+                model_settings=request.model_settings,
+                input_schema=request.input_schema,
+                output_schema=request.output_schema,
+                messages=request.messages,
+                input_data=input_data,
+                stream=request.stream,
+                input_validation=request.input_validation,
+                output_validation=request.output_validation,
+                llm_retry_limit=request.llm_retry_limit,
+                enable_tools=request.enable_tools,
+                allow_multiple_calls=request.allow_multiple_calls,
+                system_prompt_role=request.system_prompt_role,
+            )
+
+            return result
+
+        except ValidationError as e:
+            # Input validation errors -> 422 Unprocessable Entity
+            logger.error(f"Input validation failed: {str(e)}")
+            raise ClientException(
+                status_code=422, message="Invalid input data", params={"errors": json.loads(e.json())}
+            ) from e
+
+        except SchemaGenerationException as e:
+            # Schema generation errors -> 400 Bad Request
+            logger.error(f"Schema generation failed: {str(e)}")
+            raise ClientException(
+                status_code=400,
+                message=e.message,  # Use the custom exception's message
+            ) from e
+
+        except TemplateRenderingException as e:
+            # Prompt execution errors -> 500 Internal Server Error
+            logger.error(f"Template rendering failed: {str(e)}")
+            raise ClientException(
+                status_code=400,
+                message=e.message,  # Use the custom exception's message
+            ) from e
+
+        except PromptExecutionException as e:
+            # Prompt execution errors -> 500 Internal Server Error
+            logger.error(f"Prompt execution failed: {str(e)}")
+            raise ClientException(
+                status_code=500,
+                message=e.message,  # Use the custom exception's message
+            ) from e
+
+        except Exception as e:
+            # Let unhandled exceptions bubble up
+            logger.error(f"Unexpected error: {str(e)}")
+            raise
 
 
 class PromptConfigurationService:
