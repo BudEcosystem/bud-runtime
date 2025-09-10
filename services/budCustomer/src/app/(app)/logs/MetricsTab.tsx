@@ -1712,7 +1712,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
                 Request origins by country
               </Text_13_400_757575>
             </div>
-            <GeoMapChart key={`geo-${metricsKey}`} data={geographicData} />
+            <GeoMapChart key={`geo-${metricsKey}`} data={geographicData} theme={effectiveTheme} />
           </div>
         </Col>
       </Row>

@@ -269,7 +269,7 @@ export default function ObservabilityDetailPage({
       <DashboardLayout>
         <div className="p-8">
           <HeaderContent />
-          <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 mt-8 bg-[var(--bg-tertiary)] text-center">
+          <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 mt-8 bg-[var(--bg-tertiary)] dark:bg-[#101010] text-center">
             <div className="py-12">
               <span className="text-base font-semibold text-red-500 mb-4 block">
                 {error || "Failed to load observability details"}
@@ -299,7 +299,7 @@ export default function ObservabilityDetailPage({
         <HeaderContent />
 
         {/* Overview & Details - Combined Section */}
-        <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6 mt-8">
+        <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] dark:bg-[#101010] mb-6 mt-8">
           <div className="w-full">
             <Text_14_600_EEEEEE className="text-[var(--text-primary)] mb-4">
               Overview
@@ -432,7 +432,7 @@ export default function ObservabilityDetailPage({
 
         {/* Gateway Metadata */}
         {inferenceData.gateway_metadata && (
-          <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6">
+          <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] dark:bg-[#101010] mb-6">
             <div className="w-full">
               <Text_14_600_EEEEEE className="text-[var(--text-primary)] mb-4">
                 Request Metadata
@@ -656,7 +656,7 @@ export default function ObservabilityDetailPage({
         )}
 
         {/* Performance Metrics */}
-        <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6">
+        <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] dark:bg-[#101010] mb-6">
           <div className="w-full">
             <Text_14_600_EEEEEE className="text-[var(--text-primary)] mb-4">
               Performance Metrics
@@ -742,7 +742,7 @@ export default function ObservabilityDetailPage({
         {/* Conversation - Only show for chat endpoint type */}
         {(!inferenceData.endpoint_type ||
           inferenceData.endpoint_type === "chat") && (
-          <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6">
+          <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] dark:bg-[#101010] mb-6">
             <div className="w-full">
               <div className="flex justify-between items-center mb-4">
                 <Text_14_600_EEEEEE className="text-[var(--text-primary)]">
@@ -881,7 +881,7 @@ export default function ObservabilityDetailPage({
 
         {/* Gateway Request */}
         {inferenceData.gateway_request && (
-          <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6">
+          <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] dark:bg-[#101010] mb-6">
             <div className="w-full">
               <div className="flex justify-between items-center mb-4">
                 <Text_14_600_EEEEEE className="text-[var(--text-primary)]">
@@ -962,7 +962,7 @@ export default function ObservabilityDetailPage({
 
         {/* Gateway Response */}
         {inferenceData.gateway_response && (
-          <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] mb-6">
+          <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] dark:bg-[#101010] mb-6">
             <div className="w-full">
               <div className="flex justify-between items-center mb-4">
                 <Text_14_600_EEEEEE className="text-[var(--text-primary)]">
