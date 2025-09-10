@@ -23,7 +23,7 @@ spec:
       containers:
       - name: {{ .Release.Name }}-budsim
         image: {{ .Values.microservices.budsim.image }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["sh", "-c", "apt update -y && apt install socat -y && (socat TCP-LISTEN:3600,fork TCP:127.0.0.1:50001 &) && alembic upgrade head && uvicorn budsim.main:app --host 0.0.0.0 --port 3002"]
         ports:
         - containerPort: 3002

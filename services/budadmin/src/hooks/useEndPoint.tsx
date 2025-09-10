@@ -4,7 +4,8 @@ import { create } from "zustand";
 import { tempApiBaseUrl } from "@/components/environment";
 import { Model } from "./useModels";
 import { Cluster } from "./useCluster";
-import { persist } from "zustand/middleware";
+import { persist } from 'zustand/middleware';
+
 
 export interface IEndPoint {
   users_count?: number;
@@ -53,32 +54,32 @@ export interface IAdapter {
   model: Model;
 }
 export interface PromptListSample {
-  hit_ratio: number;
-  latency: number;
-  page: number;
-  limit: number;
-  total_record: number;
-  total_pages: number;
-  message: string;
-  most_reused_prompts: [];
-  object: string;
-  items: [];
-}
+  hit_ratio: number,
+  latency: number,
+  page: number,
+  limit: number,
+  total_record: number,
+  total_pages: number,
+  message: string,
+  most_reused_prompts: [],
+  object: string,
+  items: [],
+};
 
 export interface PromptDetail {
-  created_at: string;
-  prompt: string;
-  request_id: string;
-  response: string;
-  score: number;
-}
+  created_at: string,
+  prompt: string,
+  request_id: string,
+  response: string,
+  score: number,
+};
 export type GetAdapterParams = {
-  endpointId: string;
-  page: number;
-  limit: number;
-  name?: string;
-  order_by?: string;
-  projectId?: string;
+  endpointId: string,
+  page: number,
+  limit: number,
+  name?: string,
+  order_by?: string,
+  projectId?: string
 };
 export const useEndPoints = create<{
   endPoints: IEndPoint[];
@@ -104,13 +105,13 @@ export const useEndPoints = create<{
     name?: string;
     order_by?: string;
   }) => void;
-  createEndPoint: (data: any) => Promise<any>;
+createEndPoint: (data: any) => Promise<any>;
   setPageSource: (data: any) => Promise<any>;
   setPromptPage: (type: string, title: string) => Promise<any>;
   deleteEndPoint: (endpointId: string, id?: string) => Promise<any>;
   updateEndPoint: (endpointId: string, data: any) => void;
-  getReusedPrompts: (deploymentId: string) => void;
-  getInferenceQualityAnalytics: (deploymentId: string) => void;
+  getReusedPrompts: (deploymentId: string,) => void;
+  getInferenceQualityAnalytics: (deploymentId: string,) => void;
   getEndpointClusterDetails: (endpointId: string, projectId?: string) => void;
   getInferenceQualityPrompts: (params: any, id: string) => void;
   clusterDetails?: EndpointClusterData;
@@ -118,17 +119,10 @@ export const useEndPoints = create<{
   deleteAdapter: (adapterId: string, projectId?: string) => void;
   getEndpointSettings: (endpointId: string) => Promise<any>;
   updateEndpointSettings: (endpointId: string, settings: any) => Promise<any>;
-  getPricingHistory: (
-    endpointId: string,
-    page?: number,
-    limit?: number,
-  ) => Promise<any>;
-  updateTokenPricing: (
-    endpointId: string,
-    pricing: any,
-    projectId?: string,
-  ) => Promise<any>;
+  getPricingHistory: (endpointId: string, page?: number, limit?: number) => Promise<any>;
+  updateTokenPricing: (endpointId: string, pricing: any, projectId?: string) => Promise<any>;
   publishEndpoint: (endpointId: string, publishData: any) => Promise<any>;
+  updateEndpointPricing: (endpointId: string, pricingData: any, projectId?: string) => Promise<any>;
 }>((set, get) => ({
   pageSource: "",
   clusterDetails: undefined,
@@ -149,12 +143,13 @@ export const useEndPoints = create<{
     set({ scoreType: scoreType });
     set({ pageTitle: title });
   },
-  getEndpointClusterDetails: async (endpointId: string, projectId?) => {
+getEndpointClusterDetails: async (endpointId: string, projectId?) => {
     set({ loading: true });
     const url = `${tempApiBaseUrl}/endpoints/${endpointId}/model-cluster-detail`;
 
     try {
       const response: any = await AppRequest.Get(url, {
+
         headers: {
           "x-resource-type": "project",
           "x-entity-id": projectId,
@@ -171,13 +166,7 @@ export const useEndPoints = create<{
     }
   },
 
-  getEndPoints: async ({
-    id,
-    page,
-    limit,
-    name,
-    order_by = "-created_at",
-  } = {}) => {
+  getEndPoints: async ({ id, page, limit, name, order_by = "-created_at" } = {}) => {
     const url = `${tempApiBaseUrl}/endpoints/`;
     set({ loading: true });
     try {
@@ -240,7 +229,7 @@ export const useEndPoints = create<{
             "x-resource-type": "project",
             "x-entity-id": id,
           },
-        },
+        }
       );
       // successToast(response.data.message);
       return response;
@@ -252,14 +241,14 @@ export const useEndPoints = create<{
     try {
       const response: any = await AppRequest.Patch(
         `/endpoints/${endpointId}`,
-        data,
+        data
       );
       successToast(response.data.message);
     } catch (error) {
       console.error("Error creating model:", error);
     }
   },
-  getAdapters: async (params: GetAdapterParams, projectId?) => {
+getAdapters: async (params: GetAdapterParams, projectId?) => {
     const url = `${tempApiBaseUrl}/endpoints/${params.endpointId}/adapters`;
     set({ loading: true });
     try {
@@ -290,12 +279,16 @@ export const useEndPoints = create<{
   deleteAdapter: async (adapterId: string, projectId?) => {
     try {
       const url = `${tempApiBaseUrl}/endpoints/delete-adapter/${adapterId}`;
-      const response: any = await AppRequest.Post(url, undefined, {
-        headers: {
-          "x-resource-type": "project",
-          "x-entity-id": projectId,
-        },
-      });
+      const response: any = await AppRequest.Post(
+        url,
+        undefined,
+        {
+          headers: {
+            "x-resource-type": "project",
+            "x-entity-id": projectId,
+          },
+        }
+      );
       successToast(response.data.message);
     } catch (error) {
       console.error("Error creating model:", error);
@@ -324,17 +317,17 @@ export const useEndPoints = create<{
     }
   },
 
+
   getInferenceQualityPrompts: async (params: any, id: string): Promise<any> => {
-    console.log("params", params);
+
+    console.log('params', params)
 
     function convertToISOString(dateStr: string): string | null {
       if (!dateStr) return null;
-      const [month, day, year] = dateStr.split("/");
+      const [month, day, year] = dateStr.split('/');
       if (!month || !day || !year) return null;
 
-      const isoString = new Date(
-        `${year}-${month}-${day}T00:00:00Z`,
-      ).toISOString();
+      const isoString = new Date(`${year}-${month}-${day}T00:00:00Z`).toISOString();
       return isoString;
     }
 
@@ -347,11 +340,10 @@ export const useEndPoints = create<{
       created_at: convertToISOString(params.created_at),
     };
 
+
     // Filter out null or undefined values
     const payload = Object.fromEntries(
-      Object.entries(rawPayload).filter(
-        ([_, v]) => v !== null && v !== undefined && v !== "",
-      ),
+      Object.entries(rawPayload).filter(([_, v]) => v !== null && v !== undefined && v !== "")
     );
 
     const query = new URLSearchParams(payload as any).toString();
@@ -380,7 +372,7 @@ export const useEndPoints = create<{
           deployment_settings: {
             rate_limits: {
               enabled: false,
-              algorithm: "token_bucket",
+              algorithm: 'token_bucket',
               requests_per_minute: null,
               requests_per_second: null,
               requests_per_hour: null,
@@ -388,19 +380,16 @@ export const useEndPoints = create<{
             },
             retry_config: null,
             fallback_config: {
-              fallback_models: [],
-            },
-          },
+              fallback_models: []
+            }
+          }
         };
       }
       throw error;
     }
   },
 
-  updateEndpointSettings: async (
-    endpointId: string,
-    settings: any,
-  ): Promise<any> => {
+  updateEndpointSettings: async (endpointId: string, settings: any): Promise<any> => {
     try {
       const url = `${tempApiBaseUrl}/endpoints/${endpointId}/deployment-settings`;
       const response: any = await AppRequest.Put(url, settings);
@@ -410,28 +399,24 @@ export const useEndPoints = create<{
       // Handle validation errors specifically
       if (error?.response?.status === 422 && error?.response?.data?.detail) {
         const validationErrors = error.response.data.detail
-          .map((err) => `${err.loc.join(".")}: ${err.msg}`)
-          .join("\n");
+          .map(err => `${err.loc.join('.')}: ${err.msg}`)
+          .join('\n');
         throw new Error(validationErrors);
       }
       throw error;
     }
   },
 
-  getPricingHistory: async (
-    endpointId: string,
-    page: number = 1,
-    limit: number = 20,
-  ): Promise<any> => {
+  getPricingHistory: async (endpointId: string, page: number = 1, limit: number = 20): Promise<any> => {
     try {
       const url = `${tempApiBaseUrl}/endpoints/${endpointId}/pricing/history`;
       const response: any = await AppRequest.Get(url, {
         params: {
           page,
-          limit,
-        },
+          limit
+        }
       });
-      console.log("Pricing history data:", response.data);
+      console.log('Pricing history data:', response.data);
       return response.data;
     } catch (error) {
       console.error("Error fetching pricing history:", error);
@@ -439,26 +424,26 @@ export const useEndPoints = create<{
     }
   },
 
-  updateTokenPricing: async (
-    endpointId: string,
-    pricing: any,
-    projectId?: string,
-  ): Promise<any> => {
+  updateTokenPricing: async (endpointId: string, pricing: any, projectId?: string): Promise<any> => {
     try {
       const url = `${tempApiBaseUrl}/endpoints/${endpointId}/pricing`;
       const payload = {
         input_cost: parseFloat(pricing.input_cost),
         output_cost: parseFloat(pricing.output_cost),
         currency: "USD",
-        per_tokens: parseInt(pricing.per_tokens),
+        per_tokens: parseInt(pricing.per_tokens)
       };
 
-      const response: any = await AppRequest.Put(url, payload, {
-        headers: {
-          "x-resource-type": "project",
-          "x-entity-id": projectId,
-        },
-      });
+      const response: any = await AppRequest.Put(
+        url,
+        payload,
+        {
+          headers: {
+            "x-resource-type": "project",
+            "x-entity-id": projectId,
+          },
+        }
+      );
       successToast(response.message || "Token pricing updated successfully");
       return response.data;
     } catch (error) {
@@ -467,10 +452,7 @@ export const useEndPoints = create<{
     }
   },
 
-  publishEndpoint: async (
-    endpointId: string,
-    publishData: any,
-  ): Promise<any> => {
+  publishEndpoint: async (endpointId: string, publishData: any): Promise<any> => {
     try {
       const url = `${tempApiBaseUrl}/endpoints/${endpointId}/publish`;
       const payload = {
@@ -479,19 +461,48 @@ export const useEndPoints = create<{
           input_cost: 0,
           output_cost: 0,
           currency: "USD",
-          per_tokens: 1000,
+          per_tokens: 1000
         },
         action_metadata: publishData.action_metadata || {
-          additionalProp1: {},
-        },
+          additionalProp1: {}
+        }
       };
 
       const response: any = await AppRequest.Put(url, payload);
-      successToast(response.message || "Endpoint published successfully");
+      console.log('Publish response:', response);
+      successToast(response.data.message || "Endpoint published successfully");
       return response.data;
     } catch (error) {
       console.error("Error publishing endpoint:", error);
       throw error;
     }
   },
+
+  updateEndpointPricing: async (endpointId: string, pricingData: any, projectId?: string): Promise<any> => {
+    try {
+      const url = `${tempApiBaseUrl}/endpoints/${endpointId}/pricing`;
+      const payload = {
+        input_cost: parseFloat(pricingData.input_cost || 0),
+        output_cost: parseFloat(pricingData.output_cost || 0),
+        currency: "USD",
+        per_tokens: parseInt(pricingData.per_tokens || 1000)
+      };
+
+      const response: any = await AppRequest.Put(
+        url,
+        payload,
+        projectId ? {
+          headers: {
+            "x-resource-type": "project",
+            "x-entity-id": projectId,
+          },
+        } : {}
+      );
+      successToast(response.message || "Pricing updated successfully");
+      return response.data;
+    } catch (error) {
+      console.error("Error updating endpoint pricing:", error);
+      throw error;
+    }
+  }
 }));

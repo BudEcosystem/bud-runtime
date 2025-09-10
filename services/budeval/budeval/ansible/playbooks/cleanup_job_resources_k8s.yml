@@ -4,57 +4,24 @@
   connection: local
   gather_facts: no
   collections:
-    - community.kubernetes
+      - community.kubernetes
 
   tasks:
-    - name: Delete evaluation job
-      community.kubernetes.k8s:
-        state: absent
-        api_version: batch/v1
-        kind: Job
-        name: "{{ job_name }}"
-        namespace: "{{ namespace }}"
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-      ignore_errors: yes
+      - name: Delete evaluation job
+        community.kubernetes.k8s:
+            state: absent
+            api_version: batch/v1
+            kind: Job
+            name: "{{ job_name }}"
+            namespace: "{{ namespace }}"
+            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        ignore_errors: yes
 
-    - name: Delete data persistent volume claim
-      community.kubernetes.k8s:
-        state: absent
-        api_version: v1
-        kind: PersistentVolumeClaim
-        name: "{{ job_name }}-data-pvc"
-        namespace: "{{ namespace }}"
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-      ignore_errors: yes
+      # Note: We no longer delete PVCs since we're using the shared bud-dev-budeval-dataset
+      # Job results remain in the PVC under /results/{{ job_name }}/
 
-    - name: Delete output persistent volume claim
-      community.kubernetes.k8s:
-        state: absent
-        api_version: v1
-        kind: PersistentVolumeClaim
-        name: "{{ job_name }}-output-pvc"
-        namespace: "{{ namespace }}"
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-      ignore_errors: yes
-
-    - name: Delete data persistent volume
-      community.kubernetes.k8s:
-        state: absent
-        api_version: v1
-        kind: PersistentVolume
-        name: "{{ job_name }}-data-pv"
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-      ignore_errors: yes
-
-    - name: Delete output persistent volume
-      community.kubernetes.k8s:
-        state: absent
-        api_version: v1
-        kind: PersistentVolume
-        name: "{{ job_name }}-output-pv"
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-      ignore_errors: yes
-
-    - name: Display cleanup completion
-      debug:
-        msg: "Cleanup completed for job {{ job_name }} and associated volumes"
+      - name: Display cleanup completion
+        debug:
+            msg: |
+                Cleanup completed for job {{ job_name }}
+                Note: Results are preserved in bud-dev-budeval-dataset at /results/{{ job_name }}/

@@ -5,35 +5,23 @@ import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import React from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useEvaluations } from "src/hooks/useEvaluations";
-import { Input } from "antd";
-import { SearchOutlined } from "@ant-design/icons";
-import {
-  Text_12_400_757575,
-  Text_12_600_EEEEEE,
-  Text_14_400_EEEEEE,
-  Text_14_600_EEEEEE,
-} from "@/components/ui/text";
-import EvaluationList, {
-  Evaluation,
-} from "src/flows/components/AvailableEvaluations";
+import { Text_14_400_EEEEEE, Text_14_600_EEEEEE } from "@/components/ui/text";
+import EvaluationList, { Evaluation } from "src/flows/components/AvailableEvaluations";
+import { successToast, errorToast } from "@/components/toast";
 import BudStepAlert from "src/flows/components/BudStepAlert";
-import {
-  SpecificationTableItem,
-  SpecificationTableItemProps,
-} from "src/flows/components/SpecificationTableItem";
+import { SpecificationTableItem, SpecificationTableItemProps } from "src/flows/components/SpecificationTableItem";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import IconRender from "src/flows/components/BudIconRender";
 import ModelTags from "src/flows/components/ModelTags";
 import { Model, useModels } from "src/hooks/useModels";
 
+
 export default function EvaluationSummary() {
-  const { getWorkflowData, workflowData, currentWorkflow, loading } =
-    useEvaluations();
+  const { getWorkflowData, workflowData, currentWorkflow, createEvaluationWorkflow } = useEvaluations();
   const { getModel, selectedModel: selectedModelFromStore } = useModels();
   const [isLoadingData, setIsLoadingData] = React.useState(true);
   const [evaluations, setEvaluations] = React.useState<Evaluation[]>([]);
-  const [selectedModelData, setSelectedModelData] =
-    React.useState<Model | null>(null);
+  const [selectedModelData, setSelectedModelData] = React.useState<Model | null>(null);
   const [modelId, setModelId] = React.useState<string | null>(null);
 
   // Mock evaluation data - will be replaced with actual data
@@ -41,43 +29,38 @@ export default function EvaluationSummary() {
     {
       id: "eval-1",
       name: "Truthfulness Evaluation",
-      description:
-        "Evaluates the model's ability to provide accurate and truthful responses",
+      description: "Evaluates the model's ability to provide accurate and truthful responses",
       category: "accuracy",
-      tags: ["accuracy", "truthfulness", "hallucination"],
+      tags: ["accuracy", "truthfulness", "hallucination"]
     },
     {
       id: "eval-2",
       name: "Code Generation Benchmark",
-      description:
-        "Tests the model's ability to generate syntactically correct and functional code",
+      description: "Tests the model's ability to generate syntactically correct and functional code",
       category: "code",
-      tags: ["code", "programming", "syntax"],
+      tags: ["code", "programming", "syntax"]
     },
     {
       id: "eval-3",
       name: "Language Understanding",
-      description:
-        "Comprehensive evaluation of natural language understanding capabilities",
+      description: "Comprehensive evaluation of natural language understanding capabilities",
       category: "language",
-      tags: ["NLU", "comprehension", "context"],
+      tags: ["NLU", "comprehension", "context"]
     },
     {
       id: "eval-4",
       name: "Mathematical Reasoning",
-      description:
-        "Assesses mathematical problem-solving and logical reasoning abilities",
+      description: "Assesses mathematical problem-solving and logical reasoning abilities",
       category: "math",
-      tags: ["math", "logic", "reasoning"],
+      tags: ["math", "logic", "reasoning"]
     },
     {
       id: "eval-5",
       name: "Safety & Ethics",
-      description:
-        "Evaluates adherence to safety guidelines and ethical considerations",
+      description: "Evaluates adherence to safety guidelines and ethical considerations",
       category: "safety",
-      tags: ["safety", "ethics", "harmful content"],
-    },
+      tags: ["safety", "ethics", "harmful content"]
+    }
   ];
 
   // Mock selected model data - replace with actual data from store
@@ -96,39 +79,19 @@ export default function EvaluationSummary() {
     modality: {
       text: { input: true, output: true, label: "Text" },
       image: { input: true, output: false, label: "Image" },
-      audio: { input: false, output: false, label: "Audio" },
+      audio: { input: false, output: false, label: "Audio" }
     },
     supported_endpoints: {
       chat: { path: "/v1/chat/completions", enabled: true, label: "Chat" },
-      completion: {
-        path: "/v1/completions",
-        enabled: true,
-        label: "Completion",
-      },
-      image_generation: {
-        path: "/v1/images/generations",
-        enabled: false,
-        label: "Image Generation",
-      },
-      audio_transcription: {
-        path: "/v1/audio/transcriptions",
-        enabled: false,
-        label: "Audio Transcription",
-      },
-      audio_speech: {
-        path: "/v1/audio/speech",
-        enabled: false,
-        label: "Audio Speech",
-      },
+      completion: { path: "/v1/completions", enabled: true, label: "Completion" },
+      image_generation: { path: "/v1/images/generations", enabled: false, label: "Image Generation" },
+      audio_transcription: { path: "/v1/audio/transcriptions", enabled: false, label: "Audio Transcription" },
+      audio_speech: { path: "/v1/audio/speech", enabled: false, label: "Audio Speech" },
       embedding: { path: "/v1/embeddings", enabled: true, label: "Embedding" },
       batch: { path: "/v1/batches", enabled: true, label: "Batch" },
       response: { path: "/v1/response", enabled: false, label: "Response" },
       rerank: { path: "/v1/rerank", enabled: false, label: "Rerank" },
-      moderation: {
-        path: "/v1/moderations",
-        enabled: true,
-        label: "Moderation",
-      },
+      moderation: { path: "/v1/moderations", enabled: true, label: "Moderation" }
     },
     source: "OpenAI",
     uri: "openai/gpt-4o",
@@ -136,14 +99,14 @@ export default function EvaluationSummary() {
     tasks: [
       { name: "Chat Completion", color: "#4CAF50" },
       { name: "Text Generation", color: "#2196F3" },
-      { name: "Code Generation", color: "#FF9800" },
+      { name: "Code Generation", color: "#FF9800" }
     ],
     description: "GPT-4o is OpenAI's most advanced multimodal model",
     icon: "🤖",
     tags: [
       { name: "multimodal", color: "#9C27B0" },
       { name: "chat", color: "#4CAF50" },
-      { name: "production-ready", color: "#2196F3" },
+      { name: "production-ready", color: "#2196F3" }
     ],
     languages: ["en"],
     use_cases: [],
@@ -152,13 +115,10 @@ export default function EvaluationSummary() {
     bud_verified: true,
     scan_verified: false,
     eval_verified: false,
-    created_at: new Date().toISOString(),
+    created_at: new Date().toISOString()
   };
 
-  const [search, setSearch] = React.useState("");
-  const [deploymentSpecs, detDeploymentSpecs] = React.useState<
-    SpecificationTableItemProps[]
-  >([
+  const [deploymentSpecs, detDeploymentSpecs] = React.useState<SpecificationTableItemProps[]>([
     {
       name: "Model",
       value: "GPT-4o",
@@ -198,11 +158,11 @@ export default function EvaluationSummary() {
       name: "Status",
       value: "Ready",
       icon: "/images/drawer/current.png",
-    },
+    }
   ]);
-  const [selectedEvaluation, setSelectedEvaluation] =
-    React.useState<Evaluation | null>(null);
-  const { openDrawerWithStep } = useDrawer();
+  const [selectedEvaluation, setSelectedEvaluation] = React.useState<Evaluation | null>(null);
+  const { openDrawerWithStep, drawerProps } = useDrawer();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   // Use existing workflowData if available, otherwise fetch it
   React.useEffect(() => {
@@ -213,14 +173,10 @@ export default function EvaluationSummary() {
         let data = workflowData;
 
         // Only fetch if we don't have workflowData already
-        if (
-          !data &&
-          currentWorkflow?.experiment_id &&
-          currentWorkflow?.workflow_id
-        ) {
+        if (!data && currentWorkflow?.experiment_id && currentWorkflow?.workflow_id) {
           data = await getWorkflowData(
             currentWorkflow.experiment_id,
-            currentWorkflow.workflow_id,
+            currentWorkflow.workflow_id
           );
         }
 
@@ -262,91 +218,88 @@ export default function EvaluationSummary() {
 
           // Extract other relevant data from next_step_data.summary
           if (data.next_step_data?.summary) {
-            const summary = data.next_step_data.summary;
+              const summary = data.next_step_data.summary;
 
-            // Update deployment specs with data from summary if available
-            const updatedSpecs: SpecificationTableItemProps[] = [];
+              // Update deployment specs with data from summary if available
+              const updatedSpecs: SpecificationTableItemProps[] = [];
 
-            if (summary.model_name || selectedModelData?.name) {
-              updatedSpecs.push({
-                name: "Model",
-                value:
-                  summary.model_name || selectedModelData?.name || "GPT-4o",
-                icon: "/images/drawer/tag.png",
-              });
+              if (summary.model_name || selectedModelData?.name) {
+                updatedSpecs.push({
+                  name: "Model",
+                  value: summary.model_name || selectedModelData?.name || "GPT-4o",
+                  icon: "/images/drawer/tag.png",
+                });
+              }
+
+              if (summary.deployment_name) {
+                updatedSpecs.push({
+                  name: "Deployment",
+                  value: summary.deployment_name,
+                  icon: "/images/drawer/tag.png",
+                });
+              }
+
+              if (summary.template_name) {
+                updatedSpecs.push({
+                  name: "Template",
+                  value: summary.template_name,
+                  icon: "/images/drawer/template-1.png",
+                });
+              }
+
+              if (summary.cluster_name) {
+                updatedSpecs.push({
+                  name: "Cluster",
+                  value: summary.cluster_name,
+                  icon: "/images/drawer/tag.png",
+                });
+              }
+
+              if (summary.dataset_size) {
+                updatedSpecs.push({
+                  name: "Dataset Size",
+                  value: summary.dataset_size,
+                  icon: "/images/drawer/context.png",
+                });
+              }
+
+              if (summary.evaluation_type) {
+                updatedSpecs.push({
+                  name: "Evaluation Type",
+                  value: Array.isArray(summary.evaluation_type) ? summary.evaluation_type : [summary.evaluation_type],
+                  tagColor: "#4CAF50",
+                });
+              }
+
+              if (summary.created_by) {
+                updatedSpecs.push({
+                  name: "Created By",
+                  value: summary.created_by,
+                  icon: "/images/drawer/tag.png",
+                });
+              }
+
+              if (summary.status) {
+                updatedSpecs.push({
+                  name: "Status",
+                  value: summary.status,
+                  icon: "/images/drawer/current.png",
+                });
+              }
+
+              // Only update specs if we have data from summary
+              if (updatedSpecs.length > 0) {
+                detDeploymentSpecs(updatedSpecs);
+              }
             }
-
-            if (summary.deployment_name) {
-              updatedSpecs.push({
-                name: "Deployment",
-                value: summary.deployment_name,
-                icon: "/images/drawer/tag.png",
-              });
-            }
-
-            if (summary.template_name) {
-              updatedSpecs.push({
-                name: "Template",
-                value: summary.template_name,
-                icon: "/images/drawer/template-1.png",
-              });
-            }
-
-            if (summary.cluster_name) {
-              updatedSpecs.push({
-                name: "Cluster",
-                value: summary.cluster_name,
-                icon: "/images/drawer/tag.png",
-              });
-            }
-
-            if (summary.dataset_size) {
-              updatedSpecs.push({
-                name: "Dataset Size",
-                value: summary.dataset_size,
-                icon: "/images/drawer/context.png",
-              });
-            }
-
-            if (summary.evaluation_type) {
-              updatedSpecs.push({
-                name: "Evaluation Type",
-                value: Array.isArray(summary.evaluation_type)
-                  ? summary.evaluation_type
-                  : [summary.evaluation_type],
-                tagColor: "#4CAF50",
-              });
-            }
-
-            if (summary.created_by) {
-              updatedSpecs.push({
-                name: "Created By",
-                value: summary.created_by,
-                icon: "/images/drawer/tag.png",
-              });
-            }
-
-            if (summary.status) {
-              updatedSpecs.push({
-                name: "Status",
-                value: summary.status,
-                icon: "/images/drawer/current.png",
-              });
-            }
-
-            // Only update specs if we have data from summary
-            if (updatedSpecs.length > 0) {
-              detDeploymentSpecs(updatedSpecs);
-            }
-          }
         } else {
           // Use mock data if no workflow data available
-          console.log("No workflow data available, using mock data");
+          console.log('No workflow data available, using mock data');
           setEvaluations(mockEvaluations);
           setSelectedModelData(mockSelectedModel);
         }
       } catch (error) {
-        console.error("Error fetching workflow data:", error);
+        console.error('Error fetching workflow data:', error);
         // Fallback to mock data on error
         setEvaluations(mockEvaluations);
         setSelectedModelData(mockSelectedModel);
@@ -356,55 +309,44 @@ export default function EvaluationSummary() {
     };
 
     initializeData();
-  }, [
-    currentWorkflow?.experiment_id,
-    currentWorkflow?.workflow_id,
-    workflowData,
-  ]);
+  }, [currentWorkflow?.experiment_id, currentWorkflow?.workflow_id, workflowData]);
 
   // Separate effect to fetch model details when modelId changes
   React.useEffect(() => {
     if (modelId) {
-      console.log("Fetching model details for ID:", modelId);
-      getModel(modelId)
-        .then((response) => {
-          if (response) {
-            // The model data is in response.model and response.model_tree
-            const modelData = {
-              ...response.model,
-              ...response.model_tree,
-              endpoints_count: response.endpoints_count,
-              eval_result: response.eval_result,
-              scan_result: response.scan_result,
-            };
-            console.log("Model data fetched:", modelData);
-            setSelectedModelData(modelData);
-          }
-        })
-        .catch((error) => {
-          console.error("Error fetching model details:", error);
-          // Fallback to mock model
-          setSelectedModelData(mockSelectedModel);
-        });
+      console.log('Fetching model details for ID:', modelId);
+      getModel(modelId).then((response: any) => {
+        if (response) {
+          // The model data is in response.model and response.model_tree
+          const modelData: any = {
+            ...response.model,
+            ...response.model_tree,
+            endpoints_count: response.endpoints_count,
+            eval_result: response.eval_result,
+            scan_result: response.scan_result,
+          };
+          console.log('Model data fetched:', modelData);
+          setSelectedModelData(modelData);
+        }
+      }).catch((error: any) => {
+        console.error('Error fetching model details:', error);
+        // Fallback to mock model
+        setSelectedModelData(mockSelectedModel);
+      });
     }
   }, [modelId]);
 
   // Watch for selectedModel changes from store (if model was already fetched)
   React.useEffect(() => {
     if (selectedModelFromStore && modelId) {
-      console.log("Using selectedModel from store:", selectedModelFromStore);
+      console.log('Using selectedModel from store:', selectedModelFromStore);
       setSelectedModelData(selectedModelFromStore);
     }
   }, [selectedModelFromStore, modelId]);
 
-  const filteredEvaluations = evaluations.filter(
-    (evaluation) =>
-      evaluation.name.toLowerCase().includes(search.toLowerCase()) ||
-      evaluation.description?.toLowerCase().includes(search.toLowerCase()) ||
-      evaluation.tags?.some((tag) =>
-        tag.toLowerCase().includes(search.toLowerCase()),
-      ),
-  );
+  const filteredEvaluations = evaluations;
+
+
 
   return (
     <BudForm
@@ -415,22 +357,63 @@ export default function EvaluationSummary() {
       // }}
       onBack={async () => {
         openDrawerWithStep("select-evaluation");
-      }}
+      }
+      }
       backText="Back"
-      onNext={() => {
-        openDrawerWithStep("select-traits");
+      disableNext={isSubmitting}
+      onNext={async () => {
+        try {
+          setIsSubmitting(true);
+
+          if (!currentWorkflow?.workflow_id) {
+            errorToast("Workflow not found. Please start over.");
+            return;
+          }
+
+          // Get experiment ID from workflow or drawer props
+          const experimentId = currentWorkflow.experiment_id || drawerProps?.experimentId;
+
+          if (!experimentId) {
+            errorToast("Experiment ID not found");
+            return;
+          }
+
+          // Prepare payload for step 5 - trigger the workflow
+          const payload = {
+            workflow_id: currentWorkflow.workflow_id,
+            step_number: 5,
+            workflow_total_steps: 5,
+            trigger_workflow: true,
+            stage_data: {}
+          };
+
+          console.log("Triggering evaluation workflow with payload:", payload);
+
+          // Call the API to trigger the evaluation
+          const response = await createEvaluationWorkflow(experimentId, payload);
+
+          console.log("Evaluation workflow triggered successfully:", response);
+
+          successToast("Evaluation workflow started successfully!");
+
+          // Navigate to status page
+          openDrawerWithStep("run-evaluation-status");
+
+        } catch (error: any) {
+          console.error("Failed to trigger evaluation workflow:", error);
+          errorToast(error.message || "Failed to start evaluation workflow");
+        } finally {
+          setIsSubmitting(false);
+        }
       }}
-      nextText="Next"
+      nextText={isSubmitting ? "Starting..." : "Run Evaluation"}
     >
+
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Selected Evaluations"
-            description={
-              isLoadingData
-                ? "Loading workflow data..."
-                : "Review the selected evaluations and model configuration"
-            }
+            description={isLoadingData ? "Loading workflow data..." : "Review the selected evaluations and model configuration"}
             classNames="pt-[.8rem]"
             descriptionClass="pt-[.3rem]"
           />
@@ -440,11 +423,10 @@ export default function EvaluationSummary() {
                 <div className="w-full">
                   <Text_14_600_EEEEEE>
                     <div className="flex items-start justify-start max-w-[72%]">
+
                       <div className="mr-[1.05rem] shrink-0 grow-0 flex items-center justify-center">
                         <IconRender
-                          icon={
-                            selectedModelData?.icon || selectedModelData?.icon
-                          }
+                          icon={selectedModelData?.icon || selectedModelData?.icon}
                           size={44}
                           imageSize={28}
                           type={selectedModelData?.provider_type}
@@ -465,10 +447,10 @@ export default function EvaluationSummary() {
                     key={index}
                     item={item}
                     valueWidth={220}
-                    // valueWidth={getSpecValueWidthOddEven(
-                    //   deploymentSpecs,
-                    //   index
-                    // )}
+                  // valueWidth={getSpecValueWidthOddEven(
+                  //   deploymentSpecs,
+                  //   index
+                  // )}
                   />
                 ))}
               </div>
@@ -483,26 +465,29 @@ export default function EvaluationSummary() {
             descriptionClass="pt-[.3rem]"
           />
           <div className="flex flex-col	justify-start items-center w-full">
+
+
             <div className="evaluationCardWrap w-full ">
               <div className="evaluationCard w-full mt-[0rem]">
-                {filteredEvaluations.length > 0 ? (
+                {filteredEvaluations.length > 0 ?
                   <EvaluationList
                     evaluations={filteredEvaluations}
                     handleEvaluationSelection={(evaluation) => {
                       setSelectedEvaluation(evaluation);
                     }}
-                    selectedEvaluation={selectedEvaluation}
-                  />
-                ) : (
-                  <>
-                    <div className="mt-[1.5rem]" />
-                    <BudStepAlert
-                      type="warining"
-                      title="No Evaluations Found"
-                      description="No evaluations match your search criteria. Try adjusting your search terms."
-                    />
-                  </>
-                )}
+                    selectedEvaluation={selectedEvaluation} />
+                  : (
+                    <>
+                      <div
+                        className="mt-[1.5rem]"
+                      />
+                      <BudStepAlert
+                        type="warining"
+                        title='No Evaluations Found'
+                        description='No evaluations match your search criteria. Try adjusting your search terms.'
+                      />
+                    </>
+                  )}
               </div>
             </div>
           </div>

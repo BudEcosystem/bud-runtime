@@ -1,8 +1,8 @@
-import { Text_12_500_FFFFFF } from '@/components/ui/text';
-import { Box, Text } from '@radix-ui/themes';
-import * as echarts from 'echarts';
-import React, { useEffect, useRef, useState } from 'react';
-import { AppRequest } from '@/services/api/requests';
+import { Text_12_500_FFFFFF } from "@/components/ui/text";
+import { Box, Text } from "@radix-ui/themes";
+import * as echarts from "echarts";
+import React, { useEffect, useRef, useState } from "react";
+import { AppRequest } from "@/services/api/requests";
 
 interface BarChartProps {
   data: {
@@ -10,8 +10,8 @@ interface BarChartProps {
     data: any[];
     label1?: string;
     label2?: string;
-    barColor?: string
-    showLegend?: string
+    barColor?: string;
+    showLegend?: string;
   };
 }
 
@@ -23,8 +23,12 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
   }, [data]);
 
   const chartRef = useRef<HTMLDivElement>(null);
+
+  // Check if data is empty
+  const hasData =
+    data?.data && data.data.length > 0 && data.data.some((val: any) => val > 0);
   useEffect(() => {
-    if (chartRef.current) {
+    if (chartRef.current && hasData) {
       const containerWidth = chartRef.current.clientWidth;
       const containerHeight = chartRef.current.clientHeight;
 
@@ -33,27 +37,27 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
         return;
       }
       const myChart = echarts.init(chartRef.current, null, {
-        renderer: 'canvas',
+        renderer: "canvas",
         useDirtyRect: false,
       });
       const formatLegendText = (text: string) => {
         return text
-          .replace(/[^a-zA-Z0-9]/g, ' ')
-          .replace(/\b\w/g, char => char.toUpperCase());
+          .replace(/[^a-zA-Z0-9]/g, " ")
+          .replace(/\b\w/g, (char) => char.toUpperCase());
       };
 
       const option = {
         legend: {
           show: barChartData.showLegend || false,
-          orient: 'horizontal',
-          left: '0%',
-          top: 'top',
+          orient: "horizontal",
+          left: "0%",
+          top: "top",
           textStyle: {
-            color: '#ffffff',
+            color: "#ffffff",
             fontSize: 13,
             fontWeight: 400,
           },
-          icon: 'square',
+          icon: "square",
           itemWidth: 10,
           itemHeight: 10,
           itemStyle: {
@@ -61,40 +65,42 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
           },
           formatter: formatLegendText,
         },
-        backgroundColor: 'transparent',
+        backgroundColor: "transparent",
         grid: {
           left: "0%",
           right: "0%",
-          bottom: '4%',
+          bottom: "4%",
           top: "23%",
           containLabel: true,
         },
         xAxis: {
-          type: 'category',
+          type: "category",
           data: barChartData?.categories,
           axisTick: {
             show: false, // Remove the tick marks from the x-axis
           },
           axisLabel: {
-            color: '#6A6E76', // Set x-axis label color to white for better visibility
+            color: "#6A6E76", // Set x-axis label color to white for better visibility
             fontSize: 12,
             formatter: (value: any) => {
               const maxLength = 7;
-              return value.length > maxLength ? value.substring(0, maxLength) + '...' : value;
-            }
+              return value.length > maxLength
+                ? value.substring(0, maxLength) + "..."
+                : value;
+            },
           },
         },
         yAxis: {
           splitLine: {
             lineStyle: {
-              type: 'solid',
-              color: '#171717', // Set y-axis split line color to grey
+              type: "solid",
+              color: "#171717", // Set y-axis split line color to grey
             },
           },
           offset: 0,
           axisLine: {
             lineStyle: {
-              color: '#6A6E76', // Set y-axis line color to white for better visibility
+              color: "#6A6E76", // Set y-axis line color to white for better visibility
               fontSize: 8,
             },
           },
@@ -102,14 +108,14 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
         tooltip: {
           // alwaysShowContent: true,
           appendToBody: true,
-          trigger: 'item',
-          backgroundColor: 'rgba(0,0,0,.75)',
-          borderColor: '#1F1F1F',
+          trigger: "item",
+          backgroundColor: "rgba(0,0,0,.75)",
+          borderColor: "#1F1F1F",
           borderWidth: 1,
           textStyle: {
-            color: '#EEEEEE',
+            color: "#EEEEEE",
             fontSize: 12,
-            fontWeight: 400
+            fontWeight: 400,
           },
           extraCssText: `
     backdrop-filter: blur(10px);
@@ -130,12 +136,15 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
               value,
               itemStyle: {
                 borderRadius: [5, 5, 0, 0], // Top-left and top-right corners rounded
-                color: index % 2 === 0 ? barChartData.barColor : barChartData.barColor,
+                color:
+                  index % 2 === 0
+                    ? barChartData.barColor
+                    : barChartData.barColor,
               },
             })),
-            type: 'bar',
+            type: "bar",
             barWidth: 22, // Set the width of the bars
-            barGap: '0%', // Set the space between bars to 0
+            barGap: "0%", // Set the space between bars to 0
           },
         ],
       };
@@ -146,20 +155,35 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
         myChart.resize();
       };
 
-      window.addEventListener('resize', handleResize);
+      window.addEventListener("resize", handleResize);
 
       return () => {
-        window.removeEventListener('resize', handleResize);
+        window.removeEventListener("resize", handleResize);
         myChart.dispose();
       };
     }
   }, [barChartData]);
 
+  // Show no data message
+  if (!hasData) {
+    return (
+      <Box className="relative h-full flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-[#757575] text-sm">No data available</p>
+        </div>
+      </Box>
+    );
+  }
+
   return (
-    <Box className='relative h-full'>
+    <Box className="relative h-full">
       {/* <Text_12_500_FFFFFF className='block absolute top-[1.8em] left-[5em]'>{barChartData?.title}</Text_12_500_FFFFFF> */}
       {/* <Text className='block absolute -rotate-90 origin-top-left	 top-[50%] left-[.8rem] mt-[1.8rem] p-0 text-xs text-[#6A6E76] font-light h-[1rem] leading-[100%]'>{barChartData?.label1}</Text> */}
-      <div ref={chartRef} style={{ width: '100%', height: '100%' }} className='' />
+      <div
+        ref={chartRef}
+        style={{ width: "100%", height: "100%" }}
+        className=""
+      />
       {/* <Text className='block absolute m-auto bottom-3 left-[50%] top-auto p-0 text-xs text-[#6A6E76] font-light h-[1rem] leading-[100%]'>{barChartData?.label2}</Text> */}
     </Box>
   );

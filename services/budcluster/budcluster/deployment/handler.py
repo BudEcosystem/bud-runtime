@@ -29,6 +29,7 @@ from ..cluster_ops import (
 )
 from ..commons.config import app_settings, secrets_settings
 from ..commons.constants import ClusterPlatformEnum
+from ..device_mapping import ClusterDeviceValidator, DeviceMappingRegistry
 from .schemas import GetDeploymentConfigRequest, WorkerInfo
 
 
@@ -94,11 +95,35 @@ class DeploymentHandler:
         return urlparse(url).netloc
 
     def _get_memory_size(self, node_list: List[dict]) -> int:
+        """Get memory size from node list, supporting both legacy and new formats.
+
+        Args:
+            node_list: List of node configurations
+
+        Returns:
+            Memory size in GB
+        """
         memory_size = 0
         for node in node_list:
-            for device in node["devices"]:
-                memory_size = device["memory"]
+            if "memory" in node:
+                # New node group format: memory directly on node
+                memory_size = node["memory"]
+                logger.info(f"Using memory from node group format: {memory_size} bytes")
                 break
+            elif "devices" in node and node["devices"]:
+                # Legacy format: memory in devices array
+                for device in node["devices"]:
+                    memory_size = device["memory"]
+                    logger.warning("Using memory from legacy devices format - consider migrating to node groups")
+                    break
+                break
+            else:
+                logger.warning(f"Node {node.get('name', 'unknown')} has no memory information")
+
+        if memory_size == 0:
+            logger.warning("No memory size found in node list, using default")
+            memory_size = 1024**3  # 1GB default
+
         return memory_size / (1024**3)
 
     def deploy(
@@ -113,6 +138,8 @@ class DeploymentHandler:
         adapters: List[dict] = None,
         delete_on_failure: bool = True,
         podscaler: dict = None,
+        input_tokens: Optional[int] = None,
+        output_tokens: Optional[int] = None,
     ):
         """Deploy nodes using Helm.
 
@@ -125,6 +152,10 @@ class DeploymentHandler:
             platform (ClusterPlatformEnum, optional): Platform type for the cluster deployment.
             add_worker (bool, optional): Whether to add a worker node. Defaults to False.
             adapters (List[dict], optional): List of model adapters to deploy. Defaults to None.
+            delete_on_failure (bool, optional): Whether to delete resources on failure. Defaults to True.
+            podscaler (dict, optional): Pod autoscaling configuration. Defaults to None.
+            input_tokens (Optional[int], optional): Average input/context tokens. Defaults to None.
+            output_tokens (Optional[int], optional): Average output/sequence tokens. Defaults to None.
 
         Raises:
             ValueError: If the device configuration is missing required keys or if ingress_url is not provided.
@@ -171,39 +202,88 @@ class DeploymentHandler:
 
         max_loras = 1 if not adapters else max(1, len(adapters))
 
-        for node in node_list:
-            node_values = {"name": node["name"], "devices": []}
-            for device in node["devices"]:
-                if not all(key in device for key in ("image", "replica", "memory", "type", "tp_size", "concurrency")):
-                    raise ValueError(f"Device configuration is missing required keys: {device}")
-                device["args"]["port"] = app_settings.engine_container_port
-                # device["args"]["tensor-parallel-size"] = 1
-                device["args"]["max-loras"] = max_loras
-                device["args"]["max-lora-rank"] = 256
+        for idx, node in enumerate(node_list):
+            node["args"]["gpu-memory-utilization"] = 0.95
+            node["args"]["max-loras"] = max_loras
+            node["args"]["max-lora-rank"] = 256
+            # node["args"]["pipeline-parallel-size"] = 2
+            # node["pp_size"] = 2
 
-                # # Remove scheduler-delay-factor and chunked-prefill-enabled from args
-                # device["args"] = {
-                #     k: v
-                #     for k, v in device["args"].items()
-                #     if k not in ["scheduler-delay-factor", "enable-chunked-prefill"]
-                # }
-                device["args"] = self._prepare_args(device["args"])
-                device["args"].append(f"--served-model-name={namespace}")
-                device["args"].append("--enable-lora")
-                device["args"].append("--max-model-len=8192")
+            node["args"] = self._prepare_args(node["args"])
+            node["args"].append(f"--served-model-name={namespace}")
+            node["args"].append("--enable-lora")
 
-                thread_bind, core_count = self._get_cpu_affinity(device["tp_size"])
-                device["envs"]["VLLM_CPU_OMP_THREADS_BIND"] = thread_bind
-                device["envs"]["VLLM_LOGGING_LEVEL"] = "INFO"
-                device["envs"]["VLLM_SKIP_WARMUP"] = "true"
-                device["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
-                device["core_count"] = core_count if device["type"] == "cpu" else 1
-                device["memory"] = device["memory"] / (1024**3)
-                device["name"] = self._to_k8s_label(device["name"])
-                # device["tp_size"] = 1
+            # Calculate max_model_len dynamically
+            if input_tokens and output_tokens:
+                max_model_len = int((input_tokens + output_tokens) * 1.1)  # Add 10% safety margin
+                node["args"].append(f"--max-model-len={max_model_len}")
+            else:
+                node["args"].append("--max-model-len=8192")  # Default fallback
 
-                node_values["devices"].append(device)
-            values["nodes"].append(node_values)
+            # Update the full_node_list with the modified args
+            full_node_list[idx]["args"] = node["args"].copy()
+
+            # thread_bind, core_count = self._get_cpu_affinity(device["tp_size"])
+            # node["envs"]["VLLM_CPU_OMP_THREADS_BIND"] = thread_bind
+            node["envs"]["VLLM_LOGGING_LEVEL"] = "INFO"
+            # node["envs"]["VLLM_SKIP_WARMUP"] = "true"
+            node["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
+            # node["core_count"] = core_count if device["type"] == "cpu" else 1
+            node["memory"] = node["memory"] / (1024**3)
+            node["name"] = self._to_k8s_label(node["name"])
+
+            # Add device mapping for node selector
+            device_name = node.get("device_name") or node.get("name", "")
+            device_type = node.get("type", "cpu")
+            device_model = node.get("device_model", "")
+
+            # Get node selector labels from device mapping
+            node_selector = DeviceMappingRegistry.get_node_selector_for_device(
+                device_name=device_name,
+                device_type=device_type,
+                device_model=device_model,
+                raw_name=node.get("raw_name", ""),
+            )
+
+            # Add node selector to the node configuration
+            node["node_selector"] = node_selector
+            logger.info(f"Generated node selector for device {device_name} ({device_type}): {node_selector}")
+
+            values["nodes"].append(node)
+
+        # Validate device availability before deployment
+        try:
+            kubeconfig_path = self.config.get("kubeconfig_path")
+            if kubeconfig_path:
+                validator = ClusterDeviceValidator(kubeconfig_path)
+
+                for node in values["nodes"]:
+                    device_name = node.get("device_name") or node.get("name", "")
+                    device_type = node.get("type", "cpu")
+                    replicas = node.get("replicas", 1)
+                    tp_size = node.get("tp_size", 1)
+                    pp_size = node.get("pp_size", 1)
+
+                    # Calculate total devices needed
+                    required_devices = replicas * tp_size * pp_size
+
+                    is_available, error_msg, available_nodes = validator.validate_device_availability(
+                        device_name=device_name, device_type=device_type, required_count=required_devices
+                    )
+
+                    if not is_available:
+                        logger.warning(f"Device validation warning for {device_name}: {error_msg}")
+                        logger.info(f"Available nodes: {available_nodes}")
+                        # Continue deployment with warning for now, but log the issue
+                    else:
+                        logger.info(
+                            f"Device validation passed for {device_name}: {len(available_nodes)} suitable nodes available"
+                        )
+            else:
+                logger.warning("No kubeconfig path provided, skipping device availability validation")
+        except Exception as e:
+            logger.warning(f"Device validation failed (deployment will continue): {str(e)}")
+
         try:
             logger.info(f"Values for local model deployment: {values}")
             number_of_nodes = len(values["nodes"])
@@ -570,7 +650,21 @@ class SimulatorHandler:
                 if response.status_code != 200:
                     raise Exception(f"Failed to get simulator configurations: {response_str}")
                 response_data = json.loads(response_str)
-                node_list = response_data.get("nodes", [])
+
+                # Handle both legacy nodes[] and new node_groups[] formats
+                node_groups = response_data.get("node_groups", [])
+                legacy_nodes = response_data.get("nodes", [])
+
+                if node_groups:
+                    # New format: return node groups directly
+                    # Device mapping will be handled later in DeploymentHandler.deploy()
+                    logger.info(f"Received {len(node_groups)} node groups from budsim")
+                    node_list = node_groups
+                else:
+                    # Legacy format: use nodes directly (deprecated)
+                    logger.warning("Received legacy nodes format from budsim - this is deprecated")
+                    node_list = legacy_nodes
+
         except Exception as e:
             raise Exception(f"Failed to get simulator config: {str(e)}") from e
         return node_list

@@ -3,6 +3,8 @@
 .DS_Store
 # nix
 result
+.cache/
+logs/
 
 # GeoIP databases (should be downloaded separately)
 *.mmdb

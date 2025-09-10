@@ -123,7 +123,9 @@ function DeployModelTemplateSelect() {
                 concurrent_requests: deploymentSpecifcation.concurrent_requests,
                 avg_context_length: 30,
                 avg_sequence_length: 10,
-                ...template,
+                per_session_tokens_per_sec: template?.per_session_tokens_per_sec || [],
+                ttft: template?.ttft || [],
+                e2e_latency: template?.e2e_latency || [],
               });
               await updateTemplate();
               openDrawerWithStep("deploy-model-specification");
@@ -144,7 +146,11 @@ function DeployModelTemplateSelect() {
               setDeploymentSpecification({
                 deployment_name: deploymentSpecifcation.deployment_name,
                 concurrent_requests: deploymentSpecifcation.concurrent_requests,
-                ...template,
+                avg_sequence_length: template.avg_sequence_length,
+                avg_context_length: template.avg_context_length,
+                per_session_tokens_per_sec: template.per_session_tokens_per_sec,
+                ttft: template.ttft,
+                e2e_latency: template.e2e_latency,
               });
             }}
           />

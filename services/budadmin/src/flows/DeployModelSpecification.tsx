@@ -1,3 +1,4 @@
+
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
@@ -9,41 +10,28 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
 
 export default function DeployModelSpecification() {
-  const { selectedTemplate } = useDeployModel();
-  const {
-    deploymentSpecifcation,
-    updateDeploymentSpecification,
-    updateDeploymentSpecificationAndDeploy,
-    currentWorkflow,
-  } = useDeployModel();
+  const { selectedTemplate } = useDeployModel()
+  const { deploymentSpecifcation, updateDeploymentSpecification, updateDeploymentSpecificationAndDeploy, currentWorkflow } = useDeployModel()
   const { openDrawer, openDrawerWithStep, closeDrawer } = useDrawer();
-  const { form } = useContext(BudFormContext);
+  const {form} = useContext(BudFormContext);
 
   return (
     <BudForm
       data={{
-        deployment_name:
-          deploymentSpecifcation.deployment_name || selectedTemplate?.name,
-        concurrent_requests: deploymentSpecifcation.concurrent_requests || 0,
+        deployment_name: deploymentSpecifcation.deployment_name,
+        concurrent_requests: deploymentSpecifcation.concurrent_requests,
         avg_context_length: deploymentSpecifcation.avg_context_length,
         avg_sequence_length: deploymentSpecifcation.avg_sequence_length,
-        per_session_tokens_per_sec:
-          deploymentSpecifcation.per_session_tokens_per_sec,
+        per_session_tokens_per_sec: deploymentSpecifcation.per_session_tokens_per_sec,
         ttft: deploymentSpecifcation.ttft,
         e2e_latency: deploymentSpecifcation.e2e_latency,
       }}
-      disableNext={
-        !deploymentSpecifcation.deployment_name ||
-        !deploymentSpecifcation.concurrent_requests ||
-        !deploymentSpecifcation.avg_sequence_length
-      }
+      disableNext={!deploymentSpecifcation.deployment_name || !deploymentSpecifcation.concurrent_requests || !deploymentSpecifcation.avg_sequence_length }
       onNext={async (values) => {
         // form.submit();
         if (currentWorkflow) {
           // Check if it's a cloud model and skip cluster steps
-          if (
-            currentWorkflow.workflow_steps.model.provider_type === "cloud_model"
-          ) {
+          if (currentWorkflow.workflow_steps.model.provider_type === "cloud_model") {
             const result = await updateDeploymentSpecificationAndDeploy();
             if (result) {
               openDrawerWithStep("deploy-model-success");
@@ -68,7 +56,9 @@ export default function DeployModelSpecification() {
     >
       <BudWraperBox>
         <BudDrawerLayout>
-          <DeployModelSpecificationInfo showDeployInfo={false} />
+          <DeployModelSpecificationInfo
+            showDeployInfo={false}
+          />
         </BudDrawerLayout>
         <BudDrawerLayout>
           <DeploymentSpecificationConfig />

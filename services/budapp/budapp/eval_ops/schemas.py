@@ -1,9 +1,10 @@
 # budapp/eval_ops/schemas.py
 
+import re
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import UUID4, BaseModel, Field
+from pydantic import UUID4, BaseModel, Field, field_validator
 
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse
 from budapp.eval_ops.models import RunStatusEnum
@@ -135,10 +136,69 @@ class ProgressOverview(BaseModel):
 class CreateExperimentRequest(BaseModel):
     """The request to create an experiment."""
 
-    name: str = Field(..., description="The name of the experiment.")
-    description: Optional[str] = Field(None, description="The description of the experiment.")
+    name: str = Field(..., min_length=1, max_length=255, description="The name of the experiment.")
+    description: Optional[str] = Field(None, max_length=500, description="The description of the experiment.")
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment (optional).")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate experiment name."""
+        if not v or not v.strip():
+            raise ValueError("Experiment name cannot be empty or only whitespace")
+
+        # Strip leading/trailing whitespace
+        v = v.strip()
+
+        # Check length after stripping
+        if len(v) < 1:
+            raise ValueError("Experiment name must be at least 1 character long")
+        if len(v) > 255:
+            raise ValueError("Experiment name must not exceed 255 characters")
+
+        # Validate allowed characters (alphanumeric, spaces, hyphens, underscores)
+        if not re.match(r"^[a-zA-Z0-9\s\-_]+$", v):
+            raise ValueError("Experiment name can only contain letters, numbers, spaces, hyphens, and underscores")
+
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, v: Optional[str]) -> Optional[str]:
+        """Validate experiment description."""
+        if v is not None:
+            v = v.strip()
+            if v and len(v) > 500:
+                raise ValueError("Description must not exceed 500 characters")
+        return v
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate tags."""
+        if v is not None:
+            # Remove duplicates and strip whitespace
+            cleaned_tags = []
+            seen = set()
+            for tag in v:
+                if tag:
+                    tag = tag.strip()
+                    if tag and tag not in seen:
+                        if len(tag) > 20:
+                            raise ValueError(f"Tag '{tag}' exceeds 20 characters")
+                        if not re.match(r"^[a-zA-Z0-9\-_]+$", tag):
+                            raise ValueError(
+                                f"Tag '{tag}' can only contain letters, numbers, hyphens, and underscores"
+                            )
+                        cleaned_tags.append(tag)
+                        seen.add(tag)
+
+            if len(cleaned_tags) > 10:
+                raise ValueError("Maximum 10 tags allowed")
+
+            return cleaned_tags if cleaned_tags else None
+        return v
 
 
 class Experiment(BaseModel):
@@ -586,6 +646,64 @@ class EvaluationDatasetsData(BaseModel):
     run_name: Optional[str] = None
     run_description: Optional[str] = None
     evaluation_config: Optional[dict] = None
+
+
+# ------------------------ Experiment Evaluation Schemas ------------------------
+
+
+class ModelDetail(BaseModel):
+    """Detailed model information for evaluations."""
+
+    id: UUID4 = Field(..., description="Model UUID")
+    name: str = Field(..., description="Model name")
+    deployment_name: Optional[str] = Field(None, description="Deployment name/namespace if deployed")
+
+
+class DatasetInfo(BaseModel):
+    """Basic dataset information."""
+
+    id: UUID4 = Field(..., description="Dataset UUID")
+    name: str = Field(..., description="Dataset name")
+    version: str = Field(..., description="Dataset version")
+    description: Optional[str] = Field(None, description="Dataset description")
+
+
+class TraitWithDatasets(BaseModel):
+    """Trait information with associated datasets."""
+
+    id: UUID4 = Field(..., description="Trait UUID")
+    name: str = Field(..., description="Trait name")
+    icon: Optional[str] = Field(None, description="Trait icon")
+    datasets: List[DatasetInfo] = Field(default_factory=list, description="Datasets associated with this trait")
+
+
+class EvaluationScore(BaseModel):
+    """Evaluation score information from BudEval."""
+
+    status: str = Field(..., description="Evaluation job status (pending/running/completed/failed)")
+    overall_accuracy: Optional[float] = Field(None, description="Overall accuracy percentage (0-100)")
+    datasets: Optional[List[dict]] = Field(None, description="Individual dataset scores")
+
+
+class RunWithEvaluations(BaseModel):
+    """Run information with evaluation details and scores."""
+
+    run_id: UUID4 = Field(..., description="Run UUID")
+    run_index: int = Field(..., description="Run index within experiment")
+    status: str = Field(..., description="Run status")
+    model: ModelDetail = Field(..., description="Model details")
+    traits: List[TraitWithDatasets] = Field(..., description="Traits with their associated datasets")
+    evaluation_job_id: Optional[str] = Field(None, description="BudEval job ID if evaluation was triggered")
+    scores: Optional[EvaluationScore] = Field(None, description="Evaluation scores from BudEval")
+    created_at: Optional[datetime] = Field(None, description="Run creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Run update timestamp")
+
+
+class ExperimentEvaluationsResponse(SuccessResponse):
+    """Response for getting experiment evaluations with scores."""
+
+    experiment: Experiment = Field(..., description="Experiment information")
+    evaluations: List[RunWithEvaluations] = Field(..., description="List of runs with evaluation details")
 
 
 # ------------------------ Run History Schemas ------------------------

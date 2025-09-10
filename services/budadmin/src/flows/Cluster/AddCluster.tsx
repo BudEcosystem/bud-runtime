@@ -4,13 +4,7 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import React, { useContext, useEffect } from "react";
-import {
-  Text_10_400_757575,
-  Text_12_400_757575,
-  Text_12_400_B3B3B3,
-  Text_12_600_EEEEEE,
-  Text_14_400_EEEEEE,
-} from "@/components/ui/text";
+import { Text_10_400_757575, Text_12_400_757575, Text_12_400_B3B3B3, Text_12_600_EEEEEE, Text_14_400_EEEEEE } from "@/components/ui/text";
 import TextInput from "../components/TextInput";
 import FileInput from "../components/FileInput";
 import { useWorkflow } from "src/stores/useWorkflow";
@@ -26,20 +20,30 @@ import ProjectNameInput from "@/components/ui/bud/dataEntry/ProjectNameInput";
 
 export default function AddCluster() {
   const { submittable, values } = useContext(BudFormContext);
-  const [formData, setFormData] = React.useState<FormData>(new FormData());
+  const [formData, setFormData] = React.useState<FormData>(() => {
+    const fd = new FormData();
+    fd.set("step_number", "1");
+    fd.set("workflow_total_steps", "3");
+    fd.set("trigger_workflow", "true");
+    return fd;
+  });
   const { getWorkflow } = useDeployModel();
-  const { createClusterWorkflow, clusterValues, setClusterValues } =
-    useCluster();
+  const { createClusterWorkflow, clusterValues, setClusterValues } = useCluster();
   const { openDrawerWithStep } = useDrawer();
 
   useEffect(() => {
-    formData.set("step_number", "1");
-    formData.set("workflow_total_steps", "3");
-    formData.set("trigger_workflow", "true");
-    formData.set("name", values.name);
-    formData.set("ingress_url", values.ingress_url);
-    formData.set("icon", values.icon);
-  }, [values]);
+    if (values.name && formData.get("name") !== values.name) {
+      formData.set("name", values.name);
+    }
+    if (values.ingress_url && formData.get("ingress_url") !== values.ingress_url) {
+      formData.set("ingress_url", values.ingress_url);
+    }
+    if (values.icon && formData.get("icon") !== values.icon) {
+      formData.set("icon", values.icon);
+    }
+    // Note: formData is intentionally not in the dependency array
+    // because we're mutating it directly, not replacing it
+  }, [values.name, values.ingress_url, values.icon]);
 
   return (
     <BudForm
@@ -47,12 +51,7 @@ export default function AddCluster() {
         icon: "😍",
         ...clusterValues,
       }}
-      disableNext={
-        !isValidClusterName(values?.name) ||
-        !values.ingress_url ||
-        !isValidUrl(values.ingress_url) ||
-        !clusterValues.configuration_file
-      }
+      disableNext={!isValidClusterName(values?.name) || !values.ingress_url || !isValidUrl(values.ingress_url) || !clusterValues.configuration_file}
       onNext={async (values) => {
         // add to form data
         const result = await createClusterWorkflow(formData);
@@ -63,7 +62,9 @@ export default function AddCluster() {
           errorToast("Error creating cluster");
         }
       }}
-      onBack={() => openDrawerWithStep("add-cluster-select-source")}
+      onBack={
+        ()=> openDrawerWithStep("add-cluster-select-source")
+      }
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -75,16 +76,12 @@ export default function AddCluster() {
             <div className="pt-[.87rem]">
               <ProjectNameInput
                 placeholder="Enter Cluster Name"
-                onChangeName={(name) =>
-                  setClusterValues({ ...clusterValues, name })
-                }
-                onChangeIcon={(icon) =>
-                  setClusterValues({ ...clusterValues, icon })
-                }
                 isEdit={true}
               />
 
-              <div className="height-26" />
+              <div
+                className="height-26"
+              />
               <TextInput
                 name="ingress_url"
                 label="Ingress URL"
@@ -92,16 +89,15 @@ export default function AddCluster() {
                 infoText="Enter the Ingress URL"
                 rules={[
                   { required: true, message: "Please enter Ingress URL" },
-                  {
-                    pattern: new RegExp(/^(http|https):\/\/[^ "]+$/),
-                    message: "Please enter a valid URL",
-                  },
+                  { pattern: new RegExp(/^(http|https):\/\/[^ "]+$/), message: "Please enter a valid URL" }
                 ]}
                 ClassNames="mt-[.1rem] mb-[0rem]"
                 InputClasses="py-[.5rem]"
                 formItemClassnames="mb-[1rem]"
                 onChange={(value) => {
-                  setClusterValues({ ...clusterValues, ingress_url: value });
+                  if (value !== clusterValues.ingress_url) {
+                    setClusterValues({ ...clusterValues, ingress_url: value });
+                  }
                 }}
               />
               <div className="mb-[1.7rem]">
@@ -112,7 +108,7 @@ export default function AddCluster() {
                   Configuration description
                 </Text_12_400_757575>
               </div>
-              {formData.get("configuration_file") ? (
+              {formData.get("configuration_file") ?
                 <div className="flex justify-start">
                   {clusterValues?.configuration_file && (
                     <Tags
@@ -131,42 +127,37 @@ export default function AddCluster() {
                     />
                   )}
                 </div>
-              ) : (
+                :
                 <FileInput
                   name="configuration_file"
-                  acceptedFileTypes={[".yaml, .yml"]}
+                  acceptedFileTypes={['.yaml, .yml']}
                   label="Upload File"
                   placeholder=""
                   infoText="Upload the configuration file"
                   required
-                  text={
-                    <div className="flex justify-center items-center w-[100%]">
-                      <Text_12_400_B3B3B3>Drag & Drop or </Text_12_400_B3B3B3>
-                      &nbsp;
-                      <Text_12_600_EEEEEE>Choose file</Text_12_600_EEEEEE>&nbsp;
-                      <Text_12_400_B3B3B3> to upload</Text_12_400_B3B3B3>
-                    </div>
-                  }
-                  hint={
-                    <>
-                      <Text_10_400_757575>
-                        Supported formats : YAML, YML
-                      </Text_10_400_757575>
-                    </>
-                  }
+                  text={<div className="flex justify-center items-center w-[100%]">
+                    <Text_12_400_B3B3B3>Drag & Drop or </Text_12_400_B3B3B3>&nbsp;
+                    <Text_12_600_EEEEEE>Choose file</Text_12_600_EEEEEE>&nbsp;
+                    <Text_12_400_B3B3B3> to upload</Text_12_400_B3B3B3>
+
+                  </div>}
+                  hint={<>
+                    <Text_10_400_757575>Supported formats : YAML, YML</Text_10_400_757575>
+                  </>}
                   rules={[{ required: true, message: "Please upload a file" }]}
                   onChange={(value) => {
-                    setClusterValues({
-                      ...clusterValues,
-                      configuration_file: value,
-                    });
-                    setFormData((prev) => {
-                      prev.set("configuration_file", value);
-                      return prev;
-                    });
+                    if (value !== clusterValues.configuration_file) {
+                      setClusterValues({
+                        ...clusterValues,
+                        configuration_file: value,
+                      });
+                      setFormData((prev) => {
+                        prev.set("configuration_file", value);
+                        return prev;
+                      });
+                    }
                   }}
-                />
-              )}
+                />}
             </div>
           </DrawerCard>
         </BudDrawerLayout>

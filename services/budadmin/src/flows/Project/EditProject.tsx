@@ -1,3 +1,4 @@
+
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -17,6 +18,7 @@ import ProjectNameInput from "@/components/ui/bud/dataEntry/ProjectNameInput";
 import { useProjects } from "src/hooks/useProjects";
 import { isValidProjectName } from "@/lib/utils";
 
+
 function EditProjectForm() {
   const { selectedProject, projectValues, setProjectValues } = useProjects();
   const { values = {} } = useContext(BudFormContext);
@@ -24,102 +26,78 @@ function EditProjectForm() {
   const [options, setOptions] = useState([]);
 
   async function fetchList(tagname) {
-    await axiosInstance(`${tempApiBaseUrl}/models/tags?page=1&limit=1000`).then(
-      (result) => {
-        const data = result.data?.tags?.map((result) => ({
-          name: result.name,
-          color: result.color,
-        }));
-        setOptions(data);
-      },
-    );
+    await axiosInstance(`${tempApiBaseUrl}/models/tags?page=1&limit=1000`).then((result) => {
+      const data = result.data?.tags?.map((result) => ({
+        name: result.name,
+        color: result.color,
+      }));
+      setOptions(data);
+    });
   }
 
   useEffect(() => {
     fetchList("");
   }, []);
 
-  return (
-    <BudWraperBox>
-      <BudDrawerLayout>
-        <DrawerTitleCard
-          title="Edit Project"
-          description="Make changes to project name, tags and description "
+  return <BudWraperBox>
+    <BudDrawerLayout>
+      <DrawerTitleCard
+        title="Edit Project"
+        description="Make changes to project name, tags and description "
+      />
+      <DrawerCard classNames="pb-0">
+        <ProjectNameInput
+          placeholder="Enter Project Name"
         />
-        <DrawerCard classNames="pb-0">
-          <ProjectNameInput
-            placeholder="Enter Project Name"
-            onChangeIcon={(icon) =>
-              setProjectValues({
+        <div className="mt-[.5rem]">
+          <div>
+            <TagsInput
+              defaultValue={selectedProject?.tags}
+              info="Enter Tags"
+              name="tags"
+              placeholder="Enter tags" rules={[
+                { validator: (rule, value) => {
+                  if (value.length === 0) {
+                    return Promise.reject("Please select at least one tag");
+                  }
+                  return Promise.resolve();
+                }}
+              ]}
+              label="Tags"
+              options={options}
+              onChange={(tags) => setProjectValues({
                 ...projectValues,
-                icon: icon,
-              })
-            }
-            onChangeName={(name) =>
-              setProjectValues({
-                ...projectValues,
-                name: name,
-              })
-            }
-          />
-          <div className="mt-[.5rem]">
-            <div>
-              <TagsInput
-                defaultValue={selectedProject?.tags}
-                info="Enter Tags"
-                name="tags"
-                placeholder="Enter tags"
-                rules={[
-                  {
-                    validator: (rule, value) => {
-                      if (value.length === 0) {
-                        return Promise.reject("Please select at least one tag");
-                      }
-                      return Promise.resolve();
-                    },
-                  },
-                ]}
-                label="Tags"
-                options={options}
-                onChange={(tags) =>
-                  setProjectValues({
-                    ...projectValues,
-                    tags: tags,
-                  })
-                }
-              />
-            </div>
-
-            <div className="mt-[.7rem]">
-              <TextAreaInput
-                name="description"
-                label="Description"
-                info="Write Description Here"
-                placeholder="Write Description Here"
-                rules={[
-                  { required: true, message: "Please enter description" },
-                ]}
-                value={values.description}
-                onChange={(description) =>
-                  setProjectValues({
-                    ...projectValues,
-                    description: description,
-                  })
-                }
-              />
-            </div>
+                tags: tags
+              })}
+            />
           </div>
-        </DrawerCard>
-      </BudDrawerLayout>
-    </BudWraperBox>
-  );
+
+          <div className="mt-[.7rem]">
+            <TextAreaInput
+              name="description"
+              label="Description"
+              info="Write Description Here"
+              placeholder="Write Description Here"
+              rules={[{ required: true, message: "Please enter description" }]}
+              value={values.description}
+              onChange={(description) => setProjectValues({
+                ...projectValues,
+                description: description
+              })}
+            />
+          </div>
+        </div>
+      </DrawerCard>
+    </BudDrawerLayout>
+  </BudWraperBox>
 }
+
 
 export default function EditProject() {
   const { values, submittable } = useContext(BudFormContext);
   const { openDrawer, closeDrawer } = useDrawer();
-  const { selectedProject, updateProject, getProject, projectValues } =
-    useProjects();
+  const { selectedProject, updateProject, getProject, projectValues } = useProjects();
+
 
   return (
     <BudForm
@@ -127,10 +105,7 @@ export default function EditProject() {
       disableNext={!submittable}
       onNext={async (values) => {
         const result = await updateProject(selectedProject?.id, {
-          name:
-            projectValues?.name === selectedProject?.name
-              ? undefined
-              : projectValues?.name,
+          name: projectValues?.name === selectedProject?.name ? undefined : projectValues?.name,
           description: values?.description,
           icon: values?.icon,
           tags: values?.tags,

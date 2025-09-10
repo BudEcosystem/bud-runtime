@@ -8,7 +8,10 @@
   coreutils,
   gnused,
   gnugrep,
-  findutils
+  findutils,
+
+  iSdebugBuild ? true,
+  neovim,
 }:
 let
   port = 3000;
@@ -45,7 +48,7 @@ let
         key=$(echo "$line" | cut -d "=" -f1)
         value=$(echo "$line" | cut -d "=" -f2-)
         echo "Processing: Key = $key, Value = $value"
-        find "$2/share/budcustomer" -type f -name "*.js" | while read -r file; do
+        find "$2/share/budcustomer/.next" -type f -name "*.js" | while read -r file; do
           echo "Processing file: $file"
           sed -i "s|$key|$value|g" "$file"
         done
@@ -64,6 +67,15 @@ dockerTools.buildLayeredImage {
     budcustomer
     novu_id_env_setter
     dockerTools.binSh # npm error enoent spawn sh ENOENT
+  ]
+  ++ lib.optional iSdebugBuild [
+    curl
+    jq
+    coreutils
+    gnused
+    gnugrep
+    findutils
+    neovim
   ];
 
   config = {

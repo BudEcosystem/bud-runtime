@@ -51,7 +51,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
         limit: 100,
       });
     }
-  }, [projectId]);
+  }, [projectId, getEndPoints]);
 
   const handleFilterChange = (changedValues: any) => {
     // Handle date range
@@ -363,14 +363,16 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
                   }}
                 >
                   <span
-                    className="text-[#EEEEEE]"
+                    className="text-gray-700 dark:text-gray-300"
                     style={{ marginRight: "8px" }}
                   >
                     Show only successful:
                   </span>
-                  <Form.Item name="isSuccess" valuePropName="checked" noStyle>
-                    <Switch className="bg-[#1F1F1F]" />
-                  </Form.Item>
+                  <div className="[&_.ant-switch]:!bg-gray-300 dark:[&_.ant-switch]:!bg-gray-600 [&_.ant-switch-checked]:!bg-blue-500 dark:[&_.ant-switch-checked]:!bg-blue-500">
+                    <Form.Item name="isSuccess" valuePropName="checked" noStyle>
+                      <Switch className="!bg-[#2f2f2f]" />
+                    </Form.Item>
+                  </div>
                 </div>
               </Space>
             </Col>

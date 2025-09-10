@@ -3,6 +3,8 @@ import { Worker } from "cluster";
 import { AppRequest } from "src/pages/api/requests";
 import { create } from "zustand";
 
+
+
 export interface GetEvaluationsPayload {
   page?: number;
   limit?: number;
@@ -26,12 +28,12 @@ export interface GetExperimentsPayload {
 export interface ExperimentData {
   id: string;
   name?: string;
-  experimentName: string;
-  models: string;
-  traits: string;
-  tags: string[];
-  status: "Running" | "Completed" | "Failed";
-  createdDate: string;
+  experimentName?: string;
+  models: string | any[] | any;  // Can be string, array, or object
+  traits: string | any[] | any;  // Can be string, array, or object
+  tags: string[] | any[];
+  status: "Running" | "Completed" | "Failed" | string;
+  created_at: string;
 }
 
 export interface Trait {
@@ -134,10 +136,7 @@ export const useEvaluations = create<{
   getExperimentDetails: (id: string) => Promise<any>;
   getExperimentRuns: (id: string) => Promise<any>;
   createExperiment: (payload: any) => Promise<any>;
-  createEvaluationWorkflow: (
-    experimentId: string,
-    payload: any,
-  ) => Promise<any>;
+  createEvaluationWorkflow: (experimentId: string, payload: any) => Promise<any>;
   setCurrentWorkflow: (workflow: EvaluationWorkflow | null) => void;
   getCurrentWorkflow: () => EvaluationWorkflow | null;
   getWorkflowData: (experimentId: string, workflowId: string) => Promise<any>;
@@ -163,20 +162,20 @@ export const useEvaluations = create<{
       // Build query parameters
       const params = new URLSearchParams();
 
-      if (payload?.page) params.append("page", payload.page.toString());
-      if (payload?.limit) params.append("limit", payload.limit.toString());
-      if (payload?.name) params.append("name", payload.name);
-      if (payload?.modalities) params.append("modalities", payload.modalities);
-      if (payload?.language) params.append("language", payload.language);
-      if (payload?.domains) params.append("domains", payload.domains);
+      if (payload?.page) params.append('page', payload.page.toString());
+      if (payload?.limit) params.append('limit', payload.limit.toString());
+      if (payload?.name) params.append('name', payload.name);
+      if (payload?.modalities) params.append('modalities', payload.modalities);
+      if (payload?.language) params.append('language', payload.language);
+      if (payload?.domains) params.append('domains', payload.domains);
       if (payload?.trait_ids && payload.trait_ids.length > 0) {
-        console.log("Adding trait_ids to params:", payload.trait_ids);
-        payload.trait_ids.forEach((id) => params.append("trait_ids", id));
+        console.log('Adding trait_ids to params:', payload.trait_ids);
+        payload.trait_ids.forEach(id => params.append('trait_ids', id));
       }
 
       const queryString = params.toString();
-      const url = `${tempApiBaseUrl}/experiments/datasets${queryString ? `?${queryString}` : ""}`;
-      console.log("Fetching evaluations with URL:", url);
+      const url = `${tempApiBaseUrl}/experiments/datasets${queryString ? `?${queryString}` : ''}`;
+      console.log('Fetching evaluations with URL:', url);
 
       const response: any = await AppRequest.Get(url);
       set({ evaluationsList: response.data.datasets });
@@ -196,10 +195,10 @@ export const useEvaluations = create<{
     set({ loading: true });
     try {
       const url = `${tempApiBaseUrl}/experiments/datasets/${datasetId}`;
-      console.log("Fetching evaluation details with URL:", url);
+      console.log('Fetching evaluation details with URL:', url);
 
       const response: any = await AppRequest.Get(url);
-      console.log("Evaluation details response:", response.data);
+      console.log('Evaluation details response:', response.data);
 
       set({ evaluationDetails: response.data });
       return response.data;
@@ -218,24 +217,22 @@ export const useEvaluations = create<{
       const limit = payload?.limit ?? 50;
 
       const params = new URLSearchParams();
-      params.append("page", page.toString());
-      params.append("limit", limit.toString());
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
 
       const queryString = params.toString();
-      const url = `${tempApiBaseUrl}/experiments/traits${queryString ? `?${queryString}` : ""}`;
+      const url = `${tempApiBaseUrl}/experiments/traits${queryString ? `?${queryString}` : ''}`;
 
       const response: any = await AppRequest.Get(url);
 
       // Remove datasets field from each trait
-      const traitsWithoutDatasets: TraitSimple[] = response.data.traits.map(
-        (trait: TraitWithDatasets) => ({
-          id: trait.id,
-          name: trait.name,
-          description: trait.description,
-          category: trait.category,
-          exps_ids: trait.exps_ids,
-        }),
-      );
+      const traitsWithoutDatasets: TraitSimple[] = response.data.traits.map((trait: TraitWithDatasets) => ({
+        id: trait.id,
+        name: trait.name,
+        description: trait.description,
+        category: trait.category,
+        exps_ids: trait.exps_ids
+      }));
 
       set({ traitsList: traitsWithoutDatasets });
     } catch (error) {
@@ -251,17 +248,17 @@ export const useEvaluations = create<{
       // Build query parameters
       const params = new URLSearchParams();
 
-      if (payload?.page) params.append("page", payload.page.toString());
-      if (payload?.limit) params.append("limit", payload.limit.toString());
-      if (payload?.search) params.append("search", payload.search);
+      if (payload?.page) params.append('page', payload.page.toString());
+      if (payload?.limit) params.append('limit', payload.limit.toString());
+      if (payload?.search) params.append('search', payload.search);
       if (payload?.status && payload.status.length > 0) {
-        payload.status.forEach((status) => params.append("status", status));
+        payload.status.forEach(status => params.append('status', status));
       }
       if (payload?.tags && payload.tags.length > 0) {
-        payload.tags.forEach((tag) => params.append("tags", tag));
+        payload.tags.forEach(tag => params.append('tags', tag));
       }
-      if (payload?.order) params.append("order", payload.order);
-      if (payload?.orderBy) params.append("orderBy", payload.orderBy);
+      if (payload?.order) params.append('order', payload.order);
+      if (payload?.orderBy) params.append('orderBy', payload.orderBy);
 
       const queryString = params.toString();
       const url = `${tempApiBaseUrl}/experiments/`;
@@ -273,14 +270,9 @@ export const useEvaluations = create<{
       const experimentsArray = Array.isArray(experiments) ? experiments : [];
 
       set({ experimentsList: experimentsArray });
-      set({
-        experimentsListTotal: response.data?.total || response.total || 0,
-      });
+      set({ experimentsListTotal: response.data?.total || response.total || 0 });
 
-      return {
-        experiments: experimentsArray,
-        total: response.data?.total || response.total || 0,
-      };
+      return { experiments: experimentsArray, total: response.data?.total || response.total || 0 };
     } catch (error) {
       console.error("Error fetching experiments:", error);
       // Return empty data on error
@@ -294,11 +286,9 @@ export const useEvaluations = create<{
   getExperimentDetails: async (id: string) => {
     set({ loading: true });
     try {
-      const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/experiments/${id}`,
-      );
-      set({ experimentDetails: response.data });
-      return response.data;
+      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/experiments/${id}`);
+      set({ experimentDetails: response.data.experiment });
+      return response.data.experiment;
     } catch (error) {
       console.error("Error fetching experiment details:", error);
       throw error;
@@ -310,9 +300,7 @@ export const useEvaluations = create<{
   getExperimentRuns: async (id: string) => {
     set({ loading: true });
     try {
-      const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/experiments/${id}/runs`,
-      );
+      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/experiments/${id}/runs`);
       // Ensure experimentRuns is always an array or object with array properties
       const runs = response.data;
       const runsData = Array.isArray(runs) ? { runsHistory: runs } : runs;
@@ -331,10 +319,7 @@ export const useEvaluations = create<{
   createExperiment: async (payload: any) => {
     set({ loading: true });
     try {
-      const response: any = await AppRequest.Post(
-        `${tempApiBaseUrl}/experiments/`,
-        payload,
-      );
+      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/experiments/`, payload);
       return response.data;
     } catch (error) {
       console.error("Error creating experiment:", error);
@@ -347,10 +332,7 @@ export const useEvaluations = create<{
   createEvaluationWorkflow: async (experimentId: string, payload: any) => {
     set({ loading: true });
     try {
-      const response: any = await AppRequest.Post(
-        `${tempApiBaseUrl}/experiments/${experimentId}/evaluations/workflow`,
-        payload,
-      );
+      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/experiments/${experimentId}/evaluations/workflow`, payload);
 
       // Save the workflow response in currentWorkflow
       const currentWorkflowData = get().currentWorkflow;
@@ -363,23 +345,22 @@ export const useEvaluations = create<{
         // Explicitly merge the stage_data from the current payload
         stage_data: {
           ...currentWorkflowData?.workflow_steps?.stage_data,
-          ...payload.stage_data,
-        },
+          ...payload.stage_data
+        }
       };
 
       const workflow: EvaluationWorkflow = {
-        workflow_id:
-          response.data.workflow_id || response.data.id || payload.workflow_id,
+        workflow_id: response.data.workflow_id || response.data.id || payload.workflow_id,
         experiment_id: experimentId,
         current_step: payload.step_number || response.data.current_step || 1,
         total_steps: response.data.total_steps || 5,
-        status: response.data.status || "in_progress",
+        status: response.data.status || 'in_progress',
         workflow_steps: updatedWorkflowSteps,
         created_at: response.data.created_at || currentWorkflowData?.created_at,
-        updated_at: response.data.updated_at || new Date().toISOString(),
+        updated_at: response.data.updated_at || new Date().toISOString()
       };
 
-      console.log("Saving workflow with steps:", workflow.workflow_steps);
+      console.log('Saving workflow with steps:', workflow.workflow_steps);
       set({ currentWorkflow: workflow });
       return response.data;
     } catch (error) {
@@ -402,10 +383,10 @@ export const useEvaluations = create<{
     set({ loading: true });
     try {
       const url = `${tempApiBaseUrl}/experiments/${experimentId}/evaluations/workflow/${workflowId}`;
-      console.log("Fetching workflow data with URL:", url);
+      console.log('Fetching workflow data with URL:', url);
 
       const response: any = await AppRequest.Get(url);
-      console.log("Workflow data response:", response.data);
+      console.log('Workflow data response:', response.data);
 
       set({ workflowData: response.data });
       return response.data;
@@ -416,4 +397,5 @@ export const useEvaluations = create<{
       set({ loading: false });
     }
   },
+
 }));

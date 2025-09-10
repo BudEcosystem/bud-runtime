@@ -41,7 +41,6 @@ function TextAreaInput(props: BudInputProps) {
               required={props.required}
             />
           }
-          value={props.value}
         >
           <TextArea
             name={props.name}
@@ -59,7 +58,7 @@ function TextAreaInput(props: BudInputProps) {
             onFocus={props.onFocus}
             onBlur={props.onBlur}
             maxLength={400}
-            className="min-h-[100px] resize-none !border !border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080]"
+            className="min-h-[100px] text-[black] dark:text-[#EEEEEE] resize-none !border !border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080]"
           />
         </FloatLabel>
       </div>

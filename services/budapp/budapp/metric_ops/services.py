@@ -40,6 +40,7 @@ from ..commons.constants import (
     ModelProviderTypeEnum,
     ModelStatusEnum,
     ProjectStatusEnum,
+    UserTypeEnum,
 )
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
@@ -47,6 +48,7 @@ from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
+from ..project_ops.services import ProjectService
 from ..shared.redis_service import RedisService
 from ..user_ops.models import User as UserModel
 from ..user_ops.schemas import User
@@ -230,8 +232,6 @@ class BudMetricService(SessionMixin):
                 raise ClientException("Project not found", status_code=status.HTTP_404_NOT_FOUND)
 
             # Check if user is member of the project
-            from ..project_ops.services import ProjectService
-
             project_service = ProjectService(self.session)
             try:
                 await project_service.check_project_membership(request.project_id, current_user.id)
@@ -242,11 +242,25 @@ class BudMetricService(SessionMixin):
         request_data = request.model_dump(mode="json")
 
         # For CLIENT users, we need to filter by api_key_project_id instead of project_id
-        if current_user.user_type == UserTypeEnum.CLIENT and request.project_id:
-            # Convert project_id filter to api_key_project_id for CLIENT users
-            request_data["filters"] = request_data.get("filters", {})
-            request_data["filters"]["api_key_project_id"] = str(request.project_id)
-            # Remove the project_id from top-level (it will be in filters)
+        if current_user.user_type == UserTypeEnum.CLIENT:
+            # Ensure filters dictionary exists
+            if request_data.get("filters") is None:
+                request_data["filters"] = {}
+
+            # Determine the api_key_project_id value(s) to filter by
+            if request.project_id:
+                # Convert project_id filter to api_key_project_id for CLIENT users
+                api_key_project_id_value = str(request.project_id)
+            else:
+                # If no project_id provided, restrict to user's accessible api_key_project_ids
+                project_service = ProjectService(self.session)
+                user_projects, _ = await project_service.get_all_active_projects(
+                    current_user, offset=0, limit=1000, filters={}, order_by=[], search=False
+                )
+                api_key_project_id_value = [str(project.project.id) for project in user_projects]
+
+            # Apply the api_key_project_id filter and remove the project_id from top-level
+            request_data["filters"]["api_key_project_id"] = api_key_project_id_value
             request_data.pop("project_id", None)
 
         # Proxy request to budmetrics
@@ -335,7 +349,6 @@ class BudMetricService(SessionMixin):
                         raise ClientException("Access denied", status_code=status.HTTP_403_FORBIDDEN)
 
                     # Check if user is member of the project
-                    from ..project_ops.services import ProjectService
 
                     project_service = ProjectService(self.session)
                     try:
@@ -814,8 +827,6 @@ class BudMetricService(SessionMixin):
             if current_user.user_type == UserTypeEnum.CLIENT:
                 # For CLIENT users, filter by api_key_project_id instead of project_id
                 # Get user's accessible projects
-                from ..project_ops.services import ProjectService
-
                 project_service = ProjectService(self.session)
                 # Get all projects the user has access to
                 user_projects, _ = await project_service.get_all_active_projects(
@@ -859,8 +870,6 @@ class BudMetricService(SessionMixin):
             else:
                 # For ADMIN users, keep the existing project_id filtering logic
                 # Get user's accessible projects
-                from ..project_ops.services import ProjectService
-
                 project_service = ProjectService(self.session)
                 # Get all projects the user has access to
                 user_projects, _ = await project_service.get_all_active_projects(
@@ -901,7 +910,6 @@ class BudMetricService(SessionMixin):
             logger.warning(f"Failed to apply user project filter: {e}")
             # Fallback: restrict to user's projects only
             from ..commons.constants import UserTypeEnum
-            from ..project_ops.services import ProjectService
 
             project_service = ProjectService(self.session)
             user_projects, _ = await project_service.get_all_active_projects(
@@ -921,7 +929,6 @@ class BudMetricService(SessionMixin):
         """Apply user's project access restrictions to GET request parameters."""
         try:
             # Get user's accessible projects
-            from ..project_ops.services import ProjectService
 
             project_service = ProjectService(self.session)
             # Get all projects the user has access to
@@ -952,7 +959,6 @@ class BudMetricService(SessionMixin):
         except Exception as e:
             logger.warning(f"Failed to apply user project filter: {e}")
             # Fallback: restrict to user's projects only
-            from ..project_ops.services import ProjectService
 
             project_service = ProjectService(self.session)
             user_projects, _ = await project_service.get_all_active_projects(
@@ -960,6 +966,11 @@ class BudMetricService(SessionMixin):
             )
             user_project_ids = [str(project.project.id) for project in user_projects]
             request_params["project_ids"] = ",".join(user_project_ids)
+        finally:
+            # For CLIENT users, rename project_ids to api_key_project_id
+            if current_user.user_type == UserTypeEnum.CLIENT and "project_ids" in request_params:
+                request_params["api_key_project_id"] = request_params["project_ids"]
+                del request_params["project_ids"]
 
     async def _enrich_aggregated_metrics_response(self, response_data: Dict[str, Any]) -> None:
         """Enrich aggregated metrics response with entity names."""

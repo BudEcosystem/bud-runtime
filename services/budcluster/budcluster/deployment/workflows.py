@@ -316,6 +316,8 @@ class CreateDeploymentWorkflow:
                 platform=platform,
                 add_worker=add_worker,
                 podscaler=podscaler,
+                input_tokens=deploy_engine_request_json.input_tokens,
+                output_tokens=deploy_engine_request_json.output_tokens,
             )
             update_workflow_data_in_statestore(
                 str(workflow_id),
@@ -380,12 +382,10 @@ class CreateDeploymentWorkflow:
                 platform=verify_deployment_health_request_json.platform,
                 ingress_health=verify_deployment_health_request_json.ingress_health,
             )
-            if deployment_status["ingress_health"]:
-                supported_endpoints = deployment_handler.identify_supported_endpoints(
-                    verify_deployment_health_request_json.namespace,
-                    verify_deployment_health_request_json.cloud_model,
-                    ingress_url,
-                )
+            # Check deployment status - get_deployment_status now handles endpoint validation with retries
+            if deployment_status["status"] == DeploymentStatusEnum.READY:
+                # Supported endpoints are now included in deployment_status response
+                supported_endpoints = deployment_status.get("supported_endpoints", {})
                 logger.info(f"Supported endpoints: {supported_endpoints}")
                 # Convert dict to list of supported endpoints (where value is True)
                 supported_endpoints_list = [
@@ -421,17 +421,24 @@ class CreateDeploymentWorkflow:
                     param={**deployment_status, "supported_endpoints": supported_endpoints_list},
                 )
             else:
+                # Handle different failure types
                 if not add_worker:
                     deployment_handler.delete(
                         namespace=verify_deployment_health_request_json.namespace,
                         platform=verify_deployment_health_request_json.platform,
                     )
+
                 if deployment_status["status"] == DeploymentStatusEnum.FAILED:
                     message = f"Engine deployment failed: {deployment_status['replicas']['reason']}"
-                else:
+                elif deployment_status["status"] == DeploymentStatusEnum.ENDPOINTS_FAILED:
+                    message = f"Deployment endpoints failed to become ready within {app_settings.max_endpoint_retry_attempts * app_settings.endpoint_retry_interval} seconds"
+                elif deployment_status["status"] == DeploymentStatusEnum.INGRESS_FAILED:
                     message = "Deployment ingress verification failed"
+                else:
+                    message = "Deployment verification failed"
+
                 response = ErrorResponse(
-                    message=f"{message}",
+                    message=message,
                     code=HTTPStatus.BAD_REQUEST.value,
                 )
         except Exception as e:
@@ -2355,6 +2362,38 @@ class UpdateModelTransferStatusWorkflow:
         namespace = update_model_transfer_request_json.namespace
         platform = update_model_transfer_request_json.platform
 
+        # Initialize start time on first run
+        if not update_model_transfer_request_json.workflow_start_time:
+            update_model_transfer_request_json.workflow_start_time = ctx.current_utc_datetime.isoformat()
+
+        # Check overall workflow timeout (30 minutes for model transfer)
+        from datetime import datetime
+
+        workflow_start = datetime.fromisoformat(
+            update_model_transfer_request_json.workflow_start_time.replace("Z", "+00:00")
+        )
+        elapsed_minutes = (ctx.current_utc_datetime - workflow_start).total_seconds() / 60
+        max_transfer_minutes = 5 * 60
+
+        if elapsed_minutes > max_transfer_minutes:
+            logger.error(f"Model transfer workflow exceeded {max_transfer_minutes} minutes timeout")
+            response = ErrorResponse(
+                message=f"Model transfer timeout after {int(elapsed_minutes)} minutes",
+                param={"status": "failed", "reason": "Workflow timeout exceeded"},
+                code=HTTPStatus.REQUEST_TIMEOUT.value,
+            )
+            with DaprClient() as d:
+                d.raise_workflow_event(
+                    instance_id=str(instance_id),
+                    workflow_component="dapr",
+                    event_name="model_transfer_completed",
+                    event_data=response.model_dump(mode="json"),
+                )
+            cluster_config = json.loads(update_model_transfer_request_json.cluster_config)
+            deployment_handler = DeploymentHandler(config=cluster_config)
+            deployment_handler.delete(namespace=namespace, platform=platform)
+            return
+
         notification_request = NotificationRequest.from_cloud_event(
             cloud_event=update_model_transfer_request_json,
             name=update_model_transfer_request_json.workflow_name,
@@ -2381,7 +2420,8 @@ class UpdateModelTransferStatusWorkflow:
                 )
 
                 yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(minutes=1))
-                ctx.continue_as_new(update_model_transfer_request)
+                # Preserve workflow start time when continuing
+                ctx.continue_as_new(update_model_transfer_request_json.model_dump_json())
                 return
 
             if status["status"] == "failed":
@@ -2407,7 +2447,8 @@ class UpdateModelTransferStatusWorkflow:
             return
 
         yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(minutes=1))
-        ctx.continue_as_new(update_model_transfer_request)
+        # Preserve workflow start time when continuing
+        ctx.continue_as_new(update_model_transfer_request_json.model_dump_json())
 
     async def __call__(
         self, request: str, workflow_id: Optional[str] = None

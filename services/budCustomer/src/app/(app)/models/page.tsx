@@ -29,10 +29,14 @@ import dayjs from "dayjs";
 import { useModels, cloudProviders } from "@/hooks/useModels";
 import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
 import ModelTags from "@/components/ui/ModelTags";
+import SearchHeaderInput from "@/flows/components/SearchHeaderInput";
+import { motion } from "framer-motion";
+import styles from "./models.module.scss";
 
 // Filter interface
 interface Filters {
   name?: string;
+  endpoint_name?: string;
   author?: string;
   tasks?: string[];
   model_size_min?: number;
@@ -43,6 +47,7 @@ interface Filters {
 
 const defaultFilter: Filters = {
   name: "",
+  endpoint_name: "",
   modality: [],
   model_size_min: undefined,
   model_size_max: undefined,
@@ -109,14 +114,15 @@ export default function ModelsPage() {
   const [filter, setFilter] = useState<Filters>(defaultFilter);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterReset, setFilterReset] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
 
   // Load models with filters
   const load = useCallback(
-    async (filterParams: Filters) => {
+    async (filterParams: Filters, search?: string) => {
       await getModelsCatalog({
         page: currentPage,
         limit: pageSize,
-        name: filterParams.name,
+        name: search || filterParams.endpoint_name,
         modality: filterParams.modality?.length
           ? filterParams.modality
           : undefined,
@@ -134,13 +140,13 @@ export default function ModelsPage() {
   //   getAuthors();
   // }, []);
 
-  // Load models on filter or page change
+  // Load models on filter, page, or search change
   useEffect(() => {
     const timer = setTimeout(() => {
-      load(filter);
+      load(filter, searchValue);
     }, 500);
     return () => clearTimeout(timer);
-  }, [filter, currentPage]);
+  }, [filter, currentPage, searchValue]);
 
   // Handle filter popup
   const handleOpenChange = (open: boolean) => {
@@ -161,6 +167,7 @@ export default function ModelsPage() {
   // Reset filters
   const resetFilter = () => {
     setTempFilter(defaultFilter);
+    setSearchValue("");
     setFilterReset(true);
   };
 
@@ -242,22 +249,14 @@ export default function ModelsPage() {
           </div>
           <Flex gap={16} align="center">
             {/* Search Input */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search by name"
-                value={filter.name}
-                onChange={(e) => {
-                  setFilter({ ...filter, name: e.target.value });
-                  setCurrentPage(1);
-                }}
-                className="bg-bud-bg-secondary border border-bud-border rounded-lg px-3 py-1.5 pr-8 text-sm text-bud-text-primary placeholder-bud-text-disabled focus:outline-none focus:border-bud-purple w-64"
-              />
-              <Icon
-                icon="ph:magnifying-glass"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-bud-text-disabled text-[1.25rem]"
-              />
-            </div>
+            <SearchHeaderInput
+              placeholder="Search by name"
+              searchValue={searchValue}
+              setSearchValue={(value) => {
+                setSearchValue(value);
+                setCurrentPage(1);
+              }}
+            />
 
             {/* Filter Button */}
             <div className="hidden">
@@ -415,13 +414,39 @@ export default function ModelsPage() {
           className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 relative"
         >
           {loading && models.length === 0 ? (
-            <div className="flex justify-center items-center h-64">
-              <Spin size="large" />
+            <div className="flex justify-center items-center">
+              <div className="w-full flex flex-col gap-6">
+                {[0, 1].map((row) => (
+                  <div key={row} className="flex gap-6">
+                    {[0, 1, 2].map((col) => (
+                      <div
+                        key={col}
+                        className="flex-1 h-[200px] rounded-lg bg-bud-bg-secondary border-bud-border relative overflow-hidden"
+                        style={{ minWidth: 0 }}
+                      >
+                        {/* Animated light pass */}
+                        <div className="absolute inset-0 pointer-events-none">
+                          <motion.div
+                            className={styles.loadingBar}
+                            initial={{ width: "0%" }}
+                            animate={{ width: "100%" }}
+                            transition={{
+                              duration: 1.5,
+                              ease: "easeInOut",
+                              repeat: Infinity,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : models.length === 0 ? (
             <Empty
               description={
-                filter.name ||
+                searchValue ||
                 filter.modality?.length ||
                 filter.model_size_min !== undefined ||
                 filter.model_size_max !== undefined
@@ -479,8 +504,8 @@ export default function ModelsPage() {
                         </div>
 
                         {/* Model Title */}
-                        <Text_19_600_EEEEEE className="mb-3 line-clamp-1">
-                          {model.name}
+                        <Text_19_600_EEEEEE className="mb-3 line-clamp-1 !leading-[130%]">
+                          {model.endpoint_name}
                         </Text_19_600_EEEEEE>
 
                         {/* Description */}
@@ -491,7 +516,18 @@ export default function ModelsPage() {
                         </div>
 
                         {/* Model Tags */}
-                        <ModelTags model={model} maxTags={3} limit={true} />
+                        <ModelTags
+                          model={{
+                            ...model,
+                            endpoints_count: model.supported_endpoints
+                              ? Object.values(model.supported_endpoints).filter(
+                                  (e: any) => e.enabled,
+                                ).length
+                              : model.endpoints_count,
+                          }}
+                          maxTags={3}
+                          limit={true}
+                        />
 
                         {/* Author and Tasks */}
                         <div className="flex items-center gap-2 flex-wrap">

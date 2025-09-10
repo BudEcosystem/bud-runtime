@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from budeval.commons.storage_config import StorageConfig
+
 
 class EvaluationEngine(str, Enum):
     """Supported evaluation engines."""
@@ -98,7 +100,7 @@ class GenericEvaluationRequest(BaseModel):
 
     # Infrastructure configuration
     kubeconfig: str | None = Field(None, description="Kubernetes configuration")
-    namespace: str = Field("budeval", description="Kubernetes namespace")
+    namespace: str = Field(default_factory=StorageConfig.get_current_namespace, description="Kubernetes namespace")
 
     # Additional parameters
     debug: bool = Field(False, description="Enable debug mode")

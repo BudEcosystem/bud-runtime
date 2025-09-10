@@ -11,6 +11,7 @@ import ansible_runner
 import yaml
 
 from budeval.commons.logging import logging
+from budeval.commons.storage_config import StorageConfig
 
 
 logger = logging.getLogger(__name__)
@@ -50,9 +51,9 @@ class AnsibleOrchestrator:
         extravars = {}
 
         # For Testing: Load from local yaml file if no kubeconfig provided
-        if kubeconfig is None and Path("/home/ubuntu/bud-serve-eval/k3s.yaml").exists():
+        if kubeconfig is None and Path("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml").exists():
             # Read the local k3s.yaml file
-            with open("/home/ubuntu/bud-serve-eval/k3s.yaml", "r") as f:
+            with open("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml", "r") as f:
                 kubeconfig_yaml_content = f.read()
             # Since it's already YAML, we don't need to parse/convert it
             files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml_content}
@@ -70,8 +71,8 @@ class AnsibleOrchestrator:
             except json.JSONDecodeError as e:
                 logger.warning(f"Invalid kubeconfig JSON provided: {e}. Falling back to local k3s.yaml if available.")
                 # Fall back to local k3s.yaml if available
-                if Path("/home/ubuntu/bud-serve-eval/k3s.yaml").exists():
-                    with open("/home/ubuntu/bud-serve-eval/k3s.yaml", "r") as f:
+                if Path("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml").exists():
+                    with open("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml", "r") as f:
                         kubeconfig_yaml_content = f.read()
                     files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml_content}
                     extravars = {"kubeconfig_path": f"{temp_id}_kubeconfig.yaml"}
@@ -79,8 +80,29 @@ class AnsibleOrchestrator:
                     # Use in-cluster config as last resort
                     extravars = {"use_in_cluster_config": True}
         else:
-            # Use in-cluster config - don't pass kubeconfig_path
-            extravars = {"use_in_cluster_config": True}
+            # Try environment-based kubeconfig discovery
+            env_kubeconfig = os.environ.get("KUBECONFIG")
+            home_kubeconfig = str(Path.home() / ".kube" / "config")
+
+            if env_kubeconfig and Path(env_kubeconfig).exists():
+                try:
+                    kubeconfig_yaml_content = Path(env_kubeconfig).read_text()
+                    files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml_content}
+                    extravars = {"kubeconfig_path": f"{temp_id}_kubeconfig.yaml"}
+                except Exception as e:
+                    logger.warning(f"Failed to read KUBECONFIG at {env_kubeconfig}: {e}. Falling back further.")
+                    extravars = {"use_in_cluster_config": True}
+            elif Path(home_kubeconfig).exists():
+                try:
+                    kubeconfig_yaml_content = Path(home_kubeconfig).read_text()
+                    files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml_content}
+                    extravars = {"kubeconfig_path": f"{temp_id}_kubeconfig.yaml"}
+                except Exception as e:
+                    logger.warning(f"Failed to read ~/.kube/config: {e}. Using in-cluster config.")
+                    extravars = {"use_in_cluster_config": True}
+            else:
+                # Use in-cluster config - don't pass kubeconfig_path
+                extravars = {"use_in_cluster_config": True}
 
         return files, extravars
 
@@ -90,6 +112,15 @@ class AnsibleOrchestrator:
         playbook = "verify_cluster_k8s.yml"
 
         files, extravars = self._parse_kubeconfig(kubeconfig, temp_id)
+
+        # Ensure namespace is provided to the playbook
+        try:
+            from budeval.commons.storage_config import StorageConfig
+
+            extravars["namespace"] = StorageConfig.get_current_namespace()
+        except Exception:
+            # Fallback to 'default' if storage config is unavailable
+            extravars.setdefault("namespace", "default")
 
         try:
             self._run_ansible_playbook(playbook, temp_id, files, extravars)
@@ -106,7 +137,7 @@ class AnsibleOrchestrator:
         kubeconfig: Optional[str],
         engine_args: Dict[str, Any],
         docker_image: str,
-        namespace: str = "budeval",
+        namespace: Optional[str] = None,
         ttl_seconds: int = 600,
     ):
         """Run a job using the specified runner type.
@@ -129,6 +160,11 @@ class AnsibleOrchestrator:
         playbook = playbook_map.get(runner_type.lower())
         if not playbook:
             raise ValueError(f"Unsupported runner_type: {runner_type}")
+
+        # Resolve namespace if not provided
+        if namespace is None:
+            namespace = StorageConfig.get_current_namespace()
+            logger.debug(f"Auto-detected namespace: {namespace}")
 
         job_yaml = self._render_job_yaml(uuid, docker_image, engine_args, namespace, ttl_seconds)
 
@@ -155,7 +191,7 @@ class AnsibleOrchestrator:
         kubeconfig: Optional[str],
         engine_args: Dict[str, Any],
         docker_image: str,
-        namespace: str = "budeval",
+        namespace: Optional[str] = None,
         ttl_seconds: int = 600,
         output_volume_size: str = "5Gi",
     ):
@@ -181,19 +217,19 @@ class AnsibleOrchestrator:
         if not playbook:
             raise ValueError(f"Unsupported runner_type: {runner_type}")
 
-        # Generate YAML manifests for output PVC and Job (shared datasets use eval-datasets-pvc)
-        pvc_output_yaml = self._render_persistent_volume_claim_yaml(
-            f"{uuid}-output-pvc", f"{uuid}-output-pv", output_volume_size, namespace
-        )
+        # Resolve namespace if not provided
+        if namespace is None:
+            namespace = StorageConfig.get_current_namespace()
+            logger.debug(f"Auto-detected namespace: {namespace}")
+
+        # Generate YAML manifest for Job only (no separate output PVC needed)
         job_yaml = self._render_job_with_volumes_yaml(uuid, docker_image, engine_args, namespace, ttl_seconds)
 
         files = {
-            "pvc-output.yaml": pvc_output_yaml,
             "job.yaml": job_yaml,
         }
         extravars = {
             "job_name": uuid,
-            "pvc_output_template_path": "pvc-output.yaml",
             "job_template_path": "job.yaml",
             "namespace": namespace,
         }
@@ -211,7 +247,7 @@ class AnsibleOrchestrator:
         uuid: str,
         kubeconfig: Optional[str],
         job_config: Dict[str, Any],
-        namespace: str = "budeval",
+        namespace: Optional[str] = None,
     ):
         """Run a job using generic configuration from transformer.
 
@@ -241,15 +277,12 @@ class AnsibleOrchestrator:
         if not playbook:
             raise ValueError(f"Unsupported runner_type: {runner_type}")
 
-        # Generate YAML manifests from generic config
-        output_volume = job_config.get("output_volume", {})
-        pvc_output_yaml = self._render_persistent_volume_claim_yaml(
-            output_volume.get("claimName", f"{uuid}-output-pvc"),
-            f"{uuid}-output-pv",
-            output_volume.get("size", "10Gi"),
-            namespace,
-        )
+        # Resolve namespace if not provided
+        if namespace is None:
+            namespace = StorageConfig.get_current_namespace()
+            logger.debug(f"Auto-detected namespace: {namespace}")
 
+        # Generate YAML manifest for Job only (no separate output PVC needed)
         job_yaml = self._render_generic_job_yaml(uuid, job_config, namespace)
 
         # Enhanced debug logging
@@ -259,19 +292,16 @@ class AnsibleOrchestrator:
         logger.info(f"Job config args: {job_config.get('args')}")
         logger.info(f"Environment variables: {job_config.get('env_vars', {})}")
         logger.info(f"Data volumes: {job_config.get('data_volumes', [])}")
-        logger.info(f"Output volume: {job_config.get('output_volume', {})}")
         logger.info(f"Config volume: {job_config.get('config_volume', {})}")
         logger.info("=== Full Job YAML ===")
         logger.info(job_yaml)
         logger.info("=== End Debug ===")
 
         files = {
-            "pvc-output.yaml": pvc_output_yaml,
             "job.yaml": job_yaml,
         }
         extravars = {
             "job_name": uuid,
-            "pvc_output_template_path": "pvc-output.yaml",
             "job_template_path": "job.yaml",
             "namespace": namespace,
         }
@@ -287,7 +317,7 @@ class AnsibleOrchestrator:
         self,
         uuid: str,
         kubeconfig: Optional[str],
-        namespace: str = "budeval",
+        namespace: Optional[str] = None,
         eval_request_id: Optional[str] = None,
     ):
         """Clean up job resources including volumes and ConfigMaps.
@@ -299,6 +329,11 @@ class AnsibleOrchestrator:
             eval_request_id: Optional evaluation request ID for ConfigMap cleanup.
         """
         playbook = "cleanup_job_resources_k8s.yml"
+
+        # Resolve namespace if not provided
+        if namespace is None:
+            namespace = StorageConfig.get_current_namespace()
+            logger.debug(f"Auto-detected namespace: {namespace}")
 
         files = {}
         extravars = {
@@ -334,7 +369,7 @@ class AnsibleOrchestrator:
         self,
         uuid: str,
         kubeconfig: Optional[str],
-        namespace: str = "budeval",
+        namespace: Optional[str] = None,
     ) -> dict:
         """Get job status.
 
@@ -347,6 +382,11 @@ class AnsibleOrchestrator:
             Dict containing job status information.
         """
         playbook = "get_job_status_k8s.yml"
+
+        # Resolve namespace if not provided
+        if namespace is None:
+            namespace = StorageConfig.get_current_namespace()
+            logger.debug(f"Auto-detected namespace: {namespace}")
 
         files = {}
         extravars = {
@@ -426,6 +466,10 @@ class AnsibleOrchestrator:
             "PATH": f"{venv_bin}:{current_path}",
         }
 
+        # If kubeconfig file path is present, also export KUBECONFIG for modules honoring env var
+        if "kubeconfig_path" in extravars:
+            envvars["KUBECONFIG"] = extravars["kubeconfig_path"]
+
         logger.info(f"Running Ansible playbook: {playbook} with extravars: {extravars}")
         logger.info(f"Using Python interpreter: {sys.executable}")
         logger.info(f"PATH environment: {envvars['PATH']}")
@@ -504,6 +548,10 @@ class AnsibleOrchestrator:
             "PATH": f"{venv_bin}:{current_path}",
         }
 
+        # If kubeconfig file path is present, also export KUBECONFIG for modules honoring env var
+        if "kubeconfig_path" in extravars:
+            envvars["KUBECONFIG"] = extravars["kubeconfig_path"]
+
         logger.info(f"Running Ansible playbook: {playbook} with extravars: {extravars}")
         logger.info(f"Using Python interpreter: {sys.executable}")
         logger.info(f"PATH environment: {envvars['PATH']}")
@@ -542,6 +590,8 @@ class AnsibleOrchestrator:
                 "data_pvc_status": "unknown",
                 "output_pvc_status": "unknown",
                 "message": "Status retrieved",
+                "start_time": None,
+                "completion_time": None,
             }
 
             # Try to extract information from Ansible events
@@ -580,6 +630,21 @@ class AnsibleOrchestrator:
                                     status_info["status"] = "running"
                                 else:
                                     status_info["status"] = "pending"
+
+                                # Extract start and completion times if present under common key variants
+                                def _get_time(js: dict, keys: list[str]) -> str | None:
+                                    for k in keys:
+                                        v = js.get(k)
+                                        if v:
+                                            return str(v)
+                                    return None
+
+                                status_info["start_time"] = _get_time(
+                                    job_status, ["start_time", "startTime"]
+                                ) or status_info.get("start_time")
+                                status_info["completion_time"] = _get_time(
+                                    job_status, ["completion_time", "completionTime"]
+                                ) or status_info.get("completion_time")
 
                                 break
 
@@ -668,14 +733,18 @@ spec:
     ) -> str:
         safe_args = json.dumps(args)
 
+        # Get PVC name from configuration
+        from budeval.commons.storage_config import StorageConfig
+
+        pvc_name = StorageConfig.get_eval_datasets_pvc_name()
+
         # Extract eval_request_id for ConfigMap mounting
         eval_request_id = args.get("eval_request_id", uuid)
         configmap_name = f"opencompass-config-{eval_request_id.lower()}"
 
-        # Extract datasets and append '_gen' suffix for OpenCompass
+        # Extract datasets to pass to OpenCompass
         datasets = args.get("datasets", ["mmlu"])
-        datasets_with_gen = [f"{dataset}_gen" for dataset in datasets]
-        datasets_arg = " ".join(datasets_with_gen)
+        datasets_arg = " ".join(datasets)
 
         # Model configuration is now handled via bud-model.py config file
 
@@ -723,8 +792,10 @@ spec:
               mountPath: /workspace/data
               subPath: data
               readOnly: true
-            - name: output-volume
+            - name: eval-datasets-results
               mountPath: /workspace/outputs
+              subPath: results/{uuid}
+              readOnly: false
             - name: opencompass-config
               mountPath: /workspace/configs
               readOnly: true
@@ -734,12 +805,12 @@ spec:
       volumes:
         - name: eval-datasets
           persistentVolumeClaim:
-            claimName: eval-datasets-pvc
+            claimName: {pvc_name}
             # Note: This PVC must exist in the same namespace as the job
-            # The eval-datasets PVC should be created in the job's namespace
-        - name: output-volume
+        - name: eval-datasets-results
           persistentVolumeClaim:
-            claimName: {uuid}-output-pvc
+            claimName: {pvc_name}
+            # Reusing same PVC for results output
         - name: opencompass-config
           configMap:
             name: {configmap_name}
@@ -825,10 +896,21 @@ spec:
 
         # Output volume
         if output_volume:
-            volume_mounts.append("""            - name: output
+            # Handle shared PVC with subPath for outputs
+            if output_volume.get("type") == "shared_pvc" and output_volume.get("subPath"):
+                volume_mounts.append(f"""            - name: output
+              mountPath: {output_volume.get("mountPath", "/workspace/outputs")}
+              subPath: {output_volume["subPath"]}""")
+
+                volumes.append(f"""        - name: output
+          persistentVolumeClaim:
+            claimName: {output_volume["claimName"]}""")
+            else:
+                # Legacy approach for backward compatibility
+                volume_mounts.append("""            - name: output
               mountPath: /workspace/outputs""")
 
-            volumes.append(f"""        - name: output
+                volumes.append(f"""        - name: output
           persistentVolumeClaim:
             claimName: {output_volume["claimName"]}""")
 

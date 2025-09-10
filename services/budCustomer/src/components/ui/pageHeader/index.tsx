@@ -32,7 +32,9 @@ const PageHeader: React.FC<pageHeaderProps> = ({
         className={`pageHeader flex justify-between items-start ${classNames}`}
       >
         <div className="flex flex-col justify-start gap-[3] items-start">
-          <Heading_30_600_FFFFFF className={`mb-0 pt-[.2rem] !text-[var(--text-primary)] ${hClass}`}>
+          <Heading_30_600_FFFFFF
+            className={`mb-0 pt-[.2rem] !text-[var(--text-primary)] ${hClass}`}
+          >
             {headding}
           </Heading_30_600_FFFFFF>
           {text && (

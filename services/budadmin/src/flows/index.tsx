@@ -62,6 +62,7 @@ import EditUser from "./user/EditUser";
 import ResetPassword from "./user/ResetPassword";
 import AddUser from "./user/AddUser";
 import AddUserDetails from "./user/AddUserDetails";
+import UserUsageDrawer from "./user/UserUsageDrawer";
 import AddBenchmark from "./Benchmark/AddBenchmark";
 import Datasets from "./Benchmark/Datasets";
 import Configuration from "./Benchmark/Configuration";
@@ -79,13 +80,13 @@ import ChooseCloudSource from "./Cluster/ChooseCloudSource";
 import CloudChooser from "./Cluster/CloudChooser";
 import ChooseCloudCredentialStep from "./Cluster/_cloud/ChooseCloudCredential";
 import ConfigureClusterDetails from "./Cluster/_cloud/ConfigureClusterDetails";
-import QuantizationDetail from "./Quantization/QuantizationDetail";
-import QuantizationMethod from "./Quantization/QuantizationMethod";
-import AdvancedSettings from "./Quantization/AdvancedSettings";
-import SimulationStatus from "./Quantization/SimulationStatus";
-import QuantizationSelectCluster from "./Quantization/SelectCluster";
-import QuantizationResult from "./Quantization/QuantizationResult";
-import DeploymentStatus from "./Quantization/DeploymentStatus";
+import QuantizationDetail from './Quantization/QuantizationDetail';
+import QuantizationMethod from './Quantization/QuantizationMethod';
+import AdvancedSettings from './Quantization/AdvancedSettings';
+import SimulationStatus from './Quantization/SimulationStatus';
+import QuantizationSelectCluster from './Quantization/SelectCluster';
+import QuantizationResult from './Quantization/QuantizationResult';
+import DeploymentStatus from './Quantization/DeploymentStatus';
 import SelectEvaluationType from "./runSimulation/SelectType";
 import SelectUseCase from "./runSimulation/SelectUseCase";
 import AdditionalSettings from "./runSimulation/AdditionalSettings";
@@ -111,11 +112,14 @@ import SelectModelForNewEvaluation from "./Evaluations/RunEvaluation/SelectModel
 import SelectTrait from "./Evaluations/RunEvaluation/SelectTrait";
 import SelectEvaluation from "./Evaluations/RunEvaluation/SelectEvaluation";
 import EvaluationSummary from "./Evaluations/RunEvaluation/EvaluationSummary";
+import RunEvaluationStatus from "./Evaluations/RunEvaluation/RunEvaluationStatus";
+import RunEvaluationSuccess from "./Evaluations/RunEvaluation/RunEvaluationSuccess";
 import NewExperimentSuccess from "./Evaluations/NewExperiment/newExperimentSuccess";
 import CreateBlockingRuleStep from "./blocking/CreateBlockingRuleStep";
 import BlockingRuleSuccess from "./blocking/BlockingRuleSuccess";
 import ViewBlockingRuleDetails from "./blocking/ViewBlockingRuleDetails";
 import Publish from "./Project/Publish";
+import PublishEndpoint from "./Project/PublishEndpoint";
 import ViewEvalDetailscopy from "./Evaluations/RunEvaluation/ViewEvalDetail";
 import SelectProvider from "./GuardRails/SelectProvider";
 import PolitenessDetection from "./GuardRails/PolitenessDetection";
@@ -187,7 +191,8 @@ export const StepComponents = {
   "add-members": AddMembers,
   "worker-details": WorkerDetails,
   "use-model": UseModel,
-  publish: Publish,
+  "publish": Publish,
+  "publish-endpoint": PublishEndpoint,
   "delete-cluster": DeleteCluster,
   "deploy-model-success": DeployModelSuccess,
   "delete-cluster-status": ClusterDeleteStatus,
@@ -208,9 +213,10 @@ export const StepComponents = {
   "reset-password": ResetPassword,
   "add-user": AddUser,
   "add-user-details": AddUserDetails,
-  model_benchmark: AddBenchmark,
-  Datasets: Datasets,
-  Configuration: Configuration,
+  "user-usage": UserUsageDrawer,
+  "model_benchmark": AddBenchmark,
+  "Datasets": Datasets,
+  "Configuration": Configuration,
   "Select-Cluster": SelectCluster,
   "Select-Nodes": SelectNodes,
   "Select-Model": SelectModel,
@@ -227,13 +233,13 @@ export const StepComponents = {
   "add-cluster-select-provider": CloudChooser,
   "choose-cloud-credential": ChooseCloudCredentialStep,
   "configure-cluster-details": ConfigureClusterDetails,
-  "quantization-detail": QuantizationDetail,
-  "quantization-method": QuantizationMethod,
-  "advanced-settings": AdvancedSettings,
-  "quantization-simulation-status": SimulationStatus,
-  "quantization-select-cluster": QuantizationSelectCluster,
-  "quantization-deployment-status": DeploymentStatus,
-  "quantization-result": QuantizationResult,
+  'quantization-detail': QuantizationDetail,
+  'quantization-method': QuantizationMethod,
+  'advanced-settings': AdvancedSettings,
+  'quantization-simulation-status': SimulationStatus,
+  'quantization-select-cluster': QuantizationSelectCluster,
+  'quantization-deployment-status': DeploymentStatus,
+  'quantization-result': QuantizationResult,
   "select-evaluation-type": SelectEvaluationType,
   "select-use-case": SelectUseCase,
   "additional-settings": AdditionalSettings,
@@ -263,6 +269,8 @@ export const StepComponents = {
   // "view-eval-details": ViewEvalDetails,
   "view-eval-details": ViewEvalDetailscopy,
   "evaluation-summary": EvaluationSummary,
+  "run-evaluation-status": RunEvaluationStatus,
+  "run-evaluation-success": RunEvaluationSuccess,
   "create-blocking-rule": CreateBlockingRuleStep,
   "blocking-rule-success": BlockingRuleSuccess,
   "view-blocking-rule": ViewBlockingRuleDetails,
@@ -285,6 +293,7 @@ export const StepComponents = {
   "probe-deployment-success": ProbeDeploymentSuccess,
   "probe-details": ProbeDetails,
   "view-guardrail-details": ViewGuardRailDetails,
+
 };
 
 export type StepComponentsType = keyof typeof StepComponents;

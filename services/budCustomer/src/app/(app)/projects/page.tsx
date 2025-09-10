@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Card, Row, Col, Flex, Input, Dropdown, Button, Spin } from "antd";
+import { Card, Row, Col, Flex, Dropdown, Button, Spin, App } from "antd";
 import { Typography } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
 import { PrimaryButton } from "@/components/ui/button";
@@ -11,146 +11,164 @@ import { type Project as ContextProject } from "@/context/projectContext";
 import { useProjects } from "@/hooks/useProjects";
 import { useDrawer } from "@/hooks/useDrawer";
 import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
+import SearchHeaderInput from "@/flows/components/SearchHeaderInput";
+import styles from "./projects.module.scss";
+import { motion } from "framer-motion";
+import { useEndPoints } from "@/hooks/useEndPoint";
+import { openWarning } from "@/components/warningMessage";
+import { useOverlay } from "@/context/overlayContext";
 
 const { Text, Title } = Typography;
 
 // Separate component for project card to prevent re-renders
-const ProjectCard = React.memo(({
-  project,
-  onDelete,
-  onEdit,
-  onClick
-}: {
-  project: ContextProject;
-  onDelete: (project: ContextProject) => void;
-  onEdit: (project: ContextProject) => void;
-  onClick: (project: ContextProject) => void;
-}) => {
-  // Handle menu item clicks
-  const handleMenuClick = useCallback((e: any) => {
-    e.domEvent?.stopPropagation?.();
+const ProjectCard = React.memo(
+  ({
+    project,
+    onDelete,
+    onEdit,
+    onClick,
+  }: {
+    project: ContextProject;
+    onDelete: (project: ContextProject) => void;
+    onEdit: (project: ContextProject) => void;
+    onClick: (project: ContextProject) => void;
+  }) => {
+    // Handle menu item clicks
+    const handleMenuClick = useCallback(
+      (e: any) => {
+        e.domEvent?.stopPropagation?.();
 
-    switch (e.key) {
-      case 'edit':
-        onEdit(project);
-        break;
-      case 'delete':
-        onDelete(project);
-        break;
-    }
-  }, [project, onEdit, onDelete]);
+        switch (e.key) {
+          case "edit":
+            onEdit(project);
+            break;
+          case "delete":
+            onDelete(project);
+            break;
+        }
+      },
+      [project, onEdit, onDelete],
+    );
 
-  // Static menu items without onClick handlers
-  const menuItems = useMemo(() => [
-    {
-      key: "edit",
-      label: "Edit",
-      icon: <Icon icon="ph:pencil-simple" className="text-bud-text-primary" />,
-      className: "hover:!bg-bud-bg-tertiary",
-    },
-    {
-      key: "delete",
-      label: "Delete",
-      icon: <Icon icon="ph:trash" className="text-bud-error" />,
-      danger: true,
-      className: "hover:!bg-bud-bg-tertiary text-bud-error",
-    },
-  ], []);
+    // Static menu items without onClick handlers
+    const menuItems = useMemo(
+      () => [
+        {
+          key: "edit",
+          label: "Edit",
+          icon: (
+            <Icon icon="ph:pencil-simple" className="text-bud-text-primary" />
+          ),
+          className: "hover:!bg-bud-bg-tertiary",
+        },
+        {
+          key: "delete",
+          label: "Delete",
+          icon: <Icon icon="ph:trash" className="text-bud-error" />,
+          danger: true,
+          className: "hover:!bg-bud-bg-tertiary text-bud-error",
+        },
+      ],
+      [],
+    );
 
-  return (
-    <Card
-      className="h-full bg-bud-bg-secondary border-bud-border hover:border-bud-purple hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
-      styles={{ body: { padding: 0 } }}
-      onClick={() => onClick(project)}
-    >
-      <div className="p-6 mb-20">
-        {/* Header with Icon and Actions */}
-        <div className="flex items-start justify-between mb-6">
-          <div
-            className="w-12 h-12 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: project.color }}
-          >
-            <Icon
-              icon="ph:folder"
-              className="text-white text-[1.5rem]"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Text className="text-bud-text-disabled text-[12px]">
-              {dayjs(project.updated_at).format("DD MMM")}
-            </Text>
-            <Dropdown
-              menu={{
-                items: menuItems,
-                onClick: handleMenuClick,
-                className: "!bg-bud-bg-secondary !border-bud-border",
-              }}
-              trigger={["click"]}
-              placement="bottomRight"
-              overlayClassName="bud-dropdown-menu"
+    return (
+      <Card
+        className="h-full bg-bud-bg-secondary border-bud-border hover:border-bud-purple hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
+        styles={{ body: { padding: 0 } }}
+        onClick={() => onClick(project)}
+      >
+        <div className="p-6 mb-20">
+          {/* Header with Icon and Actions */}
+          <div className="flex items-start justify-between mb-6">
+            <div
+              className="w-12 h-12 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: project.color }}
             >
-              <Button
-                type="text"
-                icon={<MoreOutlined />}
-                className="!text-bud-text-disabled hover:!text-bud-text-primary hover:!bg-bud-bg-tertiary transition-all"
-                size="small"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </Dropdown>
+              <Icon icon="ph:folder" className="text-white text-[1.5rem]" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Text className="text-bud-text-disabled text-[12px]">
+                {dayjs(project.updated_at).format("DD MMM")}
+              </Text>
+              <Dropdown
+                menu={{
+                  items: menuItems,
+                  onClick: handleMenuClick,
+                  className: "!bg-bud-bg-secondary !border-bud-border",
+                }}
+                trigger={["click"]}
+                placement="bottomRight"
+                overlayClassName="bud-dropdown-menu"
+              >
+                <Button
+                  type="text"
+                  icon={<MoreOutlined />}
+                  className="!text-bud-text-disabled hover:!text-bud-text-primary hover:!bg-bud-bg-tertiary transition-all"
+                  size="small"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </Dropdown>
+            </div>
           </div>
-        </div>
 
-        {/* Project Title */}
-        <Text className="text-bud-text-primary text-[19px] font-semibold mb-3 line-clamp-1 block">
-          {project.name}
-        </Text>
+          {/* Project Title */}
+          <Text className="text-bud-text-primary text-[19px] font-semibold mb-3 line-clamp-1 block">
+            {project.name}
+          </Text>
 
-        {/* Description */}
-        <Text className="text-bud-text-muted text-[13px] mb-6 line-clamp-2 leading-relaxed block">
-          {project.description}
-        </Text>
-      </div>
-
-      {/* Footer Section */}
-      <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border absolute bottom-0 left-0 w-full">
-        <div className="flex items-center gap-2">
-          <Icon
-            icon="ph:key"
-            className="text-bud-text-disabled text-sm"
-          />
-          <Text className="text-bud-text-primary text-[13px]">
-            {project.resources?.api_keys || 0} API Keys
+          {/* Description */}
+          <Text className="text-bud-text-muted text-[13px] mb-6 line-clamp-2 leading-relaxed block">
+            {project.description}
           </Text>
         </div>
-      </div>
-    </Card>
-  );
-});
+
+        {/* Footer Section */}
+        <div className="bg-bud-bg-tertiary px-6 py-4 border-t border-bud-border absolute bottom-0 left-0 w-full">
+          <div className="flex items-center gap-2">
+            <Icon icon="ph:key" className="text-bud-text-disabled text-sm" />
+            <Text className="text-bud-text-primary text-[13px]">
+              {project.resources?.api_keys || 0} API Keys
+            </Text>
+          </div>
+        </div>
+      </Card>
+    );
+  },
+);
 
 ProjectCard.displayName = "ProjectCard";
 
 export default function ProjectsPage() {
-  const { globalProjects, getGlobalProjects, loading, getGlobalProject } =
-    useProjects();
+  const {
+    globalProjects,
+    getGlobalProjects,
+    loading,
+    getGlobalProject,
+    deleteProject,
+  } = useProjects();
 
   const { openDrawer } = useDrawer();
-  const [searchTerm, setSearchTerm] = useState("");
+  const { getEndPoints, endPointsCount } = useEndPoints();
+  const { notification } = App.useApp();
+  const { setOverlayVisible } = useOverlay();
+  const [searchValue, setSearchValue] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
 
   // Fetch projects from API on mount
   useEffect(() => {
-    getGlobalProjects(currentPage, pageSize, searchTerm);
-  }, [currentPage, pageSize, searchTerm, getGlobalProjects]);
+    getGlobalProjects(currentPage, pageSize, searchValue);
+  }, [currentPage, pageSize, searchValue, getGlobalProjects]);
 
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
-      getGlobalProjects(1, pageSize, searchTerm);
+      getGlobalProjects(1, pageSize, searchValue);
       setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchTerm, pageSize, getGlobalProjects]);
+  }, [searchValue, pageSize, getGlobalProjects]);
 
   // Convert API projects to context format
   const projects: ContextProject[] = globalProjects.map((p) => {
@@ -181,56 +199,120 @@ export default function ProjectsPage() {
     openDrawer("new-project", {});
   };
 
-  const handleEditProject = useCallback(async (project: ContextProject) => {
-    try {
-      // Fetch the full project data from API
-      const projectData = globalProjects.find(
-        (p) => p.project.id === project.id,
-      );
-      if (projectData) {
-        // Set the selected project for editing
-        await getGlobalProject(project.id);
-        // Open the edit drawer after project is fetched
-        setTimeout(() => {
-          openDrawer("edit-project", {});
-        }, 100);
+  const handleEditProject = useCallback(
+    async (project: ContextProject) => {
+      try {
+        // Fetch the full project data from API
+        const projectData = globalProjects.find(
+          (p) => p.project.id === project.id,
+        );
+        if (projectData) {
+          // Set the selected project for editing
+          await getGlobalProject(project.id);
+          // Open the edit drawer after project is fetched
+          setTimeout(() => {
+            openDrawer("edit-project", {});
+          }, 100);
+        }
+      } catch (error) {
+        console.error("Failed to open edit project:", error);
       }
-    } catch (error) {
-      console.error("Failed to open edit project:", error);
-    }
-  }, [globalProjects, getGlobalProject, openDrawer]);
+    },
+    [globalProjects, getGlobalProject, openDrawer],
+  );
 
-  const handleProjectClick = useCallback(async (project: ContextProject) => {
-    try {
-      // Set the selected project for viewing details
-      await getGlobalProject(project.id);
-      // Open the view drawer after project is fetched
-      setTimeout(() => {
-        openDrawer("view-project-details", {});
-      }, 100);
-    } catch (error) {
-      console.error("Failed to open project details:", error);
-    }
-  }, [getGlobalProject, openDrawer]);
+  const handleProjectClick = useCallback(
+    async (project: ContextProject) => {
+      try {
+        // Set the selected project for viewing details
+        await getGlobalProject(project.id);
+        // Open the view drawer after project is fetched
+        setTimeout(() => {
+          openDrawer("view-project-details", {});
+        }, 100);
+      } catch (error) {
+        console.error("Failed to open project details:", error);
+      }
+    },
+    [getGlobalProject, openDrawer],
+  );
 
-  const handleDeleteProject = useCallback(async (project: ContextProject) => {
-    try {
-      // Fetch the full project data from API
-      const projectData = globalProjects.find(
-        (p) => p.project.id === project.id,
-      );
-      if (projectData) {
+  const handleDeleteProject = useCallback(
+    async (project: ContextProject) => {
+      console.log("Delete clicked for project:", project);
+
+      try {
         // Set the selected project for deletion
         await getGlobalProject(project.id);
-        // Open the delete drawer after project is fetched
+
+        // Get endpoints count for this project
+        await getEndPoints({ id: project.id, page: 1, limit: 1 });
+
+        // Set overlay visible first
+        setOverlayVisible(true);
+
+        // Wait a bit for the state to update
         setTimeout(() => {
-          openDrawer("delete-project", {});
-        }, 100);
+          const count = endPointsCount || 0;
+          console.log("Endpoints count:", count);
+
+          let description =
+            count > 0
+              ? "This project has active resources. Please pause or delete all resources before deleting the project."
+              : "You can safely delete this project.";
+
+          let title =
+            count > 0
+              ? `You're not allowed to delete "${project.name}"`
+              : `You're about to delete "${project.name}"`;
+
+          const updateNotificationMessage = openWarning({
+            title: title,
+            description: description,
+            deleteDisabled: count > 0,
+            notification: notification,
+            onDelete: () => {
+              deleteProject(project.id, null)
+                .then((result) => {
+                  if (result) {
+                    setOverlayVisible(false);
+                    notification.destroy(`${title}-delete-notification`);
+                    // Refresh the project list
+                    getGlobalProjects(currentPage, pageSize, searchValue);
+                  } else {
+                    updateNotificationMessage("An unknown error occurred.");
+                    setOverlayVisible(false);
+                  }
+                })
+                .catch((error) => {
+                  console.error("Error deleting project:", error);
+                  updateNotificationMessage("An unknown error occurred.");
+                  setOverlayVisible(false);
+                });
+            },
+            onCancel: () => {
+              setOverlayVisible(false);
+            },
+          });
+        }, 500); // Give time for endpoint count to update
+      } catch (error) {
+        console.error("Failed to handle delete project:", error);
+        setOverlayVisible(false);
       }
-    } catch (error) {
-      console.error("Failed to open delete project:", error);
-    }
-  }, [globalProjects, getGlobalProject, openDrawer]);
+    },
+    [
+      notification,
+      getGlobalProject,
+      getEndPoints,
+      endPointsCount,
+      deleteProject,
+      setOverlayVisible,
+      currentPage,
+      pageSize,
+      searchValue,
+      getGlobalProjects,
+    ],
+  );
 
   // Filter to only show active projects or all if status is not available
   const activeProjects = projects.filter(
@@ -256,17 +338,13 @@ export default function ProjectsPage() {
               </Text>
             </div>
             <Flex gap={16} align="center">
-              <Input
+              <SearchHeaderInput
                 placeholder="Search projects..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-[280px] text-bud-text-primary placeholder:text-bud-text-disabled"
-                prefix={
-                  <Icon
-                    icon="ph:magnifying-glass"
-                    className="text-bud-text-disabled"
-                  />
-                }
+                searchValue={searchValue}
+                setSearchValue={(value) => {
+                  setSearchValue(value);
+                  setCurrentPage(1);
+                }}
               />
               <PrimaryButton onClick={handleCreateProject}>
                 <PlusOutlined className="mr-2" />
@@ -277,8 +355,34 @@ export default function ProjectsPage() {
 
           {/* Loading State */}
           {loading && activeProjects.length === 0 && (
-            <div className="flex justify-center items-center h-64">
-              <Spin size="large" />
+            <div className="flex justify-center items-center">
+              <div className="w-full flex flex-col gap-6">
+                {[0, 1].map((row) => (
+                  <div key={row} className="flex gap-6">
+                    {[0, 1, 2].map((col) => (
+                      <div
+                        key={col}
+                        className="flex-1 h-[200px] rounded-lg bg-bud-bg-secondary border-bud-border relative overflow-hidden"
+                        style={{ minWidth: 0 }}
+                      >
+                        {/* Animated light pass */}
+                        <div className="absolute inset-0 pointer-events-none">
+                          <motion.div
+                            className={styles.loadingBar}
+                            initial={{ width: "0%" }}
+                            animate={{ width: "100%" }}
+                            transition={{
+                              duration: 1.5,
+                              ease: "easeInOut",
+                              repeat: Infinity,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -306,24 +410,15 @@ export default function ProjectsPage() {
               <Spin />
             </div>
           )}
-
           {/* Empty State */}
           {!loading && activeProjects.length === 0 && (
             <div className="text-center py-16">
-              <Icon
-                icon="ph:folder-plus"
-                className="text-6xl text-bud-text-disabled mb-4"
-              />
               <Text className="text-bud-text-primary text-lg mb-2 block">
                 No projects found
               </Text>
               <Text className="text-bud-text-muted mb-6 block">
                 Create your first project to start organizing your AI resources
               </Text>
-              <PrimaryButton onClick={handleCreateProject}>
-                <PlusOutlined className="mr-2" />
-                <span>Create Your First Project</span>
-              </PrimaryButton>
             </div>
           )}
         </div>

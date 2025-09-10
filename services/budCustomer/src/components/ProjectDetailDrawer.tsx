@@ -1,5 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { Drawer, Tag, Spin, Empty, Card, Row, Col, Typography, Space, Button, Tooltip } from "antd";
+import {
+  Drawer,
+  Tag,
+  Spin,
+  Empty,
+  Card,
+  Row,
+  Col,
+  Typography,
+  Space,
+  Button,
+  Tooltip,
+} from "antd";
 import {
   CopyOutlined,
   TagsOutlined,
@@ -48,39 +60,39 @@ interface ProjectDetailDrawerProps {
   projectId: string | null;
 }
 
-export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => void }> = ({
-  projectId,
-  onClose,
-}) => {
+export const ProjectDetailContent: React.FC<{
+  projectId: string;
+  onClose: () => void;
+}> = ({ projectId, onClose }) => {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchProjectDetails = async () => {
+      try {
+        setLoading(true);
+        const response = await AppRequest.Get(`/projects/${projectId}`);
+        if (response.data?.project) {
+          setProject({
+            ...response.data.project,
+            endpoints_count: response.data.endpoints_count || 0,
+            models_count: response.data.models_count || 0,
+            clusters_count: response.data.clusters_count || 0,
+            credentials_count: response.data.credentials_count || 0,
+            credentials: response.data.credentials || [],
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch project details:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (projectId) {
       fetchProjectDetails();
     }
   }, [projectId]);
-
-  const fetchProjectDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await AppRequest.Get(`/projects/${projectId}`);
-      if (response.data?.project) {
-        setProject({
-          ...response.data.project,
-          endpoints_count: response.data.endpoints_count || 0,
-          models_count: response.data.models_count || 0,
-          clusters_count: response.data.clusters_count || 0,
-          credentials_count: response.data.credentials_count || 0,
-          credentials: response.data.credentials || [],
-        });
-      }
-    } catch (error) {
-      console.error("Failed to fetch project details:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -96,7 +108,6 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
     };
     return typeMap[type] || type;
   };
-
 
   if (loading) {
     return (
@@ -167,7 +178,10 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
               <div className="flex items-center gap-4 px-[1.4rem] py-[1rem]">
                 {/* <div className="text-4xl">{project.icon || "📁"}</div> */}
                 <div className="flex-1">
-                  <Title level={4} className="!mb-1 text-white">
+                  <Title
+                    level={4}
+                    className="!mb-1 text-black dark:text-[#EEEEEE]"
+                  >
                     {project.name}
                   </Title>
                   <Text className="text-gray-400">{project.description}</Text>
@@ -176,14 +190,17 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
               <div className="hR w-full bg-[#1F1F1F50] h-[1px]"></div>
               {/* Project Information */}
               <Row gutter={[16, 16]} className="px-[1.4rem] mt-[1rem]">
-
                 <Col span={24}>
                   <div className="flex items-center justify-between py-[1rem]">
                     <Text className="text-gray-400">Tags</Text>
                     <Space wrap>
                       {project.tags && project.tags.length > 0 ? (
                         project.tags.map((tag, index) => (
-                          <Tag key={index} color={tag.color} icon={<TagsOutlined />}>
+                          <Tag
+                            key={index}
+                            color={tag.color}
+                            icon={<TagsOutlined />}
+                          >
                             {tag.name}
                           </Tag>
                         ))
@@ -197,17 +214,26 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
                 <Col span={24} className="mb-[1rem]">
                   <div className="flex items-center justify-start">
                     <Text className="text-gray-400">Api Keys: &nbsp;</Text>
-                    <Text className="text-white">{project.credentials_count || 0}</Text>
+                    <Text className="text-white">
+                      {project.credentials_count || 0}
+                    </Text>
                   </div>
                 </Col>
 
                 {project.credentials && project.credentials.length > 0 && (
                   <Col span={24} className="mb-[1.5rem]">
                     <div className="bg-[#1F1F1F50] rounded-lg p-3">
-                      <Text className="text-gray-400 text-xs mb-2 block">Available API Keys</Text>
+                      <Text className="text-gray-400 text-xs mb-2 block">
+                        Available API Keys
+                      </Text>
                       {project.credentials.map((credential) => (
-                        <div key={credential.id} className="flex items-center justify-between py-2 border-b border-[#2a2a3e] last:border-0">
-                          <Text className="text-white text-sm">{credential.name}</Text>
+                        <div
+                          key={credential.id}
+                          className="flex items-center justify-between py-2 border-b border-[#2a2a3e] last:border-0"
+                        >
+                          <Text className="text-white text-sm">
+                            {credential.name}
+                          </Text>
                           <Text className="text-gray-500 text-xs">
                             {credential.last_used_at
                               ? `Last used: ${dayjs(credential.last_used_at).format("MMM DD, YYYY HH:mm")}`
@@ -218,8 +244,6 @@ export const ProjectDetailContent: React.FC<{ projectId: string; onClose: () => 
                     </div>
                   </Col>
                 )}
-
-
               </Row>
             </div>
           </div>

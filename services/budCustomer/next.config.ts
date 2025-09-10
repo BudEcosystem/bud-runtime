@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: false,
   experimental: {
     // Ensure consistent CSS class generation
-    esmExternals: 'loose',
+    esmExternals: "loose",
   },
   webpack: (config) => {
     // Ignore the optional memcpy module that bytebuffer tries to load
@@ -21,12 +21,12 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: '/login',
-        destination: '/auth/login',
+        source: "/login",
+        destination: "/auth/login",
       },
       {
-        source: '/register',
-        destination: '/auth/register',
+        source: "/register",
+        destination: "/auth/register",
       },
     ];
   },

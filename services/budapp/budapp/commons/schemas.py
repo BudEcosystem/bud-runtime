@@ -42,6 +42,21 @@ lowercase_string = Annotated[str, StringConstraints(to_lower=True)]
 ContentType = TypeVar("ContentType")
 
 
+def to_camel(string: str) -> str:
+    """Convert snake_case to camelCase."""
+    components = string.split("_")
+    return components[0] + "".join(x.title() for x in components[1:])
+
+
+class CamelCaseModel(BaseModel):
+    """Base model with camelCase field aliases."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+
 class CloudEventBase(BaseModel):
     """Base class for handling HTTP requests with cloud event compatible validation.
 
@@ -395,38 +410,3 @@ class BudNotificationMetadata(BaseModel):
     workflow_id: str
     subscriber_ids: str
     name: str
-
-
-# Proxy-related schemas for guardrails integration
-
-
-class ProxyGuardrailRuleConfig(BaseModel):
-    """Rule configuration for proxy."""
-
-    rule_id: UUID
-    rule_name: str
-    sentinel_id: Optional[str] = None
-    is_enabled: bool
-    configuration: Optional[Dict[str, Any]] = None
-    threshold_override: Optional[float] = None
-
-
-class ProxyGuardrailProbeConfig(BaseModel):
-    """Probe configuration for proxy."""
-
-    probe_id: UUID
-    probe_name: str
-    sentinel_id: Optional[str] = None
-    is_enabled: bool
-    configuration: Optional[Dict[str, Any]] = None
-    threshold_override: Optional[float] = None
-    rules: List[ProxyGuardrailRuleConfig]
-
-
-class ProxyGuardrailConfig(BaseModel):
-    """Guardrail configuration for proxy."""
-
-    name: str
-    configuration: Optional[Dict[str, Any]] = None
-    default_threshold: Optional[float] = None
-    probes: List[ProxyGuardrailProbeConfig]

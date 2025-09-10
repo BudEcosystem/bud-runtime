@@ -3,6 +3,12 @@
 import os
 from typing import Any, Dict
 
+from budeval.commons.config import app_settings
+from budeval.commons.logging import logging
+
+
+logger = logging.getLogger(__name__)
+
 
 class StorageConfig:
     """Storage configuration based on environment."""
@@ -11,7 +17,7 @@ class StorageConfig:
     def get_environment() -> str:
         """Detect the current environment."""
         # Check for local development indicators
-        if os.path.exists("/home/ubuntu/bud-serve-eval/k3s.yaml"):
+        if os.path.exists("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml"):
             return "local"
 
         # Check for environment variable
@@ -19,18 +25,61 @@ class StorageConfig:
         return env
 
     @staticmethod
+    def get_current_namespace() -> str:
+        """Get the current Kubernetes namespace where the app is running.
+
+        Returns:
+            The namespace where the app is running (always lowercase)
+        """
+        # First try environment variable
+        namespace = os.environ.get("NAMESPACE")
+        if namespace:
+            namespace = namespace.lower()  # Kubernetes namespaces must be lowercase
+            logger.debug(f"Namespace from environment variable: {namespace}")
+            return namespace
+
+        # Try reading from serviceaccount if running in cluster
+        namespace_file = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+        if os.path.exists(namespace_file):
+            try:
+                with open(namespace_file, "r") as f:
+                    namespace = f.read().strip().lower()  # Ensure lowercase
+                    logger.debug(f"Namespace from serviceaccount file: {namespace}")
+                    return namespace
+            except (IOError, OSError) as e:
+                logger.warning(f"Failed to read namespace from serviceaccount file: {e}")
+
+        # Default fallback
+        logger.debug("Using default namespace: default")
+        return "default"
+
+    @staticmethod
+    def get_eval_datasets_pvc_name() -> str:
+        """Get the PVC name for eval datasets.
+
+        Returns:
+            The PVC name to use for eval datasets
+        """
+        return app_settings.eval_datasets_path
+
+    @staticmethod
     def get_storage_config() -> Dict[str, Any]:
         """Get storage configuration for current environment."""
         env = StorageConfig.get_environment()
+        namespace = StorageConfig.get_current_namespace()
+        pvc_name = StorageConfig.get_eval_datasets_pvc_name()
 
         configs = {
             "local": {
                 "eval_datasets": {
+                    "pvc_name": pvc_name,
+                    "namespace": namespace,
                     "access_mode": "ReadWriteOnce",  # local-path doesn't support RWX
                     "size": "10Gi",
                     "storage_class": "local-path",  # Use default (local-path)
                 },
                 "job_volumes": {
+                    "namespace": namespace,
                     "access_mode": "ReadWriteOnce",
                     "data_size": "5Gi",
                     "output_size": "5Gi",
@@ -39,11 +88,14 @@ class StorageConfig:
             },
             "production": {
                 "eval_datasets": {
+                    "pvc_name": pvc_name,
+                    "namespace": namespace,
                     "access_mode": "ReadWriteMany",  # For shared access
                     "size": "100Gi",
                     "storage_class": "",  # Use cluster default
                 },
                 "job_volumes": {
+                    "namespace": namespace,
                     "access_mode": "ReadWriteOnce",
                     "data_size": "20Gi",
                     "output_size": "20Gi",
@@ -54,6 +106,7 @@ class StorageConfig:
 
         config = configs.get(env, configs["production"])
         config["environment"] = env
+        config["namespace"] = namespace
         return config
 
     @staticmethod

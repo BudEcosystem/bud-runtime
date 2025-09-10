@@ -27,12 +27,14 @@ stdenv.mkDerivation (finalAttrs: {
     rm -rf ./src
     cp -r ./.  $out/share/budcustomer
     makeWrapper "${lib.getExe pnpm}" "$out/bin/budcustomer" \
-      --set PATH ${lib.makeBinPath [
-        nodejs
-        dockerTools.binSh
-        gnused
-        coreutils
-      ]} \
+      --set PATH ${
+        lib.makeBinPath [
+          nodejs
+          dockerTools.binSh
+          gnused
+          coreutils
+        ]
+      } \
       --run "cd $out/share/budcustomer" \
       --add-flags "start"
   '';

@@ -273,7 +273,7 @@ export function NameIconInput({
       <Form.Item
         hasFeedback
         name={"name"}
-        className="w-full border-[1px] border-[#757575] box-border rounded-[6px] justify-center"
+        className="w-full border-[1px] border-[#B1B1B1] dark:border-[#757575] box-border rounded-[6px] justify-center"
         rules={[
           {
             required: true,

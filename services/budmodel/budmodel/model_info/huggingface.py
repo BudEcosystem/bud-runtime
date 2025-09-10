@@ -33,6 +33,7 @@ from ..commons.helpers import safe_delete
 from .base import BaseModelInfo
 from .download_history import DownloadHistory
 from .exceptions import HubDownloadException, RepoAccessException, SpaceNotAvailableException
+from .huggingface_aria2 import HuggingFaceAria2Downloader
 from .license import HuggingFaceLicenseExtractor
 from .parser import (
     extract_model_card_details,
@@ -541,66 +542,160 @@ class HuggingFaceModelInfo(BaseModelInfo):
         logger.debug("Downloading model %s to: %s", model_uri, local_dir)
 
         try:
-            # Calculate free space
-            free_space = DownloadHistory.get_available_space()
+            # Calculate model size
             model_size = HuggingfaceUtils.get_hf_model_size(model_uri, token)
-            logger.debug("Space details - Free: %s, Model Size: %s", free_space, model_size)
-            if model_size > free_space:
-                raise SpaceNotAvailableException("Space not available to download %s", model_uri)
-        except SpaceNotAvailableException as e:
-            logger.error(str(e))
-            raise e
+            logger.debug("Model size: %s bytes", model_size)
         except Exception as e:
             logger.error("Unexpected error during size calculation: %s", e)
             raise e
 
+        download_record_created = False
         try:
-            # Create a new download record with `running` status
-            DownloadHistory.create_download_history(output_dir, model_size)
-
-            # List files in the repository
+            # List files in the repository first to validate access
             files, total_size = self.list_repository_files(model_uri, token)
             logger.debug("Found %s files in the repository with total size %s", len(files), total_size)
 
             if not files:
                 raise HubDownloadException("No files found in repository: %s", model_uri)
 
-            logger.debug("Model downloaded to: %s", local_dir)
+            # Atomically check and reserve space for the download
+            try:
+                DownloadHistory.atomic_space_reservation(output_dir, model_size)
+                download_record_created = True
+            except SpaceNotAvailableException as e:
+                logger.error("Space reservation failed: %s", str(e))
+                raise e
 
-            # Update the record to `completed` and set the path
+            # Download each file - use aria2 if enabled
+            if app_settings.use_aria2_for_huggingface:
+                try:
+                    self._download_files_with_aria2(files, model_uri, local_dir, token, workflow_id)
+                except Exception as aria2_error:
+                    logger.warning("Aria2 download failed, falling back to standard download: %s", str(aria2_error))
+                    # Fall back to standard download
+                    self._download_files_standard(files, model_uri, local_dir, token, workflow_id, output_dir)
+            else:
+                # Standard download method
+                self._download_files_standard(files, model_uri, local_dir, token, workflow_id, output_dir)
+
+            # Update the record to `completed` only after all files are downloaded
             DownloadHistory.update_download_status(output_dir, ModelDownloadStatus.COMPLETED)
-
-            for current_file_count, file_info in enumerate(files, 1):
-                filename = (
-                    os.path.join(file_info["path"], file_info["filename"])
-                    if file_info["path"] != "."
-                    else file_info["filename"]
-                )
-                file_size = file_info["size_bytes"]
-
-                # Update workflow eta in state store
-                if workflow_id:
-                    self.update_workflow_eta_state_store(
-                        workflow_id, current_file_count, file_size, filename, output_dir
-                    )
-
-                self.download_file(filename, model_uri, local_dir, token)
+            logger.debug("Model downloaded successfully to: %s", local_dir)
 
             return output_dir
         except hf_hub_errors.GatedRepoError as e:
             logger.error("Access denied to gated repo %s:", model_uri)
             safe_delete(local_dir)
+            if download_record_created:
+                DownloadHistory.delete_download_history(output_dir)
             raise HubDownloadException(f"Access denied to gated repo: {model_uri}") from e
         except hf_hub_errors.RepositoryNotFoundError as e:
             logger.error("Repository not found or access issue for %s:", model_uri)
             safe_delete(local_dir)
+            if download_record_created:
+                DownloadHistory.delete_download_history(output_dir)
             raise HubDownloadException(f"Repository not found: {model_uri}") from e
         except Exception as e:
             logger.exception("Unexpected error during model download: %s", e)
             safe_delete(local_dir)
+            if download_record_created:
+                DownloadHistory.delete_download_history(output_dir)
             raise HubDownloadException(f"Error during snapshot download: {e}") from e
-        finally:
-            DownloadHistory.delete_download_history(output_dir)
+
+    def _download_files_with_aria2(
+        self,
+        files: list[dict],
+        model_uri: str,
+        local_dir: str,
+        token: Optional[str],
+        workflow_id: Optional[str],
+    ) -> None:
+        """Download files using aria2 with I/O monitoring.
+
+        Args:
+            files: List of file information dictionaries
+            model_uri: HuggingFace model URI
+            local_dir: Local directory to save files
+            token: HuggingFace API token
+            workflow_id: Workflow ID for progress tracking
+        """
+        logger.info("Using aria2 for HuggingFace download with I/O monitoring")
+
+        # Initialize aria2 downloader with config settings
+        aria2_downloader = HuggingFaceAria2Downloader(
+            enable_io_monitoring=app_settings.enable_io_monitoring,
+            io_check_interval=app_settings.io_check_interval,
+            min_speed=app_settings.aria2_min_speed,
+            max_speed=app_settings.aria2_max_speed,
+        )
+
+        # Prepare file list for download
+        filenames = []
+        for file_info in files:
+            filename = (
+                os.path.join(file_info["path"], file_info["filename"])
+                if file_info["path"] != "."
+                else file_info["filename"]
+            )
+            filenames.append(filename)
+
+        # Download files sequentially with I/O monitoring
+        # (could be enhanced for smart parallel downloads later)
+        for i, filename in enumerate(filenames, 1):
+            logger.info(f"Downloading file {i}/{len(filenames)} via aria2: {filename}")
+
+            # Update workflow progress
+            if workflow_id:
+                file_info = next(
+                    f
+                    for f in files
+                    if (os.path.join(f["path"], f["filename"]) if f["path"] != "." else f["filename"]) == filename
+                )
+                self.update_workflow_eta_state_store(workflow_id, i, file_info["size_bytes"], filename, local_dir)
+
+            # Download using aria2
+            aria2_downloader.download_file(
+                repo_id=model_uri,
+                filename=filename,
+                local_dir=local_dir,
+                token=token,
+                workflow_id=workflow_id,
+            )
+
+    def _download_files_standard(
+        self,
+        files: list[dict],
+        model_uri: str,
+        local_dir: str,
+        token: Optional[str],
+        workflow_id: Optional[str],
+        output_dir: str,
+    ) -> None:
+        """Download files using standard hf_hub_download.
+
+        Args:
+            files: List of file information dictionaries
+            model_uri: HuggingFace model URI
+            local_dir: Local directory to save files
+            token: HuggingFace API token
+            workflow_id: Workflow ID for progress tracking
+            output_dir: Output directory name for progress tracking
+        """
+        logger.info("Using standard HuggingFace download method")
+
+        for current_file_count, file_info in enumerate(files, 1):
+            filename = (
+                os.path.join(file_info["path"], file_info["filename"])
+                if file_info["path"] != "."
+                else file_info["filename"]
+            )
+            file_size = file_info["size_bytes"]
+
+            # Update workflow eta in state store
+            if workflow_id:
+                self.update_workflow_eta_state_store(workflow_id, current_file_count, file_size, filename, output_dir)
+
+            self.download_file(filename, model_uri, local_dir, token)
 
     @staticmethod
     def download_file(filename: str, model_uri: str, output_dir: str, token: Optional[str] = None) -> str:

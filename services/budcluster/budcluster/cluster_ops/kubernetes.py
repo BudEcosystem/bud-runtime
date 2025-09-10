@@ -1,4 +1,5 @@
 import base64
+import json
 import re
 import time
 from collections import defaultdict
@@ -99,8 +100,8 @@ class KubernetesHandler(BaseClusterHandler):
     def initial_setup(self, cluster_id: UUID) -> None:
         """Execute the initial setup for the Kubernetes cluster using Ansible playbook.
 
-        This method runs the 'NODE_INFO_COLLECTOR' playbook to gather node information
-        and apply necessary configurations.
+        This method runs the 'SETUP_CLUSTER' playbook to deploy NFD, GPU operators,
+        Aibrix components, and gather node information.
 
         Raises:
             Exception: If the setup fails on any node.
@@ -108,19 +109,18 @@ class KubernetesHandler(BaseClusterHandler):
         Returns:
             str: The status of the setup process.
         """
+        # Setup cluster with NFD, GPU operators, and Aibrix components
         result = self.ansible_executor.run_playbook(
-            playbook="NODE_INFO_COLLECTOR",
+            playbook="SETUP_CLUSTER",  # Uses comprehensive cluster setup
             extra_vars={
                 "kubeconfig_content": self.config,
-                "node_info_collector_image_cpu": app_settings.node_info_collector_image_cpu,
-                "node_info_collector_image_cuda": app_settings.node_info_collector_image_cuda,
-                "node_info_collector_image_hpu": app_settings.node_info_collector_image_hpu,
-                "node_labeler_image": app_settings.node_info_labeler_image,
                 "image_pull_secrets": self.get_image_pull_secret(),
                 "platform": self.platform,
                 "prometheus_url": f"{app_settings.prometheus_url}/api/v1/write",
                 "prometheus_namespace": "bud-system",
                 "cluster_name": str(cluster_id),
+                "namespace": "bud-system",  # Changed to bud-system for infrastructure components
+                "enable_nfd": True,  # NFD is now required
             },
         )
         if result["status"] == "failed":
@@ -223,46 +223,170 @@ class KubernetesHandler(BaseClusterHandler):
             url = f"http://{url}"
         return urlparse(url).netloc, urlparse(url).scheme
 
+    def _get_gpu_allocations(self, node_name: str) -> Dict[str, int]:
+        """Calculate GPU allocations for a specific node.
+
+        Returns dict with total_gpus, allocated_gpus, and available_gpus.
+        """
+        try:
+            # Disable SSL warnings for self-signed certs
+            import urllib3
+
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+            v1 = client.CoreV1Api()
+
+            # Get node to find total GPUs
+            node = v1.read_node(node_name)
+            total_gpus = 0
+
+            if node.status and node.status.capacity:
+                # Check for NVIDIA GPUs
+                nvidia_gpus = node.status.capacity.get("nvidia.com/gpu", "0")
+                total_gpus = int(nvidia_gpus) if nvidia_gpus else 0
+
+                # Check for AMD GPUs
+                amd_gpus = node.status.capacity.get("amd.com/gpu", "0")
+                if amd_gpus:
+                    total_gpus += int(amd_gpus)
+
+            # Get pods on this node
+            field_selector = f"spec.nodeName={node_name}"
+            pods = v1.list_pod_for_all_namespaces(field_selector=field_selector)
+
+            allocated_gpus = 0
+            for pod in pods.items:
+                # Only count Running and Pending pods
+                if pod.status.phase in ["Running", "Pending"]:
+                    for container in pod.spec.containers:
+                        if container.resources and container.resources.requests:
+                            # Check NVIDIA GPUs
+                            nvidia_request = container.resources.requests.get("nvidia.com/gpu", "0")
+                            allocated_gpus += int(nvidia_request) if nvidia_request else 0
+
+                            # Check AMD GPUs
+                            amd_request = container.resources.requests.get("amd.com/gpu", "0")
+                            allocated_gpus += int(amd_request) if amd_request else 0
+
+            available_gpus = max(0, total_gpus - allocated_gpus)
+
+            logger.debug(
+                f"Node {node_name}: {available_gpus}/{total_gpus} GPUs available ({allocated_gpus} allocated)"
+            )
+
+            return {"total_gpus": total_gpus, "allocated_gpus": allocated_gpus, "available_gpus": available_gpus}
+
+        except Exception as e:
+            logger.warning(f"Failed to get GPU allocations for {node_name}: {e}")
+            return None
+
     def get_node_info(self) -> List[Dict[str, Any]]:
-        """Get the node information from the Kubernetes cluster.
+        """Get the node information from the Kubernetes cluster using NFD labels.
 
         Returns:
-            Dict[str, Any]: A dictionary containing node information from the Kubernetes cluster.
+            List[Dict[str, Any]]: A list containing node information from the Kubernetes cluster.
 
         Raises:
-            KubernetesException: If there is an error while parsing configmap node info.
+            KubernetesException: If there is an error while extracting node info.
         """
         result = self.ansible_executor.run_playbook(
             playbook="GET_NODE_INFO", extra_vars={"kubeconfig_content": self.config}
         )
-        configmap_data = []
+
+        node_data = []
         if result["status"] == "successful":
             try:
+                # Extract node information from NFD labels
+                # First check for the output fact task
+                node_info_output = None
                 for event in result["events"]:
-                    if (
-                        event["task"] == "Fetch Node Information ConfigMap for each node"
-                        and event["status"] == "runner_on_ok"
-                    ):
-                        node_info = self._parse_configmap_node_info(event)
-                        configmap_data.extend(node_info)
+                    if event["task"] == "Set output fact for node information" and event["status"] == "runner_on_ok":
+                        node_info_output = event["event_data"]["res"]["ansible_facts"].get("node_info_output", [])
+                        break
 
-                # Fetch node status separately
-                node_status_data = self._get_nodes_status(result)
+                # If no output fact task, collect from individual processing tasks
+                if node_info_output is None:
+                    node_info_output = []
+                    for event in result["events"]:
+                        if (
+                            event["task"] == "Process each node and extract NFD information"
+                            and event["status"] == "runner_on_ok"
+                            and "ansible_facts" in event["event_data"]["res"]
+                        ):
+                            node_info = event["event_data"]["res"]["ansible_facts"].get("node_information", [])
+                            if node_info and isinstance(node_info, list) and len(node_info) > 0:
+                                # Get the last item since it's accumulated
+                                node_info_output = node_info
 
-                # Merge node status with configmap data
-                for node in configmap_data:
-                    node_name = node.get("node_name")
-                    if (
-                        node["node_status"] == "True"
-                        and node_name in node_status_data
-                        and node_status_data[node_name] != "Ready"
-                    ):
-                        node["node_status"] = "False"
-                    node["derived_status"] = node_status_data.get(node_name, "Unknown")
+                if node_info_output:
+                    # Process each node's information
+                    from .device_extractor import DeviceExtractor
+
+                    extractor = DeviceExtractor()
+
+                    for node in node_info_output:
+                        # Extract device information from node info (which includes NFD labels)
+                        devices = extractor.extract_from_node_info(node)
+
+                        # Get real GPU allocations for this node
+                        node_name = node.get("node_name")
+                        if node_name and devices.get("gpus"):
+                            gpu_allocations = self._get_gpu_allocations(node_name)
+                            if gpu_allocations:
+                                # Update GPU devices with real available counts
+                                for gpu in devices["gpus"]:
+                                    # The total count from device extractor
+                                    total_count = gpu.get("count", 1)
+                                    # Use real available count from Kubernetes
+                                    gpu["available_count"] = gpu_allocations["available_gpus"]
+                                    gpu["total_count"] = total_count
+                                    logger.debug(
+                                        f"Updated GPU on {node_name}: total={total_count}, available={gpu_allocations['available_gpus']}"
+                                    )
+
+                        # Format node data for compatibility with existing structure
+                        # Determine node status based on both Ready condition and schedulability
+                        schedulability = node.get("schedulability", {})
+
+                        # Convert string booleans to actual booleans (Ansible returns strings)
+                        ready_value = schedulability.get("ready", False)
+                        is_ready = ready_value if isinstance(ready_value, bool) else str(ready_value).lower() == "true"
+
+                        schedulable_value = schedulability.get("schedulable", True)
+                        is_schedulable = (
+                            schedulable_value
+                            if isinstance(schedulable_value, bool)
+                            else str(schedulable_value).lower() == "true"
+                        )
+
+                        # Node is truly available only if it's both Ready and schedulable
+                        node_available = is_ready and is_schedulable
+
+                        logger.debug(
+                            f"Node {node.get('node_name')}: ready={is_ready}, schedulable={is_schedulable}, available={node_available}"
+                        )
+
+                        node_formatted = {
+                            "node_name": node.get("node_name"),
+                            "node_id": node.get("node_id"),
+                            "node_status": node_available,  # Use boolean for consistency
+                            "derived_status": "Ready" if node_available else "NotReady",
+                            "devices": json.dumps(devices),
+                            "cpu_info": node.get("cpu_info", {}),
+                            "memory_info": node.get("memory_info", {}),
+                            "gpu_info": node.get("gpu_info", {}),
+                            "kernel_info": node.get("kernel_info", {}),
+                            "capacity": node.get("capacity", {}),
+                            "allocatable": node.get("allocatable", {}),
+                            "labels": node.get("labels", {}),
+                            "schedulability": schedulability,  # Include full schedulability info
+                        }
+                        node_data.append(node_formatted)
+
             except Exception as err:
-                logger.error(f"Found error while parsing configmap node info. {err}")
-                raise KubernetesException("Found error while parsing configmap node info") from err
-        return configmap_data
+                logger.error(f"Error while extracting node info from NFD labels: {err}")
+                raise KubernetesException("Failed to extract node information from NFD labels") from err
+        return node_data
 
     def _get_nodes_status(self, result: Dict[str, Any]) -> Dict[str, str]:
         """To creates a map of node name to node status."""
@@ -361,18 +485,88 @@ class KubernetesHandler(BaseClusterHandler):
         )
         logger.debug(f"get_model_transfer_status {values}")
 
+        pod_info = None
         pod_status = None
         configmap_data = None
         if result["status"] == "successful":
             for event in result["events"]:
-                if event["task"] == "Get Pod status" and event["status"] == "runner_on_ok":
-                    pod_status = event["event_data"]["res"]["resources"][0]["status"]["phase"]
-                if event["task"] == "Get ConfigMap data" and event["status"] == "runner_on_ok":
+                if (
+                    event["task"] == "Get Pod status"
+                    and event["status"] == "runner_on_ok"
+                    and event["event_data"]["res"]["resources"]
+                ):
+                    pod_info = event["event_data"]["res"]["resources"][0]
+                    pod_status = pod_info["status"]["phase"]
+                if (
+                    event["task"] == "Get ConfigMap data"
+                    and event["status"] == "runner_on_ok"
+                    and event["event_data"]["res"]["resources"]
+                ):
                     configmap_data = event["event_data"]["res"]["resources"][0]["data"]
 
         transfer_status = {"status": "inprogress"}
-        if not pod_status or pod_status == "Failed" or not configmap_data:
+
+        # Check if pod exists and its status
+        if not pod_status:
             transfer_status["status"] = "failed"
+            transfer_status["reason"] = "Pod not found"
+            return transfer_status
+
+        if pod_status == "Failed":
+            transfer_status["status"] = "failed"
+            transfer_status["reason"] = "Pod failed"
+            return transfer_status
+
+        # Check for container-level failures
+        if pod_info and "status" in pod_info:
+            container_statuses = pod_info["status"].get("containerStatuses", [])
+            for container in container_statuses:
+                if "state" in container:
+                    if "waiting" in container["state"]:
+                        waiting_reason = container["state"]["waiting"].get("reason", "")
+                        if waiting_reason in ["CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull"]:
+                            transfer_status["status"] = "failed"
+                            transfer_status["reason"] = f"Container error: {waiting_reason}"
+                            return transfer_status
+                    elif "terminated" in container["state"]:
+                        exit_code = container["state"]["terminated"].get("exitCode", 0)
+                        if exit_code != 0:
+                            transfer_status["status"] = "failed"
+                            transfer_status["reason"] = f"Container terminated with exit code {exit_code}"
+                            return transfer_status
+
+        # Check pod age for timeout
+        if pod_info and "metadata" in pod_info:
+            import datetime
+
+            creation_timestamp = pod_info["metadata"].get("creationTimestamp")
+            if creation_timestamp:
+                # Parse ISO format timestamp
+                try:
+                    from dateutil import parser
+
+                    pod_created = parser.parse(creation_timestamp)
+                    now = datetime.datetime.now(datetime.timezone.utc)
+                    pod_age_minutes = (now - pod_created).total_seconds() / 60
+
+                    # If pod is older than 5 minutes and no ConfigMap, check logs and consider it failed
+                    if not configmap_data and pod_age_minutes > 5:
+                        transfer_status["status"] = "failed"
+                        transfer_status["reason"] = f"ConfigMap not created after {int(pod_age_minutes)} minutes"
+
+                        # Try to get pod logs for more details
+                        log_result = self.get_pod_logs_for_errors(values.get("namespace"), "model-transfer-pod")
+                        if log_result["status"] == "success" and log_result.get("error_indicators"):
+                            # Include top 3 errors found in logs
+                            transfer_status["error_details"] = log_result["error_indicators"][:3]
+
+                        return transfer_status
+                except Exception as e:
+                    logger.warning(f"Failed to parse pod creation timestamp: {e}")
+
+        # If ConfigMap doesn't exist yet, return initializing status
+        if not configmap_data:
+            transfer_status["status"] = "initializing"
             return transfer_status
 
         transfer_status["status"] = configmap_data["status"]
@@ -398,6 +592,75 @@ class KubernetesHandler(BaseClusterHandler):
             self.delete_namespace(values["namespace"])
             raise KubernetesException("Failed to deploy runtime")
         return result["status"], self.get_ingress_url(values["namespace"])
+
+    def get_pod_logs_for_errors(
+        self, namespace: str, pod_name: str = "model-transfer-pod", tail_lines: int = 50
+    ) -> dict:
+        """Get logs from a pod and check for error patterns."""
+        try:
+            import tempfile
+
+            import yaml
+            from kubernetes import client
+            from kubernetes import config as k8s_config
+
+            # Write kubeconfig to temporary file
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+                yaml.dump(self.config, f)
+                kubeconfig_file = f.name
+
+            # Load kubeconfig
+            k8s_config.load_kube_config(config_file=kubeconfig_file)
+            v1 = client.CoreV1Api()
+
+            # Get pod logs
+            try:
+                logs = v1.read_namespaced_pod_log(name=pod_name, namespace=namespace, tail_lines=tail_lines)
+
+                # Clean up temp file
+                import os
+
+                os.unlink(kubeconfig_file)
+
+                return {"status": "success", "logs": logs, "error_indicators": self._check_log_errors(logs)}
+            except Exception as e:
+                logger.error(f"Failed to get pod logs: {e}")
+                # Clean up temp file
+                import os
+
+                if os.path.exists(kubeconfig_file):
+                    os.unlink(kubeconfig_file)
+                return {"status": "failed", "error": str(e)}
+        except Exception as e:
+            logger.error(f"Failed to initialize Kubernetes client: {e}")
+            return {"status": "failed", "error": str(e)}
+
+    def _check_log_errors(self, logs: str) -> list:
+        """Check logs for common error patterns."""
+        error_patterns = [
+            "Permission denied",
+            "Access denied",
+            "Mount failed",
+            "No such file or directory",
+            "Connection refused",
+            "Authentication failed",
+            "Out of memory",
+            "Disk full",
+            "ConfigMap creation failed",
+            "Failed to create",
+            "Error:",
+            "FATAL:",
+            "panic:",
+        ]
+
+        found_errors = []
+        for line in logs.split("\n"):
+            for pattern in error_patterns:
+                if pattern.lower() in line.lower():
+                    found_errors.append({"pattern": pattern, "line": line.strip()})
+                    break
+
+        return found_errors
 
     def delete_namespace(self, namespace: str) -> None:
         """Delete the runtime on the Kubernetes cluster."""
@@ -489,7 +752,7 @@ class KubernetesHandler(BaseClusterHandler):
                     elif endpoint == "/v1/chat/completions":
                         payload = {
                             "model": namespace,
-                            "messages": [{"role": "user", "content": "test"}],
+                            "messages": [{"role": "user", "content": "who are you?"}],
                             "max_tokens": 1,
                         }
                     else:  # /v1/completions
@@ -503,6 +766,7 @@ class KubernetesHandler(BaseClusterHandler):
 
                 # Check if endpoint is supported (200 OK or other success codes)
                 supported_endpoints[endpoint] = response.status_code in [200, 201, 202, 204]
+                logger.debug(f"Endpoint {endpoint} returned  {response.text}")
                 logger.debug(f"Endpoint {endpoint} returned status code {response.status_code}")
 
             except requests.RequestException as err:
@@ -633,7 +897,7 @@ class KubernetesHandler(BaseClusterHandler):
                                 cores=int(pod["spec"]["containers"][0]["resources"]["requests"].get("cpu", 0)),
                                 memory=pod["spec"]["containers"][0]["resources"]["requests"].get("memory", "0"),
                                 deployment_name=deploy_info["metadata"]["name"],
-                                concurrency=pod["metadata"]["labels"].get("concurrency", 100),
+                                concurrency=int(pod["metadata"]["labels"].get("concurrency") or 100),
                                 reason=reason,
                             )
                             worker_data_list.append(worker_data.model_dump(mode="json", exclude_none=True))
@@ -693,6 +957,10 @@ class KubernetesHandler(BaseClusterHandler):
 
     def get_deployment_status(self, values: dict, cloud_model: bool = False, ingress_health: bool = True) -> str:
         """Get the status of a deployment on the Kubernetes cluster."""
+        logger.info(
+            f"get_deployment_status called for {values.get('namespace', 'unknown')}: "
+            f"cloud_model={cloud_model}, ingress_health={ingress_health}"
+        )
         if not self.ingress_url:
             raise KubernetesException("Ingress URL is not set")
 
@@ -730,20 +998,100 @@ class KubernetesHandler(BaseClusterHandler):
             else:
                 break
 
-        ingress_health = (
-            self.verify_ingress_health(values["namespace"], cloud_model=cloud_model) if ingress_health else True
+        # Phase 2: Bounded ingress/endpoint validation
+        # if not worker_data_list:
+        #     pod_status["status"] = DeploymentStatusEnum.FAILED
+        #     return {
+        #         "status": DeploymentStatusEnum.FAILED,
+        #         "replicas": pod_status,
+        #         "ingress_health": False,
+        #         "worker_data_list": worker_data_list,
+        #         "supported_endpoints": {},
+        #     }
+
+        # Only perform ingress/endpoint validation if explicitly requested
+        if not ingress_health:
+            return {
+                "status": pod_status["status"],
+                "replicas": pod_status,
+                "ingress_health": True,
+                "worker_data_list": worker_data_list,
+                "supported_endpoints": {},
+            }
+
+        # Bounded retry for ingress and endpoint validation
+        max_retries = app_settings.max_endpoint_retry_attempts
+        retry_interval = app_settings.endpoint_retry_interval
+        retry_count = 0
+
+        logger.info(
+            f"Starting endpoint validation retry loop for {values['namespace']}: "
+            f"max_retries={max_retries}, interval={retry_interval}s, total_timeout={max_retries * retry_interval}s"
         )
-        # ingress health can be checked only if workers are available
-        if not ingress_health and worker_data_list:
-            pod_status["status"] = DeploymentStatusEnum.INGRESS_FAILED
+
+        while retry_count < max_retries:
+            logger.info(f"Attempt {retry_count + 1}/{max_retries} for {values['namespace']}")
+
+            # Check ingress health (/v1/models endpoint)
+            ingress_healthy = self.verify_ingress_health(values["namespace"], cloud_model=cloud_model)
+            logger.debug(f"Ingress health check result: {ingress_healthy}")
+
+            if ingress_healthy:
+                # Check endpoint functionality (/v1/embeddings, /v1/chat/completions)
+                endpoints_status = self.identify_supported_endpoints(values["namespace"], cloud_model)
+                functional_endpoints = [ep for ep, supported in endpoints_status.items() if supported]
+                logger.debug(f"Endpoint status: {endpoints_status}, functional: {functional_endpoints}")
+
+                if functional_endpoints:
+                    # SUCCESS: Both ingress and endpoints are ready
+                    logger.info(
+                        f"✓ Deployment ready for {values['namespace']} after {retry_count + 1} attempts "
+                        f"with endpoints: {functional_endpoints}"
+                    )
+                    return {
+                        "status": pod_status["status"],
+                        "replicas": pod_status,
+                        "ingress_health": True,
+                        "worker_data_list": worker_data_list,
+                        "supported_endpoints": endpoints_status,
+                    }
+                else:
+                    logger.info(f"Endpoints not ready for {values['namespace']} (ingress OK)")
+            else:
+                logger.info(f"Ingress not ready for {values['namespace']}")
+
+            retry_count += 1
+            if retry_count < max_retries:
+                logger.info(f"Waiting {retry_interval}s before next attempt...")
+                time.sleep(retry_interval)
+
+        # TIMEOUT: Max retries exceeded - determine final status based on original logic
+        logger.error(
+            f"Endpoints/ingress failed to become ready after {max_retries} attempts for {values['namespace']}"
+        )
+
+        # Check final ingress health state for status determination
+        final_ingress_healthy = False
+        try:
+            final_ingress_healthy = self.verify_ingress_health(values["namespace"], cloud_model=cloud_model)
+        except Exception as e:
+            logger.warning(f"Final ingress health check failed: {e}")
+
+        # Apply original status logic: ingress health can be checked only if workers are available
+        if not final_ingress_healthy and worker_data_list:
+            final_status = DeploymentStatusEnum.INGRESS_FAILED
         elif not worker_data_list:
-            pod_status["status"] = DeploymentStatusEnum.FAILED
+            final_status = DeploymentStatusEnum.FAILED
+        else:
+            # New case: ingress is healthy but endpoints failed (timeout)
+            final_status = DeploymentStatusEnum.ENDPOINTS_FAILED
 
         return {
-            "status": pod_status["status"],
+            "status": final_status,
             "replicas": pod_status,
-            "ingress_health": ingress_health,
+            "ingress_health": final_ingress_healthy,
             "worker_data_list": worker_data_list,
+            "supported_endpoints": endpoints_status if "endpoints_status" in locals() else {},
         }
 
     def apply_security_context(self, namespace: str) -> None:

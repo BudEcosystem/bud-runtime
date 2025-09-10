@@ -189,7 +189,11 @@ class CredentialService(SessionMixin):
         # Generate new credential using secure method
         api_key = generate_secure_api_key(credential_type.value)
 
-        expiry = datetime.now(UTC) + timedelta(days=request.expiry) if request.expiry else None
+        # Handle expiry: 0 means no expiry, None means no expiry, others are days
+        if request.expiry is None or request.expiry == 0:
+            expiry = None
+        else:
+            expiry = datetime.now(UTC) + timedelta(days=request.expiry)
 
         # Encrypt the API key for storage
         encrypted_api_key = await RSAHandler().encrypt(api_key)
@@ -493,8 +497,12 @@ class CredentialService(SessionMixin):
                 )
             db_credential.name = credential_update_data["name"]
 
-        if credential_update_data.get("expiry", None):
-            credential_update_data["expiry"] = datetime.now(UTC) + timedelta(days=data.expiry)
+        if "expiry" in credential_update_data:
+            # Handle expiry: 0 means no expiry, None means no expiry, others are days
+            if data.expiry is None or data.expiry == 0:
+                credential_update_data["expiry"] = None
+            else:
+                credential_update_data["expiry"] = datetime.now(UTC) + timedelta(days=data.expiry)
 
         if credential_update_data.get("max_budget", None):
             if (
@@ -789,7 +797,7 @@ class ProprietaryCredentialService(SessionMixin):
             user_id=current_user_id,
             details={
                 "credential_name": db_credential.name,
-                "credential_type": db_credential.type,
+                "credential_type": db_credential.type.value,
             },
             request=request,
             success=True,
@@ -993,7 +1001,7 @@ class ProprietaryCredentialService(SessionMixin):
                 "credential_name": db_credential.name,
             },
             details={
-                "credential_type": db_credential.type,
+                "credential_type": db_credential.type.value,
             },
             request=request,
             success=True,
@@ -1026,7 +1034,7 @@ class ProprietaryCredentialService(SessionMixin):
 
         # Store credential details before deletion
         credential_name = db_credential.name
-        credential_type = db_credential.type
+        credential_type = db_credential.type.value
 
         # Delete the credential from the database
         await ProprietaryCredentialDataManager(self.session).delete_credential(db_credential)

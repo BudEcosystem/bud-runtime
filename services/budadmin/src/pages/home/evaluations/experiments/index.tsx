@@ -5,21 +5,14 @@ import { Table, Tag, Popover, ConfigProvider, Select } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { useRouter } from "next/router";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
-import {
-  useEvaluations,
-  ExperimentData,
-  GetExperimentsPayload,
-} from "src/hooks/useEvaluations";
+import { useEvaluations, ExperimentData, GetExperimentsPayload } from "src/hooks/useEvaluations";
 import {
   Text_12_400_EEEEEE,
   Text_16_600_FFFFFF,
   Text_12_300_EEEEEE,
   Text_12_400_B3B3B3,
 } from "@/components/ui/text";
-import {
-  PrimaryButton,
-  SecondaryButton,
-} from "@/components/ui/bud/form/Buttons";
+import { PrimaryButton, SecondaryButton } from "@/components/ui/bud/form/Buttons";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import NoDataFount from "@/components/ui/noDataFount";
 import { SortIcon } from "@/components/ui/bud/table/SortIcon";
@@ -28,6 +21,7 @@ import Tags from "src/flows/components/DrawerTags";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { capitalize } from "@/lib/utils";
 import { endpointStatusMapping } from "@/lib/colorMapping";
+
 
 // Remove the local interface since we're importing it from the hook
 
@@ -47,8 +41,7 @@ const ExperimentsTable = () => {
   const [order, setOrder] = useState("");
   const [orderBy, setOrderBy] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [tempFilter, setTempFilter] =
-    useState<ExperimentFilters>(defaultFilter);
+  const [tempFilter, setTempFilter] = useState<ExperimentFilters>(defaultFilter);
   const [filter, setFilter] = useState<ExperimentFilters>(defaultFilter);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -56,56 +49,24 @@ const ExperimentsTable = () => {
 
   // Sample data for testing when API returns no data
   const sampleExperiments: ExperimentData[] = [
-    {
-      id: "exp-1",
-      experimentName: "GPT-4 vs Claude-3 Performance Test",
-      models: "GPT-4, Claude-3",
-      traits: "Accuracy, Speed, Cost",
-      tags: ["production", "benchmark"],
-      status: "Completed",
-      createdDate: "2024-01-15T10:30:00Z",
-    },
-    {
-      id: "exp-2",
-      experimentName: "Multi-Model Language Translation",
-      models: "Llama-2, Mistral-7B, GPT-3.5",
-      traits: "Translation Quality, Latency",
-      tags: ["translation", "multi-lingual"],
-      status: "Running",
-      createdDate: "2024-01-14T14:45:00Z",
-    },
-    {
-      id: "exp-3",
-      experimentName: "Code Generation Benchmark",
-      models: "CodeLlama, StarCoder",
-      traits: "Code Quality, Syntax Accuracy",
-      tags: ["coding", "benchmark"],
-      status: "Failed",
-      createdDate: "2024-01-13T09:15:00Z",
-    },
-    {
-      id: "exp-4",
-      experimentName: "Customer Support Chatbot Eval",
-      models: "GPT-3.5-Turbo, Claude-2",
-      traits: "Response Quality, Customer Satisfaction",
-      tags: ["customer-support", "production"],
-      status: "Completed",
-      createdDate: "2024-01-12T16:20:00Z",
-    },
-    {
-      id: "exp-5",
-      experimentName: "Sentiment Analysis Comparison",
-      models: "BERT, RoBERTa, DistilBERT",
-      traits: "Accuracy, F1-Score",
-      tags: ["nlp", "sentiment"],
-      status: "Running",
-      createdDate: "2024-01-11T11:00:00Z",
-    },
+    // {
+    //   id: "exp-1",
+    //   experimentName: "GPT-4 vs Claude-3 Performance Test",
+    //   models: "GPT-4, Claude-3",
+    //   traits: "Accuracy, Speed, Cost",
+    //   tags: ["production", "benchmark"],
+    //   status: "Completed",
+    //   createdDate: "2024-01-15T10:30:00Z"
+    // },
   ];
 
   // Use Zustand store
-  const { experimentsList, experimentsListTotal, loading, getExperiments } =
-    useEvaluations();
+  const {
+    experimentsList,
+    experimentsListTotal,
+    loading,
+    getExperiments
+  } = useEvaluations();
 
   // Fetch experiments data from API
   const fetchExperiments = useCallback(async () => {
@@ -125,15 +86,7 @@ const ExperimentsTable = () => {
       console.error("Failed to fetch experiments:", error);
       // You could show a toast notification here or handle the error as needed
     }
-  }, [
-    currentPage,
-    pageSize,
-    searchValue,
-    filter,
-    order,
-    orderBy,
-    getExperiments,
-  ]);
+  }, [currentPage, pageSize, searchValue, filter, order, orderBy, getExperiments]);
 
   // Initial data fetch
   useEffect(() => {
@@ -170,37 +123,74 @@ const ExperimentsTable = () => {
       render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
       sorter: true,
       sortOrder:
-        orderBy === "name" ? (order === "-" ? "descend" : "ascend") : undefined,
+        orderBy === "name"
+          ? order === "-"
+            ? "descend"
+            : "ascend"
+          : undefined,
       sortIcon: SortIcon,
     },
     {
       title: "Models",
       dataIndex: "models",
       key: "models",
-      render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
+      render: (models) => {
+        // Handle both string and object/array formats
+        if (typeof models === 'string') {
+          return <Text_12_400_EEEEEE>{models}</Text_12_400_EEEEEE>;
+        } else if (Array.isArray(models)) {
+          // If it's an array of objects with name property
+          const modelNames = models.map(m => m.name || m).join(', ');
+          return <Text_12_400_EEEEEE>{modelNames}</Text_12_400_EEEEEE>;
+        } else if (models && typeof models === 'object') {
+          // If it's a single object with name property
+          return <Text_12_400_EEEEEE>{models.name || models.deployment_name || JSON.stringify(models)}</Text_12_400_EEEEEE>;
+        }
+        return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+      },
     },
     {
       title: "Traits",
       dataIndex: "traits",
       key: "traits",
-      render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
+      render: (traits) => {
+        // Handle both string and object/array formats
+        if (typeof traits === 'string') {
+          return <Text_12_400_EEEEEE>{traits}</Text_12_400_EEEEEE>;
+        } else if (Array.isArray(traits)) {
+          // If it's an array of objects with name property
+          const traitNames = traits.map(t => t.name || t).join(', ');
+          return <Text_12_400_EEEEEE>{traitNames}</Text_12_400_EEEEEE>;
+        } else if (traits && typeof traits === 'object') {
+          // If it's a single object with name property
+          return <Text_12_400_EEEEEE>{traits.name || JSON.stringify(traits)}</Text_12_400_EEEEEE>;
+        }
+        return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+      },
     },
     {
       title: "Tags",
       dataIndex: "tags",
       key: "tags",
-      render: (tags: string[]) => (
-        <div className="flex gap-1">
-          {tags.map((tag, index) => (
-            <Tags
-              key={index}
-              name={tag}
-              color="#D1B854"
-              classNames="text-center justify-center items-center"
-            />
-          ))}
-        </div>
-      ),
+      render: (tags) => {
+        // Ensure tags is an array
+        const tagsArray = Array.isArray(tags) ? tags : [];
+        if (tagsArray.length === 0) {
+          return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+        }
+        return (
+          <div className="flex gap-1">
+            {tagsArray.map((tag, index) => (
+              <Tags
+                key={index}
+                name={typeof tag === 'string' ? tag : tag.name || JSON.stringify(tag)}
+                color="#D1B854"
+                classNames="text-center justify-center items-center"
+              />
+            ))}
+          </div>
+        );
+      },
     },
     {
       title: "Status",
@@ -209,24 +199,14 @@ const ExperimentsTable = () => {
       render: (status: string) => (
         <ProjectTags
           name={capitalize(status)}
-          color={
-            endpointStatusMapping[
-              capitalize(status) === "Running"
-                ? capitalize(status) + "-yellow"
-                : capitalize(status)
-            ]
-          }
+          color={endpointStatusMapping[capitalize(status) === 'Running' ? capitalize(status) + '-yellow' : capitalize(status)]}
           textClass="text-[.75rem] py-[.22rem]"
           tagClass="py-[0rem]"
         />
       ),
       sorter: true,
       sortOrder:
-        orderBy === "status"
-          ? order === "-"
-            ? "descend"
-            : "ascend"
-          : undefined,
+        orderBy === "status" ? (order === "-" ? "descend" : "ascend") : undefined,
       sortIcon: SortIcon,
     },
     {
@@ -251,14 +231,16 @@ const ExperimentsTable = () => {
           </svg>
         </div>
       ),
-      dataIndex: "createdDate",
-      key: "createdDate",
+      dataIndex: "created_at",
+      key: "created_at",
       render: (date) => (
-        <Text_12_400_EEEEEE>{formatDate(date)}</Text_12_400_EEEEEE>
+        <Text_12_400_EEEEEE>
+          {formatDate(date)}
+        </Text_12_400_EEEEEE>
       ),
       sorter: true,
       sortOrder:
-        orderBy === "createdDate"
+        orderBy === "created_at"
           ? order === "-"
             ? "descend"
             : "ascend"
@@ -292,9 +274,7 @@ const ExperimentsTable = () => {
 
     // Ensure experimentsList is an array
     if (!experimentsList || !Array.isArray(experimentsList)) {
-      console.log(
-        "Using sample experiments because experimentsList is not an array",
-      );
+      console.log("Using sample experiments because experimentsList is not an array");
       return sampleExperiments;
     }
     // Use sample data if experimentsList is empty
@@ -334,12 +314,12 @@ const ExperimentsTable = () => {
     if (key === "status") {
       setFilter({
         ...filter,
-        status: filter.status.filter((s) => s !== value),
+        status: filter.status?.filter((s) => s !== value) || [],
       });
     } else if (key === "tags") {
       setFilter({
         ...filter,
-        tags: filter.tags.filter((t) => t !== value),
+        tags: filter.tags?.filter((t) => t !== value) || [],
       });
     }
   };
@@ -347,9 +327,19 @@ const ExperimentsTable = () => {
   // Get unique tags from all experiments for filter options
   const availableTags = useMemo(() => {
     const tags = new Set<string>();
-    experimentsList.forEach((exp) => {
-      exp.tags.forEach((tag) => tags.add(tag));
-    });
+    if (Array.isArray(experimentsList)) {
+      experimentsList.forEach((exp) => {
+        if (Array.isArray(exp.tags)) {
+          exp.tags.forEach((tag: any) => {
+            if (typeof tag === 'string') {
+              tags.add(tag);
+            } else if (tag && typeof tag === 'object' && 'name' in tag) {
+              tags.add(tag.name);
+            }
+          });
+        }
+      });
+    }
     return Array.from(tags);
   }, [experimentsList]);
 
@@ -383,7 +373,7 @@ const ExperimentsTable = () => {
           columns={columns}
           dataSource={Array.isArray(filteredData) ? filteredData : []}
           pagination={{
-            className: "small-pagination",
+            className: 'small-pagination',
             current: currentPage,
             pageSize: pageSize,
             total: experimentsListTotal || 0,
@@ -392,15 +382,14 @@ const ExperimentsTable = () => {
               setPageSize(size);
             },
             showSizeChanger: true,
-            pageSizeOptions: ["5", "10", "20", "50"],
+            pageSizeOptions: ['5', '10', '20', '50'],
           }}
           loading={loading}
           onChange={handleTableChange}
           onRow={(record) => ({
-            onClick: () =>
-              router.push(`/home/evaluations/experiments/${record.id}`),
+            onClick: () => router.push(`/home/evaluations/experiments/${record.id}`),
             style: { cursor: "pointer" },
-            className: "group",
+            className: 'group'
           })}
           showSorterTooltip={false}
           rowKey="id"
@@ -434,20 +423,8 @@ const ExperimentsTable = () => {
                             onClick={() => setFilterOpen(false)}
                             className="text-[#B3B3B3] hover:text-[#FFFFFF]"
                           >
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 14 14"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                d="M13 1L1 13M1 1L13 13"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M13 1L1 13M1 1L13 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                           </button>
                         </div>
@@ -585,7 +562,7 @@ const ExperimentsTable = () => {
                   >
                     <label
                       className="group h-[1.7rem] text-[#EEEEEE] mx-2 flex items-center cursor-pointer text-xs font-normal leading-3 rounded-[6px] shadow-none bg-transparent"
-                      onClick={() => {}}
+                      onClick={() => { }}
                     >
                       <MixerHorizontalIcon
                         style={{ width: "0.875rem", height: "0.875rem" }}

@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from budeval.commons.storage_config import StorageConfig
 from budeval.core.schemas import (
     EvaluationEngine,
     GenericEvaluationRequest,
@@ -161,9 +162,10 @@ class BaseTransformer(ABC):
             data_volumes=self.get_volume_mounts(),
             output_volume={
                 "name": "output",
-                "type": "pvc",
-                "claimName": f"{request.eval_request_id}-output-pvc",
-                "size": "10Gi",
+                "type": "shared_pvc",
+                "claimName": StorageConfig.get_eval_datasets_pvc_name(),
+                "subPath": f"results/{request.eval_request_id}",
+                "mountPath": "/workspace/outputs",
             },
             cpu_request=resources["cpu_request"],
             cpu_limit=resources["cpu_limit"],

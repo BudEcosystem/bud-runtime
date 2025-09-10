@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 
-const FloatLabel = (props: {
+interface FloatLabelProps {
   children: React.ReactNode;
   label: React.ReactNode;
-  value: any;
+  value?: any;
   classNames?: string;
-}) => {
+}
+
+const FloatLabel = (props: FloatLabelProps) => {
   const [focus, setFocus] = useState(false);
   const { children, label, value, classNames } = props;
 

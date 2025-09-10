@@ -1057,7 +1057,7 @@ const Text_19_600_EEEEEE = ({
   ...props
 }: TextProps) => (
   <div
-    className={`text-bud-text-primary text-[1.1875rem] font-[600] leading-[100%] ${className}`}
+    className={`text-bud-text-primary text-[1.1875rem] font-[600] leading-[130%] ${className}`}
     {...props}
   >
     {children}

@@ -42,13 +42,14 @@ class Device(BaseModel):
     type: str
     available_count: int
     mem_per_GPU_in_GB: float
-    hbm_bandwidth_in_GB_per_sec: float
-    intra_node_bandwidth_in_GB_per_sec: float
-    intra_node_min_message_latency: float
-    peak_fp16_TFLOPS: float
-    peak_i8_TFLOPS: float
-    peak_i4_TFLOPS: float
-    inter_node_bandwidth_in_GB_per_sec: float
+    # Performance fields with defaults (to be removed in future)
+    hbm_bandwidth_in_GB_per_sec: float = 100.0
+    intra_node_bandwidth_in_GB_per_sec: float = 50.0
+    intra_node_min_message_latency: float = 8e-06
+    peak_fp16_TFLOPS: float = 10.0
+    peak_i8_TFLOPS: float = 20.0
+    peak_i4_TFLOPS: float = 40.0
+    inter_node_bandwidth_in_GB_per_sec: float = 10.0
 
 
 class Node(BaseModel):
@@ -194,9 +195,46 @@ class DeviceConfiguration(BaseModel):
     e2e_latency: float
     error_rate: float
     cost_per_million_tokens: float
+    # Legacy schema - kept for backward compatibility
+
+
+class NodeGroupConfiguration(BaseModel):
+    """New node group configuration schema for multi-node deployments with PP support."""
+
+    config_id: str
+    name: str  # Device group name (e.g., "A100", "V100")
+    labels: Dict[str, str] = Field(default_factory=dict)  # Kubernetes labels for device matching
+    type: str  # Hardware type: "cpu", "cuda", "hpu"
+    tp_size: int = 1  # Tensor parallelism size
+    pp_size: int = 1  # Pipeline parallelism size
+    envs: Dict[str, Any] = Field(default_factory=dict)
+    args: Dict[str, Any] = Field(default_factory=dict)
+    replicas: int = 1  # Number of replicas for this node group
+    image: str
+    memory: float
+    # Performance metrics
+    ttft: float
+    throughput_per_user: float
+    e2e_latency: float
+    error_rate: float
+    cost_per_million_tokens: float
+    # Device identification for hardware matching
+    device_name: Optional[str] = None
+    device_model: Optional[str] = None
+    raw_name: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_parallelism_config(self):
+        """Validate TP/PP size combinations and device type compatibility."""
+        NodeGroupConfigurationValidator.validate_device_type_compatibility(self.type, self.pp_size)
+        # Note: Hardware availability validation happens at deployment time
+        # when actual cluster resources are known
+        return self
 
 
 class NodeConfiguration(BaseModel):
+    """Legacy node configuration schema - kept for backward compatibility."""
+
     id: str
     name: str
     devices: List[DeviceConfiguration]
@@ -205,7 +243,10 @@ class NodeConfiguration(BaseModel):
 class DeploymentConfigurationResponse(ResponseBase):
     object: lowercase_string = "deployment_configuration"
     id: str
-    nodes: List[NodeConfiguration]
+    # Legacy node structure for backward compatibility
+    nodes: Optional[List[NodeConfiguration]] = None
+    # New node group structure for multi-node deployments
+    node_groups: Optional[List[NodeGroupConfiguration]] = None
     replica: int
     concurrency: int
     ttft: float
@@ -216,10 +257,47 @@ class DeploymentConfigurationResponse(ResponseBase):
 
     def reset(self):
         """Reset the simulation state by clearing nodes and replica count."""
-        self.nodes = []
-        self.num_replicas = 0
+        self.nodes = [] if self.nodes is not None else None
+        self.node_groups = [] if self.node_groups is not None else None
+        self.replica = 0
         self.concurrency = 0
         self.ttft = 0
         self.throughput_per_user = 0
         self.e2e_latency = 0
         self.error_rate = 0
+
+    @model_validator(mode="after")
+    def validate_node_structure(self):
+        """Ensure at least one of nodes or node_groups is provided."""
+        if self.nodes is None and self.node_groups is None:
+            raise ValueError("Either nodes or node_groups must be provided")
+        return self
+
+
+class NodeGroupConfigurationValidator:
+    """Validation utilities for node group configurations."""
+
+    @staticmethod
+    def validate_parallelism_combination(tp_size: int, pp_size: int, available_devices: int) -> None:
+        """Validate TP/PP size combinations against available hardware."""
+        if tp_size < 1:
+            raise ValueError("tp_size must be at least 1")
+        if pp_size < 1:
+            raise ValueError("pp_size must be at least 1")
+
+        total_devices_needed = tp_size * pp_size
+        if total_devices_needed > available_devices:
+            raise ValueError(
+                f"Required devices ({total_devices_needed} = {tp_size}*{pp_size}) "
+                f"exceeds available devices ({available_devices})"
+            )
+
+    @staticmethod
+    def validate_device_type_compatibility(device_type: str, pp_size: int) -> None:
+        """Validate that device type supports the requested parallelism configuration."""
+        if device_type == "cpu" and pp_size > 1:
+            raise ValueError("Pipeline parallelism (PP) is not supported for CPU devices")
+
+        # Multi-node PP requires CUDA devices with appropriate interconnect
+        if pp_size > 1 and device_type != "cuda":
+            raise ValueError("Multi-node pipeline parallelism requires CUDA devices")

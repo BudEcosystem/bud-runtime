@@ -44,7 +44,11 @@ export function CustomBreadcrumb({
     //   }
     // />
     <Breadcrumb
-      separator={<Text_12_400_5B6168 className="mx-2">/</Text_12_400_5B6168>}
+      separator={
+        <Text_12_400_5B6168 className="mx-2 text-gray-400 dark:text-[#5B6168]">
+          /
+        </Text_12_400_5B6168>
+      }
       items={
         data?.map((item, index) => {
           const isLast = index === data.length - 1;
@@ -57,8 +61,8 @@ export function CustomBreadcrumb({
                 key={index}
                 className={
                   isLast || !hasUrl
-                    ? "cursor-default text-[#EEEEEE]"
-                    : "hover:cursor-pointer hover:text-[#EEEEEE]"
+                    ? "cursor-default text-black dark:text-[#EEEEEE]"
+                    : "cursor-pointer text-black dark:text-[#787B83]"
                 }
               >
                 {item}
@@ -80,20 +84,24 @@ export function DeawerCustomBreadcrumb({
 }) {
   return (
     <Breadcrumb
-      separator={<Text_12_400_5B6168 className="mx-2">/</Text_12_400_5B6168>}
+      separator={
+        <Text_12_400_5B6168 className="mx-2 text-gray-400 dark:text-[#5B6168]">
+          /
+        </Text_12_400_5B6168>
+      }
       items={
         data?.map((item, index) => ({
           // Remove href to prevent nested <a> tags
           title:
             index === 0 ? (
               <Link href={urls ? urls[index] : "#"}>
-                <Text_12_400_5B6168 className="inline-flex items-center ">
+                <Text_12_400_5B6168 className="inline-flex items-center text-gray-600 dark:text-[#5B6168]">
                   {item}
                 </Text_12_400_5B6168>
               </Link>
             ) : (
               <Link href={urls ? urls[index] : "#"}>
-                <Text_12_400_787B83 className="text-white">
+                <Text_12_400_787B83 className="text-black dark:text-[#EEEEEE]">
                   {item}
                 </Text_12_400_787B83>
               </Link>

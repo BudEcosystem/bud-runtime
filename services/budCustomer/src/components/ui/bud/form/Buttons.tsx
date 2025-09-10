@@ -120,25 +120,31 @@ export function SecondaryButton({ classNames = "", ...props }: any) {
     <Button
       {...props}
       className={`text-[0.75rem] h-[1.75rem] border-[.5px] min-w-[4rem] font-normal
-    ${isLight
-      ? "bg-white border-[#d0d0d0] hover:bg-[#f5f5f5] hover:border-[#999999]"
-      : "bg-[#1F1F1F] border-[#757575] hover:bg-[#1F1F1F] hover:border-[#B3B3B3]"
+    ${
+      isLight
+        ? "bg-white border-[#d0d0d0] hover:bg-[#f5f5f5] hover:border-[#999999]"
+        : "bg-[#1F1F1F] border-[#757575] hover:bg-[#1F1F1F] hover:border-[#B3B3B3]"
     } ${classNames}
     ${props.text == "Skip" && !isLight && "hover:bg-[#38260B] hover:border-[#896814]"}
     ${props.text == "Close" && !isLight && "hover:bg-[#290E0E] hover:border-[#6F0E0E]"}
-    ${props.disabled
-      ? isLight
-        ? "bg-[#f5f5f5] text-[#999999] cursor-not-allowed"
-        : "bg-[#1F1F1F] text-[#757575] cursor-not-allowed"
-      : ""
+    ${
+      props.disabled
+        ? isLight
+          ? "bg-[#f5f5f5] text-[#999999] cursor-not-allowed"
+          : "bg-[#1F1F1F] text-[#757575] cursor-not-allowed"
+        : ""
     }
     `}
     >
       <div
         className={`text-[0.75rem] font-[400] ${
           props.disabled
-            ? isLight ? "text-[#999999]" : "text-[#757575]"
-            : isLight ? "text-[#1a1a1a]" : "text-[#EEEEEE]"
+            ? isLight
+              ? "text-[#999999]"
+              : "text-[#757575]"
+            : isLight
+              ? "text-[#1a1a1a]"
+              : "text-[#EEEEEE]"
         }`}
       >
         {props.children || props.text || "Back"}{" "}

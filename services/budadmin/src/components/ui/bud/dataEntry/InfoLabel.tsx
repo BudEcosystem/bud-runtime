@@ -24,7 +24,7 @@ const InfoLabel: React.FC<InfoLabelProps> = ({
         background: "#0d0d0d",
       }}
     >
-      {text} {required && <b className="text-[#FF4D4F]">*</b>}
+      <div className="whitespace-nowrap">{text}</div> {required && <b className="text-[#FF4D4F]">*</b>}
       {content && (
         <CustomPopover title={content}>
           <Image

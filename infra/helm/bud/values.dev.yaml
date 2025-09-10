@@ -1,0 +1,11 @@
+ingress:
+    hosts:
+        root: "dev.bud.studio"
+
+microservices:
+    budmodel:
+        storageSize: "1024Gi"
+# TODO: do strageClass migration before enabling this
+# minio:
+#     persistence:
+#         size: "1024Gi"

@@ -60,7 +60,13 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
         clearSelectedInference();
       }
     };
-  }, [visible, inferenceId]);
+  }, [
+    visible,
+    inferenceId,
+    fetchInferenceDetail,
+    fetchInferenceFeedback,
+    clearSelectedInference,
+  ]);
 
   const copyToClipboard = (text: string, label: string = "Content") => {
     navigator.clipboard.writeText(text);

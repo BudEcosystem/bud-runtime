@@ -65,7 +65,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ .Release.Name }}-budproxy
+                name: {{ .Release.Name }}-budgateway
                 port:
                   number: 3000
   tls:

@@ -20,6 +20,7 @@
 import json
 import os
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 from urllib.request import ProxyHandler, Request, build_opener
@@ -422,10 +423,20 @@ class HuggingFaceLicenseExtractor(LicenseExtractor):
                     LicenseInfoSchema.license_id == hf_license_id,
                     LicenseInfoSchema.url.startswith(f"{LICENSE_MINIO_OBJECT_NAME}/{sanitized_uri}/"),
                 )
-                db_license_info = crud.session.execute(stmt).scalar_one_or_none()
-                if db_license_info and db_license_info.is_extracted:
-                    logger.debug("License info already extracted and present in database")
-                    return db_license_info
+                results = crud.session.execute(stmt).scalars().all()
+                if results:
+                    if len(results) > 1:
+                        logger.warning(
+                            f"Found {len(results)} duplicate licenses for {hf_license_id} "
+                            f"with URL pattern {sanitized_uri}, using most recent"
+                        )
+                    # Use the most recent license record
+                    db_license_info = max(results, key=lambda x: x.created_at if x.created_at else datetime.min)
+                    if db_license_info and db_license_info.is_extracted:
+                        logger.debug("License info already extracted and present in database")
+                        return db_license_info
+                else:
+                    db_license_info = None
 
             # Get license content from huggingface
             headers = {}
@@ -497,25 +508,47 @@ class HuggingFaceLicenseExtractor(LicenseExtractor):
                     url=minio_object_name,
                 )
 
-                if db_license_info:
-                    with LicenseInfoCRUD() as crud:
+                # Use upsert pattern to avoid duplicates from concurrent inserts
+                with LicenseInfoCRUD() as crud:
+                    # If we found an existing record, update it
+                    if db_license_info:
                         crud.update(license_data.model_dump(), {"id": db_license_info.id})
                         db_license_info = crud.fetch_one({"id": db_license_info.id})
                         logger.debug("License info updated in database")
                         return db_license_info
-                else:
-                    with LicenseInfoCRUD() as crud:
-                        db_license_info = crud.insert(LicenseInfoSchema(**license_data.model_dump()))
-                        logger.debug("License info inserted in database")
-                        return db_license_info
+                    else:
+                        # Try to insert, but handle potential race condition
+                        try:
+                            db_license_info = crud.insert(LicenseInfoSchema(**license_data.model_dump()))
+                            logger.debug("License info inserted in database")
+                            return db_license_info
+                        except Exception as e:
+                            # If insert fails due to unique constraint, fetch the existing record
+                            if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+                                logger.warning("Concurrent insert detected, fetching existing license record")
+                                stmt = select(LicenseInfoSchema).where(
+                                    LicenseInfoSchema.license_id == license_data.license_id,
+                                    LicenseInfoSchema.url == license_data.url,
+                                )
+                                db_license_info = crud.session.execute(stmt).scalar_one_or_none()
+                                if db_license_info:
+                                    return db_license_info
+                            # Re-raise if it's a different error
+                            raise
         else:
             with LicenseInfoCRUD() as crud:
                 stmt = select(LicenseInfoSchema).where(
                     LicenseInfoSchema.license_id == hf_license_id,
                     LicenseInfoSchema.url.startswith(f"{COMMON_LICENSE_MINIO_OBJECT_NAME}/"),
                 )
-                db_license_info = crud.session.execute(stmt).scalar_one_or_none()
-                if db_license_info:
+                results = crud.session.execute(stmt).scalars().all()
+                if results:
+                    if len(results) > 1:
+                        logger.warning(
+                            f"Found {len(results)} duplicate common licenses for {hf_license_id}, using most recent"
+                        )
+                    # Use the most recent license record
+                    db_license_info = max(results, key=lambda x: x.created_at if x.created_at else datetime.min)
                     logger.debug("License info found in database")
                     return db_license_info
                 else:

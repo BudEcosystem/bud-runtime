@@ -1,17 +1,14 @@
 # Use the slim version to reduce the base image size
 FROM python:3.11.0-slim
 
-
-RUN
-
 # Install system dependencies in one layer, clean up afterwards
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
-    ansible \
     ca-certificates \
     gnupg \
     lsb-release \
+    openssh-client \
     && curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list \
     && apt-get update && apt-get install -y terraform \
@@ -21,16 +18,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash \
     && helm repo add stable https://charts.helm.sh/stable \
     && helm plugin install https://github.com/databus23/helm-diff \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ansible-core instead of full ansible (saves ~200MB)
+RUN pip install --no-cache-dir ansible-core==2.15.* ansible-runner \
     && ansible-galaxy collection install community.kubernetes \
-    && rm -rf /var/lib/apt/lists/*  # Clean up apt cache to reduce image size
+    && rm -rf /root/.cache/pip/*
 
+# Install CPU-only PyTorch to save ~8GB (CUDA version is ~10GB, CPU-only is ~2GB)
+# RUN pip install --no-cache-dir \
+#     torch==2.2.0+cpu torchvision==0.17.0+cpu \
+#     -f https://download.pytorch.org/whl/torch_stable.html
 
-RUN git clone --branch release/v1.1.0 https://github.com/BudEcosystem/llm-benchmark.git /llm-benchmark
+# Install llm-benchmark directly from git (not editable mode, saves space)
+RUN pip install --no-cache-dir git+https://github.com/BudEcosystem/llm-benchmark.git
 
-WORKDIR /llm-benchmark
-RUN pip install --prefer-binary -e .
-
-RUN pip install git+https://github.com/BudEcosystem/bud-microframe.git
+# Install bud-microframe
+RUN pip install --no-cache-dir git+https://github.com/BudEcosystem/bud-microframe.git
 
 # Set up the app and install dependencies with binary wheels
 WORKDIR /app

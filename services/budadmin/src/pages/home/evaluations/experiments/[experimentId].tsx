@@ -182,6 +182,9 @@ const ExperimentDetailsPage = () => {
       getExperimentRuns(experimentId);
     }
   }, [experimentId]);
+  useEffect(() => {
+    console.log("Experiment Details:", experimentDetails);
+  }, [experimentDetails]);
 
   const handleNewEvaluation = () => {
     // Navigate to new evaluation flow

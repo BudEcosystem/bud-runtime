@@ -40,7 +40,7 @@ export default function ViewApiKey() {
   const [showKey, setShowKey] = useState(false);
   const { closeDrawer, openDrawer } = useDrawer();
   const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
-  const [decryptedKey, setDecryptedKey] = useState('');
+  const [decryptedKey, setDecryptedKey] = useState("");
   const [copyText, setCopiedText] = useState<string>("Copy");
 
   const decryptKey = async (key: string) => {
@@ -64,10 +64,10 @@ export default function ViewApiKey() {
   useEffect(() => {
     const fetchDecryptedKey = async () => {
       if (selectedApiKey?.key) {
-        console.log('selectedApiKey.key', selectedApiKey.key);
+        console.log("selectedApiKey.key", selectedApiKey.key);
         // Try to decrypt the key
         const decrypted = await decryptKey(selectedApiKey.key);
-        console.log('decrypted key', decrypted);
+        console.log("decrypted key", decrypted);
 
         // If decryption fails or returns null, use the key as-is (might be plain text)
         if (decrypted) {
@@ -107,35 +107,37 @@ export default function ViewApiKey() {
     return null;
   }
 
-  const firstLineText = `Are you sure you want to delete this API key?`
-  const secondLineText = `You are about to delete ${selectedApiKey?.name}`
+  const firstLineText = `Are you sure you want to delete this API key?`;
+  const secondLineText = `You are about to delete ${selectedApiKey?.name}`;
 
   return (
     <BudForm data={{}}>
       <BudWraperBox>
-        {showConfirm && <BudDrawerLayout>
-          <BudStepAlert
-            type="warning"
-            title={firstLineText}
-            description={secondLineText}
-            confirmText='Delete API Key'
-            cancelText='Cancel'
-            confirmAction={async () => {
-              try {
-                await AppRequest.Delete(`/credentials/${selectedApiKey?.id}`);
-                successToast('API key deleted successfully');
-                closeDrawer();
-              } catch (error) {
-                errorToast('Failed to delete API key');
-              } finally {
+        {showConfirm && (
+          <BudDrawerLayout>
+            <BudStepAlert
+              type="warning"
+              title={firstLineText}
+              description={secondLineText}
+              confirmText="Delete API Key"
+              cancelText="Cancel"
+              confirmAction={async () => {
+                try {
+                  await AppRequest.Delete(`/credentials/${selectedApiKey?.id}`);
+                  successToast("API key deleted successfully");
+                  closeDrawer();
+                } catch (error) {
+                  errorToast("Failed to delete API key");
+                } finally {
+                  setShowConfirm(false);
+                }
+              }}
+              cancelAction={() => {
                 setShowConfirm(false);
-              }
-            }}
-            cancelAction={() => {
-              setShowConfirm(false)
-            }}
-          />
-        </BudDrawerLayout>}
+              }}
+            />
+          </BudDrawerLayout>
+        )}
         <BudDrawerLayout>
           <div className="px-[1.4rem] pb-[.9rem] rounded-ss-lg rounded-se-lg pt-[1.1rem] border-b-[.5px] border-b-[#1F1F1F] relative">
             <div className="flex justify-between align-center">
@@ -154,29 +156,30 @@ export default function ViewApiKey() {
                       preview={false}
                       src="/images/drawer/threeDots.png"
                       alt="info"
-                      style={{ width: '0.1125rem', height: '.6rem' }}
+                      style={{ width: "0.1125rem", height: ".6rem" }}
                     />
                   </div>
                 }
-                items={
-                  [
-                    {
-                      key: '1',
-                      label: 'Edit',
-                      onClick: () => {
-                        localStorage.setItem('selected_api_key', JSON.stringify(selectedApiKey));
-                        openDrawer('edit-api-key');
-                      }
+                items={[
+                  {
+                    key: "1",
+                    label: "Edit",
+                    onClick: () => {
+                      localStorage.setItem(
+                        "selected_api_key",
+                        JSON.stringify(selectedApiKey),
+                      );
+                      openDrawer("edit-api-key");
                     },
-                    {
-                      key: '2',
-                      label: 'Delete',
-                      onClick: () => {
-                        setShowConfirm(true)
-                      }
+                  },
+                  {
+                    key: "2",
+                    label: "Delete",
+                    onClick: () => {
+                      setShowConfirm(true);
                     },
-                  ]
-                }
+                  },
+                ]}
               />
             </div>
           </div>
@@ -198,7 +201,7 @@ export default function ViewApiKey() {
                 <div className="flex items-center justify-between w-full flex-auto max-w-[73%]">
                   {showKey ? (
                     <Text_12_400_EEEEEE className="leading-[100%] !leading-[0.875rem] max-w-[90%] truncate">
-                      {decryptedKey || 'Loading...'}
+                      {decryptedKey || "Loading..."}
                     </Text_12_400_EEEEEE>
                   ) : (
                     <Text_10_400_EEEEEE className="leading-[0.875rem] max-w-[90%] truncate">
@@ -216,7 +219,10 @@ export default function ViewApiKey() {
                         <EyeInvisibleOutlined className="text-[#B3B3B3]" />
                       )}
                     </button>
-                    <CustomPopover title={copyText} contentClassNames="py-[.3rem]">
+                    <CustomPopover
+                      title={copyText}
+                      contentClassNames="py-[.3rem]"
+                    >
                       <div
                         className="w-[1.25rem] h-[1.25rem] rounded-[4px] flex justify-center items-center ml-[.4rem] cursor-pointer hover:bg-[#1F1F1F]"
                         onClick={() => handleCopy(decryptedKey)}
@@ -318,7 +324,6 @@ export default function ViewApiKey() {
                   </Text_12_400_EEEEEE>
                 </div>
               </div>
-
             </div>
           </div>
         </BudDrawerLayout>

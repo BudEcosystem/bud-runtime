@@ -9,7 +9,7 @@
 #  #
 #  Unless required by applicable law or agreed to in writing, software
 #  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  WITHOUT WARRANTIES OssR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
@@ -29,7 +29,14 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .audit_ops import audit_routes
-from .auth import auth_routes
+from .auth import (
+    auth_routes,
+    oauth_admin_routes,
+    oauth_internal_proxy,
+    oauth_routes,
+    secure_oauth_callback,
+    token_exchange_routes,
+)
 from .benchmark_ops import benchmark_routes
 from .billing_ops import billing_router
 from .cluster_ops import cluster_routes
@@ -44,6 +51,7 @@ from .endpoint_ops import endpoint_routes
 from .eval_ops import eval_routes
 from .eval_ops.workflows import EvalDataSyncWorkflows
 from .guardrails import guardrail_routes
+from .guardrails.workflows import GuardrailSyncWorkflows
 from .initializers.seeder import seeders
 from .metric_ops import metric_routes
 from .model_ops import model_routes
@@ -85,6 +93,9 @@ async def execute_initial_dapr_workflows() -> None:
 
     response = await ClusterRecommendedSchedulerWorkflows().__call__()
     logger.debug("Recommended cluster scheduler workflow response: %s", response)
+
+    response = await GuardrailSyncWorkflows().__call__()
+    logger.debug("Guardrail sync workflow response: %s", response)
 
     # Execute initial eval data sync workflow if enabled
     if app_settings.eval_sync_enabled:
@@ -193,6 +204,32 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             # Sleep for 5 minutes (300 seconds)
             await asyncio.sleep(300)
 
+    async def schedule_usage_limit_sync() -> None:
+        """Schedule periodic synchronization of usage limits to Redis."""
+        from .billing_ops.usage_sync import start_usage_sync, stop_usage_sync
+
+        # Wait for services to be ready
+        await asyncio.sleep(10)
+
+        try:
+            logger.info("Starting usage limit sync task")
+            await start_usage_sync()
+        except Exception as e:
+            logger.error("Failed to start usage limit sync: %s", e)
+
+    async def schedule_billing_cycle_reset() -> None:
+        """Schedule periodic check for expired billing cycles."""
+        from .billing_ops.reset_usage import start_billing_reset_task, stop_billing_reset_task
+
+        # Wait for services to be ready
+        await asyncio.sleep(15)
+
+        try:
+            logger.info("Starting billing cycle reset task")
+            await start_billing_reset_task()
+        except Exception as e:
+            logger.error("Failed to start billing cycle reset task: %s", e)
+
     task = asyncio.create_task(schedule_secrets_and_config_sync())
 
     for seeder_name, seeder in seeders.items():
@@ -214,6 +251,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Start the credential usage sync scheduler
     credential_usage_task = asyncio.create_task(schedule_credential_usage_sync())
 
+    # Start the usage limit sync scheduler
+    usage_limit_task = asyncio.create_task(schedule_usage_limit_sync())
+
+    # Start the billing cycle reset scheduler
+    billing_reset_task = asyncio.create_task(schedule_billing_cycle_reset())
+
     yield
 
     try:
@@ -222,6 +265,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         eval_sync_task.cancel()
         blocking_stats_task.cancel()
         credential_usage_task.cancel()
+        usage_limit_task.cancel()
+        billing_reset_task.cancel()
+
+        # Stop the background tasks
+        from .billing_ops.reset_usage import stop_billing_reset_task
+        from .billing_ops.usage_sync import stop_usage_sync
+
+        await stop_usage_sync()
+        await stop_billing_reset_task()
     except asyncio.CancelledError:
         logger.exception("Failed to cleanup config & store sync.")
 
@@ -269,6 +321,11 @@ if app_settings.cors_origins:
 internal_router = APIRouter()
 internal_router.include_router(audit_routes.audit_router)
 internal_router.include_router(auth_routes.auth_router)
+internal_router.include_router(oauth_routes.oauth_router)
+internal_router.include_router(secure_oauth_callback.secure_oauth_callback_router)
+internal_router.include_router(token_exchange_routes.token_exchange_router)
+internal_router.include_router(oauth_admin_routes.oauth_admin_router)
+internal_router.include_router(oauth_internal_proxy.internal_oauth_router)
 internal_router.include_router(benchmark_routes.benchmark_router)
 internal_router.include_router(cluster_routes.cluster_router)
 internal_router.include_router(common_routes.common_router)

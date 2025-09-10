@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -45,9 +45,21 @@ class UserBilling(Base, TimestampMixin):
     """User billing configuration and status."""
 
     __tablename__ = "user_billing"
+    __table_args__ = (
+        # Index for finding current billing record for a user
+        Index("ix_user_billing_user_current", "user_id", "is_current"),
+        # Index for finding active billing records
+        Index("ix_user_billing_active", "user_id", "is_active"),
+        # Index for billing period queries
+        Index("ix_user_billing_period", "user_id", "billing_period_start", "billing_period_end"),
+        # Index for historical queries
+        Index("ix_user_billing_created_current", "created_at", "is_current"),
+    )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("user.id"), unique=True, nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=False
+    )  # Removed unique constraint
     billing_plan_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("billing_plans.id"), nullable=False)
 
     # Current period
@@ -58,23 +70,33 @@ class UserBilling(Base, TimestampMixin):
     custom_token_quota: Mapped[Optional[int]] = mapped_column(nullable=True)
     custom_cost_quota: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
 
-    # Status
+    # Notification preferences
+    enable_email_notifications: Mapped[bool] = mapped_column(Boolean, default=True)
+    enable_in_app_notifications: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Status flags
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
     suspension_reason: Mapped[Optional[str]] = mapped_column(String(500))
 
+    # Historical tracking - NEW FIELDS
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    cycle_number: Mapped[int] = mapped_column(nullable=False, default=1)  # Track which billing cycle this is
+    superseded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))  # When this cycle was replaced
+    superseded_by_id: Mapped[Optional[UUID]] = mapped_column(PGUUID(as_uuid=True), ForeignKey("user_billing.id"))
+
     # Relationships
     billing_plan: Mapped["BillingPlan"] = relationship(back_populates="user_billings")
-    alerts: Mapped[list["BillingAlert"]] = relationship(back_populates="user_billing")
 
 
 class BillingAlert(Base, TimestampMixin):
     """Billing alerts configuration."""
 
     __tablename__ = "billing_alerts"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_billing_alert_user_name"),)
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
-    user_billing_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("user_billing.id"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=False)
 
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     alert_type: Mapped[str] = mapped_column(String(50), nullable=False)  # 'token_usage', 'cost_usage'
@@ -84,7 +106,9 @@ class BillingAlert(Base, TimestampMixin):
     last_triggered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     last_triggered_value: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2))
 
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Notification tracking
+    last_notification_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    notification_failure_count: Mapped[int] = mapped_column(default=0)
+    last_notification_error: Mapped[Optional[str]] = mapped_column(String(500))
 
-    # Relationships
-    user_billing: Mapped["UserBilling"] = relationship(back_populates="alerts")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)

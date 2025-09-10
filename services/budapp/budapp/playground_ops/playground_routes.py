@@ -76,60 +76,43 @@ playground_router = APIRouter(prefix="/playground", tags=["playground"])
     responses={
         status.HTTP_200_OK: {
             "model": PlaygroundInitializeResponse,
-            "description": "Successfully initialized playground session with JWT",
+            "description": "Successfully initialized playground session with refresh token",
         },
         status.HTTP_401_UNAUTHORIZED: {
             "model": ErrorResponse,
-            "description": "Invalid or expired JWT token",
+            "description": "Invalid or expired refresh token",
         },
         status.HTTP_400_BAD_REQUEST: {
             "model": ErrorResponse,
-            "description": "Invalid request or JWT format",
+            "description": "Invalid request or refresh token format",
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
             "description": "Service is unavailable due to server error",
         },
     },
-    description="Initialize playground session with JWT authentication. Validates JWT and populates Redis cache.",
+    description="Initialize playground session with refresh token authentication. Validates refresh token, generates new tokens, and populates Redis cache.",
 )
 async def initialize_playground(
     request: PlaygroundInitializeRequest,
     session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_user)],
 ) -> Union[PlaygroundInitializeResponse, ErrorResponse]:
-    """Initialize playground session with JWT authentication.
+    """Initialize playground session with refresh token authentication.
 
     This endpoint:
-    1. Validates the JWT token
-    2. Extracts user information
-    3. Creates hash(JWT) for Redis key
+    1. Validates the refresh token and generates new access/refresh tokens
+    2. Extracts user information from the new access token
+    3. Creates hash(access_token) for Redis key
     4. Populates Redis with user's available deployments
-    5. Returns available endpoints for the playground
+    5. Returns new token details and session information
 
     The Redis cache uses the same structure as API keys, allowing the gateway
-    to validate JWT tokens without any modifications.
+    to validate access tokens without any modifications.
     """
     try:
-        # Extract JWT expiry from the current user context (if available)
-        # The get_current_user dependency should have already validated the JWT
-        jwt_expiry = None
-
-        # Try to decode the JWT to get expiry (without verification since it's already verified)
-        try:
-            import jwt
-
-            # Decode without verification to get claims (already verified by get_current_user)
-            decoded = jwt.decode(request.jwt_token, options={"verify_signature": False})
-            jwt_expiry = decoded.get("exp")
-        except Exception as e:
-            logger.warning(f"Could not extract JWT expiry: {e}")
-
-        # Initialize the session using the PlaygroundService
+        # Initialize the session using the PlaygroundService with refresh token
         playground_service = PlaygroundService(session)
-        response = await playground_service.initialize_session(
-            jwt_token=request.jwt_token, user_id=current_user.id, jwt_expiry=jwt_expiry
-        )
+        response = await playground_service.initialize_session_with_refresh_token(refresh_token=request.refresh_token)
 
         return response.model_dump()
 

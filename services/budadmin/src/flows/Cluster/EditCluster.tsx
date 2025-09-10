@@ -8,47 +8,44 @@ import TextInput from "../components/TextInput";
 import { useCluster } from "src/hooks/useCluster";
 import { errorToast, successToast } from "@/components/toast";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
-import ProjectNameInput, {
-  NameImageDisplay,
-} from "@/components/ui/bud/dataEntry/ProjectNameInput";
+import ProjectNameInput, { NameImageDisplay } from "@/components/ui/bud/dataEntry/ProjectNameInput";
 import { isValidClusterName, isValidModelName } from "@/lib/utils";
 
-const urlPattern = new RegExp(/^(http|https):\/\/[^ "]+$/);
+const urlPattern = new RegExp(/^(http|https):\/\/[^ "]+$/)
 
 function EditClusterForm() {
   const { selectedCluster } = useCluster();
   const { form } = useContext(BudFormContext);
-  return (
-    <BudWraperBox>
-      <BudDrawerLayout>
-        <DrawerTitleCard
-          title="Edit Cluster"
-          description="Edit cluster information below"
+  return <BudWraperBox>
+    <BudDrawerLayout>
+      <DrawerTitleCard
+        title="Edit Cluster"
+        description="Edit cluster information below"
+      />
+      <DrawerCard classNames="pb-0">
+        <ProjectNameInput
+          placeholder="Enter Cluster Name"
+          isEdit={true}
         />
-        <DrawerCard classNames="pb-0">
-          <ProjectNameInput
-            placeholder="Enter Cluster Name"
-            onChangeName={(name) => form.setFieldsValue({ name })}
-            onChangeIcon={(icon) => form.setFieldsValue({ icon })}
-            isEdit={true}
-          />
-          <div className="height-26" />
-          <TextInput
-            name="ingress_url"
-            label="Ingress URL"
-            placeholder="Type Ingress URL"
-            infoText="Ingress URL is the URL that will be used to access the cluster"
-            rules={[
-              { required: true, message: "Please enter Ingress URL" },
-              { pattern: urlPattern, message: "Please enter a valid URL" },
-            ]}
-            ClassNames="mt-[.4rem]"
-            InputClasses="py-[.5rem]"
-          />
-        </DrawerCard>
-      </BudDrawerLayout>
-    </BudWraperBox>
-  );
+        <div
+          className="height-26"
+        />
+        <TextInput
+          name="ingress_url"
+          label="Ingress URL"
+          placeholder="Type Ingress URL"
+          infoText="Ingress URL is the URL that will be used to access the cluster"
+          rules={[
+            { required: true, message: "Please enter Ingress URL" },
+            { pattern: urlPattern, message: "Please enter a valid URL" }
+          ]}
+          ClassNames="mt-[.4rem]"
+          InputClasses="py-[.5rem]"
+        />
+      </DrawerCard>
+    </BudDrawerLayout>
+  </BudWraperBox>
+
 }
 
 export default function EditCluster() {
@@ -62,11 +59,7 @@ export default function EditCluster() {
         ...selectedCluster,
         icon: selectedCluster.icon?.length > 1 ? "😍" : selectedCluster.icon,
       }}
-      disableNext={
-        !isValidClusterName(values?.name) ||
-        !values?.ingress_url ||
-        !urlPattern.test(values?.ingress_url)
-      }
+      disableNext={!isValidClusterName(values?.name) || !values?.ingress_url || !urlPattern.test(values?.ingress_url)}
       onNext={async (values) => {
         const payload = {
           name: values.name,

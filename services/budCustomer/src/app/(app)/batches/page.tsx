@@ -9,6 +9,7 @@ import {
   Tag,
   Progress,
   Tooltip,
+  Dropdown,
 } from "antd";
 import { useDrawer } from "@/hooks/useDrawer";
 import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
@@ -17,6 +18,9 @@ import { Typography } from "antd";
 const { Text, Title } = Typography;
 import { Icon } from "@iconify/react/dist/iconify.js";
 import styles from "./batches.module.scss";
+import Tags from "@/components/ui/Tags";
+import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
+import { MoreOutlined } from "@ant-design/icons";
 
 interface BatchJob {
   id: string;
@@ -115,7 +119,7 @@ export default function BatchesPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "queued":
-        return "#E6C240";
+        return "#D1B854";
       case "processing":
         return "#4077E6";
       case "completed":
@@ -149,7 +153,7 @@ export default function BatchesPage() {
   const columns = [
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           BATCH NAME
         </Text>
       ),
@@ -160,15 +164,15 @@ export default function BatchesPage() {
           <Text className="text-bud-text-primary text-[14px] font-medium">
             {text}
           </Text>
-          <Text className="mt-[0.25rem] text-bud-text-disabled text-[12px] block">
+          {/* <Text className="mt-[0.25rem] text-bud-text-disabled text-[12px] block">
             {record.id}
-          </Text>
+          </Text> */}
         </div>
       ),
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           MODEL
         </Text>
       ),
@@ -180,7 +184,7 @@ export default function BatchesPage() {
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           STATUS
         </Text>
       ),
@@ -188,31 +192,29 @@ export default function BatchesPage() {
       key: "status",
       render: (status: string) => (
         <Flex align="center" gap={8}>
-          <Icon
+          {/* <Icon
             icon={getStatusIcon(status)}
             className={`text-[1rem] ${status === "processing" ? "animate-spin" : ""}`}
             style={{ color: getStatusColor(status) }}
-          />
-          <Tag
+          /> */}
+          <Tags
             color={getStatusColor(status)}
-            className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem] uppercase"
-          >
-            {status}
-          </Tag>
+            name={capitalizeFirstLetterLowerRest(status)}
+          />
         </Flex>
       ),
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           PROGRESS
         </Text>
       ),
       key: "progress",
       width: 200,
       render: (_: any, record: BatchJob) => (
-        <div>
-          <Flex justify="space-between" className="mb-[0.5rem]">
+        <div className="flex flex-col gap-[0] w-full">
+          <Flex justify="space-between" className="mb-[0rem]">
             <Text className="text-bud-text-muted text-[12px]">
               {record.completedRequests}/{record.totalRequests}
             </Text>
@@ -230,49 +232,51 @@ export default function BatchesPage() {
         </div>
       ),
     },
+    // {
+    //   title: (
+    //     <Text className="text-bud-text-disabled text-[12px] uppercase">
+    //       REQUESTS
+    //     </Text>
+    //   ),
+    //   key: "requests",
+    //   render: (_: any, record: BatchJob) => (
+    //     <Flex gap={16}>
+    //       <Tooltip title="Completed">
+    //         <Flex align="center" gap={4}>
+    //           <Icon icon="ph:check" className="text-[#479D5F]" />
+    //           <Text className="text-bud-text-primary text-[13px]">
+    //             {record.completedRequests}
+    //           </Text>
+    //         </Flex>
+    //       </Tooltip>
+    //       <Tooltip title="Failed">
+    //         <Flex align="center" gap={4}>
+    //           <Icon icon="ph:x" className="text-[#EC7575]" />
+    //           <Text className="text-bud-text-primary text-[13px]">
+    //             {record.failedRequests}
+    //           </Text>
+    //         </Flex>
+    //       </Tooltip>
+    //     </Flex>
+    //   ),
+    // },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
-          REQUESTS
-        </Text>
-      ),
-      key: "requests",
-      render: (_: any, record: BatchJob) => (
-        <Flex gap={16}>
-          <Tooltip title="Completed">
-            <Flex align="center" gap={4}>
-              <Icon icon="ph:check" className="text-[#479D5F]" />
-              <Text className="text-bud-text-primary text-[13px]">
-                {record.completedRequests}
-              </Text>
-            </Flex>
-          </Tooltip>
-          <Tooltip title="Failed">
-            <Flex align="center" gap={4}>
-              <Icon icon="ph:x" className="text-[#EC7575]" />
-              <Text className="text-bud-text-primary text-[13px]">
-                {record.failedRequests}
-              </Text>
-            </Flex>
-          </Tooltip>
-        </Flex>
-      ),
-    },
-    {
-      title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           COST
         </Text>
       ),
       dataIndex: "cost",
       key: "cost",
       render: (cost: number) => (
-        <Text className="text-bud-purple text-[13px]">${cost.toFixed(2)}</Text>
+        <Text className="text-[black] dark:text-[white] text-[13px]">
+          ${cost.toFixed(2)}
+        </Text>
       ),
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           TIME
         </Text>
       ),
@@ -299,13 +303,98 @@ export default function BatchesPage() {
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
-          ACTIONS
-        </Text>
+        <Text className="text-bud-text-primary text-[12px] uppercase"></Text>
       ),
       key: "actions",
       render: (_: any, record: BatchJob) => (
-        <Flex gap={8}>
+        <div className="flex justify-end">
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: "view",
+                  label: "View",
+                  icon: (
+                    <span className="text-bud-text-primary">
+                      <Icon icon="ph:eye" className="text-bud-text-primary" />
+                    </span>
+                  ),
+                  onClick: () => {
+                    setSelectedBatch(record);
+                    setShowDetailsModal(true);
+                  },
+                  className: "hover:!bg-bud-bg-tertiary",
+                },
+                ...(record.status === "processing"
+                  ? [
+                      {
+                        key: "pause",
+                        label: "Pause",
+                        icon: (
+                          <span className="text-orange-500">
+                            <Icon icon="ph:pause" className="text-orange-500" />
+                          </span>
+                        ),
+                        onClick: () => {
+                          // handle pause
+                        },
+                        className: "hover:!bg-bud-bg-tertiary",
+                      },
+                    ]
+                  : []),
+                ...(record.status === "queued" || record.status === "processing"
+                  ? [
+                      {
+                        key: "cancel",
+                        label: "Cancel",
+                        icon: (
+                          <span className="text-red-500">
+                            <Icon icon="ph:x" className="text-red-500" />
+                          </span>
+                        ),
+                        onClick: () => {
+                          // handle cancel
+                        },
+                        className: "hover:!bg-bud-bg-tertiary",
+                      },
+                    ]
+                  : []),
+                ...(record.status === "completed"
+                  ? [
+                      {
+                        key: "download",
+                        label: "Download",
+                        icon: (
+                          <span className="text-green-500">
+                            <Icon
+                              icon="ph:download-simple"
+                              className="text-green-500"
+                            />
+                          </span>
+                        ),
+                        onClick: () => {
+                          // handle download
+                        },
+                        className: "hover:!bg-bud-bg-tertiary",
+                      },
+                    ]
+                  : []),
+              ],
+              className: "!bg-bud-bg-secondary !border-bud-border",
+            }}
+            trigger={["click"]}
+            placement="bottomRight"
+            overlayClassName="bud-dropdown-menu"
+          >
+            <Button
+              type="text"
+              icon={<MoreOutlined />}
+              className="!text-bud-text-muted hover:!text-bud-text-primary hover:!bg-bud-bg-tertiary transition-all"
+              size="large"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </Dropdown>
+          {/* <Flex gap={8}>
           <Button
             type="text"
             icon={<Icon icon="ph:eye" />}
@@ -336,7 +425,8 @@ export default function BatchesPage() {
               className="text-green-500 hover:text-bud-text-primary"
             />
           )}
-        </Flex>
+        </Flex> */}
+        </div>
       ),
     },
   ];
@@ -349,6 +439,10 @@ export default function BatchesPage() {
     completed: batches.filter((b) => b.status === "completed").length,
     failed: batches.filter((b) => b.status === "failed").length,
     totalCost: batches.reduce((acc, b) => acc + b.cost, 0),
+  };
+  const capitalizeFirstLetterLowerRest = (text: string) => {
+    if (!text) return "";
+    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
   };
 
   return (
@@ -365,14 +459,11 @@ export default function BatchesPage() {
                 Process large volumes of requests asynchronously
               </Text>
             </div>
-            <Button
-              type="primary"
-              icon={<Icon icon="ph:plus" />}
-              className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem]"
+            <PrimaryButton
               onClick={() => openDrawerWithStep("create-batch-job")}
             >
               Create Batch Job
-            </Button>
+            </PrimaryButton>
           </Flex>
 
           {/* Stats Cards */}
@@ -436,7 +527,7 @@ export default function BatchesPage() {
           </Flex>
 
           {/* Batch Jobs Table */}
-          <div className="bg-bud-bg-secondary border border-bud-border rounded-[12px] overflow-hidden">
+          <div className="bg-bud-bg-secondary border border-bud-border rounded-[12px] overflow-hidden mb-[2rem]">
             <Table
               dataSource={batches}
               columns={columns}
@@ -445,7 +536,6 @@ export default function BatchesPage() {
               className={styles.batchesTable}
             />
           </div>
-
 
           {/* Details Modal */}
           <Modal
@@ -504,12 +594,11 @@ export default function BatchesPage() {
                     <Text className="text-bud-text-disabled text-[12px]">
                       Status
                     </Text>
-                    <Tag
+                    <Tags
                       color={getStatusColor(selectedBatch.status)}
-                      className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem] uppercase mt-[0.25rem]"
-                    >
-                      {selectedBatch.status}
-                    </Tag>
+                      name={selectedBatch.status}
+                      // className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem] uppercase mt-[0.25rem]"
+                    />
                   </div>
                 </div>
 
