@@ -36,20 +36,29 @@ export default function BudSentinelProbes() {
     setSelectedProbe: setSelectedProbeInStore,
     updateWorkflow,
     workflowLoading,
+    currentWorkflow,
   } = useGuardrails();
 
   // Fetch probes on component mount and when search changes
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      fetchProbes({
+      // Build filter payload with provider_id from workflow
+      const filterPayload: any = {
         search: searchTerm || undefined,
         page: 1,
         page_size: 100, // Fetch all probes for now
-      });
+      };
+
+      // Add provider_id filter from the current workflow if available
+      if (currentWorkflow?.provider_id) {
+        filterPayload.provider_id = currentWorkflow.provider_id;
+      }
+
+      fetchProbes(filterPayload);
     }, 300); // Debounce search
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
+  }, [searchTerm, currentWorkflow?.provider_id]);
 
   const getCategoryIcon = (category: string) => {
     switch (category.toLowerCase()) {
