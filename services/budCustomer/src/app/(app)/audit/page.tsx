@@ -470,11 +470,13 @@ export default function AuditPage() {
       render: (action: AuditAction, record: AuditLog) => {
         const display = getActionDisplay(action);
         return (
-          <Tags
-            // icon={display.icon}
-            color={record.status === "failed" ? "error" : display.color}
-            name={display.label}
-          />
+          <div className="flex items-center">
+            <Tags
+              // icon={display.icon}
+              color={record.status === "failed" ? "error" : display.color}
+              name={display.label}
+            />
+          </div>
         );
       },
     },
@@ -528,10 +530,12 @@ export default function AuditPage() {
       key: "status",
       width: 100,
       render: (status: string) => (
-        <Tags
-          color={status === "success" ? "#3EC564" : "#EC7575"}
-          name={status?.charAt(0).toUpperCase() + status?.slice(1)}
-        />
+        <div className="flex items-center">
+          <Tags
+            color={status === "success" ? "#3EC564" : "#EC7575"}
+            name={status?.charAt(0).toUpperCase() + status?.slice(1)}
+          />
+        </div>
       ),
     },
   ];

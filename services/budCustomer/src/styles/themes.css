@@ -34,9 +34,21 @@
   --color-warning: #faad14;
   --color-error: #ff4d4f;
 
+  /* Conversation role colors - Light theme */
+  --role-system-bg: #f3e8ff;
+  --role-system-border: #c4b5fd;
+  --role-user-bg: #dbeafe;
+  --role-user-border: #93c5fd;
+  --role-assistant-bg: #d1fae5;
+  --role-assistant-border: #86efac;
+
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* Tooltip Colors - Light theme */
+  --bg-tooltip: rgba(255, 255, 255, 0.95);
+  --border-tooltip: #e0e0e0;
 }
 
 /* Dark Theme */
@@ -74,9 +86,27 @@
   --color-warning: #faad14;
   --color-error: #ff4d4f;
 
+  /* Conversation role colors - Dark theme */
+  --role-system-bg: rgba(139, 92, 246, 0.1);
+  --role-system-border: rgba(139, 92, 246, 0.3);
+  --role-user-bg: #1e3a8a1a;
+  --role-user-border: #1e40af4d;
+  --role-assistant-bg: #22c55e1a;
+  --role-assistant-border: #22c55e4d;
+  /* --role-system-bg: rgba(139, 92, 246, 0.1);
+  --role-system-border: rgba(139, 92, 246, 0.3);
+  --role-user-bg: rgba(59, 130, 246, 0.1);
+  --role-user-border: rgba(59, 130, 246, 0.3);
+  --role-assistant-bg: rgba(34, 197, 94, 0.1);
+  --role-assistant-border: rgba(34, 197, 94, 0.3); */
+
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+
+  /* Tooltip Colors - Dark theme */
+  --bg-tooltip: rgba(26, 26, 26, 0.95);
+  --border-tooltip: #333;
 }
 
 /* Utility classes for smooth theme transitions */

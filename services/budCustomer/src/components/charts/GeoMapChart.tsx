@@ -20,6 +20,7 @@ export interface GeographicDataPoint {
 interface GeoMapChartProps {
   data?: GeographicDataPoint[];
   isLoading?: boolean;
+  theme?: 'light' | 'dark';
 }
 
 // Country coordinates for fallback when lat/long not provided
@@ -88,6 +89,7 @@ const COUNTRY_COORDINATES: { [key: string]: [number, number] } = {
 const GeoMapChart: React.FC<GeoMapChartProps> = ({
   data = [],
   isLoading = false,
+  theme = 'dark',
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -178,11 +180,14 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
   useEffect(() => {
     if (!chartRef.current) return;
 
-    // Initialize ECharts instance if not already created
-    if (!chartInstanceRef.current) {
-      chartInstanceRef.current = echarts.init(chartRef.current, "dark");
+    // Dispose existing chart instance if theme changed
+    if (chartInstanceRef.current) {
+      chartInstanceRef.current.dispose();
+      chartInstanceRef.current = null;
     }
 
+    // Initialize ECharts instance with appropriate theme
+    chartInstanceRef.current = echarts.init(chartRef.current, theme === 'light' ? null : 'dark');
     const chart = chartInstanceRef.current;
 
     // Load map if not loaded
@@ -238,10 +243,9 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
 
       // Calculate max values for scaling
       const maxRequests = Math.max(...displayData.map((d) => d.value[2]), 1);
-      const maxLatency = Math.max(...displayData.map((d) => d.value[4]), 1);
 
       // Create country highlighting data
-      const countryHighlights = createCountryHighlights(arrayData);
+      const countryHighlights = createCountryHighlights(arrayData, theme);
 
       // If no data, show empty message on map
       if (displayData.length === 0) {
@@ -253,16 +257,16 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
             subtext: "No requests in selected time range",
             left: "center",
             top: "center",
-            textStyle: { color: "#757575", fontSize: 16 },
-            subtextStyle: { color: "#505050", fontSize: 14 },
+            textStyle: { color: theme === 'light' ? '#666666' : '#757575', fontSize: 16 },
+            subtextStyle: { color: theme === 'light' ? '#999999' : '#505050', fontSize: 14 },
           },
           geo: {
             map: "world",
             roam: false,
             silent: true,
             itemStyle: {
-              areaColor: "#1a1a1a",
-              borderColor: "#2a2a2a",
+              areaColor: theme === 'light' ? '#f5f5f5' : '#1a1a1a',
+              borderColor: theme === 'light' ? '#d0d0d0' : '#2a2a2a',
               borderWidth: 0.5,
             },
           },
@@ -285,25 +289,28 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
                 ? `${data.city}, ${data.country_name}`
                 : data.country_name;
 
+              const titleColor = theme === 'light' ? '#1a1a1a' : '#FFFFFF';
+              const labelColor = theme === 'light' ? '#666666' : '#B3B3B3';
+
               return `
                 <div style="padding: 10px; min-width: 200px;">
-                  <div style="font-weight: bold; margin-bottom: 8px; color: #FFFFFF;">
+                  <div style="font-weight: bold; margin-bottom: 8px; color: ${titleColor};">
                     ${location}
                   </div>
                   <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                    <span style="color: #B3B3B3;">Requests:</span>
+                    <span style="color: ${labelColor};">Requests:</span>
                     <span style="color: #3F8EF7; font-weight: 500;">
                       ${data.request_count.toLocaleString()} (${data.percentage.toFixed(1)}%)
                     </span>
                   </div>
                   <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                    <span style="color: #B3B3B3;">Success Rate:</span>
+                    <span style="color: ${labelColor};">Success Rate:</span>
                     <span style="color: ${data.success_rate >= 95 ? "#22c55e" : "#f59e0b"}; font-weight: 500;">
                       ${data.success_rate.toFixed(1)}%
                     </span>
                   </div>
                   <div style="display: flex; justify-content: space-between;">
-                    <span style="color: #B3B3B3;">Avg Latency:</span>
+                    <span style="color: ${labelColor};">Avg Latency:</span>
                     <span style="color: #FFC442; font-weight: 500;">
                       ${Math.round(data.avg_latency_ms)}ms
                     </span>
@@ -313,11 +320,11 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
             }
             return params.name;
           },
-          backgroundColor: "rgba(26, 26, 26, 0.95)",
-          borderColor: "#333",
+          backgroundColor: theme === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(26, 26, 26, 0.95)',
+          borderColor: theme === 'light' ? '#e0e0e0' : '#333',
           borderWidth: 1,
           textStyle: {
-            color: "#EEEEEE",
+            color: theme === 'light' ? '#1a1a1a' : '#EEEEEE',
             fontSize: 12,
           },
         },
@@ -344,7 +351,7 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
             ],
           },
           textStyle: {
-            color: "#B3B3B3",
+            color: theme === 'light' ? '#666666' : '#B3B3B3',
             fontSize: 10,
           },
           itemWidth: 15,
@@ -362,13 +369,13 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
             max: 5,
           },
           itemStyle: {
-            areaColor: "#1a1a1a",
-            borderColor: "#2a2a2a",
+            areaColor: theme === 'light' ? '#f5f5f5' : '#1a1a1a',
+            borderColor: theme === 'light' ? '#d0d0d0' : '#2a2a2a',
             borderWidth: 0.5,
           },
           emphasis: {
             itemStyle: {
-              areaColor: "#4a3a5a",
+              areaColor: theme === 'light' ? '#e8d9f5' : '#4a3a5a',
               borderColor: "#965CDE",
               borderWidth: 2,
               shadowBlur: 10,
@@ -376,7 +383,7 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
             },
             label: {
               show: true,
-              color: "#FFFFFF",
+              color: theme === 'light' ? '#1a1a1a' : '#FFFFFF',
             },
           },
           regions: countryHighlights,
@@ -471,11 +478,11 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
             },
           },
           iconStyle: {
-            borderColor: "#757575",
+            borderColor: theme === 'light' ? '#999999' : '#757575',
           },
           emphasis: {
             iconStyle: {
-              borderColor: "#FFFFFF",
+              borderColor: theme === 'light' ? '#1a1a1a' : '#FFFFFF',
             },
           },
         },
@@ -491,18 +498,13 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
       chart.setOption(option);
 
       // Handle zoom events to adjust container height
-      chart.on("georoam", function (params: any) {
+      chart.on("georoam", function () {
         setTimeout(() => {
           if (chartRef.current && chartInstanceRef.current) {
-            const currentOption = chartInstanceRef.current.getOption();
-            // need to check the params
-            // const geoComponent = currentOption.geo?.[0];
-            const geoComponent = { zoom: 0 };
-            const zoom = geoComponent?.zoom || 1.2;
+            // Fixed zoom value for now, can be enhanced later
+            const zoom = 1.2;
 
             // Calculate dynamic height based on zoom level
-            // Base height is 25rem for zoom level 1.2 (our initial zoom)
-            const baseHeight = 25;
             const minHeight = 25;
             const maxHeight = 35; // Reduced max height
 
@@ -548,7 +550,7 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
         chartInstanceRef.current.off("restore");
       }
     };
-  }, [data, mapLoaded, mapLoadError]);
+  }, [data, mapLoaded, mapLoadError, theme]); // Added theme to dependencies
 
   // Resize chart when container height changes
   useEffect(() => {
@@ -571,7 +573,7 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
   // };
 
   // Function to create country highlighting regions with purple theme
-  const createCountryHighlights = (data: GeographicDataPoint[]) => {
+  const createCountryHighlights = (data: GeographicDataPoint[], currentTheme: string = 'dark') => {
     const countryData: {
       [key: string]: { requests: number; successRate: number };
     } = {};
@@ -592,14 +594,18 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
     return Object.entries(countryData).map(([country, data]) => ({
       name: country,
       itemStyle: {
-        // Use darker purple for higher request counts
-        areaColor: `rgba(106, 66, 135, ${Math.min(data.requests / 1000, 0.4)})`, // Darker purple base
-        borderColor: "#7c4daa",
+        // Use purple tint for higher request counts - lighter for light theme
+        areaColor: currentTheme === 'light'
+          ? `rgba(150, 92, 222, ${Math.min(data.requests / 1000, 0.15)})` // Light purple for light theme
+          : `rgba(106, 66, 135, ${Math.min(data.requests / 1000, 0.4)})`, // Darker purple for dark theme
+        borderColor: currentTheme === 'light' ? "#c4b5fd" : "#7c4daa",
         borderWidth: 0.5,
       },
       emphasis: {
         itemStyle: {
-          areaColor: `rgba(130, 79, 160, 0.7)`, // Darker purple on hover
+          areaColor: currentTheme === 'light'
+            ? `rgba(196, 181, 253, 0.5)` // Light purple on hover for light theme
+            : `rgba(130, 79, 160, 0.7)`, // Darker purple on hover for dark theme
           borderColor: "#965CDE",
           borderWidth: 2,
           shadowBlur: 15,

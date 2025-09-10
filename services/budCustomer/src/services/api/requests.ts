@@ -53,7 +53,7 @@ let isRedirecting = false;
 if (typeof window !== "undefined") {
   Token = localStorage.getItem("access_token");
   // Reset isRedirecting flag if we're on the login page
-  if (window.location.pathname === "/auth/login") {
+  if (window.location.pathname === "/login") {
     isRedirecting = false;
   }
 }
@@ -92,6 +92,8 @@ axiosInstance.interceptors.request.use(
       config.url?.includes("auth/login") ||
       config.url?.includes("auth/register") ||
       config.url?.includes("users/reset-password") ||
+      config.url?.includes("users/validate-reset-token") ||
+      config.url?.includes("users/reset-password-with-token") ||
       config.url?.includes("auth/refresh-token") ||
       config.url?.includes("auth/oauth/callback") ||
       config.url?.includes("auth/token/exchange") ||
@@ -102,12 +104,12 @@ axiosInstance.interceptors.request.use(
       // Prevent redirect loop
       if (
         typeof window !== "undefined" &&
-        window.location.pathname !== "/auth/login"
+        window.location.pathname !== "/login"
       ) {
         if (!isRedirecting) {
           isRedirecting = true;
           localStorage.clear();
-          window.location.replace("/auth/login");
+          window.location.replace("/login");
         }
       }
       return Promise.reject(new Error("No access token found"));
@@ -196,7 +198,7 @@ const handleErrorResponse = (err: any) => {
     if (!isRedirecting) {
       isRedirecting = true;
       localStorage.clear();
-      window.location.replace("/auth/login");
+      window.location.replace("/login");
     }
     return false;
   }
@@ -204,7 +206,7 @@ const handleErrorResponse = (err: any) => {
     if (!isRedirecting) {
       isRedirecting = true;
       localStorage.clear();
-      window.location.replace("/auth/login");
+      window.location.replace("/login");
       return false;
     }
   }
@@ -237,6 +239,8 @@ const handleErrorResponse = (err: any) => {
     const skipErrorToastEndpoints = [
       "/credentials/",
       "users/reset-password",
+      "users/validate-reset-token",
+      "users/reset-password-with-token",
       "/auth/login",
     ];
 
@@ -288,7 +292,7 @@ const refreshToken = async () => {
     if (!isRedirecting) {
       isRedirecting = true;
       localStorage.clear();
-      window.location.replace("/auth/login");
+      window.location.replace("/login");
     }
     throw err;
   }

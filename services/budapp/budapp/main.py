@@ -51,6 +51,7 @@ from .endpoint_ops import endpoint_routes
 from .eval_ops import eval_routes
 from .eval_ops.workflows import EvalDataSyncWorkflows
 from .guardrails import guardrail_routes
+from .guardrails.workflows import GuardrailSyncWorkflows
 from .initializers.seeder import seeders
 from .metric_ops import metric_routes
 from .model_ops import model_routes
@@ -92,6 +93,9 @@ async def execute_initial_dapr_workflows() -> None:
 
     response = await ClusterRecommendedSchedulerWorkflows().__call__()
     logger.debug("Recommended cluster scheduler workflow response: %s", response)
+
+    response = await GuardrailSyncWorkflows().__call__()
+    logger.debug("Guardrail sync workflow response: %s", response)
 
     # Execute initial eval data sync workflow if enabled
     if app_settings.eval_sync_enabled:

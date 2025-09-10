@@ -115,6 +115,7 @@ class CloudModelSyncScheduler:
                     description=provider["description"],
                     type=provider["provider_type"],
                     icon=provider["icon"],
+                    capabilities=provider["capabilities"],
                 ).model_dump()
                 db_provider = await ProviderDataManager(session).upsert_one(ProviderModel, provider_data, ["type"])
                 provider_type_id_mapper[provider["provider_type"]] = str(db_provider.id)
@@ -131,6 +132,7 @@ class CloudModelSyncScheduler:
                 "description": provider["description"],
                 "icon": provider["icon"],
                 "credentials": provider["credentials"],
+                "capabilities": provider["capabilities"],
             }
         with open(PROVIDERS_SEEDER_FILE_PATH, "w") as f:
             json.dump(providers_data, f, indent=4)

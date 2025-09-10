@@ -6,7 +6,7 @@ data:
   tensorzero.toml: |
     [gateway]
     bind_address = "0.0.0.0:3000"
-    debug = true
+    debug = false
 
     [gateway.rate_limits]
     enabled = true
@@ -31,6 +31,9 @@ data:
     mechanism = "PLAIN"
     username = "{{ index .Values.kafka.sasl.client.users 0 }}"
     password = "{{ index .Values.kafka.sasl.client.passwords 0 }}"
+
+    [object_storage]
+    type = "disabled"
 ---
 apiVersion: apps/v1
 kind: Deployment

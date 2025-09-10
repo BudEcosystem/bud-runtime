@@ -72,8 +72,8 @@ function LoginContent() {
             console.log("Failed to get user data, continuing anyway:", error);
           }
 
-          // Redirect to models page
-          router.push("/models");
+          // Redirect to models page using window.location for clean redirect
+          window.location.href = "/models";
         } catch (error: any) {
           console.error("OAuth token exchange error:", error);
           errorToast(
@@ -113,8 +113,8 @@ function LoginContent() {
             console.log("Failed to get user data, continuing anyway:", error);
           }
 
-          // Redirect to models page
-          router.push("/models");
+          // Redirect to models page using window.location for clean redirect
+          window.location.href = "/models";
         } catch (error: any) {
           console.error("OAuth callback error:", error);
           errorToast(
@@ -193,18 +193,20 @@ function LoginContent() {
         });
 
         // Handle different login scenarios
+        hideLoader();
+
         if (response.data.is_reset_password) {
-          router.push("/auth/resetPassword");
+          router.replace("/auth/resetPassword");
         } else {
-          router.push("/models");
+          // Use replace to avoid history stack issues and window.location for clean redirect
+          window.location.href = "/models";
         }
       } else if (response.data) {
         // Handle case where login is successful but no token (shouldn't happen normally)
         setAuthError("");
-        router.push("/models");
+        hideLoader();
+        window.location.href = "/models";
       }
-
-      hideLoader();
     } catch (error: any) {
       console.error("Login error:", error);
       const errorMessage =
@@ -219,7 +221,7 @@ function LoginContent() {
   const handleForgetPassword = async (email: string) => {
     showLoader();
     try {
-      const response = await AppRequest.Post(`users/reset-password`, {
+      const response = await AppRequest.Post(`/users/reset-password`, {
         email,
       });
       if (response) {

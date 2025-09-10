@@ -134,8 +134,14 @@ class BudNotifyService:
                 response_data = await response.json()
                 if response.status != 200:
                     logger.error(f"Failed to send notification: {response.status} {response_data}")
+                    return response_data
 
-                logger.debug("Successfully sent notification")
+                # Check if the response contains an error from budnotify
+                if isinstance(response_data, dict) and response_data.get("object") == "error":
+                    logger.error(f"Budnotify returned error: {response_data}")
+                else:
+                    logger.debug("Successfully sent notification")
+
                 return response_data
         except Exception as e:
             logger.exception(f"Failed to send notification: {e}")
