@@ -72,7 +72,7 @@ export default function SelectProvider() {
 
   // Fetch providers on mount
   useEffect(() => {
-    getProviders(1, 50); // Fetch first 50 providers
+    getProviders(1, 50, undefined, "moderation"); // Fetch first 50 providers with moderation capability
   }, []);
 
   const handleProviderSelect = (providerId: string, providerData?: any) => {

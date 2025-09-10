@@ -67,16 +67,21 @@ let dummyProviders: Provider[] = [
 export const useCloudProviders = create<{
   providers: Provider[];
   loading: boolean;
-  getProviders: (page: any, limit: any, search?: string) => void;
+  getProviders: (page: any, limit: any, search?: string, capabilities?: string) => void;
 }>((set) => ({
   providers: [],
   loading: true,
-  getProviders: async (page: any, limit: any, search?: string) => {
+  getProviders: async (page: any, limit: any, search?: string, capabilities?: string) => {
     let url;
     if (search) {
       url = `${tempApiBaseUrl}/models/providers?page=${page}&limit=${limit}&search=true&name=${search}&order_by=-created_at`;
     } else {
       url = `${tempApiBaseUrl}/models/providers?page=${page}&limit=${limit}&search=false&order_by=-created_at`;
+    }
+
+    // Add capabilities filter if provided
+    if (capabilities) {
+      url += `&capabilities=${capabilities}`;
     }
     set({ loading: true });
     try {
