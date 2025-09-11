@@ -1517,7 +1517,7 @@ class ExperimentWorkflowService:
                 workflow = await WorkflowDataManager(self.session).insert_one(
                     WorkflowModel(
                         created_by=current_user_id,
-                        workflow_type=WorkflowTypeEnum.EVALUATION_CREATION,
+                        workflow_type=WorkflowTypeEnum.EVALUATE_MODEL,
                         status=WorkflowStatusEnum.IN_PROGRESS,
                         current_step=0,
                         total_steps=request.workflow_total_steps,
@@ -2007,7 +2007,7 @@ class EvaluationWorkflowService:
                 workflow = await WorkflowDataManager(self.session).insert_one(
                     WorkflowModel(
                         title=f"evaluation_workflow_{experiment_id}",
-                        workflow_type=WorkflowTypeEnum.EVALUATION_CREATION,
+                        workflow_type=WorkflowTypeEnum.EVALUATE_MODEL,
                         status=WorkflowStatusEnum.IN_PROGRESS,
                         current_step=0,  # Start at 0, will be updated to 1 after first step
                         total_steps=request.workflow_total_steps,
