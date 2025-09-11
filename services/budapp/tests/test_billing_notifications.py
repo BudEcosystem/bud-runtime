@@ -9,10 +9,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
-from budapp.billing_ops.models import BillingAlert, BillingPlan, UserBilling
-from budapp.billing_ops.notification_service import BillingNotificationService
-from budapp.billing_ops.services import BillingService
-from budapp.user_ops.models import User
+# Import models locally in tests to avoid configuration issues
 
 
 @pytest.fixture
@@ -21,64 +18,7 @@ def mock_db():
     return Mock(spec=Session)
 
 
-@pytest.fixture
-def mock_user():
-    """Create a mock user."""
-    user = Mock(spec=User)
-    user.id = uuid4()
-    user.email = "test@example.com"
-    user.user_type = "NORMAL"
-    return user
-
-
-@pytest.fixture
-def mock_billing_plan():
-    """Create a mock billing plan."""
-    plan = Mock(spec=BillingPlan)
-    plan.id = uuid4()
-    plan.name = "Professional"
-    plan.monthly_token_quota = 1000000
-    plan.monthly_cost_quota = Decimal("100.00")
-    plan.base_monthly_price = Decimal("50.00")
-    plan.is_active = True
-    return plan
-
-
-@pytest.fixture
-def mock_user_billing(mock_user, mock_billing_plan):
-    """Create a mock user billing."""
-    billing = Mock(spec=UserBilling)
-    billing.id = uuid4()
-    billing.user_id = mock_user.id
-    billing.billing_plan_id = mock_billing_plan.id
-    billing.billing_period_start = datetime.now(timezone.utc).replace(day=1)
-    billing.billing_period_end = (billing.billing_period_start + timedelta(days=30))
-    billing.custom_token_quota = None
-    billing.custom_cost_quota = None
-    billing.enable_email_notifications = True
-    billing.enable_in_app_notifications = True
-    billing.is_active = True
-    billing.is_suspended = False
-    billing.suspension_reason = None
-    return billing
-
-
-@pytest.fixture
-def mock_billing_alert(mock_user):
-    """Create a mock billing alert."""
-    alert = Mock(spec=BillingAlert)
-    alert.id = uuid4()
-    alert.user_id = mock_user.id
-    alert.name = "75% Token Usage Alert"
-    alert.alert_type = "token_usage"
-    alert.threshold_percent = 75
-    alert.last_triggered_at = None
-    alert.last_triggered_value = None
-    alert.last_notification_sent_at = None
-    alert.notification_failure_count = 0
-    alert.last_notification_error = None
-    alert.is_active = True
-    return alert
+# Fixtures removed - will use local mocks in each test to avoid import issues
 
 
 class TestBillingNotificationService:
@@ -191,11 +131,14 @@ class TestBillingServiceNotifications:
     @pytest.mark.asyncio
     async def test_check_and_trigger_alerts_with_notifications(self):
         """Test that alerts trigger notifications when thresholds are exceeded."""
-        # Create a more direct test by mocking only what's necessary
+        # Import models locally to avoid configuration issues
         from unittest.mock import Mock, AsyncMock, patch
         from decimal import Decimal
         from uuid import uuid4
         from datetime import datetime, timezone
+
+        # Import billing service locally to avoid initialization issues
+        from budapp.billing_ops.services import BillingService
 
         # Create mock objects
         user_id = uuid4()
@@ -225,7 +168,7 @@ class TestBillingServiceNotifications:
              patch.object(service, 'get_user_billing') as mock_get_user_billing, \
              patch.object(service, 'get_billing_alerts') as mock_get_alerts, \
              patch.object(service.session, 'execute') as mock_execute, \
-             patch('budapp.billing_ops.notification_service.BillingNotificationService') as MockNotificationService:
+             patch('budapp.billing_ops.services.BillingNotificationService') as MockNotificationService:
 
             # Setup all mocks
             mock_get_usage.return_value = {
