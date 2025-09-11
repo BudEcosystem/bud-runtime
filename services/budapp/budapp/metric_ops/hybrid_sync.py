@@ -21,7 +21,11 @@ logger = get_logger(__name__)
 
 
 class HybridMetricsSyncTask:
-    """Unified task that handles both credential and user usage sync with smart filtering."""
+    """Unified task that handles both credential and user usage sync with smart filtering.
+
+    Also checks and triggers billing alerts when users exceed their configured thresholds,
+    ensuring timely notifications for approaching usage limits.
+    """
 
     def __init__(self, incremental_interval: int = 60, full_sync_interval: int = 900):
         """Initialize the hybrid sync task.
@@ -45,6 +49,8 @@ class HybridMetricsSyncTask:
             "last_error": None,
             "active_credentials_avg": 0,
             "active_users_avg": 0,
+            "total_alerts_triggered": 0,
+            "total_alerts_failed": 0,
         }
 
     async def start(self):
@@ -140,11 +146,20 @@ class HybridMetricsSyncTask:
                     self.sync_stats["active_credentials_avg"] = stats.get("active_credentials", 0)
                     self.sync_stats["active_users_avg"] = stats.get("active_users", 0)
 
+                # Update alert stats
+                self.sync_stats["total_alerts_triggered"] += result.get("alerts_triggered", 0)
+                self.sync_stats["total_alerts_failed"] += result.get("alerts_failed", 0)
+
+                # Include alert information in sync completion log
+                alert_info = ""
+                if result.get("alerts_triggered", 0) > 0 or result.get("alerts_failed", 0) > 0:
+                    alert_info = f", alerts_triggered={result.get('alerts_triggered', 0)}, alerts_failed={result.get('alerts_failed', 0)}"
+
                 logger.info(
                     f"{mode.capitalize()} sync completed: "
                     f"credentials={stats.get('active_credentials', 0)}, "
                     f"users={stats.get('active_users', 0)}, "
-                    f"updates={result.get('total_updates', 0)}"
+                    f"updates={result.get('total_updates', 0)}{alert_info}"
                 )
 
                 return result
@@ -173,15 +188,21 @@ class HybridMetricsSyncTask:
                 errors.extend(credential_result.get("errors", []))
 
             # Process user usage updates
+            alerts_triggered = 0
+            alerts_failed = 0
             if user_usage:
                 user_result = await self._update_user_usage(user_usage)
                 total_updates += user_result.get("updated_count", 0)
+                alerts_triggered = user_result.get("alerts_triggered", 0)
+                alerts_failed = user_result.get("alerts_failed", 0)
                 errors.extend(user_result.get("errors", []))
 
             return {
                 "total_updates": total_updates,
                 "credential_updates": len(credential_usage),
                 "user_updates": len(user_usage),
+                "alerts_triggered": alerts_triggered,
+                "alerts_failed": alerts_failed,
                 "errors": errors,
             }
 
@@ -246,6 +267,32 @@ class HybridMetricsSyncTask:
                 # Process all users in a single bulk operation
                 bulk_results = await billing_service.check_bulk_usage_limits(user_ids)
 
+                # Check and trigger alerts for each user (non-admin users only)
+                alert_check_results = {"triggered": 0, "failed": 0}
+                for user_id in user_ids:
+                    try:
+                        # Skip alert checking for admin users (they have unlimited access)
+                        user_result = bulk_results.get(str(user_id), {})
+                        if user_result.get("status") == "admin_unlimited":
+                            continue
+
+                        # Check and trigger alerts for this user
+                        triggered_alerts = await billing_service.check_and_trigger_alerts(user_id)
+                        if triggered_alerts:
+                            alert_check_results["triggered"] += len(triggered_alerts)
+                            logger.info(f"Triggered {len(triggered_alerts)} alerts for user {user_id}")
+                    except Exception as e:
+                        alert_check_results["failed"] += 1
+                        logger.warning(f"Failed to check alerts for user {user_id}: {e}")
+
+                # Log alert checking summary
+                if alert_check_results["triggered"] > 0 or alert_check_results["failed"] > 0:
+                    logger.info(
+                        f"Alert checking completed: "
+                        f"triggered={alert_check_results['triggered']}, "
+                        f"failed={alert_check_results['failed']}"
+                    )
+
                 # Count results
                 updated_count = len([r for r in bulk_results.values() if r])  # Non-empty results
                 failed_count = len(user_ids) - updated_count
@@ -258,12 +305,20 @@ class HybridMetricsSyncTask:
                 return {
                     "updated_count": updated_count,
                     "failed_count": failed_count,
+                    "alerts_triggered": alert_check_results["triggered"],
+                    "alerts_failed": alert_check_results["failed"],
                     "errors": [] if failed_count == 0 else [f"{failed_count} users failed processing"],
                 }
 
         except Exception as e:
             logger.error(f"Error updating user usage with bulk method: {e}")
-            return {"updated_count": 0, "failed_count": len(user_usage), "errors": [str(e)]}
+            return {
+                "updated_count": 0,
+                "failed_count": len(user_usage),
+                "alerts_triggered": 0,
+                "alerts_failed": 0,
+                "errors": [str(e)],
+            }
 
     async def _get_admin_user_ids(self) -> List[UUID]:
         """Get active admin user IDs to ensure they're included in full sync."""

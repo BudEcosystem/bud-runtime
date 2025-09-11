@@ -189,19 +189,45 @@ class TestBillingServiceNotifications:
     """Test billing service notification integration."""
 
     @pytest.mark.asyncio
-    async def test_check_and_trigger_alerts_with_notifications(self, mock_db, mock_user, mock_user_billing, mock_billing_plan, mock_billing_alert):
+    async def test_check_and_trigger_alerts_with_notifications(self):
         """Test that alerts trigger notifications when thresholds are exceeded."""
-        service = BillingService(mock_db)
+        # Create a more direct test by mocking only what's necessary
+        from unittest.mock import Mock, AsyncMock, patch
+        from decimal import Decimal
+        from uuid import uuid4
+        from datetime import datetime, timezone
 
-        # Mock all the service method calls instead of individual database queries
+        # Create mock objects
+        user_id = uuid4()
+        mock_session = Mock()
+        service = BillingService(mock_session)
+
+        # Create mock alert that should trigger
+        mock_alert = Mock()
+        mock_alert.alert_type = "token_usage"
+        mock_alert.threshold_percent = 75
+        mock_alert.last_triggered_value = None  # Important: not triggered before
+        mock_alert.name = "75% Token Usage Alert"
+        mock_alert.notification_failure_count = 0
+
+        # Create mock user billing
+        mock_user_billing = Mock()
+        mock_user_billing.enable_email_notifications = True
+        mock_user_billing.enable_in_app_notifications = True
+        mock_user_billing.billing_period_start = datetime.now(timezone.utc)
+        mock_user_billing.billing_period_end = datetime.now(timezone.utc)
+
+        # Create mock user
+        mock_user = Mock()
+        mock_user.email = "test@example.com"
+
         with patch.object(service, 'get_current_usage', new_callable=AsyncMock) as mock_get_usage, \
              patch.object(service, 'get_user_billing') as mock_get_user_billing, \
              patch.object(service, 'get_billing_alerts') as mock_get_alerts, \
-             patch.object(service, 'get_billing_plan') as mock_get_plan, \
-             patch('budapp.billing_ops.services.select') as mock_select, \
+             patch.object(service.session, 'execute') as mock_execute, \
              patch('budapp.billing_ops.notification_service.BillingNotificationService') as MockNotificationService:
 
-            # Mock return values
+            # Setup all mocks
             mock_get_usage.return_value = {
                 "has_billing": True,
                 "plan_name": "Professional",
@@ -215,11 +241,8 @@ class TestBillingServiceNotifications:
                 },
             }
             mock_get_user_billing.return_value = mock_user_billing
-            mock_get_alerts.return_value = [mock_billing_alert]
-            mock_get_plan.return_value = mock_billing_plan
-            
-            # Mock the User database query
-            mock_db.execute.return_value.scalar_one_or_none.return_value = mock_user
+            mock_get_alerts.return_value = [mock_alert]
+            mock_execute.return_value.scalar_one_or_none.return_value = mock_user
 
             # Setup notification service mock
             mock_notification_instance = MockNotificationService.return_value
@@ -230,9 +253,9 @@ class TestBillingServiceNotifications:
             })
 
             # Execute
-            triggered_alerts = await service.check_and_trigger_alerts(mock_user.id)
+            triggered_alerts = await service.check_and_trigger_alerts(user_id)
 
-            # Verify
+            # Verify alert was triggered
             assert len(triggered_alerts) == 1
             assert triggered_alerts[0]["alert_name"] == "75% Token Usage Alert"
             assert triggered_alerts[0]["threshold_percent"] == 75
@@ -242,10 +265,10 @@ class TestBillingServiceNotifications:
             mock_notification_instance.send_usage_alert.assert_called_once()
 
             # Verify alert was updated
-            assert mock_billing_alert.last_triggered_at is not None
-            assert mock_billing_alert.last_triggered_value == Decimal("800000")
-            assert mock_billing_alert.last_notification_sent_at is not None
-            assert mock_billing_alert.notification_failure_count == 0
+            assert mock_alert.last_triggered_at is not None
+            assert mock_alert.last_triggered_value == Decimal("800000")
+            assert mock_alert.last_notification_sent_at is not None
+            assert mock_alert.notification_failure_count == 0
 
     @pytest.mark.asyncio
     async def test_check_and_trigger_alerts_notification_failure(self, mock_db, mock_user, mock_user_billing, mock_billing_plan, mock_billing_alert):
