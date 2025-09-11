@@ -2095,9 +2095,7 @@ class EvaluationWorkflowService:
 
                 logger.debug(f"Trigger Workflow Response 01 : {trigger_workflow_response}")
 
-                evaluation_events_payload = {
-                    BudServeWorkflowStepEventName.EVALUATION_EVENTS.value: trigger_workflow_response
-                }
+                evaluation_events_payload = trigger_workflow_response.copy()
 
                 db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
                     workflow.id, current_step_number, evaluation_events_payload
@@ -2107,7 +2105,7 @@ class EvaluationWorkflowService:
 
                 evaluation_events_payload["progress_type"] = BudServeWorkflowStepEventName.EVALUATION_EVENTS.value
                 await WorkflowDataManager(self.session).update_by_fields(
-                    workflow, {"progress": trigger_workflow_response, "current_step": workflow_current_step}
+                    workflow, {"progress": evaluation_events_payload, "current_step": workflow_current_step}
                 )
 
                 logger.debug(f"Trigger Workflow Response 02: {evaluation_events_payload}")
