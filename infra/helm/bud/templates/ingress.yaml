@@ -68,6 +68,16 @@ spec:
                 name: {{ .Release.Name }}-budgateway
                 port:
                   number: 3000
+    - host: {{ include "bud.ingress.hosts.s3" $ }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-minio
+                port:
+                  number: 8080
   tls:
     - hosts:
         - {{ include "bud.ingress.hosts.budcustomer" $ }}
@@ -84,6 +94,9 @@ spec:
     - hosts:
         - {{ include "bud.ingress.hosts.budgateway" $ }}
       secretName: {{ .Release.Name }}-budgateway-acme-cert
+    - hosts:
+        - {{ include "bud.ingress.hosts.s3" $ }}
+      secretName: {{ .Release.Name }}-s3-acme-cert
 ---
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
