@@ -1154,6 +1154,8 @@ impl ModerationProvider for MistralProvider {
                         harassment: result.categories.hate_and_discrimination,
                         harassment_threatening: result.categories.hate_and_discrimination
                             && result.categories.violence_and_threats,
+                        illicit: false,         // Mistral doesn't have this category
+                        illicit_violent: false, // Mistral doesn't have this category
                         self_harm: result.categories.self_harm,
                         self_harm_intent: result.categories.self_harm,
                         self_harm_instructions: result.categories.self_harm,
@@ -1161,6 +1163,12 @@ impl ModerationProvider for MistralProvider {
                         sexual_minors: result.categories.sexual, // Mistral doesn't distinguish minors
                         violence: result.categories.violence_and_threats,
                         violence_graphic: result.categories.violence_and_threats,
+                        profanity: false,    // Mistral doesn't have this category
+                        insult: false,       // Mistral doesn't have this category
+                        toxicity: false,     // Mistral doesn't have this category
+                        malicious: false,    // Mistral doesn't have this category
+                        ip_violation: false, // Mistral doesn't have this category
+                        hallucination: false, // Mistral doesn't have this category
                     };
 
                     let category_scores = ModerationCategoryScores {
@@ -1181,6 +1189,11 @@ impl ModerationProvider for MistralProvider {
                         sexual_minors: result.category_scores.sexual,
                         violence: result.category_scores.violence_and_threats,
                         violence_graphic: result.category_scores.violence_and_threats,
+                        illicit: 0.0,         // Mistral doesn't have this category
+                        illicit_violent: 0.0, // Mistral doesn't have this category
+                        profanity: 0.0,       // Mistral doesn't have this category
+                        insult: 0.0,          // Mistral doesn't have this category
+                        toxicity: 0.0,        // Mistral doesn't have this category
                     };
 
                     // Determine if content is flagged (any category is true)
@@ -1188,18 +1201,28 @@ impl ModerationProvider for MistralProvider {
                         || categories.hate_threatening
                         || categories.harassment
                         || categories.harassment_threatening
+                        || categories.illicit
+                        || categories.illicit_violent
                         || categories.self_harm
                         || categories.self_harm_intent
                         || categories.self_harm_instructions
                         || categories.sexual
                         || categories.sexual_minors
                         || categories.violence
-                        || categories.violence_graphic;
+                        || categories.violence_graphic
+                        || categories.profanity
+                        || categories.insult
+                        || categories.toxicity
+                        || categories.malicious
+                        || categories.ip_violation;
 
                     ModerationResult {
                         flagged,
                         categories,
                         category_scores,
+                        category_applied_input_types: None, // Mistral doesn't provide this information
+                        hallucination_details: None,
+                        ip_violation_details: None,
                     }
                 })
                 .collect();

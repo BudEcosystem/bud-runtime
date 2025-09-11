@@ -1,7 +1,7 @@
 pub mod limiter;
 pub mod middleware;
 
-pub use limiter::{UsageLimiter, UsageLimitInfo, UsageLimiterConfig};
+pub use limiter::{UsageLimitInfo, UsageLimiter, UsageLimiterConfig};
 pub use middleware::usage_limit_middleware;
 
 /// User usage limit status with usage tracking

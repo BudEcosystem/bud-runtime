@@ -48,7 +48,7 @@ use crate::{
     inference::{
         providers::{
             anthropic::AnthropicProvider, aws_bedrock::AWSBedrockProvider, azure::AzureProvider,
-            deepseek::DeepSeekProvider, fireworks::FireworksProvider,
+            azure_content_safety::AzureContentSafetyProvider, deepseek::DeepSeekProvider, fireworks::FireworksProvider,
             gcp_vertex_anthropic::GCPVertexAnthropicProvider,
             gcp_vertex_gemini::GCPVertexGeminiProvider, mistral::MistralProvider,
             openai::OpenAIProvider, openrouter::OpenRouterProvider,
@@ -1425,6 +1425,7 @@ impl ModelProvider {
             ProviderConfig::AWSBedrock(_) => "aws_bedrock",
             ProviderConfig::AWSSagemaker(_) => "aws_sagemaker",
             ProviderConfig::Azure(_) => "azure",
+            ProviderConfig::AzureContentSafety(_) => "azure_content_safety",
             ProviderConfig::Fireworks(_) => "fireworks",
             ProviderConfig::GCPVertexAnthropic(_) => "gcp_vertex_anthropic",
             ProviderConfig::GCPVertexGemini(_) => "gcp_vertex_gemini",
@@ -1452,6 +1453,7 @@ impl ModelProvider {
             // SageMaker doesn't have a meaningful model name concept, as we just invoke an endpoint
             ProviderConfig::AWSSagemaker(_) => None,
             ProviderConfig::Azure(provider) => Some(provider.deployment_id()),
+            ProviderConfig::AzureContentSafety(_) => None, // Content Safety doesn't have a model name
             ProviderConfig::Fireworks(provider) => Some(provider.model_name()),
             ProviderConfig::GCPVertexAnthropic(provider) => Some(provider.model_id()),
             ProviderConfig::GCPVertexGemini(provider) => Some(provider.model_id()),
@@ -1496,6 +1498,7 @@ pub enum ProviderConfig {
     AWSBedrock(AWSBedrockProvider),
     AWSSagemaker(AWSSagemakerProvider),
     Azure(AzureProvider),
+    AzureContentSafety(AzureContentSafetyProvider),
     DeepSeek(DeepSeekProvider),
     Fireworks(FireworksProvider),
     GCPVertexAnthropic(GCPVertexAnthropicProvider),
@@ -1556,6 +1559,13 @@ pub(super) enum UninitializedProviderConfig {
         deployment_id: String,
         endpoint: Url,
         api_key_location: Option<CredentialLocation>,
+    },
+    #[strum(serialize = "azure_content_safety")]
+    #[serde(rename = "azure_content_safety")]
+    AzureContentSafety {
+        endpoint: Url,
+        api_key_location: Option<CredentialLocation>,
+        api_version: Option<String>,
     },
     #[strum(serialize = "gcp_vertex_anthropic")]
     #[serde(rename = "gcp_vertex_anthropic")]
@@ -1714,6 +1724,14 @@ impl UninitializedProviderConfig {
                 endpoint,
                 api_key_location,
             )?),
+            UninitializedProviderConfig::AzureContentSafety {
+                endpoint,
+                api_key_location,
+                api_version: _,
+            } => ProviderConfig::AzureContentSafety(AzureContentSafetyProvider::new(
+                endpoint,
+                api_key_location,
+            )?),
             UninitializedProviderConfig::Fireworks {
                 model_name,
                 api_key_location,
@@ -1854,6 +1872,12 @@ impl ModelProvider {
             ProviderConfig::Azure(provider) => {
                 provider.infer(request, client, api_keys, self).await
             }
+            ProviderConfig::AzureContentSafety(_) => {
+                Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "inference".to_string(),
+                    provider: self.name.to_string(),
+                }))
+            }
             ProviderConfig::Fireworks(provider) => {
                 provider.infer(request, client, api_keys, self).await
             }
@@ -1926,6 +1950,12 @@ impl ModelProvider {
             }
             ProviderConfig::Azure(provider) => {
                 provider.infer_stream(request, client, api_keys, self).await
+            }
+            ProviderConfig::AzureContentSafety(_) => {
+                return Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "inference_stream".to_string(),
+                    provider: self.name.to_string(),
+                }))
             }
             ProviderConfig::Fireworks(provider) => {
                 provider.infer_stream(request, client, api_keys, self).await
@@ -2008,6 +2038,12 @@ impl ModelProvider {
                 provider
                     .start_batch_inference(requests, client, api_keys)
                     .await
+            }
+            ProviderConfig::AzureContentSafety(_) => {
+                Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "batch_inference".to_string(),
+                    provider: self.name.to_string(),
+                }))
             }
             ProviderConfig::Fireworks(provider) => {
                 provider
@@ -2114,6 +2150,12 @@ impl ModelProvider {
                 provider
                     .poll_batch_inference(batch_request, http_client, dynamic_api_keys)
                     .await
+            }
+            ProviderConfig::AzureContentSafety(_) => {
+                Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "batch_inference".to_string(),
+                    provider: self.name.to_string(),
+                }))
             }
             ProviderConfig::Fireworks(provider) => {
                 provider
@@ -4313,7 +4355,7 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
-            pricing: None,
+                pricing: None,
             },
         );
         models.insert(
@@ -4325,7 +4367,7 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
-            pricing: None,
+                pricing: None,
             },
         );
         models.insert(
@@ -4337,7 +4379,7 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
-            pricing: None,
+                pricing: None,
             },
         );
 
@@ -4390,7 +4432,7 @@ mod tests {
                         fallback_models: None,
                         retry_config: None,
                         rate_limits: None,
-            pricing: None,
+                        pricing: None,
                     },
                 );
 
