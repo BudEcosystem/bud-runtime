@@ -1,13 +1,15 @@
 apiVersion: v2
 name: nfd
-description: Node Feature Discovery wrapper chart for bud-stack
+description: Node Feature Discovery wrapper chart for bud-stack with hardware detection plugins
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "0.15.4"
 
-# Dependencies are managed separately in the playbook
-# NFD is deployed directly from upstream repository
-# GPU Operator is deployed conditionally if GPUs are detected
+dependencies:
+  - name: node-feature-discovery
+    version: "0.15.4"
+    repository: https://kubernetes-sigs.github.io/node-feature-discovery/charts
+    condition: nfd.enabled
 
 maintainers:
   - name: BudEcosystem
@@ -16,5 +18,7 @@ maintainers:
 keywords:
   - nfd
   - gpu
+  - hpu
   - hardware-detection
   - kubernetes
+  - intel-device-plugin

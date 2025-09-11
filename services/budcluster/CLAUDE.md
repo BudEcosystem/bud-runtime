@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Bud-Serve-Cluster is a FastAPI-based microservice that manages Kubernetes/OpenShift clusters and AI model deployments. It uses Dapr for distributed runtime capabilities, Ansible/Terraform for infrastructure automation, and provides multi-cloud support (AWS EKS, Azure AKS, on-premises).
+BudCluster is a FastAPI-based microservice that manages Kubernetes/OpenShift clusters and AI model deployments. It uses Dapr for distributed runtime capabilities, Ansible/Terraform for infrastructure automation, and provides multi-cloud support (AWS EKS, Azure AKS, on-premises).
 
 ## Common Development Commands
 
@@ -135,3 +135,48 @@ Dapr components are defined in `.dapr/components/` and configured via environmen
 - Test with different cluster types (cloud/on-prem)
 - Model deployments now use dynamic `--max-model-len` based on `input_tokens + output_tokens` with 10% safety margin
 - Token parameters are optional and fallback to default (8192) when not provided
+
+## Technical Stack
+
+- **Framework**: FastAPI with Dapr sidecars
+- **Database**: PostgreSQL with SQLAlchemy ORM and Alembic migrations
+- **State Management**: Redis for Dapr state store and configuration
+- **Containerization**: Docker with docker-compose for development
+- **Infrastructure**: Terraform for cloud provisioning, Ansible for configuration
+- **Validation**: Pydantic schemas for request/response handling
+- **Code Quality**: Ruff for linting/formatting, MyPy for type checking
+- **Testing**: pytest with asyncio support
+
+## Configuration Management
+
+Environment configuration uses budmicroframe patterns:
+- `.env` files with `.env.sample` templates
+- Dapr configuration components for runtime settings
+- Periodic sync from configuration store
+- Crypto keys for encryption/decryption of sensitive data
+
+## Hardware Detection (NFD)
+
+The service uses Node Feature Discovery (NFD) as the only method for hardware detection:
+- Deploys NFD components to clusters for automatic hardware labeling
+- Timeout configurable via `NFD_DETECTION_TIMEOUT` (default: 30s)
+- NFD namespace configurable via `NFD_NAMESPACE` (default: `node-feature-discovery`)
+- Legacy node-info-collector methods have been removed
+
+## Workflow Orchestration
+
+Long-running operations use Dapr workflows:
+- Cluster provisioning workflows for cloud providers
+- Model deployment workflows with error handling
+- State persistence in Redis state store
+- Notification integration for status updates
+
+## Development Patterns
+
+Follow these patterns when adding new functionality:
+- Use existing CRUD patterns in `base_crud.py`
+- Implement Pydantic schemas for all API endpoints
+- Add proper error handling and logging
+- Use Dapr service invocation for inter-service communication
+- Encrypt sensitive data before storing in database
+- Add appropriate database migrations for schema changes

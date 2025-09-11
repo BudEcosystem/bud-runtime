@@ -233,6 +233,29 @@ class RegisterClusterWorkflow:
                         param={"configuration_status": configuration_status, "cluster_id": str(cluster_id)},
                     )
                 else:
+                    # Update cluster status to NOT_AVAILABLE when configuration fails
+                    try:
+                        from ..commons.constants import ClusterStatusEnum
+                        from ..db.crud import ClusterDataManager
+                        from ..db.session import DBSession
+
+                        if cluster_id:
+                            with DBSession() as session:
+                                db_cluster = asyncio.run(
+                                    ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+                                )
+                                if db_cluster:
+                                    asyncio.run(
+                                        ClusterDataManager(session).update_cluster_by_fields(
+                                            db_cluster, {"status": ClusterStatusEnum.NOT_AVAILABLE}
+                                        )
+                                    )
+                                    logger.info(
+                                        f"Marked cluster {cluster_id} as NOT_AVAILABLE due to configuration failure"
+                                    )
+                    except Exception as db_e:
+                        logger.error(f"Failed to update cluster status on configuration failure: {db_e}")
+
                     response = ErrorResponse(message="Cluster configuration failed", code=HTTPStatus.BAD_REQUEST.value)
             workflow_status = check_workflow_status_in_statestore(workflow_id)
             if workflow_status:
@@ -250,6 +273,33 @@ class RegisterClusterWorkflow:
         except Exception as e:
             error_msg = f"Error configuring cluster for workflow_id: {workflow_id} and task_id: {task_id}, error: {e}"
             logger.error(error_msg)
+
+            # Update cluster status to NOT_AVAILABLE on configuration failure
+            try:
+                from ..commons.constants import ClusterStatusEnum
+                from ..db.crud import ClusterDataManager
+                from ..db.session import DBSession
+
+                workflow_data = get_workflow_data_from_statestore(str(workflow_id))
+                cluster_id = workflow_data.get("cluster_id") if workflow_data else None
+
+                if cluster_id:
+                    with DBSession() as session:
+                        db_cluster = asyncio.run(
+                            ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+                        )
+                        if db_cluster:
+                            asyncio.run(
+                                ClusterDataManager(session).update_cluster_by_fields(
+                                    db_cluster, {"status": ClusterStatusEnum.NOT_AVAILABLE}
+                                )
+                            )
+                            logger.info(
+                                f"Marked cluster {cluster_id} as NOT_AVAILABLE due to configure_cluster failure"
+                            )
+            except Exception as db_e:
+                logger.error(f"Failed to update cluster status on configure_cluster failure: {db_e}")
+
             response = ErrorResponse(message="Cluster configuration failed", code=HTTPStatus.BAD_REQUEST.value)
         return response.model_dump(mode="json")
 
@@ -939,6 +989,36 @@ class RegisterClusterWorkflow:
 
         # if configure cluster is not successful
         if configure_cluster_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
+            # Update cluster status to NOT_AVAILABLE if cluster was created
+            try:
+                from ..commons.constants import ClusterStatusEnum
+                from ..db.crud import ClusterDataManager
+                from ..db.session import DBSession
+
+                # Try to get cluster_id from the configure_cluster_result or workflow data
+                cluster_id = configure_cluster_result.get("param", {}).get("cluster_id")
+                if not cluster_id:
+                    # Fallback to workflow data
+                    workflow_data = get_workflow_data_from_statestore(str(instance_id))
+                    cluster_id = workflow_data.get("cluster_id") if workflow_data else None
+
+                if cluster_id:
+                    with DBSession() as session:
+                        db_cluster = asyncio.run(
+                            ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+                        )
+                        if db_cluster:
+                            asyncio.run(
+                                ClusterDataManager(session).update_cluster_by_fields(
+                                    db_cluster, {"status": ClusterStatusEnum.NOT_AVAILABLE}
+                                )
+                            )
+                            logger.info(
+                                f"Marked cluster {cluster_id} as NOT_AVAILABLE due to workflow configure_cluster failure"
+                            )
+            except Exception as e:
+                logger.error(f"Failed to update cluster status on workflow configure_cluster failure: {e}")
+
             # notify activity that cluster configuration failed
             notification_req.payload.event = "configure_cluster"
             notification_req.payload.content = NotificationContent(

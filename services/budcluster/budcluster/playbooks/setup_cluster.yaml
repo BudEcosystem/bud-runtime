@@ -65,8 +65,8 @@
     # Clean up any existing problematic NFD deployment
     - name: Check for and remove problematic NFD deployment
       shell: |
-        helm list -n {{ namespace }} --kubeconfig {{ kubeconfig_path }} | grep -q {{ nfd_release_name }} && \
-        helm uninstall {{ nfd_release_name }} -n {{ namespace }} --kubeconfig {{ kubeconfig_path }} || true
+        helm list -n {{ namespace }} --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}| grep -q {{ nfd_release_name }} && \
+        helm uninstall {{ nfd_release_name }} -n {{ namespace }} --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}|| true
       when:
         - nfd_helm_info is failed
         - nfd_needs_deployment | default(true)
@@ -75,29 +75,25 @@
     # Clean up cluster-scoped resources from previous installations
     - name: Clean up existing NFD ClusterRoles and ClusterRoleBindings
       shell: |
-        kubectl --kubeconfig {{ kubeconfig_path }} delete clusterrole node-feature-discovery --ignore-not-found=true
-        kubectl --kubeconfig {{ kubeconfig_path }} delete clusterrolebinding node-feature-discovery --ignore-not-found=true
+        kubectl --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}delete clusterrole node-feature-discovery --ignore-not-found=true
+        kubectl --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}delete clusterrolebinding node-feature-discovery --ignore-not-found=true
         # Also clean up from old bud-runtime namespace if exists
-        helm list -n bud-runtime --kubeconfig {{ kubeconfig_path }} | grep -q {{ nfd_release_name }} && \
-        helm uninstall {{ nfd_release_name }} -n bud-runtime --kubeconfig {{ kubeconfig_path }} || true
+        helm list -n bud-runtime --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}| grep -q {{ nfd_release_name }} && \
+        helm uninstall {{ nfd_release_name }} -n bud-runtime --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}|| true
         # Remove any leftover ClusterRoles/ClusterRoleBindings with NFD in the name
-        kubectl --kubeconfig {{ kubeconfig_path }} delete clusterrole -l app.kubernetes.io/name=node-feature-discovery --ignore-not-found=true
-        kubectl --kubeconfig {{ kubeconfig_path }} delete clusterrolebinding -l app.kubernetes.io/name=node-feature-discovery --ignore-not-found=true
+        kubectl --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}delete clusterrole -l app.kubernetes.io/name=node-feature-discovery --ignore-not-found=true
+        kubectl --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}delete clusterrolebinding -l app.kubernetes.io/name=node-feature-discovery --ignore-not-found=true
       when: nfd_needs_deployment | default(true)
       ignore_errors: true
 
-    - name: Add NFD Helm repository
-      kubernetes.core.helm_repository:
-        name: nfd
-        repo_url: https://kubernetes-sigs.github.io/node-feature-discovery/charts
-        kubeconfig: "{{ kubeconfig_path }}"
+    - name: Update NFD chart dependencies
+      shell: helm dependency update "{{ nfd_chart_path }}"
       when: nfd_needs_deployment | default(true)
 
-    - name: Deploy NFD from upstream chart
+    - name: Deploy NFD from local chart
       kubernetes.core.helm:
         release_name: "{{ nfd_release_name }}"
-        chart_ref: "nfd/node-feature-discovery"
-        chart_version: "0.15.4"
+        chart_ref: "{{ nfd_chart_path }}"
         release_namespace: "{{ namespace }}"
         create_namespace: true
         atomic: true
@@ -106,83 +102,12 @@
         force: true
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
-        # Use inline values with enhanced CPU detection
+        # Use values from local chart
         values:
-          master:
-            resources:
-              requests:
-                cpu: 100m
-                memory: 128Mi
-              limits:
-                cpu: 200m
-                memory: 256Mi
-          worker:
-            resources:
-              requests:
-                cpu: 100m
-                memory: 64Mi
-              limits:
-                cpu: 200m
-                memory: 128Mi
-            config:
-              core:
-                sleepInterval: 60s
-                # Allow more labels for better hardware detection
-                labelWhiteList: "^feature\\.node\\.kubernetes\\.io/.*"
-                labelSources:
-                  - custom
-                  - pci
-                  - cpu
-                  - kernel
-                  - local
-                  - memory
-                  - network
-                  - storage
-                  - system
-                  - usb
-              sources:
-                cpu:
-                  cpuid:
-                    # Include all CPUID attributes for full detection
-                    attributeBlacklist: []
-                    attributeWhitelist: []
-                # System detection for OS and node info
-                system:
-                  osRelease:
-                    id:
-                      - "ID"
-                      - "VERSION_ID"
-                  name:
-                    - "nodename"
-                # Local hooks for custom CPU detection
-                local:
-                  hooksEnabled: true
-                # Custom rules to extract CPU information
-                custom:
-                  - name: "cpu-info"
-                    labels:
-                      "cpu-model": "@cpu.model"
-                      "cpu-vendor": "@cpu.vendor_id"
-                    matchOn:
-                      - cpuId:
-                          vendor_id: [".*"]
-                  - name: "cpu-attributes"
-                    labels:
-                      "cpu-family": "@cpu.family"
-                    matchOn:
-                      - cpuId:
-                          family: [".*"]
-                pci:
-                  deviceClassWhitelist:
-                    - "0300"
-                    - "0302"
-                    - "0b40"
-                  deviceLabelFields:
-                    - vendor
-                    - device
-                    - class
-          topologyUpdater:
-            enable: true
+          global:
+            namespace: "{{ namespace }}"
+          nfd:
+            enabled: true
       when: nfd_needs_deployment | default(true)
 
     - name: Wait for NFD master to be ready
@@ -243,6 +168,12 @@
         validate_certs: "{{ validate_certs }}"
       register: cluster_nodes
 
+    - name: Debug node labels for GPU detection
+      debug:
+        msg: "Node labels: {{ item.metadata.labels | default({}) | dict2items | selectattr('key', 'match', '.*pci.*') | list }}"
+      loop: "{{ cluster_nodes.resources }}"
+      when: cluster_nodes.resources is defined
+
     - name: Set GPU detection fact
       set_fact:
         has_nvidia_gpus: >-
@@ -256,14 +187,27 @@
             selectattr('metadata.labels', 'defined') |
             selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-10de\\.present', 'defined') |
             selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-10de\\.present', 'equalto', 'true') |
+            list | length > 0 or
+            cluster_nodes.resources |
+            selectattr('metadata.labels', 'defined') |
+            map(attribute='metadata.labels') |
+            map('dict2items') |
+            flatten |
+            selectattr('key', 'match', '^feature\\.node\\.kubernetes\\.io/pci-.*10de\\.present$') |
+            selectattr('value', 'equalto', 'true') |
             list | length > 0
           }}
+
+    - name: Debug GPU detection result
+      debug:
+        msg: "NVIDIA GPUs detected: {{ has_nvidia_gpus }}"
 
     - name: Add NVIDIA Helm repository
       kubernetes.core.helm_repository:
         name: nvidia
         repo_url: https://helm.ngc.nvidia.com/nvidia
         kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
       when: has_nvidia_gpus | default(false)
 
     - name: Deploy GPU Operator if NVIDIA GPUs detected
@@ -314,6 +258,14 @@
             selectattr('metadata.labels', 'defined') |
             selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1022', 'defined') |
             selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1022', 'equalto', 'true') |
+            list | length > 0 or
+            cluster_nodes.resources |
+            selectattr('metadata.labels', 'defined') |
+            map(attribute='metadata.labels') |
+            map('dict2items') |
+            flatten |
+            selectattr('key', 'match', '^feature\\.node\\.kubernetes\\.io/pci-.*8086\\.device-(1020|1021|1022)$') |
+            selectattr('value', 'equalto', 'true') |
             list | length > 0
           }}
 
