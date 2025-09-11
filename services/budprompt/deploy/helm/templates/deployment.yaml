@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "{{ .Values.name }}"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Values.name }}"
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "{{ .Values.name }}"
+        dapr.io/app-port: "{{ .Values.env.APP_PORT }}"
+        dapr.io/placement-host-address: "dapr-placement-server.dapr-system:50005"
+    spec:
+      containers:
+      - name: "{{ .Values.name }}"
+        image: {{ .Values.image }}
+        imagePullPolicy: IfNotPresent
+        command: ["sh","-c","alembic upgrade head && uvicorn budprompt.main:app --host 0.0.0.0 --port {{ .Values.env.APP_PORT }}"]
+        ports:
+        - containerPort: {{ .Values.env.APP_PORT }}
+        envFrom:
+          - configMapRef:
+              name: bud-global-config
+        resources:
+          limits:
+            memory: 1024Mi
+            cpu: 1
+          requests:
+            memory: 1024Mi
+            cpu: 1
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.env.APP_PORT }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.env.APP_PORT }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  ports:
+  - port: {{ .Values.env.APP_PORT }}
+    targetPort: {{ .Values.env.APP_PORT }}
+  selector:
+    app: {{ .Values.name }}
+  type: ClusterIP
