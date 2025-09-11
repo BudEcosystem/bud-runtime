@@ -27,6 +27,7 @@ from budmicroframe.commons.constants import WorkflowStatus
 from budmicroframe.commons.schemas import (
     NotificationContent,
     NotificationRequest,
+    SuccessResponse,
 )
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 from pydantic import ValidationError
@@ -1041,3 +1042,44 @@ class PromptService:
         except Exception as e:
             logger.exception(f"Failed to copy prompt configuration: {str(e)}")
             raise ClientException(status_code=500, message="Failed to copy prompt configuration") from e
+
+    async def set_default_version(self, prompt_id: str, version: int) -> SuccessResponse:
+        """Set a specific version as the default for a prompt configuration.
+
+        Args:
+            prompt_id: The prompt ID to set default version for
+            version: The version number to set as default
+
+        Returns:
+            SuccessResponse indicating successful operation
+
+        Raises:
+            ClientException: If the specified version doesn't exist
+        """
+        # Initialize Redis service
+        self.redis_service = RedisService()
+
+        try:
+            # Construct the versioned key to check if it exists
+            versioned_key = f"prompt:{prompt_id}:v{version}"
+
+            # Check if the specified version exists
+            version_data = await self.redis_service.get(versioned_key)
+            if not version_data:
+                logger.error(f"Version {version} not found for prompt_id: {prompt_id}")
+                raise ClientException(
+                    status_code=404, message=f"Version {version} not found for prompt_id: {prompt_id}"
+                )
+
+            # Set the default version pointer
+            default_key = f"prompt:{prompt_id}:default_version"
+            await self.redis_service.set(default_key, versioned_key)
+            logger.debug(f"Set version key {versioned_key} as default for prompt_id: {prompt_id}")
+
+            return SuccessResponse(message=f"Successfully set version {version} as default for prompt_id: {prompt_id}")
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception(f"Failed to set default version: {str(e)}")
+            raise ClientException(status_code=500, message="Failed to set default version") from e

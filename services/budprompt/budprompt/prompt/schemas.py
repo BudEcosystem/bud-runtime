@@ -458,3 +458,10 @@ class PromptConfigCopyResponse(SuccessResponse):
     target_prompt_id: str = Field(..., description="Target prompt ID copied to")
     target_version: int = Field(..., description="Target version number saved as")
     message: str = Field(default="Prompt configuration copied successfully")
+
+
+class PromptSetDefaultVersionRequest(BaseModel):
+    """Request model for setting default version of prompt configuration."""
+
+    prompt_id: str = Field(..., description="The prompt ID to set default version for")
+    version: int = Field(..., ge=1, description="The version number to set as default")
