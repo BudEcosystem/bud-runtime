@@ -127,19 +127,30 @@ async def execute_streaming_validation(
         max_retries: int = llm_retry_limit,
         partial_data: dict = None,
         validation_errors: list = None,
+        original_valid_partial: dict = None,
     ):
         """Recursively attempt streaming with retry on validation failure.
 
         Continues from partial data on retry.
+
+        Args:
+            prompt: The user prompt
+            retry_count: Current retry attempt number
+            max_retries: Maximum number of retries allowed
+            partial_data: The last attempted data (may be invalid) for context
+            validation_errors: List of validation errors accumulated
+            original_valid_partial: The original valid partial data to preserve
         """
         nonlocal complete_sent
 
         if retry_count >= max_retries:
             # Max retries exhausted
+            # Use original_valid_partial if available, otherwise partial_data
+            final_data = original_valid_partial if original_valid_partial is not None else partial_data
             error_msg = {
                 "type": "error",
                 "message": f"Max retries ({max_retries}) exhausted",
-                "final_partial_data": partial_data,
+                "final_partial_data": final_data,
                 "all_errors": validation_errors,
             }
             yield f"data: {json.dumps(error_msg)}\n\n"
@@ -356,6 +367,11 @@ Generate the corrected object with all fields properly populated:"""
         latest_partial = {}  # noqa: F841
         last_valid_partial = partial_data or {}
 
+        # Preserve the original valid partial data for final error reporting
+        # If this is the first attempt, use partial_data as the original
+        if original_valid_partial is None and partial_data:
+            original_valid_partial = partial_data
+
         # Extract field validators for incremental validation
         field_validators = extract_field_validators(input_model_simple_with_validator)
         logger.debug(f"Extracted field validators: {list(field_validators.keys())}")
@@ -406,12 +422,14 @@ Generate the corrected object with all fields properly populated:"""
                             stream_validator.reset()
 
                             # Recursive retry with attempted data as context
+                            # Preserve the first valid partial through retries
                             async for event in attempt_stream_with_retry(
                                 prompt=prompt,
                                 retry_count=retry_count + 1,
                                 max_retries=max_retries,
                                 partial_data=attempted_data,  # Pass attempted data for context
                                 validation_errors=validation_errors,
+                                original_valid_partial=original_valid_partial or last_valid_partial,
                             ):
                                 yield event
                             return
@@ -450,23 +468,25 @@ Generate the corrected object with all fields properly populated:"""
                             validation_errors = validation_errors or []
                             validation_errors.append(str(e))
 
-                            # Try to extract what was generated
+                            # Try to extract what was generated (invalid data)
+                            invalid_data = {}
                             if isinstance(message, dict):
-                                last_valid_partial = message
+                                invalid_data = message
                             elif hasattr(message, "model_dump"):
-                                last_valid_partial = message.model_dump()
+                                invalid_data = message.model_dump()
 
                             # Log retry attempt internally (not sent to client)
                             logger.debug(f"Validation failed on attempt {retry_count + 1}: {str(e)}")
-                            logger.debug(f"Generated data before validation: {last_valid_partial}")
+                            logger.debug(f"Generated data before validation: {invalid_data}")
 
-                            # Recursive retry with accumulated context
+                            # Recursive retry with invalid data as context but preserve original valid partial
                             async for event in attempt_stream_with_retry(
                                 prompt=prompt,
                                 retry_count=retry_count + 1,
                                 max_retries=max_retries,
-                                partial_data=last_valid_partial,
+                                partial_data=invalid_data,  # Pass invalid data for context
                                 validation_errors=validation_errors,
+                                original_valid_partial=original_valid_partial or last_valid_partial,
                             ):
                                 yield event
                             return
@@ -484,6 +504,7 @@ Generate the corrected object with all fields properly populated:"""
                     max_retries=max_retries,
                     partial_data=last_valid_partial,
                     validation_errors=validation_errors,
+                    original_valid_partial=original_valid_partial or last_valid_partial,
                 ):
                     yield event
             else:
@@ -509,6 +530,7 @@ Generate the corrected object with all fields properly populated:"""
                     max_retries=max_retries,
                     partial_data=last_valid_partial,
                     validation_errors=validation_errors,
+                    original_valid_partial=original_valid_partial or last_valid_partial,
                 ):
                     yield event
             else:
