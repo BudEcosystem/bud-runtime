@@ -381,3 +381,66 @@ async def set_default_version(
             code=500,
             message="An unexpected error occurred during set default version",
         ).to_http_response()
+
+
+@prompt_router.delete(
+    "/prompt-config/{prompt_id}",
+    response_model=Union[SuccessResponse, ErrorResponse],
+    summary="Delete prompt configuration",
+    description="Delete a specific version or all versions of a prompt configuration",
+    responses={
+        200: {
+            "description": "Configuration deleted successfully",
+            "model": SuccessResponse,
+        },
+        400: {"description": "Cannot delete default version"},
+        404: {"description": "Configuration not found"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def delete_prompt_config(
+    prompt_id: str,
+    version: Optional[int] = Query(
+        None, description="Specific version to delete. If not provided, deletes all versions", ge=1
+    ),
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete prompt configuration(s).
+
+    If version is provided, deletes only that specific version (unless it's the default).
+    If version is not provided, deletes all versions and the default pointer.
+
+    Args:
+        prompt_id: The prompt ID to delete
+        version: Optional specific version to delete
+
+    Returns:
+        Success response indicating what was deleted
+
+    Raises:
+        HTTPException: If configuration not found or trying to delete default version
+    """
+    try:
+        if version:
+            logger.debug(f"Deleting version {version} for prompt_id: {prompt_id}")
+        else:
+            logger.debug(f"Deleting all configurations for prompt_id: {prompt_id}")
+
+        # Create service instance
+        prompt_service = PromptService()
+
+        # Delete the configuration(s)
+        result = await prompt_service.delete_prompt_config(prompt_id, version)
+
+        return result.to_http_response()
+
+    except ClientException as e:
+        return ErrorResponse(
+            code=e.status_code,
+            message=e.message,
+        ).to_http_response()
+    except Exception as e:
+        logger.error(f"Unexpected error during delete prompt configuration: {str(e)}")
+        return ErrorResponse(
+            code=500,
+            message="An unexpected error occurred during delete prompt configuration",
+        ).to_http_response()

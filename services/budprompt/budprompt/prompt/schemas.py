@@ -465,3 +465,12 @@ class PromptSetDefaultVersionRequest(BaseModel):
 
     prompt_id: str = Field(..., description="The prompt ID to set default version for")
     version: int = Field(..., ge=1, description="The version number to set as default")
+
+
+class PromptDeleteRequest(BaseModel):
+    """Request model for deleting prompt configuration."""
+
+    prompt_id: str = Field(..., description="The prompt ID to delete")
+    version: Optional[int] = Field(
+        None, ge=1, description="Specific version to delete (if not provided, deletes all versions)"
+    )

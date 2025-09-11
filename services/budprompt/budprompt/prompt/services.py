@@ -1083,3 +1083,78 @@ class PromptService:
         except Exception as e:
             logger.exception(f"Failed to set default version: {str(e)}")
             raise ClientException(status_code=500, message="Failed to set default version") from e
+
+    async def delete_prompt_config(self, prompt_id: str, version: Optional[int] = None) -> SuccessResponse:
+        """Delete prompt configuration(s) from Redis.
+
+        Args:
+            prompt_id: The prompt ID to delete
+            version: Optional specific version to delete. If not provided, deletes all versions.
+
+        Returns:
+            SuccessResponse indicating successful deletion
+
+        Raises:
+            ClientException: If configuration not found or if trying to delete default version
+        """
+        # Initialize Redis service
+        self.redis_service = RedisService()
+
+        try:
+            if version is not None:
+                # Delete specific version
+                versioned_key = f"prompt:{prompt_id}:v{version}"
+
+                # Check if the version exists
+                version_data = await self.redis_service.get(versioned_key)
+                if not version_data:
+                    logger.error(f"Version {version} not found for prompt_id: {prompt_id}")
+                    raise ClientException(
+                        status_code=404, message=f"Version {version} not found for prompt_id: {prompt_id}"
+                    )
+
+                # Check if this version is the current default
+                default_key = f"prompt:{prompt_id}:default_version"
+                current_default = await self.redis_service.get(default_key)
+
+                if current_default and current_default.decode("utf-8") == versioned_key:
+                    logger.error(
+                        f"Cannot delete version {version} as it is the current default for prompt_id: {prompt_id}"
+                    )
+                    raise ClientException(
+                        status_code=400,
+                        message=f"Cannot delete version {version} as it is the current default version",
+                    )
+
+                # Delete the specific version
+                await self.redis_service.delete(versioned_key)
+                logger.debug(f"Deleted version {version} for prompt_id: {prompt_id}")
+
+                return SuccessResponse(message=f"Successfully deleted version {version} for prompt_id: {prompt_id}")
+
+            else:
+                # Delete all versions and default key
+                pattern = f"prompt:{prompt_id}:v*"
+                deleted_count = await self.redis_service.delete_keys_by_pattern(pattern)
+
+                # Also delete the default version key
+                default_key = f"prompt:{prompt_id}:default_version"
+                default_deleted = await self.redis_service.delete(default_key)
+
+                total_deleted = deleted_count + default_deleted
+
+                if total_deleted == 0:
+                    logger.error(f"No configurations found for prompt_id: {prompt_id}")
+                    raise ClientException(
+                        status_code=404, message=f"No configurations found for prompt_id: {prompt_id}"
+                    )
+
+                logger.debug(f"Deleted all {total_deleted} configurations for prompt_id: {prompt_id}")
+
+                return SuccessResponse(message=f"Successfully deleted all configurations for prompt_id: {prompt_id}")
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception(f"Failed to delete prompt configuration: {str(e)}")
+            raise ClientException(status_code=500, message="Failed to delete prompt configuration") from e
