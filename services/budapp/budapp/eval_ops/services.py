@@ -2047,10 +2047,10 @@ class EvaluationWorkflowService:
             # If this is the final step and trigger_workflow is True, create the runs
             if request.step_number == 5 and request.trigger_workflow:
                 await self._create_runs_from_workflow(workflow.id, experiment_id, current_user_id)
-                await WorkflowDataManager(self.session).update_by_fields(
-                    workflow,
-                    {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
-                )
+                # await WorkflowDataManager(self.session).update_by_fields(
+                #     workflow,
+                #     {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
+                # )
 
             # After storing the workflow step, retrieve all accumulated data
             all_step_data = await self._get_accumulated_step_data(workflow.id)
