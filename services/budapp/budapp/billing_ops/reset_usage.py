@@ -1,15 +1,19 @@
 """Manual usage reset functionality for billing cycle updates."""
 
 import asyncio
+import contextlib
 import json
 from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from budapp.billing_ops.models import UserBilling
+from budapp.billing_ops.services import BillingService
 from budapp.commons.constants import UserTypeEnum
+from budapp.commons.database import SessionLocal
 from budapp.commons.dependencies import get_session
 from budapp.commons.logging import get_logger
 from budapp.shared.redis_service import RedisService
@@ -36,15 +40,11 @@ class UsageResetService:
             True if successful, False otherwise
         """
         try:
-            from datetime import datetime, timezone
-
-            # Get current billing information using the updated service
-            from budapp.billing_ops.services import BillingService
-
             billing_service = BillingService(self.session)
 
-            # Get user information to determine user type
-            user = self.session.query(UserModel).filter(UserModel.id == user_id).first()
+            # Get user information to determine user type - use modern select
+            stmt = select(UserModel).where(UserModel.id == user_id)
+            user = self.session.execute(stmt).scalar_one_or_none()
             user_type = user.user_type if user else UserTypeEnum.CLIENT
 
             user_billing = billing_service.get_user_billing(user_id)
@@ -55,32 +55,14 @@ class UsageResetService:
             # Get current time
             now = datetime.now(timezone.utc)
 
-            # Check if we need to create a new billing cycle
-            from budapp.billing_ops.utils import calculate_billing_cycle
-
-            billing_cycle_start, billing_cycle_end = calculate_billing_cycle(
-                user_billing.created_at, reference_date=now
-            )
-
-            # Create new billing cycle if the current one has expired
-            if billing_cycle_start and billing_cycle_end:
-                cycle_start_dt = datetime.fromisoformat(billing_cycle_start.replace("Z", "+00:00"))
-                cycle_end_dt = datetime.fromisoformat(billing_cycle_end.replace("Z", "+00:00"))
-
-                # Check if we need to create a new billing cycle
-                if (
-                    user_billing.billing_period_start != cycle_start_dt
-                    or user_billing.billing_period_end != cycle_end_dt
-                ):
-                    # Create new billing cycle entry (preserves history)
-                    user_billing = billing_service.create_next_billing_cycle(user_id)
-                    logger.info(
-                        f"Created new billing cycle for user {user_id}: {billing_cycle_start} to {billing_cycle_end}"
-                    )
-
-                    # Update references for the new cycle dates
-                    billing_cycle_start = user_billing.billing_period_start.isoformat()
-                    billing_cycle_end = user_billing.billing_period_end.isoformat()
+            # Check if current billing cycle has expired - simple comparison
+            if user_billing.billing_period_end <= now:
+                # Create new billing cycle entry (preserves history)
+                user_billing = billing_service.create_next_billing_cycle(user_id)
+                logger.info(
+                    f"Created new billing cycle for user {user_id}: "
+                    f"{user_billing.billing_period_start.isoformat()} to {user_billing.billing_period_end.isoformat()}"
+                )
 
             # Get effective quotas from current billing record
             billing_plan = billing_service.get_billing_plan(user_billing.billing_plan_id)
@@ -103,24 +85,19 @@ class UsageResetService:
                 "prev_tokens_used": 0,
                 "prev_cost_used": 0.0,
                 "reason": reason if user_type != UserTypeEnum.ADMIN else "Admin user - unlimited access",
-                "reset_at": billing_cycle_end,
+                "reset_at": user_billing.billing_period_end.isoformat(),
                 "last_updated": now.isoformat(),
-                "billing_cycle_start": billing_cycle_start,
-                "billing_cycle_end": billing_cycle_end,
+                "billing_cycle_start": user_billing.billing_period_start.isoformat(),
+                "billing_cycle_end": user_billing.billing_period_end.isoformat(),
             }
 
-            # Publish to Redis with dual-TTL strategy for reset scenario
+            # Publish to Redis with single 90-minute TTL (consistent with hybrid sync)
             redis_service = RedisService()
-            primary_key = f"usage_limit:{user_id}"
-            fallback_key = f"usage_limit_fallback:{user_id}"
+            key = f"usage_limit:{user_id}"
             data = json.dumps(usage_limit_info)
+            ttl_seconds = 90 * 60  # 90 minutes (consistent with main system)
 
-            # For billing reset, use longer TTL to ensure gateway gets the update
-            primary_ttl = 1800  # 30 minutes (longer for reset events)
-            fallback_ttl = 3600  # 1 hour (ensure reset persists)
-
-            await redis_service.set(primary_key, data, ex=primary_ttl)
-            await redis_service.set(fallback_key, data, ex=fallback_ttl)
+            await redis_service.set(key, data, ex=ttl_seconds)
 
             # Also clear any cached data in gateway by publishing a clear command
             clear_key = f"usage_limit_clear:{user_id}"
@@ -144,10 +121,6 @@ class UsageResetService:
         """
         try:
             # Get all current active billing users (not suspended)
-            from sqlalchemy import select
-
-            from budapp.billing_ops.models import UserBilling
-
             stmt = select(UserBilling).where(
                 UserBilling.is_current, UserBilling.is_suspended.is_(False), UserBilling.is_active
             )
@@ -173,55 +146,27 @@ class UsageResetService:
             Number of users reset
         """
         try:
-            from datetime import datetime, timezone
-
-            from budapp.billing_ops.services import BillingService
-            from budapp.billing_ops.utils import calculate_billing_cycle
-
             now = datetime.now(timezone.utc)
             reset_count = 0
 
-            # Get all current active billing records (not suspended)
-            from sqlalchemy import select
-
-            from budapp.billing_ops.models import UserBilling
-
+            # Directly query for expired billing cycles - much more efficient
             stmt = select(UserBilling).where(
-                UserBilling.is_current, UserBilling.is_suspended.is_(False), UserBilling.is_active
+                UserBilling.is_current,
+                UserBilling.is_suspended.is_(False),
+                UserBilling.is_active,
+                UserBilling.billing_period_end <= now,
             )
-            active_billings = self.session.execute(stmt).scalars().all()
+            expired_billings = self.session.execute(stmt).scalars().all()
 
-            for billing in active_billings:
-                if billing.created_at:
-                    # Calculate what the current billing cycle should be
-                    cycle_start_str, cycle_end_str = calculate_billing_cycle(billing.created_at, reference_date=now)
+            for billing in expired_billings:
+                logger.info(
+                    f"Resetting expired cycle for user {billing.user_id}: "
+                    f"cycle ended {billing.billing_period_end.isoformat()}, now={now.isoformat()}"
+                )
 
-                    if cycle_end_str:
-                        # Parse the cycle end date with proper timezone handling
-                        cycle_end = datetime.fromisoformat(cycle_end_str.replace("Z", "+00:00"))
-
-                        # Ensure cycle_end is timezone-aware
-                        if cycle_end.tzinfo is None:
-                            cycle_end = cycle_end.replace(tzinfo=timezone.utc)
-
-                        # Check if we need to reset (current cycle has expired)
-                        database_cycle_end = billing.billing_period_end
-                        if database_cycle_end.tzinfo is None:
-                            database_cycle_end = database_cycle_end.replace(tzinfo=timezone.utc)
-
-                        # Reset if either condition is true:
-                        # 1. Current time is past the database cycle end
-                        # 2. Database billing period is outdated compared to calculated cycle
-                        if now >= database_cycle_end or database_cycle_end < cycle_end:
-                            logger.info(
-                                f"Resetting expired cycle for user {billing.user_id}: "
-                                f"now={now.isoformat()}, cycle_end={cycle_end.isoformat()}, "
-                                f"db_cycle_end={database_cycle_end.isoformat()}"
-                            )
-
-                            if await self.reset_user_usage(billing.user_id, "Automatic cycle reset"):
-                                reset_count += 1
-                                await asyncio.sleep(0.01)
+                if await self.reset_user_usage(billing.user_id, "Automatic cycle reset"):
+                    reset_count += 1
+                    await asyncio.sleep(0.01)
 
             if reset_count > 0:
                 logger.info(f"Automatically reset {reset_count} expired billing cycles")
@@ -235,8 +180,6 @@ class UsageResetService:
 
 async def manual_reset_user(user_id: UUID):
     """Manual function to reset a specific user's usage."""
-    from budapp.commons.database import SessionLocal
-
     session = SessionLocal()
     try:
         service = UsageResetService(session)
@@ -248,8 +191,6 @@ async def manual_reset_user(user_id: UUID):
 
 async def reset_all_users():
     """Reset all users' usage (use with caution)."""
-    from budapp.commons.database import SessionLocal
-
     session = SessionLocal()
     try:
         service = UsageResetService(session)
@@ -261,8 +202,6 @@ async def reset_all_users():
 
 async def auto_reset_expired():
     """Automatically reset expired billing cycles."""
-    from budapp.commons.database import SessionLocal
-
     session = SessionLocal()
     try:
         service = UsageResetService(session)
@@ -298,8 +237,6 @@ class BillingCycleResetTask:
 
     async def stop(self):
         """Stop the background reset task."""
-        import contextlib
-
         self.running = False
         if self.task:
             self.task.cancel()

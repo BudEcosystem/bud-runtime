@@ -419,13 +419,12 @@ impl UsageLimiter {
         let redis_client = self.redis_client.read().await;
 
         if let Some(mut conn) = redis_client.as_ref().map(|c| c.clone()) {
-            let primary_key = format!("usage_limit:{}", user_id);
-            let fallback_key = format!("usage_limit_fallback:{}", user_id);
+            let key = format!("usage_limit:{}", user_id);
 
-            // Try primary key first
+            // Get usage limit data from Redis
             let result = timeout(
                 Duration::from_millis(self.config.redis_timeout_ms),
-                conn.get::<_, Option<String>>(&primary_key)
+                conn.get::<_, Option<String>>(&key)
             ).await;
 
             match result {
@@ -433,63 +432,29 @@ impl UsageLimiter {
                     // Parse the JSON data
                     match serde_json::from_str::<UsageLimitInfo>(&data) {
                         Ok(info) => {
-                            debug!("Fetched usage limit from primary key for user {}: allowed={}", user_id, info.allowed);
+                            debug!("Fetched usage limit for user {}: allowed={}", user_id, info.allowed);
                             return Ok(Some(info));
                         },
                         Err(e) => {
-                            error!("Failed to parse usage limit data from primary key for user {}: {}", user_id, e);
-                            // Continue to try fallback key
-                        }
-                    }
-                }
-                Ok(Ok(None)) => {
-                    debug!("No usage limit found in primary key for user {}, trying fallback", user_id);
-                    // Continue to try fallback key
-                },
-                Ok(Err(e)) => {
-                    warn!("Redis error fetching usage limit from primary key for user {}: {}, trying fallback", user_id, e);
-                    // Continue to try fallback key
-                }
-                Err(_) => {
-                    warn!("Redis timeout fetching usage limit from primary key for user {}, trying fallback", user_id);
-                    // Continue to try fallback key
-                }
-            }
-
-            // Try fallback key
-            let fallback_result = timeout(
-                Duration::from_millis(self.config.redis_timeout_ms),
-                conn.get::<_, Option<String>>(&fallback_key)
-            ).await;
-
-            match fallback_result {
-                Ok(Ok(Some(data))) => {
-                    // Parse the JSON data from fallback
-                    match serde_json::from_str::<UsageLimitInfo>(&data) {
-                        Ok(info) => {
-                            debug!("Fetched usage limit from fallback key for user {}: allowed={}", user_id, info.allowed);
-                            Ok(Some(info))
-                        },
-                        Err(e) => {
-                            error!("Failed to parse usage limit data from fallback key for user {}: {}", user_id, e);
+                            error!("Failed to parse usage limit data for user {}: {}", user_id, e);
                             Ok(None)
                         }
                     }
                 }
                 Ok(Ok(None)) => {
-                    debug!("No usage limit found in both primary and fallback keys for user {}", user_id);
+                    debug!("No usage limit found for user {}", user_id);
                     Ok(None)
                 },
                 Ok(Err(e)) => {
-                    warn!("Redis error fetching usage limit from fallback for user {}: {}", user_id, e);
+                    warn!("Redis error fetching usage limit for user {}: {}", user_id, e);
                     Err(Error::new(ErrorDetails::Config {
-                        message: format!("Redis error on fallback: {}", e),
+                        message: format!("Redis error: {}", e),
                     }))
                 }
                 Err(_) => {
-                    warn!("Redis timeout fetching usage limit from fallback for user {}", user_id);
+                    warn!("Redis timeout fetching usage limit for user {}", user_id);
                     Err(Error::new(ErrorDetails::Config {
-                        message: "Redis timeout on fallback".to_string(),
+                        message: "Redis timeout".to_string(),
                     }))
                 }
             }

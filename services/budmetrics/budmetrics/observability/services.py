@@ -3226,17 +3226,21 @@ class ObservabilityMetricsService:
     ) -> list[UserUsageItem]:
         """Get user usage data for sync based on mode."""
         try:
-            # Base query for user usage
+            from datetime import datetime, timezone
+
+            logger.info(f"_get_sync_user_data called: mode={sync_mode}, user_ids={len(user_ids) if user_ids else 0}")
+            # Base query for user usage - need to join with ModelInference for token data
             query = """
             SELECT
-                user_id,
-                MAX(request_arrival_time) as last_activity_at,
-                SUM(input_token_count + output_token_count) as total_tokens,
-                SUM(cost) as total_cost,
+                mid.user_id,
+                MAX(mid.request_arrival_time) as last_activity_at,
+                SUM(COALESCE(mi.input_tokens, 0) + COALESCE(mi.output_tokens, 0)) as total_tokens,
+                SUM(COALESCE(mid.cost, 0)) as total_cost,
                 COUNT(*) as request_count,
-                AVG(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_rate
-            FROM ModelInferenceDetails
-            WHERE user_id IS NOT NULL
+                AVG(CASE WHEN mid.is_success THEN 1 ELSE 0 END) as success_rate
+            FROM ModelInferenceDetails mid
+            LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+            WHERE mid.user_id IS NOT NULL
             """
 
             params = {}
@@ -3244,21 +3248,22 @@ class ObservabilityMetricsService:
             if sync_mode == "incremental":
                 # Only users with activity within threshold
                 since_time = datetime.now() - timedelta(minutes=threshold_minutes)
-                query += " AND request_arrival_time >= %(since)s"
+                query += " AND mid.request_arrival_time >= %(since)s"
                 params["since"] = since_time
-            elif user_ids:
-                # Specific user IDs for full sync
-                placeholders = [f"%(user_{i})s" for i in range(len(user_ids))]
-                query += f" AND user_id IN ({','.join(placeholders)})"
-                for i, user_id in enumerate(user_ids):
-                    params[f"user_{i}"] = str(user_id)
+            # For full sync, get ALL users with any activity (no time filter, no user filter)
 
             query += """
-            GROUP BY user_id
+            GROUP BY mid.user_id
             ORDER BY last_activity_at DESC
             """
 
             results = await self.clickhouse_client.execute_query(query, params)
+            logger.info(f"ClickHouse query returned {len(results)} rows")
+
+            # Debug specific user
+            debug_user_id = "24048fb6-d6d2-436d-97bb-13580b457283"
+            debug_user_found = any(str(row[0]) == debug_user_id for row in results)
+            logger.info(f"DEBUG: User {debug_user_id} found in ClickHouse results: {debug_user_found}")
 
             users = []
             found_user_ids = set()
@@ -3288,15 +3293,32 @@ class ObservabilityMetricsService:
                     )
                 )
 
-            # For specific user_ids (like admin users), include those with no activity
-            if user_ids:
-                for user_id in user_ids:
+            # For full sync, include all users with active billing records (even if no activity)
+            if sync_mode == "full":
+                # Import the Dapr service function
+                from budmetrics.shared.dapr_service import get_users_with_active_billing
+
+                # Get users with active billing from budapp
+                billing_user_ids = await get_users_with_active_billing()
+                logger.info(
+                    f"Full sync: found {len(found_user_ids)} users with activity, {len(billing_user_ids)} users with active billing"
+                )
+
+                # Combine specific user_ids (if provided) with billing users
+                users_to_add = set(billing_user_ids)
+                if user_ids:
+                    users_to_add.update(user_ids)
+
+                no_activity_count = 0
+                for user_id in users_to_add:
                     if user_id not in found_user_ids:
-                        # Create entry for users with no activity (typically admin users)
+                        # Create entry for users with no activity but who have billing records
                         users.append(
                             UserUsageItem(
                                 user_id=user_id,
-                                last_activity_at=None,  # No activity
+                                last_activity_at=datetime.now(
+                                    timezone.utc
+                                ),  # Use current time for users with no activity
                                 usage_data={
                                     "total_tokens": 0,
                                     "total_cost": 0.0,
@@ -3305,6 +3327,12 @@ class ObservabilityMetricsService:
                                 },
                             )
                         )
+                        no_activity_count += 1
+
+                logger.info(
+                    f"Added {no_activity_count} users with no activity to sync data "
+                    f"({len(billing_user_ids)} with billing, {len(user_ids) if user_ids else 0} admin users)"
+                )
 
             return users
 

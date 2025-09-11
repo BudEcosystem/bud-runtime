@@ -15,7 +15,6 @@ from sqlalchemy.orm import Session
 
 from budapp.billing_ops.models import BillingAlert, BillingPlan, UserBilling
 from budapp.billing_ops.notification_service import BillingNotificationService
-from budapp.billing_ops.utils import calculate_billing_cycle
 from budapp.commons.config import app_settings
 from budapp.commons.constants import UserTypeEnum
 from budapp.commons.db_utils import DataManagerUtils
@@ -206,6 +205,9 @@ class BillingService(DataManagerUtils):
 
         result_dict = {}
 
+        # Get current time for timestamps
+        now = datetime.now(timezone.utc)
+
         try:
             # Get user information for all users at once
             users_stmt = select(UserModel).where(UserModel.id.in_(user_ids))
@@ -240,22 +242,20 @@ class BillingService(DataManagerUtils):
 
             # Get bulk usage data for users with billing
             if users_with_billing:
-                # Calculate date range for usage query
-                now = datetime.now(timezone.utc)
-                billing_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                if billing_period_start.month == 12:
-                    billing_period_end = billing_period_start.replace(
-                        year=billing_period_start.year + 1, month=1
-                    ) - timedelta(seconds=1)
-                else:
-                    billing_period_end = billing_period_start.replace(
-                        month=billing_period_start.month + 1
-                    ) - timedelta(seconds=1)
+                # Group users by their billing cycle dates to minimize API calls
+                cycle_groups = {}
+                for user_id in users_with_billing:
+                    billing = billing_lookup[user_id]
+                    cycle_key = (billing.billing_period_start, billing.billing_period_end)
+                    if cycle_key not in cycle_groups:
+                        cycle_groups[cycle_key] = []
+                    cycle_groups[cycle_key].append(user_id)
 
-                # Get bulk usage data
-                bulk_usage_data = await self.get_bulk_usage_from_clickhouse(
-                    users_with_billing, billing_period_start, billing_period_end
-                )
+                # Get bulk usage data for each unique billing cycle
+                bulk_usage_data = {}
+                for (cycle_start, cycle_end), user_group in cycle_groups.items():
+                    group_usage_data = await self.get_bulk_usage_from_clickhouse(user_group, cycle_start, cycle_end)
+                    bulk_usage_data.update(group_usage_data)
 
                 # Process each user with billing
                 for user_id in users_with_billing:
@@ -414,22 +414,21 @@ class BillingService(DataManagerUtils):
 
                     result_dict[user_id_str] = usage_limit_info
 
-            # Bulk publish to Redis with smart TTL
+            # Publish to Redis with single 90-minute TTL
             redis_service = RedisService()
+            ttl_seconds = 90 * 60  # 90 minutes
+
+            # Count admin users for logging
+            admin_count = sum(1 for info in result_dict.values() if info.get("status") == "admin_unlimited")
 
             for user_id_str, usage_limit_info in result_dict.items():
-                # Calculate smart TTL based on usage patterns
-                primary_ttl, fallback_ttl = await self._calculate_smart_ttl(usage_limit_info)
-
-                # Publish to Redis with dual-TTL strategy
-                primary_key = f"usage_limit:{user_id_str}"
-                fallback_key = f"usage_limit_fallback:{user_id_str}"
+                key = f"usage_limit:{user_id_str}"
                 data = json.dumps(usage_limit_info)
+                await redis_service.set(key, data, ex=ttl_seconds)
 
-                await redis_service.set(primary_key, data, ex=primary_ttl)
-                await redis_service.set(fallback_key, data, ex=fallback_ttl)
-
-            logger.info(f"Bulk checked usage limits for {len(result_dict)} users")
+            logger.info(
+                f"Bulk checked usage limits for {len(result_dict)} users (including {admin_count} admin users)"
+            )
             return result_dict
 
         except Exception as e:
@@ -496,56 +495,31 @@ class BillingService(DataManagerUtils):
         """Get current billing period usage for a user."""
         user_billing = self.get_user_billing(user_id)
         if not user_billing:
+            # All users should have billing records - this case should not occur
+            logger.warning(f"No billing record found for user {user_id} - this should not happen")
             # Try to get the Free plan as default
             free_plan = self.get_free_billing_plan()
             if not free_plan:
                 # Create a virtual Free plan if it doesn't exist in DB
                 free_plan = self._get_default_free_plan()
 
-            # For Free plan users, we still need dates for ClickHouse query but return None in response
-            now = datetime.now(timezone.utc)
-            billing_period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            # Calculate end of month for internal use
-            if billing_period_start.month == 12:
-                billing_period_end = billing_period_start.replace(
-                    year=billing_period_start.year + 1, month=1
-                ) - timedelta(seconds=1)
-            else:
-                billing_period_end = billing_period_start.replace(month=billing_period_start.month + 1) - timedelta(
-                    seconds=1
-                )
-
-            # Get actual usage from ClickHouse even for Free plan users
-            usage_data = await self.get_usage_from_clickhouse(
-                user_id=user_id,
-                start_date=billing_period_start,
-                end_date=billing_period_end,
-            )
-
-            # Get Free plan quotas
-            token_quota = free_plan.get("monthly_token_quota", 100000)  # Default 100K tokens for free
-            cost_quota = free_plan.get("monthly_cost_quota", None)  # No cost limit for free tier
-
-            # Calculate usage percentages
-            token_usage_percent = (usage_data["total_tokens"] / token_quota * 100) if token_quota else 0
-            cost_usage_percent = (Decimal(str(usage_data["total_cost"])) / cost_quota * 100) if cost_quota else 0
-
+            # Return minimal response indicating no billing setup
             return {
-                "has_billing": True,  # We're treating free plan as having billing
-                "billing_period_start": None,  # Return None for Free plan users
-                "billing_period_end": None,  # Return None for Free plan users
-                "plan_name": free_plan.get("name", "Free"),
-                "billing_plan_id": None,  # Return None for Free plan users
-                "base_monthly_price": float(free_plan.get("base_monthly_price", 0)),
+                "has_billing": False,
+                "billing_period_start": None,
+                "billing_period_end": None,
+                "plan_name": "No Plan",
+                "billing_plan_id": None,
+                "base_monthly_price": 0.0,
                 "usage": {
-                    "tokens_used": usage_data["total_tokens"],
-                    "tokens_quota": token_quota,
-                    "tokens_usage_percent": float(token_usage_percent),
-                    "cost_used": usage_data["total_cost"],
-                    "cost_quota": float(cost_quota) if cost_quota else None,
-                    "cost_usage_percent": float(cost_usage_percent),
-                    "request_count": usage_data["request_count"],
-                    "success_rate": usage_data["success_rate"],
+                    "tokens_used": 0,
+                    "tokens_quota": free_plan.get("monthly_token_quota", 100000),
+                    "tokens_usage_percent": 0.0,
+                    "cost_used": 0.0,
+                    "cost_quota": free_plan.get("monthly_cost_quota", None),
+                    "cost_usage_percent": 0.0,
+                    "request_count": 0,
+                    "success_rate": 0.0,
                 },
                 "is_suspended": False,
                 "suspension_reason": None,
@@ -588,57 +562,6 @@ class BillingService(DataManagerUtils):
             "suspension_reason": user_billing.suspension_reason,
         }
 
-    async def _calculate_smart_ttl(self, usage_limit_info: Dict[str, Any]) -> tuple[int, int]:
-        """Calculate smart TTL values based on user activity patterns.
-
-        Args:
-            usage_limit_info: Usage limit information containing last_updated timestamp
-
-        Returns:
-            Tuple of (primary_ttl, fallback_ttl) in seconds
-        """
-        try:
-            # Parse last activity from usage info
-            last_updated_str = usage_limit_info.get("last_updated")
-            if last_updated_str:
-                last_updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
-                now = datetime.now(timezone.utc)
-                inactive_minutes = (now - last_updated).total_seconds() / 60
-            else:
-                # No activity data, treat as inactive
-                inactive_minutes = 60
-
-            # Calculate TTL based on activity level
-            if inactive_minutes < 5:
-                # Very active users - short TTL, rely on frequent incremental sync
-                primary_ttl = 120  # 2 minutes
-                fallback_ttl = 1200  # 20 minutes
-            elif inactive_minutes < 30:
-                # Moderately active - medium TTL
-                primary_ttl = 300  # 5 minutes
-                fallback_ttl = 1200  # 20 minutes
-            else:
-                # Inactive users - TTL until next full sync + buffer
-                # Full sync every 15 minutes, so max wait is 15 minutes
-                now = datetime.now(timezone.utc)
-                minutes_since_quarter_hour = now.minute % 15
-                minutes_to_next_full_sync = 15 - minutes_since_quarter_hour
-
-                primary_ttl = max(300, (minutes_to_next_full_sync + 2) * 60)  # Buffer for next full sync
-                fallback_ttl = 1200  # 20 minutes (longer than full sync interval)
-
-            logger.debug(
-                f"Smart TTL for user {usage_limit_info.get('user_id')}: "
-                f"inactive_minutes={inactive_minutes:.1f}, primary_ttl={primary_ttl}, fallback_ttl={fallback_ttl}"
-            )
-
-            return primary_ttl, fallback_ttl
-
-        except Exception as e:
-            logger.warning(f"Error calculating smart TTL, using defaults: {e}")
-            # Safe defaults
-            return 120, 1200  # 2 minutes primary, 20 minutes fallback
-
     async def check_usage_limits(self, user_id: UUID) -> Dict[str, Any]:
         """Check if user has exceeded usage limits and publish to Redis."""
         # Get user information to determine user type
@@ -680,8 +603,10 @@ class BillingService(DataManagerUtils):
         if usage.get("has_billing"):
             # Get billing cycle from user billing record
             user_billing = self.get_user_billing(user_id)
-            if user_billing and user_billing.created_at:
-                billing_cycle_start, billing_cycle_end = calculate_billing_cycle(user_billing.created_at)
+            if user_billing:
+                # Use the actual stored billing cycle dates (no need to recalculate)
+                billing_cycle_start = user_billing.billing_period_start.isoformat()
+                billing_cycle_end = user_billing.billing_period_end.isoformat()
 
         # Check if this is a new billing cycle
         if existing_data and billing_cycle_start:
@@ -791,21 +716,14 @@ class BillingService(DataManagerUtils):
                 }
             )
 
-        # Publish to Redis for gateway consumption with dual-TTL fallback strategy
+        # Publish to Redis for gateway consumption with single 90-minute TTL
         try:
             redis_service = RedisService()
-            primary_key = f"usage_limit:{user_id}"
-            fallback_key = f"usage_limit_fallback:{user_id}"
+            key = f"usage_limit:{user_id}"
             data = json.dumps(usage_limit_info)
+            ttl_seconds = 90 * 60  # 90 minutes
 
-            # Calculate smart TTL based on user activity
-            primary_ttl, fallback_ttl = await self._calculate_smart_ttl(usage_limit_info)
-
-            # Store primary key with smart TTL
-            await redis_service.set(primary_key, data, ex=primary_ttl)
-
-            # Store fallback key with longer TTL for Redis miss protection
-            await redis_service.set(fallback_key, data, ex=fallback_ttl)
+            await redis_service.set(key, data, ex=ttl_seconds)
 
         except Exception as e:
             logger.warning(f"Failed to publish usage limit to Redis: {e}")
@@ -1062,55 +980,67 @@ class BillingService(DataManagerUtils):
         if not current_billing:
             raise ValueError(f"No current billing record found for user {user_id}")
 
-        # Calculate the next billing cycle
+        # Create a new billing cycle using smart date logic and plan-based cycle period
         now = datetime.now(timezone.utc)
-        cycle_start_str, cycle_end_str = calculate_billing_cycle(current_billing.created_at, reference_date=now)
 
-        if not cycle_start_str or not cycle_end_str:
-            raise ValueError(f"Failed to calculate next billing cycle for user {user_id}")
+        # Get the billing plan to determine cycle length
+        billing_plan = self.get_billing_plan(current_billing.billing_plan_id)
+        cycle_months = billing_plan.billing_cycle_months if billing_plan else 1
 
-        # Parse cycle dates
-        cycle_start = datetime.fromisoformat(cycle_start_str.replace("Z", "+00:00"))
-        cycle_end = datetime.fromisoformat(cycle_end_str.replace("Z", "+00:00"))
+        # Smart cycle start logic:
+        # 1. Use previous cycle end date if it's in the past or now
+        # 2. Use current time if previous cycle end is in the future (early reset)
+        previous_end = current_billing.billing_period_end
+        if previous_end.tzinfo is None:
+            previous_end = previous_end.replace(tzinfo=timezone.utc)
 
-        # Ensure timezone aware
-        if cycle_start.tzinfo is None:
-            cycle_start = cycle_start.replace(tzinfo=timezone.utc)
-        if cycle_end.tzinfo is None:
-            cycle_end = cycle_end.replace(tzinfo=timezone.utc)
+        # Smart cycle start logic: use previous end if past/current, otherwise use now (early reset)
+        cycle_start = previous_end if previous_end <= now else now
 
-        # Create new billing cycle entry
-        new_billing = UserBilling(
-            user_id=user_id,
-            billing_plan_id=current_billing.billing_plan_id,
-            billing_period_start=cycle_start,
-            billing_period_end=cycle_end,
-            custom_token_quota=current_billing.custom_token_quota,  # Inherit current settings
-            custom_cost_quota=current_billing.custom_cost_quota,
-            enable_email_notifications=current_billing.enable_email_notifications,
-            enable_in_app_notifications=current_billing.enable_in_app_notifications,
-            is_active=True,
-            is_suspended=current_billing.is_suspended,
-            suspension_reason=current_billing.suspension_reason,
-            is_current=True,
-            cycle_number=current_billing.cycle_number + 1,
-        )
+        # Calculate cycle end based on plan's cycle period
+        cycle_end = cycle_start + relativedelta(months=cycle_months)
 
-        # Mark the current billing as superseded
-        superseded_at = datetime.now(timezone.utc)
-        current_billing.is_current = False
-        current_billing.superseded_at = superseded_at
-        # We'll set superseded_by_id after we get the new record ID
+        try:
+            # Start a nested transaction to handle constraint issues
+            with self.session.begin_nested():
+                # First, mark the current billing as superseded (this removes any unique constraint conflicts)
+                superseded_at = datetime.now(timezone.utc)
+                current_billing.is_current = False
+                current_billing.superseded_at = superseded_at
 
-        # Add new record to session
-        self.session.add(new_billing)
-        self.session.flush()  # Get the ID without committing
+                # Flush to ensure the update is committed before creating new record
+                self.session.flush()
 
-        # Now set the superseded_by reference
-        current_billing.superseded_by_id = new_billing.id
+                # Create new billing cycle entry
+                new_billing = UserBilling(
+                    user_id=user_id,
+                    billing_plan_id=current_billing.billing_plan_id,
+                    billing_period_start=cycle_start,
+                    billing_period_end=cycle_end,
+                    custom_token_quota=current_billing.custom_token_quota,  # Inherit current settings
+                    custom_cost_quota=current_billing.custom_cost_quota,
+                    enable_email_notifications=current_billing.enable_email_notifications,
+                    enable_in_app_notifications=current_billing.enable_in_app_notifications,
+                    is_active=True,
+                    is_suspended=current_billing.is_suspended,
+                    suspension_reason=current_billing.suspension_reason,
+                    is_current=True,
+                    cycle_number=current_billing.cycle_number + 1,
+                )
 
-        # Reset alerts for the new billing cycle
-        self.reset_user_alerts(new_billing.id)
+                # Add new record to session
+                self.session.add(new_billing)
+                self.session.flush()  # Get the ID without committing
+
+                # Now set the superseded_by reference
+                current_billing.superseded_by_id = new_billing.id
+
+                # Reset alerts for the new billing cycle
+                self.reset_user_alerts(new_billing.id)
+
+        except Exception as e:
+            logger.error(f"Failed to create billing cycle for user {user_id}: {e}")
+            raise
 
         # Commit all changes
         self.session.commit()
@@ -1128,3 +1058,26 @@ class BillingService(DataManagerUtils):
         """Deprecated method - use create_next_billing_cycle instead."""
         logger.warning("update_billing_period is deprecated, use create_next_billing_cycle instead")
         self.create_next_billing_cycle(user_billing.user_id)
+
+    def get_all_users_with_active_billing(self) -> List[UUID]:
+        """Get all user IDs that have active billing records.
+
+        This method returns a list of user IDs who have active and current billing records.
+        Used for full sync operations to ensure all users with billing are included in
+        usage limit synchronization, even if they have no recent activity.
+
+        Returns:
+            List[UUID]: List of user IDs with active billing records
+        """
+        try:
+            stmt = select(UserBilling.user_id).where(UserBilling.is_current, UserBilling.is_active).distinct()
+
+            result = self.session.execute(stmt).scalars().all()
+            user_ids = list(result)
+
+            logger.info(f"Found {len(user_ids)} users with active billing records")
+            return user_ids
+
+        except Exception as e:
+            logger.error(f"Error getting users with active billing: {e}")
+            return []
