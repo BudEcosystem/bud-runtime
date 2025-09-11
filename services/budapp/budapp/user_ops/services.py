@@ -429,7 +429,7 @@ class UserService(SessionMixin):
         await UserDataManager(self.session).update_by_fields(db_user, fields)
 
         # Create reset URL
-        reset_url = f"{str(app_settings.frontend_url).rstrip('/')}/auth/reset-password?token={reset_token}"
+        reset_url = f"{str(app_settings.frontend_url).rstrip('/')}/reset-password?token={reset_token}"
 
         # Send email notification to user
         content = {"reset_url": reset_url, "token": reset_token, "expires_in_minutes": 60, "user_name": db_user.name}
