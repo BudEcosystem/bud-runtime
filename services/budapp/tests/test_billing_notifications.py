@@ -193,21 +193,15 @@ class TestBillingServiceNotifications:
         """Test that alerts trigger notifications when thresholds are exceeded."""
         service = BillingService(mock_db)
 
-        # Setup mocks
-        mock_db.execute.return_value.scalar_one_or_none.side_effect = [
-            mock_user_billing,  # get_user_billing (first call in check_and_trigger_alerts)
-            mock_user,  # get user for email
-            mock_user_billing,  # get_user_billing (second call in get_billing_alerts)
-        ]
-        mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_billing_alert]
-
-        # Mock the get_current_usage to return high usage
-        # Note: BillingNotificationService is in notification_service module, not services module
-        # Note: BillingNotificationService is in notification_service module, not services module
+        # Mock all the service method calls instead of individual database queries
         with patch.object(service, 'get_current_usage', new_callable=AsyncMock) as mock_get_usage, \
+             patch.object(service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(service, 'get_billing_alerts') as mock_get_alerts, \
              patch.object(service, 'get_billing_plan') as mock_get_plan, \
+             patch('budapp.billing_ops.services.select') as mock_select, \
              patch('budapp.billing_ops.notification_service.BillingNotificationService') as MockNotificationService:
 
+            # Mock return values
             mock_get_usage.return_value = {
                 "has_billing": True,
                 "plan_name": "Professional",
@@ -220,7 +214,12 @@ class TestBillingServiceNotifications:
                     "cost_usage_percent": 80.0,
                 },
             }
+            mock_get_user_billing.return_value = mock_user_billing
+            mock_get_alerts.return_value = [mock_billing_alert]
             mock_get_plan.return_value = mock_billing_plan
+            
+            # Mock the User database query
+            mock_db.execute.return_value.scalar_one_or_none.return_value = mock_user
 
             # Setup notification service mock
             mock_notification_instance = MockNotificationService.return_value

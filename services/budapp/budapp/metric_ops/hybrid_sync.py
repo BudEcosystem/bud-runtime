@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 class HybridMetricsSyncTask:
     """Unified task that handles both credential and user usage sync with smart filtering."""
 
-    def __init__(self, incremental_interval: int = 60, full_sync_interval: int = 300):
+    def __init__(self, incremental_interval: int = 60, full_sync_interval: int = 900):
         """Initialize the hybrid sync task.
 
         Args:

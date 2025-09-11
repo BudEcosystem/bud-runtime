@@ -565,7 +565,8 @@ class BillingService(DataManagerUtils):
     async def check_usage_limits(self, user_id: UUID) -> Dict[str, Any]:
         """Check if user has exceeded usage limits and publish to Redis."""
         # Get user information to determine user type
-        user = self.session.query(UserModel).filter(UserModel.id == user_id).first()
+        stmt = select(UserModel).where(UserModel.id == user_id)
+        user = self.session.execute(stmt).scalar_one_or_none()
         user_type = user.user_type if user else UserTypeEnum.CLIENT
         is_admin_user = user_type == UserTypeEnum.ADMIN
 
