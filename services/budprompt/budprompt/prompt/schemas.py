@@ -292,6 +292,8 @@ class PromptSchemaRequest(CloudEventBase):
     """
 
     prompt_id: Optional[str] = Field(None, description="Unique identifier for the prompt configuration")
+    version: Optional[int] = Field(None, ge=1, description="Version of the configuration to save (defaults to 1)")
+    set_default: bool = Field(False, description="Whether to set this version as the default (defaults to False)")
     schema: SchemaBase = Field(None, description="JSON schema for structured input/output (None for unstructured)")
     type: Literal["input", "output"] = Field(..., description="Type of schema - either 'input' or 'output'")
     deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
@@ -395,6 +397,8 @@ class PromptConfigRequest(BaseModel):
         None,
         description="Unique identifier for the prompt configuration. If not provided, will be auto-generated.",
     )
+    version: Optional[int] = Field(None, ge=1, description="Version of the configuration to save (defaults to 1)")
+    set_default: bool = Field(False, description="Whether to set this version as the default (defaults to False)")
     deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
     model_settings: Optional[ModelSettings] = Field(None, description="Model settings configuration")
     stream: Optional[bool] = Field(None, description="Enable streaming response")

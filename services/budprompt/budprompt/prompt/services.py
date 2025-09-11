@@ -507,11 +507,14 @@ class PromptConfigurationService:
             request = PromptSchemaRequest.model_validate_json(request_json)
             request_dict = json.loads(request_json)
 
+            # Extract version from request, default to 1 if not provided
+            version = request_dict.get("version", 1)
+
             # Create Redis service instance
             redis_service = RedisService()
 
-            # Construct Redis key with prompt: prefix and v1 version
-            redis_key = f"prompt:{prompt_id}:v1"
+            # Construct Redis key with prompt: prefix and version
+            redis_key = f"prompt:{prompt_id}:v{version}"
 
             # Fetch existing data if it exists
             existing_data_json = run_async(redis_service.get(redis_key))
@@ -544,11 +547,18 @@ class PromptConfigurationService:
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
             run_async(redis_service.set(redis_key, config_json, ex=app_settings.prompt_config_redis_ttl))
 
-            # Also set default version pointer
-            default_version_key = f"prompt:{prompt_id}:default_version"
-            run_async(redis_service.set(default_version_key, redis_key, ex=app_settings.prompt_config_redis_ttl))
-
-            logger.debug(f"Stored prompt configuration for prompt_id: {prompt_id}, type: {request.type}")
+            # Only set default version pointer if set_default is True
+            set_default = request_dict.get("set_default", False)
+            if set_default:
+                default_version_key = f"prompt:{prompt_id}:default_version"
+                run_async(redis_service.set(default_version_key, redis_key, ex=app_settings.prompt_config_redis_ttl))
+                logger.debug(
+                    f"Stored prompt configuration for prompt_id: {prompt_id}, type: {request.type}, updated default to v{version}"
+                )
+            else:
+                logger.debug(
+                    f"Stored prompt configuration for prompt_id: {prompt_id}, type: {request.type}, v{version} without updating default"
+                )
 
             notification_req.payload.content = NotificationContent(
                 title="Successfully stored prompt configuration",
@@ -790,8 +800,11 @@ class PromptService:
             RedisException: If Redis operation fails
         """
         try:
-            # Construct Redis key with prompt: prefix and v1 version
-            redis_key = f"prompt:{request.prompt_id}:v1"
+            # Extract version from request, default to 1 if not provided
+            version = request.version or 1
+
+            # Construct Redis key with prompt: prefix and version
+            redis_key = f"prompt:{request.prompt_id}:v{version}"
 
             # Fetch existing data if it exists
             existing_data_json = await self.redis_service.get(redis_key)
@@ -810,7 +823,11 @@ class PromptService:
 
             # Update configuration with provided fields (partial update)
             for field_name, value in updates.items():
-                if field_name != "prompt_id":  # Skip prompt_id as it's not part of config_data
+                if field_name not in [
+                    "prompt_id",
+                    "version",
+                    "set_default",
+                ]:  # Skip prompt_id, version, and set_default as they're not part of config_data
                     setattr(config_data, field_name, value)
 
             # Convert to JSON and store in Redis with configured TTL
@@ -826,11 +843,16 @@ class PromptService:
             # Store in Redis
             await self.redis_service.set(redis_key, config_json, ex=app_settings.prompt_config_redis_ttl)
 
-            # Also set default version pointer
-            default_version_key = f"prompt:{request.prompt_id}:default_version"
-            await self.redis_service.set(default_version_key, redis_key, ex=app_settings.prompt_config_redis_ttl)
-
-            logger.debug(f"Stored prompt configuration for prompt_id: {request.prompt_id}")
+            if request.set_default:
+                default_version_key = f"prompt:{request.prompt_id}:default_version"
+                await self.redis_service.set(default_version_key, redis_key, ex=app_settings.prompt_config_redis_ttl)
+                logger.debug(
+                    f"Stored prompt configuration for prompt_id: {request.prompt_id} and updated default to v{version}"
+                )
+            else:
+                logger.debug(
+                    f"Stored prompt configuration for prompt_id: {request.prompt_id} v{version} without updating default"
+                )
 
             return PromptConfigResponse(
                 code=200,
