@@ -443,7 +443,7 @@ async def determine_modality_endpoints(
         result["endpoints"] = [ModelEndpointEnum.EMBEDDING]
     elif input_modality == "text_to_speech":
         result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.AUDIO_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.AUDIO_SPEECH]
+        result["endpoints"] = [ModelEndpointEnum.TEXT_TO_SPEECH]
     elif input_modality == "speech_to_text":
         result["modality"] = [ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT]
         result["endpoints"] = [ModelEndpointEnum.AUDIO_TRANSCRIPTION]
@@ -487,7 +487,7 @@ async def determine_supported_endpoints(
         endpoints.add(ModelEndpointEnum.IMAGE_GENERATION)
 
     if ModalityEnum.AUDIO_OUTPUT.value in modality_set:
-        endpoints.add(ModelEndpointEnum.AUDIO_SPEECH)
+        endpoints.add(ModelEndpointEnum.TEXT_TO_SPEECH)
 
     if {
         ModalityEnum.AUDIO_INPUT.value,

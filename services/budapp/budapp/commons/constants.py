@@ -2987,7 +2987,7 @@ class ModelEndpointEnum(Enum):
         COMPLETION (str): Text completion endpoint for non-conversational AI.
         IMAGE_GENERATION (str): Image creation endpoint.
         AUDIO_TRANSCRIPTION (str): Speech-to-text conversion endpoint.
-        AUDIO_SPEECH (str): Text-to-speech synthesis endpoint.
+        TEXT_TO_SPEECH (str): Text-to-speech synthesis endpoint.
         EMBEDDING (str): Vector embedding generation endpoint.
         BATCH (str): Batch processing endpoint for multiple requests.
         RESPONSE (str): Response retrieval endpoint for asynchronous operations.
@@ -2997,7 +2997,7 @@ class ModelEndpointEnum(Enum):
     COMPLETION = "/v1/completions"
     IMAGE_GENERATION = "/v1/images/generations"
     AUDIO_TRANSCRIPTION = "/v1/audio/transcriptions"
-    AUDIO_SPEECH = "/v1/audio/speech"
+    TEXT_TO_SPEECH = "/v1/audio/speech"
     EMBEDDING = "/v1/embeddings"
     BATCH = "/v1/batch"
     RESPONSES = "/v1/responses"
@@ -3023,7 +3023,7 @@ class ModelEndpointEnum(Enum):
             cls.COMPLETION: "Completions",
             cls.IMAGE_GENERATION: "Image Generation",
             cls.AUDIO_TRANSCRIPTION: "Transcription",
-            cls.AUDIO_SPEECH: "Speech generation",
+            cls.TEXT_TO_SPEECH: "Speech generation",
             cls.EMBEDDING: "Embeddings",
             cls.BATCH: "Batch",
             cls.RESPONSES: "Responses",

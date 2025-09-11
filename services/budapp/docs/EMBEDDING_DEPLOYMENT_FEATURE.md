@@ -69,7 +69,7 @@ Supported to be added
 
 1. **IMAGE_GENERATION** (`/v1/images/generations`) - Image generation
 2. **AUDIO_TRANSCRIPTION** (`/v1/audio/transcriptions`) - Speech-to-text
-3. **AUDIO_SPEECH** (`/v1/audio/speech`) - Text-to-speech
+3. **TEXT_TO_SPEECH** (`/v1/audio/speech`) - Text-to-speech
 4. **EMBEDDING** (`/v1/embeddings`) - Vector embeddings
 5. **BATCH** (`/v1/batch`) - Batch processing
 6. **RESPONSE** (`/v1/responses`) - Async response retrieval
