@@ -589,6 +589,7 @@ class WorkflowTypeEnum(StrEnum):
     ADD_ADAPTER = auto()
     DELETE_ADAPTER = auto()
     EVALUATION_CREATION = auto()
+    EVALUATE_MODEL = auto()
     GUARDRAIL_DEPLOYMENT = auto()
 
 
