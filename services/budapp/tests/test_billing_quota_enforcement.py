@@ -71,15 +71,21 @@ class TestQuotaEnforcement:
         """Test token quota check when usage is within limit."""
         user_id = user_billing_standard.user_id
 
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
+
         # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_execute.scalar_one_or_none.return_value = mock_user  # Return User object, not UserBilling
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = user_billing_standard
+        mock_filter_by.first.return_value = mock_user  # Return User object, not UserBilling
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
