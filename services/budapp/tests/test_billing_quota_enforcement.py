@@ -118,20 +118,29 @@ class TestQuotaEnforcement:
         """Test token quota check when usage exceeds limit."""
         user_id = user_billing_standard.user_id
 
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
+
         # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_execute.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = user_billing_standard
+        mock_filter_by.first.return_value = mock_user
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
-        # Mock usage exceeding limit
-        with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+        # Mock get_user_billing to return the actual billing object
+        with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+
+            mock_get_user_billing.return_value = user_billing_standard
             mock_get_usage.return_value = {
                 "has_billing": True,
                 "usage": {
@@ -154,24 +163,29 @@ class TestQuotaEnforcement:
         """Test cost quota check when usage is within limit."""
         user_id = user_billing_standard.user_id
 
-        mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
-        mock_session.execute.return_value = mock_execute
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
 
         # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_execute.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = user_billing_standard
+        mock_filter_by.first.return_value = mock_user
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
-        # Mock usage within cost limit
-        with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+        # Mock get_user_billing to return the actual billing object
+        with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+
+            mock_get_user_billing.return_value = user_billing_standard
             mock_get_usage.return_value = {
                 "has_billing": True,
                 "usage": {
@@ -194,24 +208,29 @@ class TestQuotaEnforcement:
         """Test cost quota check when usage exceeds limit."""
         user_id = user_billing_standard.user_id
 
-        mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
-        mock_session.execute.return_value = mock_execute
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
 
         # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_execute.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = user_billing_standard
+        mock_filter_by.first.return_value = mock_user
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
-        # Mock usage exceeding cost limit
-        with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+        # Mock get_user_billing to return the actual billing object
+        with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+
+            mock_get_user_billing.return_value = user_billing_standard
             mock_get_usage.return_value = {
                 "has_billing": True,
                 "usage": {
@@ -234,24 +253,29 @@ class TestQuotaEnforcement:
         """Test when both token and cost quotas are exceeded."""
         user_id = user_billing_standard.user_id
 
-        mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
-        mock_session.execute.return_value = mock_execute
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
 
         # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_execute.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = user_billing_standard
+        mock_filter_by.first.return_value = mock_user
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
-        # Mock usage exceeding both limits (token limit checked first)
-        with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+        # Mock get_user_billing to return the actual billing object
+        with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+
+            mock_get_user_billing.return_value = user_billing_standard
             mock_get_usage.return_value = {
                 "has_billing": True,
                 "usage": {
@@ -277,24 +301,29 @@ class TestQuotaEnforcement:
         user_billing_standard.custom_token_quota = 150000  # Override plan's 100000
         user_billing_standard.custom_cost_quota = Decimal("300.00")  # Override plan's 200.00
 
-        mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
-        mock_session.execute.return_value = mock_execute
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
 
         # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_execute.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = user_billing_standard
+        mock_filter_by.first.return_value = mock_user
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
-        # Mock usage that would exceed plan limits but not custom limits
-        with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+        # Mock get_user_billing to return the actual billing object
+        with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+
+            mock_get_user_billing.return_value = user_billing_standard
             mock_get_usage.return_value = {
                 "has_billing": True,
                 "usage": {
@@ -326,24 +355,29 @@ class TestQuotaEnforcement:
         user_billing.is_suspended = False
         user_billing.created_at = datetime.now(timezone.utc)
 
-        mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing
-        mock_session.execute.return_value = mock_execute
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_billing.user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
 
         # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing
+        mock_execute.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = user_billing
+        mock_filter_by.first.return_value = mock_user
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
-        # Mock very high usage
-        with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+        # Mock get_user_billing to return the actual billing object
+        with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+
+            mock_get_user_billing.return_value = user_billing
             mock_get_usage.return_value = {
                 "has_billing": True,
                 "usage": {
@@ -368,24 +402,29 @@ class TestQuotaEnforcement:
         user_billing_standard.is_suspended = True
         user_billing_standard.suspension_reason = "Payment failed"
 
-        mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
-        mock_session.execute.return_value = mock_execute
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
 
         # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_execute.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = user_billing_standard
+        mock_filter_by.first.return_value = mock_user
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
-        # Even with low usage, suspended users should be blocked
-        with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+        # Mock get_user_billing to return the actual billing object
+        with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+
+            mock_get_user_billing.return_value = user_billing_standard
             mock_get_usage.return_value = {
                 "has_billing": True,
                 "usage": {
@@ -443,24 +482,29 @@ class TestQuotaEnforcement:
         user_id = user_billing_standard.user_id
         project_id = uuid.uuid4()
 
-        mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
-        mock_session.execute.return_value = mock_execute
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
 
         # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_execute.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = user_billing_standard
+        mock_filter_by.first.return_value = mock_user
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
-        # Mock project-specific usage
-        with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+        # Mock get_user_billing to return the actual billing object
+        with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+
+            mock_get_user_billing.return_value = user_billing_standard
             mock_get_usage.return_value = {
                 "has_billing": True,
                 "usage": {
@@ -486,9 +530,11 @@ class TestQuotaEnforcement:
         """Test accurate percentage calculation for quota usage."""
         user_id = user_billing_standard.user_id
 
-        mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
-        mock_session.execute.return_value = mock_execute
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
 
         test_cases = [
             # (tokens_used, expected_percent)
@@ -503,18 +549,21 @@ class TestQuotaEnforcement:
 
         # Setup mock returns for both execute() and query() methods
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = user_billing_standard
+        mock_execute.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = user_billing_standard
+        mock_filter_by.first.return_value = mock_user
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
         for tokens_used, expected_percent in test_cases:
-            with patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+            with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+                 patch.object(billing_service, 'get_current_usage') as mock_get_usage:
+
+                mock_get_user_billing.return_value = user_billing_standard
                 mock_get_usage.return_value = {
                     "has_billing": True,
                     "usage": {
