@@ -282,10 +282,10 @@ class BillingService(DataManagerUtils):
                             "prev_tokens_used": 0,
                             "prev_cost_used": 0.0,
                             "reason": "Admin user - unlimited access",
-                            "reset_at": billing_period_end.isoformat() if billing else None,
+                            "reset_at": billing.billing_period_end.isoformat() if billing else None,
                             "last_updated": now.isoformat(),
-                            "billing_cycle_start": billing_period_start.isoformat() if billing else None,
-                            "billing_cycle_end": billing_period_end.isoformat() if billing else None,
+                            "billing_cycle_start": billing.billing_period_start.isoformat() if billing else None,
+                            "billing_cycle_end": billing.billing_period_end.isoformat() if billing else None,
                         }
                         result_dict[user_id_str] = usage_limit_info
                         continue
