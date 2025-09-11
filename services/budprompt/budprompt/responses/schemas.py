@@ -36,7 +36,7 @@ class ResponsePromptParam(BaseModel):
     """
 
     id: str = Field(..., description="The unique identifier of the prompt template to use")
-    variables: Optional[Dict[str, Union[str, ResponseInputTextParam]]] = Field(
+    variables: Optional[Dict[str, Union[str, ResponseInputTextParam, Any]]] = Field(
         None,
         description="Optional map of values to substitute in for variables in your prompt. "
         "The substitution values can either be strings or ResponseInputTextParam.",

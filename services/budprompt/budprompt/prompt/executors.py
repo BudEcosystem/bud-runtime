@@ -728,9 +728,9 @@ class SimplePromptExecutor:
             input_model = enhanced_models.get("InputModel", input_model)
 
         # Extract the content field type (the actual model to validate input against)
-        input_type = input_model.__pydantic_fields__["content"].annotation  # noqa: F841
+        input_model = input_model.__pydantic_fields__["content"].annotation  # noqa: F841
 
-        return input_model
+        return input_model  # NOTE: input schema should none for unstructured input, content field required for structured input
 
     async def _get_pydantic_model(self, schema: Dict[str, Any], model_name: str) -> Type[BaseModel]:
         """Convert JSON schema to Pydantic model.

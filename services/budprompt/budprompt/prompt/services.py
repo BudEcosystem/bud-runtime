@@ -465,8 +465,7 @@ class PromptConfigurationService:
         workflow_id: str,
         notification_request: NotificationRequest,
         prompt_id: str,
-        schema: Optional[Dict[str, Any]],
-        schema_type: str,
+        request_json: str,
         validation_codes: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None,
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
@@ -504,6 +503,10 @@ class PromptConfigurationService:
         )
 
         try:
+            # Convert to request object
+            request = PromptSchemaRequest.model_validate_json(request_json)
+            request_dict = json.loads(request_json)
+
             # Create Redis service instance
             redis_service = RedisService()
 
@@ -519,22 +522,22 @@ class PromptConfigurationService:
                 config_data = PromptConfigurationData()
 
             # Update configuration based on type
-            if schema_type == "input":
+            if request.type == "input":
                 # Store input schema
-                if schema:
-                    config_data.input_schema = schema
+                if "schema" in request_dict["schema"]:
+                    config_data.input_schema = request.schema.schema
 
                 # Store input validation codes
-                if validation_codes:
+                if "validations" in request_dict["schema"]:
                     config_data.input_validation = validation_codes
 
-            elif schema_type == "output":
+            elif request.type == "output":
                 # Store output schema
-                if schema:
-                    config_data.output_schema = schema
+                if "schema" in request_dict["schema"]:
+                    config_data.output_schema = request.schema.schema
 
                 # Store output validation codes
-                if validation_codes:
+                if "validations" in request_dict["schema"]:
                     config_data.output_validation = validation_codes
 
             # Convert to JSON and store in Redis with configured TTL
@@ -545,7 +548,7 @@ class PromptConfigurationService:
             default_version_key = f"prompt:{prompt_id}:default_version"
             run_async(redis_service.set(default_version_key, redis_key, ex=app_settings.prompt_config_redis_ttl))
 
-            logger.debug(f"Stored prompt configuration for prompt_id: {prompt_id}, type: {schema_type}")
+            logger.debug(f"Stored prompt configuration for prompt_id: {prompt_id}, type: {request.type}")
 
             notification_req.payload.content = NotificationContent(
                 title="Successfully stored prompt configuration",
@@ -706,6 +709,7 @@ class PromptConfigurationService:
             name=workflow_name,
             workflow_id=workflow_id,
         )
+        request_json = request.model_dump_json(exclude_unset=True)
 
         # Validate schema
         self.validate_schema(
@@ -732,8 +736,7 @@ class PromptConfigurationService:
             workflow_id,
             notification_request,
             request.prompt_id,
-            request.schema.schema,
-            request.type,
+            request_json,
             validation_codes,
             request.source_topic,
             request.source,

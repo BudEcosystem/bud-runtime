@@ -192,32 +192,38 @@ class PromptExecuteResponse(SuccessResponse):
 class SchemaBase(BaseModel):
     """Base schema for input/output with validations."""
 
-    schema: Dict[str, Any] = Field(..., description="JSON schema representation")
-    validations: Dict[str, Dict[str, str]] = Field(
-        default_factory=dict,
+    schema: Optional[Dict[str, Any]] = Field(None, description="JSON schema representation")
+    validations: Optional[Dict[str, Dict[str, str]]] = Field(
+        None,
         description="Validation prompts by model and field. Format: {ModelName: {field_name: validation_prompt}}",
     )
 
     @field_validator("validations")
     @classmethod
-    def validate_validations_structure(cls, v: Dict[str, Dict[str, str]]) -> Dict[str, Dict[str, str]]:
+    def validate_validations_structure(
+        cls, v: Optional[Dict[str, Dict[str, str]]]
+    ) -> Optional[Dict[str, Dict[str, str]]]:
         """Validate that validations have proper nested structure."""
-        if not isinstance(v, dict):
-            raise ValueError("Validations must be a dictionary")
+        # Allow None values
+        if v is None:
+            return v
 
-        for model_name, fields in v.items():
-            if not isinstance(model_name, str) or not model_name.strip():
-                raise ValueError(f"Model name must be a non-empty string, got: {model_name}")
+        if isinstance(v, dict):
+            for model_name, fields in v.items():
+                if not isinstance(model_name, str) or not model_name.strip():
+                    raise ValueError(f"Model name must be a non-empty string, got: {model_name}")
 
-            if not isinstance(fields, dict):
-                raise ValueError(f"Validations for model '{model_name}' must be a dictionary of fields")
+                if not isinstance(fields, dict):
+                    raise ValueError(f"Validations for model '{model_name}' must be a dictionary of fields")
 
-            for field_name, prompt in fields.items():
-                if not isinstance(field_name, str) or not field_name.strip():
-                    raise ValueError(f"Field name in model '{model_name}' must be a non-empty string")
+                for field_name, prompt in fields.items():
+                    if not isinstance(field_name, str) or not field_name.strip():
+                        raise ValueError(f"Field name in model '{model_name}' must be a non-empty string")
 
-                if not isinstance(prompt, str) or not prompt.strip():
-                    raise ValueError(f"Validation prompt for '{model_name}.{field_name}' must be a non-empty string")
+                    if not isinstance(prompt, str) or not prompt.strip():
+                        raise ValueError(
+                            f"Validation prompt for '{model_name}.{field_name}' must be a non-empty string"
+                        )
 
         return v
 
@@ -286,9 +292,7 @@ class PromptSchemaRequest(CloudEventBase):
     """
 
     prompt_id: Optional[str] = Field(None, description="Unique identifier for the prompt configuration")
-    schema: Optional[SchemaBase] = Field(
-        None, description="JSON schema for structured input/output (None for unstructured)"
-    )
+    schema: SchemaBase = Field(None, description="JSON schema for structured input/output (None for unstructured)")
     type: Literal["input", "output"] = Field(..., description="Type of schema - either 'input' or 'output'")
     deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
 

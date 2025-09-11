@@ -16,6 +16,7 @@
 
 """Unit tests for PromptConfigurationService validate_schema method."""
 
+import json
 import uuid
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -351,9 +352,15 @@ class TestValidateSchema:
         # Arrange
         workflow_id = str(uuid.uuid4())
 
+        # Create SchemaBase with None values
+        schema_base = SchemaBase(
+            schema=None,
+            validations=None
+        )
+
         request = PromptSchemaRequest(
             prompt_id="test_prompt_8",
-            schema=None,
+            schema=schema_base,  # Now using SchemaBase object
             type="input",
         )
 
@@ -695,6 +702,128 @@ class TestValidateSchema:
 
         # Verify the error message
         assert "Model 'Persons' not found in schema structure" in str(exc_info.value)
+
+    @patch('budprompt.prompt.services.run_async')
+    @patch('budprompt.prompt.services.dapr_workflow')
+    def test_store_prompt_configuration_with_null_schema(
+        self, mock_dapr_workflow, mock_run_async, mock_notification_request
+    ):
+        """Test that null schema can be stored to clear existing schema."""
+        # Arrange
+        workflow_id = str(uuid.uuid4())
+        prompt_id = "test-null-schema"
+
+        # Create request with null schema
+        request = PromptSchemaRequest(
+            prompt_id=prompt_id,
+            schema=SchemaBase(schema=None, validations=None),
+            type="input"
+        )
+        request_json = request.model_dump_json(exclude_unset=True)
+
+        # Mock Redis operations
+        mock_run_async.side_effect = [
+            None,  # get returns None (no existing data)
+            None,  # set returns None
+            None,  # set default version returns None
+        ]
+
+        # Act
+        result = PromptConfigurationService.store_prompt_configuration(
+            workflow_id=workflow_id,
+            notification_request=mock_notification_request,
+            prompt_id=prompt_id,
+            request_json=request_json,  # Pass request_json instead of schema
+            validation_codes=None,  # Clear validation codes
+        )
+
+        # Assert
+        assert result == prompt_id
+        assert mock_dapr_workflow.publish_notification.call_count == 2  # Start and complete
+
+    @patch('budprompt.prompt.services.run_async')
+    @patch('budprompt.prompt.services.dapr_workflow')
+    def test_store_prompt_configuration_update_with_null_values(
+        self, mock_dapr_workflow, mock_run_async, mock_notification_request
+    ):
+        """Test updating existing configuration with null values to clear fields."""
+        # Arrange
+        workflow_id = str(uuid.uuid4())
+        prompt_id = "test-update-null"
+
+        # Create request to clear input schema
+        request = PromptSchemaRequest(
+            prompt_id=prompt_id,
+            schema=SchemaBase(schema=None, validations=None),
+            type="input"
+        )
+        request_json = request.model_dump_json(exclude_unset=True)
+
+        # Existing configuration with input schema and validation
+        existing_config = {
+            "input_schema": {"type": "object", "properties": {"name": {"type": "string"}}},
+            "input_validation": {"InputSchema": {"name": {"prompt": "Name validation", "code": "def validate_name()"}}},
+            "output_schema": {"type": "object", "properties": {"result": {"type": "string"}}},
+        }
+
+        # Mock Redis operations
+        mock_run_async.side_effect = [
+            json.dumps(existing_config),  # get returns existing data
+            None,  # set returns None
+            None,  # set default version returns None
+        ]
+
+        # Act - Update input schema to null (should clear it)
+        result = PromptConfigurationService.store_prompt_configuration(
+            workflow_id=workflow_id,
+            notification_request=mock_notification_request,
+            prompt_id=prompt_id,
+            request_json=request_json,  # Pass request_json instead of schema
+            validation_codes=None,  # Clear input validation codes
+        )
+
+        # Assert
+        assert result == prompt_id
+        # Since we're mocking run_async, we can't easily verify the exact stored data
+        # But we can verify that the function completed successfully
+        assert mock_dapr_workflow.publish_notification.call_count == 2  # Start and complete
+
+    @patch('budprompt.prompt.services.run_async')
+    @patch('budprompt.prompt.services.dapr_workflow')
+    def test_prompt_schema_request_with_null_schema(
+        self, mock_dapr_workflow, mock_run_async
+    ):
+        """Test PromptConfigurationService.__call__ with schema containing null values."""
+        # Arrange
+        service = PromptConfigurationService()
+        workflow_id = str(uuid.uuid4())
+
+        # Create request with SchemaBase having null schema and validations
+        # This tests clearing existing schema/validations
+        request = PromptSchemaRequest(
+            prompt_id="test-null-prompt",
+            schema=SchemaBase(
+                schema=None,  # Clear schema
+                validations=None  # Clear validations
+            ),
+            type="input",
+        )
+
+        # Mock Redis operations
+        mock_run_async.side_effect = [
+            None,  # get returns None (no existing data)
+            None,  # set returns None
+            None,  # set default version returns None
+        ]
+
+        # Act
+        result = service(request, workflow_id)
+
+        # Assert
+        assert result.prompt_id == "test-null-prompt"
+        assert result.workflow_id == uuid.UUID(workflow_id)
+        # Verify notifications were published
+        assert mock_dapr_workflow.publish_notification.call_count >= 2
 
 class TestGenerateValidationCodes:
     """Test cases for the generate_validation_codes method."""

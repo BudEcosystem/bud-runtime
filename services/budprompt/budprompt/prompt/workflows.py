@@ -122,14 +122,14 @@ class PromptSchemaWorkflow:
             retry_policy=retry_policy,
         )
 
+        request_json = request.model_dump_json(exclude_unset=True)
         redis_key = yield ctx.call_activity(  # noqa: F841
             PromptSchemaWorkflow.store_prompt_configuration,
             input={
                 "workflow_id": workflow_id,
                 "notification_request": notification_request_dict,
                 "prompt_id": request.prompt_id,
-                "schema": request.schema.schema,
-                "schema_type": request.type,
+                "request_json": request_json,
                 "validation_codes": validation_codes,
                 "target_topic_name": request.source_topic,
                 "target_name": request.source,
