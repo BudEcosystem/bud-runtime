@@ -15,6 +15,7 @@ ingress:
         budask: ""
         novuapi: ""
         novuws: ""
+        s3: ""
 
 microservices:
     # frontend services
@@ -103,7 +104,7 @@ microservices:
             LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
 
             MINIO_BUCKET: models-registry
-            MINIO_ENDPOINT: "{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}"
+            MINIO_ENDPOINT: '{{ include "bud.ingress.url.s3" $ }}'
             MINIO_SECURE: "false"
     budmetrics:
         daprid: budmetrics
@@ -208,7 +209,7 @@ microservices:
             LOG_LEVEL: INFO
             MINIO_ACCESS_KEY: "{{ .Values.minio.auth.rootUser }}"
             MINIO_BUCKET: models-registry
-            MINIO_ENDPOINT: "{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}"
+            MINIO_ENDPOINT: '{{ include "bud.ingress.url.s3" $ }}'
             MINIO_MODEL_BUCKET: model-info
             MINIO_SECRET_KEY: "{{ .Values.minio.auth.rootPassword }}"
             MINIO_SECURE: "false"
