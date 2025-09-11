@@ -85,6 +85,7 @@ microservices:
 
             CONFIGSTORE_NAME: "{{ .Release.Name }}-configstore"
             SECRETSTORE_SECRET_NAME: "{{ .Release.Name }}-secretstore"
+            STATESTORE_NAME: "{{ .Release.Name }}-dapr-statestore"
 
             PSQL_HOST: "{{ $.Release.Name }}-postgresql"
             PSQL_PORT: "5432"
