@@ -387,13 +387,17 @@ const BudIsland: React.FC = () => {
   );
 };
 
-export default function BudIslandProvider() {
+function BudIslandWrapper() {
   const { user } = useUser();
-  if (!user) return null;
 
-  return (
-    // <NovuProvider applicationIdentifier={novuAppId} backendUrl={novuBackendUrl} socketUrl={novuSocketUrl} subscriberId={user?.id}>
-    <BudIsland />
-    // </NovuProvider>
-  );
+  // Check if we have a user before rendering BudIsland with Novu hooks
+  if (!user?.id) {
+    return null;
+  }
+
+  return <BudIsland />;
+}
+
+export default function BudIslandProvider() {
+  return <BudIslandWrapper />;
 }
