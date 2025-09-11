@@ -1192,3 +1192,28 @@ async def get_latency_distribution(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get latency distribution"
         ).to_http_response()
+
+
+@metric_router.get("/sync-stats")
+async def get_hybrid_sync_stats(
+    current_user: Annotated[dict, Depends(get_current_active_user)],
+) -> Dict[str, Any]:
+    """Get hybrid metrics sync task statistics.
+
+    This endpoint returns statistics about the hybrid sync task that combines
+    credential usage sync and user usage sync.
+
+    Args:
+        current_user: The current authenticated user
+
+    Returns:
+        Dict containing sync task statistics
+    """
+    try:
+        from budapp.metric_ops.hybrid_sync import get_hybrid_sync_stats
+
+        stats = get_hybrid_sync_stats()
+        return {"success": True, "data": stats, "message": "Hybrid sync statistics retrieved successfully"}
+    except Exception as e:
+        logger.exception(f"Failed to get hybrid sync stats: {e}")
+        return {"success": False, "message": f"Failed to get sync statistics: {str(e)}"}

@@ -732,3 +732,41 @@ async def get_billing_for_period(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve billing record for period",
         )
+
+
+@router.get("/users-with-billing", response_model=SingleResponse[List[str]])
+async def get_users_with_active_billing(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[List[str]]:
+    """Get all user IDs that have active billing records (internal service use only).
+
+    This endpoint is intended for use by internal services (like budmetrics)
+    for synchronization purposes. It requires admin privileges.
+    """
+    try:
+        # Check if user is admin - only internal services should call this
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin/internal services can access this endpoint",
+            )
+
+        service = BillingService(db)
+        user_ids = service.get_all_users_with_active_billing()
+
+        # Convert UUIDs to strings for JSON serialization
+        user_id_strings = [str(user_id) for user_id in user_ids]
+
+        return SingleResponse(
+            result=user_id_strings,
+            message=f"Retrieved {len(user_id_strings)} users with active billing records",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving users with active billing: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve users with active billing",
+        )
