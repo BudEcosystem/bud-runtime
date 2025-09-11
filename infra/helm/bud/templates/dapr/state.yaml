@@ -12,3 +12,5 @@ spec:
       value: {{ .Values.valkey.auth.password }}
     - name: actorStateStore
       value: "true"
+    - name: keyPrefix
+      value: none
