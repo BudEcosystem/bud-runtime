@@ -44,6 +44,8 @@ from .executors import SimplePromptExecutor
 from .revised_code.field_validation import generate_validation_function
 from .schema_builder import ModelGeneratorFactory
 from .schemas import (
+    PromptConfigCopyRequest,
+    PromptConfigCopyResponse,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -948,3 +950,94 @@ class PromptService:
                 status_code=500,
                 message="Failed to retrieve prompt configuration",
             ) from e
+
+    async def copy_prompt_config(self, request: PromptConfigCopyRequest) -> PromptConfigCopyResponse:
+        """Copy a specific version of prompt configuration from one ID to another.
+
+        This method:
+        1. Validates source prompt and version exist
+        2. Either replaces or merges with target configuration based on replace flag
+        3. Removes TTL (permanent storage)
+        4. Optionally sets as default for target prompt
+
+        Args:
+            request: The copy configuration request
+
+        Returns:
+            PromptConfigCopyResponse with copy details
+
+        Raises:
+            ClientException: If source not found or copy fails
+        """
+        try:
+            # Validate source and target are different
+            if (
+                request.source_prompt_id == request.target_prompt_id
+                and request.source_version == request.target_version
+            ):
+                raise ClientException(status_code=400, message="Cannot copy to same prompt ID and version")
+
+            # Construct source Redis key
+            source_key = f"prompt:{request.source_prompt_id}:v{request.source_version}"
+
+            # Get source configuration
+            source_data_json = await self.redis_service.get(source_key)
+            if not source_data_json:
+                raise ClientException(
+                    status_code=404,
+                    message=f"Source prompt configuration not found: {request.source_prompt_id} v{request.source_version}",
+                )
+
+            source_data = json.loads(source_data_json)
+
+            # Construct target Redis key
+            target_key = f"prompt:{request.target_prompt_id}:v{request.target_version}"
+
+            # Determine operation: replace or merge
+            if request.replace:
+                # Complete replacement - use source data as is
+                final_data = source_data
+                logger.debug("Replacing target config with source data")
+            else:
+                # Merge mode - get existing target data if it exists
+                target_data_json = await self.redis_service.get(target_key)
+                if target_data_json:
+                    target_data = json.loads(target_data_json)
+                    # Merge: Update target with only fields present in source
+                    final_data = target_data.copy()
+                    for key, value in source_data.items():
+                        if value is not None:  # Only update non-null fields from source
+                            final_data[key] = value
+                    logger.debug("Merging source fields into existing target config")
+                else:
+                    # No existing target, use source data
+                    final_data = source_data
+                    logger.debug("No existing target, using source data")
+
+            # Save to target without TTL (permanent storage)
+            final_data_json = json.dumps(final_data)
+            await self.redis_service.set(target_key, final_data_json, ex=None)
+
+            # Set as default if requested
+            if request.set_as_default:
+                default_key = f"prompt:{request.target_prompt_id}:default_version"
+                await self.redis_service.set(default_key, target_key, ex=None)
+                logger.debug(f"Set {target_key} as default for {request.target_prompt_id}")
+
+            logger.debug(
+                f"Copied prompt config from {request.source_prompt_id}:v{request.source_version} "
+                f"to {request.target_prompt_id}:v{request.target_version}"
+            )
+
+            return PromptConfigCopyResponse(
+                source_prompt_id=request.source_prompt_id,
+                source_version=request.source_version,
+                target_prompt_id=request.target_prompt_id,
+                target_version=request.target_version,
+            )
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception(f"Failed to copy prompt configuration: {str(e)}")
+            raise ClientException(status_code=500, message="Failed to copy prompt configuration") from e

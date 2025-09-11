@@ -27,6 +27,8 @@ from fastapi.responses import StreamingResponse
 
 from ..commons.exceptions import ClientException
 from .schemas import (
+    PromptConfigCopyRequest,
+    PromptConfigCopyResponse,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -142,7 +144,7 @@ async def perform_prompt_schema(request: PromptSchemaRequest) -> Response:
 
     if request.debug:
         try:
-            logger.info("Running prompt schema validation in debug mode", request.model_dump())
+            logger.debug("Running prompt schema validation in debug mode", request.model_dump())
             response = PromptConfigurationService().__call__(request, workflow_id=str(uuid.uuid4()))
         except Exception as e:
             logger.exception("Error running prompt schema validation: %s", str(e))
@@ -262,4 +264,64 @@ async def get_prompt_config(
         return ErrorResponse(
             code=500,
             message="An unexpected error occurred during prompt configuration retrieval",
+        ).to_http_response()
+
+
+@prompt_router.post(
+    "/copy-config",
+    response_model=Union[PromptConfigCopyResponse, ErrorResponse],
+    summary="Copy prompt configuration",
+    description="Copy a specific version of prompt configuration with replace or merge options",
+    responses={
+        200: {
+            "description": "Configuration copied successfully",
+            "model": PromptConfigCopyResponse,
+        },
+        400: {"description": "Invalid request"},
+        404: {"description": "Source configuration not found"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def copy_prompt_config(
+    request: PromptConfigCopyRequest,
+) -> Union[PromptConfigCopyResponse, ErrorResponse]:
+    """Copy a specific version of prompt configuration from source to target prompt_id.
+
+    Supports two modes:
+    - replace=true: Complete replacement of target configuration
+    - replace=false: Merge only fields present in source into existing target
+
+    Args:
+        request: The copy configuration request
+
+    Returns:
+        The copy configuration response
+
+    Raises:
+        HTTPException: If source not found or copy fails
+    """
+    try:
+        logger.info(
+            f"Copying prompt config from {request.source_prompt_id}:v{request.source_version} "
+            f"to {request.target_prompt_id}:v{request.target_version} (replace={request.replace})"
+        )
+
+        # Create service instance
+        prompt_service = PromptService()
+
+        # Copy the configuration
+        result = await prompt_service.copy_prompt_config(request)
+
+        return result.to_http_response()
+
+    except ClientException as e:
+        return ErrorResponse(
+            code=e.status_code,
+            message=e.message,
+        ).to_http_response()
+    except Exception as e:
+        logger.error(f"Unexpected error during prompt configuration copy: {str(e)}")
+        return ErrorResponse(
+            code=500,
+            message="An unexpected error occurred during prompt configuration copy",
         ).to_http_response()

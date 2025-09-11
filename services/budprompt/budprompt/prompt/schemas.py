@@ -435,3 +435,26 @@ class PromptConfigGetResponse(SuccessResponse):
 
     prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")
     data: PromptConfigurationData = Field(..., description="The prompt configuration data")
+
+
+class PromptConfigCopyRequest(BaseModel):
+    """Request model for copying prompt configuration."""
+
+    source_prompt_id: str = Field(..., description="Source prompt ID to copy from")
+    source_version: int = Field(..., ge=1, description="Source version number to copy")
+    target_prompt_id: str = Field(..., description="Target prompt ID to copy to")
+    target_version: int = Field(..., ge=1, description="Target version number to save as")
+    replace: bool = Field(
+        True, description="If true, replace entire target config. If false, merge only fields present in source"
+    )
+    set_as_default: bool = Field(False, description="Whether to set the copied version as default for target prompt")
+
+
+class PromptConfigCopyResponse(SuccessResponse):
+    """Response model for copy prompt configuration."""
+
+    source_prompt_id: str = Field(..., description="Source prompt ID copied from")
+    source_version: int = Field(..., description="Source version number copied")
+    target_prompt_id: str = Field(..., description="Target prompt ID copied to")
+    target_version: int = Field(..., description="Target version number saved as")
+    message: str = Field(default="Prompt configuration copied successfully")
