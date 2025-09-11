@@ -77,7 +77,7 @@ spec:
               service:
                 name: {{ .Release.Name }}-minio
                 port:
-                  number: 8080
+                  number: 9000
   tls:
     - hosts:
         - {{ include "bud.ingress.hosts.budcustomer" $ }}
