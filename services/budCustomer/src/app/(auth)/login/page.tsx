@@ -24,6 +24,7 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const [isBackToLogin, setIsBackToLogin] = useState(false);
   const [oauthProcessing, setOauthProcessing] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Use the new environment system
 
@@ -153,6 +154,7 @@ function LoginContent() {
   const handleLogin = async (payload: DataInterface) => {
     console.log("=== LOGIN HANDLER CALLED ===");
     console.log("Login payload:", payload);
+    setIsLoggingIn(true);
     showLoader();
     try {
       // Prepare the payload
@@ -194,6 +196,7 @@ function LoginContent() {
 
         // Handle different login scenarios
         hideLoader();
+        setIsLoggingIn(false);
 
         if (response.data.is_reset_password) {
           router.replace("/auth/resetPassword");
@@ -205,6 +208,7 @@ function LoginContent() {
         // Handle case where login is successful but no token (shouldn't happen normally)
         setAuthError("");
         hideLoader();
+        setIsLoggingIn(false);
         window.location.href = "/models";
       }
     } catch (error: any) {
@@ -216,6 +220,7 @@ function LoginContent() {
         "Login failed. Please check your credentials and try again.";
       setAuthError(errorMessage);
       hideLoader();
+      setIsLoggingIn(false);
     }
   };
   const handleForgetPassword = async (email: string) => {
@@ -262,7 +267,7 @@ function LoginContent() {
               </div>
             ) : (
               <>
-                {activePage === 1 && <LoginForm onSubmit={handleLogin} />}
+                {activePage === 1 && <LoginForm onSubmit={handleLogin} isLoading={isLoggingIn} />}
                 {activePage === 4 && (
                   <ContactAdmin onSubmit={handleForgetPassword} />
                 )}

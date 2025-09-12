@@ -196,7 +196,7 @@ export default function ViewApiKey() {
                       style={{ height: ".75rem" }}
                     />
                   </div>
-                  <Text_12_400_B3B3B3>Key</Text_12_400_B3B3B3>
+                  <div className="block text-xs font-normal text-gray-700 dark:text-[#B3B3B3]">Key</div>
                 </div>
                 <div className="flex items-center justify-between w-full flex-auto max-w-[73%]">
                   {showKey ? (
@@ -250,7 +250,7 @@ export default function ViewApiKey() {
                       style={{ height: ".75rem" }}
                     />
                   </div>
-                  <Text_12_400_B3B3B3>Project name</Text_12_400_B3B3B3>
+                  <div className="block text-xs font-normal text-gray-700 dark:text-[#B3B3B3]">Project name</div>
                 </div>
                 <div className="flex items-center justify-between w-full flex-auto max-w-[73%]">
                   <Text_12_400_EEEEEE className="leading-[.875rem] w-[280px] truncate">
@@ -270,7 +270,7 @@ export default function ViewApiKey() {
                       style={{ height: ".75rem" }}
                     />
                   </div>
-                  <Text_12_400_B3B3B3>Created</Text_12_400_B3B3B3>
+                  <div className="block text-xs font-normal text-gray-700 dark:text-[#B3B3B3]">Created</div>
                 </div>
                 <div className="flex items-center justify-between w-full flex-auto max-w-[73%]">
                   <Text_12_400_EEEEEE className="leading-[.875rem] w-[280px] truncate">
@@ -292,7 +292,7 @@ export default function ViewApiKey() {
                       style={{ height: ".75rem" }}
                     />
                   </div>
-                  <Text_12_400_B3B3B3>Expiry Date</Text_12_400_B3B3B3>
+                  <div className="block text-xs font-normal text-gray-700 dark:text-[#B3B3B3]">Expiry Date</div>
                 </div>
                 <div className="flex items-center justify-between w-full flex-auto max-w-[73%]">
                   <Text_12_400_EEEEEE className="leading-[.875rem] w-[280px] truncate">
@@ -314,7 +314,7 @@ export default function ViewApiKey() {
                       style={{ height: ".75rem" }}
                     />
                   </div>
-                  <Text_12_400_B3B3B3>Last Used</Text_12_400_B3B3B3>
+                  <div className="block text-xs font-normal text-gray-700 dark:text-[#B3B3B3]">Last Used</div>
                 </div>
                 <div className="flex items-center justify-between w-full flex-auto max-w-[73%]">
                   <Text_12_400_EEEEEE className="leading-[.875rem] w-[280px] truncate">
