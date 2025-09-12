@@ -101,6 +101,9 @@ class RetrieveWorkflowStepData(BaseModel):
     concurrency: list[int] | None = None
     rate_limit_type: RateLimitTypeEnum | None = None
     rate_limit_value: int | None = None
+    bud_prompt_id: str | None = None
+    bud_prompt_version: int | str | None = None
+    prompt_schema_events: dict | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

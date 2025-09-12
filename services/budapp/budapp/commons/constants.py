@@ -591,6 +591,7 @@ class WorkflowTypeEnum(StrEnum):
     EVALUATION_CREATION = auto()
     GUARDRAIL_DEPLOYMENT = auto()
     PROMPT_CREATION = auto()
+    PROMPT_SCHEMA_CREATION = auto()
 
 
 class NotificationType(Enum):
@@ -644,6 +645,7 @@ class PayloadType(str, Enum):
     ADD_ADAPTER = "add_adapter"
     DELETE_ADAPTER = "delete_adapter"
     EVALUATE_MODEL = "evaluate_model"
+    PERFORM_PROMPT_SCHEMA = "perform_prompt_schema"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -671,6 +673,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     ADAPTER_DEPLOYMENT_EVENTS = "adapter_deployment_events"
     ADAPTER_DELETE_EVENTS = "adapter_delete_events"
     EVALUATION_EVENTS = "evaluation_events"
+    PROMPT_SCHEMA_EVENTS = "prompt_schema_events"
 
 
 # Mapping between payload types and workflow step event names.

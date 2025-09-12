@@ -391,3 +391,82 @@ class SinglePromptVersionResponse(SuccessResponse):
     """Single prompt version response."""
 
     version: PromptVersionResponse
+
+
+class SchemaBase(BaseModel):
+    """Base schema for input/output with validations."""
+
+    schema: Optional[Dict[str, Any]] = Field(None, description="JSON schema representation")
+    validations: Optional[Dict[str, Dict[str, str]]] = Field(
+        None,
+        description="Validation prompts by model and field. Format: {ModelName: {field_name: validation_prompt}}",
+    )
+
+    @field_validator("validations")
+    @classmethod
+    def validate_validations_structure(
+        cls, v: Optional[Dict[str, Dict[str, str]]]
+    ) -> Optional[Dict[str, Dict[str, str]]]:
+        """Validate that validations have proper nested structure."""
+        # Allow None values
+        if v is None:
+            return v
+
+        if isinstance(v, dict):
+            for model_name, fields in v.items():
+                if not isinstance(model_name, str) or not model_name.strip():
+                    raise ValueError(f"Model name must be a non-empty string, got: {model_name}")
+
+                if not isinstance(fields, dict):
+                    raise ValueError(f"Validations for model '{model_name}' must be a dictionary of fields")
+
+                for field_name, prompt in fields.items():
+                    if not isinstance(field_name, str) or not field_name.strip():
+                        raise ValueError(f"Field name in model '{model_name}' must be a non-empty string")
+
+                    if not isinstance(prompt, str) or not prompt.strip():
+                        raise ValueError(
+                            f"Validation prompt for '{model_name}.{field_name}' must be a non-empty string"
+                        )
+
+        return v
+
+
+class PromptSchemaRequest(BaseModel):
+    """Schema for prompt schema validation request.
+
+    This request model supports structured schemas with validation prompts.
+    The type field specifies whether this is an input or output schema.
+    """
+
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None
+
+    prompt_id: str | None = None
+    version: int | None = None
+    set_default: bool | None = None
+    schema: SchemaBase | None = None
+    type: Literal["input", "output"] | None = None
+    deployment_name: str | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self):
+        # Validate workflow_total_steps when workflow_id is not provided
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        return self
+
+
+class PromptSchemaWorkflowSteps(BaseModel):
+    """Prompt schema workflow steps request schema."""
+
+    prompt_id: str | None = None
+    version: int | None = None
+    set_default: bool | None = None
+    schema: SchemaBase | None = None
+    type: Literal["input", "output"] | None = None
+    deployment_name: str | None = None

@@ -207,6 +207,9 @@ class WorkflowService(SessionMixin):
             concurrency = required_data.get("concurrency")
             rate_limit_type = required_data.get("rate_limit_type")
             rate_limit_value = required_data.get("rate_limit_value")
+            bud_prompt_id = required_data.get("bud_prompt_id")
+            bud_prompt_version = required_data.get("bud_prompt_version")
+            prompt_schema_events = required_data.get(BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value)
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -350,6 +353,9 @@ class WorkflowService(SessionMixin):
                 concurrency=concurrency if concurrency else None,
                 rate_limit_type=rate_limit_type if rate_limit_type else None,
                 rate_limit_value=rate_limit_value if rate_limit_value else None,
+                bud_prompt_id=bud_prompt_id if bud_prompt_id else None,
+                bud_prompt_version=bud_prompt_version if bud_prompt_version else None,
+                prompt_schema_events=prompt_schema_events if prompt_schema_events else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -517,6 +523,11 @@ class WorkflowService(SessionMixin):
                 "rate_limit_type",
                 "rate_limit_value",
                 "prompt_schema",
+            ],
+            "prompt_schema_creation": [
+                "bud_prompt_id",
+                "bud_prompt_version",
+                BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value,
             ],
         }
 

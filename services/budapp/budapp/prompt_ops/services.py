@@ -16,14 +16,19 @@
 
 """Business logic services for the prompt ops module."""
 
-from typing import Any
+from ast import Dict
+from typing import Any, Dict
 from uuid import UUID
 
+import aiohttp
 from fastapi import status
 
 from ..commons import logging
+from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
+    BUD_INTERNAL_WORKFLOW,
+    BudServeWorkflowStepEventName,
     EndpointStatusEnum,
     ModelProviderTypeEnum,
     ProjectStatusEnum,
@@ -31,11 +36,13 @@ from ..commons.constants import (
     PromptTypeEnum,
     PromptVersionStatusEnum,
     RateLimitTypeEnum,
+    VisibilityEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
 )
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
+from ..core.schemas import NotificationPayload
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..model_ops.crud import ProviderDataManager
@@ -56,6 +63,8 @@ from .schemas import (
     PromptListItem,
     PromptResponse,
     PromptSchemaConfig,
+    PromptSchemaRequest,
+    PromptSchemaWorkflowSteps,
     PromptVersionListItem,
     PromptVersionResponse,
 )
@@ -469,6 +478,230 @@ class PromptWorkflowService(SessionMixin):
             )
 
         return db_workflow
+
+    async def create_prompt_schema_workflow(
+        self, current_user_id: UUID, request: PromptSchemaRequest
+    ) -> WorkflowModel:
+        """Create a prompt schema workflow with validation."""
+        # Get request data
+        current_step_number = request.step_number
+        workflow_id = request.workflow_id
+        workflow_total_steps = request.workflow_total_steps
+        trigger_workflow = request.trigger_workflow
+        prompt_id = request.prompt_id
+        version = request.version
+        set_default = request.set_default
+        schema = request.schema
+        type = request.type
+        deployment_name = request.deployment_name
+
+        # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.PROMPT_SCHEMA_CREATION,
+            title="Prompt Schema Creation",
+            total_steps=workflow_total_steps,
+            icon=APP_ICONS["general"]["deployment_mono"],  # NOTE: Dummy icon
+            tag="Prompt Schema Creation",
+            visibility=VisibilityEnum.INTERNAL,
+        )
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_create, current_user_id
+        )
+
+        if workflow_id:
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": workflow_id}
+            )
+
+        # Validate deployment_name
+        if deployment_name:
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel,
+                {"name": deployment_name},
+                exclude_fields={"status": EndpointStatusEnum.DELETED},
+                missing_ok=True,
+            )
+            if not db_endpoint:
+                raise ClientException(message="Deployment not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Prepare workflow step data
+        workflow_step_data = PromptSchemaWorkflowSteps(
+            prompt_id=prompt_id,
+            version=version,
+            set_default=set_default,
+            schema=schema,
+            type=type,
+            deployment_name=deployment_name,
+        ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        # Create or update workflow step
+        await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, workflow_step_data
+        )
+
+        # Update workflow current step
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"current_step": current_step_number})
+
+        # If trigger_workflow is True, create the prompt schema
+        if trigger_workflow:
+            logger.info("Workflow triggered")
+
+            # Retrieve all step data
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": db_workflow.id}
+            )
+
+            # Define the keys required for model deployment
+            keys_of_interest = [
+                "prompt_id",
+                "version",
+                "set_default",
+                "schema",
+                "type",
+                "deployment_name",
+            ]
+
+            # from workflow steps extract necessary information
+            required_data = {}
+            for db_workflow_step in db_workflow_steps:
+                for key in keys_of_interest:
+                    if key in db_workflow_step.data:
+                        required_data[key] = db_workflow_step.data[key]
+
+            # Check if all required keys are present
+            required_keys = ["schema", "type", "deployment_name"]
+            missing_keys = [key for key in required_keys if key not in required_data]
+            if missing_keys:
+                raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
+
+            # Merge all step data
+            merged_data = {}
+            for step in db_workflow_steps:
+                if step.data:
+                    merged_data.update(step.data)
+
+            # Create prompt schema
+            try:
+                # Perform model extraction
+                await self._perform_prompt_schema_creation(
+                    current_step_number, merged_data, current_user_id, db_workflow
+                )
+            except ClientException as e:
+                raise e
+
+        return db_workflow
+
+    async def _perform_prompt_schema_creation(
+        self, current_step_number: int, data: Dict, current_user_id: UUID, db_workflow: WorkflowModel
+    ) -> None:
+        """Perform prompt schema creation request to budprompt app.
+
+        Args:
+            current_step_number: the current step number in the workflow.
+            data: request body to send to budprompt.
+            current_user_id: the id of the current user.
+            db_workflow: the workflow instance.
+        """
+        bud_prompt_schema_response = await self._perform_prompt_schema_request(data, current_user_id, db_workflow.id)
+
+        # Add payload dict to response
+        for step in bud_prompt_schema_response["steps"]:
+            step["payload"] = {}
+
+        prompt_schema_events = {BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value: bud_prompt_schema_response}
+
+        current_step_number = current_step_number + 1
+        workflow_current_step = current_step_number
+
+        # Update or create next workflow step
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, prompt_schema_events
+        )
+        logger.debug(f"Workflow step created with id {db_workflow_step.id}")
+
+        # Update progress in workflow
+        bud_prompt_schema_response["progress_type"] = BudServeWorkflowStepEventName.MODEL_EXTRACTION_EVENTS.value
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"progress": bud_prompt_schema_response, "current_step": workflow_current_step}
+        )
+
+    async def _perform_prompt_schema_request(
+        self, data: Dict[str, Any], current_user_id: UUID, workflow_id: UUID
+    ) -> Dict:
+        """Perform prompt schema creation request to budprompt app.
+
+        Args:
+            data: request body to send to budprompt.
+        """
+        license_faq_fetch_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-schema"
+        )
+
+        payload = {
+            "prompt_id": data.get("prompt_id"),
+            "version": data.get("version"),
+            "set_default": data.get("set_default"),
+            "schema": data.get("schema"),
+            "type": data.get("type"),
+            "deployment_name": data.get("deployment_name"),
+            "notification_metadata": {
+                "name": BUD_INTERNAL_WORKFLOW,
+                "subscriber_ids": str(current_user_id),
+                "workflow_id": str(workflow_id),
+            },
+            "source_topic": f"{app_settings.source_topic}",
+        }
+
+        logger.debug(f"Performing create prompt schema request to budprompt {payload}")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(license_faq_fetch_endpoint, json=payload) as response:
+                    response_data = await response.json()
+                    if response.status != 200:
+                        logger.error(f"Failed to create prompt schema: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to create prompt schema", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
+
+                    logger.debug(f"Successfully fetched prompt schema events from budprompt {response_data}")
+                    return response_data
+        except Exception as e:
+            logger.exception(f"Failed to send create prompt schema request: {e}")
+            raise ClientException(
+                "Failed to create prompt schema", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def create_prompt_schema_from_notification_event(self, payload: NotificationPayload) -> None:
+        """Create a local model from notification event."""
+        logger.debug("Received event for creating local model")
+
+        # Get workflow and steps
+        workflow_id = payload.workflow_id
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+
+        # Get data from result
+        prompt_id = payload.content.result.get("prompt_id")
+        prompt_version = payload.content.result.get("version")
+        data = {
+            "bud_prompt_id": prompt_id,
+            "bud_prompt_version": prompt_version,
+        }
+
+        # Update prompt_id as next step
+        # Update current step number
+        current_step_number = db_workflow.current_step + 1
+        workflow_current_step = current_step_number
+
+        db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+            db_workflow.id, current_step_number, data
+        )
+        logger.debug(f"Upsert workflow step {db_workflow_step.id} for storing prompt schema details")
+
+        # Mark workflow as completed
+        logger.debug(f"Marking workflow as completed: {workflow_id}")
+        await WorkflowDataManager(self.session).update_by_fields(
+            db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
+        )
 
 
 class PromptVersionService(SessionMixin):
