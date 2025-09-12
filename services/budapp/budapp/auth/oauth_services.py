@@ -904,8 +904,8 @@ class OAuthService(SessionMixin):
 
             # Update user's subscriber status
             _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[user.id], is_subscriber=True)
-        except BudNotifyException as e:
-            logger.error(f"Failed to create notification subscriber for user {user.email}: {e}")
+        except Exception as e:
+            logger.error(f"Failed to set up notification subscription for user {user.email}: {e}")
             # Don't fail the OAuth registration if subscriber creation fails
 
         # Set up billing and create default project for new CLIENT users
