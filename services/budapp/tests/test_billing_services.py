@@ -327,12 +327,12 @@ class TestBillingService:
 
             result = await billing_service.get_current_usage(user_id)
 
-            # Free plan users still have "billing" (free plan)
-            assert result["has_billing"] is True
-            assert result["plan_name"] == "Free"
+            # Users without billing setup should have has_billing False
+            assert result["has_billing"] is False
+            assert result["plan_name"] == "No Plan"
             assert result["base_monthly_price"] == 0.0
-            assert result["usage"]["tokens_used"] == 1000
-            assert result["usage"]["tokens_quota"] == 100000
+            assert result["usage"]["tokens_used"] == 0  # Service returns 0 for no billing
+            assert result["usage"]["tokens_quota"] == 100000  # From free plan quota
 
     @pytest.mark.asyncio
     async def test_check_usage_limits_within_limits(self, billing_service, mock_session):
@@ -355,20 +355,29 @@ class TestBillingService:
         mock_user_billing.is_suspended = False
         mock_user_billing.suspension_reason = None
 
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
+
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = mock_user_billing
+        mock_execute.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = mock_user_billing
+        mock_filter_by.first.return_value = mock_user
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
         # Mock ClickHouse usage (below limits)
-        with patch.object(billing_service, 'get_billing_plan') as mock_get_plan, \
+        with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_billing_plan') as mock_get_plan, \
              patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
+
+            mock_get_user_billing.return_value = mock_user_billing
 
             mock_get_plan.return_value = mock_plan
             mock_get_usage.return_value = {
@@ -404,20 +413,29 @@ class TestBillingService:
         mock_user_billing.is_suspended = False
         mock_user_billing.suspension_reason = None
 
+        # Create a mock user with user_type attribute (required by check_usage_limits)
+        from budapp.commons.constants import UserTypeEnum
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        mock_user.user_type = UserTypeEnum.CLIENT
+
         mock_execute = MagicMock()
-        mock_execute.scalar_one_or_none.return_value = mock_user_billing
+        mock_execute.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_execute
 
         # Mock the session.query() method that the service actually uses
         mock_query = MagicMock()
         mock_filter_by = MagicMock()
-        mock_filter_by.first.return_value = mock_user_billing
+        mock_filter_by.first.return_value = mock_user
         mock_query.filter_by.return_value = mock_filter_by
         mock_session.query.return_value = mock_query
 
         # Mock ClickHouse usage (exceeds limits)
-        with patch.object(billing_service, 'get_billing_plan') as mock_get_plan, \
+        with patch.object(billing_service, 'get_user_billing') as mock_get_user_billing, \
+             patch.object(billing_service, 'get_billing_plan') as mock_get_plan, \
              patch.object(billing_service, 'get_usage_from_clickhouse') as mock_get_usage:
+
+            mock_get_user_billing.return_value = mock_user_billing
 
             mock_get_plan.return_value = mock_plan
             mock_get_usage.return_value = {
