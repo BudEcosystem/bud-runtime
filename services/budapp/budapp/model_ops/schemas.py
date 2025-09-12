@@ -44,6 +44,7 @@ from budapp.commons.constants import (
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelStatusEnum,
+    ProviderCapabilityEnum,
     WorkflowStatusEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
@@ -60,6 +61,7 @@ class ProviderFilter(BaseModel):
     """Provider filter schema."""
 
     name: str | None = None
+    capabilities: ProviderCapabilityEnum | None = None
 
 
 class ProviderCreate(BaseModel):
@@ -69,6 +71,7 @@ class ProviderCreate(BaseModel):
     description: str
     type: str
     icon: str
+    capabilities: list[ProviderCapabilityEnum]
     is_active: bool = True
 
 
@@ -82,6 +85,7 @@ class Provider(BaseModel):
     description: str
     type: str
     icon: str
+    capabilities: list[ProviderCapabilityEnum]
 
 
 class ProviderResponse(PaginatedSuccessResponse):

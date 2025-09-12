@@ -23,7 +23,7 @@ spec:
       containers:
       - name: {{ .Release.Name }}-budmodel
         image: {{ .Values.microservices.budmodel.image }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["sh", "-c", "apt install clamav clamav-daemon -y && freshclam && sed -i 's|^LocalSocket .*|LocalSocket /tmp/clamd.ctl|' /etc/clamav/clamd.conf && nohup clamd -c /etc/clamav/clamd.conf && nohup aria2c --enable-rpc --rpc-listen-all --rpc-listen-port 6800 --dir /data/models-registry --max-concurrent-downloads 5 > aria2.log 2>&1 & sleep 2 && alembic -c ./alembic.ini upgrade head && uvicorn budmodel.main:app --host 0.0.0.0 --port 3004"]
         ports:
         - containerPort: 3004

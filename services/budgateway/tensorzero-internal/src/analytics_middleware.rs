@@ -6,7 +6,6 @@ use axum::{
 };
 use chrono::Utc;
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::error;
 use uaparser::{Parser, UserAgentParser};
@@ -152,9 +151,11 @@ pub async fn analytics_middleware(
 
 /// Extract client IP from headers only (when ConnectInfo is not available)
 fn get_client_ip_fallback(headers: &HeaderMap) -> String {
+
     // Check X-Forwarded-For first
     if let Some(forwarded_for) = headers.get("x-forwarded-for") {
         if let Ok(forwarded_str) = forwarded_for.to_str() {
+            tracing::debug!("Found X-Forwarded-For header: {}", forwarded_str);
             // X-Forwarded-For can contain multiple IPs, take the first one
             if let Some(first_ip) = forwarded_str.split(',').next() {
                 return first_ip.trim().to_string();
@@ -165,36 +166,16 @@ fn get_client_ip_fallback(headers: &HeaderMap) -> String {
     // Check X-Real-IP
     if let Some(real_ip) = headers.get("x-real-ip") {
         if let Ok(ip_str) = real_ip.to_str() {
+            tracing::debug!("Found X-Real-IP header: {}", ip_str);
             return ip_str.to_string();
         }
     }
 
     // Fallback to unknown
+    tracing::debug!("No forwarded IP headers found, using 'unknown'");
     "unknown".to_string()
 }
 
-/// Extract the real client IP considering proxy headers
-fn get_client_ip(addr: &SocketAddr, headers: &HeaderMap) -> String {
-    // Check X-Forwarded-For first
-    if let Some(forwarded_for) = headers.get("x-forwarded-for") {
-        if let Ok(forwarded_str) = forwarded_for.to_str() {
-            // X-Forwarded-For can contain multiple IPs, take the first one
-            if let Some(first_ip) = forwarded_str.split(',').next() {
-                return first_ip.trim().to_string();
-            }
-        }
-    }
-
-    // Check X-Real-IP
-    if let Some(real_ip) = headers.get("x-real-ip") {
-        if let Ok(ip_str) = real_ip.to_str() {
-            return ip_str.to_string();
-        }
-    }
-
-    // Fallback to socket address
-    addr.ip().to_string()
-}
 
 /// Extract proxy chain information
 fn extract_proxy_chain(headers: &HeaderMap) -> Option<String> {

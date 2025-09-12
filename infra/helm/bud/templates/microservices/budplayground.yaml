@@ -19,7 +19,7 @@ spec:
       containers:
       - name: {{ .Release.Name }}-budplayground
         image: {{ .Values.microservices.budplayground.image }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         ports:
         - containerPort: 3000
         env:

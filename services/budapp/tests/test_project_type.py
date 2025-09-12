@@ -279,6 +279,8 @@ class TestProjectTypeImmutability:
             # First call returns the existing project, second call for duplicate check returns None
             mock_dm_instance.retrieve_by_fields = AsyncMock(side_effect=[mock_project, None])
             mock_dm_instance.update_by_fields = AsyncMock(return_value=updated_project)
+            # Mock the check_duplicate_name_for_user_projects method for CLIENT_APP projects
+            mock_dm_instance.check_duplicate_name_for_user_projects = AsyncMock(return_value=False)
             mock_data_manager.return_value = mock_dm_instance
 
             # Act

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field
@@ -7,7 +9,7 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Ta
 from ..cluster_ops.schemas import ClusterResponse
 from ..commons.constants import (
     AddModelModalityEnum,
-    GuardrailDeploymentTypeEnum,
+    GuardrailProviderTypeEnum,
     ModelProviderTypeEnum,
     PromptTypeEnum,
     RateLimitTypeEnum,
@@ -18,7 +20,7 @@ from ..commons.constants import (
 from ..core.schemas import ModelTemplateResponse
 from ..credential_ops.schemas import ProprietaryCredentialResponse
 from ..endpoint_ops.schemas import AddAdapterWorkflowStepData, EndpointResponse
-from ..guardrails.schemas import ProbeSelection
+from ..guardrails.schemas import GuardrailProfileProbeSelection, GuardrailProfileResponse
 from ..model_ops.schemas import (
     CloudModel,
     Model,
@@ -36,7 +38,7 @@ class RetrieveWorkflowStepData(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
-    provider_type: ModelProviderTypeEnum | None = None
+    provider_type: ModelProviderTypeEnum | GuardrailProviderTypeEnum | None = None
     provider: Provider | None = None
     cloud_model: CloudModel | None = None
     cloud_model_id: UUID4 | None = None
@@ -89,11 +91,15 @@ class RetrieveWorkflowStepData(BaseModel):
     endpoint_details: dict | None = None
     template: ModelTemplateResponse | None = None
     add_model_modality: list[AddModelModalityEnum] | None = None
-    # Guardrail-related fields
-    deployment_type: GuardrailDeploymentTypeEnum | None = None
+
+    guardrail_profile_id: UUID4 | None = None
+    guardrail_profile: GuardrailProfileResponse | None = None
+    endpoint_ids: list[UUID4] | None = None
+    endpoints: list[EndpointResponse] | None = None
+    is_standalone: bool | None = None
+    probe_selections: list[GuardrailProfileProbeSelection] | None = None
     guard_types: list[str] | None = None
-    threshold: float | None = None
-    probe_selections: list[ProbeSelection] | None = None
+    severity_threshold: float | None = None
     prompt_type: PromptTypeEnum | None = None
     prompt_schema: PromptSchemaConfig | None = None
     auto_scale: bool | None = None

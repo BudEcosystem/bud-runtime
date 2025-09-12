@@ -2,6 +2,7 @@
   self,
   mkShell,
   nixfmt-rfc-style,
+  markdownlint-cli,
 
   sops,
   age,
@@ -66,6 +67,7 @@ mkShell {
     pyright
     bud_wg
     pnpm
+    markdownlint-cli
   ];
 
   shellHook = ''
@@ -122,7 +124,7 @@ mkShell {
     }
 
     bud_sops_sync() {
-        for sec in $(find -name secrets.yaml) $(find -name values.enc.yaml); do
+        for sec in $(find -name secrets.yaml) $(find -name '*.enc.yaml'); do
                 sops updatekeys "$sec"
         done
     }

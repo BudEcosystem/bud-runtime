@@ -12,7 +12,9 @@ from budapp.billing_ops.schemas import (
     CreateBillingAlertRequest,
     CreateUserBillingRequest,
     CurrentUsageSchema,
+    UpdateBillingAlertStatusRequest,
     UpdateBillingPlanRequest,
+    UpdateNotificationPreferencesRequest,
     UsageHistoryRequest,
     UserBillingSchema,
 )
@@ -59,6 +61,8 @@ async def get_current_usage(
     try:
         service = BillingService(db)
         usage = await service.get_current_usage(current_user.id)
+
+        # Now the service always returns valid billing data (Free plan as default)
         return SingleResponse(
             result=CurrentUsageSchema(**usage),
             message="Current usage retrieved successfully",
@@ -127,6 +131,7 @@ async def get_user_current_usage(
         service = BillingService(db)
         usage = await service.get_current_usage(user_id)
 
+        # Now the service always returns valid billing data (Free plan as default)
         return SingleResponse(
             result=CurrentUsageSchema(**usage),
             message="User usage retrieved successfully",
@@ -205,9 +210,8 @@ async def setup_user_billing(
                 detail="Only admins can set up billing",
             )
 
-        service = BillingService(db)
-
         # Verify the billing plan exists
+        service = BillingService(db)
         billing_plan = service.get_billing_plan(request.billing_plan_id)
         if not billing_plan:
             raise HTTPException(
@@ -265,9 +269,8 @@ async def update_billing_plan(
                 detail="Only admins can update billing plans",
             )
 
-        service = BillingService(db)
-
         # Verify the billing plan exists
+        service = BillingService(db)
         billing_plan = service.get_billing_plan(request.billing_plan_id)
         if not billing_plan:
             raise HTTPException(
@@ -289,6 +292,15 @@ async def update_billing_plan(
                 detail="No billing information found for this user",
             )
 
+        # Check if quotas or plan are being changed
+        quota_changed = False
+        if user_billing.billing_plan_id != request.billing_plan_id:
+            quota_changed = True  # Plan change affects base quotas
+        if request.custom_token_quota is not None and user_billing.custom_token_quota != request.custom_token_quota:
+            quota_changed = True
+        if request.custom_cost_quota is not None and user_billing.custom_cost_quota != request.custom_cost_quota:
+            quota_changed = True
+
         # Update billing plan
         user_billing.billing_plan_id = request.billing_plan_id
         if request.custom_token_quota is not None:
@@ -298,6 +310,11 @@ async def update_billing_plan(
 
         db.commit()
         db.refresh(user_billing)
+
+        # Reset alerts if quotas were changed
+        if quota_changed:
+            service.reset_user_alerts(request.user_id)
+            logger.info(f"Reset billing alerts for user {request.user_id} due to quota update")
 
         return SingleResponse(
             result=UserBillingSchema.from_orm(user_billing),
@@ -320,8 +337,14 @@ async def get_billing_alerts(
 ) -> SingleResponse[List[BillingAlertSchema]]:
     """Get all billing alerts for the authenticated user."""
     try:
-        service = BillingService(db)
-        alerts = service.get_billing_alerts(current_user.id)
+        from sqlalchemy import select
+
+        from budapp.billing_ops.models import BillingAlert
+
+        # Get all alerts for the current user
+        stmt = select(BillingAlert).where(BillingAlert.user_id == current_user.id)
+        alerts = db.execute(stmt).scalars().all()
+
         return SingleResponse(
             result=[BillingAlertSchema.from_orm(alert) for alert in alerts],
             message="Billing alerts retrieved successfully",
@@ -343,26 +366,12 @@ async def create_billing_alert(
     """Create a new billing alert for the authenticated user."""
     try:
         service = BillingService(db)
-
-        user_billing = service.get_user_billing(current_user.id)
-        if not user_billing:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No billing information found",
-            )
-
-        from budapp.billing_ops.models import BillingAlert
-
-        alert = BillingAlert(
-            user_billing_id=user_billing.id,
+        alert = service.create_billing_alert(
+            user_id=current_user.id,
             name=request.name,
             alert_type=request.alert_type,
             threshold_percent=request.threshold_percent,
         )
-
-        db.add(alert)
-        db.commit()
-        db.refresh(alert)
 
         return SingleResponse(
             result=BillingAlertSchema.from_orm(alert),
@@ -375,6 +384,88 @@ async def create_billing_alert(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create billing alert",
+        )
+
+
+@router.put("/alerts/{alert_id}", response_model=SingleResponse[BillingAlertSchema])
+async def update_billing_alert_status(
+    alert_id: UUID,
+    request: UpdateBillingAlertStatusRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[BillingAlertSchema]:
+    """Enable or disable a billing alert for the authenticated user."""
+    try:
+        from sqlalchemy import select
+
+        from budapp.billing_ops.models import BillingAlert
+
+        # Get the alert and verify ownership
+        stmt = select(BillingAlert).where(BillingAlert.id == alert_id, BillingAlert.user_id == current_user.id)
+        alert = db.execute(stmt).scalar_one_or_none()
+
+        if not alert:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Alert not found or access denied",
+            )
+
+        # Update the alert status
+        alert.is_active = request.is_active
+        db.commit()
+        db.refresh(alert)
+
+        return SingleResponse(
+            result=BillingAlertSchema.from_orm(alert),
+            message=f"Alert {'enabled' if request.is_active else 'disabled'} successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating alert status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update alert status",
+        )
+
+
+@router.delete("/alerts/{alert_id}", response_model=SingleResponse)
+async def delete_billing_alert(
+    alert_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse:
+    """Delete a billing alert for the authenticated user."""
+    try:
+        from sqlalchemy import select
+
+        from budapp.billing_ops.models import BillingAlert
+
+        # Get the alert and verify ownership
+        stmt = select(BillingAlert).where(BillingAlert.id == alert_id, BillingAlert.user_id == current_user.id)
+        alert = db.execute(stmt).scalar_one_or_none()
+
+        if not alert:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Alert not found or access denied",
+            )
+
+        # Delete the alert
+        db.delete(alert)
+        db.commit()
+
+        return SingleResponse(
+            result={"alert_id": str(alert_id), "deleted": True},
+            message="Alert deleted successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting alert: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete alert",
         )
 
 
@@ -397,4 +488,285 @@ async def check_and_trigger_alerts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to check alerts",
+        )
+
+
+@router.put("/notification-preferences", response_model=SingleResponse[UserBillingSchema])
+async def update_notification_preferences(
+    request: UpdateNotificationPreferencesRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[UserBillingSchema]:
+    """Update notification preferences for the authenticated user."""
+    try:
+        service = BillingService(db)
+        user_billing = service.get_user_billing(current_user.id)
+
+        if not user_billing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No billing information found for this user",
+            )
+
+        # Update notification preferences
+        if request.enable_email_notifications is not None:
+            user_billing.enable_email_notifications = request.enable_email_notifications
+        if request.enable_in_app_notifications is not None:
+            user_billing.enable_in_app_notifications = request.enable_in_app_notifications
+
+        db.commit()
+        db.refresh(user_billing)
+
+        return SingleResponse(
+            result=UserBillingSchema.from_orm(user_billing),
+            message="Notification preferences updated successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating notification preferences: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update notification preferences",
+        )
+
+
+@router.post("/reset/{user_id}", response_model=SingleResponse)
+async def reset_user_usage(
+    user_id: UUID,
+    reason: str = "Manual reset",
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse:
+    """Reset a user's usage (admin only)."""
+    try:
+        # Check if current user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can reset user usage",
+            )
+
+        from budapp.billing_ops.reset_usage import UsageResetService
+
+        service = UsageResetService(db)
+        success = await service.reset_user_usage(user_id, reason)
+
+        if success:
+            return SingleResponse(
+                result={"user_id": str(user_id), "reset": True},
+                message=f"Successfully reset usage for user {user_id}",
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User {user_id} not found or has no billing plan",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting user usage: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reset user usage",
+        )
+
+
+@router.post("/reset-all", response_model=SingleResponse)
+async def reset_all_users_usage(
+    reason: str = "System reset",
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse:
+    """Reset all users' usage (admin only)."""
+    try:
+        # Check if current user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can reset all users' usage",
+            )
+
+        from budapp.billing_ops.reset_usage import UsageResetService
+
+        service = UsageResetService(db)
+        count = await service.reset_all_users(reason)
+
+        return SingleResponse(
+            result={"users_reset": count},
+            message=f"Successfully reset usage for {count} users",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting all users' usage: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reset all users' usage",
+        )
+
+
+@router.post("/reset-expired", response_model=SingleResponse)
+async def reset_expired_cycles(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse:
+    """Reset expired billing cycles (admin only)."""
+    try:
+        # Check if current user is admin
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can reset expired cycles",
+            )
+
+        from budapp.billing_ops.reset_usage import UsageResetService
+
+        service = UsageResetService(db)
+        count = await service.reset_expired_cycles()
+
+        return SingleResponse(
+            result={"cycles_reset": count},
+            message=f"Successfully reset {count} expired billing cycles",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting expired cycles: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reset expired cycles",
+        )
+
+
+@router.get("/history", response_model=SingleResponse[List[UserBillingSchema]])
+async def get_billing_history(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[List[UserBillingSchema]]:
+    """Get billing cycle history for the current user."""
+    try:
+        service = BillingService(db)
+        history = service.get_user_billing_history(current_user.id)
+
+        return SingleResponse(
+            result=[UserBillingSchema.from_orm(billing) for billing in history],
+            message=f"Retrieved {len(history)} billing cycle records",
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving billing history: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve billing history",
+        )
+
+
+@router.get("/history/{user_id}", response_model=SingleResponse[List[UserBillingSchema]])
+async def get_user_billing_history(
+    user_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[List[UserBillingSchema]]:
+    """Get billing cycle history for a specific user (admin only)."""
+    try:
+        # Check if current user is admin or requesting their own history
+        if current_user.user_type != UserTypeEnum.ADMIN and current_user.id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can view other users' billing history",
+            )
+
+        service = BillingService(db)
+        history = service.get_user_billing_history(user_id)
+
+        return SingleResponse(
+            result=[UserBillingSchema.from_orm(billing) for billing in history],
+            message=f"Retrieved {len(history)} billing cycle records for user",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving billing history for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve billing history",
+        )
+
+
+@router.get("/history/period", response_model=SingleResponse[UserBillingSchema])
+async def get_billing_for_period(
+    date: str,  # ISO format date string
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[UserBillingSchema]:
+    """Get billing record that was active during a specific date."""
+    try:
+        from datetime import datetime
+
+        # Parse the date
+        target_date = datetime.fromisoformat(date.replace("Z", "+00:00"))
+
+        service = BillingService(db)
+        billing = service.get_user_billing_for_period(current_user.id, target_date)
+
+        if not billing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No billing record found for date {date}",
+            )
+
+        return SingleResponse(
+            result=UserBillingSchema.from_orm(billing),
+            message=f"Retrieved billing record for {date}",
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid date format: {e}",
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving billing for period {date}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve billing record for period",
+        )
+
+
+@router.get("/users-with-billing", response_model=SingleResponse[List[str]])
+async def get_users_with_active_billing(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+) -> SingleResponse[List[str]]:
+    """Get all user IDs that have active billing records (internal service use only).
+
+    This endpoint is intended for use by internal services (like budmetrics)
+    for synchronization purposes. It requires admin privileges.
+    """
+    try:
+        # Check if user is admin - only internal services should call this
+        if current_user.user_type != UserTypeEnum.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin/internal services can access this endpoint",
+            )
+
+        service = BillingService(db)
+        user_ids = service.get_all_users_with_active_billing()
+
+        # Convert UUIDs to strings for JSON serialization
+        user_id_strings = [str(user_id) for user_id in user_ids]
+
+        return SingleResponse(
+            result=user_id_strings,
+            message=f"Retrieved {len(user_id_strings)} users with active billing records",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving users with active billing: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve users with active billing",
         )

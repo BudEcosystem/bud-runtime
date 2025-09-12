@@ -7,13 +7,13 @@ from budapp.initializers.template_seeder import TemplateSeeder
 
 
 seeders = {
-    # "keycloak": BaseKeycloakSeeder,
+    "keycloak": BaseKeycloakSeeder,
     # "user": UserSeeder,
     # "provider": ProviderSeeder,   # Commented out for budconnect sync
     # "cloud_model": CloudModelSeeder,   # Commented out for budconnect sync
-    # "icon": IconSeeder,
-    # "template": TemplateSeeder,
-    # "cloud_provider": CloudProviderSeeder,
-    # "quantization_method": QuantizationMethodSeeder,
-    # "datasets": DatasetSeeder,
+    "icon": IconSeeder,
+    "template": TemplateSeeder,
+    "cloud_provider": CloudProviderSeeder,
+    "quantization_method": QuantizationMethodSeeder,
+    "datasets": DatasetSeeder,
 }

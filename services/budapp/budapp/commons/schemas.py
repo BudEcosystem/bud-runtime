@@ -410,38 +410,3 @@ class BudNotificationMetadata(BaseModel):
     workflow_id: str
     subscriber_ids: str
     name: str
-
-
-# Proxy-related schemas for guardrails integration
-
-
-class ProxyGuardrailRuleConfig(BaseModel):
-    """Rule configuration for proxy."""
-
-    rule_id: UUID
-    rule_name: str
-    sentinel_id: Optional[str] = None
-    is_enabled: bool
-    configuration: Optional[Dict[str, Any]] = None
-    threshold_override: Optional[float] = None
-
-
-class ProxyGuardrailProbeConfig(BaseModel):
-    """Probe configuration for proxy."""
-
-    probe_id: UUID
-    probe_name: str
-    sentinel_id: Optional[str] = None
-    is_enabled: bool
-    configuration: Optional[Dict[str, Any]] = None
-    threshold_override: Optional[float] = None
-    rules: List[ProxyGuardrailRuleConfig]
-
-
-class ProxyGuardrailConfig(BaseModel):
-    """Guardrail configuration for proxy."""
-
-    name: str
-    configuration: Optional[Dict[str, Any]] = None
-    default_threshold: Optional[float] = None
-    probes: List[ProxyGuardrailProbeConfig]

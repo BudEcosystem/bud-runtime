@@ -9,7 +9,7 @@ import { endpointStatusMapping } from "@/lib/colorMapping";
 interface RunHistoryItem {
   runId: string;
   model: string;
-  status: 'Completed' | 'Failed' | 'Running';
+  status: "Completed" | "Failed" | "Running";
   startedDate: string;
   duration: string;
   benchmarkScore: string;
@@ -25,17 +25,13 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
       title: "Run ID",
       dataIndex: "runId",
       key: "runId",
-      render: (text: string) => (
-        <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-      ),
+      render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
     },
     {
       title: "Model",
       dataIndex: "model",
       key: "model",
-      render: (text: string) => (
-        <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-      ),
+      render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
     },
     {
       title: "Status",
@@ -44,7 +40,13 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
       render: (status: string) => (
         <ProjectTags
           name={capitalize(status)}
-          color={endpointStatusMapping[capitalize(status) === 'Running' ? capitalize(status) + '-yellow' : capitalize(status)]}
+          color={
+            endpointStatusMapping[
+              capitalize(status) === "Running"
+                ? capitalize(status) + "-yellow"
+                : capitalize(status)
+            ]
+          }
           textClass="text-[.75rem] py-[.22rem]"
           tagClass="py-[0rem]"
         />
@@ -54,17 +56,13 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
       title: "Started Date",
       dataIndex: "startedDate",
       key: "startedDate",
-      render: (text: string) => (
-        <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-      ),
+      render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
     },
     {
       title: "Duration",
       dataIndex: "duration",
       key: "duration",
-      render: (text: string) => (
-        <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-      ),
+      render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
     },
     {
       title: "Evaluated Benchmark and Score",
@@ -88,15 +86,15 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
         }
         .runs-history-table .ant-table-thead > tr > th {
           background: transparent;
-          border-bottom: 1px solid #1F1F1F;
-          color: #B3B3B3;
+          border-bottom: 1px solid #1f1f1f;
+          color: #b3b3b3;
           font-size: 12px;
           font-weight: 400;
           padding: 12px 16px;
         }
         .runs-history-table .ant-table-tbody > tr > td {
           background: transparent;
-          border-bottom: 1px solid #1F1F1F;
+          border-bottom: 1px solid #1f1f1f;
           padding: 12px 16px;
         }
         .runs-history-table .ant-table-tbody > tr:hover > td {

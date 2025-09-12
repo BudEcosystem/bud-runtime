@@ -6,7 +6,7 @@ key_pub="$(echo "$key_prv" | wg pubkey)"
 wg_config_prv_gen() {
 	host_addr="${1:?}"
 
-	cat <<- EOF
+	cat <<-EOF
 		[interface]
 		Address = 10.54.132.$host_addr/24
 		PrivateKey = $key_prv
@@ -14,18 +14,17 @@ wg_config_prv_gen() {
 
 		[Peer]
 		PublicKey = O2GRMEWf22YRGKexHAdg1fitucTZ/U/om2MWEJMeyFQ=
-		Endpoint = dev.bud.studio:51820
+		Endpoint = primary.k8s.bud.studio:51820
 		PersistentKeepalive = 25
 		AllowedIPs = 10.54.132.0/24
 	EOF
 }
 
-
 wg_config_pub_gen() {
 	host_addr="${1:?}"
 	name="${2:?}"
 
-	cat <<- EOF
+	cat <<-EOF
 		[Peer]
 		# friendly_name = $name
 		PublicKey = $key_pub
@@ -33,10 +32,9 @@ wg_config_pub_gen() {
 	EOF
 }
 
-
 if [ "$#" != 2 ]; then
-    echo "Usage: ${0##*/} <host_addr> <name>"
-    exit 1
+	echo "Usage: ${0##*/} <host_addr> <name>"
+	exit 1
 fi
 
 wg_config_prv_gen "$1" | qrencode -t ANSI256UTF8

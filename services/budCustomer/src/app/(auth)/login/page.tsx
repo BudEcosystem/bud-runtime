@@ -24,6 +24,7 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const [isBackToLogin, setIsBackToLogin] = useState(false);
   const [oauthProcessing, setOauthProcessing] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Use the new environment system
 
@@ -34,8 +35,8 @@ function LoginContent() {
   useEffect(() => {
     const handleOAuthCallback = async () => {
       // Check for OAuth error parameters
-      const error = searchParams.get('error');
-      const errorDescription = searchParams.get('error_description');
+      const error = searchParams.get("error");
+      const errorDescription = searchParams.get("error_description");
 
       if (error) {
         AppRequest.OAuth.handleOAuthError(error, errorDescription || undefined);
@@ -43,10 +44,10 @@ function LoginContent() {
       }
 
       // Check for OAuth success parameters
-      const code = searchParams.get('code');
-      const state = searchParams.get('state');
-      const provider = searchParams.get('provider');
-      const exchangeToken = searchParams.get('exchange_token');
+      const code = searchParams.get("code");
+      const state = searchParams.get("state");
+      const provider = searchParams.get("provider");
+      const exchangeToken = searchParams.get("exchange_token");
 
       // Handle token exchange flow
       if (exchangeToken) {
@@ -55,15 +56,14 @@ function LoginContent() {
 
         try {
           // Poll for token exchange completion
-          const result = await AppRequest.OAuth.pollTokenExchange(exchangeToken);
+          const result =
+            await AppRequest.OAuth.pollTokenExchange(exchangeToken);
 
           // Store tokens
           localStorage.setItem("access_token", result.access_token);
           if (result.refresh_token) {
             localStorage.setItem("refresh_token", result.refresh_token);
           }
-
-          successToast("Login successful!");
 
           // Get user data
           try {
@@ -73,11 +73,13 @@ function LoginContent() {
             console.log("Failed to get user data, continuing anyway:", error);
           }
 
-          // Redirect to models page
-          router.push("/models");
+          // Redirect to models page using window.location for clean redirect
+          window.location.href = "/models";
         } catch (error: any) {
           console.error("OAuth token exchange error:", error);
-          errorToast(error.message || "Authentication failed. Please try again.");
+          errorToast(
+            error.message || "Authentication failed. Please try again.",
+          );
         } finally {
           hideLoader();
           setOauthProcessing(false);
@@ -92,15 +94,17 @@ function LoginContent() {
         showLoader();
 
         try {
-          const result = await AppRequest.OAuth.handleCallback(provider, code, state);
+          const result = await AppRequest.OAuth.handleCallback(
+            provider,
+            code,
+            state,
+          );
 
           // Store tokens
           localStorage.setItem("access_token", result.access_token);
           if (result.refresh_token) {
             localStorage.setItem("refresh_token", result.refresh_token);
           }
-
-          successToast("Login successful!");
 
           // Get user data
           try {
@@ -110,11 +114,13 @@ function LoginContent() {
             console.log("Failed to get user data, continuing anyway:", error);
           }
 
-          // Redirect to models page
-          router.push("/models");
+          // Redirect to models page using window.location for clean redirect
+          window.location.href = "/models";
         } catch (error: any) {
           console.error("OAuth callback error:", error);
-          errorToast(error.message || "Authentication failed. Please try again.");
+          errorToast(
+            error.message || "Authentication failed. Please try again.",
+          );
         } finally {
           hideLoader();
           setOauthProcessing(false);
@@ -128,7 +134,7 @@ function LoginContent() {
   }, [searchParams, router, showLoader, hideLoader]);
 
   useEffect(() => {
-    console.log("Environment variables from provider:");
+
     console.log("baseUrl:", environment.baseUrl);
     console.log("novuBaseUrl:", environment.novuBaseUrl);
 
@@ -148,6 +154,7 @@ function LoginContent() {
   const handleLogin = async (payload: DataInterface) => {
     console.log("=== LOGIN HANDLER CALLED ===");
     console.log("Login payload:", payload);
+    setIsLoggingIn(true);
     showLoader();
     try {
       // Prepare the payload
@@ -172,7 +179,6 @@ function LoginContent() {
         );
 
         setAuthError("");
-        successToast("Login successful!");
 
         // Get user data - commenting out for now as it causes 404 errors
         // TODO: Fix the /users/me endpoint or handle the error gracefully
@@ -189,19 +195,22 @@ function LoginContent() {
         });
 
         // Handle different login scenarios
+        hideLoader();
+        setIsLoggingIn(false);
+
         if (response.data.is_reset_password) {
-          router.push("/auth/resetPassword");
+          router.replace("/auth/resetPassword");
         } else {
-          router.push("/models");
+          // Use replace to avoid history stack issues and window.location for clean redirect
+          window.location.href = "/models";
         }
       } else if (response.data) {
         // Handle case where login is successful but no token (shouldn't happen normally)
         setAuthError("");
-        successToast("Login successful!");
-        router.push("/models");
+        hideLoader();
+        setIsLoggingIn(false);
+        window.location.href = "/models";
       }
-
-      hideLoader();
     } catch (error: any) {
       console.error("Login error:", error);
       const errorMessage =
@@ -211,12 +220,13 @@ function LoginContent() {
         "Login failed. Please check your credentials and try again.";
       setAuthError(errorMessage);
       hideLoader();
+      setIsLoggingIn(false);
     }
   };
   const handleForgetPassword = async (email: string) => {
     showLoader();
     try {
-      const response = await AppRequest.Post(`users/reset-password`, {
+      const response = await AppRequest.Post(`/users/reset-password`, {
         email,
       });
       if (response) {
@@ -225,11 +235,16 @@ function LoginContent() {
       console.log("response", response);
       successToast(response.data.message);
       hideLoader();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Reset password error:", error);
+      const errorMessage =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Failed to send reset email. Please try again.";
+      errorToast(errorMessage);
       hideLoader();
     }
-  }
+  };
 
   return (
     <AuthLayout>
@@ -246,12 +261,16 @@ function LoginContent() {
             {oauthProcessing ? (
               <div className="flex flex-col items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bud-purple"></div>
-                <p className="mt-4 text-sm text-bud-text-muted">Completing authentication...</p>
+                <p className="mt-4 text-sm text-bud-text-muted">
+                  Completing authentication...
+                </p>
               </div>
             ) : (
               <>
-                {activePage === 1 && <LoginForm onSubmit={handleLogin} />}
-                {activePage === 4 && <ContactAdmin onSubmit={handleForgetPassword} />}
+                {activePage === 1 && <LoginForm onSubmit={handleLogin} isLoading={isLoggingIn} />}
+                {activePage === 4 && (
+                  <ContactAdmin onSubmit={handleForgetPassword} />
+                )}
                 {/* Other pages can be added here - reset password, contact admin, etc. */}
               </>
             )}
@@ -264,14 +283,16 @@ function LoginContent() {
 
 export default function Login() {
   return (
-    <Suspense fallback={
-      <AuthLayout>
-        <div className="flex flex-col justify-center items-center h-full">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bud-purple"></div>
-          <p className="mt-4 text-sm text-bud-text-muted">Loading...</p>
-        </div>
-      </AuthLayout>
-    }>
+    <Suspense
+      fallback={
+        <AuthLayout>
+          <div className="flex flex-col justify-center items-center h-full">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-bud-purple"></div>
+            <p className="mt-4 text-sm text-bud-text-muted">Loading...</p>
+          </div>
+        </AuthLayout>
+      }
+    >
       <LoginContent />
     </Suspense>
   );

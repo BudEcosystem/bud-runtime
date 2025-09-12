@@ -3,8 +3,9 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-budeval-dataset
 spec:
+  storageClassName: {{ .Values.microservices.budeval.storageClassName }}
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   resources:
     requests:
       storage: 32Gi
@@ -64,7 +65,7 @@ spec:
       containers:
       - name: {{ .Release.Name }}-budeval
         image: {{ .Values.microservices.budeval.image }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budeval.main:app --host 0.0.0.0 --port 3003"]
         ports:
         - containerPort: 3003
@@ -86,9 +87,9 @@ spec:
           - name: CLICKHOUSE_DATABASE
             value: "budeval"
           - name: CLICKHOUSE_USER
-            value: "budeval"
+            value: "{{ .Values.clickhouse.auth.username }}"
           - name: CLICKHOUSE_PASSWORD
-            value: "budeval"
+            value: "{{ .Values.clickhouse.auth.password }}"
           - name: CLICKHOUSE_BATCH_SIZE
             value: "1000"
           - name: CLICKHOUSE_POOL_MIN_SIZE

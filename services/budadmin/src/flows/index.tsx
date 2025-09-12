@@ -62,6 +62,7 @@ import EditUser from "./user/EditUser";
 import ResetPassword from "./user/ResetPassword";
 import AddUser from "./user/AddUser";
 import AddUserDetails from "./user/AddUserDetails";
+import UserUsageDrawer from "./user/UserUsageDrawer";
 import AddBenchmark from "./Benchmark/AddBenchmark";
 import Datasets from "./Benchmark/Datasets";
 import Configuration from "./Benchmark/Configuration";
@@ -118,6 +119,7 @@ import CreateBlockingRuleStep from "./blocking/CreateBlockingRuleStep";
 import BlockingRuleSuccess from "./blocking/BlockingRuleSuccess";
 import ViewBlockingRuleDetails from "./blocking/ViewBlockingRuleDetails";
 import Publish from "./Project/Publish";
+import PublishEndpoint from "./Project/PublishEndpoint";
 import ViewEvalDetailscopy from "./Evaluations/RunEvaluation/ViewEvalDetail";
 import SelectProvider from "./GuardRails/SelectProvider";
 import PolitenessDetection from "./GuardRails/PolitenessDetection";
@@ -190,6 +192,7 @@ export const StepComponents = {
   "worker-details": WorkerDetails,
   "use-model": UseModel,
   "publish": Publish,
+  "publish-endpoint": PublishEndpoint,
   "delete-cluster": DeleteCluster,
   "deploy-model-success": DeployModelSuccess,
   "delete-cluster-status": ClusterDeleteStatus,
@@ -210,6 +213,7 @@ export const StepComponents = {
   "reset-password": ResetPassword,
   "add-user": AddUser,
   "add-user-details": AddUserDetails,
+  "user-usage": UserUsageDrawer,
   "model_benchmark": AddBenchmark,
   "Datasets": Datasets,
   "Configuration": Configuration,

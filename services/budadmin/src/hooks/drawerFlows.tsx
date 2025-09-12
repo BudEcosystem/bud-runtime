@@ -1890,6 +1890,27 @@ const publish: DrawerFlowType = {
   ],
 };
 
+const publishEndpoint: DrawerFlowType = {
+  title: "Publish Endpoint",
+  description: "Publish endpoint with pricing",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Projects", "Publish Endpoint"],
+      id: "publish-endpoint",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["publish-endpoint"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Add Token Pricing",
+        },
+      ],
+    },
+  ],
+};
+
 const deleteCluster: DrawerFlowType = {
   title: "Delete Cluster",
   description: "Delete a cluster",
@@ -2344,6 +2365,22 @@ const addUser: DrawerFlowType = {
       confirmClose: false,
       step: 1,
       component: StepComponents["add-user-details"],
+      progress: [],
+    },
+  ],
+};
+
+const userUsage: DrawerFlowType = {
+  title: "Usage Values",
+  description: "Description for usage values...",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["User Management", "Usage Values"],
+      id: "user-usage",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["user-usage"],
       progress: [],
     },
   ],
@@ -4087,6 +4124,7 @@ const flows = {
   "worker-details": workerDetails,
   "use-model": useModel,
   "publish": publish,
+  "publish-endpoint": publishEndpoint,
   "delete-cluster": deleteCluster,
   "delete-project": deleteProject,
   "deleting-endpoint": deletingEndpoint,
@@ -4104,6 +4142,7 @@ const flows = {
   "edit-user": editUser,
   "reset-password": resetPassword,
   "add-user": addUser,
+  "user-usage": userUsage,
   "model_benchmark": addBenchmark,
   "add-quantization": addQuantizationFlow,
   "add-new-cloud-provider": addNewCloudProvider,

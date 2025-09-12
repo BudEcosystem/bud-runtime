@@ -96,16 +96,16 @@ class LocalModelDownloadService:
                         model_size_gb = model_size_bytes / (1024 * 1024 * 1024)
                         logger.debug("Space available: %s GB, Space required: %s GB", free_space_gb, model_size_gb)
 
-                        if model_size_gb > free_space_gb:
+                        # Atomically check and reserve space
+                        try:
+                            DownloadHistory.atomic_space_reservation(directory_name, model_size_gb)
+                        except SpaceNotAvailableException as e:
                             logger.error("Space not available to download. Removing download record")
                             try:
                                 aria2_downloader.remove_download(aria2_download, force=True, remove_files=True)
                             except Aria2Exception:
                                 logger.error("Aria2 download cleanup failed")
-                            raise SpaceNotAvailableException("Space not available to download")
-
-                        # Create a new download record with `running` status
-                        DownloadHistory.create_download_history(directory_name, model_size_gb)
+                            raise e
 
                         # Track download
                         self.listen_to_aria2p_download(
@@ -141,16 +141,16 @@ class LocalModelDownloadService:
                     model_size_gb = model_size_bytes / (1024 * 1024 * 1024)
                     logger.debug("Space available: %s GB, Space required: %s GB", free_space_gb, model_size_gb)
 
-                    if model_size_gb > free_space_gb:
+                    # Atomically check and reserve space
+                    try:
+                        DownloadHistory.atomic_space_reservation(directory_name, model_size_gb)
+                    except SpaceNotAvailableException as e:
                         logger.error("Space not available to download. Removing download record")
                         try:
                             aria2_downloader.remove_download(aria2_download, force=True, remove_files=True)
                         except Aria2Exception:
                             logger.error("Aria2 download cleanup failed")
-                        raise SpaceNotAvailableException("Space not available to download")
-
-                    # Create a new download record with `running` status
-                    DownloadHistory.create_download_history(directory_name, model_size_gb)
+                        raise e
 
                     # Track download
                     self.listen_to_aria2p_download(aria2_download, is_archived=is_archived, workflow_id=workflow_id)
@@ -196,19 +196,14 @@ class LocalModelDownloadService:
         source_path = os.path.join(app_settings.add_model_dir, uri)
         destination = os.path.join(app_settings.model_download_dir, directory_name)
 
-        # Calculate free space
-        free_space_gb = DownloadHistory.get_available_space()
+        # Calculate model size
         model_size_bytes = get_size_in_bytes(source_path)
         model_size_gb = model_size_bytes / (1024 * 1024 * 1024)
-        logger.debug("Space available: %s GB, Space required: %s GB", free_space_gb, model_size_gb)
-
-        if model_size_gb > free_space_gb:
-            logger.error("Space not available to download.")
-            raise SpaceNotAvailableException("Space not available to download")
+        logger.debug("Space required: %s GB", model_size_gb)
 
         try:
-            # Create a new download record with `running` status
-            DownloadHistory.create_download_history(directory_name, model_size_gb)
+            # Atomically check and reserve space
+            DownloadHistory.atomic_space_reservation(directory_name, model_size_gb)
 
             if is_zip_file(source_path):
                 logger.debug("Extracting zip file from: %s to: %s", source_path, destination)

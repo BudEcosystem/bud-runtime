@@ -116,7 +116,8 @@ export default function TagsInput(props: SelectProps) {
       }));
 
       // Check if tags are different to avoid infinite loops
-      const isDifferent = JSON.stringify(formattedTags) !== JSON.stringify(selected);
+      const isDifferent =
+        JSON.stringify(formattedTags) !== JSON.stringify(selected);
       if (isDifferent) {
         setSelected(formattedTags);
       }
@@ -153,154 +154,157 @@ export default function TagsInput(props: SelectProps) {
           </CustomPopover>
         </div>
         <CreatableSelect
-        menuPlacement={props.menuplacement || "auto"}
-        ref={ref}
-        className={`drawerSelect w-full placeholder:text-xs text-xs indent-[.5rem] font-light outline-none !bg-[transparent] rounded-[6px] ${props.SelectClassNames}`}
-        closeMenuOnSelect={false}
-        isMulti
-        styles={colourStyles(props.overrides, isLight)}
-        // menuIsOpen={true}
-        options={options?.map((tag) => ({
-          label: tag.name,
-          value: tag.color,
-        }))}
-        value={selected?.map((item) => ({
-          label: item.name,
-          value: item.color,
-        }))}
-        onChange={(newValue) => {
-          setSelected(
-            newValue.map((item) => ({
-              name: item.label,
-              color: item.value,
-            })),
-          );
-        }}
-        onBlur={() => {
-          setOnTouched(true);
-          form.validateFields([fieldName]);
-        }}
-        placeholder={props.placeholder}
-        onKeyDown={(e: any) => {
-          if (
-            e.key === "Enter" &&
-            !(ref.current as any)?.state?.focusedOption
-          ) {
-            e.preventDefault();
-            return;
-          }
-          if (e.key === "Backspace" && e.target.value === "") {
-            setSelected(selected.slice(0, selected.length - 1));
-          }
-          if (e.key === "Enter" && e.target.value) {
-            handleCreate(e.target.value);
-            setInputValue("");
-          }
-          form.validateFields([fieldName]);
-        }}
-        inputValue={inputValue}
-        onInputChange={(value) => {
-          setInputValue(value);
-          form.validateFields([fieldName]);
-        }}
-        onCreateOption={handleCreate}
-        components={{
-          DropdownIndicator:
-            required && onTouched && selected.length === 0
-              ? () => (
-                  <Image
-                    preview={false}
-                    className="absolute right-[.5rem] cursor-pointer"
-                    src="/icons/warning.svg"
-                    alt="error"
-                    width={"1rem"}
-                    height={"1rem"}
-                  />
-                )
-              : null,
-          MenuList: (props) => {
-            return (
-              <components.MenuList {...props}>
-                <Text_12_400_808080
-                  style={{
-                    marginBottom: "16px",
-                  }}
-                >
-                  Select an option or create one
-                </Text_12_400_808080>
-                {props.children}
-              </components.MenuList>
+          menuPlacement={props.menuplacement || "auto"}
+          ref={ref}
+          className={`drawerSelect w-full placeholder:text-xs text-xs indent-[.5rem] font-light outline-none !bg-[transparent] rounded-[6px] ${props.SelectClassNames}`}
+          closeMenuOnSelect={false}
+          isMulti
+          styles={colourStyles(props.overrides, isLight)}
+          // menuIsOpen={true}
+          options={options?.map((tag) => ({
+            label: tag.name,
+            value: tag.color,
+          }))}
+          value={selected?.map((item) => ({
+            label: item.name,
+            value: item.color,
+          }))}
+          onChange={(newValue) => {
+            setSelected(
+              newValue.map((item) => ({
+                name: item.label,
+                color: item.value,
+              })),
             );
-          },
-          Option: (props) => {
-            const { innerProps, innerRef } = props;
-            // If color is not available, set it default bg color
-            const color =
-              colourOptions.find((option) => option.value === props.data.value)
-                ?.value || "#FFF";
-            const selectedTag = selected?.find(
-              (tag) => tag.name === props.data.label,
-            );
+          }}
+          onBlur={() => {
+            setOnTouched(true);
+            form.validateFields([fieldName]);
+          }}
+          placeholder={props.placeholder}
+          onKeyDown={(e: any) => {
+            if (
+              e.key === "Enter" &&
+              !(ref.current as any)?.state?.focusedOption
+            ) {
+              e.preventDefault();
+              return;
+            }
+            if (e.key === "Backspace" && e.target.value === "") {
+              setSelected(selected.slice(0, selected.length - 1));
+            }
+            if (e.key === "Enter" && e.target.value) {
+              handleCreate(e.target.value);
+              setInputValue("");
+            }
+            form.validateFields([fieldName]);
+          }}
+          inputValue={inputValue}
+          onInputChange={(value) => {
+            setInputValue(value);
+            form.validateFields([fieldName]);
+          }}
+          onCreateOption={handleCreate}
+          components={{
+            DropdownIndicator:
+              required && onTouched && selected.length === 0
+                ? () => (
+                    <Image
+                      preview={false}
+                      className="absolute right-[.5rem] cursor-pointer"
+                      src="/icons/warning.svg"
+                      alt="error"
+                      width={"1rem"}
+                      height={"1rem"}
+                    />
+                  )
+                : null,
+            MenuList: (props) => {
+              return (
+                <components.MenuList {...props}>
+                  <Text_12_400_808080
+                    style={{
+                      marginBottom: "16px",
+                    }}
+                  >
+                    Select an option or create one
+                  </Text_12_400_808080>
+                  {props.children}
+                </components.MenuList>
+              );
+            },
+            Option: (props) => {
+              const { innerProps, innerRef } = props;
+              // If color is not available, set it default bg color
+              const color =
+                colourOptions.find(
+                  (option) => option.value === props.data.value,
+                )?.value || "#FFF";
+              const selectedTag = selected?.find(
+                (tag) => tag.name === props.data.label,
+              );
 
-            return (
-              <div
-                {...innerProps}
-                ref={innerRef}
-                className={`flex items-center justify-between cursor-pointer mb-1 py-[.3rem] px-[.3rem] rounded-[8px] ${isLight ? "hover:bg-[#f0f0f0]" : "hover:bg-[#1F1F1F]"}`}
-                style={{
-                  backgroundColor: props.isFocused
-                    ? (isLight ? "#f0f0f0" : "#1F1F1F")
-                    : "transparent",
-                }}
-              >
+              return (
                 <div
+                  {...innerProps}
+                  ref={innerRef}
+                  className={`flex items-center justify-between cursor-pointer mb-1 py-[.3rem] px-[.3rem] rounded-[8px] ${isLight ? "hover:bg-[#f0f0f0]" : "hover:bg-[#1F1F1F]"}`}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                  onClick={(e) => {
-                    if (selectedTag) {
-                      e.stopPropagation();
-                      setSelected(
-                        selected.filter(
-                          (item) => item.name !== props.data.label,
-                        ),
-                      );
-                    }
+                    backgroundColor: props.isFocused
+                      ? isLight
+                        ? "#f0f0f0"
+                        : "#1F1F1F"
+                      : "transparent",
                   }}
                 >
                   <div
                     style={{
-                      backgroundColor: getChromeColor(color),
-                      borderRadius: 8,
-                      marginRight: 8,
-                      color: color,
-                      padding: "4px 8px",
-                      gap: "6px",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
+                    }}
+                    onClick={(e) => {
+                      if (selectedTag) {
+                        e.stopPropagation();
+                        setSelected(
+                          selected.filter(
+                            (item) => item.name !== props.data.label,
+                          ),
+                        );
+                      }
                     }}
                   >
-                    {props.data.label}
-                    <button type="button" className="!text-[#B3B3B3] ">
-                      {selectedTag && (
-                        <Cross1Icon
-                          className="!text-[#B3B3B3] colorFix"
-                          style={{
-                            width: ".75rem",
-                            height: ".75rem",
-                            color: "#B3B3B3 !important",
-                          }}
-                        />
-                      )}
-                    </button>
+                    <div
+                      style={{
+                        backgroundColor: getChromeColor(color),
+                        borderRadius: 8,
+                        marginRight: 8,
+                        color: color,
+                        padding: "4px 8px",
+                        gap: "6px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {props.data.label}
+                      <button type="button" className="!text-[#B3B3B3] ">
+                        {selectedTag && (
+                          <Cross1Icon
+                            className="!text-[#B3B3B3] colorFix"
+                            style={{
+                              width: ".75rem",
+                              height: ".75rem",
+                              color: "#B3B3B3 !important",
+                            }}
+                          />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          },
-        }}
+              );
+            },
+          }}
         />
       </div>
     </Form.Item>

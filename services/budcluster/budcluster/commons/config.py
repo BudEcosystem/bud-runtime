@@ -43,6 +43,10 @@ class AppConfig(BaseAppConfig):
     nfd_detection_timeout: int = Field(30, alias="NFD_DETECTION_TIMEOUT")
     nfd_namespace: str = Field("node-feature-discovery", alias="NFD_NAMESPACE")
 
+    # Endpoint validation configuration
+    max_endpoint_retry_attempts: int = Field(15, alias="MAX_ENDPOINT_RETRY_ATTEMPTS")
+    endpoint_retry_interval: int = Field(20, alias="ENDPOINT_RETRY_INTERVAL")
+
     registry_server: str = Field(..., alias="REGISTRY_SERVER")
     registry_username: str = Field(..., alias="REGISTRY_USERNAME")
     registry_password: str = Field(..., alias="REGISTRY_PASSWORD")

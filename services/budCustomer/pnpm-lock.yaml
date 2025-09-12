@@ -66,8 +66,8 @@ importers:
         specifier: ^5.27.1
         version: 5.27.1(date-fns@4.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       axios:
-        specifier: ^1.11.0
-        version: 1.11.0
+        specifier: ^1.12.0
+        version: 1.12.0
       bytebuffer:
         specifier: ^5.0.1
         version: 5.0.1
@@ -2066,8 +2066,8 @@ packages:
     resolution: {integrity: sha512-Xm7bpRXnDSX2YE2YFfBk2FnF0ep6tmG7xPh8iHee8MIcrgq762Nkce856dYtJYLkuIoYZvGfTs/PbZhideTcEg==}
     engines: {node: '>=4'}
 
-  axios@1.11.0:
-    resolution: {integrity: sha512-1Lx3WLFQWm3ooKDYZD1eXmoGO9fxYQjrycfHFC8P0sCfQVXyROp0p9PFWBehewBOdCwHc+f/b8I0fMto5eSfwA==}
+  axios@1.12.0:
+    resolution: {integrity: sha512-oXTDccv8PcfjZmPGlWsPSwtOJCZ/b6W5jAMCNcfwJbCzDckwG0jrYJFaWH1yvivfCXjVzV/SPDEhMB3Q+DSurg==}
 
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
@@ -4788,7 +4788,7 @@ snapshots:
       '@novu/shared': 2.6.6
       '@tanstack/react-query': 4.40.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       acorn-jsx: 5.3.2(acorn@8.15.0)
-      axios: 1.11.0
+      axios: 1.12.0
       lodash.clonedeep: 4.5.0
       lodash.debounce: 4.0.8
       lodash.merge: 4.6.2
@@ -6280,7 +6280,7 @@ snapshots:
 
   axe-core@4.10.3: {}
 
-  axios@1.11.0:
+  axios@1.12.0:
     dependencies:
       follow-redirects: 1.15.11
       form-data: 4.0.4

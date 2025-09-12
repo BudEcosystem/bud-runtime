@@ -42,6 +42,7 @@ from budapp.project_ops.models import Project as Project
 from budapp.router_ops.models import Router as Router
 from budapp.router_ops.models import RouterEndpoint as RouterEndpoint
 from budapp.user_ops.models import User as User
+from budapp.user_ops.oauth_models import UserOAuthProvider as UserOAuthProvider
 from budapp.workflow_ops.models import Workflow as Workflow
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStep
 
@@ -50,9 +51,10 @@ from ..benchmark_ops.models import BenchmarkSchema as BenchmarkSchema
 from ..cluster_ops.models import ModelClusterRecommended as ModelClusterRecommended
 from ..dataset_ops.models import DatasetSchema as DatasetSchema
 from ..guardrails.models import GuardrailDeployment as GuardrailDeployment
-from ..guardrails.models import GuardrailDeploymentProbe as GuardrailDeploymentProbe
-from ..guardrails.models import GuardrailDeploymentRule as GuardrailDeploymentRule
 from ..guardrails.models import GuardrailProbe as GuardrailProbe
+from ..guardrails.models import GuardrailProfile as GuardrailProfile
+from ..guardrails.models import GuardrailProfileProbe as GuardrailProfileProbe
+from ..guardrails.models import GuardrailProfileRule as GuardrailProfileRule
 from ..guardrails.models import GuardrailRule as GuardrailRule
 from ..playground_ops.models import ChatSession as ChatSession
 from ..playground_ops.models import Message as Message

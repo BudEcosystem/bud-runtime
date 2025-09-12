@@ -3,13 +3,16 @@ import CreateBatchJob from "./BatchJob/CreateBatchJob";
 import CreateBatchJobSuccess from "./BatchJob/CreateBatchJobSuccess";
 import NewProject from "./NewProject";
 import EditProject from "./EditProject";
-import DeleteProject from "./DeleteProject";
+// import DeleteProject from "./DeleteProject"; // Removed - now using notification warning approach
 import AddNewKey from "./ApiKeys/AddNewKey";
 import ApiKeySuccess from "./ApiKeys/ApiKeySuccess";
 import ViewApiKey from "./ApiKeys/ViewApiKey";
+import ProjectSuccess from "./Projects/ProjectSuccess";
+import ProjectEditSuccess from "./Projects/ProjectEditSuccess";
 import EditApiKey from "./ApiKeys/EditApiKey";
 import ViewModelDetails from "./ViewModelDetails";
 import ViewProjectDetails from "./ViewProjectDetails";
+import CreateBillingAlert from "./BillingAlert/CreateBillingAlert";
 
 // Placeholder component factory
 const createPlaceholderComponent = (name: string) => {
@@ -141,7 +144,10 @@ const stepComponentNames = [
   "create-batch-job",
   "create-batch-job-success",
   "api-key-success",
+  "project-success",
+  "project-edit-success",
   "edit-api-key",
+  "create-billing-alert",
 ];
 
 // Create StepComponents object with placeholder components
@@ -158,12 +164,15 @@ StepComponents["create-batch-job"] = CreateBatchJob;
 StepComponents["create-batch-job-success"] = CreateBatchJobSuccess;
 StepComponents["new-project"] = NewProject;
 StepComponents["edit-project"] = EditProject;
-StepComponents["delete-project"] = DeleteProject;
+// StepComponents["delete-project"] = DeleteProject; // Removed - now using notification warning approach
 StepComponents["add-new-key"] = AddNewKey;
 StepComponents["api-key-success"] = ApiKeySuccess;
+StepComponents["project-success"] = ProjectSuccess;
+StepComponents["project-edit-success"] = ProjectEditSuccess;
 StepComponents["view-api-key"] = ViewApiKey;
 StepComponents["edit-api-key"] = EditApiKey;
 StepComponents["view-model-details"] = ViewModelDetails;
 StepComponents["view-project-details"] = ViewProjectDetails;
+StepComponents["create-billing-alert"] = CreateBillingAlert;
 
 export type StepComponentsType = keyof typeof StepComponents;

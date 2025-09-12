@@ -382,12 +382,10 @@ class CreateDeploymentWorkflow:
                 platform=verify_deployment_health_request_json.platform,
                 ingress_health=verify_deployment_health_request_json.ingress_health,
             )
-            if deployment_status["ingress_health"]:
-                supported_endpoints = deployment_handler.identify_supported_endpoints(
-                    verify_deployment_health_request_json.namespace,
-                    verify_deployment_health_request_json.cloud_model,
-                    ingress_url,
-                )
+            # Check deployment status - get_deployment_status now handles endpoint validation with retries
+            if deployment_status["status"] == DeploymentStatusEnum.READY:
+                # Supported endpoints are now included in deployment_status response
+                supported_endpoints = deployment_status.get("supported_endpoints", {})
                 logger.info(f"Supported endpoints: {supported_endpoints}")
                 # Convert dict to list of supported endpoints (where value is True)
                 supported_endpoints_list = [
@@ -423,17 +421,24 @@ class CreateDeploymentWorkflow:
                     param={**deployment_status, "supported_endpoints": supported_endpoints_list},
                 )
             else:
+                # Handle different failure types
                 if not add_worker:
                     deployment_handler.delete(
                         namespace=verify_deployment_health_request_json.namespace,
                         platform=verify_deployment_health_request_json.platform,
                     )
+
                 if deployment_status["status"] == DeploymentStatusEnum.FAILED:
                     message = f"Engine deployment failed: {deployment_status['replicas']['reason']}"
-                else:
+                elif deployment_status["status"] == DeploymentStatusEnum.ENDPOINTS_FAILED:
+                    message = f"Deployment endpoints failed to become ready within {app_settings.max_endpoint_retry_attempts * app_settings.endpoint_retry_interval} seconds"
+                elif deployment_status["status"] == DeploymentStatusEnum.INGRESS_FAILED:
                     message = "Deployment ingress verification failed"
+                else:
+                    message = "Deployment verification failed"
+
                 response = ErrorResponse(
-                    message=f"{message}",
+                    message=message,
                     code=HTTPStatus.BAD_REQUEST.value,
                 )
         except Exception as e:

@@ -12,6 +12,6 @@ export const useIsland = create<{
     });
   },
   close: () => {
-    set({ isOpen: false});
+    set({ isOpen: false });
   },
 }));

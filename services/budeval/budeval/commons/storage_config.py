@@ -3,6 +3,12 @@
 import os
 from typing import Any, Dict
 
+from budeval.commons.config import app_settings
+from budeval.commons.logging import logging
+
+
+logger = logging.getLogger(__name__)
+
 
 class StorageConfig:
     """Storage configuration based on environment."""
@@ -11,7 +17,7 @@ class StorageConfig:
     def get_environment() -> str:
         """Detect the current environment."""
         # Check for local development indicators
-        if os.path.exists("/home/ubuntu/bud-serve-eval/k3s.yaml"):
+        if os.path.exists("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml"):
             return "local"
 
         # Check for environment variable
@@ -29,16 +35,22 @@ class StorageConfig:
         namespace = os.environ.get("NAMESPACE")
         if namespace:
             namespace = namespace.lower()  # Kubernetes namespaces must be lowercase
+            logger.debug(f"Namespace from environment variable: {namespace}")
             return namespace
 
         # Try reading from serviceaccount if running in cluster
         namespace_file = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
         if os.path.exists(namespace_file):
-            with open(namespace_file, "r") as f:
-                namespace = f.read().strip().lower()  # Ensure lowercase
-                return namespace
+            try:
+                with open(namespace_file, "r") as f:
+                    namespace = f.read().strip().lower()  # Ensure lowercase
+                    logger.debug(f"Namespace from serviceaccount file: {namespace}")
+                    return namespace
+            except (IOError, OSError) as e:
+                logger.warning(f"Failed to read namespace from serviceaccount file: {e}")
 
         # Default fallback
+        logger.debug("Using default namespace: default")
         return "default"
 
     @staticmethod
@@ -48,7 +60,7 @@ class StorageConfig:
         Returns:
             The PVC name to use for eval datasets
         """
-        return os.environ.get("EVAL_DATASETS_PATH", "panda-budeval-dataset")
+        return app_settings.eval_datasets_path
 
     @staticmethod
     def get_storage_config() -> Dict[str, Any]:

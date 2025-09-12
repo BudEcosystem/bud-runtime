@@ -37,7 +37,7 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
     setPasswordError(
       formData["password"] && !passwordValid
         ? "Password must be at least 8 characters long"
-        : ""
+        : "",
     );
     setIsEmailValid(!formData["email"] || emailValid);
   }, [formData, emailRegex]);
@@ -65,7 +65,6 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
   const handleBlur = () => {
     validateForm();
   };
-
 
   return (
     <Flex

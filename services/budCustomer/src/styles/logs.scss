@@ -1,0 +1,955 @@
+// Logs Page Styles
+.logs-page-styles {
+  /* Override Ant Design hardcoded colors for theme support */
+  .ant-card.bg-\[\#101010\] {
+    background-color: var(--bg-secondary) !important;
+  }
+  .ant-card.border-\[\#1F1F1F\] {
+    border-color: var(--border-color) !important;
+  }
+  /* Specific fix for the Requests tab card */
+  .ant-card-small.bg-\[\#101010\] {
+    background-color: var(--bg-secondary) !important;
+  }
+  [data-theme="light"] .ant-card-small.bg-\[\#101010\] {
+    background-color: #f5f5f5 !important;
+  }
+  [data-theme="dark"] .ant-card-small.bg-\[\#101010\] {
+    background-color: #161616 !important;
+  }
+  /* Fallback for any ant-card with dark backgrounds */
+  .ant-card[class*="bg-\[\#101010\]"],
+  .ant-card[class*="bg-\[\#1A1A1A\]"],
+  .ant-card[class*="bg-\[\#0A0A0A\]"] {
+    background-color: var(--bg-secondary) !important;
+  }
+  [data-theme="light"] .ant-card[class*="bg-\[\#101010\]"],
+  [data-theme="light"] .ant-card[class*="bg-\[\#1A1A1A\]"],
+  [data-theme="light"] .ant-card[class*="bg-\[\#0A0A0A\]"] {
+    background-color: #f5f5f5 !important;
+  }
+  .ant-table-wrapper .ant-table {
+    background: var(--bg-card) !important;
+  }
+  .ant-table-wrapper .ant-table-thead > tr > th {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+  }
+  .ant-table-wrapper .ant-table-tbody > tr > td {
+    border-bottom: 1px solid var(--border-color) !important;
+    background: var(--bg-card) !important;
+  }
+  .ant-table-wrapper .ant-table-tbody > tr:hover > td {
+    background: var(--bg-hover) !important;
+  }
+  .ant-table-title {
+    background: var(--bg-secondary) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+  }
+  /* Light theme specific table styling */
+  [data-theme="light"] .ant-table-title {
+    background: #f5f5f5 !important;
+  }
+  [data-theme="light"] .ant-table-wrapper .ant-table-thead > tr > th {
+    background: #fafafa !important;
+  }
+  /* Fix button colors */
+  .ant-btn {
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+  }
+  .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous) {
+    background: var(--bg-secondary) !important;
+  }
+  .ant-btn:hover:not(.ant-btn-primary):not(.ant-btn-dangerous) {
+    background: var(--bg-hover) !important;
+    border-color: var(--border-secondary) !important;
+  }
+  /* Fix Primary Button */
+  button[class*="bg-\[\#1E0C34\]"] {
+    background: var(--color-purple) !important;
+    opacity: 0.9;
+  }
+  button[class*="bg-\[\#1E0C34\]"]:hover {
+    background: var(--color-purple-hover) !important;
+    opacity: 1;
+  }
+  /* Button text - dark theme */
+  [data-theme="dark"] button[class*="bg-\[\#1E0C34\]"] div,
+  [data-theme="dark"] button[class*="bg-\[\#1E0C34\]"] span,
+  [data-theme="dark"] button[class*="bg-\[\#1E0C34\]"] .anticon {
+    color: white !important;
+  }
+  /* Button text - light theme */
+  [data-theme="light"] button[class*="bg-\[\#1E0C34\]"] div,
+  [data-theme="light"] button[class*="bg-\[\#1E0C34\]"] span,
+  [data-theme="light"] button[class*="bg-\[\#1E0C34\]"] .anticon {
+    color: #000000 !important;
+  }
+  /* Specific fix for refresh and export buttons */
+  [data-theme="dark"] .ant-btn span.ml-2 {
+    color: white !important;
+    margin-left: 0.5rem !important;
+  }
+  [data-theme="light"] .ant-btn span.ml-2 {
+    color: #000000 !important;
+    margin-left: 0.5rem !important;
+  }
+  [data-theme="dark"] .ant-btn[class*="bg-\[\#1E0C34\]"] * {
+    color: white !important;
+  }
+  [data-theme="light"] .ant-btn[class*="bg-\[\#1E0C34\]"] * {
+    color: #000000 !important;
+  }
+  /* Fix Secondary Button */
+  button[class*="bg-\[\#1F1F1F\]"] {
+    background: var(--bg-secondary);
+    border-color: var(--border-secondary) !important;
+  }
+  button[class*="bg-\[\#1F1F1F\]"]:hover {
+    background: var(--bg-hover) !important;
+    border-color: var(--border-color) !important;
+  }
+  [data-theme="dark"] button[class*="bg-\[\#1F1F1F\]"] span,
+  [data-theme="dark"] button[class*="bg-\[\#1F1F1F\]"] .anticon {
+    color: #eeeeee !important;
+  }
+  [data-theme="light"] button[class*="bg-\[\#1F1F1F\]"] span,
+  [data-theme="light"] button[class*="bg-\[\#1F1F1F\]"] .anticon {
+    color: #000000 !important;
+  }
+  /* Ensure all Ant Design icons in buttons are visible */
+  .ant-btn .anticon {
+    color: inherit !important;
+  }
+  /* Fix segmented control */
+  .antSegmented {
+    background: var(--bg-secondary) !important;
+  }
+  .antSegmented .ant-segmented-item {
+    color: var(--text-muted) !important;
+  }
+  .antSegmented .ant-segmented-item-selected {
+    background: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+  }
+  /* Fix date picker */
+  .ant-picker {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-secondary) !important;
+  }
+  .ant-picker-input > input {
+    color: var(--text-primary) !important;
+  }
+  .ant-picker-suffix {
+    color: var(--text-muted) !important;
+  }
+  /* Fix Input fields */
+  .ant-input {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-primary) !important;
+  }
+  .ant-input::placeholder {
+    color: var(--text-disabled) !important;
+  }
+  .ant-input:hover {
+    border-color: var(--border-color) !important;
+  }
+  .ant-input:focus {
+    border-color: var(--color-purple) !important;
+    box-shadow: 0 0 0 2px rgba(150, 92, 222, 0.2) !important;
+  }
+  .ant-input-prefix {
+    color: var(--text-muted) !important;
+  }
+  /* Fix tabs */
+  .ant-tabs-tab {
+    color: var(--text-muted) !important;
+  }
+  .ant-tabs-tab.ant-tabs-tab-active {
+    color: var(--text-primary) !important;
+  }
+  .ant-tabs-ink-bar {
+    background: var(--color-purple) !important;
+  }
+  /* Ensure key text elements are dark black in light theme */
+  [data-theme="light"] &.logs-page h1,
+  [data-theme="light"] &.logs-page h2,
+  [data-theme="light"] &.logs-page h3,
+  [data-theme="light"] &.logs-page .ant-table-tbody > tr > td,
+  [data-theme="light"] &.logs-page .ant-table-thead > tr > th,
+  [data-theme="light"] &.logs-page .ant-table-title,
+  [data-theme="light"] &.logs-page [class*="Text_"] {
+    color: #000000 !important;
+  }
+  [data-theme="light"] &.logs-page .ant-tabs-tab {
+    color: #666666 !important;
+  }
+  [data-theme="light"] &.logs-page .ant-tabs-tab.ant-tabs-tab-active {
+    color: #000000 !important;
+  }
+  /* Fix input placeholder in light theme */
+  [data-theme="light"] &.logs-page .ant-input::placeholder {
+    color: #999999 !important;
+  }
+  /* Filter section background to match Inference Requests section */
+  .filter-section-bg {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+  }
+  [data-theme="light"] .filter-section-bg {
+    background: #f5f5f5 !important;
+    border: 1px solid #e0e0e0 !important;
+  }
+  [data-theme="dark"] .filter-section-bg {
+    background: #161616 !important;
+    border: 1px solid #1f1f1f !important;
+  }
+  /* Comprehensive fix for InferenceFilters component hardcoded colors */
+  [data-theme="light"] .filter-section-bg .ant-card {
+    background: #ffffff !important;
+    border-color: #d9d9d9 !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-card-head {
+    background: #fafafa !important;
+    border-bottom: 1px solid #d9d9d9 !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-card-body {
+    background: #ffffff !important;
+  }
+  [data-theme="light"] .filter-section-bg [class*="bg-\[\#1A1A1A\]"],
+  [data-theme="light"] .filter-section-bg [class*="bg-\[\#101010\]"],
+  [data-theme="light"] .filter-section-bg [class*="bg-\[\#1F1F1F\]"],
+  [data-theme="light"] .filter-section-bg [class*="bg-\[\#2F2F2F\]"] {
+    background: #ffffff !important;
+  }
+  [data-theme="light"] .filter-section-bg [class*="border-\[\#1F1F1F\]"],
+  [data-theme="light"] .filter-section-bg [class*="border-\[\#2F2F2F\]"],
+  [data-theme="light"] .filter-section-bg [class*="border-\[\#3F3F3F\]"] {
+    border-color: #d9d9d9 !important;
+  }
+  [data-theme="light"] .filter-section-bg [class*="text-\[\#EEEEEE\]"],
+  [data-theme="light"] .filter-section-bg [class*="text-\[\#B3B3B3\]"] {
+    color: #000000 !important;
+  }
+  /* Make ALL text dark black in light theme filter section */
+  [data-theme="light"] .filter-section-bg * {
+    color: #000000 !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-card-head-title {
+    color: #000000 !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-card-head-title span {
+    color: #000000 !important;
+  }
+  [data-theme="light"] .filter-section-bg input {
+    color: #000000 !important;
+  }
+  [data-theme="light"] .filter-section-bg input::placeholder {
+    color: #666666 !important;
+  }
+  /* Fix all input elements in filter section */
+  [data-theme="light"] .filter-section-bg .ant-input,
+  [data-theme="light"] .filter-section-bg .ant-select-selector,
+  [data-theme="light"] .filter-section-bg .ant-picker,
+  [data-theme="light"] .filter-section-bg .ant-input-number,
+  [data-theme="light"] .filter-section-bg .ant-switch {
+    background: #ffffff !important;
+    border-color: #d9d9d9 !important;
+    color: #000000 !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-input-number-input {
+    color: #000000 !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-btn {
+    background: #ffffff !important;
+    border-color: #d9d9d9 !important;
+    color: #000000 !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-btn:hover {
+    background: #f5f5f5 !important;
+    border-color: #40a9ff !important;
+    color: #000000 !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-btn span {
+    color: #000000 !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-btn:hover span {
+    color: #000000 !important;
+  }
+  /* Fix form labels */
+  [data-theme="light"] .filter-section-bg .ant-form-item-label > label {
+    color: #000000 !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-form-item-label > label > span {
+    color: #000000 !important;
+  }
+  /* Fix select dropdown text */
+  [data-theme="light"] .filter-section-bg .ant-select-selection-placeholder {
+    color: #999999 !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-select-selection-item {
+    color: #000000 !important;
+  }
+  /* Fix picker text */
+  [data-theme="light"] .filter-section-bg .ant-picker-input input {
+    color: #000000 !important;
+  }
+  /* Additional text in filter components */
+  [data-theme="light"] .filter-section-bg .ant-space-item span {
+    color: #000000 !important;
+  }
+  /* Fix antd icons in filter section */
+  [data-theme="light"] .filter-section-bg .anticon {
+    color: #666666 !important;
+  }
+  /* Fix switch component */
+  [data-theme="light"] .filter-section-bg .ant-switch {
+    background: #ffffff !important;
+  }
+  [data-theme="light"] .filter-section-bg .ant-switch-checked {
+    background: #1890ff !important;
+  }
+
+  /* Fix text next to switch in light theme */
+  [data-theme="light"] .filter-section-bg span.text-gray-700,
+  [data-theme="light"] .filter-section-bg span[class*="text-gray"] {
+    color: #000000 !important;
+  }
+
+  /* Ensure all inline text elements near switches are visible */
+  [data-theme="light"]
+    .filter-section-bg
+    div[style*="display: inline-flex"]
+    span,
+  [data-theme="light"]
+    .filter-section-bg
+    div[style*="display:inline-flex"]
+    span {
+    color: #000000 !important;
+  }
+
+  /* Logs header override styles */
+  .logs-header-override .pageHeader h1,
+  .logs-header-override .pageHeader h2,
+  .logs-header-override .pageHeader h3,
+  .logs-header-override .pageHeader div[class*="Heading"],
+  .logs-header-override .pageHeader * {
+    color: var(--text-primary) !important;
+  }
+
+  /* Theme aware logs styles */
+  .theme-aware-logs *,
+  .theme-aware-logs div,
+  .theme-aware-logs span,
+  .theme-aware-logs p,
+  .theme-aware-logs h1,
+  .theme-aware-logs h2,
+  .theme-aware-logs h3,
+  .theme-aware-logs h4,
+  .theme-aware-logs h5,
+  .theme-aware-logs h6 {
+    color: var(--text-primary) !important;
+  }
+
+  /* Override specific hardcoded text components */
+  .theme-aware-logs [class*="Text_"][class*="_FFFFFF"],
+  .theme-aware-logs [class*="Text_"][class*="_EEEEEE"],
+  .theme-aware-logs [class*="Heading_"][class*="_FFFFFF"] {
+    color: var(--text-primary) !important;
+  }
+
+  .theme-aware-logs [class*="Text_"][class*="_B3B3B3"],
+  .theme-aware-logs [class*="Text_"][class*="_808080"],
+  .theme-aware-logs [class*="Text_"][class*="_757575"] {
+    color: var(--text-muted) !important;
+  }
+
+  /* Ant Design components */
+  .theme-aware-logs .ant-tabs-tab {
+    color: var(--text-muted) !important;
+  }
+  .theme-aware-logs .ant-tabs-tab-active {
+    color: var(--text-primary) !important;
+  }
+  .theme-aware-logs .ant-table {
+    color: var(--text-primary) !important;
+  }
+  .theme-aware-logs .ant-table-thead > tr > th {
+    color: var(--text-primary) !important;
+  }
+  .theme-aware-logs .ant-table-tbody > tr > td {
+    color: var(--text-primary) !important;
+  }
+  .theme-aware-logs .ant-empty-description {
+    color: var(--text-muted) !important;
+  }
+  .theme-aware-logs .ant-segmented-item {
+    color: var(--text-muted) !important;
+  }
+  .theme-aware-logs .ant-segmented-item-selected {
+    color: var(--text-primary) !important;
+  }
+
+  /* Input components and form elements */
+  .theme-aware-logs .ant-input,
+  .theme-aware-logs .ant-input:focus,
+  .theme-aware-logs .ant-input:hover,
+  .theme-aware-logs .ant-input-affix-wrapper,
+  .theme-aware-logs .ant-input-affix-wrapper:focus,
+  .theme-aware-logs .ant-input-affix-wrapper:hover {
+    color: var(--text-primary) !important;
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-secondary) !important;
+  }
+
+  .theme-aware-logs .ant-input::placeholder,
+  .theme-aware-logs .ant-input-affix-wrapper input::placeholder {
+    color: var(--text-disabled) !important;
+  }
+
+  /* Button components */
+  .theme-aware-logs .ant-btn,
+  .theme-aware-logs .ant-btn span {
+    color: var(--text-primary) !important;
+  }
+
+  .theme-aware-logs .ant-btn-default {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .theme-aware-logs .ant-btn-default:hover {
+    background-color: var(--bg-hover) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Dropdown and Select components */
+  .theme-aware-logs .ant-select,
+  .theme-aware-logs .ant-select:hover,
+  .theme-aware-logs .ant-select:focus {
+    color: var(--text-primary) !important;
+  }
+
+  .theme-aware-logs .ant-select-selector {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .theme-aware-logs .ant-select-selection-placeholder {
+    color: var(--text-disabled) !important;
+  }
+
+  .theme-aware-logs .ant-select-selection-item {
+    color: var(--text-primary) !important;
+  }
+
+  /* Date picker components */
+  .theme-aware-logs .ant-picker,
+  .theme-aware-logs .ant-picker:hover,
+  .theme-aware-logs .ant-picker:focus {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .theme-aware-logs .ant-picker input {
+    color: var(--text-primary) !important;
+  }
+
+  .theme-aware-logs .ant-picker-input > input::placeholder {
+    color: var(--text-disabled) !important;
+  }
+
+  /* Filter components specific */
+  .theme-aware-logs .ant-form-item-label > label {
+    color: var(--text-primary) !important;
+  }
+
+  .theme-aware-logs .ant-checkbox-wrapper {
+    color: var(--text-primary) !important;
+  }
+
+  .theme-aware-logs .ant-radio-wrapper {
+    color: var(--text-primary) !important;
+  }
+
+  /* Search header specific */
+  .theme-aware-logs .ant-input-search .ant-input {
+    color: var(--text-primary) !important;
+    background-color: var(--bg-tertiary) !important;
+  }
+
+  /* Any remaining text elements */
+  .theme-aware-logs label,
+  .theme-aware-logs .ant-form-item-label,
+  .theme-aware-logs .ant-form-item-control {
+    color: var(--text-primary) !important;
+  }
+
+  /* SearchHeaderInput component override */
+  .theme-aware-logs .ant-input[style*="#1A1A1A"],
+  .theme-aware-logs .ant-input[class*="bg-[#1A1A1A]"] {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Icon color override */
+  .theme-aware-logs .ant-input-prefix,
+  .theme-aware-logs .ant-input-prefix * {
+    color: var(--text-muted) !important;
+  }
+
+  /* Button text specific overrides */
+  .theme-aware-logs .ant-btn .ml-2,
+  .theme-aware-logs button span {
+    color: var(--text-primary) !important;
+  }
+
+  /* Ensure all divs and spans in buttons are visible */
+  .theme-aware-logs .ant-btn div,
+  .theme-aware-logs .ant-btn span,
+  .theme-aware-logs button div,
+  .theme-aware-logs button span {
+    color: inherit !important;
+  }
+
+  /* Custom button components override */
+  .theme-aware-logs button[class*="bg-[#"],
+  .theme-aware-logs .ant-btn[class*="bg-[#"] {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .theme-aware-logs button[class*="bg-[#1E0C34"] {
+    background-color: var(--color-purple) !important;
+    border-color: var(--color-purple) !important;
+    color: white !important;
+  }
+
+  /* Override hardcoded text colors in buttons */
+  .theme-aware-logs button div[class*="text-[#EEEEEE]"],
+  .theme-aware-logs button span[class*="text-[#EEEEEE]"],
+  .theme-aware-logs .ant-btn div[class*="text-[#EEEEEE]"],
+  .theme-aware-logs .ant-btn span[class*="text-[#EEEEEE]"] {
+    color: var(--text-primary) !important;
+  }
+
+  /* Force visibility for all interactive elements */
+  .theme-aware-logs input,
+  .theme-aware-logs textarea,
+  .theme-aware-logs select,
+  .theme-aware-logs button,
+  .theme-aware-logs .ant-input,
+  .theme-aware-logs .ant-btn,
+  .theme-aware-logs .ant-select,
+  .theme-aware-logs .ant-picker {
+    color: var(--text-primary) !important;
+  }
+
+  /* InferenceFilters component specific */
+  .theme-aware-logs [class*="InferenceFilters"] *,
+  .theme-aware-logs [class*="filters"] * {
+    color: var(--text-primary) !important;
+  }
+
+  /* SearchHeaderInput specific override */
+  .theme-aware-logs .theme-search-override,
+  .theme-aware-logs .theme-search-override input,
+  .theme-aware-logs .theme-search-override .ant-input {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .theme-aware-logs .theme-search-override input::placeholder {
+    color: var(--text-disabled) !important;
+  }
+
+  /* Ant Design Card components with hardcoded dark colors */
+  .theme-aware-logs .ant-card,
+  .theme-aware-logs .ant-card.ant-card-bordered,
+  .theme-aware-logs .ant-card.ant-card-small,
+  .theme-aware-logs .ant-card[class*="bg-[#101010]"],
+  .theme-aware-logs .ant-card[class*="bg-[#1A1A1A]"],
+  .theme-aware-logs .ant-card[class*="bg-[#161616]"],
+  .theme-aware-logs div[class*="bg-[#101010]"],
+  .theme-aware-logs div[class*="bg-[#1A1A1A]"],
+  .theme-aware-logs div[class*="bg-[#161616]"] {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Card borders with hardcoded dark colors */
+  .theme-aware-logs .ant-card[class*="border-[#1F1F1F]"],
+  .theme-aware-logs .ant-card[class*="border-[#2F2F2F]"],
+  .theme-aware-logs div[class*="border-[#1F1F1F]"],
+  .theme-aware-logs div[class*="border-[#2F2F2F]"] {
+    border-color: var(--border-color) !important;
+  }
+
+  /* Card headers and content */
+  .theme-aware-logs .ant-card-head,
+  .theme-aware-logs .ant-card-body,
+  .theme-aware-logs .ant-card-head-title {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* All nested elements in cards */
+  .theme-aware-logs .ant-card *,
+  .theme-aware-logs .ant-card .ant-card-body *,
+  .theme-aware-logs div[class*="bg-[#101010]"] *,
+  .theme-aware-logs div[class*="bg-[#1A1A1A]"] * {
+    color: var(--text-primary) !important;
+  }
+
+  /* Specific override for the problematic div class */
+  .theme-aware-logs .ant-card.bg-\[\#101010\],
+  .theme-aware-logs .ant-card.border-\[\#1F1F1F\] {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  /* Global override for ANY element with hardcoded dark backgrounds */
+  .theme-aware-logs *[style*="background-color: rgb(16, 16, 16)"],
+  .theme-aware-logs *[style*="background-color: #101010"],
+  .theme-aware-logs *[style*="background-color: #1A1A1A"],
+  .theme-aware-logs *[style*="background-color: #161616"],
+  .theme-aware-logs *[style*="border-color: rgb(31, 31, 31)"],
+  .theme-aware-logs *[style*="border-color: #1F1F1F"],
+  .theme-aware-logs *[style*="border-color: #2F2F2F"] {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Catch-all for any missed dark backgrounds */
+  .theme-aware-logs [class*="bg-black"],
+  .theme-aware-logs [class*="bg-gray-900"],
+  .theme-aware-logs [class*="bg-slate-900"] {
+    background-color: var(--bg-card) !important;
+  }
+
+  /* Specific fixes for inference filters */
+  .theme-aware-logs .inference-filters-container *,
+  .theme-aware-logs .filters-wrapper *,
+  .theme-aware-logs .inference-filters-container .ant-card,
+  .theme-aware-logs .filters-wrapper .ant-card {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Force override for any stubborn components */
+  .theme-aware-logs .ant-card.css-dev-only-do-not-override-nvrefq {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+}
+
+/* Light theme fixes for select and input components */
+[data-theme="light"] .logs-page-styles {
+  /* Fix ALL select components in light theme */
+  .ant-select .ant-select-selector {
+    background: #ffffff !important;
+    border-color: #d9d9d9 !important;
+    color: #000000 !important;
+  }
+
+  /* Fix select components with dark backgrounds */
+  .ant-select.bg-\[\#1A1A1A\] .ant-select-selector,
+  .ant-select[class*="bg-\[\#1A1A1A\]"] .ant-select-selector,
+  .ant-select[class*="bg-\[\#1"] .ant-select-selector,
+  .ant-select[class*="bg-\[\#0"] .ant-select-selector,
+  .ant-select[class*="bg-\[\#2"] .ant-select-selector {
+    background: #ffffff !important;
+    border-color: #d9d9d9 !important;
+    color: #000000 !important;
+
+    /* Ensure all text inside is black */
+    * {
+      color: #000000 !important;
+    }
+  }
+
+  /* Force ALL text inside ANY select to be black */
+  .ant-select .ant-select-selector * {
+    color: #000000 !important;
+  }
+
+  .ant-select .ant-select-selection-item,
+  .ant-select .ant-select-selection-item *,
+  .ant-select .ant-select-selection-item-content {
+    color: #000000 !important;
+  }
+
+  .ant-select.bg-\[\#1A1A1A\],
+  .ant-select[class*="bg-\[\#1A1A1A\]"],
+  .ant-select[class*="bg-\[\#1"],
+  .ant-select[class*="bg-\[\#0"],
+  .ant-select[class*="bg-\[\#2"] {
+    background: transparent !important;
+  }
+
+  .ant-select-selection-placeholder {
+    color: #999999 !important;
+  }
+
+  .ant-select-selection-item {
+    color: #000000 !important;
+  }
+
+  .ant-select-arrow {
+    color: #666666 !important;
+  }
+
+  /* Fix select option text color in selector */
+  .ant-select-selector .ant-select-selection-item-content,
+  .ant-select-selector span {
+    color: #000000 !important;
+  }
+
+  /* Ensure all text inside select is black */
+  .ant-select-selector * {
+    color: #000000 !important;
+  }
+
+  /* Specific fix for request tab selects */
+  .ant-tabs-tabpane .ant-select .ant-select-selector,
+  .ant-tabs-tabpane .ant-select .ant-select-selector * {
+    color: #000000 !important;
+  }
+
+  /* Override any white text classes */
+  .ant-select-selector [class*="text-white"],
+  .ant-select-selector [class*="text-\[\#FFF"],
+  .ant-select-selector [class*="text-\[\#fff"],
+  .ant-select-selector [class*="text-\[\#EEE"] {
+    color: #000000 !important;
+  }
+
+  /* Fix InputNumber with dark backgrounds */
+  .ant-input-number.bg-\[\#1A1A1A\],
+  .ant-input-number[class*="bg-\[\#1A1A1A\]"],
+  .ant-input-number[class*="bg-\[\#1"],
+  .ant-input-number[class*="bg-\[\#0"],
+  .ant-input-number[class*="bg-\[\#2"] {
+    background: #ffffff !important;
+    border-color: #d9d9d9 !important;
+
+    .ant-input-number-input {
+      background: #ffffff !important;
+      color: #000000 !important;
+    }
+
+    .ant-input-number-handler-wrap {
+      background: #ffffff !important;
+      border-left: 1px solid #d9d9d9 !important;
+    }
+
+    .ant-input-number-handler {
+      color: #666666 !important;
+
+      &:hover {
+        background: #f5f5f5 !important;
+      }
+    }
+  }
+
+  /* Fix text visibility */
+  span.text-gray-700,
+  span[class*="text-gray-700"],
+  span.dark\:text-gray-300,
+  span[class*="dark\:text-gray"] {
+    color: #000000 !important;
+  }
+
+  /* Remove black backgrounds from form controls */
+  .ant-form-item-control {
+    background: transparent !important;
+  }
+
+  .ant-form-item-control[class*="bg-\[\#"],
+  .ant-form-item-control[style*="background"] {
+    background: transparent !important;
+  }
+}
+
+/* Select dropdown menu fixes */
+[data-theme="light"] .ant-select-dropdown {
+  background: #ffffff !important;
+  border: 1px solid #d9d9d9 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+
+  .ant-select-item {
+    color: #000000 !important;
+    background: #ffffff !important;
+
+    &:hover {
+      background: #f5f5f5 !important;
+    }
+
+    &.ant-select-item-option-selected {
+      background: #e6f7ff !important;
+      font-weight: 600;
+    }
+
+    &.ant-select-item-option-active {
+      background: #f5f5f5 !important;
+    }
+  }
+
+  /* Fix the option content text specifically */
+  .ant-select-item-option-content {
+    color: #000000 !important;
+  }
+
+  .ant-select-item-option .ant-select-item-option-content {
+    color: #000000 !important;
+  }
+
+  /* Ensure all text in dropdown items is black */
+  .ant-select-item * {
+    color: #000000 !important;
+  }
+
+  .ant-select-item-empty {
+    color: #999999 !important;
+    background: #ffffff !important;
+  }
+}
+
+[data-theme="dark"] .ant-select-dropdown {
+  background: #1f1f1f !important;
+  border: 1px solid #434343 !important;
+
+  .ant-select-item {
+    color: #ffffff !important;
+
+    &:hover {
+      background: #2a2a2a !important;
+    }
+
+    &.ant-select-item-option-selected {
+      background: rgba(150, 92, 222, 0.2) !important;
+      font-weight: 600;
+    }
+
+    &.ant-select-item-option-active {
+      background: #2a2a2a !important;
+    }
+  }
+
+  .ant-select-item-empty {
+    color: #8c8c8c !important;
+  }
+}
+
+/* Global override for select text in light theme - most specific */
+[data-theme="light"] {
+  .logs-page-styles .ant-select .ant-select-selector,
+  .logs-page-styles .ant-select .ant-select-selector *,
+  .logs-page-styles .ant-select .ant-select-selection-item,
+  .logs-page-styles .ant-select .ant-select-selection-item *,
+  .logs-page-styles .ant-select .ant-select-selection-item-content,
+  .logs-page-styles .ant-select-selection-item span,
+  .logs-page-styles .ant-select-selector span {
+    color: #000000 !important;
+  }
+
+  /* Maximum specificity override */
+  body[data-theme="light"]
+    .logs-page-styles
+    .ant-select
+    .ant-select-selector
+    .ant-select-selection-item,
+  body[data-theme="light"]
+    .logs-page-styles
+    .ant-select
+    .ant-select-selector
+    .ant-select-selection-item
+    *,
+  body[data-theme="light"]
+    .logs-page-styles
+    .ant-select
+    .ant-select-selector
+    .ant-select-selection-item
+    span,
+  body[data-theme="light"]
+    .logs-page-styles
+    .ant-select
+    .ant-select-selector
+    .ant-select-selection-item-content {
+    color: #000000 !important;
+  }
+
+  /* Override ANY possible text color class or style */
+  .logs-page-styles .ant-select-selector [style*="color"],
+  .logs-page-styles .ant-select-selector [class*="text-"],
+  .logs-page-styles .ant-select-selector [class*="color-"] {
+    color: #000000 !important;
+  }
+
+  /* Target the actual rendered text node */
+  .logs-page-styles
+    .ant-select-single
+    .ant-select-selector
+    .ant-select-selection-item,
+  .logs-page-styles
+    .ant-select-single
+    .ant-select-selector
+    .ant-select-selection-placeholder {
+    color: #000000 !important;
+
+    * {
+      color: inherit !important;
+    }
+  }
+}
+
+/* Ultimate override - target without theme wrapper */
+html[data-theme="light"] .logs-page-styles .ant-select-selector,
+html[data-theme="light"] .logs-page-styles .ant-select-selector *,
+html[data-theme="light"] .logs-page-styles .ant-select-selection-item,
+html[data-theme="light"] .logs-page-styles .ant-select-selection-item * {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+/* CSS variable override for light theme */
+[data-theme="light"] .logs-page-styles {
+  --ant-select-text-color: #000000 !important;
+  --text-color: #000000 !important;
+  --text-primary: #000000 !important;
+
+  .ant-select-selector {
+    color: var(--ant-select-text-color) !important;
+    -webkit-text-fill-color: var(--ant-select-text-color) !important;
+  }
+}
+
+/* Global override for ant-select-item-option-content in light theme */
+[data-theme="light"] .ant-select-item-option-content,
+html[data-theme="light"] .ant-select-item-option-content,
+body[data-theme="light"] .ant-select-item-option-content {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+/* Even more specific for logs page */
+[data-theme="light"] .logs-page-styles + * .ant-select-item-option-content,
+[data-theme="light"] body .ant-select-dropdown .ant-select-item-option-content {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}

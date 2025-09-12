@@ -51,6 +51,7 @@ from .endpoint_ops import endpoint_routes
 from .eval_ops import eval_routes
 from .eval_ops.workflows import EvalDataSyncWorkflows
 from .guardrails import guardrail_routes
+from .guardrails.workflows import GuardrailSyncWorkflows
 from .initializers.seeder import seeders
 from .metric_ops import metric_routes
 from .model_ops import model_routes
@@ -93,6 +94,9 @@ async def execute_initial_dapr_workflows() -> None:
 
     response = await ClusterRecommendedSchedulerWorkflows().__call__()
     logger.debug("Recommended cluster scheduler workflow response: %s", response)
+
+    response = await GuardrailSyncWorkflows().__call__()
+    logger.debug("Guardrail sync workflow response: %s", response)
 
     # Execute initial eval data sync workflow if enabled
     if app_settings.eval_sync_enabled:
@@ -179,27 +183,31 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             # Sleep for 30 minutes (1800 seconds)
             await asyncio.sleep(1800)
 
-    async def schedule_credential_usage_sync() -> None:
-        """Schedule periodic synchronization of credential usage data from budmetrics."""
-        from .commons.database import SessionLocal
-        from .credential_ops.services import CredentialService
+    async def schedule_hybrid_metrics_sync() -> None:
+        """Schedule hybrid metrics sync combining credential usage and user limits."""
+        from .metric_ops.hybrid_sync import start_hybrid_sync, stop_hybrid_sync
 
         # Wait for services to be ready
-        await asyncio.sleep(20)
+        await asyncio.sleep(15)
 
-        while True:
-            try:
-                logger.info("Running scheduled credential usage sync")
-                # Create a new session for this sync operation
-                with SessionLocal() as session:
-                    credential_service = CredentialService(session)
-                    result = await credential_service.sync_credential_usage_from_metrics()
-                    logger.info("Credential usage sync completed: %s", result)
-            except Exception as e:
-                logger.error("Failed to sync credential usage: %s", e)
+        try:
+            logger.info("Starting hybrid metrics sync task")
+            await start_hybrid_sync()
+        except Exception as e:
+            logger.error("Failed to start hybrid metrics sync: %s", e)
 
-            # Sleep for 5 minutes (300 seconds)
-            await asyncio.sleep(300)
+    async def schedule_billing_cycle_reset() -> None:
+        """Schedule periodic check for expired billing cycles."""
+        from .billing_ops.reset_usage import start_billing_reset_task, stop_billing_reset_task
+
+        # Wait for services to be ready
+        await asyncio.sleep(15)
+
+        try:
+            logger.info("Starting billing cycle reset task")
+            await start_billing_reset_task()
+        except Exception as e:
+            logger.error("Failed to start billing cycle reset task: %s", e)
 
     task = asyncio.create_task(schedule_secrets_and_config_sync())
 
@@ -219,8 +227,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Start the blocking rule stats sync scheduler
     blocking_stats_task = asyncio.create_task(schedule_blocking_rule_stats_sync())
 
-    # Start the credential usage sync scheduler
-    credential_usage_task = asyncio.create_task(schedule_credential_usage_sync())
+    # Start the hybrid metrics sync scheduler (combines credential usage + user limits)
+    hybrid_sync_task = asyncio.create_task(schedule_hybrid_metrics_sync())
+
+    # Start the billing cycle reset scheduler
+    billing_reset_task = asyncio.create_task(schedule_billing_cycle_reset())
 
     yield
 
@@ -229,7 +240,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         dapr_workflow_task.cancel()
         eval_sync_task.cancel()
         blocking_stats_task.cancel()
-        credential_usage_task.cancel()
+        hybrid_sync_task.cancel()
+        billing_reset_task.cancel()
+
+        # Stop the background tasks
+        from .billing_ops.reset_usage import stop_billing_reset_task
+        from .metric_ops.hybrid_sync import stop_hybrid_sync
+
+        await stop_hybrid_sync()
+        await stop_billing_reset_task()
     except asyncio.CancelledError:
         logger.exception("Failed to cleanup config & store sync.")
 

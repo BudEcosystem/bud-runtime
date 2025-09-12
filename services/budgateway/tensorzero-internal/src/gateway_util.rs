@@ -26,6 +26,7 @@ use crate::kafka::KafkaConnectionInfo;
 use crate::model::ModelTable;
 use crate::rate_limit::DistributedRateLimiter;
 use crate::redis_client::RedisClient;
+use crate::usage_limit::{UsageLimiter, UsageLimiterConfig};
 
 /// Represents the authentication state of the gateway
 #[derive(Clone)]
@@ -44,6 +45,7 @@ pub struct AppStateData {
     pub authentication_info: AuthenticationInfo,
     pub model_credential_store: Arc<std::sync::RwLock<HashMap<String, SecretString>>>,
     pub rate_limiter: Option<Arc<DistributedRateLimiter>>,
+    pub usage_limiter: Option<Arc<UsageLimiter>>,
     pub geoip_service: Option<Arc<GeoIpService>>,
     pub ua_parser: Option<Arc<UserAgentParser>>,
     pub blocking_manager: Option<Arc<BlockingRulesManager>>,
@@ -102,6 +104,7 @@ impl AppStateData {
             authentication_info,
             model_credential_store: Arc::new(std::sync::RwLock::new(HashMap::new())),
             rate_limiter: None, // Will be initialized later with Redis client
+            usage_limiter: None, // Will be initialized later with Redis client
             geoip_service,
             ua_parser,
             blocking_manager: None, // Will be initialized later with Redis client
@@ -144,6 +147,12 @@ impl AppStateData {
     /// Create a new instance with rate limiter initialized
     pub fn with_rate_limiter(mut self, rate_limiter: Arc<DistributedRateLimiter>) -> Self {
         self.rate_limiter = Some(rate_limiter);
+        self
+    }
+
+    /// Create a new instance with usage limiter initialized
+    pub fn with_usage_limiter(mut self, usage_limiter: Arc<UsageLimiter>) -> Self {
+        self.usage_limiter = Some(usage_limiter);
         self
     }
 
@@ -372,6 +381,33 @@ pub async fn setup_redis_and_rate_limiter(
         app_state.blocking_manager = Some(manager);
         app_state
     } else {
+        app_state
+    };
+
+    // Initialize usage limiter if authentication is enabled
+    let app_state = if matches!(app_state.authentication_info, AuthenticationInfo::Enabled(_)) {
+        if let Ok(redis_url_var) = std::env::var("TENSORZERO_REDIS_URL") {
+            if !redis_url_var.is_empty() {
+                match UsageLimiter::new(redis_url_var.clone(), UsageLimiterConfig::default()).await {
+                    Ok(usage_limiter) => {
+                        tracing::info!("Usage limiter initialized successfully");
+                        app_state.with_usage_limiter(Arc::new(usage_limiter))
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to initialize usage limiter: {}", e);
+                        app_state
+                    }
+                }
+            } else {
+                tracing::warn!("Authentication is enabled but TENSORZERO_REDIS_URL is empty");
+                app_state
+            }
+        } else {
+            tracing::warn!("Authentication is enabled but TENSORZERO_REDIS_URL is not set");
+            app_state
+        }
+    } else {
+        tracing::info!("Authentication is disabled, skipping usage limiter initialization");
         app_state
     };
 

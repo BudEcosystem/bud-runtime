@@ -1,7 +1,7 @@
 // Using CSS variables for theme support
 $bg-main: var(--bg-primary);
 $bg-card: var(--bg-secondary);
-$border-color: var(--border);
+$border-color: var(--border-color);
 $text-white: var(--text-primary);
 $text-gray: var(--text-muted);
 $text-dark-gray: var(--text-disabled);
@@ -16,7 +16,7 @@ $primary-color: var(--color-purple);
 
     .ant-table-thead > tr > th {
       background: var(--bg-tertiary);
-      border-bottom: 1px solid $border-color;
+      border-bottom: 1px solid $border-color !important;
       color: $text-dark-gray;
       font-weight: 400;
       padding: 1rem 1.5rem;

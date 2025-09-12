@@ -23,7 +23,7 @@ spec:
       containers:
       - name: {{ .Release.Name}}-budapp
         image: {{ .Values.microservices.budapp.image }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["sh", "-c", "alembic -c ./budapp/alembic.ini upgrade head && uvicorn budapp.main:app --host 0.0.0.0 --port 9082"]
         ports:
         - containerPort: 9082
@@ -49,6 +49,8 @@ spec:
             value: {{ .Values.microservices.budsim.daprid }}
           - name: BUD_EVAL_APP_ID
             value: {{ .Values.microservices.budeval.daprid }}
+          - name: FRONTEND_URL
+            value: {{ include "bud.ingress.url.budcustomer" . }}
           - name: CORS_ORIGINS
             value: {{ join "," .Values.microservices.budapp.corsOrigins }},{{ include "bud.ingress.url.budadmin" $ }},{{ include "bud.ingress.url.budplayground" $ }},{{ include "bud.ingress.url.budcustomer" $ }}
         {{- $root := . }}

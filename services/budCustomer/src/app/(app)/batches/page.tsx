@@ -9,6 +9,7 @@ import {
   Tag,
   Progress,
   Tooltip,
+  Dropdown,
 } from "antd";
 import { useDrawer } from "@/hooks/useDrawer";
 import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
@@ -19,6 +20,7 @@ import { Icon } from "@iconify/react/dist/iconify.js";
 import styles from "./batches.module.scss";
 import Tags from "@/components/ui/Tags";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
+import { MoreOutlined } from "@ant-design/icons";
 
 interface BatchJob {
   id: string;
@@ -151,7 +153,7 @@ export default function BatchesPage() {
   const columns = [
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           BATCH NAME
         </Text>
       ),
@@ -170,7 +172,7 @@ export default function BatchesPage() {
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           MODEL
         </Text>
       ),
@@ -182,7 +184,7 @@ export default function BatchesPage() {
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           STATUS
         </Text>
       ),
@@ -190,21 +192,21 @@ export default function BatchesPage() {
       key: "status",
       render: (status: string) => (
         <Flex align="center" gap={8}>
-          <Icon
+          {/* <Icon
             icon={getStatusIcon(status)}
             className={`text-[1rem] ${status === "processing" ? "animate-spin" : ""}`}
             style={{ color: getStatusColor(status) }}
-          />
+          /> */}
           <Tags
             color={getStatusColor(status)}
-            name={status}
+            name={capitalizeFirstLetterLowerRest(status)}
           />
         </Flex>
       ),
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           PROGRESS
         </Text>
       ),
@@ -260,19 +262,21 @@ export default function BatchesPage() {
     // },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           COST
         </Text>
       ),
       dataIndex: "cost",
       key: "cost",
       render: (cost: number) => (
-        <Text className="text-[black] dark:text-[white] text-[13px]">${cost.toFixed(2)}</Text>
+        <Text className="text-[black] dark:text-[white] text-[13px]">
+          ${cost.toFixed(2)}
+        </Text>
       ),
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
+        <Text className="text-bud-text-primary text-[12px] uppercase">
           TIME
         </Text>
       ),
@@ -299,13 +303,98 @@ export default function BatchesPage() {
     },
     {
       title: (
-        <Text className="text-bud-text-disabled text-[12px] uppercase">
-          ACTIONS
-        </Text>
+        <Text className="text-bud-text-primary text-[12px] uppercase"></Text>
       ),
       key: "actions",
       render: (_: any, record: BatchJob) => (
-        <Flex gap={8}>
+        <div className="flex justify-end">
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: "view",
+                  label: "View",
+                  icon: (
+                    <span className="text-bud-text-primary">
+                      <Icon icon="ph:eye" className="text-bud-text-primary" />
+                    </span>
+                  ),
+                  onClick: () => {
+                    setSelectedBatch(record);
+                    setShowDetailsModal(true);
+                  },
+                  className: "hover:!bg-bud-bg-tertiary",
+                },
+                ...(record.status === "processing"
+                  ? [
+                      {
+                        key: "pause",
+                        label: "Pause",
+                        icon: (
+                          <span className="text-orange-500">
+                            <Icon icon="ph:pause" className="text-orange-500" />
+                          </span>
+                        ),
+                        onClick: () => {
+                          // handle pause
+                        },
+                        className: "hover:!bg-bud-bg-tertiary",
+                      },
+                    ]
+                  : []),
+                ...(record.status === "queued" || record.status === "processing"
+                  ? [
+                      {
+                        key: "cancel",
+                        label: "Cancel",
+                        icon: (
+                          <span className="text-red-500">
+                            <Icon icon="ph:x" className="text-red-500" />
+                          </span>
+                        ),
+                        onClick: () => {
+                          // handle cancel
+                        },
+                        className: "hover:!bg-bud-bg-tertiary",
+                      },
+                    ]
+                  : []),
+                ...(record.status === "completed"
+                  ? [
+                      {
+                        key: "download",
+                        label: "Download",
+                        icon: (
+                          <span className="text-green-500">
+                            <Icon
+                              icon="ph:download-simple"
+                              className="text-green-500"
+                            />
+                          </span>
+                        ),
+                        onClick: () => {
+                          // handle download
+                        },
+                        className: "hover:!bg-bud-bg-tertiary",
+                      },
+                    ]
+                  : []),
+              ],
+              className: "!bg-bud-bg-secondary !border-bud-border",
+            }}
+            trigger={["click"]}
+            placement="bottomRight"
+            overlayClassName="bud-dropdown-menu"
+          >
+            <Button
+              type="text"
+              icon={<MoreOutlined />}
+              className="!text-bud-text-muted hover:!text-bud-text-primary hover:!bg-bud-bg-tertiary transition-all"
+              size="large"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </Dropdown>
+          {/* <Flex gap={8}>
           <Button
             type="text"
             icon={<Icon icon="ph:eye" />}
@@ -336,7 +425,8 @@ export default function BatchesPage() {
               className="text-green-500 hover:text-bud-text-primary"
             />
           )}
-        </Flex>
+        </Flex> */}
+        </div>
       ),
     },
   ];
@@ -349,6 +439,10 @@ export default function BatchesPage() {
     completed: batches.filter((b) => b.status === "completed").length,
     failed: batches.filter((b) => b.status === "failed").length,
     totalCost: batches.reduce((acc, b) => acc + b.cost, 0),
+  };
+  const capitalizeFirstLetterLowerRest = (text: string) => {
+    if (!text) return "";
+    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
   };
 
   return (
@@ -366,7 +460,6 @@ export default function BatchesPage() {
               </Text>
             </div>
             <PrimaryButton
-
               onClick={() => openDrawerWithStep("create-batch-job")}
             >
               Create Batch Job
@@ -443,7 +536,6 @@ export default function BatchesPage() {
               className={styles.batchesTable}
             />
           </div>
-
 
           {/* Details Modal */}
           <Modal

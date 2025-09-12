@@ -8,13 +8,18 @@ import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { useProjects } from "@/hooks/useProjects";
 import { useDrawer } from "@/hooks/useDrawer";
 import { useRouter } from "next/navigation";
-import { Text_12_400_B3B3B3, Text_12_400_EEEEEE, Text_14_400_EEEEEE } from "@/components/ui/text";
+import {
+  Text_12_400_B3B3B3,
+  Text_12_400_EEEEEE,
+  Text_14_400_EEEEEE,
+} from "@/components/ui/text";
 import { Icon } from "@iconify/react";
 import AlertIcons from "@/flows/components/AlertIcons";
 
 export default function DeleteProject() {
   const { closeDrawer } = useDrawer();
-  const { globalSelectedProject, deleteProject, getGlobalProjects } = useProjects();
+  const { globalSelectedProject, deleteProject, getGlobalProjects } =
+    useProjects();
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -34,7 +39,7 @@ export default function DeleteProject() {
       await getGlobalProjects(1, 10);
       closeDrawer();
       // Only navigate if not already on projects page
-      if (!window.location.pathname.includes('/projects')) {
+      if (!window.location.pathname.includes("/projects")) {
         router.push("/projects");
       }
     } catch (error) {
@@ -75,10 +80,18 @@ export default function DeleteProject() {
                     Once you delete this project, all associated data including:
                   </Text_12_400_B3B3B3>
                   <ul className="list-disc list-inside ml-2">
-                    <li className="text-[#B3B3B3] text-xs">All project configurations</li>
-                    <li className="text-[#B3B3B3] text-xs">API keys and credentials</li>
-                    <li className="text-[#B3B3B3] text-xs">Deployment history</li>
-                    <li className="text-[#B3B3B3] text-xs">Team member associations</li>
+                    <li className="text-[#B3B3B3] text-xs">
+                      All project configurations
+                    </li>
+                    <li className="text-[#B3B3B3] text-xs">
+                      API keys and credentials
+                    </li>
+                    <li className="text-[#B3B3B3] text-xs">
+                      Deployment history
+                    </li>
+                    <li className="text-[#B3B3B3] text-xs">
+                      Team member associations
+                    </li>
                   </ul>
                   <Text_12_400_B3B3B3>
                     will be permanently removed and cannot be recovered.
@@ -91,7 +104,10 @@ export default function DeleteProject() {
                 <div className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
-                    style={{ backgroundColor: globalSelectedProject?.profile_colors?.[0] || "#965CDE" }}
+                    style={{
+                      backgroundColor:
+                        globalSelectedProject?.profile_colors?.[0] || "#965CDE",
+                    }}
                   >
                     {globalSelectedProject?.project?.icon || "📁"}
                   </div>
@@ -100,7 +116,8 @@ export default function DeleteProject() {
                       {projectName}
                     </Text_14_400_EEEEEE>
                     <Text_12_400_B3B3B3>
-                      {globalSelectedProject?.project?.description || "No description"}
+                      {globalSelectedProject?.project?.description ||
+                        "No description"}
                     </Text_12_400_B3B3B3>
                   </div>
                 </div>

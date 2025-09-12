@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -8,8 +8,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  ReferenceLine,
-  Rectangle,
 } from "recharts";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
@@ -84,10 +82,28 @@ const UsageChart: React.FC<UsageChartProps> = ({
     return null;
   };
 
+  const getDayFilterSelected = useMemo(() => {
+    const match = timeRange.match(/^(\d+)d$/);
+    return match ? parseInt(match[1], 10) : 30;
+  }, [timeRange]);
+
   const maxValue = useMemo(() => {
     if (!data || data.length === 0) return 0;
     return Math.max(...data.map((item) => item[chartConfig.dataKey] || 0));
   }, [data, chartConfig.dataKey]);
+
+  // Calculate days with usage and total value with proper memoization
+  const daysWithUsage = useMemo(() => {
+    const count = data.filter((d) => d.hasData === true).length;
+    return count;
+  }, [data]); // Recalculates when data changes
+
+  const totalValue = useMemo(() => {
+    return data.reduce(
+      (sum, item) => sum + (item[chartConfig.dataKey] || 0),
+      0,
+    );
+  }, [data, chartConfig.dataKey]); // Recalculates when data or dataKey changes
 
   // Custom bar shape with baseline
   const CustomBar = (props: any) => {
@@ -97,8 +113,9 @@ const UsageChart: React.FC<UsageChartProps> = ({
     const baselineY = y + height; // Bottom position
 
     // Check if light theme
-    const isLightTheme = document.documentElement.getAttribute('data-theme') === 'light';
-    const baselineColor = isLightTheme ? '#d1d5db' : '#4a4a4a';
+    const isLightTheme =
+      document.documentElement.getAttribute("data-theme") === "light";
+    const baselineColor = isLightTheme ? "#d1d5db" : "#4a4a4a";
 
     return (
       <g>
@@ -167,14 +184,17 @@ const UsageChart: React.FC<UsageChartProps> = ({
       <div className={styles.chartHeader}>
         <div className={styles.chartInfo}>
           <div className={styles.chartLegend}>
-            <span className={styles.legendDot} style={{ background: chartConfig.color }} />
+            <span
+              className={styles.legendDot}
+              style={{ background: chartConfig.color }}
+            />
             <span className={styles.legendText}>
-              {data.filter(d => d.hasData !== false).length} {type === "requests" ? "requests" : "days with usage"}
+              {type === "requests"
+                ? `${data.filter((d) => d.hasData !== false).length} requests`
+                : `${getDayFilterSelected} day${getDayFilterSelected > 1 ? "s" : ""} with usage`}
             </span>
             <span className={styles.legendValue}>
-              {chartConfig.formatter(
-                data.reduce((sum, item) => sum + (item[chartConfig.dataKey] || 0), 0)
-              )}
+              {chartConfig.formatter(totalValue)}
             </span>
           </div>
         </div>
@@ -183,12 +203,31 @@ const UsageChart: React.FC<UsageChartProps> = ({
       <ResponsiveContainer width="100%" height={220}>
         <BarChart
           data={data}
-          margin={{ top: 15, right: 15, left: 5, bottom: 5 }}
-          barCategoryGap={data.length > 30 ? "10%" : data.length > 14 ? "15%" : data.length > 7 ? "20%" : "25%"}
+          margin={{ top: 15, right: 15, left: 0, bottom: 10 }}
+          barCategoryGap={
+            data.length > 30
+              ? "10%"
+              : data.length > 14
+                ? "15%"
+                : data.length > 7
+                  ? "20%"
+                  : "25%"
+          }
         >
           <defs>
-            <pattern id="dotPattern" patternUnits="userSpaceOnUse" width="4" height="1">
-              <circle cx="1" cy="0.5" r="0.5" fill="var(--border-color)" opacity="0.5" />
+            <pattern
+              id="dotPattern"
+              patternUnits="userSpaceOnUse"
+              width="4"
+              height="1"
+            >
+              <circle
+                cx="1"
+                cy="0.5"
+                r="0.5"
+                fill="var(--border-color)"
+                opacity="0.5"
+              />
             </pattern>
           </defs>
           <CartesianGrid
@@ -197,41 +236,55 @@ const UsageChart: React.FC<UsageChartProps> = ({
             vertical={false}
             horizontal={false}
           />
-          {/* Top reference line with label */}
-          <ReferenceLine
-            y={maxValue}
-            stroke="#7c3aed"
-            strokeDasharray="2 2"
-            strokeWidth={1}
-            opacity={0.5}
-            label={{
-              value: chartConfig.formatter(maxValue),
-              position: "left",
-              fill: "#7c3aed",
-              fontSize: 11,
-              opacity: 0.8
-            }}
-          />
           {/* Baseline - removed as we'll use custom lines */}
           <XAxis
             dataKey="displayDate"
-            tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+            tick={{ fill: "var(--text-muted)", fontSize: 10 }}
             axisLine={false}
             tickLine={false}
-            height={35}
-            interval={data.length > 30 ? Math.floor(data.length / 10) : data.length > 14 ? 3 : data.length > 7 ? 1 : 0}
-            tickMargin={10}
+            height={40}
+            interval={
+              data.length > 30
+                ? Math.floor(data.length / 10)
+                : data.length > 14
+                  ? 3
+                  : data.length > 7
+                    ? 1
+                    : 0
+            }
+            tickMargin={15}
           />
           <YAxis
-            tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+            tick={(props: any) => {
+              // Skip rendering the first (bottom) tick to avoid overlap with X-axis
+              if (props.index === 0) {
+                return <text />;
+              }
+
+              let formattedValue = props.payload.value.toString();
+              if (type === "spend") {
+                formattedValue = `$${props.payload.value}`;
+              } else if (props.payload.value >= 1000) {
+                formattedValue = `${(props.payload.value / 1000).toFixed(0)}k`;
+              }
+
+              return (
+                <text
+                  x={props.x}
+                  y={props.y}
+                  fill="var(--text-muted)"
+                  fontSize={10}
+                  textAnchor="end"
+                  dx={-8}
+                >
+                  {formattedValue}
+                </text>
+              );
+            }}
             axisLine={false}
             tickLine={false}
-            width={45}
-            tickFormatter={(value: number) => {
-              if (type === "spend") return `$${value}`;
-              if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
-              return value.toString();
-            }}
+            width={65}
+            tickMargin={8}
           />
           <Tooltip
             content={<CustomTooltip />}
@@ -252,8 +305,8 @@ const UsageChart: React.FC<UsageChartProps> = ({
                   entry.hasData === false
                     ? "transparent"
                     : entry[chartConfig.dataKey] > maxValue * 0.8
-                    ? chartConfig.color
-                    : `${chartConfig.color}99`
+                      ? chartConfig.color
+                      : `${chartConfig.color}99`
                 }
               />
             ))}
