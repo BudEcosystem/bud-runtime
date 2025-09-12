@@ -716,7 +716,7 @@ class PromptConfigurationService:
         if not workflow_id:
             workflow_id = str(uuid.uuid4())
 
-        workflow_name = "prompt_schema"
+        workflow_name = "perform_prompt_schema"
         notification_request = NotificationRequest.from_cloud_event(
             cloud_event=request,
             name=workflow_name,
