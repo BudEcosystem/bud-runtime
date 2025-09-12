@@ -1,0 +1,6 @@
+ingress:
+    hosts:
+        root: varun.bud.studio
+
+# disable keel
+deploymentAnnotations: null
