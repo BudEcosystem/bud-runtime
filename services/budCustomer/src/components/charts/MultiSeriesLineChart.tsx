@@ -73,7 +73,7 @@ const MultiSeriesLineChart: React.FC<MultiSeriesLineChartProps> = ({
       grid: {
         left: "3%",
         right: "4%",
-        bottom: "15%",
+        bottom: "20%",
         top: "5%",
         containLabel: true,
       },
