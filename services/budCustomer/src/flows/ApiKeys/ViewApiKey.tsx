@@ -2,10 +2,8 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import {
-  Text_10_400_EEEEEE,
   Text_12_400_757575,
   Text_12_400_B3B3B3,
-  Text_12_400_EEEEEE,
   Text_14_400_EEEEEE,
 } from "@/components/ui/text";
 import React, { useEffect, useState } from "react";
@@ -141,13 +139,13 @@ export default function ViewApiKey() {
         <BudDrawerLayout>
           <div className="px-[1.4rem] pb-[.9rem] rounded-ss-lg rounded-se-lg pt-[1.1rem] border-b-[.5px] border-b-[#1F1F1F] relative">
             <div className="flex justify-between align-center">
-              <Text_14_400_EEEEEE className="p-0 pt-[.4rem] m-0">
+              <div className="block text-sm font-normal text-gray-900 dark:text-[#EEEEEE] p-0 pt-[.4rem] m-0">
                 {selectedApiKey?.name}
-              </Text_14_400_EEEEEE>
+              </div>
             </div>
-            <Text_12_400_757575 className="pt-[.55rem] leading-[1.05rem]">
+            <div className="block text-xs font-normal text-gray-500 dark:text-[#757575] pt-[.55rem] leading-[1.05rem]">
               API Key Details
-            </Text_12_400_757575>
+            </div>
             <div className="absolute right-[.5rem] top-[.5rem]">
               <CustomDropDown
                 buttonContent={
@@ -200,13 +198,13 @@ export default function ViewApiKey() {
                 </div>
                 <div className="flex items-center justify-between w-full flex-auto max-w-[73%]">
                   {showKey ? (
-                    <Text_12_400_EEEEEE className="leading-[100%] !leading-[0.875rem] max-w-[90%] truncate">
+                    <div className="block text-xs font-normal text-gray-900 dark:text-[#EEEEEE] leading-[100%] !leading-[0.875rem] max-w-[90%] truncate">
                       {decryptedKey || "Loading..."}
-                    </Text_12_400_EEEEEE>
+                    </div>
                   ) : (
-                    <Text_10_400_EEEEEE className="leading-[0.875rem] max-w-[90%] truncate">
+                    <div className="block text-[0.625rem] font-normal text-gray-900 dark:text-[#EEEEEE] leading-[0.875rem] max-w-[90%] truncate">
                       {decryptedKey?.replace(/./g, "⏺")}
-                    </Text_10_400_EEEEEE>
+                    </div>
                   )}
                   <div className="flex justify-end items-center relative">
                     <button
@@ -214,9 +212,9 @@ export default function ViewApiKey() {
                       className="ml-[.5rem]"
                     >
                       {showKey ? (
-                        <EyeOutlined className="text-[#B3B3B3]" />
+                        <EyeOutlined className="text-gray-600 dark:text-[#B3B3B3]" />
                       ) : (
-                        <EyeInvisibleOutlined className="text-[#B3B3B3]" />
+                        <EyeInvisibleOutlined className="text-gray-600 dark:text-[#B3B3B3]" />
                       )}
                     </button>
                     <CustomPopover
@@ -253,9 +251,9 @@ export default function ViewApiKey() {
                   <div className="block text-xs font-normal text-gray-700 dark:text-[#B3B3B3]">Project name</div>
                 </div>
                 <div className="flex items-center justify-between w-full flex-auto max-w-[73%]">
-                  <Text_12_400_EEEEEE className="leading-[.875rem] w-[280px] truncate">
+                  <div className="block text-xs font-normal text-gray-900 dark:text-[#EEEEEE] leading-[.875rem] w-[280px] truncate">
                     {selectedApiKey?.project?.name || "N/A"}
-                  </Text_12_400_EEEEEE>
+                  </div>
                 </div>
               </div>
 
@@ -273,11 +271,11 @@ export default function ViewApiKey() {
                   <div className="block text-xs font-normal text-gray-700 dark:text-[#B3B3B3]">Created</div>
                 </div>
                 <div className="flex items-center justify-between w-full flex-auto max-w-[73%]">
-                  <Text_12_400_EEEEEE className="leading-[.875rem] w-[280px] truncate">
+                  <div className="block text-xs font-normal text-gray-900 dark:text-[#EEEEEE] leading-[.875rem] w-[280px] truncate">
                     {selectedApiKey?.created_at
                       ? formatDate(selectedApiKey.created_at)
                       : "--"}
-                  </Text_12_400_EEEEEE>
+                  </div>
                 </div>
               </div>
 
@@ -295,11 +293,11 @@ export default function ViewApiKey() {
                   <div className="block text-xs font-normal text-gray-700 dark:text-[#B3B3B3]">Expiry Date</div>
                 </div>
                 <div className="flex items-center justify-between w-full flex-auto max-w-[73%]">
-                  <Text_12_400_EEEEEE className="leading-[.875rem] w-[280px] truncate">
+                  <div className="block text-xs font-normal text-gray-900 dark:text-[#EEEEEE] leading-[.875rem] w-[280px] truncate">
                     {selectedApiKey?.expiry
                       ? formatDate(selectedApiKey.expiry)
                       : "Never"}
-                  </Text_12_400_EEEEEE>
+                  </div>
                 </div>
               </div>
 
@@ -317,11 +315,11 @@ export default function ViewApiKey() {
                   <div className="block text-xs font-normal text-gray-700 dark:text-[#B3B3B3]">Last Used</div>
                 </div>
                 <div className="flex items-center justify-between w-full flex-auto max-w-[73%]">
-                  <Text_12_400_EEEEEE className="leading-[.875rem] w-[280px] truncate">
+                  <div className="block text-xs font-normal text-gray-900 dark:text-[#EEEEEE] leading-[.875rem] w-[280px] truncate">
                     {selectedApiKey?.last_used_at
                       ? formatDate(selectedApiKey.last_used_at)
                       : "--"}
-                  </Text_12_400_EEEEEE>
+                  </div>
                 </div>
               </div>
             </div>
