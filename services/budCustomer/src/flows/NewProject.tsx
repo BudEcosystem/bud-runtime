@@ -37,6 +37,7 @@ export default function NewProject() {
   const { openDrawerWithStep } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
   const [options, setOptions] = useState<{ name: string; color: string }[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
 
   const fetchList = useCallback(() => {
     const data =
@@ -114,10 +115,19 @@ export default function NewProject() {
           icon: "😍",
         }}
         onNext={(values) => {
+          // Prevent multiple submissions
+          if (isCreating) {
+            return;
+          }
+
           if (!submittable) {
             form.submit();
             return;
           }
+
+          // Set loading state to prevent multiple clicks
+          setIsCreating(true);
+
           // Ensure tags are in the correct format (array of objects with name and color)
           const formattedTags = values.tags
             ? (Array.isArray(values.tags) ? values.tags : [])
@@ -147,13 +157,19 @@ export default function NewProject() {
             : [];
 
           const projectData: ProjectData = {
-            name: values.name,
-            description: values.description,
+            name: values.name ? values.name.trim() : "",
+            description: values.description ? values.description.trim() : "",
             tags: formattedTags,
             icon: values.icon || "😍",
             project_type: "client_app",
             benchmark: false,
           };
+
+          // Additional validation to ensure name is not empty after trimming
+          if (!projectData.name) {
+            setIsCreating(false);
+            return;
+          }
 
           apiCreateProject(projectData)
             .then((result) => {
@@ -168,9 +184,15 @@ export default function NewProject() {
             })
             .catch((error) => {
               console.error("Error creating project:", error);
+            })
+            .finally(() => {
+              // Reset loading state in case of error or if user navigates back
+              setIsCreating(false);
             });
         }}
         nextText="Create Project"
+        disableNext={isCreating}
+        drawerLoading={isCreating}
       >
         <BudWraperBox center>
           <BudDrawerLayout>
