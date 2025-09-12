@@ -2013,7 +2013,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topModels}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2059,7 +2059,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topEndpoints}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2105,7 +2105,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topProjects}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2152,7 +2152,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topModels}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2198,7 +2198,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topEndpoints}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
