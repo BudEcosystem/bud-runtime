@@ -612,107 +612,55 @@ export default function AuditPage() {
       <style
         dangerouslySetInnerHTML={{
           __html: `
-        /* Custom pagination text color styling for audit page */
+        /* Theme-aware pagination styling for Audit page */
+        .CommonCustomPagination .ant-pagination {
+          color: var(--text-primary) !important;
+        }
         .CommonCustomPagination .ant-pagination-item a {
-          color: #ffffff !important;
+          color: var(--text-primary) !important;
         }
         .CommonCustomPagination .ant-pagination-item-active a {
-          color: #000000 !important;
-        }
-        .CommonCustomPagination .ant-pagination-prev,
-        .CommonCustomPagination .ant-pagination-next {
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: inline-block !important;
+          color: var(--text-contrast) !important;
         }
         .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
         .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
-          color: #ffffff !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: block !important;
-        }
-        .CommonCustomPagination .ant-pagination-prev button,
-        .CommonCustomPagination .ant-pagination-next button {
-          opacity: 1 !important;
-          visibility: visible !important;
-          color: #ffffff !important;
-        }
-        .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link svg,
-        .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link svg {
-          fill: #ffffff !important;
-          opacity: 1 !important;
-        }
-        .CommonCustomPagination .ant-pagination-prev:not(.ant-pagination-disabled),
-        .CommonCustomPagination .ant-pagination-next:not(.ant-pagination-disabled) {
-          opacity: 1 !important;
-        }
-        .CommonCustomPagination .ant-pagination-disabled .ant-pagination-item-link {
-          color: #666666 !important;
-          opacity: 0.5 !important;
-          visibility: visible !important;
+          color: var(--text-primary) !important;
         }
         .CommonCustomPagination .ant-pagination-options {
-          color: #ffffff !important;
+          color: var(--text-primary) !important;
         }
         .CommonCustomPagination .ant-select-selector {
-          color: #ffffff !important;
+          color: var(--text-primary) !important;
         }
         .CommonCustomPagination .ant-select-arrow {
-          color: #ffffff !important;
+          color: var(--text-primary) !important;
         }
-        .CommonCustomPagination .ant-pagination-item:hover a {
-          color: #965CDE !important;
-        }
-        /* Light theme specific - keep numbers white */
+        /* Light theme specific */
         [data-theme="light"] .CommonCustomPagination .ant-pagination-item a {
-          color: #ffffff !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-item-active a {
           color: #000000 !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next {
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: inline-block !important;
         }
         [data-theme="light"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
         [data-theme="light"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
           color: #000000 !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: block !important;
         }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:hover .ant-pagination-item-link,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:hover .ant-pagination-item-link {
-          color: #965CDE !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev button,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next button {
-          opacity: 1 !important;
-          visibility: visible !important;
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-options {
           color: #000000 !important;
         }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link svg,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link svg {
-          fill: #000000 !important;
-          opacity: 1 !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:hover .ant-pagination-item-link svg,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:hover .ant-pagination-item-link svg {
-          fill: #965CDE !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:not(.ant-pagination-disabled),
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:not(.ant-pagination-disabled) {
-          opacity: 1 !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-disabled .ant-pagination-item-link {
-          color: #666666 !important;
-          opacity: 0.5 !important;
-          visibility: visible !important;
-        }
         [data-theme="light"] .CommonCustomPagination .ant-select-selector {
+          color: #000000 !important;
+        }
+        /* Dark theme specific */
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-item a {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-options {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-select-selector {
           color: #ffffff !important;
         }
       `,
@@ -916,7 +864,7 @@ export default function AuditPage() {
                 <Skeleton active paragraph={{ rows: 8 }} />
               </div>
             ) : (
-              <div>
+              <div className="pb-6">
                 <div className="flex items-center gap-2 mb-3 hidden">
                   <ClockCircleOutlined className="text-bud-text-disabled" />
                   {dayFilter.map((item: any) => (
@@ -951,7 +899,7 @@ export default function AuditPage() {
                   }
                 />
                 {/* Pagination */}
-                <div className="flex justify-end my-4 px-3  CommonCustomPagination">
+                <div className="flex justify-end mt-4 mr-4 CommonCustomPagination">
                   <Pagination
                     className="small-pagination"
                     current={currentPage}
