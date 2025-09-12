@@ -153,7 +153,7 @@ class ExperimentService:
             self.session.refresh(ev)
         except Exception as e:
             self.session.rollback()
-            logger.debug(f"Failed to create experiment: {e}", exc_info=True)
+            logger.warning(f"Failed to create experiment: {e}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create experiment"
             ) from e
@@ -238,7 +238,7 @@ class ExperimentService:
             raise
         except Exception as e:
             self.session.rollback()
-            logger.debug(f"Failed to configure runs: {e}", exc_info=True)
+            logger.warning(f"Failed to configure runs: {e}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to configure runs"
             ) from e
@@ -1094,7 +1094,7 @@ class ExperimentService:
             raise
         except Exception as e:
             self.session.rollback()
-            logger.debug(f"Failed to create dataset: {e}", exc_info=True)
+            logger.warning(f"Failed to create dataset: {e}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create dataset"
             ) from e
@@ -1177,7 +1177,7 @@ class ExperimentService:
             raise
         except Exception as e:
             self.session.rollback()
-            logger.debug(f"Failed to update dataset: {e}", exc_info=True)
+            logger.warning(f"Failed to update dataset: {e}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update dataset"
             ) from e
@@ -1564,7 +1564,7 @@ class ExperimentWorkflowService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.debug(f"Failed to process experiment workflow step: {e}", exc_info=True)
+            logger.warning(f"Failed to process experiment workflow step: {e}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process workflow step"
             ) from e
@@ -2055,7 +2055,7 @@ class EvaluationWorkflowService:
             # After storing the workflow step, retrieve all accumulated data
             all_step_data = await self._get_accumulated_step_data(workflow.id)
 
-            logger.debug(f"All Step Data: {all_step_data}")
+            logger.warning(f"All Step Data: {all_step_data}")
 
             # Determine if workflow is complete
             is_complete = (
@@ -2091,9 +2091,9 @@ class EvaluationWorkflowService:
                         if isinstance(step, dict) and "payload" not in step:
                             step["payload"] = {}
                 except Exception as e:
-                    logger.debug(f"Skipping step payload initialization: {e}")
+                    logger.warning(f"Skipping step payload initialization: {e}")
 
-                logger.debug(f"Trigger Workflow Response 01 : {trigger_workflow_response}")
+                logger.warning(f"Trigger Workflow Response 01 : {trigger_workflow_response}")
 
                 evaluation_events_payload = {
                     BudServeWorkflowStepEventName.EVALUATION_EVENTS.value: trigger_workflow_response
@@ -2103,14 +2103,14 @@ class EvaluationWorkflowService:
                     workflow.id, current_step_number, evaluation_events_payload
                 )
 
-                logger.debug(f"Workflow step created with id {db_workflow_step.id}")
+                logger.warning(f"Workflow step created with id {db_workflow_step.id}")
 
                 evaluation_events_payload["progress_type"] = BudServeWorkflowStepEventName.EVALUATION_EVENTS.value
                 await WorkflowDataManager(self.session).update_by_fields(
                     workflow, {"progress": trigger_workflow_response, "current_step": workflow_current_step}
                 )
 
-                logger.debug(f"Trigger Workflow Response 02: {evaluation_events_payload}")
+                logger.warning(f"Trigger Workflow Response 02: {evaluation_events_payload}")
 
                 # Get All The Step From Workflow
                 # db_workflow_step = await self._create_or_update_next_workflow_step(workflow.id, current_step_number, {})
@@ -2143,13 +2143,13 @@ class EvaluationWorkflowService:
 
                 # Return unified workflow response matching cluster creation
                 # return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
-                logger.debug(f"Trigger Workflow Response 03: {trigger_workflow_response}")
+                logger.warning(f"Trigger Workflow Response 03: {trigger_workflow_response}")
             return await WorkflowService(self.session).retrieve_workflow_data(workflow.id)
 
         except HTTPException:
             raise
         except Exception as e:
-            logger.debug(f"Failed to process evaluation workflow step: {e}", exc_info=True)
+            logger.warning(f"Failed to process evaluation workflow step: {e}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process workflow step"
             ) from e
@@ -2191,7 +2191,7 @@ class EvaluationWorkflowService:
         """
         steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps({"workflow_id": workflow_id})
 
-        logger.debug(f"Steps: {steps}")
+        logger.warning(f"Steps: {steps}")
 
         accumulated_data = {}
         for step in steps:
@@ -2666,7 +2666,7 @@ class EvaluationWorkflowService:
             async with aiohttp.ClientSession() as session:
                 async with session.post(budeval_endpoint, json=eval_request) as response:
                     response_data = await response.json()
-                    logger.debug(f"Response from budeval service: {response_data}")
+                    logger.warning(f"Response from budeval service: {response_data}")
 
                     if response.status != 200:
                         error_message = response_data.get("message", "Failed to start evaluation")
@@ -2701,7 +2701,7 @@ class EvaluationWorkflowService:
                 f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_eval_app_id}/method/evals/status/{job_id}"
             )
 
-            logger.debug(f"Getting evaluation status for job {job_id}")
+            logger.warning(f"Getting evaluation status for job {job_id}")
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(status_endpoint) as response:
@@ -2872,7 +2872,7 @@ class EvaluationWorkflowService:
     #                 f"Successfully triggered single evaluation for {len(runs)} runs with datasets: {all_datasets}"
     #             )
 
-    #             logger.debug(f"Response X02: {response}")
+    #             logger.warning(f"Response X02: {response}")
 
     #             return response
 
@@ -2986,7 +2986,7 @@ class EvaluationWorkflowService:
                     f"Successfully triggered single evaluation for {len(runs)} runs with datasets: {all_datasets}"
                 )
 
-                logger.debug(f"Response X01: {response}")
+                logger.warning(f"Response X01: {response}")
 
                 return response
             except Exception as e:
@@ -3020,7 +3020,7 @@ class EvaluationWorkflowService:
         from budapp.core.schemas import NotificationResult
         from budapp.shared.notification_service import BudNotifyService, NotificationBuilder
 
-        logger.debug("Received event for evaluation completion")
+        logger.warning("Received event for evaluation completion")
 
         try:
             # Get workflow and steps
@@ -3051,7 +3051,7 @@ class EvaluationWorkflowService:
                         if key in db_workflow_step.data:
                             required_data[key] = db_workflow_step.data[key]
 
-            logger.debug("Collected required data from workflow steps")
+            logger.warning("Collected required data from workflow steps")
 
             # Get experiment details
             experiment_id = required_data.get("experiment_id")
@@ -3134,7 +3134,7 @@ class EvaluationWorkflowService:
                 db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
                     db_workflow.id, current_step_number, workflow_step_data
                 )
-                logger.debug(f"Updated workflow step {db_workflow_step.id} with evaluation completion status")
+                logger.warning(f"Updated workflow step {db_workflow_step.id} with evaluation completion status")
 
                 # Update workflow
                 workflow_data.update({"current_step": workflow_current_step})
