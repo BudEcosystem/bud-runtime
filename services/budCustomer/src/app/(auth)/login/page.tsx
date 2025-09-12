@@ -133,7 +133,7 @@ function LoginContent() {
   }, [searchParams, router, showLoader, hideLoader]);
 
   useEffect(() => {
-    console.log("Environment variables from provider:");
+
     console.log("baseUrl:", environment.baseUrl);
     console.log("novuBaseUrl:", environment.novuBaseUrl);
 
