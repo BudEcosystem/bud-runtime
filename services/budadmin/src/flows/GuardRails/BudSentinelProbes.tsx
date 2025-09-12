@@ -100,7 +100,7 @@ export default function BudSentinelProbes() {
           workflow_total_steps: 6,
           probe_selections: [
             {
-              probe_id: selectedProbe,
+              id: selectedProbe,
               enabled: true,
             },
           ],

@@ -53,7 +53,7 @@ interface GuardrailsWorkflow {
   workflow_total_steps: number;
   provider_id?: string;
   probe_selections?: Array<{
-    probe_id: string;
+    id: string;
     enabled: boolean;
     rule_selections?: string[];
   }>;
