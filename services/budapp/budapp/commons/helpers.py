@@ -447,6 +447,23 @@ async def determine_modality_endpoints(
     elif input_modality == "speech_to_text":
         result["modality"] = [ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT]
         result["endpoints"] = [ModelEndpointEnum.AUDIO_TRANSCRIPTION]
+    elif input_modality == "audio_translation":
+        result["modality"] = [ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT]
+        result["endpoints"] = [ModelEndpointEnum.AUDIO_TRANSLATION]
+    elif input_modality == "image_edit":
+        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.IMAGE_OUTPUT]
+        result["endpoints"] = [ModelEndpointEnum.IMAGE_EDIT]
+    elif input_modality == "image_variation":
+        result["modality"] = [ModalityEnum.IMAGE_INPUT, ModalityEnum.IMAGE_OUTPUT]
+        result["endpoints"] = [ModelEndpointEnum.IMAGE_VARIATION]
+    elif input_modality == "realtime":
+        result["modality"] = [
+            ModalityEnum.TEXT_INPUT,
+            ModalityEnum.AUDIO_INPUT,
+            ModalityEnum.TEXT_OUTPUT,
+            ModalityEnum.AUDIO_OUTPUT,
+        ]
+        result["endpoints"] = [ModelEndpointEnum.REALTIME_SESSION, ModelEndpointEnum.REALTIME_TRANSCRIPTION]
     elif input_modality == "llm_embedding":
         result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
         result["endpoints"] = [ModelEndpointEnum.EMBEDDING]
@@ -494,6 +511,25 @@ async def determine_supported_endpoints(
         ModalityEnum.TEXT_OUTPUT.value,
     }.issubset(modality_set):
         endpoints.add(ModelEndpointEnum.AUDIO_TRANSCRIPTION)
+        endpoints.add(ModelEndpointEnum.AUDIO_TRANSLATION)
+
+    # Image editing requires both image input and output
+    if {
+        ModalityEnum.IMAGE_INPUT.value,
+        ModalityEnum.IMAGE_OUTPUT.value,
+    }.issubset(modality_set):
+        endpoints.add(ModelEndpointEnum.IMAGE_EDIT)
+        endpoints.add(ModelEndpointEnum.IMAGE_VARIATION)
+
+    # Real-time endpoints for audio+text bidirectional
+    if {
+        ModalityEnum.AUDIO_INPUT.value,
+        ModalityEnum.AUDIO_OUTPUT.value,
+        ModalityEnum.TEXT_INPUT.value,
+        ModalityEnum.TEXT_OUTPUT.value,
+    }.issubset(modality_set):
+        endpoints.add(ModelEndpointEnum.REALTIME_SESSION)
+        endpoints.add(ModelEndpointEnum.REALTIME_TRANSCRIPTION)
 
     if not endpoints:
         # Add default endpoint

@@ -2986,18 +2986,30 @@ class ModelEndpointEnum(Enum):
         CHAT (str): Chat completion endpoint for conversational AI.
         COMPLETION (str): Text completion endpoint for non-conversational AI.
         IMAGE_GENERATION (str): Image creation endpoint.
+        IMAGE_EDIT (str): Image editing endpoint for modifying existing images.
+        IMAGE_VARIATION (str): Image variation endpoint for creating variations of existing images.
         AUDIO_TRANSCRIPTION (str): Speech-to-text conversion endpoint.
+        AUDIO_TRANSLATION (str): Audio translation to English text endpoint.
         TEXT_TO_SPEECH (str): Text-to-speech synthesis endpoint.
+        REALTIME_SESSION (str): Real-time bidirectional conversation endpoint.
+        REALTIME_TRANSCRIPTION (str): Real-time audio transcription session endpoint.
         EMBEDDING (str): Vector embedding generation endpoint.
         BATCH (str): Batch processing endpoint for multiple requests.
-        RESPONSE (str): Response retrieval endpoint for asynchronous operations.
+        RESPONSES (str): Response retrieval endpoint for asynchronous operations.
+        RERANK (str): Reranking endpoint for relevance scoring.
+        MODERATION (str): Content moderation endpoint.
     """
 
     CHAT = "/v1/chat/completions"
     COMPLETION = "/v1/completions"
     IMAGE_GENERATION = "/v1/images/generations"
+    IMAGE_EDIT = "/v1/images/edits"
+    IMAGE_VARIATION = "/v1/images/variations"
     AUDIO_TRANSCRIPTION = "/v1/audio/transcriptions"
+    AUDIO_TRANSLATION = "/v1/audio/translations"
     TEXT_TO_SPEECH = "/v1/audio/speech"
+    REALTIME_SESSION = "/v1/realtime/sessions"
+    REALTIME_TRANSCRIPTION = "/v1/realtime/transcription_sessions"
     EMBEDDING = "/v1/embeddings"
     BATCH = "/v1/batch"
     RESPONSES = "/v1/responses"
@@ -3022,8 +3034,13 @@ class ModelEndpointEnum(Enum):
             cls.CHAT: "Chat Completions",
             cls.COMPLETION: "Completions",
             cls.IMAGE_GENERATION: "Image Generation",
+            cls.IMAGE_EDIT: "Image Editing",
+            cls.IMAGE_VARIATION: "Image Variations",
             cls.AUDIO_TRANSCRIPTION: "Transcription",
+            cls.AUDIO_TRANSLATION: "Audio Translation",
             cls.TEXT_TO_SPEECH: "Speech generation",
+            cls.REALTIME_SESSION: "Real-time Session",
+            cls.REALTIME_TRANSCRIPTION: "Real-time Transcription",
             cls.EMBEDDING: "Embeddings",
             cls.BATCH: "Batch",
             cls.RESPONSES: "Responses",
