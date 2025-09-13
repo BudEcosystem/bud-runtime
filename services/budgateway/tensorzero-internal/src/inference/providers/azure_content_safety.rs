@@ -23,6 +23,29 @@ const PROVIDER_TYPE: &str = "azure_content_safety";
 pub struct AzureContentSafetyProvider {
     endpoint: Url,
     credentials: AzureContentSafetyCredentials,
+    probe_type: ProbeType,  // New field to specify which probe this instance handles
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ProbeType {
+    Moderation,
+    PromptShields,
+    GroundednessDetection,
+    ProtectedMaterialText,
+    ProtectedMaterialCode,
+}
+
+impl ProbeType {
+    pub fn from_probe_id(probe_id: &str) -> Option<Self> {
+        match probe_id {
+            "moderation" => Some(ProbeType::Moderation),
+            "prompt-shields" => Some(ProbeType::PromptShields),
+            "groundedness-detection-preview" => Some(ProbeType::GroundednessDetection),
+            "protected-material-detection-text" => Some(ProbeType::ProtectedMaterialText),
+            "protected-material-detection-code" => Some(ProbeType::ProtectedMaterialCode),
+            _ => None,
+        }
+    }
 }
 
 static DEFAULT_CREDENTIALS: OnceLock<AzureContentSafetyCredentials> = OnceLock::new();
@@ -31,6 +54,7 @@ impl AzureContentSafetyProvider {
     pub fn new(
         endpoint: Url,
         api_key_location: Option<CredentialLocation>,
+        probe_type: ProbeType,
     ) -> Result<Self, Error> {
         let credentials = build_creds_caching_default(
             api_key_location,
@@ -41,6 +65,7 @@ impl AzureContentSafetyProvider {
         Ok(AzureContentSafetyProvider {
             endpoint,
             credentials,
+            probe_type,
         })
     }
 }
@@ -94,7 +119,7 @@ fn default_api_key_location() -> CredentialLocation {
 
 // URL construction functions following Azure provider pattern
 // Each endpoint has its own API version as per Azure documentation
-fn get_azure_content_safety_text_url(endpoint: &Url) -> Result<Url, Error> {
+fn get_azure_content_safety_text_moderation_url(endpoint: &Url) -> Result<Url, Error> {
     const TEXT_API_VERSION: &str = "2024-09-01";
     let mut url = endpoint.clone();
     url.path_segments_mut()
@@ -187,10 +212,6 @@ fn get_azure_content_safety_protected_material_code_url(endpoint: &Url) -> Resul
         .append_pair("api-version", PROTECTED_MATERIAL_CODE_API_VERSION);
     Ok(url)
 }
-// fn get_azure_content_safety_image_url(endpoint: &Url) -> Result<Url, Error> {
-//     const IMAGE_API_VERSION: &str = "2024-09-01";
-//     // Implementation...
-// }
 
 // Azure Content Safety specific request/response structures
 #[derive(Debug, Serialize)]
@@ -418,7 +439,300 @@ fn severity_to_flagged(severity: i32, threshold: i32) -> bool {
     severity >= threshold
 }
 
+impl ModerationProvider for AzureContentSafetyProvider {
+    async fn moderate(
+        &self,
+        request: &ModerationRequest,
+        client: &reqwest::Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<ModerationProviderResponse, Error> {
+        let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
+        let start_time = Instant::now();
+
+        // Get input texts
+        let texts = request.input.as_vec();
+        let text_strings: Vec<String> = texts.iter().map(|s| s.to_string()).collect();
+
+        if text_strings.is_empty() {
+            return Err(Error::new(ErrorDetails::InvalidRequest {
+                message: "No input text provided".to_string(),
+            }));
+        }
+
+        // Execute the appropriate probe based on probe_type
+        let results = match self.probe_type {
+            ProbeType::Moderation => {
+                self.handle_text_moderation(request, &text_strings, api_key, client).await?
+            }
+            ProbeType::PromptShields => {
+                self.handle_prompt_shields(request, &text_strings, api_key, client).await?
+            }
+            ProbeType::GroundednessDetection => {
+                self.handle_groundedness(request, &text_strings, api_key, client).await?
+            }
+            ProbeType::ProtectedMaterialText => {
+                self.handle_protected_material(request, &text_strings, api_key, client).await?
+            }
+            ProbeType::ProtectedMaterialCode => {
+                self.handle_protected_material_code(request, &text_strings, api_key, client).await?
+            }
+        };
+
+        let latency = Latency::NonStreaming {
+            response_time: start_time.elapsed(),
+        };
+
+        let raw_request = serde_json::to_string(&request).map_err(|e| {
+            Error::new(ErrorDetails::Serialization {
+                message: format!(
+                    "Error serializing request body as JSON: {}",
+                    DisplayOrDebugGateway::new(e)
+                ),
+            })
+        })?;
+
+        Ok(ModerationProviderResponse {
+            id: Uuid::now_v7(),
+            input: request.input.clone(),
+            results: results.clone(),
+            created: current_timestamp(),
+            model: "azure-content-safety".to_string(),
+            raw_request,
+            raw_response: serde_json::to_string(&results).unwrap_or_default(),
+            usage: Usage {
+                input_tokens: texts.iter().map(|t| t.split_whitespace().count() as u32).sum(),
+                output_tokens: 0,
+            },
+            latency,
+        })
+    }
+}
+
 impl AzureContentSafetyProvider {
+    /// Handle text moderation probe
+    async fn handle_text_moderation(
+        &self,
+        request: &ModerationRequest,
+        texts: &[String],
+        api_key: Option<&SecretString>,
+        client: &reqwest::Client,
+    ) -> Result<Vec<ModerationResult>, Error> {
+        // Extract parameters
+        let mut blocklist_names = vec![];
+        let mut categories = None;
+        let mut halt_on_blocklist_hit = None;
+        let mut output_type = Some("EightSeverityLevels".to_string());
+
+        if let Some(provider_params) = &request.provider_params {
+            if let Some(obj) = provider_params.as_object() {
+                // Extract blocklistNames
+                if let Some(names) = obj.get("blocklistNames").or_else(|| obj.get("blocklist_names")) {
+                    if let Some(names_array) = names.as_array() {
+                        blocklist_names = names_array
+                            .iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect();
+                    }
+                }
+
+                // Extract categories
+                if let Some(cats) = obj.get("categories") {
+                    if let Some(cats_array) = cats.as_array() {
+                        let cat_strings: Vec<String> = cats_array
+                            .iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect();
+                        if !cat_strings.is_empty() {
+                            categories = Some(cat_strings);
+                        }
+                    }
+                }
+
+                // Extract halt flag
+                if let Some(halt) = obj.get("haltOnBlocklistHit").or_else(|| obj.get("halt_on_blocklist_hit")) {
+                    halt_on_blocklist_hit = halt.as_bool();
+                }
+
+                // Extract output type
+                if let Some(output) = obj.get("outputType").or_else(|| obj.get("output_type")) {
+                    if let Some(output_str) = output.as_str() {
+                        output_type = Some(output_str.to_string());
+                    }
+                }
+            }
+        }
+
+        self.analyze_text(
+            texts,
+            blocklist_names,
+            categories,
+            halt_on_blocklist_hit,
+            output_type,
+            api_key,
+            client,
+        ).await
+    }
+
+    /// Handle prompt shields probe
+    async fn handle_prompt_shields(
+        &self,
+        request: &ModerationRequest,
+        texts: &[String],
+        api_key: Option<&SecretString>,
+        client: &reqwest::Client,
+    ) -> Result<Vec<ModerationResult>, Error> {
+        let mut documents = vec![];
+
+        if let Some(provider_params) = &request.provider_params {
+            if let Some(obj) = provider_params.as_object() {
+                if let Some(docs) = obj.get("documents") {
+                    if let Some(docs_array) = docs.as_array() {
+                        documents = docs_array
+                            .iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect();
+                    }
+                }
+            }
+        }
+
+        let user_prompt = texts[0].to_string();
+        let result = self.analyze_prompt_shield(user_prompt, documents, api_key, client).await?;
+        Ok(vec![result])
+    }
+
+    /// Handle groundedness detection probe
+    async fn handle_groundedness(
+        &self,
+        request: &ModerationRequest,
+        texts: &[String],
+        api_key: Option<&SecretString>,
+        client: &reqwest::Client,
+    ) -> Result<Vec<ModerationResult>, Error> {
+        let mut grounding_sources = vec![];
+        let mut domain = DomainType::Generic;
+        let mut task_type = TaskType::Summarization;
+        let mut query = None;
+        let mut reasoning = false;
+        let mut correction = false;
+        let mut llm_resource = None;
+
+        if let Some(provider_params) = &request.provider_params {
+            if let Some(obj) = provider_params.as_object() {
+                // Extract grounding sources
+                if let Some(sources) = obj.get("grounding_sources").or_else(|| obj.get("groundingSources")) {
+                    if let Some(sources_array) = sources.as_array() {
+                        grounding_sources = sources_array
+                            .iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect();
+                    }
+                }
+
+                // Extract domain
+                if let Some(domain_param) = obj.get("domain") {
+                    if let Some(domain_str) = domain_param.as_str() {
+                        domain = match domain_str.to_uppercase().as_str() {
+                            "MEDICAL" => DomainType::Medical,
+                            _ => DomainType::Generic,
+                        };
+                    }
+                }
+
+                // Extract task type
+                if let Some(task) = obj.get("task") {
+                    if let Some(task_str) = task.as_str() {
+                        task_type = match task_str.to_uppercase().as_str() {
+                            "QNA" | "Q&A" => TaskType::QnA,
+                            _ => TaskType::Summarization,
+                        };
+                    }
+                }
+
+                // Extract query
+                if let Some(q) = obj.get("query") {
+                    query = q.as_str().map(|s| s.to_string());
+                }
+
+                // Extract flags
+                if let Some(r) = obj.get("reasoning") {
+                    reasoning = r.as_bool().unwrap_or(false);
+                }
+                if let Some(c) = obj.get("correction") {
+                    correction = c.as_bool().unwrap_or(false);
+                }
+
+                // Extract LLM resource
+                if let Some(llm) = obj.get("llm_resource") {
+                    if let Some(llm_obj) = llm.as_object() {
+                        if let (Some(endpoint), Some(deployment)) = (
+                            llm_obj.get("azure_openai_endpoint").and_then(|v| v.as_str()),
+                            llm_obj.get("azure_openai_deployment_name").and_then(|v| v.as_str())
+                        ) {
+                            llm_resource = Some(LLMResource {
+                                resource_type: "AzureOpenAI".to_string(),
+                                azure_openai_endpoint: endpoint.to_string(),
+                                azure_openai_deployment_name: deployment.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        if grounding_sources.is_empty() {
+            return Err(Error::new(ErrorDetails::InvalidRequest {
+                message: "No grounding sources provided for groundedness detection".to_string(),
+            }));
+        }
+
+        let result = self.analyze_groundedness(
+            texts[0].to_string(),
+            grounding_sources,
+            domain,
+            task_type,
+            query,
+            reasoning,
+            correction,
+            llm_resource,
+            api_key,
+            client,
+        ).await?;
+        Ok(vec![result])
+    }
+
+    /// Handle protected material text probe
+    async fn handle_protected_material(
+        &self,
+        _request: &ModerationRequest,
+        texts: &[String],
+        api_key: Option<&SecretString>,
+        client: &reqwest::Client,
+    ) -> Result<Vec<ModerationResult>, Error> {
+        let result = self.analyze_protected_material(
+            texts[0].to_string(),
+            api_key,
+            client,
+        ).await?;
+        Ok(vec![result])
+    }
+
+    /// Handle protected material code probe
+    async fn handle_protected_material_code(
+        &self,
+        _request: &ModerationRequest,
+        texts: &[String],
+        api_key: Option<&SecretString>,
+        client: &reqwest::Client,
+    ) -> Result<Vec<ModerationResult>, Error> {
+        let result = self.analyze_protected_material_code(
+            texts[0].to_string(),
+            api_key,
+            client,
+        ).await?;
+        Ok(vec![result])
+    }
+
     /// Perform text moderation analysis using Azure Content Safety
     async fn analyze_text(
         &self,
@@ -444,7 +758,7 @@ impl AzureContentSafetyProvider {
                 output_type: output_type.clone(),
             };
 
-            let url = get_azure_content_safety_text_url(&self.endpoint)?;
+            let url = get_azure_content_safety_text_moderation_url(&self.endpoint)?;
 
             let mut request_builder = client
                 .post(url)
@@ -845,395 +1159,6 @@ impl AzureContentSafetyProvider {
     }
 }
 
-impl ModerationProvider for AzureContentSafetyProvider {
-    async fn moderate(
-        &self,
-        request: &ModerationRequest,
-        client: &reqwest::Client,
-        dynamic_api_keys: &InferenceCredentials,
-    ) -> Result<ModerationProviderResponse, Error> {
-        let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
-        let start_time = Instant::now();
-
-        // Extract provider-specific parameters
-        // Note: We accept both snake_case (OpenAI style) and camelCase (Azure style) for better usability
-        let mut blocklist_names = vec![];
-        let mut categories = None;
-        let mut halt_on_blocklist_hit = None;
-        let mut output_type = Some("EightSeverityLevels".to_string()); // Default to 8 levels
-        let mut enabled_features = vec!["text_moderation".to_string()]; // Default to text moderation
-        let mut documents = vec![];
-        let mut grounding_sources = vec![];
-        let mut groundedness_domain = DomainType::Generic;
-        let mut groundedness_task = TaskType::Summarization;
-        let mut groundedness_query = None;
-        let mut groundedness_reasoning = false;
-        let mut groundedness_correction = false;
-        let mut groundedness_llm_resource = None;
-
-        if let Some(provider_params) = &request.provider_params {
-            if let Some(obj) = provider_params.as_object() {
-                // Extract blocklistNames (accept both snake_case and camelCase)
-                if let Some(names) = obj.get("blocklistNames").or_else(|| obj.get("blocklist_names")) {
-                    if let Some(names_array) = names.as_array() {
-                        blocklist_names = names_array
-                            .iter()
-                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                            .collect();
-                    }
-                }
-
-                // Extract categories
-                if let Some(cats) = obj.get("categories") {
-                    if let Some(cats_array) = cats.as_array() {
-                        let cat_strings: Vec<String> = cats_array
-                            .iter()
-                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                            .collect();
-                        if !cat_strings.is_empty() {
-                            categories = Some(cat_strings);
-                        }
-                    }
-                }
-
-                // Extract haltOnBlocklistHit (accept both snake_case and camelCase)
-                if let Some(halt) = obj.get("haltOnBlocklistHit").or_else(|| obj.get("halt_on_blocklist_hit")) {
-                    halt_on_blocklist_hit = halt.as_bool();
-                }
-
-                // Extract outputType (accept both snake_case and camelCase)
-                if let Some(output) = obj.get("outputType").or_else(|| obj.get("output_type")) {
-                    if let Some(output_str) = output.as_str() {
-                        output_type = Some(output_str.to_string());
-                    }
-                }
-
-                // Extract enabled_features (accept both snake_case and camelCase)
-                if let Some(features) = obj.get("enabled_features").or_else(|| obj.get("enabledFeatures")) {
-                    if let Some(features_array) = features.as_array() {
-                        enabled_features = features_array
-                            .iter()
-                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                            .collect();
-                    }
-                }
-
-                // Extract documents for prompt shield
-                if let Some(docs) = obj.get("documents") {
-                    if let Some(docs_array) = docs.as_array() {
-                        documents = docs_array
-                            .iter()
-                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                            .collect();
-                    }
-                }
-
-                // Extract grounding sources for groundedness detection
-                if let Some(sources) = obj.get("grounding_sources").or_else(|| obj.get("groundingSources")) {
-                    if let Some(sources_array) = sources.as_array() {
-                        grounding_sources = sources_array
-                            .iter()
-                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                            .collect();
-                    }
-                }
-
-                // Extract groundedness domain
-                if let Some(domain) = obj.get("groundedness_domain").or_else(|| obj.get("domain")) {
-                    if let Some(domain_str) = domain.as_str() {
-                        groundedness_domain = match domain_str.to_uppercase().as_str() {
-                            "MEDICAL" => DomainType::Medical,
-                            _ => DomainType::Generic,
-                        };
-                    }
-                }
-
-                // Extract groundedness task type
-                if let Some(task) = obj.get("groundedness_task").or_else(|| obj.get("task")) {
-                    if let Some(task_str) = task.as_str() {
-                        groundedness_task = match task_str.to_uppercase().as_str() {
-                            "QNA" | "Q&A" => TaskType::QnA,
-                            _ => TaskType::Summarization,
-                        };
-                    }
-                }
-
-                // Extract groundedness query (for QnA tasks)
-                if let Some(query) = obj.get("groundedness_query").or_else(|| obj.get("query")) {
-                    groundedness_query = query.as_str().map(|s| s.to_string());
-                }
-
-                // Extract groundedness reasoning flag
-                if let Some(reasoning) = obj.get("groundedness_reasoning").or_else(|| obj.get("reasoning")) {
-                    groundedness_reasoning = reasoning.as_bool().unwrap_or(false);
-                }
-
-                // Extract groundedness correction flag
-                // When enabled, Azure will provide corrected text for ungrounded segments
-                if let Some(correction) = obj.get("groundedness_correction").or_else(|| obj.get("correction")) {
-                    groundedness_correction = correction.as_bool().unwrap_or(false);
-                }
-
-                // Extract LLM resource for reasoning
-                if let Some(llm) = obj.get("groundedness_llm_resource").or_else(|| obj.get("llm_resource")) {
-                    if let Some(llm_obj) = llm.as_object() {
-                        if let (Some(endpoint), Some(deployment)) = (
-                            llm_obj.get("azure_openai_endpoint").and_then(|v| v.as_str()),
-                            llm_obj.get("azure_openai_deployment_name").and_then(|v| v.as_str())
-                        ) {
-                            groundedness_llm_resource = Some(LLMResource {
-                                resource_type: "AzureOpenAI".to_string(),
-                                azure_openai_endpoint: endpoint.to_string(),
-                                azure_openai_deployment_name: deployment.to_string(),
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        // Azure Content Safety only supports single text input
-        // For batch input, we'll need to make multiple requests
-        let texts = request.input.as_vec();
-        let text_strings: Vec<String> = texts.iter().map(|s| s.to_string()).collect();
-
-        // Check which features are enabled and process accordingly
-        let mut all_results = Vec::new();
-
-        // If no features specified or text_moderation is enabled, run text moderation
-        if enabled_features.is_empty() || enabled_features.contains(&"text_moderation".to_string()) {
-            let text_results = self.analyze_text(
-                &text_strings,
-                blocklist_names,
-                categories,
-                halt_on_blocklist_hit,
-                output_type,
-                api_key,
-                client,
-            ).await?;
-            all_results.extend(text_results);
-        }
-
-        // Run prompt shield if enabled
-        if enabled_features.contains(&"prompt_shield".to_string()) {
-            if texts.is_empty() {
-                return Err(Error::new(ErrorDetails::InvalidRequest {
-                    message: "No input text provided for prompt shield".to_string(),
-                }));
-            }
-
-            let user_prompt = texts[0].to_string();
-            let prompt_shield_result = self.analyze_prompt_shield(user_prompt, documents, api_key, client).await?;
-
-            // Merge prompt shield results with text moderation results
-            if all_results.is_empty() {
-                all_results.push(prompt_shield_result);
-            } else {
-                // Merge the first result with prompt shield result
-                if let Some(first_result) = all_results.get_mut(0) {
-                    // If prompt shield detected an attack, flag the content
-                    if prompt_shield_result.flagged {
-                        first_result.flagged = true;
-                        first_result.categories.malicious = true;
-                        // Merge category_applied_input_types
-                        if let Some(prompt_shield_input_types) = prompt_shield_result.category_applied_input_types {
-                            if let Some(ref mut existing_input_types) = first_result.category_applied_input_types {
-                                // Merge with existing input types
-                                existing_input_types.malicious = prompt_shield_input_types.malicious;
-                            } else {
-                                // Set the input types from prompt shield
-                                first_result.category_applied_input_types = Some(prompt_shield_input_types);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Run groundedness detection if enabled
-        if enabled_features.contains(&"groundedness".to_string()) {
-            if texts.is_empty() {
-                return Err(Error::new(ErrorDetails::InvalidRequest {
-                    message: "No input text provided for groundedness detection".to_string(),
-                }));
-            }
-
-            if grounding_sources.is_empty() {
-                return Err(Error::new(ErrorDetails::InvalidRequest {
-                    message: "No grounding sources provided for groundedness detection".to_string(),
-                }));
-            }
-
-            let groundedness_text = texts[0].to_string();
-            let groundedness_result = self.analyze_groundedness(
-                groundedness_text,
-                grounding_sources,
-                groundedness_domain,
-                groundedness_task,
-                groundedness_query,
-                groundedness_reasoning,
-                groundedness_correction,
-                groundedness_llm_resource,
-                api_key,
-                client
-            ).await?;
-
-            // Merge groundedness results with existing results
-            if all_results.is_empty() {
-                all_results.push(groundedness_result);
-            } else {
-                // Merge the first result with groundedness result
-                if let Some(first_result) = all_results.get_mut(0) {
-                    // If groundedness detected ungrounded content, flag it
-                    if groundedness_result.flagged {
-                        first_result.flagged = true;
-                        first_result.categories.hallucination = true;
-                        // Note: We don't update category_scores for hallucination as scores aren't available for this category
-
-                        // Merge category_applied_input_types
-                        if let Some(groundedness_input_types) = groundedness_result.category_applied_input_types {
-                            if let Some(ref mut existing_input_types) = first_result.category_applied_input_types {
-                                // Merge with existing input types
-                                existing_input_types.hallucination = groundedness_input_types.hallucination;
-                            } else {
-                                // Set the input types from groundedness
-                                first_result.category_applied_input_types = Some(groundedness_input_types);
-                            }
-                        }
-                    }
-                    // Merge hallucination details
-                    if let Some(hallucination_details) = groundedness_result.hallucination_details {
-                        first_result.hallucination_details = Some(hallucination_details);
-                    }
-                }
-            }
-        }
-
-        // Run protected material detection if enabled
-        if enabled_features.contains(&"protected_material".to_string()) {
-            if texts.is_empty() {
-                return Err(Error::new(ErrorDetails::InvalidRequest {
-                    message: "No input text provided for protected material detection".to_string(),
-                }));
-            }
-
-            let protected_material_text = texts[0].to_string();
-            let protected_material_result = self.analyze_protected_material(
-                protected_material_text,
-                api_key,
-                client
-            ).await?;
-
-            // Merge protected material results with existing results
-            if all_results.is_empty() {
-                all_results.push(protected_material_result);
-            } else {
-                // Merge the first result with protected material result
-                if let Some(first_result) = all_results.get_mut(0) {
-                    // If protected material is detected, flag it
-                    if protected_material_result.flagged {
-                        first_result.flagged = true;
-                        first_result.categories.ip_violation = true;
-
-                        // Merge category_applied_input_types
-                        if let Some(protected_input_types) = protected_material_result.category_applied_input_types {
-                            if let Some(ref mut existing_input_types) = first_result.category_applied_input_types {
-                                // Merge with existing input types
-                                existing_input_types.ip_violation = protected_input_types.ip_violation;
-                            } else {
-                                // Set the input types from protected material
-                                first_result.category_applied_input_types = Some(protected_input_types);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Run protected material code detection if enabled
-        if enabled_features.contains(&"protected_material_code".to_string()) {
-            if texts.is_empty() {
-                return Err(Error::new(ErrorDetails::InvalidRequest {
-                    message: "No input text provided for protected material code detection".to_string(),
-                }));
-            }
-
-            let protected_material_code_text = texts[0].to_string();
-            let protected_material_code_result = self.analyze_protected_material_code(
-                protected_material_code_text,
-                api_key,
-                client
-            ).await?;
-
-            // Merge protected material code results with existing results
-            if all_results.is_empty() {
-                all_results.push(protected_material_code_result);
-            } else {
-                // Merge the first result with protected material code result
-                if let Some(first_result) = all_results.get_mut(0) {
-                    // If protected material code is detected, flag it
-                    if protected_material_code_result.flagged {
-                        first_result.flagged = true;
-                        first_result.categories.ip_violation = true;
-
-                        // Merge category_applied_input_types
-                        if let Some(protected_code_input_types) = protected_material_code_result.category_applied_input_types {
-                            if let Some(ref mut existing_input_types) = first_result.category_applied_input_types {
-                                // Merge with existing input types
-                                existing_input_types.ip_violation = protected_code_input_types.ip_violation;
-                            } else {
-                                // Set the input types from protected material code
-                                first_result.category_applied_input_types = Some(protected_code_input_types);
-                            }
-                        }
-                    }
-                    // Merge ip_violation_details if present
-                    if let Some(ip_details) = protected_material_code_result.ip_violation_details {
-                        first_result.ip_violation_details = Some(ip_details);
-                    }
-                }
-            }
-        }
-
-        // If no results were generated (e.g., empty feature list with no defaults), return an error
-        if all_results.is_empty() {
-            return Err(Error::new(ErrorDetails::InvalidRequest {
-                message: "No valid features enabled for Azure Content Safety".to_string(),
-            }));
-        }
-
-        let results = all_results;
-
-        let latency = Latency::NonStreaming {
-            response_time: start_time.elapsed(),
-        };
-
-        let raw_request = serde_json::to_string(&request).map_err(|e| {
-            Error::new(ErrorDetails::Serialization {
-                message: format!(
-                    "Error serializing request body as JSON: {}",
-                    DisplayOrDebugGateway::new(e)
-                ),
-            })
-        })?;
-
-        Ok(ModerationProviderResponse {
-            id: Uuid::now_v7(),
-            input: request.input.clone(),
-            results: results.clone(),
-            created: current_timestamp(),
-            model: "azure-content-safety".to_string(),
-            raw_request,
-            raw_response: serde_json::to_string(&results).unwrap_or_default(),
-            usage: Usage {
-                input_tokens: texts.iter().map(|t| t.split_whitespace().count() as u32).sum(),
-                output_tokens: 0,
-            },
-            latency,
-        })
-    }
-}
-
 fn convert_groundedness_response_to_openai(groundedness_response: &AzureGroundednessResponse) -> ModerationResult {
     use crate::moderation::{HallucinationDetails, HallucinationSegment, CategoryAppliedInputTypes};
 
@@ -1499,6 +1424,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_probe_type_from_probe_id() {
+        assert_eq!(ProbeType::from_probe_id("moderation"), Some(ProbeType::Moderation));
+        assert_eq!(ProbeType::from_probe_id("prompt-shields"), Some(ProbeType::PromptShields));
+        assert_eq!(ProbeType::from_probe_id("groundedness-detection-preview"), Some(ProbeType::GroundednessDetection));
+        assert_eq!(ProbeType::from_probe_id("protected-material-detection-text"), Some(ProbeType::ProtectedMaterialText));
+        assert_eq!(ProbeType::from_probe_id("protected-material-detection-code"), Some(ProbeType::ProtectedMaterialCode));
+        assert_eq!(ProbeType::from_probe_id("unknown-probe"), None);
+    }
+
+    #[test]
     fn test_severity_to_score() {
         // Test 4-level scoring
         assert_eq!(severity_to_score(0, false), 0.0);
@@ -1626,7 +1561,7 @@ mod tests {
     fn test_url_construction() {
         let endpoint = Url::parse("https://my-content-safety.cognitiveservices.azure.com").unwrap();
 
-        let url = get_azure_content_safety_text_url(&endpoint).unwrap();
+        let url = get_azure_content_safety_text_moderation_url(&endpoint).unwrap();
         assert_eq!(
             url.as_str(),
             "https://my-content-safety.cognitiveservices.azure.com/contentsafety/text:analyze?api-version=2024-09-01"

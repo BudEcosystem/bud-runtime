@@ -22,6 +22,7 @@ use crate::config_parser::Config;
 use crate::endpoints;
 use crate::error::{Error, ErrorDetails};
 use crate::geoip::GeoIpService;
+use crate::guardrail_table::GuardrailTable;
 use crate::kafka::KafkaConnectionInfo;
 use crate::model::ModelTable;
 use crate::rate_limit::DistributedRateLimiter;
@@ -49,6 +50,7 @@ pub struct AppStateData {
     pub geoip_service: Option<Arc<GeoIpService>>,
     pub ua_parser: Option<Arc<UserAgentParser>>,
     pub blocking_manager: Option<Arc<BlockingRulesManager>>,
+    pub guardrails: Arc<tokio::sync::RwLock<GuardrailTable>>,
 }
 pub type AppState = axum::extract::State<AppStateData>;
 
@@ -108,6 +110,7 @@ impl AppStateData {
             geoip_service,
             ua_parser,
             blocking_manager: None, // Will be initialized later with Redis client
+            guardrails: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         })
     }
     pub async fn update_model_table(&self, mut new_models: ModelTable) {
@@ -142,6 +145,18 @@ impl AppStateData {
                 model_name
             );
         }
+    }
+
+    /// Update guardrail configuration
+    pub async fn update_guardrail(&self, guardrail_id: &str, config: Arc<crate::guardrail_table::GuardrailConfig>) {
+        let mut guardrails = self.guardrails.write().await;
+        guardrails.insert(Arc::from(guardrail_id), config);
+    }
+
+    /// Remove guardrail configuration
+    pub async fn remove_guardrail(&self, guardrail_id: &str) {
+        let mut guardrails = self.guardrails.write().await;
+        guardrails.remove(guardrail_id);
     }
 
     /// Create a new instance with rate limiter initialized

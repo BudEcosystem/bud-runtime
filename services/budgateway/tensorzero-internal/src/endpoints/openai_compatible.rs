@@ -2165,6 +2165,7 @@ pub async fn moderation_handler(
         kafka_connection_info,
         authentication_info: _,
         model_credential_store,
+        guardrails,
         ..
     }): AppState,
     headers: HeaderMap,
@@ -2220,7 +2221,7 @@ pub async fn moderation_handler(
     let gateway_request_json = serialize_without_nulls(&openai_compatible_params).ok();
 
     let moderation_request = crate::moderation::ModerationRequest {
-        input: internal_input,
+        input: internal_input.clone(),
         model: None, // Let the provider set the appropriate model name
         provider_params: if openai_compatible_params.unknown_fields.is_empty() {
             None
@@ -2229,7 +2230,7 @@ pub async fn moderation_handler(
         },
     };
 
-    // Get the regular model table
+    // Get the model table
     let models = config.models.read().await;
 
     // Check if the model exists and has moderation capability
@@ -2264,12 +2265,76 @@ pub async fn moderation_handler(
         cache_options: &cache_options,
     };
 
-    // For now, we'll use the first provider in routing that supports moderation
-    // This is a temporary solution until we fully integrate moderation into the regular model system
-    let mut provider_errors = HashMap::new();
     let mut response = None;
 
-    for provider_name in &model_config.routing {
+    // Check if the model has a guardrail profile configured
+    if let Some(guardrail_profile) = &model_config.guardrail_profile {
+        tracing::info!("Model has guardrail profile configured: {}", guardrail_profile);
+
+        // Get the guardrail configuration
+        let guardrails_read = guardrails.read().await;
+        let guardrail_config = guardrails_read
+            .get(guardrail_profile.as_ref())
+            .ok_or_else(|| Error::new(ErrorDetails::Config {
+                message: format!("Guardrail profile '{}' not found", guardrail_profile),
+            }))?
+            .clone();
+        drop(guardrails_read);
+
+        // Execute the guardrail
+        let start_time = tokio::time::Instant::now();
+        let guardrail_result = crate::guardrail::execute_guardrail(
+            &guardrail_config,
+            moderation_request.input.clone(),
+            crate::guardrail_table::GuardType::Input,
+            &clients,
+            moderation_request.provider_params.clone(),
+        ).await?;
+        let latency = start_time.elapsed();
+
+        // Convert guardrail result to moderation response
+        let results = vec![crate::moderation::ModerationResult {
+            flagged: guardrail_result.flagged,
+            categories: guardrail_result.merged_categories.clone(),
+            category_scores: guardrail_result.merged_scores.clone(),
+            category_applied_input_types: guardrail_result.merged_category_applied_input_types.clone(),
+            hallucination_details: guardrail_result.hallucination_details.clone(),
+            ip_violation_details: guardrail_result.ip_violation_details.clone(),
+        }];
+
+        let provider_response = crate::moderation::ModerationProviderResponse {
+            id: Uuid::now_v7(),
+            model: resolved_model_name.clone(),
+            results,
+            input: moderation_request.input.clone(),
+            created: crate::inference::types::current_timestamp() as u64,
+            raw_request: serde_json::to_string(&moderation_request).unwrap_or_default(),
+            raw_response: serde_json::to_value(&guardrail_result)
+                .ok()
+                .map(|v| v.to_string())
+                .unwrap_or_default(),
+            usage: crate::inference::types::Usage {
+                input_tokens: 0,
+                output_tokens: 0,
+            },
+            latency: crate::inference::types::Latency::NonStreaming {
+                response_time: latency,
+            },
+        };
+
+        response = Some(crate::moderation::ModerationResponse::new(
+            provider_response,
+            "guardrail".into(),
+        ));
+    }
+
+    let mut provider_errors = HashMap::new();
+
+    // Only use providers if guardrail didn't already handle the request
+    if response.is_none() {
+        // For now, we'll use the first provider in routing that supports moderation
+        // This is a temporary solution until we fully integrate moderation into the regular model system
+        for provider_name in &model_config.routing {
         let provider = match model_config.providers.get(provider_name) {
             Some(p) => &p.config,
             None => {
@@ -2379,6 +2444,7 @@ pub async fn moderation_handler(
             }
         }
     }
+    } // End of if response.is_none()
 
     let response = response
         .ok_or_else(|| Error::new(ErrorDetails::ModelProvidersExhausted { provider_errors }))?;
