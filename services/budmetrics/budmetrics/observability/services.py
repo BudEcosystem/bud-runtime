@@ -1807,6 +1807,9 @@ class ObservabilityMetricsService:
                 elif group == "user":
                     group_by_fields.append("ga.user_id")
                     select_fields.append("ga.user_id")
+                elif group == "user_project":
+                    group_by_fields.append("mid.api_key_project_id")
+                    select_fields.append("mid.api_key_project_id")
 
         # Build aggregation fields based on requested metrics
         for metric in request.metrics:
@@ -1822,6 +1825,10 @@ class ObservabilityMetricsService:
                 select_fields.append("quantile(0.99)(mi.response_time_ms) as p99_latency")
             elif metric == "total_tokens":
                 select_fields.append("SUM(mi.input_tokens + mi.output_tokens) as total_tokens")
+            elif metric == "total_input_tokens":
+                select_fields.append("SUM(mi.input_tokens) as total_input_tokens")
+            elif metric == "total_output_tokens":
+                select_fields.append("SUM(mi.output_tokens) as total_output_tokens")
             elif metric == "avg_tokens":
                 select_fields.append("AVG(mi.input_tokens + mi.output_tokens) as avg_tokens")
             elif metric == "total_cost":
@@ -1933,7 +1940,11 @@ class ObservabilityMetricsService:
                     for f in (
                         ["model_id", "model_name"]
                         if group == "model"
-                        else [f"{group}_id" if group != "user" else "user_id"]
+                        else [
+                            "api_key_project_id"
+                            if group == "user_project"
+                            else (f"{group}_id" if group != "user" else "user_id")
+                        ]
                     )
                 ]
             )
@@ -1956,6 +1967,9 @@ class ObservabilityMetricsService:
                         field_idx += 1
                     elif group_by == "user":
                         group.user_id = row[field_idx]
+                        field_idx += 1
+                    elif group_by == "user_project":
+                        group.api_key_project_id = row[field_idx]
                         field_idx += 1
 
                 # Extract metrics
@@ -2024,6 +2038,9 @@ class ObservabilityMetricsService:
                 elif group == "endpoint":
                     group_by_fields.append("mid.endpoint_id")
                     select_fields.append("mid.endpoint_id")
+                elif group == "user_project":
+                    group_by_fields.append("mid.api_key_project_id")
+                    select_fields.append("mid.api_key_project_id")
 
         # Add metric calculations
         for metric in request.metrics:
@@ -2131,6 +2148,11 @@ class ObservabilityMetricsService:
                         group_info["endpoint_id"] = endpoint_id
                         group_key_parts.append(f"endpoint:{endpoint_id}")
                         field_idx += 1
+                    elif group == "user_project":
+                        api_key_project_id = row[field_idx]
+                        group_info["api_key_project_id"] = api_key_project_id
+                        group_key_parts.append(f"api_key_project:{api_key_project_id}")
+                        field_idx += 1
 
                 group_key = "|".join(group_key_parts)
 
@@ -2157,6 +2179,7 @@ class ObservabilityMetricsService:
                 group.model_name = group_info.get("model_name")
                 group.project_id = group_info.get("project_id")
                 group.endpoint_id = group_info.get("endpoint_id")
+                group.api_key_project_id = group_info.get("api_key_project_id")
 
             groups.append(group)
 
@@ -2228,12 +2251,24 @@ class ObservabilityMetricsService:
         if request.filters:
             for filter_key, filter_value in request.filters.items():
                 if filter_key == "project_id":
-                    where_conditions.append("ga.project_id = %(project_id)s")
-                    params["project_id"] = filter_value
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
                 elif filter_key == "api_key_project_id":
                     # Support filtering by api_key_project_id for CLIENT users
-                    where_conditions.append("ga.api_key_project_id = %(api_key_project_id)s")
-                    params["api_key_project_id"] = filter_value
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
                 elif filter_key == "country_code":
                     if isinstance(filter_value, list):
                         placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
@@ -2267,7 +2302,6 @@ class ObservabilityMetricsService:
         """
 
         params["limit"] = request.limit
-
         # Execute query
         results = await self.clickhouse_client.execute_query(query, params)
 
@@ -2275,13 +2309,13 @@ class ObservabilityMetricsService:
         total_query = f"""
         SELECT COUNT(*) as total_requests
         FROM GatewayAnalytics ga
+        LEFT JOIN ModelInferenceDetails mid ON ga.inference_id = mid.inference_id
         WHERE {" AND ".join(where_conditions)}
         """
         total_result = await self.clickhouse_client.execute_query(
             total_query, {k: v for k, v in params.items() if k != "limit"}
         )
         total_requests = total_result[0][0] if total_result else 0
-
         # Process results
         locations = []
         for row in results:
@@ -2504,6 +2538,9 @@ class ObservabilityMetricsService:
             # User info would need additional joins - for now use project as proxy
             group_columns.extend(["toString(mdi.project_id) as user_id"])
 
+        if "user_project" in request.group_by:
+            group_columns.extend(["toString(mdi.api_key_project_id) as api_key_project_id"])
+
         group_by_clause = ", ".join([col.split(" as ")[1] if " as " in col else col for col in group_columns])
         select_columns = ", ".join(group_columns)
 
@@ -2570,6 +2607,11 @@ class ObservabilityMetricsService:
                 group_key.append(f"user:{group_values['user_id']}")
                 col_idx += 1
 
+            if "user_project" in request.group_by:
+                group_values["api_key_project_id"] = row[col_idx]
+                group_key.append(f"user_project:{group_values['api_key_project_id']}")
+                col_idx += 1
+
             group_key_str = "|".join(group_key)
             bucket = row[col_idx]
             request_count = row[col_idx + 1]
@@ -2627,6 +2669,13 @@ class ObservabilityMetricsService:
                 group_obj.endpoint_name = group_vals["endpoint_name"]
             if "user_id" in group_vals:
                 group_obj.user_id = group_vals["user_id"]
+            if "api_key_project_id" in group_vals:
+                try:
+                    group_obj.api_key_project_id = (
+                        UUID(group_vals["api_key_project_id"]) if group_vals["api_key_project_id"] else None
+                    )
+                except (ValueError, TypeError):
+                    group_obj.api_key_project_id = None
 
             groups.append(group_obj)
 
@@ -2709,7 +2758,7 @@ class ObservabilityMetricsService:
             return f"{value:.0f}ms", "ms"
 
         # Token metrics
-        elif metric in ["total_tokens", "avg_tokens"]:
+        elif metric in ["total_tokens", "total_input_tokens", "total_output_tokens", "avg_tokens"]:
             if value >= 1_000_000:
                 return f"{value / 1_000_000:.1f}M", "tokens"
             elif value >= 1_000:
@@ -3259,11 +3308,6 @@ class ObservabilityMetricsService:
 
             results = await self.clickhouse_client.execute_query(query, params)
             logger.info(f"ClickHouse query returned {len(results)} rows")
-
-            # Debug specific user
-            debug_user_id = "24048fb6-d6d2-436d-97bb-13580b457283"
-            debug_user_found = any(str(row[0]) == debug_user_id for row in results)
-            logger.info(f"DEBUG: User {debug_user_id} found in ClickHouse results: {debug_user_found}")
 
             users = []
             found_user_ids = set()
