@@ -23,11 +23,13 @@ const { Option } = Select;
 interface InferenceFiltersProps {
   projectId: string;
   onFiltersChange: () => void;
+  skipEndpointsFetch?: boolean;
 }
 
 const InferenceFilters: React.FC<InferenceFiltersProps> = ({
   projectId,
   onFiltersChange,
+  skipEndpointsFetch = false,
 }) => {
   const [form] = Form.useForm();
 
@@ -36,6 +38,11 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
 
   // Fetch endpoints when component mounts or projectId changes
   useEffect(() => {
+    // Skip fetching if explicitly disabled
+    if (skipEndpointsFetch) {
+      return;
+    }
+
     if (projectId === "all") {
       // Fetch all endpoints across all projects (no project_id parameter)
       getEndPoints({
@@ -51,7 +58,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
         limit: 100,
       });
     }
-  }, [projectId]);
+  }, [projectId, skipEndpointsFetch]);
 
   const handleFilterChange = (changedValues: any) => {
     // Handle date range
@@ -290,6 +297,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
                   }}
                   popupClassName="[&_.ant-select-item]:!text-white [&_.ant-select-item-option-content]:!text-white"
                   showSearch
+                  disabled={skipEndpointsFetch}
                   filterOption={(input, option) =>
                     option?.children
                       ?.toString()
@@ -297,7 +305,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
                       .includes(input.toLowerCase()) ?? false
                   }
                 >
-                  {endPoints?.map((endpoint: any) => (
+                  {!skipEndpointsFetch && endPoints?.map((endpoint: any) => (
                     <Option key={endpoint.id} value={endpoint.id}>
                       {endpoint.name}
                     </Option>

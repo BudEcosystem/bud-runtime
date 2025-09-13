@@ -648,6 +648,7 @@ export default function ObservabilityPage() {
                         <InferenceFilters
                           projectId={"all"} // Pass a dummy ID for global view
                           onFiltersChange={() => fetchInferences()}
+                          skipEndpointsFetch={true} // Skip fetching endpoints in logs page
                         />
                       </div>
 
