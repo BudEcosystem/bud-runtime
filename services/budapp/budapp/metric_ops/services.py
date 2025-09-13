@@ -272,8 +272,6 @@ class BudMetricService(SessionMixin):
         # Proxy request to budmetrics
         metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/inferences/list"
 
-        logger.info(f"Sending inference list request to budmetrics: {request_data}")
-
         try:
             async with (
                 aiohttp.ClientSession() as session,
