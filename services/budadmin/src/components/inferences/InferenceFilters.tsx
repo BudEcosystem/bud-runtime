@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Card,
   DatePicker,
@@ -30,6 +30,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
   onFiltersChange,
 }) => {
   const [form] = Form.useForm();
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const { filters, setFilters, resetFilters } = useInferences();
   const { endPoints, getEndPoints } = useEndPoints();
@@ -53,14 +54,34 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
     }
   }, [projectId, getEndPoints]);
 
-  const handleFilterChange = (changedValues: any) => {
-    // Handle date range
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleFilterChange = useCallback((changedValues: any) => {
+    // Determine if the change is for a numeric input field that needs debouncing
+    const numericFields = ["minTokens", "maxTokens", "maxLatency"];
+    const isNumericChange = Object.keys(changedValues).some(key =>
+      numericFields.includes(key)
+    );
+
+    // Handle date range (no debounce needed)
     if (changedValues.dateRange) {
       const [fromDate, toDate] = changedValues.dateRange;
       setFilters({
         from_date: fromDate ? fromDate.toISOString() : undefined,
         to_date: toDate ? toDate.toISOString() : undefined,
       });
+
+      // If only date changed, trigger immediately
+      if (!isNumericChange) {
+        onFiltersChange();
+      }
     }
 
     // Handle other filters
@@ -84,11 +105,29 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
       }
     });
 
-    // Trigger data refresh
-    onFiltersChange();
-  };
+    // Clear existing debounce timer if any
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Apply debounce for numeric inputs, immediate for others
+    if (isNumericChange) {
+      // Debounce API call for numeric inputs (wait 500ms after last keystroke)
+      debounceTimerRef.current = setTimeout(() => {
+        onFiltersChange();
+      }, 500);
+    } else if (!changedValues.dateRange) {
+      // For non-numeric, non-date changes (dropdowns, switches), trigger immediately
+      onFiltersChange();
+    }
+  }, [setFilters, onFiltersChange]);
 
   const handleReset = () => {
+    // Clear any pending debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
     form.resetFields();
     resetFilters();
     onFiltersChange();
