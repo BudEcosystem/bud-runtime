@@ -250,7 +250,8 @@ class BudMetricService(SessionMixin):
             # Determine the api_key_project_id value(s) to filter by
             if request.project_id:
                 # Convert project_id filter to api_key_project_id for CLIENT users
-                api_key_project_id_value = str(request.project_id)
+                # Always use a list for consistency
+                api_key_project_id_value = [str(request.project_id)]
             else:
                 # If no project_id provided, restrict to user's accessible api_key_project_ids
                 project_service = ProjectService(self.session)
@@ -260,11 +261,18 @@ class BudMetricService(SessionMixin):
                 api_key_project_id_value = [str(project.project.id) for project in user_projects]
 
             # Apply the api_key_project_id filter and remove the project_id from top-level
-            request_data["filters"]["api_key_project_id"] = api_key_project_id_value
+            # Only add the filter if there are actually projects to filter by
+            if api_key_project_id_value:
+                request_data["filters"]["api_key_project_id"] = api_key_project_id_value
             request_data.pop("project_id", None)
+
+            # Log the request data for debugging
+            logger.info(f"CLIENT user inference request - api_key_project_id filter: {api_key_project_id_value}")
 
         # Proxy request to budmetrics
         metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/inferences/list"
+
+        logger.info(f"Sending inference list request to budmetrics: {request_data}")
 
         try:
             async with (
@@ -277,9 +285,10 @@ class BudMetricService(SessionMixin):
                 response_data = await response.json()
 
                 if response.status != status.HTTP_200_OK:
-                    logger.error(f"Inference list request failed: {response.status}")
+                    logger.error(f"Inference list request failed: status={response.status}, response={response_data}")
+                    error_message = response_data.get("detail", "Failed to list inferences")
                     raise ClientException(
-                        "Failed to list inferences",
+                        error_message,
                         status_code=response.status,
                     )
 
