@@ -539,7 +539,7 @@ export const ModelDetailContent: React.FC<{
     const baseUrl =
       process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL ||
       "https://api.example.com";
-    const apiUrl = `${baseUrl.replace( /\/+$/, '')}${endpoint}`;
+    const apiUrl = `${baseUrl.replace( /\/+$/, '')}/${endpoint}`;
     console.log("baseUrl:", baseUrl);
     console.log("endpoint:", endpoint);
     console.log("API URL:", apiUrl);
