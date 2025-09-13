@@ -131,6 +131,7 @@ class AuditTrailDataManager(DataManagerUtils):
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         ip_address: Optional[str] = None,
+        search: Optional[str] = None,
         offset: int = 0,
         limit: int = 20,
         include_user: bool = True,
@@ -146,7 +147,8 @@ class AuditTrailDataManager(DataManagerUtils):
             resource_name: Filter by resource name (partial match)
             start_date: Filter by start date (inclusive)
             end_date: Filter by end date (inclusive)
-            ip_address: Filter by IP address
+            ip_address: Filter by IP address (exact match)
+            search: Search term for partial matching in resource name and IP address
             offset: Number of records to skip for pagination
             limit: Maximum number of records to return
             include_user: Whether to include user relationships
@@ -167,6 +169,16 @@ class AuditTrailDataManager(DataManagerUtils):
             conditions.append(AuditTrail.resource_type == resource_type)
         if resource_id is not None:
             conditions.append(AuditTrail.resource_id == resource_id)
+
+        # Handle search parameter for partial matching
+        if search is not None:
+            # Search in both resource_name and ip_address fields
+            search_conditions = []
+            if search:  # Only add conditions if search is not empty
+                search_conditions.append(AuditTrail.resource_name.ilike(f"%{search}%"))
+                search_conditions.append(AuditTrail.ip_address.ilike(f"%{search}%"))
+                conditions.append(or_(*search_conditions))
+
         if resource_name is not None:
             # Use ILIKE for case-insensitive partial match
             conditions.append(AuditTrail.resource_name.ilike(f"%{resource_name}%"))
