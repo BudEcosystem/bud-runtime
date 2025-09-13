@@ -554,8 +554,8 @@ export default function AuditPage() {
         "Action",
         "Resource Type",
         "Resource Name",
-        "Resource ID",
-        "Project",
+        // "Resource ID",
+        // "Project",
         "IP Address",
         "Status",
       ],
@@ -565,8 +565,8 @@ export default function AuditPage() {
         getActionDisplay(log.action).label,
         log.resource_type,
         log.resource_name,
-        log.resource_id,
-        log.project_name || "",
+        // log.resource_id,
+        // log.project_name || "",
         log.ip_address || "",
         log.status,
       ]),
@@ -616,40 +616,107 @@ export default function AuditPage() {
         .CommonCustomPagination .ant-pagination {
           color: var(--text-primary) !important;
         }
+
+        /* Pagination items */
         .CommonCustomPagination .ant-pagination-item a {
           color: var(--text-primary) !important;
         }
-        .CommonCustomPagination .ant-pagination-item-active a {
-          color: var(--text-contrast) !important;
+        .CommonCustomPagination .ant-pagination-item-active {
+          background-color: var(--color-purple) !important;
+          border-color: var(--color-purple) !important;
         }
+        .CommonCustomPagination .ant-pagination-item-active a {
+          color: #ffffff !important;
+        }
+
+        /* Previous/Next buttons */
         .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
         .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
           color: var(--text-primary) !important;
         }
+
+        /* Size changer and options */
         .CommonCustomPagination .ant-pagination-options {
           color: var(--text-primary) !important;
         }
+        .CommonCustomPagination .ant-pagination-options-size-changer {
+          color: var(--text-primary) !important;
+        }
+        .CommonCustomPagination .ant-pagination-options-size-changer .ant-select {
+          color: var(--text-primary) !important;
+        }
         .CommonCustomPagination .ant-select-selector {
+          background-color: var(--bg-tertiary) !important;
+          border-color: var(--border-secondary) !important;
+          color: var(--text-primary) !important;
+        }
+        .CommonCustomPagination .ant-select-selection-item {
           color: var(--text-primary) !important;
         }
         .CommonCustomPagination .ant-select-arrow {
           color: var(--text-primary) !important;
         }
-        /* Light theme specific */
+
+        /* Dropdown menu */
+        .ant-select-dropdown {
+          background-color: var(--bg-tertiary) !important;
+        }
+        .ant-select-item {
+          color: var(--text-primary) !important;
+        }
+        .ant-select-item-option-selected {
+          background-color: var(--bg-hover) !important;
+        }
+        .ant-select-item-option-active {
+          background-color: var(--bg-hover) !important;
+        }
+
+        /* Jump input */
+        .CommonCustomPagination .ant-pagination-options-quick-jumper input {
+          background-color: var(--bg-tertiary) !important;
+          border-color: var(--border-secondary) !important;
+          color: var(--text-primary) !important;
+        }
+
+        /* Light theme specific overrides */
         [data-theme="light"] .CommonCustomPagination .ant-pagination-item a {
-          color: #000000 !important;
+          color: #1a1a1a !important;
         }
         [data-theme="light"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
         [data-theme="light"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
-          color: #000000 !important;
+          color: #1a1a1a !important;
         }
         [data-theme="light"] .CommonCustomPagination .ant-pagination-options {
-          color: #000000 !important;
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-options-size-changer {
+          color: #1a1a1a !important;
         }
         [data-theme="light"] .CommonCustomPagination .ant-select-selector {
-          color: #000000 !important;
+          background-color: #fafafa !important;
+          border-color: #d0d0d0 !important;
+          color: #1a1a1a !important;
         }
-        /* Dark theme specific */
+        [data-theme="light"] .CommonCustomPagination .ant-select-selection-item {
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-select-arrow {
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .ant-select-dropdown {
+          background-color: #fafafa !important;
+        }
+        [data-theme="light"] .ant-select-item {
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .ant-select-item-option-selected {
+          background-color: #f0f0f0 !important;
+        }
+        [data-theme="light"] .ant-select-item-option-active {
+          background-color: #f0f0f0 !important;
+        }
+
+        /* Dark theme specific overrides */
         [data-theme="dark"] .CommonCustomPagination .ant-pagination-item a {
           color: #ffffff !important;
         }
@@ -660,8 +727,36 @@ export default function AuditPage() {
         [data-theme="dark"] .CommonCustomPagination .ant-pagination-options {
           color: #ffffff !important;
         }
-        [data-theme="dark"] .CommonCustomPagination .ant-select-selector {
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-options-size-changer {
           color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-select-selector {
+          background-color: #1f1f1f !important;
+          border-color: #2f2f2f !important;
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-select-selection-item {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-select-arrow {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .ant-select-dropdown {
+          background-color: #1f1f1f !important;
+        }
+        [data-theme="dark"] .ant-select-item {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .ant-select-item-option-selected {
+          background-color: #2f2f2f !important;
+        }
+        [data-theme="dark"] .ant-select-item-option-active {
+          background-color: #2f2f2f !important;
+        }
+
+        /* Disabled states */
+        .CommonCustomPagination .ant-pagination-disabled .ant-pagination-item-link {
+          color: var(--text-disabled) !important;
         }
       `,
         }}

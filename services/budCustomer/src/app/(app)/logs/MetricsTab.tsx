@@ -110,7 +110,7 @@ function ChartCard({
 }) {
   return (
     <div
-      className={`p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] w-full h-[${height}] flex items-center justify-between flex-col`}
+      className={`p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] w-full h-[${height}] min-h-[350px] flex items-center justify-between flex-col`}
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-color)",
@@ -1620,6 +1620,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           <ChartCard
             title="Request Volume Over Time"
             subtitle={`Hourly distribution by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedHourlyData).length > 0 ? (
               <MultiSeriesLineChart
@@ -1658,6 +1659,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           <ChartCard
             title="Latency Distribution"
             subtitle={`Response time ranges by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedLatencyData).length > 0 ? (
               <GroupedBarChart
@@ -1718,11 +1720,12 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
       </Row>
 
       {/* Performance Metrics Row */}
-      <Row gutter={[16, 16]} className="mb-6">
+      <Row gutter={[16, 16]} className="mb-6 ">
         <Col xs={24} md={12}>
           <ChartCard
             title="Request Latency Over Time"
             subtitle={`Average latency by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedLatencyOverTime).length > 0 ? (
               <MultiSeriesLineChart
@@ -1793,6 +1796,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           <ChartCard
             title="Token Usage Over Time"
             subtitle={`Total tokens by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedTokensOverTime).length > 0 ? (
               <MultiSeriesLineChart
@@ -1858,6 +1862,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           <ChartCard
             title="Requests Per Second"
             subtitle={`Throughput by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedRequestsPerSecond).length > 0 ? (
               <MultiSeriesLineChart
@@ -1917,6 +1922,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           <ChartCard
             title="Time to First Token (TTFT)"
             subtitle={`Stream response metrics by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedTTFTOverTime).length > 0 ? (
               <MultiSeriesLineChart
@@ -1995,7 +2001,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
         {viewBy === "model" && (
           <Col xs={24} md={12}>
             <div
-              className="p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] h-[22rem]"
+              className="p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] h-[24rem]"
               style={{
                 backgroundColor: "var(--bg-card)",
                 borderColor: "var(--border-color)",
@@ -2007,7 +2013,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topModels}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2053,7 +2059,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topEndpoints}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2099,7 +2105,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topProjects}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2146,7 +2152,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topModels}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2192,7 +2198,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topEndpoints}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2224,7 +2230,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
         )}
 
         <Col xs={24} md={12}>
-          <ChartCard title="Success/Failure Ratio" height="22rem">
+          <ChartCard title="Success/Failure Ratio" height="100%">
             <div className="flex justify-around items-center h-full">
               <div className="text-center">
                 <CheckCircleOutlined

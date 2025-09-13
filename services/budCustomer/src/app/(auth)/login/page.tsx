@@ -24,6 +24,7 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const [isBackToLogin, setIsBackToLogin] = useState(false);
   const [oauthProcessing, setOauthProcessing] = useState(false);
+  const [exchangeProcessed, setExchangeProcessed] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Use the new environment system
@@ -50,7 +51,8 @@ function LoginContent() {
       const exchangeToken = searchParams.get("exchange_token");
 
       // Handle token exchange flow
-      if (exchangeToken) {
+      if (exchangeToken && !exchangeProcessed && !oauthProcessing) {
+        setExchangeProcessed(true); // Prevent re-entry
         setOauthProcessing(true);
         showLoader();
 
@@ -89,7 +91,8 @@ function LoginContent() {
       }
 
       // Handle authorization code flow (fallback)
-      if (code && state && provider) {
+      if (code && state && provider && !exchangeProcessed && !oauthProcessing) {
+        setExchangeProcessed(true); // Prevent re-entry
         setOauthProcessing(true);
         showLoader();
 
