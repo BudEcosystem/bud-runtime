@@ -451,18 +451,16 @@ class EndpointService(SessionMixin):
 
         db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
 
-        # Check duplicate name exist in endpoints
+        # Check duplicate name exist in endpoints (globally, irrespective of project)
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
             EndpointModel,
-            fields={"name": required_data["endpoint_name"], "project_id": required_data["project_id"]},
+            fields={"name": required_data["endpoint_name"]},  # Removed project_id to make it global
             exclude_fields={"status": EndpointStatusEnum.DELETED},
             missing_ok=True,
             case_sensitive=False,
         )
         if db_endpoint:
-            logger.error(
-                f"An endpoint with name {required_data['endpoint_name']} already exists in project: {required_data['project_id']}"
-            )
+            logger.error(f"An endpoint with name {required_data['endpoint_name']} already exists.")
             return
 
         # Create endpoint in database
