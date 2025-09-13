@@ -718,7 +718,11 @@ class GatewayAnalyticsRequest(BaseModel):
     frequency_interval: Optional[int] = None
     filters: Optional[Dict[str, Any]] = None  # e.g., {"country_code": ["US", "UK"], "is_bot": False}
     group_by: Optional[
-        list[Literal["project", "country", "city", "device_type", "browser", "os", "path", "status_code", "user_project"]]
+        list[
+            Literal[
+                "project", "country", "city", "device_type", "browser", "os", "path", "status_code", "user_project"
+            ]
+        ]
     ] = None
     return_delta: bool = True
     fill_time_gaps: bool = True

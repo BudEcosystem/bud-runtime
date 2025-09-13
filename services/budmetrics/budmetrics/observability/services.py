@@ -1492,9 +1492,7 @@ class ObservabilityMetricsService:
         # Build queries for country and city stats
         country_query = self._build_geographical_query(from_date, to_date, project_id, "country")
         city_query = self._build_geographical_query(from_date, to_date, project_id, "city")
-        
-        logger.info("COUNTRY QUERY:{country_query}");
-        logger.info("CITY QUERY:{city_query}");
+
         # Execute queries in parallel
         country_result, city_result = await asyncio.gather(
             self._clickhouse_client.execute_query(country_query), self._clickhouse_client.execute_query(city_query)
@@ -1942,7 +1940,11 @@ class ObservabilityMetricsService:
                     for f in (
                         ["model_id", "model_name"]
                         if group == "model"
-                        else ["api_key_project_id" if group == "user_project" else (f"{group}_id" if group != "user" else "user_id")]
+                        else [
+                            "api_key_project_id"
+                            if group == "user_project"
+                            else (f"{group}_id" if group != "user" else "user_id")
+                        ]
                     )
                 ]
             )
@@ -2247,7 +2249,6 @@ class ObservabilityMetricsService:
 
         # Add filters
         if request.filters:
-            logger.info(f"DEBUG: Geographic filters received: {request.filters}")  # TEMP DEBUG
             for filter_key, filter_value in request.filters.items():
                 if filter_key == "project_id":
                     if isinstance(filter_value, list):
@@ -2255,11 +2256,9 @@ class ObservabilityMetricsService:
                         where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"project_{i}"] = val
-                        logger.info(f"DEBUG: Added project_id filter for {len(filter_value)} projects")  # TEMP DEBUG
                     else:
                         where_conditions.append("mid.project_id = %(project_id)s")
                         params["project_id"] = filter_value
-                        logger.info(f"DEBUG: Added project_id filter: {filter_value}")  # TEMP DEBUG
                 elif filter_key == "api_key_project_id":
                     # Support filtering by api_key_project_id for CLIENT users
                     if isinstance(filter_value, list):
@@ -2267,11 +2266,9 @@ class ObservabilityMetricsService:
                         where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"api_key_project_{i}"] = val
-                        logger.info(f"DEBUG: Added api_key_project_id filter for {len(filter_value)} projects")  # TEMP DEBUG
                     else:
                         where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
                         params["api_key_project_id"] = filter_value
-                        logger.info(f"DEBUG: Added api_key_project_id filter: {filter_value}")  # TEMP DEBUG
                 elif filter_key == "country_code":
                     if isinstance(filter_value, list):
                         placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
@@ -2305,7 +2302,6 @@ class ObservabilityMetricsService:
         """
 
         params["limit"] = request.limit
-        logger.info(f"QUERY: {query}")
         # Execute query
         results = await self.clickhouse_client.execute_query(query, params)
 
@@ -2320,7 +2316,6 @@ class ObservabilityMetricsService:
             total_query, {k: v for k, v in params.items() if k != "limit"}
         )
         total_requests = total_result[0][0] if total_result else 0
-        logger.info(f"TOTAL QUERY:{total_query}");
         # Process results
         locations = []
         for row in results:
@@ -2676,7 +2671,9 @@ class ObservabilityMetricsService:
                 group_obj.user_id = group_vals["user_id"]
             if "api_key_project_id" in group_vals:
                 try:
-                    group_obj.api_key_project_id = UUID(group_vals["api_key_project_id"]) if group_vals["api_key_project_id"] else None
+                    group_obj.api_key_project_id = (
+                        UUID(group_vals["api_key_project_id"]) if group_vals["api_key_project_id"] else None
+                    )
                 except (ValueError, TypeError):
                     group_obj.api_key_project_id = None
 
@@ -3311,11 +3308,6 @@ class ObservabilityMetricsService:
 
             results = await self.clickhouse_client.execute_query(query, params)
             logger.info(f"ClickHouse query returned {len(results)} rows")
-
-            # Debug specific user
-            debug_user_id = "24048fb6-d6d2-436d-97bb-13580b457283"
-            debug_user_found = any(str(row[0]) == debug_user_id for row in results)
-            logger.info(f"DEBUG: User {debug_user_id} found in ClickHouse results: {debug_user_found}")
 
             users = []
             found_user_ids = set()

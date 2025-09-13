@@ -571,7 +571,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           // Create a key for the group based on available identifiers
           const groupKey =
             group.model_name ||
-            (viewBy === 'project' ? group.api_key_project_name : group.project_name) ||
+            (viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name) ||
             group.endpoint_name ||
             "Unknown";
 
@@ -633,7 +633,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           // Get the name based on what's available in the group
           const name =
             group.model_name ||
-            (viewBy === 'project' ? group.api_key_project_name : group.project_name) ||
+            (viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name) ||
             group.endpoint_name ||
             "Unknown";
           const count = group.metrics?.total_requests?.value || 0;
@@ -768,7 +768,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
       requestsTimeSeries.groups.forEach((group: any) => {
         const groupKey =
           group.model_name ||
-          (viewBy === 'project' ? group.api_key_project_name : group.project_name) ||
+          (viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name) ||
           group.endpoint_name ||
           "Unknown";
         const hourlyMap = new Map<number, number>();
@@ -800,7 +800,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
         if (group.model_name) {
           groupKey = group.model_name;
         } else if (group.project_name || group.api_key_project_name) {
-          groupKey = viewBy === 'project' ? group.api_key_project_name : group.project_name;
+          groupKey = viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name;
         } else if (group.endpoint_name) {
           groupKey = group.endpoint_name;
         } else if (group.user_id) {

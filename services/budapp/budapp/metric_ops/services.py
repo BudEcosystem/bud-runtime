@@ -972,7 +972,9 @@ class BudMetricService(SessionMixin):
                     # Keep the api_key_project_id as is
                 elif "project_ids" not in request_params:
                     # No project filter specified, for CLIENT users set api_key_project_id
-                    # Since GET params don't support lists well, we'll use the first project
+                    # NOTE: This method is for GET requests which have limitations with lists
+                    # For POST requests, use _apply_user_project_filter which sends all project IDs
+                    # Here we can only send the first project due to GET parameter constraints
                     if user_project_ids:
                         request_params["api_key_project_id"] = user_project_ids[0]
             else:
@@ -1094,39 +1096,23 @@ class BudMetricService(SessionMixin):
     async def _enrich_time_series_response(self, response_data: Dict[str, Any]) -> None:
         """Enrich time-series response with entity names."""
         try:
-            # TEMP DEBUG: Log incoming response structure
             groups = response_data.get("groups", [])
-            logger.info(f"DEBUG _enrich_time_series_response: Processing {len(groups)} groups")
 
             # Collect unique IDs from all groups
             project_ids = set()
             model_ids = set()
             endpoint_ids = set()
-            api_key_project_ids_found = []  # TEMP DEBUG
 
-            for idx, group in enumerate(groups):
-                # TEMP DEBUG: Log keys for first few groups
-                if idx < 3:
-                    logger.info(f"DEBUG: Time series group {idx} keys: {list(group.keys())}")
-
+            for _idx, group in enumerate(groups):
                 if project_id := group.get("project_id"):
                     project_ids.add(str(project_id))
-                    logger.info(f"DEBUG: Group {idx} has project_id: {project_id}")
                 # Also handle api_key_project_id (points to project table)
                 if api_key_project_id := group.get("api_key_project_id"):
                     project_ids.add(str(api_key_project_id))
-                    api_key_project_ids_found.append(str(api_key_project_id))  # TEMP DEBUG
-                    logger.info(f"DEBUG: Group {idx} has api_key_project_id: {api_key_project_id}")
                 if model_id := group.get("model_id"):
                     model_ids.add(str(model_id))
                 if endpoint_id := group.get("endpoint_id"):
                     endpoint_ids.add(str(endpoint_id))
-
-            # TEMP DEBUG: Log what we collected
-            logger.info(
-                f"DEBUG: Found {len(api_key_project_ids_found)} api_key_project_ids: {api_key_project_ids_found[:5]}"
-            )
-            logger.info(f"DEBUG: Total project_ids to fetch names for: {len(project_ids)}")
 
             # Fetch entity names
             project_names = {}
@@ -1138,13 +1124,6 @@ class BudMetricService(SessionMixin):
                 result = self.session.execute(stmt)
                 projects = result.scalars().all()
                 project_names = {str(p.id): p.name for p in projects}
-                # TEMP DEBUG: Log fetched project names
-                logger.info(f"DEBUG: Fetched {len(project_names)} project names")
-                if api_key_project_ids_found:
-                    for api_key_proj_id in api_key_project_ids_found[:3]:
-                        logger.info(
-                            f"DEBUG: api_key_project_id {api_key_proj_id} -> name: {project_names.get(api_key_proj_id)}"
-                        )
 
             if model_ids:
                 stmt = select(Model).where(Model.id.in_(list(model_ids)))
@@ -1159,35 +1138,20 @@ class BudMetricService(SessionMixin):
                 endpoint_names = {str(e.id): e.name for e in endpoints}
 
             # Add names to groups
-            for idx, group in enumerate(groups):
-                # TEMP DEBUG: Log enrichment process
-                if idx < 3:
-                    logger.info(f"DEBUG: Enriching time series group {idx}")
-
+            for _idx, group in enumerate(groups):
                 if project_id := group.get("project_id"):
                     name = project_names.get(str(project_id))
                     group["project_name"] = name
-                    if idx < 3:
-                        logger.info(f"DEBUG: Group {idx} project_id {project_id} -> name: {name}")
 
                 # Handle api_key_project_id - add the project name as api_key_project_name
                 if api_key_project_id := group.get("api_key_project_id"):
                     name = project_names.get(str(api_key_project_id))
                     group["api_key_project_name"] = name
-                    logger.info(
-                        f"DEBUG: Group {idx} api_key_project_id {api_key_project_id} -> api_key_project_name: {name}"
-                    )
 
                 if model_id := group.get("model_id"):
                     group["model_name"] = model_names.get(str(model_id))
                 if endpoint_id := group.get("endpoint_id"):
                     group["endpoint_name"] = endpoint_names.get(str(endpoint_id))
-
-            # TEMP DEBUG: Log final enriched data for first group
-            if groups:
-                logger.info(f"DEBUG: First enriched time series group keys: {list(groups[0].keys())}")
-                if "api_key_project_name" in groups[0]:
-                    logger.info(f"DEBUG: First group api_key_project_name: {groups[0]['api_key_project_name']}")
 
         except Exception as e:
             logger.warning(f"Failed to enrich time-series response: {e}")
@@ -1285,39 +1249,23 @@ class BudMetricService(SessionMixin):
         try:
             from sqlalchemy import select
 
-            # TEMP DEBUG: Log incoming response structure
             groups = response_data.get("groups", [])
-            logger.info(f"DEBUG _enrich_latency_distribution_response: Processing {len(groups)} groups")
 
             # Collect all unique IDs from the response
             project_ids = set()
             model_ids = set()
             endpoint_ids = set()
-            api_key_project_ids_found = []  # TEMP DEBUG
 
-            for idx, group in enumerate(groups):
-                # TEMP DEBUG: Log keys for first few groups
-                if idx < 3:
-                    logger.info(f"DEBUG: Latency group {idx} keys: {list(group.keys())}")
-
+            for _idx, group in enumerate(groups):
                 if project_id := group.get("project_id"):
                     project_ids.add(str(project_id))
-                    logger.info(f"DEBUG: Group {idx} has project_id: {project_id}")
                 # Also handle api_key_project_id (points to project table)
                 if api_key_project_id := group.get("api_key_project_id"):
                     project_ids.add(str(api_key_project_id))
-                    api_key_project_ids_found.append(str(api_key_project_id))  # TEMP DEBUG
-                    logger.info(f"DEBUG: Group {idx} has api_key_project_id: {api_key_project_id}")
                 if model_id := group.get("model_id"):
                     model_ids.add(str(model_id))
                 if endpoint_id := group.get("endpoint_id"):
                     endpoint_ids.add(str(endpoint_id))
-
-            # TEMP DEBUG: Log what we collected
-            logger.info(
-                f"DEBUG: Found {len(api_key_project_ids_found)} api_key_project_ids: {api_key_project_ids_found[:5]}"
-            )
-            logger.info(f"DEBUG: Total project_ids to fetch names for: {len(project_ids)}")
 
             # Fetch names in batches for efficiency
             project_names = {}
@@ -1329,13 +1277,6 @@ class BudMetricService(SessionMixin):
                 result = self.session.execute(stmt)
                 projects = result.scalars().all()
                 project_names = {str(p.id): p.name for p in projects}
-                # TEMP DEBUG: Log fetched project names
-                logger.info(f"DEBUG: Fetched {len(project_names)} project names")
-                if api_key_project_ids_found:
-                    for api_key_proj_id in api_key_project_ids_found[:3]:
-                        logger.info(
-                            f"DEBUG: api_key_project_id {api_key_proj_id} -> name: {project_names.get(api_key_proj_id)}"
-                        )
 
             if model_ids:
                 stmt = select(Model).where(Model.id.in_([UUID(mid) for mid in model_ids]))
