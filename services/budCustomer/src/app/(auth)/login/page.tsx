@@ -50,8 +50,16 @@ function LoginContent() {
       const provider = searchParams.get("provider");
       const exchangeToken = searchParams.get("exchange_token");
 
+      // Check if this exchange token was already processed
+      const processedExchangeTokens = localStorage.getItem("processed_exchange_tokens");
+      const processedTokensList = processedExchangeTokens ? JSON.parse(processedExchangeTokens) : [];
+
       // Handle token exchange flow
-      if (exchangeToken && !exchangeProcessed && !oauthProcessing) {
+      if (exchangeToken && !processedTokensList.includes(exchangeToken) && !oauthProcessing) {
+        // Mark this exchange token as processed in local storage
+        processedTokensList.push(exchangeToken);
+        localStorage.setItem("processed_exchange_tokens", JSON.stringify(processedTokensList));
+
         setExchangeProcessed(true); // Prevent re-entry
         setOauthProcessing(true);
         showLoader();
@@ -75,10 +83,20 @@ function LoginContent() {
             console.log("Failed to get user data, continuing anyway:", error);
           }
 
+          // Clean up old processed tokens (keep only last 10)
+          const updatedTokensList = processedTokensList.slice(-10);
+          localStorage.setItem("processed_exchange_tokens", JSON.stringify(updatedTokensList));
+
           // Redirect to models page using window.location for clean redirect
           window.location.href = "/models";
         } catch (error: any) {
           console.error("OAuth token exchange error:", error);
+          // Remove the token from processed list if it failed
+          const failedTokenIndex = processedTokensList.indexOf(exchangeToken);
+          if (failedTokenIndex > -1) {
+            processedTokensList.splice(failedTokenIndex, 1);
+            localStorage.setItem("processed_exchange_tokens", JSON.stringify(processedTokensList));
+          }
           errorToast(
             error.message || "Authentication failed. Please try again.",
           );
@@ -90,8 +108,17 @@ function LoginContent() {
         return;
       }
 
+      // Check if this auth code was already processed (for authorization code flow)
+      const processedAuthCodes = localStorage.getItem("processed_auth_codes");
+      const processedCodesList = processedAuthCodes ? JSON.parse(processedAuthCodes) : [];
+      const authCodeKey = `${provider}_${code}_${state}`;
+
       // Handle authorization code flow (fallback)
-      if (code && state && provider && !exchangeProcessed && !oauthProcessing) {
+      if (code && state && provider && !processedCodesList.includes(authCodeKey) && !oauthProcessing) {
+        // Mark this auth code as processed in local storage
+        processedCodesList.push(authCodeKey);
+        localStorage.setItem("processed_auth_codes", JSON.stringify(processedCodesList));
+
         setExchangeProcessed(true); // Prevent re-entry
         setOauthProcessing(true);
         showLoader();
@@ -117,10 +144,20 @@ function LoginContent() {
             console.log("Failed to get user data, continuing anyway:", error);
           }
 
+          // Clean up old processed codes (keep only last 10)
+          const updatedCodesList = processedCodesList.slice(-10);
+          localStorage.setItem("processed_auth_codes", JSON.stringify(updatedCodesList));
+
           // Redirect to models page using window.location for clean redirect
           window.location.href = "/models";
         } catch (error: any) {
           console.error("OAuth callback error:", error);
+          // Remove the code from processed list if it failed
+          const failedCodeIndex = processedCodesList.indexOf(authCodeKey);
+          if (failedCodeIndex > -1) {
+            processedCodesList.splice(failedCodeIndex, 1);
+            localStorage.setItem("processed_auth_codes", JSON.stringify(processedCodesList));
+          }
           errorToast(
             error.message || "Authentication failed. Please try again.",
           );
