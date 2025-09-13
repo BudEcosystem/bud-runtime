@@ -777,18 +777,33 @@ class BudMetricService(SessionMixin):
 
     async def proxy_geographic_metrics(self, request_params: Dict[str, Any], current_user: User) -> Dict[str, Any]:
         """Proxy geographic metrics request to budmetrics with access control and enrichment."""
-        # Apply user's project access restrictions for GET request params
-        await self._apply_user_project_filter_params(request_params, current_user)
+        # Convert GET params to POST body format
+        from_date = request_params.get("from_date")
+        to_date = request_params.get("to_date")
+        group_by = request_params.get("group_by", "country")
+        limit = int(request_params.get("limit", 50))
 
-        # Proxy to budmetrics
+        # Build request body with filters
+        request_body = {
+            "from_date": from_date,
+            "to_date": to_date,
+            "group_by": group_by,
+            "limit": limit,
+            "filters": {},
+        }
+
+        # Apply user's project access restrictions
+        await self._apply_user_project_filter(request_body, current_user)
+
+        # Proxy to budmetrics using POST endpoint
         metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/metrics/geography"
 
         try:
             async with (
                 aiohttp.ClientSession() as session,
-                session.get(
+                session.post(
                     metrics_endpoint,
-                    params=request_params,
+                    json=request_body,
                 ) as response,
             ):
                 response_data = await response.json()
@@ -928,8 +943,10 @@ class BudMetricService(SessionMixin):
     async def _apply_user_project_filter_params(self, request_params: Dict[str, Any], current_user: User) -> None:
         """Apply user's project access restrictions to GET request parameters."""
         try:
-            # Get user's accessible projects
+            # Import UserTypeEnum for user type checking
+            from ..commons.constants import UserTypeEnum
 
+            # Get user's accessible projects
             project_service = ProjectService(self.session)
             # Get all projects the user has access to
             user_projects, _ = await project_service.get_all_active_projects(
@@ -937,22 +954,53 @@ class BudMetricService(SessionMixin):
             )
             user_project_ids = [str(project.project.id) for project in user_projects]
 
-            # If project_ids parameter exists, intersect with user's accessible projects
-            if "project_ids" in request_params:
-                existing_project_ids = request_params["project_ids"]
-                if isinstance(existing_project_ids, str):
-                    # Convert comma-separated string to list
-                    existing_project_ids = existing_project_ids.split(",")
+            # Check if user is a CLIENT and apply appropriate filtering
+            if current_user.user_type == UserTypeEnum.CLIENT:
+                # For CLIENT users, convert project_id to api_key_project_id parameter
+                if "project_id" in request_params:
+                    # Move project_id to api_key_project_id for CLIENT users
+                    request_params["api_key_project_id"] = request_params.pop("project_id")
 
-                # Keep only projects that user has access to
-                accessible_ids = [pid for pid in existing_project_ids if str(pid) in user_project_ids]
-                if not accessible_ids:
-                    # User has no access to any of the requested projects
-                    raise ClientException("Access denied to requested projects", status_code=status.HTTP_403_FORBIDDEN)
-                request_params["project_ids"] = ",".join(accessible_ids)
+                # If api_key_project_id parameter exists, intersect with user's accessible projects
+                if "api_key_project_id" in request_params:
+                    existing_project_id = request_params["api_key_project_id"]
+                    # Check if user has access to this project
+                    if str(existing_project_id) not in user_project_ids:
+                        raise ClientException(
+                            "Access denied to requested project", status_code=status.HTTP_403_FORBIDDEN
+                        )
+                    # Keep the api_key_project_id as is
+                elif "project_ids" not in request_params:
+                    # No project filter specified, for CLIENT users set api_key_project_id
+                    # Since GET params don't support lists well, we'll use the first project
+                    if user_project_ids:
+                        request_params["api_key_project_id"] = user_project_ids[0]
             else:
-                # No project filter specified, apply user's projects
-                request_params["project_ids"] = ",".join(user_project_ids)
+                # For non-CLIENT users, use regular project_id filtering
+                # If project_ids parameter exists, intersect with user's accessible projects
+                if "project_ids" in request_params:
+                    existing_project_ids = request_params["project_ids"]
+                    if isinstance(existing_project_ids, str):
+                        # Convert comma-separated string to list
+                        existing_project_ids = existing_project_ids.split(",")
+
+                    # Keep only projects that user has access to
+                    accessible_ids = [pid for pid in existing_project_ids if str(pid) in user_project_ids]
+                    if not accessible_ids:
+                        # User has no access to any of the requested projects
+                        raise ClientException(
+                            "Access denied to requested projects", status_code=status.HTTP_403_FORBIDDEN
+                        )
+                    request_params["project_ids"] = ",".join(accessible_ids)
+                elif "project_id" in request_params:
+                    # Single project_id parameter
+                    if str(request_params["project_id"]) not in user_project_ids:
+                        raise ClientException(
+                            "Access denied to requested project", status_code=status.HTTP_403_FORBIDDEN
+                        )
+                else:
+                    # No project filter specified, apply user's projects
+                    request_params["project_ids"] = ",".join(user_project_ids)
 
         except ClientException:
             raise
@@ -986,6 +1034,9 @@ class BudMetricService(SessionMixin):
             for group in groups:
                 if project_id := group.get("project_id"):
                     project_ids.add(str(project_id))
+                # Also handle api_key_project_id (points to project table)
+                if api_key_project_id := group.get("api_key_project_id"):
+                    project_ids.add(str(api_key_project_id))
                 if model_id := group.get("model_id"):
                     model_ids.add(str(model_id))
                 if endpoint_id := group.get("endpoint_id"):
@@ -995,6 +1046,8 @@ class BudMetricService(SessionMixin):
             if isinstance(summary_group, dict):
                 if project_id := summary_group.get("project_id"):
                     project_ids.add(str(project_id))
+                if api_key_project_id := summary_group.get("api_key_project_id"):
+                    project_ids.add(str(api_key_project_id))
                 if model_id := summary_group.get("model_id"):
                     model_ids.add(str(model_id))
                 if endpoint_id := summary_group.get("endpoint_id"):
@@ -1027,6 +1080,9 @@ class BudMetricService(SessionMixin):
             for group in groups:
                 if project_id := group.get("project_id"):
                     group["project_name"] = project_names.get(str(project_id))
+                # Handle api_key_project_id - add the project name as api_key_project_name
+                if api_key_project_id := group.get("api_key_project_id"):
+                    group["api_key_project_name"] = project_names.get(str(api_key_project_id))
                 if model_id := group.get("model_id"):
                     group["model_name"] = model_names.get(str(model_id))
                 if endpoint_id := group.get("endpoint_id"):
@@ -1038,20 +1094,39 @@ class BudMetricService(SessionMixin):
     async def _enrich_time_series_response(self, response_data: Dict[str, Any]) -> None:
         """Enrich time-series response with entity names."""
         try:
+            # TEMP DEBUG: Log incoming response structure
+            groups = response_data.get("groups", [])
+            logger.info(f"DEBUG _enrich_time_series_response: Processing {len(groups)} groups")
+
             # Collect unique IDs from all groups
             project_ids = set()
             model_ids = set()
             endpoint_ids = set()
+            api_key_project_ids_found = []  # TEMP DEBUG
 
-            groups = response_data.get("groups", [])
+            for idx, group in enumerate(groups):
+                # TEMP DEBUG: Log keys for first few groups
+                if idx < 3:
+                    logger.info(f"DEBUG: Time series group {idx} keys: {list(group.keys())}")
 
-            for group in groups:
                 if project_id := group.get("project_id"):
                     project_ids.add(str(project_id))
+                    logger.info(f"DEBUG: Group {idx} has project_id: {project_id}")
+                # Also handle api_key_project_id (points to project table)
+                if api_key_project_id := group.get("api_key_project_id"):
+                    project_ids.add(str(api_key_project_id))
+                    api_key_project_ids_found.append(str(api_key_project_id))  # TEMP DEBUG
+                    logger.info(f"DEBUG: Group {idx} has api_key_project_id: {api_key_project_id}")
                 if model_id := group.get("model_id"):
                     model_ids.add(str(model_id))
                 if endpoint_id := group.get("endpoint_id"):
                     endpoint_ids.add(str(endpoint_id))
+
+            # TEMP DEBUG: Log what we collected
+            logger.info(
+                f"DEBUG: Found {len(api_key_project_ids_found)} api_key_project_ids: {api_key_project_ids_found[:5]}"
+            )
+            logger.info(f"DEBUG: Total project_ids to fetch names for: {len(project_ids)}")
 
             # Fetch entity names
             project_names = {}
@@ -1063,6 +1138,13 @@ class BudMetricService(SessionMixin):
                 result = self.session.execute(stmt)
                 projects = result.scalars().all()
                 project_names = {str(p.id): p.name for p in projects}
+                # TEMP DEBUG: Log fetched project names
+                logger.info(f"DEBUG: Fetched {len(project_names)} project names")
+                if api_key_project_ids_found:
+                    for api_key_proj_id in api_key_project_ids_found[:3]:
+                        logger.info(
+                            f"DEBUG: api_key_project_id {api_key_proj_id} -> name: {project_names.get(api_key_proj_id)}"
+                        )
 
             if model_ids:
                 stmt = select(Model).where(Model.id.in_(list(model_ids)))
@@ -1077,13 +1159,35 @@ class BudMetricService(SessionMixin):
                 endpoint_names = {str(e.id): e.name for e in endpoints}
 
             # Add names to groups
-            for group in groups:
+            for idx, group in enumerate(groups):
+                # TEMP DEBUG: Log enrichment process
+                if idx < 3:
+                    logger.info(f"DEBUG: Enriching time series group {idx}")
+
                 if project_id := group.get("project_id"):
-                    group["project_name"] = project_names.get(str(project_id))
+                    name = project_names.get(str(project_id))
+                    group["project_name"] = name
+                    if idx < 3:
+                        logger.info(f"DEBUG: Group {idx} project_id {project_id} -> name: {name}")
+
+                # Handle api_key_project_id - add the project name as api_key_project_name
+                if api_key_project_id := group.get("api_key_project_id"):
+                    name = project_names.get(str(api_key_project_id))
+                    group["api_key_project_name"] = name
+                    logger.info(
+                        f"DEBUG: Group {idx} api_key_project_id {api_key_project_id} -> api_key_project_name: {name}"
+                    )
+
                 if model_id := group.get("model_id"):
                     group["model_name"] = model_names.get(str(model_id))
                 if endpoint_id := group.get("endpoint_id"):
                     group["endpoint_name"] = endpoint_names.get(str(endpoint_id))
+
+            # TEMP DEBUG: Log final enriched data for first group
+            if groups:
+                logger.info(f"DEBUG: First enriched time series group keys: {list(groups[0].keys())}")
+                if "api_key_project_name" in groups[0]:
+                    logger.info(f"DEBUG: First group api_key_project_name: {groups[0]['api_key_project_name']}")
 
         except Exception as e:
             logger.warning(f"Failed to enrich time-series response: {e}")
@@ -1181,20 +1285,39 @@ class BudMetricService(SessionMixin):
         try:
             from sqlalchemy import select
 
+            # TEMP DEBUG: Log incoming response structure
+            groups = response_data.get("groups", [])
+            logger.info(f"DEBUG _enrich_latency_distribution_response: Processing {len(groups)} groups")
+
             # Collect all unique IDs from the response
             project_ids = set()
             model_ids = set()
             endpoint_ids = set()
+            api_key_project_ids_found = []  # TEMP DEBUG
 
-            groups = response_data.get("groups", [])
+            for idx, group in enumerate(groups):
+                # TEMP DEBUG: Log keys for first few groups
+                if idx < 3:
+                    logger.info(f"DEBUG: Latency group {idx} keys: {list(group.keys())}")
 
-            for group in groups:
                 if project_id := group.get("project_id"):
                     project_ids.add(str(project_id))
+                    logger.info(f"DEBUG: Group {idx} has project_id: {project_id}")
+                # Also handle api_key_project_id (points to project table)
+                if api_key_project_id := group.get("api_key_project_id"):
+                    project_ids.add(str(api_key_project_id))
+                    api_key_project_ids_found.append(str(api_key_project_id))  # TEMP DEBUG
+                    logger.info(f"DEBUG: Group {idx} has api_key_project_id: {api_key_project_id}")
                 if model_id := group.get("model_id"):
                     model_ids.add(str(model_id))
                 if endpoint_id := group.get("endpoint_id"):
                     endpoint_ids.add(str(endpoint_id))
+
+            # TEMP DEBUG: Log what we collected
+            logger.info(
+                f"DEBUG: Found {len(api_key_project_ids_found)} api_key_project_ids: {api_key_project_ids_found[:5]}"
+            )
+            logger.info(f"DEBUG: Total project_ids to fetch names for: {len(project_ids)}")
 
             # Fetch names in batches for efficiency
             project_names = {}
@@ -1206,6 +1329,13 @@ class BudMetricService(SessionMixin):
                 result = self.session.execute(stmt)
                 projects = result.scalars().all()
                 project_names = {str(p.id): p.name for p in projects}
+                # TEMP DEBUG: Log fetched project names
+                logger.info(f"DEBUG: Fetched {len(project_names)} project names")
+                if api_key_project_ids_found:
+                    for api_key_proj_id in api_key_project_ids_found[:3]:
+                        logger.info(
+                            f"DEBUG: api_key_project_id {api_key_proj_id} -> name: {project_names.get(api_key_proj_id)}"
+                        )
 
             if model_ids:
                 stmt = select(Model).where(Model.id.in_([UUID(mid) for mid in model_ids]))
@@ -1223,6 +1353,11 @@ class BudMetricService(SessionMixin):
             for group in groups:
                 if project_id := group.get("project_id"):
                     group["project_name"] = project_names.get(str(project_id), group.get("project_name"))
+                # Handle api_key_project_id - add the project name as api_key_project_name
+                if api_key_project_id := group.get("api_key_project_id"):
+                    group["api_key_project_name"] = project_names.get(
+                        str(api_key_project_id), group.get("api_key_project_name")
+                    )
                 if model_id := group.get("model_id"):
                     # Preserve original model_name if enrichment fails
                     enriched_name = model_names.get(str(model_id))

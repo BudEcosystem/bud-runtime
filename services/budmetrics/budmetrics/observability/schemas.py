@@ -201,7 +201,7 @@ class ObservabilityMetricsRequest(BaseModel):
     frequency_unit: Literal["hour", "day", "week", "month", "quarter", "year"] = "day"
     frequency_interval: Optional[int] = None
     filters: Optional[dict[Literal["model", "project", "endpoint"], Union[list[UUID], UUID]]] = None
-    group_by: Optional[list[Literal["model", "project", "endpoint"]]] = None
+    group_by: Optional[list[Literal["model", "project", "endpoint", "user_project"]]] = None
     return_delta: bool = True
     fill_time_gaps: bool = True
     topk: Optional[int] = None
@@ -718,7 +718,7 @@ class GatewayAnalyticsRequest(BaseModel):
     frequency_interval: Optional[int] = None
     filters: Optional[Dict[str, Any]] = None  # e.g., {"country_code": ["US", "UK"], "is_bot": False}
     group_by: Optional[
-        list[Literal["project", "country", "city", "device_type", "browser", "os", "path", "status_code"]]
+        list[Literal["project", "country", "city", "device_type", "browser", "os", "path", "status_code", "user_project"]]
     ] = None
     return_delta: bool = True
     fill_time_gaps: bool = True
@@ -761,6 +761,7 @@ class GatewayMetricsData(BaseModel):
 
     # Grouping dimensions (optional based on group_by)
     project_id: Optional[UUID] = None
+    api_key_project_id: Optional[UUID] = None  # For user_project grouping
     country_code: Optional[str] = None
     city: Optional[str] = None
     device_type: Optional[str] = None
@@ -862,7 +863,7 @@ class AggregatedMetricsRequest(BaseModel):
 
     from_date: datetime
     to_date: Optional[datetime] = None
-    group_by: Optional[list[Literal["model", "project", "endpoint", "user"]]] = None
+    group_by: Optional[list[Literal["model", "project", "endpoint", "user", "user_project"]]] = None
     filters: Optional[Dict[str, Any]] = None  # e.g., {"project_id": ["uuid1", "uuid2"], "model_id": "uuid"}
     metrics: list[
         Literal[
@@ -872,6 +873,8 @@ class AggregatedMetricsRequest(BaseModel):
             "p95_latency",
             "p99_latency",
             "total_tokens",
+            "total_input_tokens",
+            "total_output_tokens",
             "avg_tokens",
             "total_cost",
             "avg_cost",
@@ -912,6 +915,8 @@ class AggregatedMetricsGroup(BaseModel):
     endpoint_id: Optional[UUID] = None
     endpoint_name: Optional[str] = None
     user_id: Optional[str] = None
+    api_key_project_id: Optional[UUID] = None  # For user_project grouping
+    api_key_project_name: Optional[str] = None
 
     # Aggregated metrics
     metrics: Dict[str, AggregatedMetricValue]
@@ -949,7 +954,7 @@ class TimeSeriesRequest(BaseModel):
         ]
     ]
     filters: Optional[Dict[str, Any]] = None
-    group_by: Optional[list[Literal["model", "project", "endpoint"]]] = None
+    group_by: Optional[list[Literal["model", "project", "endpoint", "user_project"]]] = None
     fill_gaps: bool = True
 
     @field_validator("to_date")
@@ -977,6 +982,8 @@ class TimeSeriesGroup(BaseModel):
     project_name: Optional[str] = None
     endpoint_id: Optional[UUID] = None
     endpoint_name: Optional[str] = None
+    api_key_project_id: Optional[UUID] = None  # For user_project grouping
+    api_key_project_name: Optional[str] = None
 
     # Time series data
     data_points: List[TimeSeriesPoint]
@@ -1052,7 +1059,7 @@ class LatencyDistributionRequest(BaseModel):
     from_date: datetime
     to_date: Optional[datetime] = None
     filters: Optional[Dict[str, Any]] = None
-    group_by: Optional[list[Literal["model", "project", "endpoint", "user"]]] = None
+    group_by: Optional[list[Literal["model", "project", "endpoint", "user", "user_project"]]] = None
     buckets: Optional[List[Dict[str, Union[int, str]]]] = None
 
     @field_validator("to_date")
@@ -1096,6 +1103,8 @@ class LatencyDistributionGroup(BaseModel):
     endpoint_id: Optional[UUID] = None
     endpoint_name: Optional[str] = None
     user_id: Optional[str] = None
+    api_key_project_id: Optional[UUID] = None  # For user_project grouping
+    api_key_project_name: Optional[str] = None
 
     # Distribution data
     buckets: List[LatencyDistributionBucket]

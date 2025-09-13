@@ -110,6 +110,7 @@ export interface InferenceListItem {
   model_name: string;
   model_display_name?: string;
   project_name?: string;
+  api_key_project_name?: string;
   endpoint_name?: string;
   prompt_preview: string;
   response_preview: string;
@@ -136,6 +137,7 @@ export interface InferenceDetail {
   // Project/Endpoint info
   project_id: string;
   project_name?: string;
+  api_key_project_name?: string;
   endpoint_id: string;
   endpoint_name?: string;
 
