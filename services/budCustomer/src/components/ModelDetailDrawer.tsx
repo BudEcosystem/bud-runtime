@@ -18,8 +18,8 @@ import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import CustomDropDown from "@/flows/components/CustomDropDown";
 import CustomPopover from "@/flows/components/customPopover";
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import {
   Text_12_400_757575,
   Text_12_400_B3B3B3,
@@ -89,10 +89,10 @@ const ModelDetailDrawer: React.FC<ModelDetailDrawerProps> = ({
   );
 };
 
-export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }> = ({
-  model,
-  onClose,
-}) => {
+export const ModelDetailContent: React.FC<{
+  model: Model;
+  onClose: () => void;
+}> = ({ model, onClose }) => {
   const [filteredItems, setFilteredItems] = useState<TabsProps["items"]>([]);
   const assetBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
@@ -144,9 +144,7 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
           <div>
             <div
               ref={descriptionRef}
-              className={`${
-                isExpanded ? "" : "line-clamp-3"
-              } overflow-hidden`}
+              className={`${isExpanded ? "" : "line-clamp-3"} overflow-hidden`}
             >
               <Text_12_400_B3B3B3 className="leading-[180%] text-gray-800 dark:text-[#B3B3B3]">
                 {model?.description}
@@ -172,21 +170,33 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
           </Text_14_500_EEEEEE>
           <div className="bg-gray-50 dark:bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-gray-200 dark:border-[#1F1F1F] rounded-lg p-4 space-y-3">
             <div className="flex justify-between items-center">
-              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">Model Name</Text_12_400_B3B3B3>
-              <Text_12_400_EEEEEE className="text-right text-gray-900 dark:text-[#EEEEEE]">{model.endpoint_name}</Text_12_400_EEEEEE>
+              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">
+                Model Name
+              </Text_12_400_B3B3B3>
+              <Text_12_400_EEEEEE className="text-right text-gray-900 dark:text-[#EEEEEE]">
+                {model.endpoint_name}
+              </Text_12_400_EEEEEE>
             </div>
             <div className="flex justify-between items-center">
-              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">Source</Text_12_400_B3B3B3>
-              <Text_12_400_EEEEEE className="text-right text-gray-900 dark:text-[#EEEEEE]">{model.source || "N/A"}</Text_12_400_EEEEEE>
+              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">
+                Source
+              </Text_12_400_B3B3B3>
+              <Text_12_400_EEEEEE className="text-right text-gray-900 dark:text-[#EEEEEE]">
+                {model.source || "N/A"}
+              </Text_12_400_EEEEEE>
             </div>
             <div className="flex justify-between items-center">
-              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">Model Size</Text_12_400_B3B3B3>
+              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">
+                Model Size
+              </Text_12_400_B3B3B3>
               <Text_12_400_EEEEEE className="text-right text-gray-900 dark:text-[#EEEEEE]">
                 {model.model_size ? `${model.model_size}B` : "N/A"}
               </Text_12_400_EEEEEE>
             </div>
             <div className="flex justify-between items-center">
-              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">Provider Type</Text_12_400_B3B3B3>
+              <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">
+                Provider Type
+              </Text_12_400_B3B3B3>
               <Text_12_400_EEEEEE className="text-right text-gray-900 dark:text-[#EEEEEE]">
                 {model.provider_type === "cloud_model" ? "Cloud" : "Local"}
               </Text_12_400_EEEEEE>
@@ -196,13 +206,17 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
 
         {/* Modalities */}
         <div>
-          <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Modalities</Text_14_500_EEEEEE>
+          <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">
+            Modalities
+          </Text_14_500_EEEEEE>
           <Text_12_400_757575 className="mt-1 mb-3 text-gray-600 dark:text-[#757575]">
             Input and output capabilities of the model
           </Text_12_400_757575>
           <div className="flex gap-3">
             <div className="flex flex-col items-center gap-3 bg-gray-50 dark:bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-gray-200 dark:border-[#1F1F1F] w-[50%] p-4 rounded-lg">
-              <Text_14_400_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Input</Text_14_400_EEEEEE>
+              <Text_14_400_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">
+                Input
+              </Text_14_400_EEEEEE>
               <div className="flex justify-center items-center gap-3">
                 <Image
                   preview={false}
@@ -246,7 +260,9 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
               </Text_12_400_EEEEEE>
             </div>
             <div className="flex flex-col items-center gap-3 bg-gray-50 dark:bg-[rgba(255,255,255,0.027)] backdrop-blur-[10px] border border-gray-200 dark:border-[#1F1F1F] w-[50%] p-4 rounded-lg">
-              <Text_14_400_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Output</Text_14_400_EEEEEE>
+              <Text_14_400_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">
+                Output
+              </Text_14_400_EEEEEE>
               <div className="flex justify-center items-center gap-3">
                 <Image
                   preview={false}
@@ -294,15 +310,15 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
 
         {/* Supported Endpoints */}
         <div>
-          <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Supported Endpoints</Text_14_500_EEEEEE>
+          <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">
+            Supported Endpoints
+          </Text_14_500_EEEEEE>
           <Text_12_400_757575 className="mt-1 mb-3 text-gray-600 dark:text-[#757575]">
             Available API endpoints for this model
           </Text_12_400_757575>
           <div className="grid grid-cols-2 gap-3">
             {Object.entries(model.supported_endpoints).map(([key, value]) => {
-              const iconName = value.enabled
-                ? `${key}.png`
-                : `${key}-not.png`;
+              const iconName = value.enabled ? `${key}.png` : `${key}-not.png`;
               return (
                 <div
                   key={key}
@@ -322,14 +338,18 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
                   <div className="flex-1 min-w-0">
                     {value.enabled ? (
                       <>
-                        <Text_14_400_EEEEEE className="truncate text-gray-900 dark:text-[#EEEEEE]">{value.label}</Text_14_400_EEEEEE>
+                        <Text_14_400_EEEEEE className="truncate text-gray-900 dark:text-[#EEEEEE]">
+                          {value.label}
+                        </Text_14_400_EEEEEE>
                         <Text_12_400_B3B3B3 className="truncate text-gray-700 dark:text-[#B3B3B3]">
                           {value.path}
                         </Text_12_400_B3B3B3>
                       </>
                     ) : (
                       <>
-                        <Text_14_400_757575 className="truncate text-gray-700 dark:text-[#757575]">{value.label}</Text_14_400_757575>
+                        <Text_14_400_757575 className="truncate text-gray-700 dark:text-[#757575]">
+                          {value.label}
+                        </Text_14_400_757575>
                         <Text_12_400_757575 className="truncate text-gray-600 dark:text-[#757575]">
                           {value.path}
                         </Text_12_400_757575>
@@ -367,7 +387,9 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
         {/* Tags */}
         {model.tags && model.tags.length > 0 && (
           <div>
-            <Text_14_500_EEEEEE className="mb-3 text-gray-900 dark:text-[#EEEEEE]">Tags</Text_14_500_EEEEEE>
+            <Text_14_500_EEEEEE className="mb-3 text-gray-900 dark:text-[#EEEEEE]">
+              Tags
+            </Text_14_500_EEEEEE>
             <div className="flex flex-wrap gap-2">
               {model.tags.map((tag, index) => (
                 <Tag
@@ -384,7 +406,9 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
         {/* Strengths */}
         {model?.strengths?.length > 0 && (
           <div>
-            <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Model is Great at</Text_14_500_EEEEEE>
+            <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">
+              Model is Great at
+            </Text_14_500_EEEEEE>
             <Text_12_400_757575 className="mt-1 mb-3 text-gray-600 dark:text-[#757575]">
               Key strengths and capabilities
             </Text_12_400_757575>
@@ -406,7 +430,9 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
         {/* Limitations */}
         {model?.limitations?.length > 0 && (
           <div>
-            <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">Model is Not Good With</Text_14_500_EEEEEE>
+            <Text_14_500_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">
+              Model is Not Good With
+            </Text_14_500_EEEEEE>
             <Text_12_400_757575 className="mt-1 mb-3 text-gray-600 dark:text-[#757575]">
               Known limitations and constraints
             </Text_12_400_757575>
@@ -429,72 +455,80 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
   };
 
   const UseThisModel = () => {
-    type CodeType = 'curl' | 'python' | 'javascript';
+    type CodeType = "curl" | "python" | "javascript";
     const [selectedCode, setSelectedCode] = useState<CodeType>("curl");
-    const [copyText, setCopyText] = useState<string>('Copy');
+    const [copyText, setCopyText] = useState<string>("Copy");
 
     // Function to get the appropriate endpoint and payload based on model type
     const getEndpointConfig = useMemo(() => {
-      const modelName = model?.endpoint_name || 'model';
+      const modelName = model?.endpoint_name || "model";
 
       // Default to chat endpoint
-      let endpoint = '/v1/chat/completions';
+      let endpoint = "/v1/chat/completions";
       let payloadExample: any = {
         model: modelName,
         max_tokens: 256,
-        messages: [{"role": "user", "content": "Summarize the given text"}]
+        messages: [{ role: "user", content: "Summarize the given text" }],
       };
 
       // Check model supported endpoints
       if (model?.supported_endpoints) {
         // Check for embedding endpoint
         if (model.supported_endpoints.embedding?.enabled) {
-          endpoint = model.supported_endpoints.embedding.path || '/v1/embeddings';
+          endpoint =
+            model.supported_endpoints.embedding.path || "/v1/embeddings";
           payloadExample = {
             model: modelName,
-            input: "Your text to embed"
+            input: "Your text to embed",
           };
         }
         // Check for audio transcription endpoint
         else if (model.supported_endpoints.audio_transcription?.enabled) {
-          endpoint = model.supported_endpoints.audio_transcription.path || '/v1/audio/transcriptions';
+          endpoint =
+            model.supported_endpoints.audio_transcription.path ||
+            "/v1/audio/transcriptions";
           payloadExample = {
             model: modelName,
             file: "@/path/to/audio.mp3",
-            response_format: "json"
+            response_format: "json",
           };
         }
         // Check for text-to-speech endpoint
         else if (model.supported_endpoints.audio_speech?.enabled) {
-          endpoint = model.supported_endpoints.audio_speech.path || '/v1/audio/speech';
+          endpoint =
+            model.supported_endpoints.audio_speech.path || "/v1/audio/speech";
           payloadExample = {
             model: modelName,
             input: "Text to convert to speech",
-            voice: "alloy"
+            voice: "alloy",
           };
         }
         // Check for image generation endpoint
         else if (model.supported_endpoints.image_generation?.enabled) {
-          endpoint = model.supported_endpoints.image_generation.path || '/v1/images/generations';
+          endpoint =
+            model.supported_endpoints.image_generation.path ||
+            "/v1/images/generations";
           payloadExample = {
             model: modelName,
             prompt: "A cute baby sea otter",
             n: 1,
-            size: "1024x1024"
+            size: "1024x1024",
           };
         }
         // Check for completion endpoint
         else if (model.supported_endpoints.completion?.enabled) {
-          endpoint = model.supported_endpoints.completion.path || '/v1/completions';
+          endpoint =
+            model.supported_endpoints.completion.path || "/v1/completions";
           payloadExample = {
             model: modelName,
             prompt: "Once upon a time",
-            max_tokens: 256
+            max_tokens: 256,
           };
         }
         // Default to chat if it's enabled
         else if (model.supported_endpoints.chat?.enabled) {
-          endpoint = model.supported_endpoints.chat.path || '/v1/chat/completions';
+          endpoint =
+            model.supported_endpoints.chat.path || "/v1/chat/completions";
         }
       }
 
@@ -502,12 +536,16 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
     }, []);
 
     const { endpoint, payloadExample } = getEndpointConfig;
-    const baseUrl = process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL || 'https://api.example.com';
-    const apiUrl = `${baseUrl}${endpoint}`;
-
+    const baseUrl =
+      process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL ||
+      "https://api.example.com";
+    const apiUrl = `${baseUrl.replace( /\/+$/, '')}/${endpoint}`;
+    console.log("baseUrl:", baseUrl);
+    console.log("endpoint:", endpoint);
+    console.log("API URL:", apiUrl);
     const generateCurlCommand = useMemo(() => {
       // Special handling for audio transcription (file upload)
-      if (endpoint.includes('audio/transcriptions')) {
+      if (endpoint.includes("audio/transcriptions")) {
         return `curl --location '${apiUrl}' \\
   --header 'Authorization: Bearer {API_KEY_HERE}' \\
   --form 'file=@"/path/to/audio.mp3"' \\
@@ -524,7 +562,7 @@ export const ModelDetailContent: React.FC<{ model: Model; onClose: () => void }>
 
     const generatePythonCode = useMemo(() => {
       // Special handling for audio transcription (file upload)
-      if (endpoint.includes('audio/transcriptions')) {
+      if (endpoint.includes("audio/transcriptions")) {
         return `import requests
 
 url = "${apiUrl}"
@@ -558,7 +596,7 @@ print(response.text)`;
 
     const generateJavaScriptCode = useMemo(() => {
       // Special handling for audio transcription (file upload)
-      if (endpoint.includes('audio/transcriptions')) {
+      if (endpoint.includes("audio/transcriptions")) {
         return `const formData = new FormData();
 formData.append('file', fileInput.files[0]); // fileInput is your file input element
 formData.append('model', '${payloadExample.model}');
@@ -592,12 +630,17 @@ fetch('${apiUrl}', {
 .catch(error => console.error('Error:', error));`;
     }, [apiUrl, endpoint, payloadExample]);
 
-    const codeSnippets = useMemo(() => ({
-      curl: generateCurlCommand,
-      python: generatePythonCode,
-      javascript: generateJavaScriptCode
-    }), [generateCurlCommand, generatePythonCode, generateJavaScriptCode]);
-    const [selectedText, setSelectedText] = useState<string>(codeSnippets[selectedCode]);
+    const codeSnippets = useMemo(
+      () => ({
+        curl: generateCurlCommand,
+        python: generatePythonCode,
+        javascript: generateJavaScriptCode,
+      }),
+      [generateCurlCommand, generatePythonCode, generateJavaScriptCode],
+    );
+    const [selectedText, setSelectedText] = useState<string>(
+      codeSnippets[selectedCode],
+    );
 
     // Update selected text when code type or snippets change
     useEffect(() => {
@@ -609,7 +652,8 @@ fetch('${apiUrl}', {
     };
 
     const handleCopy = (text: string) => {
-      navigator.clipboard.writeText(text)
+      navigator.clipboard
+        .writeText(text)
         .then(() => {
           setCopyText("Copied!");
           setTimeout(() => {
@@ -624,7 +668,9 @@ fetch('${apiUrl}', {
     return (
       <div className="space-y-6">
         <div>
-          <Text_20_400_FFFFFF className="tracking-[.03rem] text-gray-900 dark:text-[#FFFFFF]">Code Snippet</Text_20_400_FFFFFF>
+          <Text_20_400_FFFFFF className="tracking-[.03rem] text-gray-900 dark:text-[#FFFFFF]">
+            Code Snippet
+          </Text_20_400_FFFFFF>
           <Text_12_400_757575 className="tracking-[.004rem] mt-[1rem] text-gray-600 dark:text-[#757575]">
             Copy the code below and use it for deployment
           </Text_12_400_757575>
@@ -632,7 +678,7 @@ fetch('${apiUrl}', {
 
         <div className="flex justify-start">
           <CustomDropDown
-          parentClassNames="cursor-pointer"
+            parentClassNames="cursor-pointer"
             Placement="bottomLeft"
             buttonContent={
               <div className="cursor-pointer border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[1.75rem] flex items-center justify-center px-[.6rem]">
@@ -663,10 +709,7 @@ fetch('${apiUrl}', {
         </div>
 
         <div className="custom-code rounded-[8px] relative bg-[#FFFFFF08] w-full overflow-hidden">
-          <CustomPopover
-            title={copyText}
-            contentClassNames="py-[.3rem]"
-          >
+          <CustomPopover title={copyText} contentClassNames="py-[.3rem]">
             <div
               className="w-[1.25rem] h-[1.25rem] rounded-[4px] flex justify-center items-center absolute right-[0.35rem] top-[0.65rem] cursor-pointer hover:bg-[#1F1F1F] z-10"
               onClick={() => handleCopy(selectedText)}
@@ -675,20 +718,26 @@ fetch('${apiUrl}', {
                 preview={false}
                 src="/images/drawer/Copy.png"
                 alt="copy"
-                style={{ height: '.75rem' }}
+                style={{ height: ".75rem" }}
               />
             </div>
           </CustomPopover>
 
           <div className="markdown-body">
             <SyntaxHighlighter
-              language={selectedCode === "python" ? "python" : selectedCode === "javascript" ? "javascript" : "bash"}
+              language={
+                selectedCode === "python"
+                  ? "python"
+                  : selectedCode === "javascript"
+                    ? "javascript"
+                    : "bash"
+              }
               style={oneDark}
               showLineNumbers
               customStyle={{
                 margin: 0,
-                borderRadius: '8px',
-                fontSize: '0.75rem',
+                borderRadius: "8px",
+                fontSize: "0.75rem",
               }}
             >
               {selectedText}
@@ -741,7 +790,7 @@ fetch('${apiUrl}', {
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Model Details"
-            description={`View detailed information about ${model?.endpoint_name || 'this model'}`}
+            description={`View detailed information about ${model?.endpoint_name || "this model"}`}
           />
           <DrawerCard classNames="pb-0">
             {/* Model Header with Icon and Tags */}
@@ -772,19 +821,26 @@ fetch('${apiUrl}', {
                 <Text_14_400_EEEEEE className="mb-2 font-medium text-gray-900 dark:text-[#EEEEEE]">
                   {model?.endpoint_name}
                 </Text_14_400_EEEEEE>
-                <ModelTags model={{
-                            ...model,
-                            endpoints_count: model.supported_endpoints
-                              ? Object.values(model.supported_endpoints).filter((e: any) => e.enabled).length
-                              : model.endpoints_count
-                          }}
-		 maxTags={3} limit={true} />
+                <ModelTags
+                  model={{
+                    ...model,
+                    endpoints_count: model.supported_endpoints
+                      ? Object.values(model.supported_endpoints).filter(
+                          (e: any) => e.enabled,
+                        ).length
+                      : model.endpoints_count,
+                  }}
+                  maxTags={3}
+                  limit={true}
+                />
                 <div className="flex items-center gap-2 mt-2">
                   <Icon
                     icon="ph:calendar"
                     className="text-[#757575] text-[0.875rem]"
                   />
-                  <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">Created on&nbsp;&nbsp;</Text_12_400_B3B3B3>
+                  <Text_12_400_B3B3B3 className="text-gray-700 dark:text-[#B3B3B3]">
+                    Created on&nbsp;&nbsp;
+                  </Text_12_400_B3B3B3>
                   <Text_12_400_EEEEEE className="text-gray-900 dark:text-[#EEEEEE]">
                     {dayjs(model.created_at).format("DD MMM, YYYY")}
                   </Text_12_400_EEEEEE>

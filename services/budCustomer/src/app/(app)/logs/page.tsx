@@ -1,31 +1,72 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { Tabs, Button, Table, Tag, Tooltip, Typography, message, Card, Row, Col, Statistic, Select, DatePicker, Space, Segmented, Image, ConfigProvider } from 'antd';
-import { DownloadOutlined, ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined, BarChartOutlined, LineChartOutlined, PieChartOutlined, GlobalOutlined, FilterOutlined, UserOutlined, AppstoreOutlined, RocketOutlined, CodeOutlined } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
-import { format } from 'date-fns';
-import { formatTimestamp } from '@/utils/formatDateNew';
-import { useRouter } from 'next/navigation';
-import { useInferences, InferenceListItem } from '@/stores/useInferences';
-import InferenceFilters from '@/components/inferences/InferenceFilters';
-import { Text_12_400_EEEEEE, Text_16_600_FFFFFF, Text_14_600_EEEEEE, Text_14_600_B3B3B3, Text_12_400_808080 } from '@/components/ui/text';
-import SearchHeaderInput from 'src/flows/components/SearchHeaderInput';
-import NoDataFount from '@/components/ui/noDataFount';
-import { PrimaryButton, SecondaryButton } from '@/components/ui/bud/form/Buttons';
-import ProjectTags from 'src/flows/components/ProjectTags';
-import { SortIcon } from '@/components/ui/bud/table/SortIcon';
-import { formatDate } from 'src/utils/formatDate';
-import { useLoaderOnLoading } from 'src/hooks/useLoaderOnLoading';
+import React, { useEffect, useState } from "react";
+import {
+  Tabs,
+  Button,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+  message,
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Select,
+  DatePicker,
+  Space,
+  Segmented,
+  Image,
+  ConfigProvider,
+} from "antd";
+import {
+  DownloadOutlined,
+  ReloadOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
+  BarChartOutlined,
+  LineChartOutlined,
+  PieChartOutlined,
+  GlobalOutlined,
+  FilterOutlined,
+  UserOutlined,
+  AppstoreOutlined,
+  RocketOutlined,
+  CodeOutlined,
+} from "@ant-design/icons";
+import type { ColumnsType } from "antd/es/table";
+import { format } from "date-fns";
+import { formatTimestamp } from "@/utils/formatDateNew";
+import { useRouter } from "next/navigation";
+import { useInferences, InferenceListItem } from "@/stores/useInferences";
+import InferenceFilters from "@/components/inferences/InferenceFilters";
+import {
+  Text_12_400_EEEEEE,
+  Text_16_600_FFFFFF,
+  Text_14_600_EEEEEE,
+  Text_14_600_B3B3B3,
+  Text_12_400_808080,
+} from "@/components/ui/text";
+import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
+import NoDataFount from "@/components/ui/noDataFount";
+import {
+  PrimaryButton,
+  SecondaryButton,
+} from "@/components/ui/bud/form/Buttons";
+import ProjectTags from "src/flows/components/ProjectTags";
+import { SortIcon } from "@/components/ui/bud/table/SortIcon";
+import { formatDate } from "src/utils/formatDate";
+import { useLoaderOnLoading } from "src/hooks/useLoaderOnLoading";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import PageHeader from '@/components/ui/pageHeader';
-import { useTheme } from '@/context/themeContext';
-import { ClientTimestamp } from '@/components/ui/ClientTimestamp';
-import MetricsTab from './MetricsTab';
-import RulesTab from './RulesTab';
-import type { RangePickerProps } from 'antd/es/date-picker';
-import dayjs from 'dayjs';
-import '@/styles/logs.scss';
+import PageHeader from "@/components/ui/pageHeader";
+import { useTheme } from "@/context/themeContext";
+import { ClientTimestamp } from "@/components/ui/ClientTimestamp";
+import MetricsTab from "./MetricsTab";
+import RulesTab from "./RulesTab";
+import type { RangePickerProps } from "antd/es/date-picker";
+import dayjs from "dayjs";
+import "@/styles/logs.scss";
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -33,15 +74,17 @@ const { RangePicker } = DatePicker;
 export default function ObservabilityPage() {
   const router = useRouter();
   const { effectiveTheme } = useTheme();
-  const [searchValue, setSearchValue] = useState('');
-  const [activeTab, setActiveTab] = useState('metrics');
+  const [searchValue, setSearchValue] = useState("");
+  const [activeTab, setActiveTab] = useState("metrics");
   // Initialize with consistent rounded times
   const [timeRange, setTimeRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
-    dayjs().startOf('day').subtract(7, 'days'),
-    dayjs().startOf('hour')
+    dayjs().startOf("day").subtract(7, "days"),
+    dayjs().startOf("hour"),
   ]);
-  const [viewBy, setViewBy] = useState<'model' | 'deployment' | 'project' | 'user'>('model');
-  const [selectedPreset, setSelectedPreset] = useState<string>('Last 7 days');
+  const [viewBy, setViewBy] = useState<
+    "model" | "deployment" | "project" | "user"
+  >("model");
+  const [selectedPreset, setSelectedPreset] = useState<string>("Last 7 days");
 
   const {
     inferences,
@@ -63,8 +106,8 @@ export default function ObservabilityPage() {
     const initialFilters = {
       from_date: timeRange[0].toISOString(),
       to_date: timeRange[1].toISOString(),
-      sort_by: 'timestamp' as const,
-      sort_order: 'desc' as const
+      sort_by: "timestamp" as const,
+      sort_order: "desc" as const,
     };
     // Set filters in store
     setFilters(initialFilters);
@@ -83,20 +126,20 @@ export default function ObservabilityPage() {
   // Copy inference ID to clipboard
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    message.success('Copied to clipboard');
+    message.success("Copied to clipboard");
   };
 
   // Handle time range change
-  const handleTimeRangeChange: RangePickerProps['onChange'] = (dates) => {
+  const handleTimeRangeChange: RangePickerProps["onChange"] = (dates) => {
     if (dates && dates[0] && dates[1]) {
       setTimeRange([dates[0], dates[1]]);
-      setSelectedPreset(''); // Clear preset selection when using date picker
+      setSelectedPreset(""); // Clear preset selection when using date picker
       // Create the new filters
       const newFilters = {
         from_date: dates[0].toISOString(),
         to_date: dates[1].toISOString(),
-        sort_by: 'timestamp' as const,
-        sort_order: 'desc' as const
+        sort_by: "timestamp" as const,
+        sort_order: "desc" as const,
       };
       // Update filters in store
       setFilters(newFilters);
@@ -109,62 +152,66 @@ export default function ObservabilityPage() {
   // Round times to consistent boundaries to prevent data shifting
   const timeRangePresets = [
     {
-      label: 'Last 1 hour',
+      label: "Last 1 hour",
       value: () => {
         const now = dayjs(); // Use exact current time
-        return [now.subtract(1, 'hours'), now] as [dayjs.Dayjs, dayjs.Dayjs];
-      }
+        return [now.subtract(1, "hours"), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      },
     },
     {
-      label: 'Last 6 hours',
+      label: "Last 6 hours",
       value: () => {
         const now = dayjs(); // Use exact current time
-        return [now.subtract(6, 'hours'), now] as [dayjs.Dayjs, dayjs.Dayjs];
-      }
+        return [now.subtract(6, "hours"), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      },
     },
     {
-      label: 'Last 24 hours',
+      label: "Last 24 hours",
       value: () => {
         const now = dayjs(); // Use exact current time
-        return [now.subtract(24, 'hours'), now] as [dayjs.Dayjs, dayjs.Dayjs];
-      }
+        return [now.subtract(24, "hours"), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      },
     },
     {
-      label: 'Last 7 days',
+      label: "Last 7 days",
       value: () => {
-        const now = dayjs().startOf('day'); // Round to start of current day
-        return [now.subtract(7, 'days'), now] as [dayjs.Dayjs, dayjs.Dayjs];
-      }
+        const now = dayjs().startOf("day"); // Round to start of current day
+        return [now.subtract(7, "days"), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      },
     },
     {
-      label: 'Last 30 days',
+      label: "Last 30 days",
       value: () => {
-        const now = dayjs().startOf('day'); // Round to start of current day
-        return [now.subtract(30, 'days'), now] as [dayjs.Dayjs, dayjs.Dayjs];
-      }
+        const now = dayjs().startOf("day"); // Round to start of current day
+        return [now.subtract(30, "days"), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      },
     },
     {
-      label: 'Last 3 months',
+      label: "Last 3 months",
       value: () => {
-        const now = dayjs().startOf('day'); // Round to start of current day
-        return [now.subtract(3, 'months'), now] as [dayjs.Dayjs, dayjs.Dayjs];
-      }
+        const now = dayjs().startOf("day"); // Round to start of current day
+        return [now.subtract(3, "months"), now] as [dayjs.Dayjs, dayjs.Dayjs];
+      },
     },
   ];
 
   // View by options with appropriate icons
   const viewByOptions = [
     {
-      label: 'Model',
-      value: 'model',
+      label: "Model",
+      value: "model",
       icon: (active: boolean) => (
         <Image
           preview={false}
-          src={active ? '/images/icons/modelRepoWhite.png' : '/images/icons/modelRepo.png'}
+          src={
+            active
+              ? "/images/icons/modelRepoWhite.png"
+              : "/images/icons/modelRepo.png"
+          }
           style={{ width: "14px", height: "14px" }}
           alt="Model"
         />
-      )
+      ),
     },
     // {
     //   label: 'Deployment',
@@ -179,16 +226,20 @@ export default function ObservabilityPage() {
     //   )
     // },
     {
-      label: 'Project',
-      value: 'project',
+      label: "Project",
+      value: "project",
       icon: (active: boolean) => (
         <Image
           preview={false}
-          src={active ? '/images/icons/projectIconWhite.png' : '/images/icons/projectIcon.png'}
+          src={
+            active
+              ? "/images/icons/projectIconWhite.png"
+              : "/images/icons/projectIcon.png"
+          }
           style={{ width: "14px", height: "14px" }}
           alt="Project"
         />
-      )
+      ),
     },
     // {
     //   label: 'User',
@@ -207,46 +258,48 @@ export default function ObservabilityPage() {
   // Table columns definition
   const columns: ColumnsType<InferenceListItem> = [
     {
-      title: 'Timestamp',
-      dataIndex: 'timestamp',
-      key: 'timestamp',
+      title: "Timestamp",
+      dataIndex: "timestamp",
+      key: "timestamp",
       width: 180,
       render: (timestamp: string) => (
-        <Text_12_400_EEEEEE className="!text-[var(--text-primary)]"><ClientTimestamp timestamp={timestamp} /></Text_12_400_EEEEEE>
+        <Text_12_400_EEEEEE className="!text-[var(--text-primary)]">
+          <ClientTimestamp timestamp={timestamp} />
+        </Text_12_400_EEEEEE>
       ),
       sorter: true,
       sortIcon: SortIcon,
     },
     {
-      title: 'Project',
-      dataIndex: 'project_name',
-      key: 'project_name',
+      title: "Project",
+      dataIndex: "project_name",
+      key: "project_name",
       width: 150,
       render: (project_name: string) => (
-        <Tooltip title={project_name || 'N/A'}>
+        <Tooltip title={project_name || "N/A"}>
           <Text_12_400_EEEEEE className="truncate max-w-[130px] !text-[var(--text-primary)]">
-            {project_name || '-'}
+            {project_name || "-"}
           </Text_12_400_EEEEEE>
         </Tooltip>
       ),
     },
     {
-      title: 'Deployment',
-      dataIndex: 'endpoint_name',
-      key: 'endpoint_name',
+      title: "Deployment",
+      dataIndex: "endpoint_name",
+      key: "endpoint_name",
       width: 200,
       render: (endpoint_name: string) => (
-        <Tooltip title={endpoint_name || 'N/A'}>
+        <Tooltip title={endpoint_name || "N/A"}>
           <Text_12_400_EEEEEE className="truncate max-w-[180px] !text-[var(--text-primary)]">
-            {endpoint_name || '-'}
+            {endpoint_name || "-"}
           </Text_12_400_EEEEEE>
         </Tooltip>
       ),
     },
     {
-      title: 'Prompt Preview',
-      dataIndex: 'prompt_preview',
-      key: 'prompt_preview',
+      title: "Prompt Preview",
+      dataIndex: "prompt_preview",
+      key: "prompt_preview",
       width: 350,
       render: (prompt: string) => (
         <Tooltip title={prompt}>
@@ -257,53 +310,46 @@ export default function ObservabilityPage() {
       ),
     },
     {
-      title: 'Response Time',
-      dataIndex: 'response_time_ms',
-      key: 'response_time_ms',
+      title: "Response Time",
+      dataIndex: "response_time_ms",
+      key: "response_time_ms",
       width: 120,
       render: (response_time_ms: number) => (
         <Text_12_400_EEEEEE className="!text-[var(--text-primary)]">
-          {response_time_ms ? `${response_time_ms.toLocaleString()} ms` : '-'}
+          {response_time_ms ? `${response_time_ms.toLocaleString()} ms` : "-"}
         </Text_12_400_EEEEEE>
       ),
       sorter: true,
       sortIcon: SortIcon,
     },
     {
-      title: 'Tokens',
-      key: 'tokens',
+      title: "Tokens",
+      key: "tokens",
       width: 120,
       render: (_, record) => (
         <Text_12_400_EEEEEE className="!text-[var(--text-primary)]">
-          {record.input_tokens + record.output_tokens || '-'}
+          {record.input_tokens + record.output_tokens || "-"}
         </Text_12_400_EEEEEE>
       ),
     },
-    {
-      title: 'Status',
-      key: 'status',
-      width: 100,
-      render: (_, record) => (
-        <ProjectTags
-          name={record.is_success ? 'Success' : 'Failed'}
-          color={record.is_success ? '#22c55e' : '#ef4444'}
-          textClass="text-[.75rem]"
-        />
-      ),
-    },
+
   ];
 
   // Handle table change (pagination, sorting)
-  const handleTableChange = (newPagination: any, _filters: any, sorter: any) => {
+  const handleTableChange = (
+    newPagination: any,
+    _filters: any,
+    sorter: any,
+  ) => {
     // Handle sorting
     if (sorter.field) {
       const sortMap: Record<string, string> = {
-        timestamp: 'timestamp',
-        response_time_ms: 'latency',
+        timestamp: "timestamp",
+        response_time_ms: "latency",
       };
 
-      const sortBy = sortMap[sorter.field] || 'timestamp';
-      const sortOrder = sorter.order === 'ascend' ? 'asc' : 'desc';
+      const sortBy = sortMap[sorter.field] || "timestamp";
+      const sortOrder = sorter.order === "ascend" ? "asc" : "desc";
 
       setFilters({
         sort_by: sortBy as any,
@@ -316,14 +362,14 @@ export default function ObservabilityPage() {
   // Export menu items
   const exportMenu = [
     {
-      key: 'csv',
-      label: 'Export as CSV',
-      onClick: () => exportInferences('csv'),
+      key: "csv",
+      label: "Export as CSV",
+      onClick: () => exportInferences("csv"),
     },
     {
-      key: 'json',
-      label: 'Export as JSON',
-      onClick: () => exportInferences('json'),
+      key: "json",
+      label: "Export as JSON",
+      onClick: () => exportInferences("json"),
     },
   ];
 
@@ -333,9 +379,7 @@ export default function ObservabilityPage() {
         <div className="h-full flex flex-col p-8 logs-page">
           <div className="boardPageTop">
             <div className="logs-header-override">
-              <PageHeader
-                headding="Logs"
-              />
+              <PageHeader headding="Logs" />
             </div>
           </div>
 
@@ -347,33 +391,72 @@ export default function ObservabilityPage() {
                 {
                   label: (
                     <div className="flex items-center gap-[0.375rem] px-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 14" fill="none">
-                        <path d="M12.6875 12.3672C12.6842 12.6073 12.4901 12.8014 12.25 12.8047H2.33352C1.77079 12.8014 1.31579 12.3464 1.3125 11.7837V1.86719C1.3125 1.62546 1.50828 1.42969 1.75 1.42969C1.99172 1.42969 2.1875 1.62546 2.1875 1.86719V7.40867L3.08602 6.73765V6.73819C3.07672 6.67038 3.07672 6.60148 3.08602 6.53367C3.08602 5.96985 3.54266 5.5132 4.10649 5.5132C4.67032 5.5132 5.12751 5.96983 5.12751 6.53367C5.12751 6.61843 5.11603 6.7032 5.09251 6.78469L7.18103 8.53469C7.31447 8.47344 7.45994 8.44172 7.60651 8.44117C7.69565 8.44281 7.78424 8.45649 7.86901 8.48219L10.15 5.78117C10.0942 5.65047 10.0647 5.50937 10.0625 5.36719C10.0625 4.9543 10.3114 4.58187 10.6925 4.42383C11.0743 4.26633 11.5134 4.35328 11.8054 4.64531C12.0969 4.93733 12.1844 5.37648 12.0264 5.75765C11.8683 6.13937 11.4964 6.3882 11.0835 6.3882C10.9944 6.38655 10.9058 6.37288 10.821 6.34718L8.48751 9.03616C8.5433 9.16741 8.57283 9.30796 8.57501 9.45069C8.57501 10.0145 8.11783 10.4712 7.55399 10.4712C6.99017 10.4712 6.53352 10.0145 6.53352 9.45069C6.53297 9.36592 6.545 9.28116 6.56852 9.19967L4.48 7.44967C4.34656 7.51092 4.20109 7.54263 4.05398 7.54318C3.88882 7.54099 3.72695 7.49943 3.58148 7.42068L2.1875 8.50568V11.7836C2.1875 11.8225 2.20281 11.8597 2.23016 11.887C2.2575 11.9143 2.29469 11.9297 2.33352 11.9297H12.25C12.4901 11.9329 12.6842 12.1271 12.6875 12.3672Z" fill={activeTab === "metrics" ? (effectiveTheme === 'dark' ? "#EEEEEE" : "#1a1a1a") : (effectiveTheme === 'dark' ? "#B3B3B3" : "#666666")} />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width=".875rem"
+                        height=".875rem"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                      >
+                        <path
+                          d="M12.6875 12.3672C12.6842 12.6073 12.4901 12.8014 12.25 12.8047H2.33352C1.77079 12.8014 1.31579 12.3464 1.3125 11.7837V1.86719C1.3125 1.62546 1.50828 1.42969 1.75 1.42969C1.99172 1.42969 2.1875 1.62546 2.1875 1.86719V7.40867L3.08602 6.73765V6.73819C3.07672 6.67038 3.07672 6.60148 3.08602 6.53367C3.08602 5.96985 3.54266 5.5132 4.10649 5.5132C4.67032 5.5132 5.12751 5.96983 5.12751 6.53367C5.12751 6.61843 5.11603 6.7032 5.09251 6.78469L7.18103 8.53469C7.31447 8.47344 7.45994 8.44172 7.60651 8.44117C7.69565 8.44281 7.78424 8.45649 7.86901 8.48219L10.15 5.78117C10.0942 5.65047 10.0647 5.50937 10.0625 5.36719C10.0625 4.9543 10.3114 4.58187 10.6925 4.42383C11.0743 4.26633 11.5134 4.35328 11.8054 4.64531C12.0969 4.93733 12.1844 5.37648 12.0264 5.75765C11.8683 6.13937 11.4964 6.3882 11.0835 6.3882C10.9944 6.38655 10.9058 6.37288 10.821 6.34718L8.48751 9.03616C8.5433 9.16741 8.57283 9.30796 8.57501 9.45069C8.57501 10.0145 8.11783 10.4712 7.55399 10.4712C6.99017 10.4712 6.53352 10.0145 6.53352 9.45069C6.53297 9.36592 6.545 9.28116 6.56852 9.19967L4.48 7.44967C4.34656 7.51092 4.20109 7.54263 4.05398 7.54318C3.88882 7.54099 3.72695 7.49943 3.58148 7.42068L2.1875 8.50568V11.7836C2.1875 11.8225 2.20281 11.8597 2.23016 11.887C2.2575 11.9143 2.29469 11.9297 2.33352 11.9297H12.25C12.4901 11.9329 12.6842 12.1271 12.6875 12.3672Z"
+                          fill={
+                            activeTab === "metrics"
+                              ? effectiveTheme === "dark"
+                                ? "#EEEEEE"
+                                : "#1a1a1a"
+                              : effectiveTheme === "dark"
+                                ? "#B3B3B3"
+                                : "#666666"
+                          }
+                        />
                       </svg>
                       {activeTab === "metrics" ? (
-                        <span className="font-semibold text-sm" style={{ color: effectiveTheme === 'light' ? '#000000' : '#EEEEEE' }}>Metrics</span>
+                        <span
+                          className="font-semibold text-sm"
+                          style={{
+                            color:
+                              effectiveTheme === "light"
+                                ? "#000000"
+                                : "#EEEEEE",
+                          }}
+                        >
+                          Metrics
+                        </span>
                       ) : (
-                        <span className="font-semibold text-sm" style={{ color: effectiveTheme === 'light' ? '#666666' : '#B3B3B3' }}>Metrics</span>
+                        <span
+                          className="font-semibold text-sm"
+                          style={{
+                            color:
+                              effectiveTheme === "light"
+                                ? "#666666"
+                                : "#B3B3B3",
+                          }}
+                        >
+                          Metrics
+                        </span>
                       )}
                     </div>
                   ),
-                  key: 'metrics',
+                  key: "metrics",
                   children: (
                     <>
                       {/* Enhanced Filters Section - Single Row */}
                       <div className="mb-8 mt-2 flex justify-between items-end gap-6 p-6 rounded-lg filter-section-bg">
                         {/* View By Section */}
                         <div className="flex flex-col gap-2">
-                          <Text_12_400_808080 className="!text-[var(--text-muted)]">View by</Text_12_400_808080>
+                          <Text_12_400_808080 className="!text-[var(--text-muted)]">
+                            View by
+                          </Text_12_400_808080>
                           <Segmented
-                            options={viewByOptions.map(opt => ({
+                            options={viewByOptions.map((opt) => ({
                               label: (
                                 <span className="flex items-center gap-2">
                                   {opt.icon(viewBy === opt.value)}
                                   {opt.label}
                                 </span>
                               ),
-                              value: opt.value
+                              value: opt.value,
                             }))}
                             value={viewBy}
                             onChange={(value) => setViewBy(value as any)}
@@ -383,30 +466,34 @@ export default function ObservabilityPage() {
 
                         {/* Time Range Section */}
                         <div className="flex flex-col gap-2 flex-1">
-                          <Text_12_400_808080 className="!text-[var(--text-muted)]">Time Range</Text_12_400_808080>
+                          <Text_12_400_808080 className="!text-[var(--text-muted)]">
+                            Time Range
+                          </Text_12_400_808080>
                           <div className="flex items-center gap-3">
                             <ConfigProvider
                               theme={{
                                 token: {
-                                  colorPrimary: '#965CDE',
-                                  colorPrimaryHover: '#a873e5',
-                                  colorPrimaryActive: '#8348c7',
+                                  colorPrimary: "#965CDE",
+                                  colorPrimaryHover: "#a873e5",
+                                  colorPrimaryActive: "#8348c7",
                                 },
                                 components: {
                                   DatePicker: {
-                                    colorBgContainer: 'var(--bg-tertiary)',
-                                    colorBorder: 'var(--border-secondary)',
-                                    colorText: 'var(--text-primary)',
-                                    colorTextPlaceholder: 'var(--text-disabled)',
-                                    colorBgElevated: 'var(--bg-tertiary)',
-                                    colorPrimary: 'var(--color-purple)',
-                                    colorPrimaryBg: 'var(--bg-hover)',
-                                    colorPrimaryBgHover: 'var(--bg-hover)',
-                                    colorTextLightSolid: 'var(--text-primary)',
-                                    controlItemBgActive: 'var(--color-purple)',
-                                    colorLink: 'var(--color-purple)',
-                                    colorLinkHover: 'var(--color-purple-hover)',
-                                    colorLinkActive: 'var(--color-purple-active)',
+                                    colorBgContainer: "var(--bg-tertiary)",
+                                    colorBorder: "var(--border-secondary)",
+                                    colorText: "var(--text-primary)",
+                                    colorTextPlaceholder:
+                                      "var(--text-disabled)",
+                                    colorBgElevated: "var(--bg-tertiary)",
+                                    colorPrimary: "var(--color-purple)",
+                                    colorPrimaryBg: "var(--bg-hover)",
+                                    colorPrimaryBgHover: "var(--bg-hover)",
+                                    colorTextLightSolid: "var(--text-primary)",
+                                    controlItemBgActive: "var(--color-purple)",
+                                    colorLink: "var(--color-purple)",
+                                    colorLinkHover: "var(--color-purple-hover)",
+                                    colorLinkActive:
+                                      "var(--color-purple-active)",
                                   },
                                 },
                               }}
@@ -418,21 +505,28 @@ export default function ObservabilityPage() {
                                 showTime
                                 format="YYYY-MM-DD HH:mm"
                                 className="bg-[var(--bg-tertiary)] border-[var(--border-secondary)] hover:border-[var(--border-color)] flex-1 h-7"
-                                placeholder={['Start Date', 'End Date']}
+                                placeholder={["Start Date", "End Date"]}
                               />
                             </ConfigProvider>
                             <div className="flex gap-2">
                               {timeRangePresets.slice(0, 3).map((preset) => {
-                                const isSelected = selectedPreset === preset.label;
+                                const isSelected =
+                                  selectedPreset === preset.label;
                                 return (
                                   <Button
                                     key={preset.label}
                                     size="small"
                                     style={{
-                                      height: '34px',
-                                      backgroundColor: isSelected ? 'var(--bg-hover)' : 'transparent',
-                                      borderColor: isSelected ? 'var(--color-purple)' : 'var(--border-color)',
-                                      color: isSelected ? 'var(--text-primary)' : 'var(--text-muted)'
+                                      height: "34px",
+                                      backgroundColor: isSelected
+                                        ? "var(--bg-hover)"
+                                        : "transparent",
+                                      borderColor: isSelected
+                                        ? "var(--color-purple)"
+                                        : "var(--border-color)",
+                                      color: isSelected
+                                        ? "var(--text-primary)"
+                                        : "var(--text-muted)",
                                     }}
                                     onClick={() => {
                                       // Skip if already selected and using the same preset
@@ -447,8 +541,8 @@ export default function ObservabilityPage() {
                                       const newFilters = {
                                         from_date: timeValue[0].toISOString(),
                                         to_date: timeValue[1].toISOString(),
-                                        sort_by: 'timestamp' as const,
-                                        sort_order: 'desc' as const
+                                        sort_by: "timestamp" as const,
+                                        sort_order: "desc" as const,
                                       };
                                       // Update filters in store
                                       setFilters(newFilters);
@@ -466,13 +560,20 @@ export default function ObservabilityPage() {
                         </div>
 
                         {/* Refresh Button */}
-                        <div style={{ color: 'var(--text-primary)' }}>
+                        <div style={{ color: "var(--text-primary)" }}>
                           <PrimaryButton
                             onClick={() => fetchInferences()}
-                            style={{ color: 'var(--text-primary)' }}
+                            style={{ color: "var(--text-primary)" }}
                           >
-                            <ReloadOutlined style={{ color: 'var(--text-primary)' }} />
-                            <span className="ml-2" style={{ color: 'var(--text-primary)' }}>Refresh</span>
+                            <ReloadOutlined
+                              style={{ color: "var(--text-primary)" }}
+                            />
+                            <span
+                              className="ml-2"
+                              style={{ color: "var(--text-primary)" }}
+                            >
+                              Refresh
+                            </span>
                           </PrimaryButton>
                         </div>
                       </div>
@@ -482,31 +583,70 @@ export default function ObservabilityPage() {
                         inferences={inferences}
                         isLoading={isLoading}
                         viewBy={viewBy}
-                        isActive={activeTab === 'metrics'}
+                        isActive={activeTab === "metrics"}
                         filters={filters}
                       />
                     </>
-                  )
+                  ),
                 },
                 {
                   label: (
                     <div className="flex items-center gap-[0.375rem] px-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 14" fill="none">
-                        <path fillRule="evenodd" clipRule="evenodd" d="M1.75 2.11719C1.50828 2.11719 1.3125 2.31296 1.3125 2.55469V12.4922C1.3125 12.7339 1.50828 12.9297 1.75 12.9297H12.25C12.4917 12.9297 12.6875 12.7339 12.6875 12.4922V4.74219C12.6875 4.50046 12.4917 4.30469 12.25 4.30469H7.875C7.71148 4.30469 7.56147 4.21718 7.48353 4.07718L6.39147 2.11719H1.75ZM0.4375 2.55469C0.4375 1.82951 1.02483 1.24219 1.75 1.24219H6.625C6.78852 1.24219 6.93853 1.3297 7.01647 1.4697L8.10853 3.42969H12.25C12.9752 3.42969 13.5625 4.01701 13.5625 4.74219V12.4922C13.5625 13.2174 12.9752 13.8047 12.25 13.8047H1.75C1.02483 13.8047 0.4375 13.2174 0.4375 12.4922V2.55469Z" fill={activeTab === "requests" ? (effectiveTheme === 'dark' ? "#EEEEEE" : "#1a1a1a") : (effectiveTheme === 'dark' ? "#B3B3B3" : "#666666")}/>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width=".875rem"
+                        height=".875rem"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          clipRule="evenodd"
+                          d="M1.75 2.11719C1.50828 2.11719 1.3125 2.31296 1.3125 2.55469V12.4922C1.3125 12.7339 1.50828 12.9297 1.75 12.9297H12.25C12.4917 12.9297 12.6875 12.7339 12.6875 12.4922V4.74219C12.6875 4.50046 12.4917 4.30469 12.25 4.30469H7.875C7.71148 4.30469 7.56147 4.21718 7.48353 4.07718L6.39147 2.11719H1.75ZM0.4375 2.55469C0.4375 1.82951 1.02483 1.24219 1.75 1.24219H6.625C6.78852 1.24219 6.93853 1.3297 7.01647 1.4697L8.10853 3.42969H12.25C12.9752 3.42969 13.5625 4.01701 13.5625 4.74219V12.4922C13.5625 13.2174 12.9752 13.8047 12.25 13.8047H1.75C1.02483 13.8047 0.4375 13.2174 0.4375 12.4922V2.55469Z"
+                          fill={
+                            activeTab === "requests"
+                              ? effectiveTheme === "dark"
+                                ? "#EEEEEE"
+                                : "#1a1a1a"
+                              : effectiveTheme === "dark"
+                                ? "#B3B3B3"
+                                : "#666666"
+                          }
+                        />
                       </svg>
                       {activeTab === "requests" ? (
-                        <span className="font-semibold text-sm" style={{ color: effectiveTheme === 'light' ? '#000000' : '#EEEEEE' }}>Requests</span>
+                        <span
+                          className="font-semibold text-sm"
+                          style={{
+                            color:
+                              effectiveTheme === "light"
+                                ? "#000000"
+                                : "#EEEEEE",
+                          }}
+                        >
+                          Requests
+                        </span>
                       ) : (
-                        <span className="font-semibold text-sm" style={{ color: effectiveTheme === 'light' ? '#666666' : '#B3B3B3' }}>Requests</span>
+                        <span
+                          className="font-semibold text-sm"
+                          style={{
+                            color:
+                              effectiveTheme === "light"
+                                ? "#666666"
+                                : "#B3B3B3",
+                          }}
+                        >
+                          Requests
+                        </span>
                       )}
                     </div>
                   ),
-                  key: 'requests',
+                  key: "requests",
                   children: (
                     <div className="listingContainer">
                       <div className="mb-4 p-6 rounded-lg filter-section-bg">
                         <InferenceFilters
-                          projectId={'all'} // Pass a dummy ID for global view
+                          projectId={"all"} // Pass a dummy ID for global view
                           onFiltersChange={() => fetchInferences()}
                         />
                       </div>
@@ -526,9 +666,12 @@ export default function ObservabilityPage() {
                         onRow={(record) => ({
                           onClick: (e) => {
                             e.preventDefault();
-                            router.push(`/observability/${record.inference_id}`);
+                            router.push(
+                              `/observability/${record.inference_id}`,
+                            );
                           },
-                          className: 'cursor-pointer hover:bg-[var(--bg-hover)]',
+                          className:
+                            "cursor-pointer hover:bg-[var(--bg-hover)]",
                         })}
                         title={() => (
                           <div className="flex justify-between items-center px-[0.75rem] py-[1rem]">
@@ -536,7 +679,7 @@ export default function ObservabilityPage() {
                               Inference Requests
                             </Text_16_600_FFFFFF>
                             <div className="flex items-center justify-between gap-x-[.8rem]">
-                              <div style={{ color: 'var(--text-primary)' }}>
+                              <div style={{ color: "var(--text-primary)" }}>
                                 <SearchHeaderInput
                                   placeholder={"Search by prompt or response"}
                                   searchValue={searchValue}
@@ -544,22 +687,36 @@ export default function ObservabilityPage() {
                                   classNames="mr-[.6rem] theme-search-override"
                                 />
                               </div>
-                              <div style={{ color: 'var(--text-primary)' }}>
+                              <div style={{ color: "var(--text-primary)" }}>
                                 <PrimaryButton
                                   onClick={() => fetchInferences()}
-                                  style={{ color: 'var(--text-primary)' }}
+                                  style={{ color: "var(--text-primary)" }}
                                 >
-                                  <ReloadOutlined style={{ color: 'var(--text-primary)' }} />
-                                  <span className="ml-2" style={{ color: 'var(--text-primary)' }}>Refresh</span>
+                                  <ReloadOutlined
+                                    style={{ color: "var(--text-primary)" }}
+                                  />
+                                  <span
+                                    className="ml-2"
+                                    style={{ color: "var(--text-primary)" }}
+                                  >
+                                    Refresh
+                                  </span>
                                 </PrimaryButton>
                               </div>
-                              <div style={{ color: 'var(--text-primary)' }}>
+                              <div style={{ color: "var(--text-primary)" }}>
                                 <SecondaryButton
-                                  onClick={() => exportInferences('csv')}
-                                  style={{ color: 'var(--text-primary)' }}
+                                  onClick={() => exportInferences("csv")}
+                                  style={{ color: "var(--text-primary)" }}
                                 >
-                                  <DownloadOutlined style={{ color: 'var(--text-primary)' }} />
-                                  <span className="ml-2" style={{ color: 'var(--text-primary)' }}>Export</span>
+                                  <DownloadOutlined
+                                    style={{ color: "var(--text-primary)" }}
+                                  />
+                                  <span
+                                    className="ml-2"
+                                    style={{ color: "var(--text-primary)" }}
+                                  >
+                                    Export
+                                  </span>
                                 </SecondaryButton>
                               </div>
                             </div>
@@ -575,7 +732,7 @@ export default function ObservabilityPage() {
                         }}
                       />
                     </div>
-                  )
+                  ),
                 },
                 // {
                 //   label: (
@@ -605,4 +762,4 @@ export default function ObservabilityPage() {
       </div>
     </DashboardLayout>
   );
-};
+}

@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Image } from "antd";
 import { useDrawer } from "@/hooks/useDrawer";
-import {
-  Text_13_400_EEEEEE,
-  Text_24_600_EEEEEE,
-} from "@/components/ui/text";
+import { Text_13_400_EEEEEE, Text_24_600_EEEEEE } from "@/components/ui/text";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
@@ -29,7 +26,8 @@ const ProjectSuccess = () => {
       nextText="Get Started"
       onNext={() => {
         closeDrawer();
-      }}>
+      }}
+    >
       <BudWraperBox center={true}>
         <BudDrawerLayout>
           <div className="flex flex-col justify-start items-center p-[2.5rem]">
@@ -50,7 +48,8 @@ const ProjectSuccess = () => {
 
               {projectName && (
                 <Text_13_400_EEEEEE className="text-center text-[#B3B3B3]">
-                  Your project &quot;{projectName}&quot; has been created and is ready to use.
+                  Your project &quot;{projectName}&quot; has been created and is
+                  ready to use.
                 </Text_13_400_EEEEEE>
               )}
             </div>

@@ -47,7 +47,10 @@ function TextInput(props: BudInputProps) {
                 top: "-2px",
               }}
             >
-              {props.label} {props.rules?.some((rule: any) => rule.required) && <b className="text-[#FF4D4F]">*</b>}
+              {props.label}{" "}
+              {props.rules?.some((rule: any) => rule.required) && (
+                <b className="text-[#FF4D4F]">*</b>
+              )}
               {props.infoText && (
                 <CustomPopover title={props.infoText}>
                   <Image
@@ -107,7 +110,6 @@ function TextInput(props: BudInputProps) {
             className={`border border-[#B1B1B1] dark:border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] !placeholder:font-[300] ${props.InputClasses}`}
           />
         )}
-
       </div>
     </Form.Item>
   );

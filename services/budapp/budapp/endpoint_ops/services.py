@@ -451,18 +451,16 @@ class EndpointService(SessionMixin):
 
         db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
 
-        # Check duplicate name exist in endpoints
+        # Check duplicate name exist in endpoints (globally, irrespective of project)
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
             EndpointModel,
-            fields={"name": required_data["endpoint_name"], "project_id": required_data["project_id"]},
+            fields={"name": required_data["endpoint_name"]},  # Removed project_id to make it global
             exclude_fields={"status": EndpointStatusEnum.DELETED},
             missing_ok=True,
             case_sensitive=False,
         )
         if db_endpoint:
-            logger.error(
-                f"An endpoint with name {required_data['endpoint_name']} already exists in project: {required_data['project_id']}"
-            )
+            logger.error(f"An endpoint with name {required_data['endpoint_name']} already exists.")
             return
 
         # Create endpoint in database
@@ -2739,6 +2737,16 @@ class EndpointService(SessionMixin):
 
         # Handle pricing for publish action
         if is_published and pricing:
+            # Validate pricing values before database operation
+            input_cost = float(pricing.get("input_cost", 0))
+            output_cost = float(pricing.get("output_cost", 0))
+
+            if input_cost >= 10000 or output_cost >= 10000:
+                raise ClientException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Pricing values must be less than 10000. Got input_cost: {input_cost}, output_cost: {output_cost}",
+                )
+
             # Begin transaction to ensure atomicity
             try:
                 # Update previous pricing records to not current

@@ -269,7 +269,9 @@ export default function BatchesPage() {
       dataIndex: "cost",
       key: "cost",
       render: (cost: number) => (
-        <Text className="text-[black] dark:text-[white] text-[13px]">${cost.toFixed(2)}</Text>
+        <Text className="text-[black] dark:text-[white] text-[13px]">
+          ${cost.toFixed(2)}
+        </Text>
       ),
     },
     {
@@ -301,9 +303,7 @@ export default function BatchesPage() {
     },
     {
       title: (
-        <Text className="text-bud-text-primary text-[12px] uppercase">
-
-        </Text>
+        <Text className="text-bud-text-primary text-[12px] uppercase"></Text>
       ),
       key: "actions",
       render: (_: any, record: BatchJob) => (
@@ -314,7 +314,11 @@ export default function BatchesPage() {
                 {
                   key: "view",
                   label: "View",
-                  icon: <span className="text-bud-text-primary"><Icon icon="ph:eye" className="text-bud-text-primary" /></span>,
+                  icon: (
+                    <span className="text-bud-text-primary">
+                      <Icon icon="ph:eye" className="text-bud-text-primary" />
+                    </span>
+                  ),
                   onClick: () => {
                     setSelectedBatch(record);
                     setShowDetailsModal(true);
@@ -322,37 +326,58 @@ export default function BatchesPage() {
                   className: "hover:!bg-bud-bg-tertiary",
                 },
                 ...(record.status === "processing"
-                  ? [{
-                    key: "pause",
-                    label: "Pause",
-                    icon: <span className="text-orange-500"><Icon icon="ph:pause" className="text-orange-500" /></span>,
-                    onClick: () => {
-                      // handle pause
-                    },
-                    className: "hover:!bg-bud-bg-tertiary",
-                  }]
+                  ? [
+                      {
+                        key: "pause",
+                        label: "Pause",
+                        icon: (
+                          <span className="text-orange-500">
+                            <Icon icon="ph:pause" className="text-orange-500" />
+                          </span>
+                        ),
+                        onClick: () => {
+                          // handle pause
+                        },
+                        className: "hover:!bg-bud-bg-tertiary",
+                      },
+                    ]
                   : []),
                 ...(record.status === "queued" || record.status === "processing"
-                  ? [{
-                    key: "cancel",
-                    label: "Cancel",
-                    icon: <span className="text-red-500"><Icon icon="ph:x" className="text-red-500" /></span>,
-                    onClick: () => {
-                      // handle cancel
-                    },
-                    className: "hover:!bg-bud-bg-tertiary",
-                  }]
+                  ? [
+                      {
+                        key: "cancel",
+                        label: "Cancel",
+                        icon: (
+                          <span className="text-red-500">
+                            <Icon icon="ph:x" className="text-red-500" />
+                          </span>
+                        ),
+                        onClick: () => {
+                          // handle cancel
+                        },
+                        className: "hover:!bg-bud-bg-tertiary",
+                      },
+                    ]
                   : []),
                 ...(record.status === "completed"
-                  ? [{
-                    key: "download",
-                    label: "Download",
-                    icon: <span className="text-green-500"><Icon icon="ph:download-simple" className="text-green-500" /></span>,
-                    onClick: () => {
-                      // handle download
-                    },
-                    className: "hover:!bg-bud-bg-tertiary",
-                  }]
+                  ? [
+                      {
+                        key: "download",
+                        label: "Download",
+                        icon: (
+                          <span className="text-green-500">
+                            <Icon
+                              icon="ph:download-simple"
+                              className="text-green-500"
+                            />
+                          </span>
+                        ),
+                        onClick: () => {
+                          // handle download
+                        },
+                        className: "hover:!bg-bud-bg-tertiary",
+                      },
+                    ]
                   : []),
               ],
               className: "!bg-bud-bg-secondary !border-bud-border",
@@ -416,9 +441,9 @@ export default function BatchesPage() {
     totalCost: batches.reduce((acc, b) => acc + b.cost, 0),
   };
   const capitalizeFirstLetterLowerRest = (text: string) => {
-    if (!text) return '';
+    if (!text) return "";
     return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-  }
+  };
 
   return (
     <DashboardLayout>
@@ -435,7 +460,6 @@ export default function BatchesPage() {
               </Text>
             </div>
             <PrimaryButton
-
               onClick={() => openDrawerWithStep("create-batch-job")}
             >
               Create Batch Job
@@ -513,7 +537,6 @@ export default function BatchesPage() {
             />
           </div>
 
-
           {/* Details Modal */}
           <Modal
             title={
@@ -574,7 +597,7 @@ export default function BatchesPage() {
                     <Tags
                       color={getStatusColor(selectedBatch.status)}
                       name={selectedBatch.status}
-                    // className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem] uppercase mt-[0.25rem]"
+                      // className="border-0 px-[0.75rem] py-[0.25rem] text-[0.75rem] uppercase mt-[0.25rem]"
                     />
                   </div>
                 </div>

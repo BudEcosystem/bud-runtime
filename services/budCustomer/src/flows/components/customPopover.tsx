@@ -2,7 +2,8 @@ import React from "react";
 import { ConfigProvider, Popover, PopoverProps } from "antd";
 import { TooltipPlacement } from "antd/es/tooltip";
 
-interface CustomPopoverProps extends Omit<PopoverProps, 'content' | 'title' | 'children' | 'classNames'> {
+interface CustomPopoverProps
+  extends Omit<PopoverProps, "content" | "title" | "children" | "classNames"> {
   children?: React.ReactNode;
   customClassName?: string;
   contentClassNames?: string;
@@ -17,12 +18,13 @@ const CustomPopover: React.FC<CustomPopoverProps> = ({
   customClassName,
   contentClassNames,
   titleClassName,
-  Placement="top",
+  Placement = "top",
   ...rest
 }) => {
   return (
-    <div className={`antPopoverArrow ${customClassName ?? ''}`}
-      style={{width: '100%'}}
+    <div
+      className={`antPopoverArrow ${customClassName ?? ""}`}
+      style={{ width: "100%" }}
     >
       <ConfigProvider
         theme={{
@@ -37,13 +39,18 @@ const CustomPopover: React.FC<CustomPopoverProps> = ({
           placement={Placement}
           showArrow
           content={
-            <div className={`flex items-center gap-[.8rem] backdropBlur rounded-[6px] border-[#1F1F1F] ${contentClassNames}`}
+            <div
+              className={`flex items-center gap-[.8rem] backdropBlur rounded-[6px] border-[#1F1F1F] ${contentClassNames}`}
               style={{
-                padding: '.1rem',
-                backgroundColor: '#1F1F1F',
+                padding: ".1rem",
+                backgroundColor: "#1F1F1F",
               }}
             >
-              <div className={`text-[#b3b3b3] dark:text-[white] text-[.75rem] font-400 ${titleClassName}`}>{title}</div>
+              <div
+                className={`text-[#b3b3b3] dark:text-[white] text-[.75rem] font-400 ${titleClassName}`}
+              >
+                {title}
+              </div>
             </div>
           }
           getPopupContainer={(trigger) =>

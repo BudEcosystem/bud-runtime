@@ -14,9 +14,7 @@ interface UsageTableProps {
 const UsageTable: React.FC<UsageTableProps> = ({ data, loading = false }) => {
   const columns = [
     {
-      title: (
-        <Text className={styles.columnHeader}>DATE</Text>
-      ),
+      title: <Text className={styles.columnHeader}>DATE</Text>,
       dataIndex: "date",
       key: "date",
       render: (date: string) => (
@@ -26,29 +24,7 @@ const UsageTable: React.FC<UsageTableProps> = ({ data, loading = false }) => {
       ),
     },
     {
-      title: (
-        <Text className={styles.columnHeader}>MODEL</Text>
-      ),
-      dataIndex: "model",
-      key: "model",
-      render: (model: string) => (
-        <Text className={styles.cellText}>{model || "—"}</Text>
-      ),
-    },
-    {
-      title: (
-        <Text className={styles.columnHeader}>ENDPOINT</Text>
-      ),
-      dataIndex: "endpoint",
-      key: "endpoint",
-      render: (endpoint: string) => (
-        <Text className={styles.cellText}>{endpoint || "—"}</Text>
-      ),
-    },
-    {
-      title: (
-        <Text className={styles.columnHeader}>TOKENS</Text>
-      ),
+      title: <Text className={styles.columnHeader}>TOKENS</Text>,
       dataIndex: "tokens",
       key: "tokens",
       align: "right" as const,
@@ -59,9 +35,7 @@ const UsageTable: React.FC<UsageTableProps> = ({ data, loading = false }) => {
       ),
     },
     {
-      title: (
-        <Text className={styles.columnHeader}>REQUESTS</Text>
-      ),
+      title: <Text className={styles.columnHeader}>REQUESTS</Text>,
       dataIndex: "requests",
       key: "requests",
       align: "right" as const,
@@ -70,9 +44,7 @@ const UsageTable: React.FC<UsageTableProps> = ({ data, loading = false }) => {
       ),
     },
     {
-      title: (
-        <Text className={styles.columnHeader}>COST</Text>
-      ),
+      title: <Text className={styles.columnHeader}>COST</Text>,
       dataIndex: "cost",
       key: "cost",
       align: "right" as const,

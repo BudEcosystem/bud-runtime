@@ -36,6 +36,7 @@ from budapp.commons.constants import (
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelStatusEnum,
+    ProviderCapabilityEnum,
 )
 from budapp.commons.database import Base, TimestampMixin
 
@@ -195,6 +196,17 @@ class Provider(Base):
     description: Mapped[str] = mapped_column(String, nullable=True)
     icon: Mapped[Optional[str]] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    capabilities: Mapped[List[str]] = mapped_column(
+        PG_ARRAY(
+            PG_ENUM(
+                ProviderCapabilityEnum,
+                name="provider_capability_enum",
+                values_callable=lambda x: [e.value for e in x],
+                create_type=False,
+            ),
+        ),
+        nullable=True,
+    )
 
     models: Mapped[Optional[list["Model"]]] = relationship("Model", back_populates="provider")
     cloud_models: Mapped[list["CloudModel"]] = relationship("CloudModel", back_populates="provider")

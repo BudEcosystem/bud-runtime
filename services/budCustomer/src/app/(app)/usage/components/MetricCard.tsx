@@ -44,15 +44,24 @@ const MetricCard: React.FC<MetricCardProps> = ({
         >
           <div className={styles.header}>
             <span className={styles.title}>{title}</span>
-            {icon && (
-              <Icon icon={icon} className={styles.icon} />
-            )}
+            {icon && <Icon icon={icon} className={styles.icon} />}
           </div>
 
           <div className={styles.valueContainer}>
-            <span className={styles.value}>{value}</span>
+            {typeof value === "string" && value.includes("\n") ? (
+              <div className={styles.stackedValue}>
+                <span className={styles.value}>{value.split("\n")[0]}</span>
+                <span className={styles.quotaValue}>
+                  {value.split("\n")[1]}
+                </span>
+              </div>
+            ) : (
+              <span className={styles.value}>{value}</span>
+            )}
             {trend !== undefined && trend !== 0 && (
-              <div className={`${styles.trend} ${trend > 0 ? styles.positive : styles.negative}`}>
+              <div
+                className={`${styles.trend} ${trend > 0 ? styles.positive : styles.negative}`}
+              >
                 <Icon
                   icon={trend > 0 ? "ph:trend-up" : "ph:trend-down"}
                   className={styles.trendIcon}
@@ -62,9 +71,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
             )}
           </div>
 
-          {subtitle && (
-            <span className={styles.subtitle}>{subtitle}</span>
-          )}
+          {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
         </motion.div>
       )}
     </div>

@@ -21,6 +21,8 @@ from uuid import UUID
 
 from fastapi import status
 
+from budapp.cluster_ops.crud import ClusterDataManager
+from budapp.cluster_ops.models import Cluster as ClusterModel
 from budapp.commons import logging
 from budapp.commons.constants import (
     WORKFLOW_DELETE_MESSAGES,
@@ -30,6 +32,16 @@ from budapp.commons.constants import (
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
+from budapp.core.crud import ModelTemplateDataManager
+from budapp.core.models import ModelTemplate as ModelTemplateModel
+from budapp.credential_ops.crud import ProprietaryCredentialDataManager
+from budapp.credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
+from budapp.endpoint_ops.crud import EndpointDataManager
+from budapp.endpoint_ops.models import Endpoint as EndpointModel
+from budapp.endpoint_ops.schemas import AddAdapterWorkflowStepData
+from budapp.guardrails.crud import GuardrailsDeploymentDataManager
+from budapp.guardrails.models import GuardrailProfile
+from budapp.guardrails.schemas import GuardrailProfileResponse
 from budapp.model_ops.crud import (
     CloudModelDataManager,
     ModelDataManager,
@@ -40,22 +52,12 @@ from budapp.model_ops.models import CloudModel, Model
 from budapp.model_ops.models import ModelSecurityScanResult as ModelSecurityScanResultModel
 from budapp.model_ops.models import Provider as ProviderModel
 from budapp.model_ops.schemas import QuantizeModelWorkflowStepData
+from budapp.project_ops.crud import ProjectDataManager
+from budapp.project_ops.models import Project as ProjectModel
+from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
-
-from ..cluster_ops.crud import ClusterDataManager
-from ..cluster_ops.models import Cluster as ClusterModel
-from ..core.crud import ModelTemplateDataManager
-from ..core.models import ModelTemplate as ModelTemplateModel
-from ..credential_ops.crud import ProprietaryCredentialDataManager
-from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
-from ..endpoint_ops.crud import EndpointDataManager
-from ..endpoint_ops.models import Endpoint as EndpointModel
-from ..endpoint_ops.schemas import AddAdapterWorkflowStepData
-from ..project_ops.crud import ProjectDataManager
-from ..project_ops.models import Project as ProjectModel
-from .crud import WorkflowDataManager, WorkflowStepDataManager
-from .schemas import RetrieveWorkflowDataResponse, RetrieveWorkflowStepData, WorkflowUtilCreate
+from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse, RetrieveWorkflowStepData, WorkflowUtilCreate
 
 
 logger = logging.get_logger(__name__)
@@ -167,11 +169,13 @@ class WorkflowService(SessionMixin):
             template_id = required_data.get("template_id")
             endpoint_details = required_data.get("endpoint_details")
             add_model_modality = required_data.get("add_model_modality")
-            # Guardrail-related fields
-            deployment_type = required_data.get("deployment_type")
-            guard_types = required_data.get("guard_types")
-            threshold = required_data.get("threshold")
+            guardrail_profile_id = required_data.get("guardrail_profile_id")
+            endpoint_ids = required_data.get("endpoint_ids")
+            is_standalone = required_data.get("is_standalone")
             probe_selections = required_data.get("probe_selections")
+            guard_types = required_data.get("guard_types")
+            severity_threshold = required_data.get("severity_threshold")
+
             quantization_config = (
                 QuantizeModelWorkflowStepData(
                     model_id=model_id,
@@ -273,6 +277,22 @@ class WorkflowService(SessionMixin):
                 else None
             )
 
+            db_guardrail_profile = (
+                await GuardrailsDeploymentDataManager(self.session).retrieve_by_fields(
+                    GuardrailProfile, {"id": UUID(required_data["guardrail_profile_id"])}, missing_ok=True
+                )
+                if "guardrail_profile_id" in required_data
+                else None
+            )
+
+            db_endpoints = (
+                await EndpointDataManager(self.session).get_endpoints(
+                    [UUID(endpoint_id) for endpoint_id in required_data["endpoint_ids"]]
+                )
+                if "endpoint_ids" in required_data
+                else None
+            )
+
             workflow_steps = RetrieveWorkflowStepData(
                 provider_type=provider_type if provider_type else None,
                 provider=db_provider if db_provider else None,
@@ -331,11 +351,14 @@ class WorkflowService(SessionMixin):
                 endpoint_details=endpoint_details if endpoint_details else None,
                 template=db_template if db_template else None,
                 add_model_modality=add_model_modality if add_model_modality else None,
-                # Guardrail-related fields
-                deployment_type=deployment_type if deployment_type else None,
-                guard_types=guard_types if guard_types else None,
-                threshold=threshold if threshold else None,
+                guardrail_profile_id=guardrail_profile_id if guardrail_profile_id else None,
+                guardrail_profile=db_guardrail_profile if db_guardrail_profile else None,
+                endpoint_ids=endpoint_ids if endpoint_ids else None,
+                endpoints=db_endpoints if db_endpoints else None,
+                is_standalone=is_standalone,
                 probe_selections=probe_selections if probe_selections else None,
+                guard_types=guard_types if guard_types else None,
+                severity_threshold=severity_threshold if severity_threshold else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -474,19 +497,19 @@ class WorkflowService(SessionMixin):
                 "scaling_specification",
             ],
             "guardrail_deployment": [
-                "provider_ids",
-                "probe_selections",
-                "deployment_type",
+                "provider_id",
+                "provider_type",
+                "guardrail_profile_id",
+                "name",
+                "description",
+                "tags",
                 "project_id",
-                "endpoint_id",
+                "endpoint_ids",
+                "credential_id",
+                "is_standalone",
+                "probe_selections",
                 "guard_types",
-                "threshold",
-                "deployment_name",
-                "deployment_description",
-                "estimated_deployment_time",
-                "deployment_status",
-                "deployment_message",
-                "deployment_id",
+                "severity_threshold",
             ],
         }
 

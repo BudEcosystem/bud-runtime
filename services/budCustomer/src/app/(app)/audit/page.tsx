@@ -17,6 +17,7 @@ import {
   Empty,
   ConfigProvider,
   Pagination,
+  Skeleton,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -63,7 +64,7 @@ enum AuditAction {
   LOGIN = "login",
   LOGOUT = "logout",
   REGENERATE = "regenerate",
-  LOGIN_FAILED = 'login_failed'
+  LOGIN_FAILED = "login_failed",
 }
 
 enum ResourceType {
@@ -209,22 +210,30 @@ export default function AuditPage() {
 
   const [dayFilter, setDayFilter] = useState([
     {
-      label: 'Today', value: 'today', active: true
+      label: "Today",
+      value: "today",
+      active: true,
     },
     {
-      label: 'Yesterday', value: 'yesterday'
+      label: "Yesterday",
+      value: "yesterday",
     },
     {
-      label: 'This week', value: 'week'
+      label: "This week",
+      value: "week",
     },
-  ])
+  ]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalNumber, setTotalNumber] = useState(0);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const setCurrentDayFilter = (val: any) => {
-    setDayFilter(dayFilter.map(item => ({...item, active: item.value == val})))
-  }
+    setDayFilter(
+      dayFilter.map((item) => ({ ...item, active: item.value == val })),
+    );
+  };
   // Get action icon and color
   const getActionDisplay = (action: AuditAction) => {
     const config = {
@@ -268,7 +277,7 @@ export default function AuditPage() {
         color: "blue",
         label: "Regenerated",
       },
-       [AuditAction.LOGIN_FAILED]: {
+      [AuditAction.LOGIN_FAILED]: {
         icon: <LoginOutlined />,
         color: "red",
         label: "Login Failed",
@@ -312,7 +321,9 @@ export default function AuditPage() {
     if (searchText) {
       filtered = filtered.filter(
         (log) =>
-          log.resource_name?.toLowerCase().includes(searchText?.toLowerCase()) ||
+          log.resource_name
+            ?.toLowerCase()
+            .includes(searchText?.toLowerCase()) ||
           log.user_name?.toLowerCase().includes(searchText?.toLowerCase()) ||
           log.resource_id?.toLowerCase().includes(searchText?.toLowerCase()),
       );
@@ -351,7 +362,7 @@ export default function AuditPage() {
 
   const pad = (n: number) => {
     return n < 10 ? "0" + n : n;
-  }
+  };
 
   const formatDateString = (date: Date | null, endOfDay = false) => {
     if (!date) return undefined;
@@ -364,9 +375,10 @@ export default function AuditPage() {
     } else {
       return `${y}-${m}-${d} 00:00:00`;
     }
-  }
+  };
 
-  const getAuditList = async() => {
+  const getAuditList = async () => {
+    setLoading(true);
     try {
       const params = {
         page: currentPage,
@@ -374,40 +386,52 @@ export default function AuditPage() {
         action: selectedAction,
         resource_type: selectedResource,
         search: searchText,
-        start_date: dateRange?.[0] ? formatDateString(dateRange[0]?.toDate(), false) : undefined,
-        end_date: dateRange?.[1] ? formatDateString(dateRange[1]?.toDate(), true) : undefined
-      }
-      const response = await AppRequest.Get("/audit/records", {params});
-      setAuditLogs(response.data.data.map((item: any)=> ({...item, status: item.details?.success === false ? 'failed' : 'success'})));
+        start_date: dateRange?.[0]
+          ? formatDateString(dateRange[0]?.toDate(), false)
+          : undefined,
+        end_date: dateRange?.[1]
+          ? formatDateString(dateRange[1]?.toDate(), true)
+          : undefined,
+      };
+      const response = await AppRequest.Get("/audit/records", { params });
+      setAuditLogs(
+        response.data.data.map((item: any) => ({
+          ...item,
+          status: item.details?.success === false ? "failed" : "success",
+        })),
+      );
       setTotalNumber(response.data.total_record);
     } catch (error) {
       console.error("Failed to fetch usage data:", error);
     } finally {
+      setLoading(false);
     }
-  }
+  };
 
   const [statistics, setStatistics] = useState({
     totalEvents: 0,
     failedActions: 0,
-    resourcesModified: 0
+    resourcesModified: 0,
   });
-  const getAuditSummary = async() => {
+  const getAuditSummary = async () => {
+    setIsStatsLoading(true);
     try {
       // const params = {
       //   start_date: dateRange?.[0] ? formatDateString(dateRange[0]?.toDate(), false) : undefined,
       //   end_date: dateRange?.[1] ? formatDateString(dateRange[1]?.toDate(), true) : undefined
       // }
-      const {data} = await AppRequest.Get("/audit/summary");
+      const { data } = await AppRequest.Get("/audit/summary");
       setStatistics({
         totalEvents: data.data.total_records || 0,
         failedActions: data.data.failure_events_count || 0,
         resourcesModified: data.data.unique_resources_updated || 0,
-      })
+      });
     } catch (error) {
       console.error("Failed to fetch usage data:", error);
     } finally {
+      setIsStatsLoading(false);
     }
-  }
+  };
   // Table columns
   const columns: ColumnsType<AuditLog> = [
     {
@@ -446,11 +470,13 @@ export default function AuditPage() {
       render: (action: AuditAction, record: AuditLog) => {
         const display = getActionDisplay(action);
         return (
-          <Tags
-            // icon={display.icon}
-            color={record.status === "failed" ? "error" : display.color}
-            name={display.label}
-          />
+          <div className="flex items-center">
+            <Tags
+              // icon={display.icon}
+              color={record.status === "failed" ? "error" : display.color}
+              name={display.label}
+            />
+          </div>
         );
       },
     },
@@ -504,10 +530,12 @@ export default function AuditPage() {
       key: "status",
       width: 100,
       render: (status: string) => (
-        <Tags
-          color={status === "success" ? "#3EC564" : "#EC7575"}
-          name={status?.charAt(0).toUpperCase() + status?.slice(1)}
-        />
+        <div className="flex items-center">
+          <Tags
+            color={status === "success" ? "#3EC564" : "#EC7575"}
+            name={status?.charAt(0).toUpperCase() + status?.slice(1)}
+          />
+        </div>
       ),
     },
   ];
@@ -526,8 +554,8 @@ export default function AuditPage() {
         "Action",
         "Resource Type",
         "Resource Name",
-        "Resource ID",
-        "Project",
+        // "Resource ID",
+        // "Project",
         "IP Address",
         "Status",
       ],
@@ -537,8 +565,8 @@ export default function AuditPage() {
         getActionDisplay(log.action).label,
         log.resource_type,
         log.resource_name,
-        log.resource_id,
-        log.project_name || "",
+        // log.resource_id,
+        // log.project_name || "",
         log.ip_address || "",
         log.status,
       ]),
@@ -566,126 +594,173 @@ export default function AuditPage() {
   const hasActiveFilters =
     selectedAction || selectedResource || dateRange || searchText;
 
-  useEffect(()=> {
+  useEffect(() => {
     getAuditList();
     getAuditSummary();
-  }, [selectedAction,selectedResource, dateRange, currentPage, pageSize])
+  }, [selectedAction, selectedResource, dateRange, currentPage, pageSize]);
 
-  useEffect(()=> {
+  useEffect(() => {
     const timer = setTimeout(() => {
       getAuditList();
       getAuditSummary();
     }, 500);
     return () => clearTimeout(timer);
-  } , [searchText])
+  }, [searchText]);
 
   return (
     <DashboardLayout>
-      <style dangerouslySetInnerHTML={{ __html: `
-        /* Custom pagination text color styling for audit page */
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        /* Theme-aware pagination styling for Audit page */
+        .CommonCustomPagination .ant-pagination {
+          color: var(--text-primary) !important;
+        }
+
+        /* Pagination items */
         .CommonCustomPagination .ant-pagination-item a {
-          color: #ffffff !important;
+          color: var(--text-primary) !important;
+        }
+        .CommonCustomPagination .ant-pagination-item-active {
+          background-color: var(--color-purple) !important;
+          border-color: var(--color-purple) !important;
         }
         .CommonCustomPagination .ant-pagination-item-active a {
-          color: #000000 !important;
+          color: #ffffff !important;
         }
-        .CommonCustomPagination .ant-pagination-prev,
-        .CommonCustomPagination .ant-pagination-next {
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: inline-block !important;
-        }
+
+        /* Previous/Next buttons */
         .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
         .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
-          color: #ffffff !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: block !important;
+          color: var(--text-primary) !important;
         }
-        .CommonCustomPagination .ant-pagination-prev button,
-        .CommonCustomPagination .ant-pagination-next button {
-          opacity: 1 !important;
-          visibility: visible !important;
-          color: #ffffff !important;
-        }
-        .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link svg,
-        .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link svg {
-          fill: #ffffff !important;
-          opacity: 1 !important;
-        }
-        .CommonCustomPagination .ant-pagination-prev:not(.ant-pagination-disabled),
-        .CommonCustomPagination .ant-pagination-next:not(.ant-pagination-disabled) {
-          opacity: 1 !important;
-        }
-        .CommonCustomPagination .ant-pagination-disabled .ant-pagination-item-link {
-          color: #666666 !important;
-          opacity: 0.5 !important;
-          visibility: visible !important;
-        }
+
+        /* Size changer and options */
         .CommonCustomPagination .ant-pagination-options {
-          color: #ffffff !important;
+          color: var(--text-primary) !important;
+        }
+        .CommonCustomPagination .ant-pagination-options-size-changer {
+          color: var(--text-primary) !important;
+        }
+        .CommonCustomPagination .ant-pagination-options-size-changer .ant-select {
+          color: var(--text-primary) !important;
         }
         .CommonCustomPagination .ant-select-selector {
-          color: #ffffff !important;
+          background-color: var(--bg-tertiary) !important;
+          border-color: var(--border-secondary) !important;
+          color: var(--text-primary) !important;
+        }
+        .CommonCustomPagination .ant-select-selection-item {
+          color: var(--text-primary) !important;
         }
         .CommonCustomPagination .ant-select-arrow {
-          color: #ffffff !important;
+          color: var(--text-primary) !important;
         }
-        .CommonCustomPagination .ant-pagination-item:hover a {
-          color: #965CDE !important;
+
+        /* Dropdown menu */
+        .ant-select-dropdown {
+          background-color: var(--bg-tertiary) !important;
         }
-        /* Light theme specific - keep numbers white */
+        .ant-select-item {
+          color: var(--text-primary) !important;
+        }
+        .ant-select-item-option-selected {
+          background-color: var(--bg-hover) !important;
+        }
+        .ant-select-item-option-active {
+          background-color: var(--bg-hover) !important;
+        }
+
+        /* Jump input */
+        .CommonCustomPagination .ant-pagination-options-quick-jumper input {
+          background-color: var(--bg-tertiary) !important;
+          border-color: var(--border-secondary) !important;
+          color: var(--text-primary) !important;
+        }
+
+        /* Light theme specific overrides */
         [data-theme="light"] .CommonCustomPagination .ant-pagination-item a {
-          color: #ffffff !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-item-active a {
-          color: #000000 !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next {
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: inline-block !important;
+          color: #1a1a1a !important;
         }
         [data-theme="light"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
         [data-theme="light"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
-          color: #000000 !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: block !important;
+          color: #1a1a1a !important;
         }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:hover .ant-pagination-item-link,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:hover .ant-pagination-item-link {
-          color: #965CDE !important;
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-options {
+          color: #1a1a1a !important;
         }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev button,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next button {
-          opacity: 1 !important;
-          visibility: visible !important;
-          color: #000000 !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link svg,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link svg {
-          fill: #000000 !important;
-          opacity: 1 !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:hover .ant-pagination-item-link svg,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:hover .ant-pagination-item-link svg {
-          fill: #965CDE !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:not(.ant-pagination-disabled),
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:not(.ant-pagination-disabled) {
-          opacity: 1 !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-disabled .ant-pagination-item-link {
-          color: #666666 !important;
-          opacity: 0.5 !important;
-          visibility: visible !important;
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-options-size-changer {
+          color: #1a1a1a !important;
         }
         [data-theme="light"] .CommonCustomPagination .ant-select-selector {
+          background-color: #fafafa !important;
+          border-color: #d0d0d0 !important;
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-select-selection-item {
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-select-arrow {
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .ant-select-dropdown {
+          background-color: #fafafa !important;
+        }
+        [data-theme="light"] .ant-select-item {
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .ant-select-item-option-selected {
+          background-color: #f0f0f0 !important;
+        }
+        [data-theme="light"] .ant-select-item-option-active {
+          background-color: #f0f0f0 !important;
+        }
+
+        /* Dark theme specific overrides */
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-item a {
           color: #ffffff !important;
         }
-      ` }} />
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-options {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-options-size-changer {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-select-selector {
+          background-color: #1f1f1f !important;
+          border-color: #2f2f2f !important;
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-select-selection-item {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-select-arrow {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .ant-select-dropdown {
+          background-color: #1f1f1f !important;
+        }
+        [data-theme="dark"] .ant-select-item {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .ant-select-item-option-selected {
+          background-color: #2f2f2f !important;
+        }
+        [data-theme="dark"] .ant-select-item-option-active {
+          background-color: #2f2f2f !important;
+        }
+
+        /* Disabled states */
+        .CommonCustomPagination .ant-pagination-disabled .ant-pagination-item-link {
+          color: var(--text-disabled) !important;
+        }
+      `,
+        }}
+      />
       <div className="p-8 bg-bud-bg-primary min-h-full">
         {/* Header */}
         <div className="mb-6">
@@ -701,139 +776,168 @@ export default function AuditPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
           <Card className="bg-bud-bg-secondary border-bud-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <Text className="text-bud-text-disabled text-xs block mb-1">
-                  Today&apos;s Events
-                </Text>
-                <Text className="text-bud-text-primary text-2xl font-semibold">
-                  {statistics.totalEvents}
-                </Text>
+            {isStatsLoading ? (
+              <Skeleton active paragraph={{ rows: 2 }} />
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Text className="text-bud-text-disabled text-xs block mb-1">
+                    Today&apos;s Events
+                  </Text>
+                  <Text className="text-bud-text-primary text-2xl font-semibold">
+                    {statistics.totalEvents}
+                  </Text>
+                </div>
+                <CalendarOutlined className="text-2xl text-bud-purple" />
               </div>
-              <CalendarOutlined className="text-2xl text-bud-purple" />
-            </div>
+            )}
           </Card>
 
           <Card className="bg-bud-bg-secondary border-bud-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <Text className="text-bud-text-disabled text-xs block mb-1">
-                  Failed Actions
-                </Text>
-                <Text className="text-bud-text-primary text-2xl font-semibold">
-                  {statistics.failedActions}
-                </Text>
+            {isStatsLoading ? (
+              <Skeleton active paragraph={{ rows: 2 }} />
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Text className="text-bud-text-disabled text-xs block mb-1">
+                    Failed Actions
+                  </Text>
+                  <Text className="text-bud-text-primary text-2xl font-semibold">
+                    {statistics.failedActions}
+                  </Text>
+                </div>
+                <Icon
+                  icon="ph:warning-circle"
+                  className="text-2xl text-red-500"
+                />
               </div>
-              <Icon
-                icon="ph:warning-circle"
-                className="text-2xl text-red-500"
-              />
-            </div>
+            )}
           </Card>
 
           <Card className="bg-bud-bg-secondary border-bud-border hidden">
-            <div className="flex items-center justify-between">
-              <div>
-                <Text className="text-bud-text-disabled text-xs block mb-1">
-                  Active Users
-                </Text>
-                <Text className="text-bud-text-primary text-2xl font-semibold">
-                  {statistics.resourcesModified}
-                </Text>
+            {isStatsLoading ? (
+              <Skeleton active paragraph={{ rows: 2 }} />
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Text className="text-bud-text-disabled text-xs block mb-1">
+                    Active Users
+                  </Text>
+                  <Text className="text-bud-text-primary text-2xl font-semibold">
+                    {statistics.resourcesModified}
+                  </Text>
+                </div>
+                <UserOutlined className="text-2xl text-blue-500" />
               </div>
-              <UserOutlined className="text-2xl text-blue-500" />
-            </div>
+            )}
           </Card>
 
           <Card className="bg-bud-bg-secondary border-bud-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <Text className="text-bud-text-disabled text-xs block mb-1">
-                  Resources Modified
-                </Text>
-                <Text className="text-bud-text-primary text-2xl font-semibold">
-                  {
-                    filteredLogs.filter((log) =>
-                      [
-                        AuditAction.CREATE,
-                        AuditAction.UPDATE,
-                        AuditAction.DELETE,
-                      ].includes(log.action),
-                    ).length
-                  }
-                </Text>
+            {isStatsLoading ? (
+              <Skeleton active paragraph={{ rows: 2 }} />
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Text className="text-bud-text-disabled text-xs block mb-1">
+                    Resources Modified
+                  </Text>
+                  <Text className="text-bud-text-primary text-2xl font-semibold">
+                    {
+                      filteredLogs.filter((log) =>
+                        [
+                          AuditAction.CREATE,
+                          AuditAction.UPDATE,
+                          AuditAction.DELETE,
+                        ].includes(log.action),
+                      ).length
+                    }
+                  </Text>
+                </div>
+                <Icon icon="ph:database" className="text-2xl text-green-500" />
               </div>
-              <Icon icon="ph:database" className="text-2xl text-green-500" />
-            </div>
+            )}
           </Card>
         </div>
 
         {/* Filters */}
         <Card className="bg-bud-bg-secondary border-bud-border mb-6">
-          <div className="flex items-center gap-4">
-            <Input
-              placeholder="Search by resources"
-              prefix={<SearchOutlined className="text-bud-text-disabled" />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="w-80 bg-bud-bg-tertiary border-bud-border-secondary text-bud-text-primary placeholder:text-bud-text-disabled"
-              allowClear
-            />
-            <ConfigProvider theme={themeConfig}>
-              <Select
-                placeholder="Filter by action"
-                value={selectedAction}
-                onChange={setSelectedAction}
-                className="w-48"
+          {isStatsLoading ? (
+            <Skeleton active paragraph={{ rows: 2 }} />
+          ) : (
+            <div className="flex items-center gap-4">
+              <Input
+                placeholder="Search by resources"
+                prefix={<SearchOutlined className="text-bud-text-disabled" />}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-80 bg-bud-bg-tertiary border-bud-border-secondary text-bud-text-primary placeholder:text-bud-text-disabled"
                 allowClear
-                options={Object.values(AuditAction)
-                  .filter((action) => action !== AuditAction.REGENERATE && action !== AuditAction.LOGOUT)
-                  .map((action) => ({
-                    label: getActionDisplay(action).label,
-                    value: action === AuditAction.ACCESS ? "access_granted" : action === AuditAction.EXPORT ? "data_export" : action,
+              />
+              <ConfigProvider theme={themeConfig}>
+                <Select
+                  placeholder="Filter by action"
+                  value={selectedAction}
+                  onChange={setSelectedAction}
+                  className="w-48"
+                  allowClear
+                  options={Object.values(AuditAction)
+                    .filter(
+                      (action) =>
+                        action !== AuditAction.REGENERATE &&
+                        action !== AuditAction.LOGOUT,
+                    )
+                    .map((action) => ({
+                      label: getActionDisplay(action).label,
+                      value:
+                        action === AuditAction.ACCESS
+                          ? "access_granted"
+                          : action === AuditAction.EXPORT
+                            ? "data_export"
+                            : action,
+                    }))}
+                />
+              </ConfigProvider>
+              <ConfigProvider theme={themeConfig}>
+                <Select
+                  placeholder="Filter by resource"
+                  value={selectedResource}
+                  onChange={setSelectedResource}
+                  className="w-48"
+                  allowClear
+                  options={Object.values(ResourceType).map((type) => ({
+                    label: type.replace("_", " ").toUpperCase(),
+                    value: type,
                   }))}
+                />
+              </ConfigProvider>
+
+              <RangePicker
+                value={dateRange}
+                onChange={(dates) => setDateRange(dates)}
+                className="bg-bud-bg-tertiary border-bud-border-secondary"
+                format="YYYY-MM-DD"
               />
-            </ConfigProvider>
-            <ConfigProvider theme={themeConfig}>
-              <Select
-                placeholder="Filter by resource"
-                value={selectedResource}
-                onChange={setSelectedResource}
-                className="w-48"
-                allowClear
-                options={Object.values(ResourceType).map((type) => ({
-                  label: type.replace("_", " ").toUpperCase(),
-                  value: type,
-                }))}
-              />
-            </ConfigProvider>
 
-            <RangePicker
-              value={dateRange}
-              onChange={(dates) => setDateRange(dates)}
-              className="bg-bud-bg-tertiary border-bud-border-secondary"
-              format="YYYY-MM-DD"
-            />
+              {hasActiveFilters && (
+                <Button
+                  onClick={clearFilters}
+                  className="text-bud-text-muted border-bud-border"
+                >
+                  Clear Filters
+                </Button>
+              )}
 
-            {hasActiveFilters && (
-              <Button
-                onClick={clearFilters}
-                className="text-bud-text-muted border-bud-border"
-              >
-                Clear Filters
-              </Button>
-            )}
-
-            <div className="ml-auto">
-              <Button
-                icon={<DownloadOutlined />}
-                onClick={exportToCSV}
-                className="bg-bud-purple text-white border-bud-purple hover:bg-bud-purple-hover"
-              >
-                Export CSV
-              </Button>
+              <div className="ml-auto">
+                <Button
+                  icon={<DownloadOutlined />}
+                  onClick={exportToCSV}
+                  className="bg-bud-purple text-white border-bud-purple hover:bg-bud-purple-hover"
+                >
+                  Export CSV
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </Card>
 
         {/* Audit Table */}
@@ -850,50 +954,59 @@ export default function AuditPage() {
               };
 
               return ( */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3 hidden">
-                    <ClockCircleOutlined className="text-bud-text-disabled" />
-                    {dayFilter.map((item: any) => <Tag key={item.value}
+            {loading ? (
+              <div className="p-8">
+                <Skeleton active paragraph={{ rows: 8 }} />
+              </div>
+            ) : (
+              <div className="pb-6">
+                <div className="flex items-center gap-2 mb-3 hidden">
+                  <ClockCircleOutlined className="text-bud-text-disabled" />
+                  {dayFilter.map((item: any) => (
+                    <Tag
+                      key={item.value}
                       onClick={() => setCurrentDayFilter(item.value)}
-                      color={item.active ? "green-inverse": "red"}
+                      color={item.active ? "green-inverse" : "red"}
                       className="flex items-center gap-1 w-fit"
                     >
                       {item.label}
-                    </Tag>)}
-                    {/* <Text className="text-bud-text-primary font-medium">
+                    </Tag>
+                  ))}
+                  {/* <Text className="text-bud-text-primary font-medium">
                       {groupLabels[group as keyof typeof groupLabels]}
                     </Text>
                     <Badge count={logs.length} className="bg-bud-bg-tertiary" /> */}
-                  </div>
-
-                  <Table
-                    columns={columns}
-                    dataSource={auditLogs}
-                    rowKey="id"
-                    pagination={false}
-                    size="small"
-                    className={styles.auditTable}
-                    rowSelection={{
-                      selectedRowKeys,
-                      onChange: setSelectedRowKeys,
-                    }}
-                    rowClassName={(record) =>
-                      record.status === "failed" ? "bg-red-500/5" : ""
-                    }
-                  />
-                  {/* Pagination */}
-                  <div className="flex justify-end my-4 px-3  CommonCustomPagination">
-                    <Pagination
-                      className='small-pagination'
-                      current={currentPage}
-                      pageSize={pageSize}
-                      total={totalNumber}
-                      onChange={handlePageChange}
-                      showSizeChanger
-                      pageSizeOptions={['5', '10', '20', '50']}
-                    />
-                  </div>
                 </div>
+
+                <Table
+                  columns={columns}
+                  dataSource={auditLogs}
+                  rowKey="id"
+                  pagination={false}
+                  size="small"
+                  className={styles.auditTable}
+                  rowSelection={{
+                    selectedRowKeys,
+                    onChange: setSelectedRowKeys,
+                  }}
+                  rowClassName={(record) =>
+                    record.status === "failed" ? "bg-red-500/5" : ""
+                  }
+                />
+                {/* Pagination */}
+                <div className="flex justify-end mt-4 mr-4 CommonCustomPagination">
+                  <Pagination
+                    className="small-pagination"
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={totalNumber}
+                    onChange={handlePageChange}
+                    showSizeChanger
+                    pageSizeOptions={["5", "10", "20", "50"]}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* {filteredLogs.length === 0 && (
               <Empty

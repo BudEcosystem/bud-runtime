@@ -35,16 +35,18 @@ const BudStepAlert: React.FC<BudStepAlertProps> = ({
           type === "success"
             ? "success"
             : type === "warning"
-            ? "warining"
-            : type === "error"
-            ? "failed"
-            : "success" // default fallback
+              ? "warining"
+              : type === "error"
+                ? "failed"
+                : "success" // default fallback
         }
       />
       <div className="ml-[1rem]  w-full">
         <Text_14_400_EEEEEE>{title}</Text_14_400_EEEEEE>
         <div className="height-10"></div>
-        <Text_12_400_757575 className="pb-[1.5rem]">{description}</Text_12_400_757575>
+        <Text_12_400_757575 className="pb-[1.5rem]">
+          {description}
+        </Text_12_400_757575>
         <div className="flex justify-end items-center w-full gap-[.6rem]">
           {cancelAction && (
             <SecondaryButton
@@ -66,7 +68,6 @@ const BudStepAlert: React.FC<BudStepAlertProps> = ({
         </div>
       </div>
     </div>
-
   );
 };
 

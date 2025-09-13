@@ -26,12 +26,15 @@ export interface TagProps {
 }
 
 function Tags(props: TagProps) {
-  const [copyText, setCopiedText] = useState<string>(props.tooltipText ? props.tooltipText : 'Copy');
-  const color = checkColor(props.color) ? props.color : '#D1B854';
+  const [copyText, setCopiedText] = useState<string>(
+    props.tooltipText ? props.tooltipText : "Copy",
+  );
+  const color = checkColor(props.color) ? props.color : "#D1B854";
 
   const handleCopy = (text: string) => {
-    if (copyText === 'Copy') {
-      navigator.clipboard.writeText(text)
+    if (copyText === "Copy") {
+      navigator.clipboard
+        .writeText(text)
         .then(() => {
           setCopiedText("Copied..");
         })
@@ -40,23 +43,20 @@ function Tags(props: TagProps) {
         });
 
       setTimeout(() => {
-        setCopiedText('Copy');
-      }, 3000)
+        setCopiedText("Copy");
+      }, 3000);
     }
   };
 
   const tagContent = (
     <div className="flex justify-center items-center w-full h-full">
-      {props.image && (
-        <div>
-          {props.image}
-        </div>
-      )}
-      <div className={`font-[400] ${props.textClass}`}
+      {props.image && <div>{props.image}</div>}
+      <div
+        className={`font-[400] ${props.textClass}`}
         style={{
           color: color,
-          fontSize: '0.625rem',
-          lineHeight: '115%'
+          fontSize: "0.625rem",
+          lineHeight: "115%",
         }}
       >
         {props.name}
@@ -66,12 +66,12 @@ function Tags(props: TagProps) {
 
   const tagElement = (
     <Tag
-      className={`customTags ${props.closable && 'closableTag'} border-[0] rounded-[6px] flex cursor-pointer hover:text-[#EEEEEE] ${props.classNames}`}
+      className={`customTags ${props.closable && "closableTag"} border-[0] rounded-[6px] flex cursor-pointer hover:text-[#EEEEEE] ${props.classNames}`}
       style={{
         backgroundColor: getChromeColor(color),
-        marginRight: '0',
-        paddingTop: !props.image ? '.37rem' : '.3rem',
-        paddingBottom: !props.image ? '.37rem' : '.3rem',
+        marginRight: "0",
+        paddingTop: !props.image ? ".37rem" : ".3rem",
+        paddingBottom: !props.image ? ".37rem" : ".3rem",
       }}
       onClick={(e) => {
         if (props?.onTagClick) {

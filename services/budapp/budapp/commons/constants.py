@@ -589,6 +589,7 @@ class WorkflowTypeEnum(StrEnum):
     ADD_ADAPTER = auto()
     DELETE_ADAPTER = auto()
     EVALUATION_CREATION = auto()
+    EVALUATE_MODEL = auto()
     GUARDRAIL_DEPLOYMENT = auto()
 
 
@@ -670,6 +671,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     ADAPTER_DEPLOYMENT_EVENTS = "adapter_deployment_events"
     ADAPTER_DELETE_EVENTS = "adapter_delete_events"
     EVALUATION_EVENTS = "evaluation_events"
+    GUARDRAIL_DEPLOYMENT_EVENTS = "guardrail_deployment_events"
 
 
 # Mapping between payload types and workflow step event names.
@@ -789,6 +791,7 @@ class ProxyProviderEnum(StrEnum):
     MISTRAL = "mistral"
     TOGETHER = "together"
     XAI = "xai"
+    BUD_SENTINEL = "bud-sentinel"
 
 
 # class ModelTemplateTypeEnum(StrEnum):
@@ -2884,6 +2887,7 @@ class NotificationTypeEnum(StrEnum):
     ADAPTER_DELETION_SUCCESS = auto()
     PROJECT_INVITATION_SUCCESS = auto()
     EVALUATION_SUCCESS = auto()
+    GUARDRAIL_DEPLOYMENT_SUCCESS = auto()
 
 
 BENCHMARK_FIELDS_TYPE_MAPPER = {
@@ -3069,11 +3073,18 @@ class ExperimentWorkflowStepEnum(StrEnum):
     FINALIZE = "finalize"
 
 
-class GuardrailDeploymentTypeEnum(StrEnum):
-    """Guardrail deployment type enumeration."""
+class GuardrailProviderTypeEnum(Enum):
+    """Enumeration of guardrail provider types.
 
-    ENDPOINT_MAPPED = "endpoint_mapped"
-    STANDALONE = "standalone"
+    This enum represents different types of guardrail providers or sources.
+
+    Attributes:
+        CLOUD (str): Represents cloud-based guardrail providers.
+        BUD (str): Represents guardrails from the Bud platform.
+    """
+
+    CLOUD = "cloud"
+    BUD = "bud"
 
 
 class GuardrailDeploymentStatusEnum(StrEnum):
@@ -3088,18 +3099,35 @@ class GuardrailDeploymentStatusEnum(StrEnum):
     PENDING = auto()
 
 
-class GuardrailProviderTypeEnum(Enum):
-    """Enumeration of guardrail provider types.
-
-    This enum represents different types of guardrail providers or sources.
+class GuardrailStatusEnum(StrEnum):
+    """Enumeration of entity statuses in the system.
 
     Attributes:
-        CLOUD_PROVIDER (str): Represents cloud-based guardrail providers.
-        BUD_SENTINEL (str): Represents guardrails from the Bud Sentinel.
+        ACTIVE: Represents an active entity.
+        DELETED: Represents an deleted entity.
     """
 
-    CLOUD_PROVIDER = "cloud_provider"
-    BUD_SENTINEL = "bud_sentinel"
+    ACTIVE = auto()
+    DISABLED = auto()
+    DELETED = auto()
+
+
+class ProviderCapabilityEnum(Enum):
+    """Enumeration for identifying provider capabilities.
+
+    This enum categorizes providers like OpenAI, Azure, and AWS Bedrock based on
+    the specific services they offer, allowing for clear differentiation between
+    their core functionalities.
+
+    Attributes:
+        MODEL: Represents providers that support model hubs or offer direct access
+               to model inference endpoints.
+        MODERATION: Represents providers that offer content moderation, safety, or
+                    guardrail endpoints.
+    """
+
+    MODEL = "model"
+    MODERATION = "moderation"
 
 
 class AuditActionEnum(StrEnum):

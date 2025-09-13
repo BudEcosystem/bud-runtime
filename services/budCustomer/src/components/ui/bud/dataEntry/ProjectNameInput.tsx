@@ -287,6 +287,14 @@ export function NameIconInput({
             pattern: projectNameRegex,
             message: `${placeholder} should contain only alphanumeric characters, spaces, hyphens, and underscores`,
           },
+          {
+            validator: (_, value) => {
+              if (value && value.trim().length === 0) {
+                return Promise.reject(new Error(`${placeholder} cannot be only spaces`));
+              }
+              return Promise.resolve();
+            },
+          },
         ]}
       >
         <Input

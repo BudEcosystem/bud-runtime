@@ -45,14 +45,27 @@ logger = logging.get_logger(__name__)
 class EndpointDataManager(DataManagerUtils):
     """Data manager for the Endpoint model."""
 
-    async def get_missing_endpoints(self, endpoint_ids: List[UUID]):
+    async def get_missing_endpoints(self, endpoint_ids: List[UUID], project_id: UUID | None = None):
+        if project_id is None:
+            stmt = select(EndpointModel.id).where(
+                and_(EndpointModel.id.in_(endpoint_ids), EndpointModel.status != EndpointStatusEnum.DELETED)
+            )
+        else:
+            stmt = (
+                select(EndpointModel.id)
+                .where(EndpointModel.id.in_(endpoint_ids))
+                .where(EndpointModel.project_id == project_id)
+                .where(EndpointModel.status != EndpointStatusEnum.DELETED)
+            )
+        result = self.scalars_all(stmt)
+        missing_ids = set(endpoint_ids) - set(result)
+        return list(missing_ids)
+
+    async def get_endpoints(self, endpoint_ids: List[UUID]):
         stmt = select(EndpointModel).where(
             and_(EndpointModel.id.in_(endpoint_ids), EndpointModel.status != EndpointStatusEnum.DELETED)
         )
-        result = self.scalars_all(stmt)
-        existing_ids = {ep.id for ep in result}
-        missing_ids = set(endpoint_ids) - existing_ids
-        return list(missing_ids)
+        return self.scalars_all(stmt)
 
     async def get_all_active_endpoints(
         self,
