@@ -350,6 +350,7 @@ class AuditService:
             start_date=filter_params.start_date,
             end_date=filter_params.end_date,
             ip_address=filter_params.ip_address,
+            search=filter_params.search,
             offset=offset,
             limit=limit,
             include_user=True,

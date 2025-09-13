@@ -47,7 +47,10 @@ async def get_audit_records(
     resource_name: Optional[str] = Query(None, description="Filter by resource name (partial match)"),
     start_date: Optional[datetime] = Query(None, description="Filter by start date (inclusive)"),
     end_date: Optional[datetime] = Query(None, description="Filter by end date (inclusive)"),
-    ip_address: Optional[str] = Query(None, description="Filter by IP address"),
+    ip_address: Optional[str] = Query(None, description="Filter by IP address (exact match)"),
+    search: Optional[str] = Query(
+        None, description="Search term for partial matching in resource name and IP address"
+    ),
     export_csv: bool = Query(False, description="Export results as CSV file"),
 ):
     """Get audit records with optional filtering and pagination.
@@ -55,6 +58,8 @@ async def get_audit_records(
     For CLIENT users, only their own audit records are returned.
     For ADMIN users, all audit records are accessible based on the provided filters.
     If export_csv is true, returns a CSV file download instead of JSON response.
+
+    The 'search' parameter performs partial matching on both resource_name and ip_address fields.
     """
     try:
         service = AuditService(session)
@@ -76,6 +81,7 @@ async def get_audit_records(
             start_date=start_date,
             end_date=end_date,
             ip_address=ip_address,
+            search=search,
         )
 
         # For CSV export, fetch all matching records (with a reasonable limit)
