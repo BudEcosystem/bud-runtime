@@ -52,7 +52,15 @@ function LoginContent() {
 
       // Check if this exchange token was already processed
       const processedExchangeTokens = localStorage.getItem("processed_exchange_tokens");
-      const processedTokensList = processedExchangeTokens ? JSON.parse(processedExchangeTokens) : [];
+      let processedTokensList: string[] = [];
+      try {
+        processedTokensList = processedExchangeTokens ? JSON.parse(processedExchangeTokens) : [];
+      } catch (error) {
+        console.error("Failed to parse processed_exchange_tokens from localStorage:", error);
+        // Clear corrupted data
+        localStorage.removeItem("processed_exchange_tokens");
+        processedTokensList = [];
+      }
 
       // Handle token exchange flow
       if (exchangeToken && !processedTokensList.includes(exchangeToken) && !oauthProcessing) {
@@ -92,10 +100,9 @@ function LoginContent() {
         } catch (error: any) {
           console.error("OAuth token exchange error:", error);
           // Remove the token from processed list if it failed
-          const failedTokenIndex = processedTokensList.indexOf(exchangeToken);
-          if (failedTokenIndex > -1) {
-            processedTokensList.splice(failedTokenIndex, 1);
-            localStorage.setItem("processed_exchange_tokens", JSON.stringify(processedTokensList));
+          const updatedTokens = processedTokensList.filter(token => token !== exchangeToken);
+          if (updatedTokens.length < processedTokensList.length) {
+            localStorage.setItem("processed_exchange_tokens", JSON.stringify(updatedTokens));
           }
           errorToast(
             error.message || "Authentication failed. Please try again.",
@@ -110,7 +117,15 @@ function LoginContent() {
 
       // Check if this auth code was already processed (for authorization code flow)
       const processedAuthCodes = localStorage.getItem("processed_auth_codes");
-      const processedCodesList = processedAuthCodes ? JSON.parse(processedAuthCodes) : [];
+      let processedCodesList: string[] = [];
+      try {
+        processedCodesList = processedAuthCodes ? JSON.parse(processedAuthCodes) : [];
+      } catch (error) {
+        console.error("Failed to parse processed_auth_codes from localStorage:", error);
+        // Clear corrupted data
+        localStorage.removeItem("processed_auth_codes");
+        processedCodesList = [];
+      }
       const authCodeKey = `${provider}_${code}_${state}`;
 
       // Handle authorization code flow (fallback)
@@ -153,10 +168,9 @@ function LoginContent() {
         } catch (error: any) {
           console.error("OAuth callback error:", error);
           // Remove the code from processed list if it failed
-          const failedCodeIndex = processedCodesList.indexOf(authCodeKey);
-          if (failedCodeIndex > -1) {
-            processedCodesList.splice(failedCodeIndex, 1);
-            localStorage.setItem("processed_auth_codes", JSON.stringify(processedCodesList));
+          const updatedCodes = processedCodesList.filter(code => code !== authCodeKey);
+          if (updatedCodes.length < processedCodesList.length) {
+            localStorage.setItem("processed_auth_codes", JSON.stringify(updatedCodes));
           }
           errorToast(
             error.message || "Authentication failed. Please try again.",
