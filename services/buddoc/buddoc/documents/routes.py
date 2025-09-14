@@ -42,7 +42,6 @@ document_service = DocumentService()
 @document_router.post(
     "/ocr",
     response_model=OCRResponse,
-    status_code=status.HTTP_200_OK,
     summary="Process document with OCR (Mistral format)",
     description="Process a document for OCR using base64 or URL input matching Mistral AI format",
 )
@@ -104,16 +103,14 @@ async def process_document_ocr(
         # Process the document with optional token
         result = await document_service.process_document(request, api_token=api_token)
 
-        # Check if processing failed - return gracefully with empty pages
+        # Check if processing failed - raise proper HTTP exception
         if result.status == DocumentStatus.FAILED:
             error_msg = result.error_message or "Document processing failed"
-            logger.warning(f"OCR processing failed gracefully: {error_msg}")
-            # Return empty result instead of raising exception for graceful error handling
-            return OCRResponse(
-                document_id=result.document_id,
-                model=request.model,
-                pages=[],  # Return empty pages on failure
-                usage_info=result.usage_info or UsageInfo(pages_processed=0, size_bytes=0, filename="unknown"),
+            logger.error(f"OCR processing failed: {error_msg}")
+            # Return proper error status code instead of HTTP 200
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Document processing failed: {error_msg}",
             )
 
         # Return OCR response in Mistral format

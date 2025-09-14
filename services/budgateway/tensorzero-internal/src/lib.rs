@@ -12,6 +12,7 @@ pub mod blocking_rules; // blocking rules management
 pub mod cache;
 pub mod clickhouse;
 pub mod config_parser; // TensorZero config file
+pub mod documents; // document processing and OCR
 pub mod embeddings; // embedding inference
 pub mod encryption; // RSA encryption/decryption for API keys
 pub mod endpoints; // API endpoints

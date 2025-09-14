@@ -248,6 +248,10 @@ async fn main() {
             post(endpoints::openai_compatible::image_variation_handler),
         )
         .route(
+            "/v1/document",
+            post(endpoints::openai_compatible::document_processing_handler),
+        )
+        .route(
             "/v1/realtime/sessions",
             post(endpoints::openai_compatible::realtime_session_handler),
         )

@@ -27,6 +27,7 @@ use crate::inference::providers::dummy::DummyProvider;
 use crate::inference::providers::google_ai_studio_gemini::GoogleAIStudioGeminiProvider;
 
 use crate::inference::providers::helpers::peek_first_chunk;
+use crate::inference::providers::buddoc::BudDocProvider;
 use crate::inference::providers::hyperbolic::HyperbolicProvider;
 use crate::inference::providers::provider_trait::WrappedProvider;
 use crate::inference::providers::sglang::SGLangProvider;
@@ -572,6 +573,52 @@ impl ModelConfig {
                 Ok(response) => {
                     // No caching for realtime sessions
                     return Ok(response);
+                }
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+        Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
+    }
+
+    /// Document processing method (when model supports document capability)
+    #[instrument(skip_all)]
+    pub async fn process_document(
+        &self,
+        request: &crate::documents::DocumentProcessingRequest,
+        model_name: &str,
+        clients: &crate::endpoints::inference::InferenceClients<'_>,
+    ) -> Result<crate::documents::DocumentProcessingResponse, Error> {
+        // Verify this model supports document processing
+        if !self.supports_endpoint(EndpointCapability::Document) {
+            return Err(Error::new(ErrorDetails::ModelNotConfiguredForCapability {
+                model_name: model_name.to_string(),
+                capability: EndpointCapability::Document.as_str().to_string(),
+            }));
+        }
+
+        let mut provider_errors: HashMap<String, Error> = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::ProviderNotFound {
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+
+            // Use the provider's process_document method
+            let response = provider
+                .process_document(request, clients.http_client, clients.credentials)
+                .await;
+
+            match response {
+                Ok(response) => {
+                    // TODO: Add caching support here if needed
+                    let document_response = crate::documents::DocumentProcessingResponse::new(
+                        response,
+                        provider_name.clone(),
+                    );
+                    return Ok(document_response);
                 }
                 Err(error) => {
                     provider_errors.insert(provider_name.to_string(), error);
@@ -1425,6 +1472,7 @@ impl ModelProvider {
             ProviderConfig::AWSBedrock(_) => "aws_bedrock",
             ProviderConfig::AWSSagemaker(_) => "aws_sagemaker",
             ProviderConfig::Azure(_) => "azure",
+            ProviderConfig::BudDoc(_) => "buddoc",
             ProviderConfig::Fireworks(_) => "fireworks",
             ProviderConfig::GCPVertexAnthropic(_) => "gcp_vertex_anthropic",
             ProviderConfig::GCPVertexGemini(_) => "gcp_vertex_gemini",
@@ -1467,6 +1515,7 @@ impl ModelProvider {
             ProviderConfig::TGI(_) => None,
             ProviderConfig::SGLang(provider) => Some(provider.model_name()),
             ProviderConfig::DeepSeek(provider) => Some(provider.model_name()),
+            ProviderConfig::BudDoc(_) => None, // BudDoc doesn't have a model name in the inference sense
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => Some(provider.model_name()),
         }
@@ -1496,6 +1545,7 @@ pub enum ProviderConfig {
     AWSBedrock(AWSBedrockProvider),
     AWSSagemaker(AWSSagemakerProvider),
     Azure(AzureProvider),
+    BudDoc(BudDocProvider),
     DeepSeek(DeepSeekProvider),
     Fireworks(FireworksProvider),
     GCPVertexAnthropic(GCPVertexAnthropicProvider),
@@ -1556,6 +1606,10 @@ pub(super) enum UninitializedProviderConfig {
         deployment_id: String,
         endpoint: Url,
         api_key_location: Option<CredentialLocation>,
+    },
+    BudDoc {
+        model_name: String,
+        api_url: Url,
     },
     #[strum(serialize = "gcp_vertex_anthropic")]
     #[serde(rename = "gcp_vertex_anthropic")]
@@ -1714,6 +1768,9 @@ impl UninitializedProviderConfig {
                 endpoint,
                 api_key_location,
             )?),
+            UninitializedProviderConfig::BudDoc { model_name: _, api_url } => {
+                ProviderConfig::BudDoc(BudDocProvider::new(api_url.to_string()))
+            }
             UninitializedProviderConfig::Fireworks {
                 model_name,
                 api_key_location,
@@ -1890,6 +1947,11 @@ impl ModelProvider {
             ProviderConfig::DeepSeek(provider) => {
                 provider.infer(request, client, api_keys, self).await
             }
+            ProviderConfig::BudDoc(_) => {
+                return Err(Error::new(ErrorDetails::Config {
+                    message: "BudDoc provider does not support inference operations".to_string(),
+                }))
+            }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider.infer(request, client, api_keys, self).await
@@ -1968,6 +2030,11 @@ impl ModelProvider {
             }
             ProviderConfig::DeepSeek(provider) => {
                 provider.infer_stream(request, client, api_keys, self).await
+            }
+            ProviderConfig::BudDoc(_) => {
+                return Err(Error::new(ErrorDetails::Config {
+                    message: "BudDoc provider does not support streaming inference".to_string(),
+                }))
             }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
@@ -2079,6 +2146,11 @@ impl ModelProvider {
                     .start_batch_inference(requests, client, api_keys)
                     .await
             }
+            ProviderConfig::BudDoc(_) => {
+                Err(Error::new(ErrorDetails::Config {
+                    message: "BudDoc provider does not support batch inference".to_string(),
+                }))
+            }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
@@ -2184,6 +2256,11 @@ impl ModelProvider {
                 provider
                     .poll_batch_inference(batch_request, http_client, dynamic_api_keys)
                     .await
+            }
+            ProviderConfig::BudDoc(_) => {
+                Err(Error::new(ErrorDetails::Config {
+                    message: "BudDoc provider does not support batch inference".to_string(),
+                }))
             }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
@@ -2932,6 +3009,30 @@ impl ModelProvider {
                 capability: EndpointCapability::RealtimeTranscription
                     .as_str()
                     .to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
+
+    /// Document processing method
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_document_processing"))]
+    pub async fn process_document(
+        &self,
+        request: &crate::documents::DocumentProcessingRequest,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<crate::documents::DocumentProcessingProviderResponse, Error> {
+        use crate::documents::DocumentProcessingProvider;
+
+        match &self.config {
+            ProviderConfig::BudDoc(provider) => {
+                provider
+                    .process_document(request, client, dynamic_api_keys)
+                    .await
+            }
+            // Other providers don't support document processing yet
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Document.as_str().to_string(),
                 provider: self.name.to_string(),
             })),
         }
