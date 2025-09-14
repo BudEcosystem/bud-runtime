@@ -456,14 +456,14 @@ async def determine_modality_endpoints(
     elif input_modality == "image_variation":
         result["modality"] = [ModalityEnum.IMAGE_INPUT, ModalityEnum.IMAGE_OUTPUT]
         result["endpoints"] = [ModelEndpointEnum.IMAGE_VARIATION]
-    elif input_modality == "realtime":
-        result["modality"] = [
-            ModalityEnum.TEXT_INPUT,
-            ModalityEnum.AUDIO_INPUT,
-            ModalityEnum.TEXT_OUTPUT,
-            ModalityEnum.AUDIO_OUTPUT,
-        ]
-        result["endpoints"] = [ModelEndpointEnum.REALTIME_SESSION, ModelEndpointEnum.REALTIME_TRANSCRIPTION]
+    # elif input_modality == "realtime":
+    #     result["modality"] = [
+    #         ModalityEnum.TEXT_INPUT,
+    #         ModalityEnum.AUDIO_INPUT,
+    #         ModalityEnum.TEXT_OUTPUT,
+    #         ModalityEnum.AUDIO_OUTPUT,
+    #     ]
+    #     result["endpoints"] = [ModelEndpointEnum.REALTIME_SESSION, ModelEndpointEnum.REALTIME_TRANSCRIPTION]
     elif input_modality == "llm_embedding":
         result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
         result["endpoints"] = [ModelEndpointEnum.EMBEDDING]
