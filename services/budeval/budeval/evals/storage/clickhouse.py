@@ -254,34 +254,56 @@ class ClickHouseStorage(StorageAdapter):
             return False
 
     async def _save_evaluation_job(self, conn, job_id: str, results: Dict) -> None:
-        """Save the main evaluation job record."""
-        job_data = {
-            "job_id": job_id,
-            "experiment_id": results.get("experiment_id"),
-            "model_name": results.get("model_name", ""),
-            "engine": results.get("engine", "opencompass"),
-            "status": results.get("status", "succeeded"),
-            "job_start_time": self._parse_datetime(results.get("job_start_time")),
-            "job_end_time": self._parse_datetime(results.get("job_end_time")),
-            "job_duration_seconds": float(results.get("job_duration_seconds") or 0.0),
-            "overall_accuracy": float(results.get("summary", {}).get("overall_accuracy") or 0.0),
-            "total_datasets": int(results.get("summary", {}).get("total_datasets") or 0),
-            "total_examples": int(results.get("summary", {}).get("total_examples") or 0),
-            "total_correct": int(results.get("summary", {}).get("total_correct") or 0),
-            "extracted_at": self._parse_datetime(results.get("extracted_at")),
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
-        }
-
-        query = """
-        INSERT INTO budeval.evaluation_jobs
-        (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
-         overall_accuracy, total_datasets, total_examples, total_correct,
-         extracted_at, created_at, updated_at)
-        VALUES
-        """
-
+        """Save the main evaluation job record with proper upsert logic."""
         async with conn.cursor() as cursor:
+            # First, get the existing job record to preserve original timing and created_at
+            existing_query = """
+            SELECT job_start_time, created_at
+            FROM budeval.evaluation_jobs
+            WHERE job_id = %(job_id)s
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """
+
+            await cursor.execute(existing_query, {"job_id": job_id})
+            existing_record = await cursor.fetchone()
+
+            if existing_record:
+                # Use original start time and created_at from existing record
+                original_start_time = existing_record[0]
+                original_created_at = existing_record[1]
+            else:
+                # Fallback if no existing record found
+                original_start_time = self._parse_datetime(results.get("job_start_time"))
+                original_created_at = datetime.now()
+
+            job_data = {
+                "job_id": job_id,
+                "experiment_id": results.get("experiment_id"),
+                "model_name": results.get("model_name", ""),
+                "engine": results.get("engine", "opencompass"),
+                "status": results.get("status", "succeeded"),
+                "job_start_time": original_start_time,  # Preserve original start time
+                "job_end_time": self._parse_datetime(results.get("job_end_time")),
+                "job_duration_seconds": float(results.get("job_duration_seconds") or 0.0),
+                "overall_accuracy": float(results.get("summary", {}).get("overall_accuracy") or 0.0),
+                "total_datasets": int(results.get("summary", {}).get("total_datasets") or 0),
+                "total_examples": int(results.get("summary", {}).get("total_examples") or 0),
+                "total_correct": int(results.get("summary", {}).get("total_correct") or 0),
+                "extracted_at": self._parse_datetime(results.get("extracted_at")),
+                "created_at": original_created_at,  # Preserve original created_at
+                "updated_at": datetime.now(),  # Update the timestamp
+            }
+
+            # Insert new record - ReplacingMergeTree will deduplicate based on ORDER BY key
+            query = """
+            INSERT INTO budeval.evaluation_jobs
+            (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
+             overall_accuracy, total_datasets, total_examples, total_correct,
+             extracted_at, created_at, updated_at)
+            VALUES
+            """
+
             await cursor.execute(query, [job_data])
 
     async def create_initial_job_record(
@@ -338,42 +360,65 @@ class ClickHouseStorage(StorageAdapter):
         job_end_time: Optional[datetime] = None,
         job_duration_seconds: Optional[float] = None,
     ) -> None:
-        """Insert an updated job row to reflect new status and timing."""
-        start_time = job_start_time or datetime.now()
-        end_time = job_end_time or datetime.now()
-        duration = (
-            job_duration_seconds
-            if job_duration_seconds is not None
-            else max((end_time - start_time).total_seconds(), 0.0)
-        )
-
-        job_row = {
-            "job_id": job_id,
-            "experiment_id": experiment_id,
-            "model_name": model_name,
-            "engine": engine,
-            "status": status,
-            "job_start_time": start_time,
-            "job_end_time": end_time,
-            "job_duration_seconds": float(duration),
-            "overall_accuracy": 0.0,
-            "total_datasets": 0,
-            "total_examples": 0,
-            "total_correct": 0,
-            "extracted_at": end_time,
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
-        }
-
-        query = """
-        INSERT INTO budeval.evaluation_jobs
-        (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
-         overall_accuracy, total_datasets, total_examples, total_correct,
-         extracted_at, created_at, updated_at)
-        VALUES
-        """
-
+        """Update job status using ClickHouse-specific upsert pattern."""
         async with self.get_connection() as conn, conn.cursor() as cursor:
+            # First, get the existing job record to preserve original job_start_time and created_at
+            existing_query = """
+            SELECT job_start_time, created_at
+            FROM budeval.evaluation_jobs
+            WHERE job_id = %(job_id)s
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """
+
+            await cursor.execute(existing_query, {"job_id": job_id})
+            existing_record = await cursor.fetchone()
+
+            if existing_record:
+                # Use original start time and created_at from existing record
+                original_start_time = existing_record[0]
+                original_created_at = existing_record[1]
+            else:
+                # Fallback if no existing record found
+                original_start_time = job_start_time or datetime.now()
+                original_created_at = datetime.now()
+
+            # Calculate proper timing
+            start_time = original_start_time  # Always use original start time
+            end_time = job_end_time or datetime.now()
+            duration = (
+                job_duration_seconds
+                if job_duration_seconds is not None
+                else max((end_time - start_time).total_seconds(), 0.0)
+            )
+
+            job_row = {
+                "job_id": job_id,
+                "experiment_id": experiment_id,
+                "model_name": model_name,
+                "engine": engine,
+                "status": status,
+                "job_start_time": start_time,  # Preserve original start time
+                "job_end_time": end_time,
+                "job_duration_seconds": float(duration),
+                "overall_accuracy": 0.0,
+                "total_datasets": 0,
+                "total_examples": 0,
+                "total_correct": 0,
+                "extracted_at": end_time,
+                "created_at": original_created_at,  # Preserve original created_at
+                "updated_at": datetime.now(),  # Update the timestamp
+            }
+
+            # Insert new record - ReplacingMergeTree will deduplicate based on ORDER BY key
+            query = """
+            INSERT INTO budeval.evaluation_jobs
+            (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
+             overall_accuracy, total_datasets, total_examples, total_correct,
+             extracted_at, created_at, updated_at)
+            VALUES
+            """
+
             await cursor.execute(query, [job_row])
 
     async def _save_dataset_results(self, conn, job_id: str, results: Dict) -> None:
