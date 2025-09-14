@@ -99,7 +99,7 @@ class DocumentService:
         """Save document bytes to a temporary file."""
         os.makedirs(app_settings.temp_upload_dir, exist_ok=True)
 
-        temp_file_path = os.path.join(app_settings.temp_upload_dir, f"{uuid4()}_{filename}")
+        temp_file_path = os.path.join(app_settings.temp_upload_dir, f"{uuid4()}_{os.path.basename(filename)}")
 
         async with aiofiles.open(temp_file_path, "wb") as f:
             await f.write(document_bytes)
