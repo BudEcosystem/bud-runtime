@@ -281,14 +281,14 @@ curl --location 'https://<base_url>/clusters/clusters' \
 
 // Select prompt type
 {
-  "workflow_id": "39590514-e32f-4a7d-be18-3344f010a039",
+  "workflow_id": "0ed70061-361b-438d-b577-a8afb6847749",
   "step_number": 2,
   "prompt_type": "simple_prompt"
 }
 
 // Insert prompt schema
 {
-  "workflow_id": "39590514-e32f-4a7d-be18-3344f010a039",
+  "workflow_id": "0ed70061-361b-438d-b577-a8afb6847749",
   "step_number": 3,
   "prompt_schema": {
     "deployment_name": "qwen3-32b",
@@ -388,7 +388,7 @@ curl --location 'https://<base_url>/clusters/clusters' \
 
 // Insert prompt metadata
 {
-  "workflow_id": "39590514-e32f-4a7d-be18-3344f010a039",
+  "workflow_id": "0ed70061-361b-438d-b577-a8afb6847749",
   "step_number": 4,
   "name": "test prompt",
   "description": "This is a test prompt",
@@ -396,7 +396,7 @@ curl --location 'https://<base_url>/clusters/clusters' \
   "auto_scale": true,
   "caching": true,
   "concurrency": [10, 100],
-  "rate_limit_type": "custom",
+  "rate_limit": true,
   "rate_limit_value": 10,
   "trigger_workflow": true
 }
