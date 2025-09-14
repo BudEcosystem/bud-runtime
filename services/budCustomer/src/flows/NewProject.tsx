@@ -4,7 +4,8 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import ProjectNameInput from "@/components/ui/bud/dataEntry/ProjectNameInput";
+import TextInput from "@/components/ui/bud/dataEntry/TextInput";
+import { projectNameRegex } from "@/lib/utils";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 import React, { useContext, useEffect, useState, useCallback } from "react";
 import { useDrawer } from "@/hooks/useDrawer";
@@ -201,14 +202,35 @@ export default function NewProject() {
               description="Let's get started by filling in the details below"
             />
             <DrawerCard classNames="pb-0">
-              <ProjectNameInput
+              <TextInput
+                name="name"
+                label="Project Name"
                 placeholder="Enter Project Name"
-                onChangeName={(name) => form.setFieldsValue({ name })}
-                onChangeIcon={(icon) => form.setFieldsValue({ icon })}
-                isEdit={true}
-                showIcon={false}
+                preventFirstSpace={true}
+                rules={[
+                  {
+                    required: true,
+                    message: "Please Enter Project Name",
+                  },
+                  {
+                    max: 30,
+                    message: "Project name should be less than 30 characters",
+                  },
+                  {
+                    pattern: projectNameRegex,
+                    message: "Project name should contain only alphanumeric characters, spaces, hyphens, and underscores",
+                  },
+                  {
+                    validator: (_, value) => {
+                      if (value && value.trim().length === 0) {
+                        return Promise.reject(new Error("Project name cannot be only spaces"));
+                      }
+                      return Promise.resolve();
+                    },
+                  },
+                ]}
               />
-              <div className="flex justify-start items-center px-[.65rem] mb-[1.65rem]">
+              <div className="flex justify-start items-center px-[.65rem] mb-[1.65rem] mt-4">
                 <Icon
                   icon="ph:calendar"
                   className="text-bud-text-disabled mr-2 text-[0.875rem]"
