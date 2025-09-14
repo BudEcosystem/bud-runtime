@@ -5,6 +5,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional
 from unittest.mock import AsyncMock, Mock, patch
@@ -18,11 +19,13 @@ from pytest_httpserver import HTTPServer
 
 # Set test environment variables before importing the app
 os.environ.setdefault("LOG_LEVEL", "INFO")
-os.environ.setdefault("LOG_DIR", "/tmp/buddoc_test_logs")
+# Use tempfile to create secure temporary directory
+test_log_dir = os.path.join(tempfile.gettempdir(), "buddoc_test_logs")
+os.environ.setdefault("LOG_DIR", test_log_dir)
 os.environ.setdefault("VLM_API_URL", "http://test-vlm:1234/v1/chat/completions")
 
 # Create log directory if it doesn't exist
-log_dir = Path(os.environ.get("LOG_DIR", "/tmp/buddoc_test_logs"))
+log_dir = Path(os.environ.get("LOG_DIR", test_log_dir))
 log_dir.mkdir(parents=True, exist_ok=True)
 
 # Import app after setting environment variables
@@ -253,13 +256,14 @@ def temp_file_path(tmp_path):
 @pytest.fixture
 def mock_env_variables(monkeypatch):
     """Mock environment variables."""
+    test_upload_dir = os.path.join(tempfile.gettempdir(), "test_uploads")
     env_vars = {
         "VLM_API_URL": "http://mock-vlm:1234/v1/chat/completions",
         "VLM_MODEL_NAME": "test-model",
         "VLM_API_TOKEN": "test-token-from-env",
         "MAX_FILE_SIZE_MB": "50",
         "ALLOWED_EXTENSIONS": "pdf,png,jpg,jpeg,docx",
-        "TEMP_UPLOAD_DIR": "/tmp/test_uploads"
+        "TEMP_UPLOAD_DIR": test_upload_dir
     }
 
     for key, value in env_vars.items():
@@ -351,15 +355,16 @@ def ocr_request_factory():
         base64_data: Optional[str] = None,
         prompt: Optional[str] = None
     ) -> Dict[str, Any]:
-        request = {
+        request: Dict[str, Any] = {
             "model": model,
             "document": {"type": doc_type}
         }
 
+        document = request["document"]
         if doc_type == "document_url":
-            request["document"]["document_url"] = url or "https://example.com/doc.pdf"
+            document["document_url"] = url or "https://example.com/doc.pdf"
         elif doc_type == "image_url":
-            request["document"]["image_url"] = base64_data or "data:image/png;base64,abc123"
+            document["image_url"] = base64_data or "data:image/png;base64,abc123"
 
         if prompt:
             request["prompt"] = prompt

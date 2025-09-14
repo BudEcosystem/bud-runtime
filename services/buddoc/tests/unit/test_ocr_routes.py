@@ -1,6 +1,7 @@
 """Unit tests for OCR routes."""
 
 import json
+from datetime import datetime
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
@@ -294,7 +295,7 @@ class TestOCRRoutes:
                 size_bytes=5120,
                 filename="multipage.pdf"
             ),
-            created_at="2024-01-01T00:00:00"
+            created_at=datetime(2024, 1, 1, 0, 0, 0)
         )
 
         mock_service = Mock()
