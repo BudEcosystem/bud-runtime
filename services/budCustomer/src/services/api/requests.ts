@@ -174,7 +174,7 @@ axiosInstance.interceptors.response.use(
           if (!isRedirecting) {
             isRedirecting = true;
             localStorage.clear();
-            window.location.replace("/auth/login");
+            window.location.replace("/login");
           }
           return;
         }
@@ -516,6 +516,9 @@ const OAuth = {
     sessionStorage.removeItem("oauth_state");
     sessionStorage.removeItem("oauth_provider");
     sessionStorage.removeItem("oauth_exchange_token");
+    // Also clear processed tokens from localStorage
+    localStorage.removeItem("processed_exchange_tokens");
+    localStorage.removeItem("processed_auth_codes");
   },
 
   /**

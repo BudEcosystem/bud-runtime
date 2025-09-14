@@ -554,8 +554,8 @@ export default function AuditPage() {
         "Action",
         "Resource Type",
         "Resource Name",
-        "Resource ID",
-        "Project",
+        // "Resource ID",
+        // "Project",
         "IP Address",
         "Status",
       ],
@@ -565,8 +565,8 @@ export default function AuditPage() {
         getActionDisplay(log.action).label,
         log.resource_type,
         log.resource_name,
-        log.resource_id,
-        log.project_name || "",
+        // log.resource_id,
+        // log.project_name || "",
         log.ip_address || "",
         log.status,
       ]),
@@ -612,108 +612,151 @@ export default function AuditPage() {
       <style
         dangerouslySetInnerHTML={{
           __html: `
-        /* Custom pagination text color styling for audit page */
+        /* Theme-aware pagination styling for Audit page */
+        .CommonCustomPagination .ant-pagination {
+          color: var(--text-primary) !important;
+        }
+
+        /* Pagination items */
         .CommonCustomPagination .ant-pagination-item a {
-          color: #ffffff !important;
+          color: var(--text-primary) !important;
+        }
+        .CommonCustomPagination .ant-pagination-item-active {
+          background-color: var(--color-purple) !important;
+          border-color: var(--color-purple) !important;
         }
         .CommonCustomPagination .ant-pagination-item-active a {
-          color: #000000 !important;
+          color: #ffffff !important;
         }
-        .CommonCustomPagination .ant-pagination-prev,
-        .CommonCustomPagination .ant-pagination-next {
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: inline-block !important;
-        }
+
+        /* Previous/Next buttons */
         .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
         .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
-          color: #ffffff !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: block !important;
+          color: var(--text-primary) !important;
         }
-        .CommonCustomPagination .ant-pagination-prev button,
-        .CommonCustomPagination .ant-pagination-next button {
-          opacity: 1 !important;
-          visibility: visible !important;
-          color: #ffffff !important;
-        }
-        .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link svg,
-        .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link svg {
-          fill: #ffffff !important;
-          opacity: 1 !important;
-        }
-        .CommonCustomPagination .ant-pagination-prev:not(.ant-pagination-disabled),
-        .CommonCustomPagination .ant-pagination-next:not(.ant-pagination-disabled) {
-          opacity: 1 !important;
-        }
-        .CommonCustomPagination .ant-pagination-disabled .ant-pagination-item-link {
-          color: #666666 !important;
-          opacity: 0.5 !important;
-          visibility: visible !important;
-        }
+
+        /* Size changer and options */
         .CommonCustomPagination .ant-pagination-options {
-          color: #ffffff !important;
+          color: var(--text-primary) !important;
+        }
+        .CommonCustomPagination .ant-pagination-options-size-changer {
+          color: var(--text-primary) !important;
+        }
+        .CommonCustomPagination .ant-pagination-options-size-changer .ant-select {
+          color: var(--text-primary) !important;
         }
         .CommonCustomPagination .ant-select-selector {
-          color: #ffffff !important;
+          background-color: var(--bg-tertiary) !important;
+          border-color: var(--border-secondary) !important;
+          color: var(--text-primary) !important;
+        }
+        .CommonCustomPagination .ant-select-selection-item {
+          color: var(--text-primary) !important;
         }
         .CommonCustomPagination .ant-select-arrow {
-          color: #ffffff !important;
+          color: var(--text-primary) !important;
         }
-        .CommonCustomPagination .ant-pagination-item:hover a {
-          color: #965CDE !important;
+
+        /* Dropdown menu */
+        .ant-select-dropdown {
+          background-color: var(--bg-tertiary) !important;
         }
-        /* Light theme specific - keep numbers white */
+        .ant-select-item {
+          color: var(--text-primary) !important;
+        }
+        .ant-select-item-option-selected {
+          background-color: var(--bg-hover) !important;
+        }
+        .ant-select-item-option-active {
+          background-color: var(--bg-hover) !important;
+        }
+
+        /* Jump input */
+        .CommonCustomPagination .ant-pagination-options-quick-jumper input {
+          background-color: var(--bg-tertiary) !important;
+          border-color: var(--border-secondary) !important;
+          color: var(--text-primary) !important;
+        }
+
+        /* Light theme specific overrides */
         [data-theme="light"] .CommonCustomPagination .ant-pagination-item a {
-          color: #ffffff !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-item-active a {
-          color: #000000 !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next {
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: inline-block !important;
+          color: #1a1a1a !important;
         }
         [data-theme="light"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
         [data-theme="light"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
-          color: #000000 !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: block !important;
+          color: #1a1a1a !important;
         }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:hover .ant-pagination-item-link,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:hover .ant-pagination-item-link {
-          color: #965CDE !important;
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-options {
+          color: #1a1a1a !important;
         }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev button,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next button {
-          opacity: 1 !important;
-          visibility: visible !important;
-          color: #000000 !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link svg,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link svg {
-          fill: #000000 !important;
-          opacity: 1 !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:hover .ant-pagination-item-link svg,
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:hover .ant-pagination-item-link svg {
-          fill: #965CDE !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-prev:not(.ant-pagination-disabled),
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-next:not(.ant-pagination-disabled) {
-          opacity: 1 !important;
-        }
-        [data-theme="light"] .CommonCustomPagination .ant-pagination-disabled .ant-pagination-item-link {
-          color: #666666 !important;
-          opacity: 0.5 !important;
-          visibility: visible !important;
+        [data-theme="light"] .CommonCustomPagination .ant-pagination-options-size-changer {
+          color: #1a1a1a !important;
         }
         [data-theme="light"] .CommonCustomPagination .ant-select-selector {
+          background-color: #fafafa !important;
+          border-color: #d0d0d0 !important;
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-select-selection-item {
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .CommonCustomPagination .ant-select-arrow {
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .ant-select-dropdown {
+          background-color: #fafafa !important;
+        }
+        [data-theme="light"] .ant-select-item {
+          color: #1a1a1a !important;
+        }
+        [data-theme="light"] .ant-select-item-option-selected {
+          background-color: #f0f0f0 !important;
+        }
+        [data-theme="light"] .ant-select-item-option-active {
+          background-color: #f0f0f0 !important;
+        }
+
+        /* Dark theme specific overrides */
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-item a {
           color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-prev .ant-pagination-item-link,
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-next .ant-pagination-item-link {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-options {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-pagination-options-size-changer {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-select-selector {
+          background-color: #1f1f1f !important;
+          border-color: #2f2f2f !important;
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-select-selection-item {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .CommonCustomPagination .ant-select-arrow {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .ant-select-dropdown {
+          background-color: #1f1f1f !important;
+        }
+        [data-theme="dark"] .ant-select-item {
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .ant-select-item-option-selected {
+          background-color: #2f2f2f !important;
+        }
+        [data-theme="dark"] .ant-select-item-option-active {
+          background-color: #2f2f2f !important;
+        }
+
+        /* Disabled states */
+        .CommonCustomPagination .ant-pagination-disabled .ant-pagination-item-link {
+          color: var(--text-disabled) !important;
         }
       `,
         }}
@@ -916,7 +959,7 @@ export default function AuditPage() {
                 <Skeleton active paragraph={{ rows: 8 }} />
               </div>
             ) : (
-              <div>
+              <div className="pb-6">
                 <div className="flex items-center gap-2 mb-3 hidden">
                   <ClockCircleOutlined className="text-bud-text-disabled" />
                   {dayFilter.map((item: any) => (
@@ -951,7 +994,7 @@ export default function AuditPage() {
                   }
                 />
                 {/* Pagination */}
-                <div className="flex justify-end my-4 px-3  CommonCustomPagination">
+                <div className="flex justify-end mt-4 mr-4 CommonCustomPagination">
                   <Pagination
                     className="small-pagination"
                     current={currentPage}

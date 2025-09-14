@@ -110,7 +110,7 @@ function ChartCard({
 }) {
   return (
     <div
-      className={`p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] w-full h-[${height}] flex items-center justify-between flex-col`}
+      className={`p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] w-full h-[${height}] min-h-[350px] flex items-center justify-between flex-col`}
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-color)",
@@ -241,6 +241,15 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
   filters,
 }) => {
   const { effectiveTheme } = useTheme();
+
+  // Helper function to get the correct project name based on viewBy setting
+  const getProjectName = (item: any): string => {
+    // When viewBy is 'project', use api_key_project_name if available
+    if (viewBy === 'project' && item.api_key_project_name) {
+      return item.api_key_project_name;
+    }
+    return item.project_name || "Unknown";
+  };
   const {
     fetchMetricsTabData,
     isLoading: metricsLoading,
@@ -375,6 +384,8 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
     const p99Latency = summaryMetrics?.summary?.p99_latency?.value || 0;
     const totalCost = summaryMetrics?.summary?.total_cost?.value || 0;
     const totalTokens = summaryMetrics?.summary?.total_tokens?.value || 0;
+    const totalInputTokens = summaryMetrics?.summary?.total_input_tokens?.value || 0;
+    const totalOutputTokens = summaryMetrics?.summary?.total_output_tokens?.value || 0;
     const avgTTFT = summaryMetrics?.summary?.ttft_avg?.value || 0;
     const p95TTFT = summaryMetrics?.summary?.ttft_p95?.value || 0;
     const throughputAvg = summaryMetrics?.summary?.throughput_avg?.value || 0;
@@ -560,7 +571,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           // Create a key for the group based on available identifiers
           const groupKey =
             group.model_name ||
-            group.project_name ||
+            (viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name) ||
             group.endpoint_name ||
             "Unknown";
 
@@ -622,7 +633,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           // Get the name based on what's available in the group
           const name =
             group.model_name ||
-            group.project_name ||
+            (viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name) ||
             group.endpoint_name ||
             "Unknown";
           const count = group.metrics?.total_requests?.value || 0;
@@ -757,7 +768,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
       requestsTimeSeries.groups.forEach((group: any) => {
         const groupKey =
           group.model_name ||
-          group.project_name ||
+          (viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name) ||
           group.endpoint_name ||
           "Unknown";
         const hourlyMap = new Map<number, number>();
@@ -788,8 +799,8 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
         let groupKey = "Unknown";
         if (group.model_name) {
           groupKey = group.model_name;
-        } else if (group.project_name) {
-          groupKey = group.project_name;
+        } else if (group.project_name || group.api_key_project_name) {
+          groupKey = viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name;
         } else if (group.endpoint_name) {
           groupKey = group.endpoint_name;
         } else if (group.user_id) {
@@ -969,8 +980,8 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
       p99Latency,
       totalCost,
       totalTokens,
-      totalInputTokens: totalTokens / 2, // Approximate
-      totalOutputTokens: totalTokens / 2,
+      totalInputTokens,
+      totalOutputTokens,
       requestsPerHour,
       avgTTFT,
       p95TTFT,
@@ -1265,7 +1276,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
         case "deployment":
           return item.endpoint_name || "Unknown";
         case "project":
-          return item.project_name || "Unknown";
+          return item.api_key_project_name || item.project_name || "Unknown";
         case "user":
           // For now using project as proxy for user since user data is not available
           return item.project_name || "Unknown";
@@ -1620,6 +1631,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           <ChartCard
             title="Request Volume Over Time"
             subtitle={`Hourly distribution by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedHourlyData).length > 0 ? (
               <MultiSeriesLineChart
@@ -1658,6 +1670,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           <ChartCard
             title="Latency Distribution"
             subtitle={`Response time ranges by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedLatencyData).length > 0 ? (
               <GroupedBarChart
@@ -1718,11 +1731,12 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
       </Row>
 
       {/* Performance Metrics Row */}
-      <Row gutter={[16, 16]} className="mb-6">
+      <Row gutter={[16, 16]} className="mb-6 ">
         <Col xs={24} md={12}>
           <ChartCard
             title="Request Latency Over Time"
             subtitle={`Average latency by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedLatencyOverTime).length > 0 ? (
               <MultiSeriesLineChart
@@ -1793,6 +1807,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           <ChartCard
             title="Token Usage Over Time"
             subtitle={`Total tokens by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedTokensOverTime).length > 0 ? (
               <MultiSeriesLineChart
@@ -1858,6 +1873,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           <ChartCard
             title="Requests Per Second"
             subtitle={`Throughput by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedRequestsPerSecond).length > 0 ? (
               <MultiSeriesLineChart
@@ -1917,6 +1933,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           <ChartCard
             title="Time to First Token (TTFT)"
             subtitle={`Stream response metrics by ${viewBy}`}
+            height="100%"
           >
             {Object.keys(metrics.groupedTTFTOverTime).length > 0 ? (
               <MultiSeriesLineChart
@@ -1995,7 +2012,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
         {viewBy === "model" && (
           <Col xs={24} md={12}>
             <div
-              className="p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] h-[22rem]"
+              className="p-[1.55rem] py-[2rem] rounded-[6.403px] border-[1.067px] h-[24rem]"
               style={{
                 backgroundColor: "var(--bg-card)",
                 borderColor: "var(--border-color)",
@@ -2007,7 +2024,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topModels}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2053,7 +2070,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topEndpoints}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2099,7 +2116,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topProjects}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2146,7 +2163,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topModels}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2192,7 +2209,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
               </Text_19_600_EEEEEE>
               <List
                 dataSource={metrics.topEndpoints}
-                renderItem={(item, index) => (
+                renderItem={(item) => (
                   <List.Item
                     className="border-[var(--border-secondary)] py-2"
                     style={{
@@ -2224,7 +2241,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
         )}
 
         <Col xs={24} md={12}>
-          <ChartCard title="Success/Failure Ratio" height="22rem">
+          <ChartCard title="Success/Failure Ratio" height="100%">
             <div className="flex justify-around items-center h-full">
               <div className="text-center">
                 <CheckCircleOutlined

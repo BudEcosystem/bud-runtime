@@ -33,9 +33,12 @@ from budapp.commons.dependencies import (
     get_user_realm,
     parse_ordering_fields,
 )
-from budapp.commons.exceptions import ClientException
+from budapp.commons.exceptions import BudNotifyException, ClientException
 from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
+from budapp.core.schemas import SubscriberCreate
+from budapp.shared.notification_service import BudNotifyHandler
+from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.schemas import (
     MyPermissions,
     ResetPasswordRequest,
@@ -647,4 +650,92 @@ async def reactivate_user(
         logger.exception(f"Failed to reactivate user: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to reactivate user"
+        ).to_http_response()
+
+
+@user_router.post(
+    "/{user_id}/subscribe",
+    response_model=SuccessResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "User not found",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully subscribed user to notifications",
+        },
+    },
+    description="Subscribe an existing user to notifications (Admin only)",
+)
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
+async def subscribe_user_to_notifications(
+    user_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Subscribe an existing user to notifications.
+
+    This endpoint allows administrators to add existing users as notification subscribers.
+    Only users with USER_MANAGE permission can access this endpoint.
+    """
+    try:
+        user_service = UserService(session)
+
+        # Get the user to subscribe
+        db_user = await user_service.retrieve_active_user(user_id)
+        if not db_user:
+            return ErrorResponse(
+                code=status.HTTP_404_NOT_FOUND, message=f"User with id {user_id} not found"
+            ).to_http_response()
+
+        # Check if user is already a subscriber
+        if db_user.is_subscriber:
+            return SuccessResponse(
+                object="user.subscribe",
+                code=status.HTTP_200_OK,
+                message=f"User {db_user.email} is already a notification subscriber",
+            ).to_http_response()
+
+        # Create subscriber in BudNotify
+        try:
+            subscriber_data = SubscriberCreate(
+                subscriber_id=str(db_user.id),
+                email=db_user.email,
+                first_name=db_user.name,
+            )
+            await BudNotifyHandler().create_subscriber(subscriber_data)
+            logger.info(f"User {db_user.email} added to budnotify subscriber by admin {current_user.email}")
+
+            # Update user's subscriber status
+            await UserDataManager(session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
+
+            return SuccessResponse(
+                object="user.subscribe",
+                code=status.HTTP_200_OK,
+                message=f"Successfully subscribed user {db_user.email} to notifications",
+            ).to_http_response()
+
+        except BudNotifyException as e:
+            logger.error(f"Failed to create notification subscriber for user {db_user.email}: {e}")
+            return ErrorResponse(
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"Failed to create notification subscriber: {str(e)}",
+            ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to subscribe user to notifications: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to subscribe user to notifications: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to subscribe user to notifications"
         ).to_http_response()

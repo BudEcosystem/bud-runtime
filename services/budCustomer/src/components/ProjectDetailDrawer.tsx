@@ -191,8 +191,8 @@ export const ProjectDetailContent: React.FC<{
               {/* Project Information */}
               <Row gutter={[16, 16]} className="px-[1.4rem] mt-[1rem]">
                 <Col span={24}>
-                  <div className="flex items-center justify-between py-[1rem]">
-                    <Text className="text-gray-400">Tags</Text>
+                  <div className="flex items-center justify-start py-[1rem]">
+                    <Text className="text-gray-400">Tags: &nbsp;</Text>
                     <Space wrap>
                       {project.tags && project.tags.length > 0 ? (
                         project.tags.map((tag, index) => (
@@ -214,7 +214,7 @@ export const ProjectDetailContent: React.FC<{
                 <Col span={24} className="mb-[1rem]">
                   <div className="flex items-center justify-start">
                     <Text className="text-gray-400">Api Keys: &nbsp;</Text>
-                    <Text className="text-white">
+                    <Text className="text-[black] dark:text-white">
                       {project.credentials_count || 0}
                     </Text>
                   </div>
@@ -222,19 +222,19 @@ export const ProjectDetailContent: React.FC<{
 
                 {project.credentials && project.credentials.length > 0 && (
                   <Col span={24} className="mb-[1.5rem]">
-                    <div className="bg-[#1F1F1F50] rounded-lg p-3">
-                      <Text className="text-gray-400 text-xs mb-2 block">
+                    <div className="bg-gray-100 dark:bg-[#1F1F1F50] rounded-lg p-3">
+                      <Text className="text-gray-600 dark:text-gray-400 text-xs mb-2 block">
                         Available API Keys
                       </Text>
                       {project.credentials.map((credential) => (
                         <div
                           key={credential.id}
-                          className="flex items-center justify-between py-2 border-b border-[#2a2a3e] last:border-0"
+                          className="flex items-center justify-between py-2 border-b border-gray-300 dark:border-[#2a2a3e] last:border-0"
                         >
-                          <Text className="text-white text-sm">
+                          <Text className="text-gray-900 dark:text-white text-sm">
                             {credential.name}
                           </Text>
-                          <Text className="text-gray-500 text-xs">
+                          <Text className="text-gray-600 dark:text-gray-500 text-xs">
                             {credential.last_used_at
                               ? `Last used: ${dayjs(credential.last_used_at).format("MMM DD, YYYY HH:mm")}`
                               : "Never used"}

@@ -3496,7 +3496,7 @@ const editApiKey: DrawerFlowType = {
           title: "Edit Key",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
   ],
 };
