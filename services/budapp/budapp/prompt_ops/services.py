@@ -669,6 +669,15 @@ class PromptWorkflowService(SessionMixin):
                 if step.data:
                     merged_data.update(step.data)
 
+            # Ensure uniqueness
+            db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+                PromptModel, {"name": merged_data["name"], "status": PromptStatusEnum.ACTIVE}, missing_ok=True
+            )
+            if db_prompt:
+                raise ClientException(
+                    message="Prompt with this name already exists", status_code=status.HTTP_400_BAD_REQUEST
+                )
+
             # Copy prompt configuration from temporary to permanent storage
             # This removes the 24hr expiry from the Redis configuration
             if merged_data.get("bud_prompt_id") and merged_data.get("name"):
