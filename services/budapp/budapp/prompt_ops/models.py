@@ -56,15 +56,7 @@ class Prompt(Base, TimestampMixin):
     auto_scale: Mapped[bool] = mapped_column(Boolean, default=False)
     caching: Mapped[bool] = mapped_column(Boolean, default=False)
     concurrency: Mapped[list[int]] = mapped_column(PG_ARRAY(Integer), nullable=True)
-    rate_limit_type: Mapped[str] = mapped_column(
-        Enum(
-            RateLimitTypeEnum,
-            name="rate_limit_type_enum",
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=False,
-        default=RateLimitTypeEnum.DISABLED,
-    )
+    rate_limit: Mapped[bool] = mapped_column(Boolean, default=False)
     rate_limit_value: Mapped[int] = mapped_column(Integer, nullable=True)
     default_version_id: Mapped[UUID] = mapped_column(
         ForeignKey("prompt_version.id", ondelete="SET NULL", use_alter=True), nullable=True

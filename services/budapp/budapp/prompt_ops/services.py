@@ -35,7 +35,6 @@ from ..commons.constants import (
     PromptStatusEnum,
     PromptTypeEnum,
     PromptVersionStatusEnum,
-    RateLimitTypeEnum,
     VisibilityEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
@@ -319,7 +318,7 @@ class PromptWorkflowService(SessionMixin):
         auto_scale = request.auto_scale
         caching = request.caching
         concurrency = request.concurrency
-        rate_limit_type = request.rate_limit_type
+        rate_limit = request.rate_limit
         rate_limit_value = request.rate_limit_value
         prompt_schema = request.prompt_schema
 
@@ -443,7 +442,7 @@ class PromptWorkflowService(SessionMixin):
             auto_scale=auto_scale,
             caching=caching,
             concurrency=concurrency,
-            rate_limit_type=rate_limit_type.value if rate_limit_type else None,
+            rate_limit=rate_limit,
             rate_limit_value=rate_limit_value,
             prompt_schema=prompt_schema,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
@@ -478,7 +477,7 @@ class PromptWorkflowService(SessionMixin):
                 "auto_scale",
                 "caching",
                 "concurrency",
-                "rate_limit_type",
+                "rate_limit",
                 "rate_limit_value",
             ]
 
@@ -512,7 +511,7 @@ class PromptWorkflowService(SessionMixin):
                     auto_scale=merged_data.get("auto_scale", False),
                     caching=merged_data.get("caching", False),
                     concurrency=merged_data.get("concurrency"),
-                    rate_limit_type=merged_data.get("rate_limit_type", RateLimitTypeEnum.DISABLED.value),
+                    rate_limit=merged_data.get("rate_limit", False),
                     rate_limit_value=merged_data.get("rate_limit_value"),
                     status=PromptStatusEnum.ACTIVE,
                     created_by=current_user_id,

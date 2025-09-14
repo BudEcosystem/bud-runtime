@@ -209,7 +209,7 @@ class WorkflowService(SessionMixin):
             auto_scale = required_data.get("auto_scale")
             caching = required_data.get("caching")
             concurrency = required_data.get("concurrency")
-            rate_limit_type = required_data.get("rate_limit_type")
+            rate_limit = required_data.get("rate_limit")
             rate_limit_value = required_data.get("rate_limit_value")
             bud_prompt_id = required_data.get("bud_prompt_id")
             bud_prompt_version = required_data.get("bud_prompt_version")
@@ -374,7 +374,7 @@ class WorkflowService(SessionMixin):
                 auto_scale=auto_scale if auto_scale else None,
                 caching=caching if caching else None,
                 concurrency=concurrency if concurrency else None,
-                rate_limit_type=rate_limit_type if rate_limit_type else None,
+                rate_limit=rate_limit if rate_limit else None,
                 rate_limit_value=rate_limit_value if rate_limit_value else None,
                 bud_prompt_id=bud_prompt_id if bud_prompt_id else None,
                 bud_prompt_version=bud_prompt_version if bud_prompt_version else None,
@@ -543,7 +543,7 @@ class WorkflowService(SessionMixin):
                 "auto_scale",
                 "caching",
                 "concurrency",
-                "rate_limit_type",
+                "rate_limit",
                 "rate_limit_value",
                 "prompt_schema",
             ],

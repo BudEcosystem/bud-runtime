@@ -105,7 +105,7 @@ class RetrieveWorkflowStepData(BaseModel):
     auto_scale: bool | None = None
     caching: bool | None = None
     concurrency: list[int] | None = None
-    rate_limit_type: RateLimitTypeEnum | None = None
+    rate_limit: bool | None = None
     rate_limit_value: int | None = None
     bud_prompt_id: str | None = None
     bud_prompt_version: int | str | None = None

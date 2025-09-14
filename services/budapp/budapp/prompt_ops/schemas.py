@@ -28,7 +28,6 @@ from ..commons.constants import (
     PromptStatusEnum,
     PromptTypeEnum,
     PromptVersionStatusEnum,
-    RateLimitTypeEnum,
 )
 from ..commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 from ..endpoint_ops.schemas import EndpointResponse
@@ -262,8 +261,8 @@ class CreatePromptWorkflowRequest(BaseModel):
     auto_scale: bool | None = None
     caching: bool | None = None
     concurrency: list[int] | None = None  # [min, max]
-    rate_limit_type: RateLimitTypeEnum | None = None
-    rate_limit_value: int | None = None
+    rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
+    rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
     prompt_schema: PromptSchemaConfig | None = None
 
     @model_validator(mode="after")
@@ -272,9 +271,9 @@ class CreatePromptWorkflowRequest(BaseModel):
         if self.workflow_id is None and self.workflow_total_steps is None:
             raise ValueError("workflow_total_steps is required when workflow_id is not provided")
 
-        # Validate rate_limit_value when type is CUSTOM
-        if self.rate_limit_type == RateLimitTypeEnum.CUSTOM and self.rate_limit_value is None:
-            raise ValueError("rate_limit_value is required when rate_limit_type is CUSTOM")
+        # Validate rate_limit_value when rate_limit is enabled
+        if self.rate_limit and not self.rate_limit_value:
+            raise ValueError("rate_limit_value is required when rate_limit is enabled")
 
         # Validate concurrency array length and values
         if self.concurrency is not None:
@@ -300,8 +299,8 @@ class CreatePromptWorkflowSteps(BaseModel):
     auto_scale: bool | None = None
     caching: bool | None = None
     concurrency: list[int] | None = None  # [min, max]
-    rate_limit_type: RateLimitTypeEnum | None = None
-    rate_limit_value: int | None = None
+    rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
+    rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
     prompt_schema: PromptSchemaConfig | None = None
 
 
@@ -356,7 +355,7 @@ class PromptResponse(BaseModel):
     auto_scale: bool
     caching: bool
     concurrency: list[int] | None
-    rate_limit_type: str
+    rate_limit: bool
     rate_limit_value: int | None
     default_version: PromptVersionResponse
     status: str
