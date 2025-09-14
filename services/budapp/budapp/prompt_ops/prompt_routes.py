@@ -41,6 +41,8 @@ from .schemas import (
     CreatePromptWorkflowRequest,
     EditPromptRequest,
     EditPromptVersionRequest,
+    PromptConfigRequest,
+    PromptConfigResponse,
     PromptFilter,
     PromptListItem,
     PromptListResponse,
@@ -565,4 +567,59 @@ async def create_prompt_schema_workflow(
         logger.exception(f"Failed to create prompt schema workflow: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to create prompt schema workflow"
+        ).to_http_response()
+
+
+@router.post(
+    "/prompt-config",
+    responses={
+        status.HTTP_200_OK: {
+            "model": PromptConfigResponse,
+            "description": "Successfully saved prompt configuration",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Save or update prompt configuration in Redis via budprompt service",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def save_prompt_config(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: PromptConfigRequest,
+) -> Union[PromptConfigResponse, ErrorResponse]:
+    """Save or update prompt configuration.
+
+    This endpoint forwards the configuration request to the budprompt service
+    which stores the configuration in Redis. The configuration can be used
+    for structured prompt execution with validation and retry capabilities.
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        request: The prompt configuration request containing messages, model settings, etc.
+
+    Returns:
+        PromptConfigResponse with the prompt_id or ErrorResponse on failure
+    """
+    try:
+        # Create service instance and save prompt config
+        prompt_service = PromptService(session)
+        response = await prompt_service.save_prompt_config(request)
+
+        return response.to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to save prompt configuration: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to save prompt configuration: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to save prompt configuration"
         ).to_http_response()

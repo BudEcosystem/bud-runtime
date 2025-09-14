@@ -59,6 +59,8 @@ from .models import PromptVersion as PromptVersionModel
 from .schemas import (
     CreatePromptWorkflowRequest,
     CreatePromptWorkflowSteps,
+    PromptConfigRequest,
+    PromptConfigResponse,
     PromptFilter,
     PromptListItem,
     PromptResponse,
@@ -225,6 +227,75 @@ class PromptService(SessionMixin):
         prompt_response = PromptResponse.model_validate(db_prompt)
 
         return prompt_response
+
+    async def save_prompt_config(self, request: PromptConfigRequest) -> PromptConfigResponse:
+        """Save prompt configuration by forwarding request to budprompt service.
+
+        Args:
+            request: The prompt configuration request
+
+        Returns:
+            PromptConfigResponse containing the bud_prompt_id and bud_prompt_version
+        """
+        # Perform the request to budprompt service
+        response_data = await self._perform_prompt_config_request(request)
+
+        # Extract prompt_id and version from the response
+        prompt_id = response_data.get("prompt_id")
+        version = response_data.get("version")
+
+        # Create and return response
+        return PromptConfigResponse(
+            bud_prompt_id=prompt_id,
+            bud_prompt_version=version,
+            message="Prompt configuration saved successfully",
+            code=status.HTTP_200_OK,
+        )
+
+    async def _perform_prompt_config_request(self, request: PromptConfigRequest) -> Dict[str, Any]:
+        """Perform prompt configuration request to budprompt service.
+
+        Args:
+            request: The prompt configuration request
+
+        Returns:
+            Response data from budprompt service
+        """
+        prompt_config_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config"
+        )
+
+        # Convert request to dict, excluding None values
+        payload = request.model_dump(exclude_none=True)
+
+        logger.debug(f"Performing prompt config request to budprompt: {payload}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(prompt_config_endpoint, json=payload) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        logger.error(f"Failed to save prompt config: {response.status} {response_data}")
+                        raise ClientException(
+                            message=response_data.get("message", "Failed to save prompt configuration"),
+                            status_code=response.status,
+                        )
+
+                    logger.debug(f"Successfully saved prompt config: {response_data}")
+                    return response_data
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Network error during prompt config request: {e}")
+            raise ClientException(
+                message="Network error while saving prompt configuration",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            ) from e
+        except Exception as e:
+            logger.exception(f"Failed to send prompt config request: {e}")
+            raise ClientException(
+                message="Failed to save prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
 
 
 class PromptWorkflowService(SessionMixin):
