@@ -104,13 +104,16 @@ async def process_document_ocr(
         # Process the document with optional token
         result = await document_service.process_document(request, api_token=api_token)
 
-        # Check if processing failed and bubble up the error
+        # Check if processing failed - return gracefully with empty pages
         if result.status == DocumentStatus.FAILED:
             error_msg = result.error_message or "Document processing failed"
-            logger.error(f"OCR processing failed: {error_msg}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=error_msg,
+            logger.warning(f"OCR processing failed gracefully: {error_msg}")
+            # Return empty result instead of raising exception for graceful error handling
+            return OCRResponse(
+                document_id=result.document_id,
+                model=request.model,
+                pages=[],  # Return empty pages on failure
+                usage_info=result.usage_info or UsageInfo(pages_processed=0, size_bytes=0, filename="unknown"),
             )
 
         # Return OCR response in Mistral format
