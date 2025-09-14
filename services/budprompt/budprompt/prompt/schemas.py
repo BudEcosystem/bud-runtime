@@ -305,6 +305,7 @@ class PromptSchemaResponse(ResponseBase):
     object: lowercase_string = "prompt_schema"
     workflow_id: UUID
     prompt_id: str = Field(..., description="Unique identifier for the prompt configuration")
+    version: int = Field(..., description="The version of the prompt configuration that was saved")
     created: int = Field(default_factory=lambda: int(time.time()))
 
 
@@ -425,6 +426,7 @@ class PromptConfigResponse(SuccessResponse):
     """Response model for prompt configuration."""
 
     prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")
+    version: int = Field(..., description="The version of the prompt configuration that was saved")
 
 
 class PromptConfigGetResponse(SuccessResponse):

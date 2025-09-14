@@ -755,7 +755,11 @@ class PromptConfigurationService:
             request.source,
         )
 
-        response = PromptSchemaResponse(workflow_id=workflow_id, prompt_id=request.prompt_id)
+        # Extract version from request, default to 1 if not provided
+        request_dict = request.model_dump(exclude_unset=True)
+        version = request_dict.get("version", 1)
+
+        response = PromptSchemaResponse(workflow_id=workflow_id, prompt_id=request.prompt_id, version=version)
 
         notification_request.payload.event = "results"
         notification_request.payload.content = NotificationContent(
@@ -861,6 +865,7 @@ class PromptService:
                 code=200,
                 message="Prompt configuration saved successfully",
                 prompt_id=request.prompt_id,
+                version=version,
             )
 
         except json.JSONDecodeError as e:
