@@ -65,7 +65,7 @@ repos:
     hooks:
       - id: mypy
         types_or: [python, pyi]
-        files: ^services/(ask-bud)/ # TODO: add budapp|budmetrics|budcluster|budsim|budmodel|budnotify back
+        files: ^services/(ask-bud|buddoc)/ # TODO: add budapp|budmetrics|budcluster|budsim|budmodel|budnotify back
         exclude: ^services/.*/(setup\.py|tests/conftest\.py|alembic/.*\.py)$
         additional_dependencies:
           - "pydantic>=1.10.4"
@@ -168,7 +168,7 @@ repos:
     hooks:
       - id: bandit
         args: [-r, -ll, --skip, "B608,B113,B104,B310,B103"]  # Temporarily skip SQL injection, timeout, bind, and file permission checks
-        files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud)/.*\.py$
+        files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud|buddoc)/.*\.py$
 
 
 default_stages: [pre-commit]
