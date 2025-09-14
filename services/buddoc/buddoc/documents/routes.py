@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional
 from budmicroframe.commons import logging
 from fastapi import APIRouter, Header, HTTPException, status
 
+from ..commons.config import app_settings
 from .schemas import (
     DocumentStatus,
     OCRRequest,

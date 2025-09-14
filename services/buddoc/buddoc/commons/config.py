@@ -39,7 +39,7 @@ class AppConfig(BaseAppConfig):
     vlm_api_url: str = Field(..., description="VLM API endpoint")
     vlm_model_name: str = Field(default="smoldocling-256m-preview-mlx-docling-snap", description="VLM model name")
     vlm_api_timeout: int = Field(default=90, description="VLM API timeout in seconds")
-    vlm_response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN, description="VLM response format")
+    vlm_response_format: str = Field(default="markdown", description="VLM response format")
 
     # Document Processing Configuration
     max_file_size_mb: int = Field(default=50, description="Maximum file size in MB")

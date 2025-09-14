@@ -75,6 +75,9 @@ class DocumentService:
         try:
             # Handle data URI format (e.g., "data:application/pdf;base64,...")
             if base64_string.startswith("data:"):
+                # Check if comma exists before splitting
+                if "," not in base64_string:
+                    raise ValueError("Invalid data URI format: missing comma separator")
                 # Extract the base64 part after the comma
                 _, base64_string = base64_string.split(",", 1)
             return base64.b64decode(base64_string)
