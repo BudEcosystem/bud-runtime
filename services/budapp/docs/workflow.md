@@ -398,6 +398,7 @@ curl --location 'https://<base_url>/clusters/clusters' \
   "concurrency": [10, 100],
   "rate_limit": true,
   "rate_limit_value": 10,
+  "bud_prompt_id": "test-1234",
   "trigger_workflow": true
 }
 ```

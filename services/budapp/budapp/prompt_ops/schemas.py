@@ -264,6 +264,7 @@ class CreatePromptWorkflowRequest(BaseModel):
     rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
     rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
     prompt_schema: PromptSchemaConfig | None = None
+    bud_prompt_id: str | None = None
 
     @model_validator(mode="after")
     def validate_fields(self):
@@ -302,6 +303,7 @@ class CreatePromptWorkflowSteps(BaseModel):
     rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
     rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
     prompt_schema: PromptSchemaConfig | None = None
+    bud_prompt_id: str | None = None
 
 
 class EditPromptRequest(BaseModel):
@@ -560,3 +562,16 @@ class PromptConfigGetResponse(SuccessResponse):
 
     prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")
     data: PromptConfigurationData = Field(..., description="The prompt configuration data")
+
+
+class PromptConfigCopyRequest(BaseModel):
+    """Request model for copying prompt configuration from budprompt."""
+
+    source_prompt_id: str = Field(..., description="Source prompt ID to copy from")
+    source_version: int = Field(..., ge=1, description="Source version number to copy")
+    target_prompt_id: str = Field(..., description="Target prompt ID to copy to")
+    target_version: int = Field(..., ge=1, description="Target version number to save as")
+    replace: bool = Field(
+        True, description="If true, replace entire target config. If false, merge only fields present in source"
+    )
+    set_as_default: bool = Field(True, description="Whether to set the copied version as default for target prompt")

@@ -58,6 +58,7 @@ from .models import PromptVersion as PromptVersionModel
 from .schemas import (
     CreatePromptWorkflowRequest,
     CreatePromptWorkflowSteps,
+    PromptConfigCopyRequest,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -377,6 +378,82 @@ class PromptService(SessionMixin):
                 message="Failed to retrieve prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
+    async def _copy_prompt_config(self, request: PromptConfigCopyRequest) -> Dict[str, Any]:
+        """Copy prompt configuration from source to target.
+
+        Calls budprompt service to copy configuration from temporary (with expiry)
+        to permanent storage (without expiry).
+
+        Args:
+            request: The copy configuration request
+
+        Returns:
+            PromptConfigCopyResponse with copy details
+
+        Raises:
+            ClientException: If copy operation fails
+        """
+        try:
+            # Call budprompt service to copy the configuration
+            return await self._perform_copy_prompt_config_request(request)
+        except ClientException:
+            raise  # Re-raise ClientException as-is
+        except Exception as e:
+            logger.exception(f"Failed to copy prompt config: {e}")
+            raise ClientException(
+                message="Failed to copy prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def _perform_copy_prompt_config_request(self, request: PromptConfigCopyRequest) -> Dict[str, Any]:
+        """Perform the actual copy-config request to budprompt service via Dapr.
+
+        Args:
+            request: The copy configuration request
+
+        Returns:
+            Response data from budprompt service
+
+        Raises:
+            ClientException: If request fails
+        """
+        copy_config_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/copy-config"
+        )
+
+        # Convert request to dict, excluding None values
+        payload = request.model_dump(exclude_none=True)
+
+        logger.debug(f"Performing copy config request to budprompt: {payload}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(copy_config_endpoint, json=payload) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        logger.error(f"Failed to copy prompt config: {response.status} {response_data}")
+                        raise ClientException(
+                            message=response_data.get("message", "Failed to copy prompt configuration"),
+                            status_code=response.status,
+                        )
+
+                    logger.debug(f"Successfully copied prompt config: {response_data}")
+                    return response_data
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Network error during copy prompt config request: {e}")
+            raise ClientException(
+                message="Network error while copying prompt configuration",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            ) from e
+        except ClientException:
+            raise  # Re-raise ClientException as-is
+        except Exception as e:
+            logger.exception(f"Failed to copy prompt config: {e}")
+            raise ClientException(
+                message="Failed to copy prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
 
 class PromptWorkflowService(SessionMixin):
     """Service for managing prompt workflows."""
@@ -402,6 +479,7 @@ class PromptWorkflowService(SessionMixin):
         rate_limit = request.rate_limit
         rate_limit_value = request.rate_limit_value
         prompt_schema = request.prompt_schema
+        bud_prompt_id = request.bud_prompt_id
 
         # Retrieve or create workflow
         workflow_create = WorkflowUtilCreate(
@@ -526,6 +604,7 @@ class PromptWorkflowService(SessionMixin):
             rate_limit=rate_limit,
             rate_limit_value=rate_limit_value,
             prompt_schema=prompt_schema,
+            bud_prompt_id=bud_prompt_id,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Create or update workflow step
@@ -560,6 +639,7 @@ class PromptWorkflowService(SessionMixin):
                 "concurrency",
                 "rate_limit",
                 "rate_limit_value",
+                "bud_prompt_id",
             ]
 
             # from workflow steps extract necessary information
@@ -570,7 +650,15 @@ class PromptWorkflowService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = ["name", "project_id", "endpoint_id", "concurrency", "model_id", "cluster_id"]
+            required_keys = [
+                "name",
+                "project_id",
+                "endpoint_id",
+                "concurrency",
+                "model_id",
+                "cluster_id",
+                "bud_prompt_id",
+            ]
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
@@ -580,6 +668,30 @@ class PromptWorkflowService(SessionMixin):
             for step in db_workflow_steps:
                 if step.data:
                     merged_data.update(step.data)
+
+            # Copy prompt configuration from temporary to permanent storage
+            # This removes the 24hr expiry from the Redis configuration
+            if merged_data.get("bud_prompt_id") and merged_data.get("name"):
+                try:
+                    prompt_service = PromptService(self.session)
+                    copy_request = PromptConfigCopyRequest(
+                        source_prompt_id=merged_data.get("bud_prompt_id"),
+                        source_version=1,
+                        target_prompt_id=merged_data.get("name"),
+                        target_version=1,
+                        replace=True,
+                        set_as_default=True,
+                    )
+                    await prompt_service._copy_prompt_config(copy_request)
+                    logger.debug(
+                        f"Successfully copied prompt config from {merged_data.get('bud_prompt_id')} to {merged_data.get('name')}"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to copy prompt configuration: {e}")
+                    raise ClientException(
+                        message="Failed to copy prompt configuration",
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
 
             # Create prompt
             db_prompt = await PromptDataManager(self.session).insert_one(
