@@ -41,6 +41,7 @@ from .schemas import (
     CreatePromptWorkflowRequest,
     EditPromptRequest,
     EditPromptVersionRequest,
+    PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
     PromptFilter,
@@ -622,4 +623,60 @@ async def save_prompt_config(
         logger.exception(f"Failed to save prompt configuration: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to save prompt configuration"
+        ).to_http_response()
+
+
+@router.get(
+    "/prompt-config/{prompt_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": PromptConfigGetResponse,
+            "description": "Successfully retrieved prompt configuration",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Configuration not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Retrieve prompt configuration from Redis via budprompt service",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_prompt_config(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: str,
+    version: Optional[int] = Query(None, description="Version of the configuration to retrieve", ge=1),
+) -> Union[PromptConfigGetResponse, ErrorResponse]:
+    """Get prompt configuration by ID.
+
+    This endpoint retrieves the configuration from the budprompt service
+    which fetches it from Redis. Optionally specify a version number.
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        prompt_id: The unique identifier of the prompt configuration
+        version: Optional version number to retrieve specific version
+
+    Returns:
+        PromptConfigGetResponse with the configuration data or ErrorResponse on failure
+    """
+    try:
+        # Create service instance and get prompt config
+        prompt_service = PromptService(session)
+        response = await prompt_service.get_prompt_config(prompt_id, version)
+
+        return response.to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to retrieve prompt configuration: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve prompt configuration: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve prompt configuration"
         ).to_http_response()

@@ -511,3 +511,52 @@ class PromptConfigResponse(SuccessResponse):
 
     bud_prompt_id: str = Field(..., description="The unique identifier for the prompt configuration from budprompt")
     bud_prompt_version: int = Field(..., ge=1, description="The version of the prompt configuration from budprompt")
+
+
+class PromptConfigurationData(BaseModel):
+    """Schema for prompt configuration data retrieved from budprompt."""
+
+    deployment_name: Optional[str] = Field(None, description="Model deployment name")
+    model_settings: Optional[ModelSettings] = Field(None, description="Model settings")
+    stream: Optional[bool] = Field(None, description="Enable streaming response")
+    input_schema: Optional[Dict[str, Any]] = Field(
+        None, description="JSON schema for structured input (None for unstructured)"
+    )
+    input_validation: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Generated validation codes for input schema",
+    )
+    output_schema: Optional[Dict[str, Any]] = Field(
+        None, description="JSON schema for structured output (None for unstructured)"
+    )
+    output_validation: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Generated validation codes for output schema",
+    )
+    messages: Optional[List[Message]] = Field(
+        None, description="Conversation messages (can include system/developer messages)"
+    )
+    llm_retry_limit: Optional[int] = Field(
+        None, description="Number of LLM retries when validation fails (non-streaming only)"
+    )
+    enable_tools: Optional[bool] = Field(
+        None, description="Enable tool calling capability (requires allow_multiple_calls=true)"
+    )
+    allow_multiple_calls: Optional[bool] = Field(
+        None,
+        description="Allow multiple LLM calls for retries and tool usage. When false, only a single LLM call is made",
+    )
+    system_prompt_role: Optional[Literal["system", "developer", "user"]] = Field(
+        None,
+        description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
+    )
+
+
+class PromptConfigGetResponse(SuccessResponse):
+    """Response model for getting prompt configuration.
+
+    Returns the complete prompt configuration data stored in Redis.
+    """
+
+    prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")
+    data: PromptConfigurationData = Field(..., description="The prompt configuration data")

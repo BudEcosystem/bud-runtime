@@ -17,7 +17,7 @@
 """Business logic services for the prompt ops module."""
 
 from ast import Dict
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 import aiohttp
@@ -58,8 +58,10 @@ from .models import PromptVersion as PromptVersionModel
 from .schemas import (
     CreatePromptWorkflowRequest,
     CreatePromptWorkflowSteps,
+    PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
+    PromptConfigurationData,
     PromptFilter,
     PromptListItem,
     PromptResponse,
@@ -294,6 +296,85 @@ class PromptService(SessionMixin):
             logger.exception(f"Failed to send prompt config request: {e}")
             raise ClientException(
                 message="Failed to save prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def get_prompt_config(self, prompt_id: str, version: Optional[int] = None) -> PromptConfigGetResponse:
+        """Get prompt configuration from budprompt service.
+
+        Args:
+            prompt_id: The prompt configuration identifier
+            version: Optional version number to retrieve
+
+        Returns:
+            PromptConfigGetResponse containing the configuration data
+        """
+        # Perform the request to budprompt service
+        response_data = await self._perform_get_prompt_config_request(prompt_id, version)
+
+        # Parse the configuration data
+        config_data = PromptConfigurationData(**response_data.get("data", {}))
+
+        # Create and return response
+        return PromptConfigGetResponse(
+            prompt_id=response_data.get("prompt_id"),
+            data=config_data,
+            message="Prompt configuration retrieved successfully",
+            code=status.HTTP_200_OK,
+        )
+
+    async def _perform_get_prompt_config_request(
+        self, prompt_id: str, version: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Perform get prompt configuration request to budprompt service.
+
+        Args:
+            prompt_id: The prompt configuration identifier
+            version: Optional version number
+
+        Returns:
+            Response data from budprompt service
+        """
+        # Build the URL with optional version query parameter
+        prompt_config_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config/{prompt_id}"
+
+        # Add version as query parameter if provided
+        params = {}
+        if version is not None:
+            params["version"] = version
+
+        logger.debug(f"Retrieving prompt config from budprompt: prompt_id={prompt_id}, version={version}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(prompt_config_endpoint, params=params) as response:
+                    response_data = await response.json()
+
+                    if response.status == 404:
+                        raise ClientException(
+                            message="Prompt configuration not found", status_code=status.HTTP_404_NOT_FOUND
+                        )
+                    elif response.status != 200:
+                        logger.error(f"Failed to get prompt config: {response.status} {response_data}")
+                        raise ClientException(
+                            message=response_data.get("message", "Failed to retrieve prompt configuration"),
+                            status_code=response.status,
+                        )
+
+                    logger.debug(f"Successfully retrieved prompt config: {prompt_id}")
+                    return response_data
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Network error during get prompt config request: {e}")
+            raise ClientException(
+                message="Network error while retrieving prompt configuration",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            ) from e
+        except ClientException:
+            raise  # Re-raise ClientException as-is
+        except Exception as e:
+            logger.exception(f"Failed to get prompt config: {e}")
+            raise ClientException(
+                message="Failed to retrieve prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
 
