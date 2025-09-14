@@ -19,12 +19,12 @@
 import base64
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 from uuid import uuid4
 
-import aiofiles
+import aiofiles  # type: ignore[import-untyped]
 import httpx
 from budmicroframe.commons import logging
 from docling.datamodel.base_models import InputFormat
@@ -54,7 +54,7 @@ logger = logging.get_logger(__name__)
 class DocumentService:
     """Service for document processing and OCR using VLM."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the document service."""
         self.converter = DocumentConverter()
 
@@ -293,8 +293,12 @@ class DocumentService:
                 for i, page in enumerate(result.pages, 1):
                     # Get page text from VLM response
                     page_text = ""
-                    if (hasattr(page, "predictions") and hasattr(page.predictions, "vlm_response") and
-                        page.predictions.vlm_response and page.predictions.vlm_response.text):
+                    if (
+                        hasattr(page, "predictions")
+                        and hasattr(page.predictions, "vlm_response")
+                        and page.predictions.vlm_response
+                        and page.predictions.vlm_response.text
+                    ):
                         page_text = page.predictions.vlm_response.text.strip()
 
                     pages.append(
@@ -329,7 +333,7 @@ class DocumentService:
                 # Legacy fields for compatibility
                 extracted_text=extracted_text,
                 extracted_tables=[],
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
 
         except HTTPException:
@@ -349,7 +353,7 @@ class DocumentService:
                     filename=filename,
                 ),
                 error_message=str(e),
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
         finally:
             # Clean up temporary file

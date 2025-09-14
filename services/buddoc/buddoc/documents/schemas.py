@@ -81,7 +81,7 @@ class DocumentInput(BaseModel):
     image_url: Optional[str] = Field(default=None, description="Image URL or base64 data URI")
 
     @model_validator(mode="after")
-    def validate_document_field(self):
+    def validate_document_field(self) -> "DocumentInput":
         """Ensure the correct field is provided based on type."""
         if self.type == DocumentType.DOCUMENT_URL:
             if not self.document_url:

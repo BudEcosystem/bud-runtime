@@ -16,7 +16,7 @@
 
 """API routes for document processing and OCR operations."""
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from budmicroframe.commons import logging
 from fastapi import APIRouter, Header, HTTPException, status
@@ -24,6 +24,7 @@ from fastapi import APIRouter, Header, HTTPException, status
 from .schemas import (
     OCRRequest,
     OCRResponse,
+    UsageInfo,
 )
 from .services import DocumentService
 
@@ -106,7 +107,8 @@ async def process_document_ocr(
             document_id=result.document_id,
             model=request.model,
             pages=result.pages,
-            usage_info=result.usage_info,
+            usage_info=result.usage_info
+            or UsageInfo(pages_processed=len(result.pages), size_bytes=0, filename="unknown"),
         )
 
     except HTTPException:
@@ -131,7 +133,7 @@ async def process_document_ocr(
     summary="Health check",
     description="Check if the document processing service is healthy",
 )
-async def health_check() -> dict:
+async def health_check() -> Dict[str, Any]:
     """Health check endpoint for the document processing service."""
     return {
         "status": "healthy",

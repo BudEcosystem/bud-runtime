@@ -16,6 +16,7 @@
 
 """Manages application and secret configurations, utilizing environment variables and Dapr's configuration store for syncing."""
 
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -45,7 +46,9 @@ class AppConfig(BaseAppConfig):
     allowed_extensions: str = Field(
         default="pdf,docx,pptx,xlsx,png,jpg,jpeg,tiff,html", description="Allowed file extensions"
     )
-    temp_upload_dir: str = Field(default="/tmp/buddoc_uploads", description="Temporary upload directory")
+    temp_upload_dir: str = Field(
+        default_factory=lambda: tempfile.gettempdir() + "/buddoc_uploads", description="Temporary upload directory"
+    )
 
 
 class SecretsConfig(BaseSecretsConfig):
