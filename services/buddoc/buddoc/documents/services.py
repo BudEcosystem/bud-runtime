@@ -76,7 +76,7 @@ class DocumentService:
             # Handle data URI format (e.g., "data:application/pdf;base64,...")
             if base64_string.startswith("data:"):
                 # Extract the base64 part after the comma
-                base64_string = base64_string.split(",", 1)[1]
+                _, base64_string = base64_string.split(",", 1)
             return base64.b64decode(base64_string)
         except Exception as e:
             logger.error(f"Error decoding base64: {e}")

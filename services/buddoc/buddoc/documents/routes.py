@@ -148,5 +148,5 @@ async def health_check() -> Dict[str, Any]:
     return {
         "status": "healthy",
         "service": "buddoc",
-        "version": "1.0.0",
+        "version": app_settings.version,
     }

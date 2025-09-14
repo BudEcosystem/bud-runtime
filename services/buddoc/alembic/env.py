@@ -33,7 +33,7 @@ target_metadata = PSQLBase.metadata
 # ... etc.
 
 
-def get_psql_url() -> PostgresDsn:
+def get_psql_url() -> str:
     if os.getenv("PSQL_HOST") is None or os.getenv("PSQL_PORT") is None or os.getenv("PSQL_DB_NAME") is None:
         raise ValueError("PSQL_HOST, PSQL_PORT, and PSQL_DB_NAME must be set")
 
@@ -42,7 +42,7 @@ def get_psql_url() -> PostgresDsn:
         username=os.getenv("SECRETS_PSQL_USER"),
         password=os.getenv("SECRETS_PSQL_PASSWORD"),
         host=os.getenv("PSQL_HOST"),
-        port=int(os.getenv("PSQL_PORT")),
+        port=int(os.getenv("PSQL_PORT") or 0),
         path=os.getenv("PSQL_DB_NAME"),
     ).__str__()
 
