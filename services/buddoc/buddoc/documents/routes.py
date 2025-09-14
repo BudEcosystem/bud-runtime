@@ -22,6 +22,7 @@ from budmicroframe.commons import logging
 from fastapi import APIRouter, Header, HTTPException, status
 
 from .schemas import (
+    DocumentStatus,
     OCRRequest,
     OCRResponse,
     UsageInfo,
@@ -101,6 +102,15 @@ async def process_document_ocr(
 
         # Process the document with optional token
         result = await document_service.process_document(request, api_token=api_token)
+
+        # Check if processing failed and bubble up the error
+        if result.status == DocumentStatus.FAILED:
+            error_msg = result.error_message or "Document processing failed"
+            logger.error(f"OCR processing failed: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=error_msg,
+            )
 
         # Return OCR response in Mistral format
         return OCRResponse(
