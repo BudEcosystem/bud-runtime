@@ -265,6 +265,7 @@ class QueryBuilder:
         "model": "mid.model_id",
         "project": "mid.project_id",
         "endpoint": "mid.endpoint_id",
+        "user_project": "mid.api_key_project_id",
     }
     _MAPPING_TABLE_ALIAS = {
         "ModelInference": "mi",
@@ -992,7 +993,7 @@ class QueryBuilder:
         frequency_unit: Union[FrequencyUnit, str] = FrequencyUnit.DAY,
         frequency_interval: Optional[int] = None,
         filters: Optional[dict[Literal["model", "project", "endpoint"], Union[list[UUID], UUID]]] = None,
-        group_by: Optional[list[Literal["model", "project", "endpoint"]]] = None,
+        group_by: Optional[list[Literal["model", "project", "endpoint", "user_project"]]] = None,
         return_delta: bool = False,
         fill_time_gaps: bool = True,
         topk: Optional[int] = None,
