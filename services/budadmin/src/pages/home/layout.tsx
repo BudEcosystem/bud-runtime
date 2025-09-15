@@ -199,11 +199,21 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   // logout
   const logOut = async () => {
     try {
+      const refreshToken = localStorage.getItem("refresh_token");
+
+      if (refreshToken) {
+        await AppRequest.Post("/auth/logout", {
+          refresh_token: refreshToken
+        });
+      }
+
       localStorage.clear();
       window.location.replace("/");
-      // If API call is successful, close the dialog
     } catch (error) {
-      console.error("Error creating model:", error);
+      console.error("Error during logout:", error);
+      // Clear localStorage and redirect even if API call fails
+      localStorage.clear();
+      window.location.replace("/");
     }
   };
 
@@ -224,7 +234,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     console.log("process.env.NEXT_PUBLIC_NOVU_APP_ID", process.env.NEXT_PUBLIC_NOVU_APP_ID);
   }, []);
 
-  const handleOpenChange = (open) => {
+  const handleOpenChange = (open: boolean) => {
     setGeneralOpen(open);
   };
   const content = (

@@ -748,20 +748,20 @@ class ObservabilityMetricsService:
             mi.timestamp,
             mi.model_name,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN substring(coalesce(ci.input, mi.input_messages), 1, 100)
-                WHEN mi.endpoint_type = 'embedding' THEN substring(ei.input, 1, 100)
-                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN substring(ai.input, 1, 100)
-                WHEN mi.endpoint_type = 'image_generation' THEN substring(ii.prompt, 1, 100)
-                WHEN mi.endpoint_type = 'moderation' THEN substring(modi.input, 1, 100)
-                ELSE substring(mi.input_messages, 1, 100)
+                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(coalesce(ci.input, mi.input_messages), 1, 100))
+                WHEN mi.endpoint_type = 'embedding' THEN toValidUTF8(substring(ei.input, 1, 100))
+                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.input, 1, 100))
+                WHEN mi.endpoint_type = 'image_generation' THEN toValidUTF8(substring(ii.prompt, 1, 100))
+                WHEN mi.endpoint_type = 'moderation' THEN toValidUTF8(substring(modi.input, 1, 100))
+                ELSE toValidUTF8(substring(mi.input_messages, 1, 100))
             END as prompt_preview,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN substring(coalesce(ci.output, mi.output), 1, 100)
+                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(coalesce(ci.output, mi.output), 1, 100))
                 WHEN mi.endpoint_type = 'embedding' THEN concat('Generated ', toString(ei.input_count), ' embeddings')
-                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN substring(ai.output, 1, 100)
+                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.output, 1, 100))
                 WHEN mi.endpoint_type = 'image_generation' THEN concat('Generated ', toString(ii.image_count), ' images')
                 WHEN mi.endpoint_type = 'moderation' THEN if(modi.flagged, 'Content flagged', 'Content passed')
-                ELSE substring(mi.output, 1, 100)
+                ELSE toValidUTF8(substring(mi.output, 1, 100))
             END as response_preview,
             mi.input_tokens,
             mi.output_tokens,
@@ -870,8 +870,8 @@ class ObservabilityMetricsService:
                 mi.model_provider_name,
                 mid.model_id,
                 mi.system,
-                coalesce(ci.input, mi.input_messages) as input_messages,
-                coalesce(ci.output, mi.output) as output,
+                toValidUTF8(coalesce(ci.input, mi.input_messages)) as input_messages,
+                toValidUTF8(coalesce(ci.output, mi.output)) as output,
                 ci.function_name,
                 ci.variant_name,
                 ci.episode_id,
@@ -890,10 +890,10 @@ class ObservabilityMetricsService:
                 mi.cached,
                 mi.finish_reason,
                 mid.cost,
-                mi.raw_request,
-                mi.raw_response,
-                mi.gateway_request,
-                mi.gateway_response,
+                toValidUTF8(mi.raw_request) as raw_request,
+                toValidUTF8(mi.raw_response) as raw_response,
+                toValidUTF8(mi.gateway_request) as gateway_request,
+                toValidUTF8(mi.gateway_response) as gateway_response,
                 coalesce(mi.endpoint_type, 'chat') as endpoint_type,
                 -- Gateway Analytics fields
                 ga.client_ip,
@@ -907,7 +907,7 @@ class ObservabilityMetricsService:
                 ga.timezone,
                 ga.asn,
                 ga.isp,
-                ga.user_agent,
+                toValidUTF8(ga.user_agent) as user_agent,
                 ga.device_type,
                 ga.browser_name,
                 ga.browser_version,
@@ -916,8 +916,8 @@ class ObservabilityMetricsService:
                 ga.is_bot,
                 ga.method,
                 ga.path,
-                ga.query_params,
-                ga.request_headers,
+                toValidUTF8(ga.query_params) as query_params,
+                toValidUTF8(ga.request_headers) as request_headers,
                 ga.body_size,
                 ga.api_key_id,
                 ga.auth_method,
@@ -958,8 +958,8 @@ class ObservabilityMetricsService:
                 mi.model_provider_name,
                 mid.model_id,
                 mi.system,
-                coalesce(ci.input, mi.input_messages) as input_messages,
-                coalesce(ci.output, mi.output) as output,
+                toValidUTF8(coalesce(ci.input, mi.input_messages)) as input_messages,
+                toValidUTF8(coalesce(ci.output, mi.output)) as output,
                 ci.function_name,
                 ci.variant_name,
                 ci.episode_id,
@@ -978,10 +978,10 @@ class ObservabilityMetricsService:
                 mi.cached,
                 mi.finish_reason,
                 mid.cost,
-                mi.raw_request,
-                mi.raw_response,
-                mi.gateway_request,
-                mi.gateway_response,
+                toValidUTF8(mi.raw_request) as raw_request,
+                toValidUTF8(mi.raw_response) as raw_response,
+                toValidUTF8(mi.gateway_request) as gateway_request,
+                toValidUTF8(mi.gateway_response) as gateway_response,
                 coalesce(mi.endpoint_type, 'chat') as endpoint_type
             FROM ModelInference mi
             INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
