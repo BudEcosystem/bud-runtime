@@ -263,7 +263,6 @@ class CreatePromptWorkflowRequest(BaseModel):
     concurrency: list[int] | None = None  # [min, max]
     rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
     rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
-    prompt_schema: PromptSchemaConfig | None = None
     bud_prompt_id: str | None = None
 
     @model_validator(mode="after")
@@ -302,7 +301,6 @@ class CreatePromptWorkflowSteps(BaseModel):
     concurrency: list[int] | None = None  # [min, max]
     rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
     rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
-    prompt_schema: PromptSchemaConfig | None = None
     bud_prompt_id: str | None = None
 
 
@@ -338,7 +336,6 @@ class PromptVersionResponse(BaseModel):
     endpoint: EndpointResponse
     model: ModelResponse
     cluster: ClusterResponse
-    prompt_schema: PromptSchemaConfig
     created_at: datetime
     modified_at: datetime
 
@@ -376,7 +373,6 @@ class CreatePromptVersionRequest(BaseModel):
     """Create prompt version request schema."""
 
     endpoint_id: UUID4 = Field(..., description="Endpoint ID for the prompt version")
-    prompt_schema: PromptSchemaConfig = Field(..., description="Prompt schema configuration")
     set_as_default: bool = Field(default=False, description="Set this version as the default version")
 
 
@@ -384,7 +380,6 @@ class EditPromptVersionRequest(BaseModel):
     """Edit prompt version request schema."""
 
     endpoint_id: UUID4 | None = Field(None, description="Endpoint ID for the prompt version")
-    prompt_schema: PromptSchemaConfig | None = Field(None, description="Prompt schema configuration")
     set_as_default: bool | None = Field(None, description="Set this version as the default version")
 
 

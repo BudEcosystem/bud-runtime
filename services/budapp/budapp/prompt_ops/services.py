@@ -478,7 +478,6 @@ class PromptWorkflowService(SessionMixin):
         concurrency = request.concurrency
         rate_limit = request.rate_limit
         rate_limit_value = request.rate_limit_value
-        prompt_schema = request.prompt_schema
         bud_prompt_id = request.bud_prompt_id
 
         # Retrieve or create workflow
@@ -603,7 +602,6 @@ class PromptWorkflowService(SessionMixin):
             concurrency=concurrency,
             rate_limit=rate_limit,
             rate_limit_value=rate_limit_value,
-            prompt_schema=prompt_schema,
             bud_prompt_id=bud_prompt_id,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
@@ -728,7 +726,6 @@ class PromptWorkflowService(SessionMixin):
                     model_id=UUID(merged_data.get("model_id")),
                     cluster_id=UUID(merged_data.get("cluster_id")),
                     version=1,  # First version
-                    prompt_schema=prompt_schema.model_dump() if prompt_schema else {},
                     status=PromptVersionStatusEnum.ACTIVE,
                     created_by=current_user_id,
                 )
@@ -980,7 +977,7 @@ class PromptVersionService(SessionMixin):
     """Service for managing prompt versions."""
 
     async def create_prompt_version(
-        self, prompt_id: UUID, endpoint_id: UUID, prompt_schema: dict, set_as_default: bool, current_user_id: UUID
+        self, prompt_id: UUID, endpoint_id: UUID, set_as_default: bool, current_user_id: UUID
     ) -> PromptVersionModel:
         """Create a new version for an existing prompt."""
         # Validate that the prompt exists and is active
@@ -1025,7 +1022,6 @@ class PromptVersionService(SessionMixin):
                 model_id=model_id,
                 cluster_id=cluster_id,
                 version=next_version,
-                prompt_schema=prompt_schema,
                 status=PromptVersionStatusEnum.ACTIVE,
                 created_by=current_user_id,
             )
@@ -1094,11 +1090,6 @@ class PromptVersionService(SessionMixin):
             data["model_id"] = db_endpoint.model_id
             data["cluster_id"] = db_endpoint.cluster_id
 
-        # Handle prompt_schema update if provided
-        if "prompt_schema" in data and data["prompt_schema"] is not None:
-            # The prompt_schema is already validated by Pydantic schema
-            pass
-
         # Handle set_as_default if provided
         set_as_default = data.pop("set_as_default", None)
         if set_as_default is True:
@@ -1154,7 +1145,7 @@ class PromptVersionService(SessionMixin):
         return None
 
     async def get_prompt_version(self, prompt_id: UUID, version_id: UUID) -> PromptVersionResponse:
-        """Retrieve a specific prompt version with its prompt_schema."""
+        """Retrieve a specific prompt version."""
         # Validate that the prompt exists and is active
         db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
             PromptModel,
