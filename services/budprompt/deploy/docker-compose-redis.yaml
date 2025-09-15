@@ -7,7 +7,7 @@ services:
     command:
       - /bin/sh
       - -c
-      - redis-server --requirepass "${REDIS_PASSWORD:?REDIS_PASSWORD variable is not set}" --port ${REDIS_PORT}
+      - redis-server --requirepass "${SECRETS_REDIS_PASSWORD:?SECRETS_REDIS_PASSWORD variable is not set}" --port ${REDIS_PORT}
     sysctls:
       net.core.somaxconn: 1024
     healthcheck:
