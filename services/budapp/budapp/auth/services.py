@@ -94,13 +94,13 @@ class AuthService(SessionMixin):
                 details={
                     "email": user.email,
                     "reason": "Client users cannot login with admin user_type",
-                    "requested_user_type": user.user_type,
+                    "requested_user_type": user.user_type.value,
                     "actual_user_type": db_user.user_type,
                 },
                 request=request,
                 success=False,
             )
-            raise ClientException("Unauthorized: Client users cannot login as admin")
+            raise ClientException("Incorrect email or password")
 
         # Get tenant information
         tenant = None
