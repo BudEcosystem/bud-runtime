@@ -273,6 +273,9 @@ ModelSourceEnum = create_dynamic_enum(
         "bedrock",
         "text-completion-codestral",
         "huggingface",
+        "bud_sentinel",
+        "azure_content_safety",
+        "aws_comprehend",
     ],
 )
 
@@ -791,6 +794,8 @@ class ProxyProviderEnum(StrEnum):
     TOGETHER = "together"
     XAI = "xai"
     BUD_SENTINEL = "bud-sentinel"
+    AZURE_CONTENT_SAFETY = "azure-content-safety"
+    AWS_COMPREHEND = "aws-comprehend"
 
 
 # class ModelTemplateTypeEnum(StrEnum):
