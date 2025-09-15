@@ -550,6 +550,13 @@ class PromptConfigurationData(BaseModel):
     )
 
 
+class GetPromptVersionResponse(SuccessResponse):
+    """Get prompt version response with configuration data."""
+
+    version: PromptVersionResponse
+    config_data: PromptConfigurationData
+
+
 class PromptConfigGetResponse(SuccessResponse):
     """Response model for getting prompt configuration.
 

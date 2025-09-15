@@ -1167,8 +1167,10 @@ class PromptVersionService(SessionMixin):
 
         return None
 
-    async def get_prompt_version(self, prompt_id: UUID, version_id: UUID) -> PromptVersionResponse:
-        """Retrieve a specific prompt version."""
+    async def get_prompt_version(
+        self, prompt_id: UUID, version_id: UUID
+    ) -> tuple[PromptVersionResponse, PromptConfigurationData]:
+        """Retrieve a specific prompt version with its configuration from Redis."""
         # Validate that the prompt exists and is active
         db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
             PromptModel,
@@ -1194,4 +1196,16 @@ class PromptVersionService(SessionMixin):
         # Create the detailed response
         version_response = PromptVersionResponse.model_validate(db_version)
 
-        return version_response
+        # Fetch the prompt configuration from Redis
+        # Use the prompt name as the prompt_id for Redis
+        try:
+            prompt_service = PromptService(self.session)
+            response_data = await prompt_service._perform_get_prompt_config_request(db_prompt.name, db_version.version)
+            # Parse the configuration data
+            config_data = PromptConfigurationData(**response_data.get("data", {}))
+        except Exception as e:
+            logger.warning(f"Failed to fetch prompt config from Redis: {e}")
+            # Return empty config if Redis fetch fails
+            config_data = PromptConfigurationData()
+
+        return version_response, config_data
