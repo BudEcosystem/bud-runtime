@@ -222,6 +222,23 @@ class PromptService(SessionMixin):
                     status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
+            # Update Redis with new default version BEFORE updating database
+            try:
+                prompt_service = PromptService(self.session)
+                await prompt_service._perform_set_default_version_request(
+                    prompt_id=db_prompt.name,  # Redis uses prompt name as ID
+                    version=db_version.version,  # Use the version number
+                )
+                logger.debug(
+                    f"Updated Redis default version for prompt {db_prompt.name} to version {db_version.version}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to update Redis default version: {str(e)}")
+                raise ClientException(
+                    message="Failed to update default version in configuration service",
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
         # Update the prompt
         db_prompt = await PromptDataManager(self.session).update_by_fields(db_prompt, data)
 
