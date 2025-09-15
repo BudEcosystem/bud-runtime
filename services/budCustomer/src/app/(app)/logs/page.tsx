@@ -310,7 +310,7 @@ export default function ObservabilityPage() {
       ),
     },
     {
-      title: "Response Time",
+      title: "Response\u00A0Time",
       dataIndex: "response_time_ms",
       key: "response_time_ms",
       width: 120,
@@ -332,12 +332,23 @@ export default function ObservabilityPage() {
         </Text_12_400_EEEEEE>
       ),
     },
-
+    {
+      title: 'Status',
+      key: 'status',
+      width: 100,
+      render: (_, record) => (
+        <ProjectTags
+          name={record.is_success ? 'Success' : 'Failed'}
+          color={record.is_success ? '#22c55e' : '#ef4444'}
+          textClass="text-[.75rem]"
+        />
+      ),
+    },
   ];
 
   // Handle table change (pagination, sorting)
   const handleTableChange = (
-    newPagination: any,
+    _newPagination: any,
     _filters: any,
     sorter: any,
   ) => {
@@ -359,19 +370,19 @@ export default function ObservabilityPage() {
     }
   };
 
-  // Export menu items
-  const exportMenu = [
-    {
-      key: "csv",
-      label: "Export as CSV",
-      onClick: () => exportInferences("csv"),
-    },
-    {
-      key: "json",
-      label: "Export as JSON",
-      onClick: () => exportInferences("json"),
-    },
-  ];
+  // Export menu items - currently unused but kept for future implementation
+  // const exportMenu = [
+  //   {
+  //     key: "csv",
+  //     label: "Export as CSV",
+  //     onClick: () => exportInferences("csv"),
+  //   },
+  //   {
+  //     key: "json",
+  //     label: "Export as JSON",
+  //     onClick: () => exportInferences("json"),
+  //   },
+  // ];
 
   return (
     <DashboardLayout>
