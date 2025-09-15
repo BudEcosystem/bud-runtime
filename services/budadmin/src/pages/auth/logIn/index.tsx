@@ -58,6 +58,7 @@ export default function Login() {
       const response: any = await AppRequest.Post("auth/login", {
         email: payload.email,
         password: payload.password,
+        user_type: "admin",
       });
       const data = response.data;
       if (data.success) {

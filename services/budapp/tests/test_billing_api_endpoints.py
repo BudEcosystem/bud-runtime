@@ -431,9 +431,10 @@ class TestUserBillingEndpoints:
 
         assert response.status_code == status.HTTP_200_OK
 
+    @patch('budapp.billing_ops.routes.UserBillingSchema.from_orm')
     @patch('budapp.billing_ops.routes.BillingService')
     def test_update_billing_plan_admin_success(
-        self, mock_billing_service_class, mock_admin_user, mock_db_session
+        self, mock_billing_service_class, mock_from_orm, mock_admin_user, mock_db_session
     ):
         """Test admin updating user's billing plan."""
         mock_service = MagicMock()
@@ -467,6 +468,32 @@ class TestUserBillingEndpoints:
         mock_user_billing.modified_at = datetime.now(timezone.utc)
         mock_service.get_user_billing.return_value = mock_user_billing
 
+        # Mock async methods
+        mock_service.reset_user_alerts = MagicMock()
+        mock_service.check_usage_limits = AsyncMock()
+
+        # Mock the schema serialization with a proper response
+        mock_from_orm.return_value = {
+            "id": str(mock_user_billing.id),
+            "user_id": str(mock_user_billing.user_id),
+            "billing_plan_id": str(mock_user_billing.billing_plan_id),
+            "billing_period_start": mock_user_billing.billing_period_start.isoformat(),
+            "billing_period_end": mock_user_billing.billing_period_end.isoformat(),
+            "custom_token_quota": 100000,  # Updated value
+            "custom_cost_quota": "100.00",
+            "enable_email_notifications": True,
+            "enable_in_app_notifications": True,
+            "is_active": True,
+            "is_suspended": False,
+            "suspension_reason": None,
+            "is_current": True,
+            "cycle_number": 1,
+            "superseded_at": None,
+            "superseded_by_id": None,
+            "created_at": mock_user_billing.created_at.isoformat(),
+            "modified_at": mock_user_billing.modified_at.isoformat(),
+        }
+
         from budapp.commons.dependencies import get_current_active_user, get_session
         from budapp.main import app
 
@@ -489,6 +516,9 @@ class TestUserBillingEndpoints:
             app.dependency_overrides.clear()
 
         assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "result" in data
+        assert data["result"]["custom_token_quota"] == 100000
 
 
 class TestBillingAlertEndpoints:
