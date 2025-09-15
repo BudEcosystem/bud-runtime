@@ -85,6 +85,7 @@ export default function ObservabilityPage() {
     "model" | "deployment" | "project" | "user"
   >("model");
   const [selectedPreset, setSelectedPreset] = useState<string>("Last 7 days");
+  const [metricsRefreshKey, setMetricsRefreshKey] = useState(0);
 
   const {
     inferences,
@@ -134,17 +135,22 @@ export default function ObservabilityPage() {
     if (dates && dates[0] && dates[1]) {
       setTimeRange([dates[0], dates[1]]);
       setSelectedPreset(""); // Clear preset selection when using date picker
-      // Create the new filters
-      const newFilters = {
-        from_date: dates[0].toISOString(),
-        to_date: dates[1].toISOString(),
-        sort_by: "timestamp" as const,
-        sort_order: "desc" as const,
-      };
-      // Update filters in store
-      setFilters(newFilters);
-      // Fetch with the same filters to ensure consistency
-      fetchInferences(undefined, newFilters);
+
+      // Only update inferences if we're on the requests tab
+      // The metrics tab will handle its own data fetching
+      if (activeTab === "requests") {
+        // Create the new filters
+        const newFilters = {
+          from_date: dates[0].toISOString(),
+          to_date: dates[1].toISOString(),
+          sort_by: "timestamp" as const,
+          sort_order: "desc" as const,
+        };
+        // Update filters in store
+        setFilters(newFilters);
+        // Fetch with the same filters to ensure consistency
+        fetchInferences(undefined, newFilters);
+      }
     }
   };
 
@@ -310,7 +316,7 @@ export default function ObservabilityPage() {
       ),
     },
     {
-      title: "Response Time",
+      title: "Response\u00A0Time",
       dataIndex: "response_time_ms",
       key: "response_time_ms",
       width: 120,
@@ -332,12 +338,23 @@ export default function ObservabilityPage() {
         </Text_12_400_EEEEEE>
       ),
     },
-
+    {
+      title: "Status",
+      key: "status",
+      width: 100,
+      render: (_, record) => (
+        <ProjectTags
+          name={record.is_success ? "Success" : "Failed"}
+          color={record.is_success ? "#22c55e" : "#ef4444"}
+          textClass="text-[.75rem]"
+        />
+      ),
+    },
   ];
 
   // Handle table change (pagination, sorting)
   const handleTableChange = (
-    newPagination: any,
+    _newPagination: any,
     _filters: any,
     sorter: any,
   ) => {
@@ -359,19 +376,19 @@ export default function ObservabilityPage() {
     }
   };
 
-  // Export menu items
-  const exportMenu = [
-    {
-      key: "csv",
-      label: "Export as CSV",
-      onClick: () => exportInferences("csv"),
-    },
-    {
-      key: "json",
-      label: "Export as JSON",
-      onClick: () => exportInferences("json"),
-    },
-  ];
+  // Export menu items - currently unused but kept for future implementation
+  // const exportMenu = [
+  //   {
+  //     key: "csv",
+  //     label: "Export as CSV",
+  //     onClick: () => exportInferences("csv"),
+  //   },
+  //   {
+  //     key: "json",
+  //     label: "Export as JSON",
+  //     onClick: () => exportInferences("json"),
+  //   },
+  // ];
 
   return (
     <DashboardLayout>
@@ -537,17 +554,9 @@ export default function ObservabilityPage() {
                                       const timeValue = preset.value();
                                       setTimeRange(timeValue);
                                       setSelectedPreset(preset.label);
-                                      // Create the new filters
-                                      const newFilters = {
-                                        from_date: timeValue[0].toISOString(),
-                                        to_date: timeValue[1].toISOString(),
-                                        sort_by: "timestamp" as const,
-                                        sort_order: "desc" as const,
-                                      };
-                                      // Update filters in store
-                                      setFilters(newFilters);
-                                      // Fetch with the same filters to ensure consistency
-                                      fetchInferences(undefined, newFilters);
+                                      // Metrics tab doesn't need to fetch inferences
+                                      // The MetricsTab component will handle its own data fetching
+                                      // based on the timeRange prop change
                                     }}
                                     className="text-xs hover:text-[var(--text-primary)] hover:border-[var(--border-secondary)]"
                                   >
@@ -562,7 +571,11 @@ export default function ObservabilityPage() {
                         {/* Refresh Button */}
                         <div style={{ color: "var(--text-primary)" }}>
                           <PrimaryButton
-                            onClick={() => fetchInferences()}
+                            onClick={() => {
+                              // Trigger a refresh by incrementing the refresh key
+                              // This will cause MetricsTab to refetch its data
+                              setMetricsRefreshKey((prev) => prev + 1);
+                            }}
                             style={{ color: "var(--text-primary)" }}
                           >
                             <ReloadOutlined
@@ -585,6 +598,7 @@ export default function ObservabilityPage() {
                         viewBy={viewBy}
                         isActive={activeTab === "metrics"}
                         filters={filters}
+                        refreshKey={metricsRefreshKey}
                       />
                     </>
                   ),
@@ -648,6 +662,7 @@ export default function ObservabilityPage() {
                         <InferenceFilters
                           projectId={"all"} // Pass a dummy ID for global view
                           onFiltersChange={() => fetchInferences()}
+                          skipEndpointsFetch={true} // Skip fetching endpoints in logs page
                         />
                       </div>
 
@@ -679,14 +694,14 @@ export default function ObservabilityPage() {
                               Inference Requests
                             </Text_16_600_FFFFFF>
                             <div className="flex items-center justify-between gap-x-[.8rem]">
-                              <div style={{ color: "var(--text-primary)" }}>
+                              {/* <div style={{ color: "var(--text-primary)" }}>
                                 <SearchHeaderInput
                                   placeholder={"Search by prompt or response"}
                                   searchValue={searchValue}
                                   setSearchValue={setSearchValue}
                                   classNames="mr-[.6rem] theme-search-override"
                                 />
-                              </div>
+                              </div> */}
                               <div style={{ color: "var(--text-primary)" }}>
                                 <PrimaryButton
                                   onClick={() => fetchInferences()}

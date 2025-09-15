@@ -22,6 +22,7 @@ export default function NewProject() {
   const { openDrawerWithStep, closeDrawer } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
   const [options, setOptions] = useState([]);
+  const [isCreating, setIsCreating] = useState(false);
 
   async function fetchList() {
     const data = projectTags?.map((result) => ({
@@ -48,21 +49,32 @@ export default function NewProject() {
         tags: [],
         icon: "😍"
       }}
+      drawerLoading={isCreating}
       // disableNext={!submittable}
-      onNext={(values) => {
+      onNext={async (values) => {
         if (!submittable) {
           form.submit();
           return;
         };
 
-        createProject(values)
-          .then((result) => {
-            if (result) {
-              getProjects(1, 10);
-              getProject(result.id);
-              openDrawerWithStep("invite-members");
-            }
-          })
+        // Prevent rapid clicks
+        if (isCreating) {
+          return;
+        }
+
+        setIsCreating(true);
+        try {
+          const result = await createProject(values);
+          if (result) {
+            await getProjects(1, 10);
+            getProject(result.id);
+            openDrawerWithStep("invite-members");
+          }
+        } catch (error) {
+          console.error("Error creating project:", error);
+        } finally {
+          setIsCreating(false);
+        }
       }}
       nextText="Next"
     >

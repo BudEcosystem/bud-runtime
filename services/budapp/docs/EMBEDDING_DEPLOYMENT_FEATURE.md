@@ -60,21 +60,26 @@ supported_endpoints: Mapped[List[str]] = mapped_column(
 
 ## Supported Endpoint Types
 
-The system supports 10 different endpoint types via `ModelEndpointEnum`:
+The system supports 15 different endpoint types via `ModelEndpointEnum`:
 
+### Currently Supported
 1. **CHAT** (`/v1/chat/completions`) - Chat completions
 2. **EMBEDDING** (`/v1/embeddings`) - Vector embeddings
 
-Supported to be added
-
-1. **IMAGE_GENERATION** (`/v1/images/generations`) - Image generation
-2. **AUDIO_TRANSCRIPTION** (`/v1/audio/transcriptions`) - Speech-to-text
-3. **AUDIO_SPEECH** (`/v1/audio/speech`) - Text-to-speech
-4. **EMBEDDING** (`/v1/embeddings`) - Vector embeddings
-5. **BATCH** (`/v1/batch`) - Batch processing
-6. **RESPONSE** (`/v1/responses`) - Async response retrieval
-7. **RERANK** (`/v1/rerank`) - Reranking functionality
-8. **MODERATION** (`/v1/moderations`) - Content moderation
+### Available Endpoints
+1. **COMPLETION** (`/v1/completions`) - Text completions
+2. **IMAGE_GENERATION** (`/v1/images/generations`) - Image generation
+3. **IMAGE_EDIT** (`/v1/images/edits`) - Image editing
+4. **IMAGE_VARIATION** (`/v1/images/variations`) - Image variations
+5. **AUDIO_TRANSCRIPTION** (`/v1/audio/transcriptions`) - Speech-to-text
+6. **AUDIO_TRANSLATION** (`/v1/audio/translations`) - Audio translation to English
+7. **TEXT_TO_SPEECH** (`/v1/audio/speech`) - Text-to-speech
+8. **REALTIME_SESSION** (`/v1/realtime/sessions`) - Real-time bidirectional conversation
+9. **REALTIME_TRANSCRIPTION** (`/v1/realtime/transcription_sessions`) - Real-time audio transcription
+10. **BATCH** (`/v1/batch`) - Batch processing
+11. **RESPONSES** (`/v1/responses`) - Async response retrieval
+12. **RERANK** (`/v1/rerank`) - Reranking functionality
+13. **MODERATION** (`/v1/moderations`) - Content moderation
 
 ## Benefits
 

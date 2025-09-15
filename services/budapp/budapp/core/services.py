@@ -334,61 +334,61 @@ class NotificationService(SessionMixin):
         # Update progress in workflow
         await self._update_workflow_progress(BudServeWorkflowStepEventName.EVALUATION_EVENTS.value, payload)
 
-        # Handle evaluation completion/failure events similar to cluster creation
-        if payload.event == "results":
-            from ..eval_ops.services import EvaluationWorkflowService
+        # # Handle evaluation completion/failure events similar to cluster creation
+        # if payload.event == "results":
+        #     from ..eval_ops.services import EvaluationWorkflowService
 
-            await EvaluationWorkflowService(self.session).create_evaluation_from_notification_event(payload)
-            return
+        #     await EvaluationWorkflowService(self.session).create_evaluation_from_notification_event(payload)
+        #     return
 
-        # Advance workflow and notify on completion/failure
-        if not payload.workflow_id:
-            return
+        # # Advance workflow and notify on completion/failure
+        # if not payload.workflow_id:
+        #     return
 
-        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
-            WorkflowModel, {"id": payload.workflow_id}
-        )
-        if not db_workflow:
-            return
+        # db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+        #     WorkflowModel, {"id": payload.workflow_id}
+        # )
+        # if not db_workflow:
+        #     return
 
-        status_str = (payload.content.status or "").upper()
-        updates: Dict[str, Any] = {}
+        # status_str = (payload.content.status or "").upper()
+        # updates: Dict[str, Any] = {}
 
-        if status_str in {"COMPLETED", "FAILED"}:
-            updates["status"] = status_str.lower()
-            updates["current_step"] = db_workflow.total_steps
-        else:
-            # Best-effort step advance while in progress
-            try:
-                curr = int(getattr(db_workflow, "current_step", 0) or 0)
-                total = int(getattr(db_workflow, "total_steps", 0) or 0)
-                if curr < total:
-                    updates["current_step"] = curr + 1
-            except Exception:
-                pass
+        # if status_str in {"COMPLETED", "FAILED"}:
+        #     updates["status"] = status_str.lower()
+        #     updates["current_step"] = db_workflow.total_steps
+        # else:
+        #     # Best-effort step advance while in progress
+        #     try:
+        #         curr = int(getattr(db_workflow, "current_step", 0) or 0)
+        #         total = int(getattr(db_workflow, "total_steps", 0) or 0)
+        #         if curr < total:
+        #             updates["current_step"] = curr + 1
+        #     except Exception:
+        #         pass
 
-        if updates:
-            self.session.refresh(db_workflow)
-            await WorkflowDataManager(self.session).update_by_fields(db_workflow, updates)
+        # if updates:
+        #     self.session.refresh(db_workflow)
+        #     await WorkflowDataManager(self.session).update_by_fields(db_workflow, updates)
 
-        # Send final user notification on completion/failure
-        if status_str in {"COMPLETED", "FAILED"}:
-            title = "Evaluation completed" if status_str == "COMPLETED" else "Evaluation failed"
-            message = payload.content.message or title
-            result = NotificationResult(target_id=db_workflow.id, target_type="workflow").model_dump(
-                exclude_none=True, exclude_unset=True
-            )
-            try:
-                notification_request = (
-                    NotificationBuilder()
-                    .set_content(title=title, message=message, result=result)
-                    .set_payload(workflow_id=str(db_workflow.id), type=PayloadType.EVALUATE_MODEL.value)
-                    .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
-                    .build()
-                )
-                await BudNotifyService().send_notification(notification_request)
-            except Exception:
-                logger.exception("Failed to send evaluation completion notification for workflow %s", db_workflow.id)
+        # # Send final user notification on completion/failure
+        # if status_str in {"COMPLETED", "FAILED"}:
+        #     title = "Evaluation completed" if status_str == "COMPLETED" else "Evaluation failed"
+        #     message = payload.content.message or title
+        #     result = NotificationResult(target_id=db_workflow.id, target_type="workflow").model_dump(
+        #         exclude_none=True, exclude_unset=True
+        #     )
+        #     try:
+        #         notification_request = (
+        #             NotificationBuilder()
+        #             .set_content(title=title, message=message, result=result)
+        #             .set_payload(workflow_id=str(db_workflow.id), type=PayloadType.EVALUATE_MODEL.value)
+        #             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+        #             .build()
+        #         )
+        #         await BudNotifyService().send_notification(notification_request)
+        #     except Exception:
+        #         logger.exception("Failed to send evaluation completion notification for workflow %s", db_workflow.id)
 
     async def update_adapter_deployment_events(self, payload: NotificationPayload) -> None:
         """Update the quantization deployment events for a workflow step."""

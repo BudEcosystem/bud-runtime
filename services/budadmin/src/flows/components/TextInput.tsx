@@ -14,6 +14,7 @@ export interface BudInputProps {
   placeholder?: string;
   disabled?: boolean;
   allowOnlyNumbers?: boolean;
+  replaceSpacesWithHyphens?: boolean;
   ClassNames?: string;
   InputClasses?: string;
   formItemClassnames?: string;
@@ -57,6 +58,9 @@ function TextInput(props: BudInputProps) {
               if (props.allowOnlyNumbers) {
                 newValue = newValue.replace(/[^0-9]/g, "");
               }
+              if (props.replaceSpacesWithHyphens) {
+                newValue = newValue.replace(/\s/g, "-");
+              }
               props.onChange?.(newValue);
               return newValue;
             }}
@@ -82,6 +86,9 @@ function TextInput(props: BudInputProps) {
             let newValue = e.target.value;
             if (props.allowOnlyNumbers) {
               newValue = newValue.replace(/[^0-9]/g, "");
+            }
+            if (props.replaceSpacesWithHyphens) {
+              newValue = newValue.replace(/\s/g, "-");
             }
             props.onChange?.(newValue);
             return newValue;

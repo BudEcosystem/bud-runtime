@@ -6,7 +6,6 @@ use axum::{
 };
 use chrono::Utc;
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::error;
 use uaparser::{Parser, UserAgentParser};

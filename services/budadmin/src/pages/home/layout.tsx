@@ -35,6 +35,7 @@ import { useOverlay } from "src/context/overlayContext";
 import { useIsland } from "src/hooks/useIsland";
 import BudIsland from "@/components/island/BudIsland";
 import { PermissionEnum, useUser } from "src/stores/useUser";
+import pkg from '@novu/notification-center/package.json';
 
 interface LayoutProps {
   children: ReactNode;
@@ -153,14 +154,14 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       iconSvg: true,
       cmd: "7",
     },
-     {
+    {
       label: "Evaluations",
       route: "/evaluations",
       icon: '/icons/simulations.png',
       iconWhite: '/icons/simulationsWhite.svg',
       cmd: "8",
     },
-     {
+    {
       label: "Guard Rails",
       route: "/guardrails",
       icon: '/icons/simulations.png',
@@ -171,7 +172,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
 
   const tabsTwo = [
     {
-      label: "User management", route: "/users", icon: PersonIcon,
+      label: "User Management", route: "/users", icon: PersonIcon,
       hide: !hasPermission(PermissionEnum.UserManage),
     },
     { label: "Settings", route: "/settings", icon: GearIcon },
@@ -198,11 +199,21 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   // logout
   const logOut = async () => {
     try {
+      const refreshToken = localStorage.getItem("refresh_token");
+
+      if (refreshToken) {
+        await AppRequest.Post("/auth/logout", {
+          refresh_token: refreshToken
+        });
+      }
+
       localStorage.clear();
       window.location.replace("/");
-      // If API call is successful, close the dialog
     } catch (error) {
-      console.error("Error creating model:", error);
+      console.error("Error during logout:", error);
+      // Clear localStorage and redirect even if API call fails
+      localStorage.clear();
+      window.location.replace("/");
     }
   };
 
@@ -215,7 +226,15 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   }, []);
 
 
-  const handleOpenChange = (open) => {
+  useEffect(() => {
+    console.log("Novu Notification Center version:", pkg.version);
+    console.log("process.env.NEXT_PUBLIC_BASE_URL", process.env.NEXT_PUBLIC_BASE_URL);
+    console.log("process.env.NEXT_PUBLIC_NOVU_SOCKET_URL", process.env.NEXT_PUBLIC_NOVU_SOCKET_URL);
+    console.log("process.env.NEXT_PUBLIC_NOVU_BASE_URL", process.env.NEXT_PUBLIC_NOVU_BASE_URL);
+    console.log("process.env.NEXT_PUBLIC_NOVU_APP_ID", process.env.NEXT_PUBLIC_NOVU_APP_ID);
+  }, []);
+
+  const handleOpenChange = (open: boolean) => {
     setGeneralOpen(open);
   };
   const content = (

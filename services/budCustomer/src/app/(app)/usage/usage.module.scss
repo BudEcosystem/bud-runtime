@@ -71,6 +71,7 @@
       border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 1rem 1.25rem;
+      position: relative;
 
       .sectionHeader {
         display: flex;
@@ -346,4 +347,24 @@
     var(--bg-secondary) 100%
   );
   background-size: 1000px 100%;
+}
+
+.loadingContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--bg-tertiary);
+  overflow: hidden;
+
+  .loadingBar {
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-purple),
+      transparent
+    );
+  }
 }

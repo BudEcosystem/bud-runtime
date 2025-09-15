@@ -423,7 +423,7 @@ export default function Publish() {
               </div>
               <div className="flex justify-between items-start px-[1.4rem] pt-[0.85rem] pb-[1.35rem]">
                 <Text_14_400_EEEEEE className="pt-[.55rem] whitespace-nowrap mr-4">
-                  Output Cost
+                  Output cost
                 </Text_14_400_EEEEEE>
                 <TextInput
                   name="output_cost"

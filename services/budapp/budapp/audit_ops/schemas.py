@@ -109,7 +109,8 @@ class AuditRecordFilter(BaseModel):
     resource_name: Optional[str] = Field(None, description="Filter by resource name (partial match)")
     start_date: Optional[datetime] = Field(None, description="Filter by start date (inclusive)")
     end_date: Optional[datetime] = Field(None, description="Filter by end date (inclusive)")
-    ip_address: Optional[str] = Field(None, description="Filter by IP address")
+    ip_address: Optional[str] = Field(None, description="Filter by IP address (exact match)")
+    search: Optional[str] = Field(None, description="Search term for partial matching in resource name and IP address")
 
 
 class AuditRecordResponse(SuccessResponse):

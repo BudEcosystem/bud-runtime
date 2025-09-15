@@ -50,9 +50,8 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // Access persisted store only on client
-      const hydrated = useChatStore.persist?.hasHydrated?.() ?? false;
-      setHasHydrated(hydrated);
+      // Store is now always hydrated since we use custom persistence
+      setHasHydrated(true);
     }
   }, []);
 

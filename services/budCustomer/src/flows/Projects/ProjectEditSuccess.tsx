@@ -54,17 +54,6 @@ const ProjectEditSuccess = () => {
                 </Text_13_400_EEEEEE>
               )}
             </div>
-
-            <div className="bg-[#1F1F1F] border border-[#2F2F2F] rounded-[8px] p-[1.5rem] w-full max-w-[500px] flex items-start gap-[0.75rem]">
-              <Icon
-                icon="ph:check-circle"
-                className="text-[#4ADE80] text-[1.25rem] flex-shrink-0"
-              />
-              <Text_13_400_EEEEEE>
-                All changes have been saved. Your project settings are now up to
-                date.
-              </Text_13_400_EEEEEE>
-            </div>
           </div>
         </BudDrawerLayout>
       </BudWraperBox>

@@ -105,8 +105,8 @@ microservices:
             LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
 
             MINIO_BUCKET: models-registry
-            MINIO_ENDPOINT: '{{ include "bud.ingress.url.s3" $ }}'
-            MINIO_SECURE: "false"
+            MINIO_ENDPOINT: '{{ include "bud.ingress.hosts.s3" $ }}'
+            MINIO_SECURE: "{{ .Values.ingress.httpsEnabled }}"
     budmetrics:
         daprid: budmetrics
         image: budstudio/budmetrics:nightly
@@ -224,10 +224,10 @@ microservices:
             LOG_LEVEL: INFO
             MINIO_ACCESS_KEY: "{{ .Values.minio.auth.rootUser }}"
             MINIO_BUCKET: models-registry
-            MINIO_ENDPOINT: '{{ include "bud.ingress.url.s3" $ }}'
+            MINIO_ENDPOINT: '{{ include "bud.ingress.hosts.s3" $ }}'
             MINIO_MODEL_BUCKET: model-info
             MINIO_SECRET_KEY: "{{ .Values.minio.auth.rootPassword }}"
-            MINIO_SECURE: "false"
+            MINIO_SECURE: "{{ .Values.ingress.httpsEnabled }}"
             MODEL_DOWNLOAD_DIR: /data/models-registry
             MODEL_DOWNLOAD_DIR_MAX_SIZE: "500"
             MODEL_REGISTRY_DIR: /data/models-registry

@@ -36,6 +36,7 @@ export default function EditProject() {
   const { closeDrawer, openDrawerWithStep } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
   const [options, setOptions] = useState<{ name: string; color: string }[]>([]);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const fetchList = useCallback(() => {
     const data =
@@ -142,6 +143,11 @@ export default function EditProject() {
           return;
         }
 
+        // Prevent multiple submissions
+        if (isUpdating) {
+          return;
+        }
+
         // Ensure tags are in the correct format (array of objects with name and color)
         const formattedTags = values.tags
           ? (Array.isArray(values.tags) ? values.tags : [])
@@ -177,6 +183,9 @@ export default function EditProject() {
           icon: values.icon || "😍",
         };
 
+        // Set loading state to true before API call
+        setIsUpdating(true);
+
         apiUpdateProject(currentProject.id, projectData)
           .then((result) => {
             if (result) {
@@ -190,9 +199,14 @@ export default function EditProject() {
           })
           .catch((error) => {
             console.error("Error updating project:", error);
+          })
+          .finally(() => {
+            // Reset loading state after API call completes
+            setIsUpdating(false);
           });
       }}
       nextText="Update Project"
+      drawerLoading={isUpdating}
     >
       <BudWraperBox center>
         <BudDrawerLayout>
