@@ -176,6 +176,22 @@ class PromptService(SessionMixin):
             PromptModel, fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE}
         )
 
+        # Delete Redis configuration BEFORE updating database
+        try:
+            prompt_service = PromptService(self.session)
+            await prompt_service._perform_delete_prompt_config_request(
+                prompt_id=db_prompt.name  # Redis uses prompt name as ID, delete all versions
+            )
+            logger.debug(f"Deleted all Redis configurations for prompt {db_prompt.name}")
+        except ClientException as e:
+            if e.status_code == 404:
+                # Redis config might not exist, which is okay
+                logger.warning(f"Redis configuration not found for prompt {db_prompt.name}: {str(e)}")
+            else:
+                # Re-raise other errors
+                logger.error(f"Failed to delete Redis configuration for prompt {db_prompt.name}: {str(e)}")
+                raise
+
         # Update prompt status to DELETED
         await PromptDataManager(self.session).update_by_fields(db_prompt, {"status": PromptStatusEnum.DELETED})
 
@@ -463,6 +479,61 @@ class PromptService(SessionMixin):
             logger.exception(f"Failed to set default version: {e}")
             raise ClientException(
                 message="Failed to set default version", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def _perform_delete_prompt_config_request(
+        self, prompt_id: str, version: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Perform delete prompt configuration request to budprompt service.
+
+        Args:
+            prompt_id: The prompt configuration identifier
+            version: Optional version number to delete specific version
+
+        Returns:
+            Response data from budprompt service
+        """
+        # Build the URL for delete endpoint
+        delete_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config/{prompt_id}"
+
+        # Add version as query parameter if provided
+        params = {}
+        if version is not None:
+            params["version"] = version
+
+        logger.debug(f"Deleting prompt config from budprompt: prompt_id={prompt_id}, version={version}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.delete(delete_endpoint, params=params) as response:
+                    response_data = await response.json()
+
+                    if response.status == 404:
+                        # It's okay if Redis config doesn't exist when deleting
+                        logger.warning(f"Prompt configuration not found in Redis: {prompt_id}")
+                        return {"message": "Configuration not found but continuing with database deletion"}
+                    elif response.status != 200:
+                        logger.error(f"Failed to delete prompt config: {response.status} {response_data}")
+                        raise ClientException(
+                            message=response_data.get("message", "Failed to delete prompt configuration"),
+                            status_code=response.status,
+                        )
+
+                    logger.debug(f"Successfully deleted prompt config: {prompt_id}")
+                    return response_data
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Network error during delete prompt config request: {e}")
+            raise ClientException(
+                message="Network error while deleting prompt configuration",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            ) from e
+        except ClientException:
+            raise  # Re-raise ClientException as-is
+        except Exception as e:
+            logger.exception(f"Failed to delete prompt config: {e}")
+            raise ClientException(
+                message="Failed to delete prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
     async def _perform_copy_prompt_config_request(self, request: PromptConfigCopyRequest) -> Dict[str, Any]:
@@ -1236,6 +1307,27 @@ class PromptVersionService(SessionMixin):
 
         if not db_version:
             raise ClientException(message="Prompt version not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Delete Redis configuration for this specific version BEFORE updating database
+        try:
+            prompt_service = PromptService(self.session)
+            await prompt_service._perform_delete_prompt_config_request(
+                prompt_id=db_prompt.name,  # Redis uses prompt name as ID
+                version=db_version.version,  # Delete specific version
+            )
+            logger.debug(f"Deleted Redis configuration for prompt {db_prompt.name} version {db_version.version}")
+        except ClientException as e:
+            if e.status_code == 404:
+                # Redis config might not exist, which is okay
+                logger.warning(
+                    f"Redis configuration not found for prompt {db_prompt.name} version {db_version.version}: {str(e)}"
+                )
+            else:
+                # Re-raise other errors
+                logger.error(
+                    f"Failed to delete Redis configuration for prompt {db_prompt.name} version {db_version.version}: {str(e)}"
+                )
+                raise
 
         # Soft delete the version by updating its status
         await PromptVersionDataManager(self.session).update_by_fields(
