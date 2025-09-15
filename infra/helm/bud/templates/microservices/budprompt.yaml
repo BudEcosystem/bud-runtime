@@ -24,7 +24,7 @@ spec:
       - name: {{ .Release.Name}}-budprompt
         image: {{ .Values.microservices.budprompt.image }}
         imagePullPolicy: {{ .Values.imagePullPolicy }}
-        command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budprompt.main:app --host 0.0.0.0 --port 9082"]
+        command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budprompt.main:app --host 0.0.0.0 --port 3015"]
         ports:
         - containerPort: 3015
         env:
