@@ -17,6 +17,7 @@ module "azure" {
   primary_sku = "Standard_D32als_v6"
   ingress_sku = {
     Standard_D32als_v6 = 1
+    Standard_DS1_v2 = 1
   }
   disk_size = {
     primary      = 512
