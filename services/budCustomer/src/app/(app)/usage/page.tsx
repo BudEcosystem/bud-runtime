@@ -371,24 +371,6 @@ export default function UsagePage() {
                   Usage
                 </Title>
               </div>
-              <div className={styles.headerActions}>
-
-                <Button
-                  icon={<Icon icon="ph:export" />}
-                  className={styles.exportBtn}
-                  onClick={handleExport}
-                >
-                  Export
-                </Button>
-                {/* <Button
-                type="primary"
-                icon={<Icon icon="ph:bell" />}
-                className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem]"
-                onClick={handleOpenCreateAlert}
-              >
-                Set Alert
-              </Button> */}
-              </div>
             </div>
 
             {/* Metrics Section */}
@@ -409,8 +391,8 @@ export default function UsagePage() {
                 title="Total tokens"
                 value={
                   metrics.totalTokens < 10000
-                    ? `${(metrics.totalTokens / 1000).toFixed(1)}K\nof ${(billingPlan.usage.tokens_quota / 1000).toFixed(1)}K`
-                    : `${(metrics.totalTokens / 1000).toFixed(0)}K\nof ${(billingPlan.usage.tokens_quota / 1000).toFixed(0)}K`
+                    ? `${metrics.totalTokens.toLocaleString()}\nof ${billingPlan.usage.tokens_quota < 10000 ? billingPlan.usage.tokens_quota.toLocaleString() : `${(billingPlan.usage.tokens_quota / 1000).toFixed(0)}K`}`
+                    : `${(metrics.totalTokens / 1000).toFixed(0)}K\nof ${billingPlan.usage.tokens_quota < 10000 ? billingPlan.usage.tokens_quota.toLocaleString() : `${(billingPlan.usage.tokens_quota / 1000).toFixed(0)}K`}`
                 }
                 loading={isLoading}
                 trend={
@@ -476,6 +458,41 @@ export default function UsagePage() {
                 </div>
               </div>
             </div>
+            <div className="flex items-center justify-end mb-[1.5rem]">
+              <div className={`${styles.headerActions} flex !gap-[.75rem]`}>
+                <ConfigProvider theme={themeConfig}>
+                  <Select
+                    value={selectedProject}
+                    onChange={setSelectedProject}
+                    style={{ width: 200 }}
+                    className={styles.projectSelect}
+                    options={availableProjects}
+                  />
+                </ConfigProvider>
+                <ConfigProvider theme={themeConfig}>
+                  <Select
+                    value={timeRange}
+                    onChange={setTimeRange}
+                    style={{ width: 150 }}
+                    className={styles.dateSelect}
+                    options={[
+                      { value: "1d", label: "1d" },
+                      { value: "7d", label: "7d" },
+                      { value: "30d", label: "30d" },
+                      { value: "90d", label: "90d" },
+                    ]}
+                  />
+                </ConfigProvider>
+                <Button
+                  icon={<Icon icon="ph:export" />}
+                  className={styles.exportBtn}
+                  style={{ height: '2rem' }}
+                  onClick={handleExport}
+                >
+                  Export
+                </Button>
+              </div>
+            </div>
 
             {/* Charts Section */}
             <Card className="bg-bud-bg-secondary border-bud-border rounded-[12px] mb-[2rem]">
@@ -487,31 +504,7 @@ export default function UsagePage() {
                 <Text className="text-bud-text-primary font-semibold text-[15px]">
                   Total Spend
                 </Text>
-                <div className={`${styles.headerActions} flex !gap-[.75rem]`}>
-                  <ConfigProvider theme={themeConfig}>
-                    <Select
-                      value={selectedProject}
-                      onChange={setSelectedProject}
-                      style={{ width: 200 }}
-                      className={styles.projectSelect}
-                      options={availableProjects}
-                    />
-                  </ConfigProvider>
-                  <ConfigProvider theme={themeConfig}>
-                    <Select
-                      value={timeRange}
-                      onChange={setTimeRange}
-                      style={{ width: 150 }}
-                      className={styles.dateSelect}
-                      options={[
-                        { value: "1d", label: "1d" },
-                        { value: "7d", label: "7d" },
-                        { value: "30d", label: "30d" },
-                        { value: "90d", label: "90d" },
-                      ]}
-                    />
-                  </ConfigProvider>
-                </div>
+
               </Flex>
 
               <div className="mt-6">

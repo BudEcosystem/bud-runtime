@@ -310,7 +310,7 @@ export default function ObservabilityPage() {
       ),
     },
     {
-      title: "Response Time",
+      title: "Response\u00A0Time",
       dataIndex: "response_time_ms",
       key: "response_time_ms",
       width: 120,
@@ -332,7 +332,18 @@ export default function ObservabilityPage() {
         </Text_12_400_EEEEEE>
       ),
     },
-
+    {
+      title: 'Status',
+      key: 'status',
+      width: 100,
+      render: (_, record) => (
+        <ProjectTags
+          name={record.is_success ? 'Success' : 'Failed'}
+          color={record.is_success ? '#22c55e' : '#ef4444'}
+          textClass="text-[.75rem]"
+        />
+      ),
+    },
   ];
 
   // Handle table change (pagination, sorting)
