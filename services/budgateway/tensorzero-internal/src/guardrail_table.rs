@@ -98,6 +98,16 @@ pub enum GuardType {
     Output,
 }
 
+impl GuardType {
+    /// Convert to u8 for database storage
+    pub fn to_db_value(self) -> u8 {
+        match self {
+            GuardType::Input => 1,
+            GuardType::Output => 2,
+        }
+    }
+}
+
 /// Table of guardrail configurations indexed by ID
 pub type GuardrailTable = HashMap<Arc<str>, Arc<GuardrailConfig>>;
 

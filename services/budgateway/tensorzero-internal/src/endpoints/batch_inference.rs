@@ -907,6 +907,7 @@ pub async fn write_completed_batch_inference<'a>(
             finish_reason,
             gateway_request: None,  // Not supported for batch inference
             gateway_response: None, // Not supported for batch inference
+            guardrail_scan_summary: None, // Not supported for batch inference
         };
         let tool_config: Option<ToolCallConfig> = tool_params.map(|t| t.into());
         let output_schema = match output_schema

@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::stream::{FuturesUnordered, StreamExt};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use uuid::Uuid;
 
 use crate::endpoints::inference::InferenceClients;
 use crate::error::{Error, ErrorDetails};
@@ -626,4 +630,272 @@ pub async fn execute_guardrail_by_id<'a>(
         })?;
 
     execute_guardrail(&guardrail_config, input, guard_type, clients, None).await
+}
+
+// ================== Observability Types ==================
+
+/// Represents the scan mode for guardrail execution
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ScanMode {
+    Single = 1,
+    ProviderManagedMulti = 2,
+    GatewayManagedMulti = 3,
+}
+
+impl ScanMode {
+    /// Convert to u8 for database storage
+    pub fn to_db_value(self) -> u8 {
+        match self {
+            ScanMode::Single => 1,
+            ScanMode::ProviderManagedMulti => 2,
+            ScanMode::GatewayManagedMulti => 3,
+        }
+    }
+}
+
+/// Represents the status of a guardrail scan
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ScanStatus {
+    Completed = 1,
+    InProgress = 2,
+    Cancelled = 3,
+    TimedOut = 4,
+}
+
+impl ScanStatus {
+    /// Convert to u8 for database storage
+    pub fn to_db_value(self) -> u8 {
+        match self {
+            ScanStatus::Completed => 1,
+            ScanStatus::InProgress => 2,
+            ScanStatus::Cancelled => 3,
+            ScanStatus::TimedOut => 4,
+        }
+    }
+}
+
+/// Database insert model for GuardrailInference table
+#[derive(Clone, Debug, Serialize)]
+pub struct GuardrailInferenceDatabaseInsert {
+    pub id: Uuid,
+    pub inference_id: Uuid,
+    pub parent_scan_id: Option<Uuid>,
+    pub guardrail_profile: String,
+    pub guard_type: u8, // Enum representation
+    pub scan_stage: String,
+    pub scan_mode: u8, // Enum representation
+    pub flagged: bool,
+    pub confidence_score: Option<f32>,
+    pub provider_results: String, // JSON
+    pub scan_status: u8, // Enum representation
+    pub scan_latency_ms: Option<u32>,
+    #[serde(serialize_with = "serialize_datetime64")]
+    pub scan_started_at: chrono::DateTime<chrono::Utc>,
+    #[serde(serialize_with = "serialize_optional_datetime64")]
+    pub scan_completed_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub action_taken: String,
+    pub external_scan_id: Option<String>,
+    pub input_hash: String,
+    pub scan_metadata: String, // JSON
+}
+
+/// Serialize DateTime to ClickHouse DateTime64(3) format
+fn serialize_datetime64<S>(dt: &chrono::DateTime<chrono::Utc>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let formatted = dt.format("%Y-%m-%d %H:%M:%S%.3f").to_string();
+    serializer.serialize_str(&formatted)
+}
+
+/// Serialize Optional DateTime to ClickHouse DateTime64(3) format
+fn serialize_optional_datetime64<S>(dt: &Option<chrono::DateTime<chrono::Utc>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match dt {
+        Some(dt) => serialize_datetime64(dt, serializer),
+        None => serializer.serialize_none(),
+    }
+}
+
+impl GuardrailInferenceDatabaseInsert {
+    pub fn from_result(
+        inference_id: Uuid,
+        guardrail_profile: String,
+        guard_type: GuardType,
+        scan_stage: String,
+        scan_mode: ScanMode,
+        result: &GuardrailResult,
+        scan_duration: Option<Duration>,
+        input_text: &str,
+        parent_scan_id: Option<Uuid>,
+    ) -> Self {
+        let scan_started_at = chrono::Utc::now();
+        let scan_completed_at = scan_duration.map(|_| scan_started_at);
+        let scan_latency_ms = scan_duration.map(|d| d.as_millis() as u32);
+
+        // Hash the input for privacy
+        let mut hasher = Sha256::new();
+        hasher.update(input_text.as_bytes());
+        let input_hash = format!("{:x}", hasher.finalize());
+
+        // Serialize provider results
+        let provider_results = serde_json::to_string(&result.provider_results)
+            .unwrap_or_else(|_| "[]".to_string());
+
+        // Determine action taken based on result
+        let action_taken = if result.flagged {
+            match guard_type {
+                GuardType::Input => "block",
+                GuardType::Output => "modify_response",
+            }
+        } else {
+            "allow"
+        }.to_string();
+
+        // Build scan metadata
+        let scan_metadata = serde_json::json!({
+            "guardrail_id": result.guardrail_id,
+            "merged_categories": result.merged_categories,
+            "merged_scores": result.merged_scores,
+            "hallucination_details": result.hallucination_details,
+            "ip_violation_details": result.ip_violation_details,
+        }).to_string();
+
+        Self {
+            id: Uuid::now_v7(),
+            inference_id,
+            parent_scan_id,
+            guardrail_profile,
+            guard_type: guard_type.to_db_value(),
+            scan_stage,
+            scan_mode: scan_mode.to_db_value(),
+            flagged: result.flagged,
+            confidence_score: None, // Could be extracted from provider results
+            provider_results,
+            scan_status: ScanStatus::Completed.to_db_value(),
+            scan_latency_ms,
+            scan_started_at,
+            scan_completed_at,
+            action_taken,
+            external_scan_id: None,
+            input_hash,
+            scan_metadata,
+        }
+    }
+}
+
+/// Summary of guardrail scans for a model inference
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct GuardrailScanSummary {
+    pub input_scans: Option<ScanSummary>,
+    pub output_scans: Option<ScanSummary>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScanSummary {
+    pub stages_completed: Vec<String>,
+    pub final_decision: String,
+    pub total_scan_time_ms: u32,
+    pub scan_chain: Vec<Uuid>,
+}
+
+/// Context for tracking guardrail execution
+pub struct GuardrailExecutionContext {
+    pub scan_records: Vec<GuardrailInferenceDatabaseInsert>,
+    pub input_scan_time_ms: Option<u32>,
+    pub output_scan_time_ms: Option<u32>,
+    pub response_terminated: bool,
+}
+
+impl GuardrailExecutionContext {
+    pub fn new() -> Self {
+        Self {
+            scan_records: Vec::new(),
+            input_scan_time_ms: None,
+            output_scan_time_ms: None,
+            response_terminated: false,
+        }
+    }
+
+    pub fn add_scan_record(&mut self, record: GuardrailInferenceDatabaseInsert) {
+        match record.guard_type {
+            1 => { // Input
+                if let Some(latency) = record.scan_latency_ms {
+                    self.input_scan_time_ms = Some(self.input_scan_time_ms.unwrap_or(0) + latency);
+                }
+            }
+            2 => { // Output
+                if let Some(latency) = record.scan_latency_ms {
+                    self.output_scan_time_ms = Some(self.output_scan_time_ms.unwrap_or(0) + latency);
+                }
+            }
+            _ => {}
+        }
+        self.scan_records.push(record);
+    }
+
+    pub fn build_summary(&self) -> GuardrailScanSummary {
+        let mut summary = GuardrailScanSummary::default();
+
+        // Group by guard type
+        let input_records: Vec<_> = self.scan_records.iter()
+            .filter(|r| r.guard_type == 1)
+            .collect();
+
+        let output_records: Vec<_> = self.scan_records.iter()
+            .filter(|r| r.guard_type == 2)
+            .collect();
+
+        // Build input scan summary
+        if !input_records.is_empty() {
+            let stages: Vec<_> = input_records.iter()
+                .map(|r| r.scan_stage.clone())
+                .collect();
+
+            let final_decision = if input_records.iter().any(|r| r.flagged) {
+                "blocked"
+            } else {
+                "allowed"
+            }.to_string();
+
+            let scan_chain: Vec<_> = input_records.iter()
+                .map(|r| r.id)
+                .collect();
+
+            summary.input_scans = Some(ScanSummary {
+                stages_completed: stages,
+                final_decision,
+                total_scan_time_ms: self.input_scan_time_ms.unwrap_or(0),
+                scan_chain,
+            });
+        }
+
+        // Build output scan summary
+        if !output_records.is_empty() {
+            let stages: Vec<_> = output_records.iter()
+                .map(|r| r.scan_stage.clone())
+                .collect();
+
+            let final_decision = if output_records.iter().any(|r| r.flagged) {
+                "blocked"
+            } else {
+                "allowed"
+            }.to_string();
+
+            let scan_chain: Vec<_> = output_records.iter()
+                .map(|r| r.id)
+                .collect();
+
+            summary.output_scans = Some(ScanSummary {
+                stages_completed: stages,
+                final_decision,
+                total_scan_time_ms: self.output_scan_time_ms.unwrap_or(0),
+                scan_chain,
+            });
+        }
+
+        summary
+    }
 }
