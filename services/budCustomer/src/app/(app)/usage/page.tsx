@@ -1,12 +1,12 @@
 "use client";
 import React, { use, useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useTheme } from "@/context/themeContext";
 import {
   Flex,
   Select,
   Button,
   ConfigProvider,
-  Tabs,
   Skeleton,
   Card,
   Switch,
@@ -61,6 +61,7 @@ interface UsageMetrics {
 }
 
 export default function UsagePage() {
+  const { effectiveTheme } = useTheme();
   const { notification: antNotification } = App.useApp();
   const { openDrawer } = useDrawer();
   const { globalProjects, getGlobalProjects, loading } = useProjects();
@@ -75,7 +76,7 @@ export default function UsagePage() {
   const [timeRange, setTimeRange] = useState("30d");
   const [selectedProject, setSelectedProject] = useState("all");
   const [availableProjects, setAvailableProjects] = useState<any>([]);
-  const [activeTab, setActiveTab] = useState("spend");
+  // Removed activeTab state - no longer needed without tabs
   const [isLoading, setIsLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(false);
 
@@ -112,21 +113,22 @@ export default function UsagePage() {
   const [chartData, setChartData] = useState<any[]>([]);
 
   const themeConfig = {
+    token: {
+      colorPrimary: "#965CDE",
+      colorPrimaryHover: "#a873e5",
+      colorPrimaryActive: "#8348c7",
+    },
     components: {
       Select: {
-        colorBgContainer: "var(--bg-tertiary)",
-        colorBorder: "var(--border-secondary)",
-        optionSelectedBg: "var(--bg-hover)",
-        colorBgElevated: "var(--bg-hover)",
-        colorText: "var(--text-primary)",
-        optionSelectedColor: "var(--text-primary)",
-        optionActiveBg: "var(--bg-hover)",
-      },
-      Tabs: {
-        colorBorderSecondary: "transparent",
-        itemSelectedColor: "var(--text-primary)",
-        itemColor: "var(--text-muted)",
-        inkBarColor: "var(--text-primary)",
+        colorBgContainer: effectiveTheme === 'light' ? '#ffffff' : '#1A1A1A',
+        colorBorder: effectiveTheme === 'light' ? '#e5e7eb' : '#1F1F1F',
+        colorText: effectiveTheme === 'light' ? '#111827' : '#EEEEEE',
+        colorTextPlaceholder: effectiveTheme === 'light' ? '#6b7280' : '#666666',
+        colorBgElevated: effectiveTheme === 'light' ? '#ffffff' : '#1A1A1A',
+        controlItemBgHover: effectiveTheme === 'light' ? '#f3f4f6' : '#2F2F2F',
+        optionSelectedBg: effectiveTheme === 'light' ? '#f3f4f6' : '#2A1F3D',
+        optionSelectedColor: effectiveTheme === 'light' ? '#111827' : '#EEEEEE',
+        optionActiveBg: effectiveTheme === 'light' ? '#f9fafb' : '#2F2F2F',
       },
     },
   };
@@ -299,22 +301,7 @@ export default function UsagePage() {
     fetchBillingHistoryData(params);
   }, [timeRange, selectedProject]);
 
-  const tabItems = [
-    {
-      key: "spend",
-      label: "Total Spend",
-      children: (
-        <div className="mt-6">
-          <UsageChart
-            data={chartData}
-            type="spend"
-            loading={chartLoading}
-            timeRange={timeRange}
-          />
-        </div>
-      ),
-    },
-  ];
+  // Removed tabItems - no longer needed without tabs
 
   const handleExport = () => {
     // Export functionality
@@ -385,29 +372,7 @@ export default function UsagePage() {
                 </Title>
               </div>
               <div className={styles.headerActions}>
-                <ConfigProvider theme={themeConfig}>
-                  <Select
-                    value={selectedProject}
-                    onChange={setSelectedProject}
-                    style={{ width: 200 }}
-                    className={styles.projectSelect}
-                    options={availableProjects}
-                  />
-                </ConfigProvider>
-                <ConfigProvider theme={themeConfig}>
-                  <Select
-                    value={timeRange}
-                    onChange={setTimeRange}
-                    style={{ width: 150 }}
-                    className={styles.dateSelect}
-                    options={[
-                      { value: "1d", label: "1d" },
-                      { value: "7d", label: "7d" },
-                      { value: "30d", label: "30d" },
-                      { value: "90d", label: "90d" },
-                    ]}
-                  />
-                </ConfigProvider>
+
                 <Button
                   icon={<Icon icon="ph:export" />}
                   className={styles.exportBtn}
@@ -435,8 +400,8 @@ export default function UsagePage() {
                 trend={
                   metrics.previousSpend
                     ? ((metrics.totalSpend - metrics.previousSpend) /
-                        metrics.previousSpend) *
-                      100
+                      metrics.previousSpend) *
+                    100
                     : 0
                 }
               />
@@ -451,8 +416,8 @@ export default function UsagePage() {
                 trend={
                   metrics.previousTokens
                     ? ((metrics.totalTokens - metrics.previousTokens) /
-                        metrics.previousTokens) *
-                      100
+                      metrics.previousTokens) *
+                    100
                     : 0
                 }
               />
@@ -463,8 +428,8 @@ export default function UsagePage() {
                 trend={
                   metrics.previousRequests
                     ? ((metrics.totalRequests - metrics.previousRequests) /
-                        metrics.previousRequests) *
-                      100
+                      metrics.previousRequests) *
+                    100
                     : 0
                 }
               />
@@ -502,16 +467,51 @@ export default function UsagePage() {
             </div>
 
             {/* Charts Section */}
-            <div className={styles.chartsSection}>
-              <ConfigProvider theme={themeConfig}>
-                <Tabs
-                  activeKey={activeTab}
-                  onChange={setActiveTab}
-                  items={tabItems}
-                  className={styles.chartTabs}
+            <Card className="bg-bud-bg-secondary border-bud-border rounded-[12px] mb-[2rem]">
+              <Flex
+                justify="space-between"
+                align="center"
+                className="mb-[1.5rem]"
+              >
+                <Text className="text-bud-text-primary font-semibold text-[15px]">
+                  Total Spend
+                </Text>
+                <div className={`${styles.headerActions} flex !gap-[.75rem]`}>
+                  <ConfigProvider theme={themeConfig}>
+                    <Select
+                      value={selectedProject}
+                      onChange={setSelectedProject}
+                      style={{ width: 200 }}
+                      className={styles.projectSelect}
+                      options={availableProjects}
+                    />
+                  </ConfigProvider>
+                  <ConfigProvider theme={themeConfig}>
+                    <Select
+                      value={timeRange}
+                      onChange={setTimeRange}
+                      style={{ width: 150 }}
+                      className={styles.dateSelect}
+                      options={[
+                        { value: "1d", label: "1d" },
+                        { value: "7d", label: "7d" },
+                        { value: "30d", label: "30d" },
+                        { value: "90d", label: "90d" },
+                      ]}
+                    />
+                  </ConfigProvider>
+                </div>
+              </Flex>
+
+              <div className="mt-6">
+                <UsageChart
+                  data={chartData}
+                  type="spend"
+                  loading={chartLoading}
+                  timeRange={timeRange}
                 />
-              </ConfigProvider>
-            </div>
+              </div>
+            </Card>
 
             {/* Billing Alerts */}
             <Card className="bg-bud-bg-secondary border-bud-border rounded-[12px] mb-[2rem]">

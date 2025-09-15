@@ -10,6 +10,7 @@ import { useTheme } from "@/context/themeContext";
 import TextInput from "@/components/ui/bud/dataEntry/TextInput";
 import CustomSelect from "@/components/ui/bud/dataEntry/CustomSelect";
 import { useProjects } from "@/hooks/useProjects";
+import { Form } from "antd";
 
 interface ApiKey {
   id: string;
@@ -38,14 +39,12 @@ function EditApiKeyForm({
   form: any;
 }) {
   const [projectData, setProjectData] = useState<any>([]);
-  const [KeyData, setKeyData] = useState<any>();
   const { projects, getProjects } = useProjects();
-  const [formData, setFormData] = useState({
+  const [formValues, setFormValues] = useState({
     name: "",
     project_id: "",
     expiry: "",
   });
-  const [isInitialized, setIsInitialized] = useState(false);
 
   // Fetch projects using the hook
   useEffect(() => {
@@ -55,54 +54,78 @@ function EditApiKeyForm({
   // Transform projects data to match the format needed for CustomSelect
   useEffect(() => {
     if (projects && projects.length > 0) {
-      console.log("Raw projects from useProjects:", projects);
-      // Match the exact pattern from AddNewKey.tsx
       const data = projects.map((item) => ({
         ...item,
         label: item?.["project"].name,
         value: item?.["project"].id,
       }));
-      console.log("Transformed project data for select options:", data);
       setProjectData(data);
     }
   }, [projects]);
 
-  // Load selected API key data - wait for projects to be loaded
+  // Re-initialize form values when component mounts and form is ready
   useEffect(() => {
     const storedKey = localStorage.getItem("selected_api_key");
-    if (storedKey && !isInitialized && projectData.length > 0) {
+    if (storedKey && form && form.setFieldsValue && projectData.length > 0) {
       const keyData = JSON.parse(storedKey);
-      setKeyData(keyData);
-      console.log("=== EditApiKey Form Initialization ===");
-      console.log("Loaded API key data:", keyData);
-      const projectId = keyData.project?.id || "";
-      const matchingProject = projectData.find((p: any) => p.value === projectId);
+      console.log("EditApiKeyForm - Initializing form with key data:", keyData);
+      console.log("EditApiKeyForm - Available projects:", projectData);
 
-      const initialData = {
+      const initialFormValues = {
         name: keyData.name || "",
-        project_id: projectId,
+        project_id: keyData.project?.id || "",
         expiry: keyData.expiry || "",
       };
 
-      console.log("Setting formData to:", initialData);
-      setFormData(initialData);
+      // Check if the project exists in projectData
+      const projectExists = projectData.some((p: any) => p.value === initialFormValues.project_id);
+      console.log("EditApiKeyForm - Project exists in options:", projectExists);
 
-      // Set form values - this is crucial for Form.Item to display the values
-      form.setFieldsValue({
-        name: keyData.name,
-        project_id: projectId,
-        expiry: keyData.expiry,
-      });
+      // Set state immediately
+      setFormValues(initialFormValues);
 
-      setIsInitialized(true);
+      // Try multiple times to ensure fields are registered
+      let attempts = 0;
+      const trySetValues = () => {
+        attempts++;
+        // Set individual field values
+        if (initialFormValues.name) {
+          form.setFieldValue("name", initialFormValues.name);
+        }
+        if (initialFormValues.project_id) {
+          form.setFieldValue("project_id", initialFormValues.project_id);
+        }
+        if (initialFormValues.expiry) {
+          form.setFieldValue("expiry", initialFormValues.expiry);
+        }
+
+        // Check what was actually set
+        const currentValues = form.getFieldsValue();
+        // If not all fields are set and we haven't tried too many times, try again
+        if ((!currentValues.project_id || !currentValues.name) && attempts < 5) {
+          setTimeout(trySetValues, 200);
+        } else {
+          // Validate after setting values
+          const isValid = currentValues.name?.trim() && currentValues.project_id;
+          setDisableNext(!isValid);
+        }
+      };
+
+      // Start trying after a short delay
+      setTimeout(trySetValues, 200);
+      console.log(projectData.find((item: { project: { id: string; }; }) =>
+        console.log(item.project.id === keyData.project?.id)
+      ));
     }
-  }, [form, isInitialized, projectData]);
+    console.log("EditApiKeyForm - Form initialization complete.", projectData);
+  }, [form, setDisableNext, projectData]);
 
-  // Validate form and enable/disable next button
-  useEffect(() => {
-    const isValid = formData.name.trim() !== "" && formData.project_id !== "";
+  // Watch form values to enable/disable next button
+  const validateForm = () => {
+    const values = form.getFieldsValue();
+    const isValid = values.name?.trim() && values.project_id;
     setDisableNext(!isValid);
-  }, [formData, setDisableNext]);
+  };
 
   return (
     <div className="px-[1.4rem] py-[2.1rem] flex flex-col gap-[1.6rem]">
@@ -115,35 +138,41 @@ function EditApiKeyForm({
         ClassNames="mt-[.1rem] mb-[0rem]"
         InputClasses="py-[.5rem]"
         formItemClassnames="mb-[0]"
-        value={formData?.name}
+        value={formValues?.name}
         onChange={(value) => {
-          form.setFieldsValue({ name: value });
-          form.validateFields(["name"]);
-          setFormData((prev) => ({ ...prev, name: value }));
+          setFormValues(prev => ({ ...prev, name: value }));
+          form.setFieldValue("name", value);
+          validateForm();
         }}
       />
 
-      <CustomSelect
+      <Form.Item
         name="project_id"
-        label="Project"
-        info="Select the project for this API key"
-        placeholder="Select Project"
-        value={KeyData?.project?.name || undefined}
-        selectOptions={projectData}
         rules={[{ required: true, message: "Please select a project!" }]}
-        onChange={(value) => {
-          form.setFieldsValue({ project_id: value });
-          form.validateFields(["project_id"]);
-          setFormData((prev) => ({ ...prev, project_id: value }));
-        }}
-      />
+        hasFeedback
+      >
+        <CustomSelect
+          name="project_id"
+          label="Project"
+          info="Select the project for this API key"
+          placeholder="Select Project"
+          value={projects.find(item => item.project.id === formValues?.project_id)?.project?.name || undefined}
+          selectOptions={projectData}
+          onChange={(value) => {
+            const selectedProject = projectData.find((p: any) => p.value === value);
+            setFormValues(prev => ({ ...prev, project_id: value }));
+            form.setFieldValue("project_id", value);
+            validateForm();
+          }}
+        />
+      </Form.Item>
 
       <CustomSelect
         name="expiry"
         label="Set Expiry"
         info="Set when this API key should expire"
         placeholder="Select Expiry"
-        value={formData.expiry || undefined}
+        value={formValues?.expiry || undefined}
         selectOptions={[
           { label: "Never", value: "0" },
           { label: "30 days", value: "30" },
@@ -151,9 +180,9 @@ function EditApiKeyForm({
           { label: "90 days", value: "90" },
         ]}
         onChange={(value) => {
-          form.setFieldsValue({ expiry: value });
-          form.validateFields(["expiry"]);
-          setFormData((prev) => ({ ...prev, expiry: value || "" }));
+          setFormValues(prev => ({ ...prev, expiry: value }));
+          form.setFieldValue("expiry", value);
+          validateForm();
         }}
       />
     </div>
@@ -167,6 +196,8 @@ export default function EditApiKey() {
   const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
   const [disableNext, setDisableNext] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [initialData, setInitialData] = useState<any>(null);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   const isLight = effectiveTheme === "light";
 
@@ -175,12 +206,29 @@ export default function EditApiKey() {
     if (storedKey) {
       const keyData = JSON.parse(storedKey);
       setSelectedApiKey(keyData);
+      // Set initial data for the form
+      const initialFormData = {
+        name: keyData.name || "",
+        project_id: keyData.project?.id || "",
+        expiry: keyData.expiry || "",
+      };
+      setInitialData(initialFormData);
+      setIsDataLoaded(true);
+    } else {
+      // No data found, but still mark as loaded
+      setIsDataLoaded(true);
+      setInitialData({});
     }
   }, []);
 
+  // Don't render the form until data is loaded
+  if (!isDataLoaded) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <BudForm
-      data={{}}
+      data={initialData}
       onNext={async () => {
         try {
           const values = await context.form?.validateFields();
