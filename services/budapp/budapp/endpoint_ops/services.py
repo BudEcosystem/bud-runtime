@@ -81,6 +81,7 @@ from .schemas import (
     AWSBedrockConfig,
     AWSSageMakerConfig,
     AzureConfig,
+    BudDocConfig,
     DeepSeekConfig,
     DeploymentPricingResponse,
     EndpointCreate,
@@ -2332,6 +2333,20 @@ class EndpointService(SessionMixin):
             provider_enum, model_name, endpoint_id, api_base, encrypted_credential_data
         )
 
+        # Initialize providers and routing
+        providers = {provider_enum: provider_config}
+        routing = [provider_enum]
+
+        # Add BudDoc provider if document endpoint is supported
+        if "document" in endpoints:
+            buddoc_config = BudDocConfig(
+                type="buddoc",
+                api_base=f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_doc_app_id}/method",
+                model_name=model_name,
+            )
+            providers[ProxyProviderEnum.BUDDOC] = buddoc_config
+            routing.append(ProxyProviderEnum.BUDDOC)
+
         # Get pricing information if requested
         pricing = None
         if include_pricing:
@@ -2346,8 +2361,8 @@ class EndpointService(SessionMixin):
 
         # Create the proxy model configuration using the schema
         model_config = ProxyModelConfig(
-            routing=[provider_enum],
-            providers={provider_enum: provider_config},
+            routing=routing,
+            providers=providers,
             endpoints=endpoints,
             api_key=encrypted_model_api_key,
             pricing=pricing,

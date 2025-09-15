@@ -434,7 +434,7 @@ async def determine_modality_endpoints(
         result["endpoints"] = [ModelEndpointEnum.CHAT, ModelEndpointEnum.COMPLETION]
     elif input_modality == "mllm":
         result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.CHAT]
+        result["endpoints"] = [ModelEndpointEnum.CHAT, ModelEndpointEnum.DOCUMENT]
     elif input_modality == "image":
         result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_OUTPUT]
         result["endpoints"] = [ModelEndpointEnum.IMAGE_GENERATION]

@@ -248,7 +248,7 @@ async fn main() {
             post(endpoints::openai_compatible::image_variation_handler),
         )
         .route(
-            "/v1/document",
+            "/v1/documents",
             post(endpoints::openai_compatible::document_processing_handler),
         )
         .route(

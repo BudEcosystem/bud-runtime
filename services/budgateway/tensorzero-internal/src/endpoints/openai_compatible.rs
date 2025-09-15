@@ -7156,7 +7156,7 @@ fn convert_openai_chunk_to_anthropic(openai_chunk: Value) -> Value {
 
 
 // Document processing handler
-/// Handler for document processing (POST /v1/document)
+/// Handler for document processing (POST /v1/documents)
 pub async fn document_processing_handler(
     State(AppStateData {
         config,

@@ -2,10 +2,21 @@ __pycache__/
 ../.dapr/
 tests/
 deploy/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
 
 requirements-*.txt
 README.md
+CLAUDE.md
 
 *secrets.json
 dapr-*.yaml
 *.log
+.env
+.env.sample
+.gitignore
+.pre-commit-config.yaml
+.commitlintrc.yaml

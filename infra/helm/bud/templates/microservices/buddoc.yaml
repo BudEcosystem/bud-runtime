@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-buddoc
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-buddoc
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-buddoc
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: {{ .Values.microservices.buddoc.daprid }}
+        dapr.io/app-port: "9081"
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-buddoc
+        image: {{ .Values.microservices.buddoc.image }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        command: ["sh", "-c", "alembic upgrade head && uvicorn buddoc.main:app --host 0.0.0.0 --port 9081"]
+        ports:
+        - containerPort: 9081
+        env:
+        {{ $root := . }}
+        {{- range $key, $value := .Values.microservices.buddoc.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name}}-bud-global
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 500m
+          requests:
+            memory: 256Mi
+            cpu: 100m
+        volumeMounts:
+        - name: temp-uploads
+          mountPath: /tmp/buddoc_uploads
+      volumes:
+      - name: temp-uploads
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-buddoc
+spec:
+  ports:
+  - port: 9081
+    targetPort: 9081
+  selector:
+    app: {{ .Release.Name }}-buddoc
+  type: ClusterIP

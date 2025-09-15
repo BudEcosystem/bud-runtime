@@ -791,6 +791,7 @@ class ProxyProviderEnum(StrEnum):
     TOGETHER = "together"
     XAI = "xai"
     BUD_SENTINEL = "bud-sentinel"
+    BUDDOC = "buddoc"
 
 
 # class ModelTemplateTypeEnum(StrEnum):
@@ -3003,6 +3004,7 @@ class ModelEndpointEnum(Enum):
     RESPONSES = "/v1/responses"
     RERANK = "/v1/rerank"  # https://docs.litellm.ai/docs/rerank
     MODERATION = "/v1/moderations"  # https://docs.litellm.ai/docs/moderation
+    DOCUMENT = "/v1/documents"  # Document processing endpoint for MLLM models
 
     @classmethod
     def serialize_endpoints(cls, selected_endpoints: List["ModelEndpointEnum"]) -> Dict[str, Any]:
@@ -3029,6 +3031,7 @@ class ModelEndpointEnum(Enum):
             cls.RESPONSES: "Responses",
             cls.RERANK: "Reranking",
             cls.MODERATION: "Moderation",
+            cls.DOCUMENT: "Document Processing",
         }
 
         # Create result dictionary
