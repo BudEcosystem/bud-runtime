@@ -977,7 +977,7 @@ class PromptVersionService(SessionMixin):
     """Service for managing prompt versions."""
 
     async def create_prompt_version(
-        self, prompt_id: UUID, endpoint_id: UUID, set_as_default: bool, current_user_id: UUID
+        self, prompt_id: UUID, endpoint_id: UUID, bud_prompt_id: str, set_as_default: bool, current_user_id: UUID
     ) -> PromptVersionModel:
         """Create a new version for an existing prompt."""
         # Validate that the prompt exists and is active
@@ -1013,6 +1013,29 @@ class PromptVersionService(SessionMixin):
 
         # Get the next version number
         next_version = await PromptVersionDataManager(self.session).get_next_version(prompt_id)
+
+        # Copy prompt configuration from temporary to permanent storage
+        # This removes the 24hr expiry from the Redis configuration
+        try:
+            prompt_service = PromptService(self.session)
+            copy_request = PromptConfigCopyRequest(
+                source_prompt_id=bud_prompt_id,
+                source_version=1,
+                target_prompt_id=db_prompt.name,
+                target_version=next_version,
+                replace=True,
+                set_as_default=set_as_default,
+            )
+            await prompt_service._copy_prompt_config(copy_request)
+            logger.debug(
+                f"Successfully copied prompt config from {bud_prompt_id} to {db_prompt.name} version {next_version}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to copy prompt configuration: {e}")
+            raise ClientException(
+                message="Failed to copy prompt configuration",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         # Create the new prompt version
         db_version = PromptVersionDataManager(self.session).add_one(

@@ -267,6 +267,7 @@ async def create_prompt_version(
         version_response = await PromptVersionService(session).create_prompt_version(
             prompt_id=prompt_id,
             endpoint_id=request.endpoint_id,
+            bud_prompt_id=request.bud_prompt_id,
             set_as_default=request.set_as_default,
             current_user_id=current_user.id,
         )

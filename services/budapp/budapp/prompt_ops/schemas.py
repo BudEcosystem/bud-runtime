@@ -373,6 +373,7 @@ class CreatePromptVersionRequest(BaseModel):
     """Create prompt version request schema."""
 
     endpoint_id: UUID4 = Field(..., description="Endpoint ID for the prompt version")
+    bud_prompt_id: str = Field(..., description="Temporary prompt ID from budprompt service")
     set_as_default: bool = Field(default=False, description="Set this version as the default version")
 
 
