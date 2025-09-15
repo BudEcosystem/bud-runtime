@@ -140,12 +140,12 @@ class TestOCRIntegration:
 
                 response = await async_client.post("/documents/ocr", json=request)
 
-                # Should handle error gracefully and return 200 with error in result
-                assert response.status_code == 200
+                # Should return HTTP 400 for processing errors
+                assert response.status_code == 400
                 data = response.json()
-                # Check that the result indicates failure (empty pages)
-                assert "pages" in data
-                assert len(data["pages"]) == 0  # No pages when processing fails
+                # Check that error details are in the response
+                assert "detail" in data
+                assert "Document processing failed" in data["detail"]
 
     @pytest.mark.asyncio
     async def test_large_document_handling(
