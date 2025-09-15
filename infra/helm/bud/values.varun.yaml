@@ -7,6 +7,6 @@ deploymentAnnotations: null
 
 microservices:
     budprompt:
-        image: budstudio/budprompt:vsr
+        image: vsrvarun/budprompt:vsr
     budapp:
-        image: budstudio/budapp:vsr
+        image: vsrvarun/budapp:vsr
