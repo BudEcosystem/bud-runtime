@@ -85,7 +85,8 @@ dockerTools.buildLayeredImage {
       (toString budcustomer)
     ];
     Env = [
-      "PORT=${builtins.toString port}"
+      "PORT=${builtins.toString port}",
+      "NEXT_PUBLIC_NOVU_APP_ID="$novu_app_id"
     ];
     ExposedPorts = {
       "${builtins.toString port}/tcp" = { };
