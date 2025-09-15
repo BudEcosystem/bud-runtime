@@ -449,7 +449,18 @@ export default function UsagePage() {
                 </div>
                 <div className={styles.planDetails}>
                   {isLoading ? (
-                    <Skeleton active paragraph={{ rows: 2 }} />
+                    <div className={styles.loadingContainer}>
+                      <motion.div
+                        className={styles.loadingBar}
+                        initial={{ width: "0%" }}
+                        animate={{ width: "100%" }}
+                        transition={{
+                          duration: 1.5,
+                          ease: "easeInOut",
+                          repeat: Infinity,
+                        }}
+                      />
+                    </div>
                   ) : (
                     <>
                       <div className={styles.planName}>
