@@ -70,7 +70,9 @@ function TextInput(props: BudInputProps) {
               name={props.name}
               placeholder={props.placeholder}
               value={props.value}
-              defaultValue={props.value === undefined ? props.defaultValue : undefined}
+              defaultValue={
+                props.value === undefined ? props.defaultValue : undefined
+              }
               style={{
                 ...props.style,
                 paddingTop: ".75rem",
@@ -88,7 +90,11 @@ function TextInput(props: BudInputProps) {
               }}
               onKeyDown={(e) => {
                 // Prevent space as first character if preventFirstSpace is true
-                if (props.preventFirstSpace && e.key === ' ' && e.currentTarget.value.length === 0) {
+                if (
+                  props.preventFirstSpace &&
+                  e.key === " " &&
+                  e.currentTarget.value.length === 0
+                ) {
                   e.preventDefault();
                 }
                 props.onKeyDown?.(e);
@@ -103,7 +109,9 @@ function TextInput(props: BudInputProps) {
             name={props.name}
             placeholder={props.placeholder}
             value={props.value}
-            defaultValue={props.value === undefined ? props.defaultValue : undefined}
+            defaultValue={
+              props.value === undefined ? props.defaultValue : undefined
+            }
             style={{
               ...props.style,
               paddingTop: ".75rem",
@@ -121,7 +129,11 @@ function TextInput(props: BudInputProps) {
             }}
             onKeyDown={(e) => {
               // Prevent space as first character if preventFirstSpace is true
-              if (props.preventFirstSpace && e.key === ' ' && e.currentTarget.value.length === 0) {
+              if (
+                props.preventFirstSpace &&
+                e.key === " " &&
+                e.currentTarget.value.length === 0
+              ) {
                 e.preventDefault();
               }
               props.onKeyDown?.(e);

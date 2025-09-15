@@ -339,13 +339,13 @@ export default function ObservabilityPage() {
       ),
     },
     {
-      title: 'Status',
-      key: 'status',
+      title: "Status",
+      key: "status",
       width: 100,
       render: (_, record) => (
         <ProjectTags
-          name={record.is_success ? 'Success' : 'Failed'}
-          color={record.is_success ? '#22c55e' : '#ef4444'}
+          name={record.is_success ? "Success" : "Failed"}
+          color={record.is_success ? "#22c55e" : "#ef4444"}
           textClass="text-[.75rem]"
         />
       ),
@@ -574,7 +574,7 @@ export default function ObservabilityPage() {
                             onClick={() => {
                               // Trigger a refresh by incrementing the refresh key
                               // This will cause MetricsTab to refetch its data
-                              setMetricsRefreshKey(prev => prev + 1);
+                              setMetricsRefreshKey((prev) => prev + 1);
                             }}
                             style={{ color: "var(--text-primary)" }}
                           >

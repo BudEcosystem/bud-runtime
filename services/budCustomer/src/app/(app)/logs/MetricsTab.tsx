@@ -247,7 +247,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
   // Helper function to get the correct project name based on viewBy setting
   const getProjectName = (item: any): string => {
     // When viewBy is 'project', use api_key_project_name if available
-    if (viewBy === 'project' && item.api_key_project_name) {
+    if (viewBy === "project" && item.api_key_project_name) {
       return item.api_key_project_name;
     }
     return item.project_name || "Unknown";
@@ -391,8 +391,10 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
     const p99Latency = summaryMetrics?.summary?.p99_latency?.value || 0;
     const totalCost = summaryMetrics?.summary?.total_cost?.value || 0;
     const totalTokens = summaryMetrics?.summary?.total_tokens?.value || 0;
-    const totalInputTokens = summaryMetrics?.summary?.total_input_tokens?.value || 0;
-    const totalOutputTokens = summaryMetrics?.summary?.total_output_tokens?.value || 0;
+    const totalInputTokens =
+      summaryMetrics?.summary?.total_input_tokens?.value || 0;
+    const totalOutputTokens =
+      summaryMetrics?.summary?.total_output_tokens?.value || 0;
     const avgTTFT = summaryMetrics?.summary?.ttft_avg?.value || 0;
     const p95TTFT = summaryMetrics?.summary?.ttft_p95?.value || 0;
     const throughputAvg = summaryMetrics?.summary?.throughput_avg?.value || 0;
@@ -578,7 +580,9 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           // Create a key for the group based on available identifiers
           const groupKey =
             group.model_name ||
-            (viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name) ||
+            (viewBy === "project"
+              ? group.api_key_project_name || group.project_name
+              : group.project_name) ||
             group.endpoint_name ||
             "Unknown";
 
@@ -640,7 +644,9 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
           // Get the name based on what's available in the group
           const name =
             group.model_name ||
-            (viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name) ||
+            (viewBy === "project"
+              ? group.api_key_project_name || group.project_name
+              : group.project_name) ||
             group.endpoint_name ||
             "Unknown";
           const count = group.metrics?.total_requests?.value || 0;
@@ -775,7 +781,9 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
       requestsTimeSeries.groups.forEach((group: any) => {
         const groupKey =
           group.model_name ||
-          (viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name) ||
+          (viewBy === "project"
+            ? group.api_key_project_name || group.project_name
+            : group.project_name) ||
           group.endpoint_name ||
           "Unknown";
         const hourlyMap = new Map<number, number>();
@@ -807,7 +815,10 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
         if (group.model_name) {
           groupKey = group.model_name;
         } else if (group.project_name || group.api_key_project_name) {
-          groupKey = viewBy === 'project' ? (group.api_key_project_name || group.project_name) : group.project_name;
+          groupKey =
+            viewBy === "project"
+              ? group.api_key_project_name || group.project_name
+              : group.project_name;
         } else if (group.endpoint_name) {
           groupKey = group.endpoint_name;
         } else if (group.user_id) {
@@ -1732,7 +1743,11 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
                 Request origins by country
               </Text_13_400_757575>
             </div>
-            <GeoMapChart key={`geo-${metricsKey}`} data={geographicData} theme={effectiveTheme} />
+            <GeoMapChart
+              key={`geo-${metricsKey}`}
+              data={geographicData}
+              theme={effectiveTheme}
+            />
           </div>
         </Col>
       </Row>

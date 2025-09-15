@@ -78,7 +78,7 @@ function EditApiKeyForm({
     }
   }, [projects]);
   useEffect(() => {
-    console.log("formValues", formValues)
+    console.log("formValues", formValues);
   }, [formValues]);
 
   // Re-initialize form values when component mounts and form is ready
@@ -114,11 +114,15 @@ function EditApiKeyForm({
         // Check what was actually set
         const currentValues = form.getFieldsValue();
         // If not all fields are set and we haven't tried too many times, try again
-        if ((!currentValues.project_id || !currentValues.name) && attempts < 5) {
+        if (
+          (!currentValues.project_id || !currentValues.name) &&
+          attempts < 5
+        ) {
           setTimeout(trySetValues, 200);
         } else {
           // Validate after setting values
-          const isValid = currentValues.name?.trim() && currentValues.project_id;
+          const isValid =
+            currentValues.name?.trim() && currentValues.project_id;
           setDisableNext(!isValid);
         }
       };
@@ -148,7 +152,7 @@ function EditApiKeyForm({
         formItemClassnames="mb-[0]"
         value={formValues?.name}
         onChange={(value) => {
-          setFormValues(prev => ({ ...prev, name: value }));
+          setFormValues((prev) => ({ ...prev, name: value }));
           form.setFieldValue("name", value);
           validateForm();
         }}
@@ -164,10 +168,13 @@ function EditApiKeyForm({
           label="Project"
           info="Select the project for this API key"
           placeholder="Select Project"
-          value={projects.find(item => item.project.id === formValues?.project_id)?.project?.name || undefined}
+          value={
+            projects.find((item) => item.project.id === formValues?.project_id)
+              ?.project?.name || undefined
+          }
           selectOptions={projectData}
           onChange={(value) => {
-            setFormValues(prev => ({ ...prev, project_id: value }));
+            setFormValues((prev) => ({ ...prev, project_id: value }));
             form.setFieldValue("project_id", value);
             validateForm();
           }}
@@ -187,7 +194,7 @@ function EditApiKeyForm({
           { label: "90 days", value: "90" },
         ]}
         onChange={(value) => {
-          setFormValues(prev => ({ ...prev, expiry: value }));
+          setFormValues((prev) => ({ ...prev, expiry: value }));
           form.setFieldValue("expiry", value);
           validateForm();
         }}
