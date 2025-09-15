@@ -80,6 +80,28 @@ class AuthService(SessionMixin):
             )
             raise ClientException("This email is not registered")
 
+        # Validate user_type: Prevent clients from logging in as admin
+        if user.user_type == UserTypeEnum.ADMIN and db_user.user_type == UserTypeEnum.CLIENT:
+            logger.debug(f"Client user attempting to login as admin: {user.email}")
+            # Log failed login attempt - unauthorized user_type
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_id=db_user.id,
+                resource_name=db_user.email,
+                user_id=db_user.id,
+                details={
+                    "email": user.email,
+                    "reason": "Client users cannot login with admin user_type",
+                    "requested_user_type": user.user_type,
+                    "actual_user_type": db_user.user_type,
+                },
+                request=request,
+                success=False,
+            )
+            raise ClientException("Unauthorized: Client users cannot login as admin")
+
         # Get tenant information
         tenant = None
         if user.tenant_id:
