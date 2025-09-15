@@ -4,3 +4,9 @@ ingress:
 
 # disable keel
 deploymentAnnotations: null
+
+microservices:
+    budprompt:
+        image: budstudio/budprompt:vsr
+    budapp:
+        image: budstudio/budapp:vsr
