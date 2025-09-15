@@ -387,9 +387,6 @@ class PromptService(SessionMixin):
         Args:
             request: The copy configuration request
 
-        Returns:
-            PromptConfigCopyResponse with copy details
-
         Raises:
             ClientException: If copy operation fails
         """
@@ -402,6 +399,53 @@ class PromptService(SessionMixin):
             logger.exception(f"Failed to copy prompt config: {e}")
             raise ClientException(
                 message="Failed to copy prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def _perform_set_default_version_request(self, prompt_id: str, version: int) -> Dict[str, Any]:
+        """Perform set default version request to budprompt service.
+
+        Args:
+            prompt_id: The prompt ID to set default version for
+            version: The version number to set as default
+
+        Returns:
+            Response data from budprompt service
+        """
+        # Build the URL for set-default-version endpoint
+        set_default_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/set-default-version"
+
+        # Prepare request payload
+        payload = {"prompt_id": prompt_id, "version": version}
+
+        logger.debug(f"Setting default version for prompt_id={prompt_id}, version={version}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(set_default_endpoint, json=payload) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        logger.error(f"Failed to set default version: {response.status} {response_data}")
+                        raise ClientException(
+                            message=response_data.get("message", "Failed to set default version"),
+                            status_code=response.status,
+                        )
+
+                    logger.debug(f"Successfully set default version for prompt: {prompt_id}")
+                    return response_data
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Network error during set default version request: {e}")
+            raise ClientException(
+                message="Network error while setting default version",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            ) from e
+        except ClientException:
+            raise  # Re-raise ClientException as-is
+        except Exception as e:
+            logger.exception(f"Failed to set default version: {e}")
+            raise ClientException(
+                message="Failed to set default version", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
     async def _perform_copy_prompt_config_request(self, request: PromptConfigCopyRequest) -> Dict[str, Any]:
@@ -1116,6 +1160,24 @@ class PromptVersionService(SessionMixin):
         # Handle set_as_default if provided
         set_as_default = data.pop("set_as_default", None)
         if set_as_default is True:
+            # FIRST: Update Redis to set default version
+            try:
+                prompt_service = PromptService(self.session)
+                await prompt_service._perform_set_default_version_request(
+                    prompt_id=db_prompt.name,  # Redis uses prompt name as ID
+                    version=db_version.version,  # Use the version number
+                )
+                logger.debug(
+                    f"Successfully set default version in Redis for prompt {db_prompt.name} version {db_version.version}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to set default version in Redis: {e}")
+                raise ClientException(
+                    message="Failed to set default version in configuration service",
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            # THEN: Update database after Redis is successfully updated
             await PromptDataManager(self.session).update_by_fields(db_prompt, {"default_version_id": db_version.id})
 
         # Update the prompt version with remaining fields
