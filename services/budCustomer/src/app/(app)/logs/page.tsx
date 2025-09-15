@@ -85,6 +85,7 @@ export default function ObservabilityPage() {
     "model" | "deployment" | "project" | "user"
   >("model");
   const [selectedPreset, setSelectedPreset] = useState<string>("Last 7 days");
+  const [metricsRefreshKey, setMetricsRefreshKey] = useState(0);
 
   const {
     inferences,
@@ -134,17 +135,22 @@ export default function ObservabilityPage() {
     if (dates && dates[0] && dates[1]) {
       setTimeRange([dates[0], dates[1]]);
       setSelectedPreset(""); // Clear preset selection when using date picker
-      // Create the new filters
-      const newFilters = {
-        from_date: dates[0].toISOString(),
-        to_date: dates[1].toISOString(),
-        sort_by: "timestamp" as const,
-        sort_order: "desc" as const,
-      };
-      // Update filters in store
-      setFilters(newFilters);
-      // Fetch with the same filters to ensure consistency
-      fetchInferences(undefined, newFilters);
+
+      // Only update inferences if we're on the requests tab
+      // The metrics tab will handle its own data fetching
+      if (activeTab === "requests") {
+        // Create the new filters
+        const newFilters = {
+          from_date: dates[0].toISOString(),
+          to_date: dates[1].toISOString(),
+          sort_by: "timestamp" as const,
+          sort_order: "desc" as const,
+        };
+        // Update filters in store
+        setFilters(newFilters);
+        // Fetch with the same filters to ensure consistency
+        fetchInferences(undefined, newFilters);
+      }
     }
   };
 
@@ -548,17 +554,9 @@ export default function ObservabilityPage() {
                                       const timeValue = preset.value();
                                       setTimeRange(timeValue);
                                       setSelectedPreset(preset.label);
-                                      // Create the new filters
-                                      const newFilters = {
-                                        from_date: timeValue[0].toISOString(),
-                                        to_date: timeValue[1].toISOString(),
-                                        sort_by: "timestamp" as const,
-                                        sort_order: "desc" as const,
-                                      };
-                                      // Update filters in store
-                                      setFilters(newFilters);
-                                      // Fetch with the same filters to ensure consistency
-                                      fetchInferences(undefined, newFilters);
+                                      // Metrics tab doesn't need to fetch inferences
+                                      // The MetricsTab component will handle its own data fetching
+                                      // based on the timeRange prop change
                                     }}
                                     className="text-xs hover:text-[var(--text-primary)] hover:border-[var(--border-secondary)]"
                                   >
@@ -573,7 +571,11 @@ export default function ObservabilityPage() {
                         {/* Refresh Button */}
                         <div style={{ color: "var(--text-primary)" }}>
                           <PrimaryButton
-                            onClick={() => fetchInferences()}
+                            onClick={() => {
+                              // Trigger a refresh by incrementing the refresh key
+                              // This will cause MetricsTab to refetch its data
+                              setMetricsRefreshKey(prev => prev + 1);
+                            }}
                             style={{ color: "var(--text-primary)" }}
                           >
                             <ReloadOutlined
@@ -596,6 +598,7 @@ export default function ObservabilityPage() {
                         viewBy={viewBy}
                         isActive={activeTab === "metrics"}
                         filters={filters}
+                        refreshKey={metricsRefreshKey}
                       />
                     </>
                   ),

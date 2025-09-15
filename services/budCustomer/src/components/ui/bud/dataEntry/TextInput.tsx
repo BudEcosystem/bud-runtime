@@ -13,6 +13,7 @@ export interface BudInputProps {
   name: string;
   label?: string;
   value?: any;
+  defaultValue?: any;
   placeholder?: string;
   disabled?: boolean;
   allowOnlyNumbers?: boolean;
@@ -68,6 +69,8 @@ function TextInput(props: BudInputProps) {
             <Input
               name={props.name}
               placeholder={props.placeholder}
+              value={props.value}
+              defaultValue={props.value === undefined ? props.defaultValue : undefined}
               style={{
                 ...props.style,
                 paddingTop: ".75rem",
@@ -99,6 +102,8 @@ function TextInput(props: BudInputProps) {
           <Input
             name={props.name}
             placeholder={props.placeholder}
+            value={props.value}
+            defaultValue={props.value === undefined ? props.defaultValue : undefined}
             style={{
               ...props.style,
               paddingTop: ".75rem",

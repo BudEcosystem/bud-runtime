@@ -40,11 +40,26 @@ function EditApiKeyForm({
 }) {
   const [projectData, setProjectData] = useState<any>([]);
   const { projects, getProjects } = useProjects();
-  const [formValues, setFormValues] = useState({
-    name: "",
-    project_id: "",
-    expiry: "",
-  });
+
+  // Initialize formValues from localStorage on mount
+  const getInitialFormValues = () => {
+    const storedKey = localStorage.getItem("selected_api_key");
+    if (storedKey) {
+      const keyData = JSON.parse(storedKey);
+      return {
+        name: keyData.name || "",
+        project_id: keyData.project?.id || "",
+        expiry: keyData.expiry || "",
+      };
+    }
+    return {
+      name: "",
+      project_id: "",
+      expiry: "",
+    };
+  };
+
+  const [formValues, setFormValues] = useState(getInitialFormValues());
 
   // Fetch projects using the hook
   useEffect(() => {
@@ -62,25 +77,22 @@ function EditApiKeyForm({
       setProjectData(data);
     }
   }, [projects]);
+  useEffect(() => {
+    console.log("formValues", formValues)
+  }, [formValues]);
 
   // Re-initialize form values when component mounts and form is ready
   useEffect(() => {
     const storedKey = localStorage.getItem("selected_api_key");
     if (storedKey && form && form.setFieldsValue && projectData.length > 0) {
       const keyData = JSON.parse(storedKey);
-      console.log("EditApiKeyForm - Initializing form with key data:", keyData);
-      console.log("EditApiKeyForm - Available projects:", projectData);
-
       const initialFormValues = {
         name: keyData.name || "",
         project_id: keyData.project?.id || "",
         expiry: keyData.expiry || "",
       };
-
-      // Check if the project exists in projectData
-      const projectExists = projectData.some((p: any) => p.value === initialFormValues.project_id);
-      console.log("EditApiKeyForm - Project exists in options:", projectExists);
-
+      // Note: Could check if the project exists in projectData if needed
+      // const projectExists = projectData.some((p: any) => p.value === initialFormValues.project_id);
       // Set state immediately
       setFormValues(initialFormValues);
 
@@ -111,13 +123,9 @@ function EditApiKeyForm({
         }
       };
 
-      // Start trying after a short delay
-      setTimeout(trySetValues, 200);
-      console.log(projectData.find((item: { project: { id: string; }; }) =>
-        console.log(item.project.id === keyData.project?.id)
-      ));
+      // Start trying to set values
+      trySetValues();
     }
-    console.log("EditApiKeyForm - Form initialization complete.", projectData);
   }, [form, setDisableNext, projectData]);
 
   // Watch form values to enable/disable next button
@@ -159,7 +167,6 @@ function EditApiKeyForm({
           value={projects.find(item => item.project.id === formValues?.project_id)?.project?.name || undefined}
           selectOptions={projectData}
           onChange={(value) => {
-            const selectedProject = projectData.find((p: any) => p.value === value);
             setFormValues(prev => ({ ...prev, project_id: value }));
             form.setFieldValue("project_id", value);
             validateForm();

@@ -191,6 +191,7 @@ interface MetricsTabProps {
   viewBy: "model" | "deployment" | "project" | "user";
   isActive?: boolean;
   filters?: Record<string, any>;
+  refreshKey?: number;
 }
 
 interface MetricStats {
@@ -239,6 +240,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
   viewBy,
   isActive,
   filters,
+  refreshKey,
 }) => {
   const { effectiveTheme } = useTheme();
 
@@ -283,6 +285,11 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
     let isMounted = true;
 
     const fetchMetrics = async () => {
+      // Only fetch if the tab is active
+      if (!isActive) {
+        return;
+      }
+
       if (timeRange && viewBy) {
         try {
           // Only pass non-date filters to avoid conflicts
@@ -319,7 +326,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [timeRange, viewBy, filters]);
+  }, [timeRange, viewBy, filters, isActive, refreshKey]);
 
   // Color palette for consistent colors across charts
   const colorPalette = [
