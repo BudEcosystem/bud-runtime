@@ -1025,7 +1025,7 @@ export default function AuditPage() {
   );
 }
 
-export const LoadingWrapper = () => {
+const LoadingWrapper = () => {
   return <div className={styles.loadingWrapper}>
     <div className={styles.loadingContainer}>
       <motion.div
