@@ -49,6 +49,7 @@ class CredentialFilter(BaseModel):
 
     name: Optional[str] = None
     project_id: Optional[UUID] = None
+    credential_type: Optional[str] = None
 
 
 class BudCredentialCreate(BaseModel):
