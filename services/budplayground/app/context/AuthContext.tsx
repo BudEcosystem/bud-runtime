@@ -2,6 +2,8 @@
 
 import { ReactNode, createContext, useContext, useEffect, useState, useRef } from 'react';
 import { useEndPoints } from '../components/bud/hooks/useEndPoint';
+import { useUserSwitching } from '../hooks/useUserSwitching';
+import { useChatStore } from '../store/chat';
 import axios from 'axios';
 
 interface AuthContextType {
@@ -29,6 +31,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isJWTAuth, setIsJWTAuth] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const hasInitialized = useRef(false);
+
+  // Enable automatic user switching based on authentication changes
+  const { getCurrentUserIdentifier } = useUserSwitching();
 
   // New state for token refresh management
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -401,6 +406,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('session_data');
     localStorage.removeItem('api_key');
+
+    // Clear chat store data when logging out
+    const { switchUser } = useChatStore.getState();
+    switchUser();
 
     // Reset all state
     setApiKey(null);
