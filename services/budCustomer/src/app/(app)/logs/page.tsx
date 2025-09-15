@@ -694,14 +694,14 @@ export default function ObservabilityPage() {
                               Inference Requests
                             </Text_16_600_FFFFFF>
                             <div className="flex items-center justify-between gap-x-[.8rem]">
-                              <div style={{ color: "var(--text-primary)" }}>
+                              {/* <div style={{ color: "var(--text-primary)" }}>
                                 <SearchHeaderInput
                                   placeholder={"Search by prompt or response"}
                                   searchValue={searchValue}
                                   setSearchValue={setSearchValue}
                                   classNames="mr-[.6rem] theme-search-override"
                                 />
-                              </div>
+                              </div> */}
                               <div style={{ color: "var(--text-primary)" }}>
                                 <PrimaryButton
                                   onClick={() => fetchInferences()}
