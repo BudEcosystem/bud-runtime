@@ -314,6 +314,7 @@ async def update_billing_plan(
         # Reset alerts if quotas were changed
         if quota_changed:
             service.reset_user_alerts(request.user_id)
+            await service.check_usage_limits(request.user_id)
             logger.info(f"Reset billing alerts for user {request.user_id} due to quota update")
 
         return SingleResponse(
