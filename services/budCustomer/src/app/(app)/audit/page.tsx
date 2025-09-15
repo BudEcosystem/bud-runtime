@@ -46,6 +46,7 @@ import isYesterday from "dayjs/plugin/isYesterday";
 import styles from "./audit.module.scss";
 import { AppRequest } from "@/services/api/requests";
 import Tags from "@/components/ui/Tags";
+import { motion, AnimatePresence } from "framer-motion";
 
 dayjs.extend(relativeTime);
 dayjs.extend(isToday);
@@ -775,9 +776,9 @@ export default function AuditPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <Card className="bg-bud-bg-secondary border-bud-border">
+          <Card className="bg-bud-bg-secondary border-bud-border relative">
             {isStatsLoading ? (
-              <Skeleton active paragraph={{ rows: 2 }} />
+              <LoadingWrapper />
             ) : (
               <div className="flex items-center justify-between">
                 <div>
@@ -793,9 +794,9 @@ export default function AuditPage() {
             )}
           </Card>
 
-          <Card className="bg-bud-bg-secondary border-bud-border">
+          <Card className="bg-bud-bg-secondary border-bud-border relative">
             {isStatsLoading ? (
-              <Skeleton active paragraph={{ rows: 2 }} />
+              <LoadingWrapper />
             ) : (
               <div className="flex items-center justify-between">
                 <div>
@@ -814,9 +815,9 @@ export default function AuditPage() {
             )}
           </Card>
 
-          <Card className="bg-bud-bg-secondary border-bud-border hidden">
+          <Card className="bg-bud-bg-secondary border-bud-border hidden relative">
             {isStatsLoading ? (
-              <Skeleton active paragraph={{ rows: 2 }} />
+              <LoadingWrapper />
             ) : (
               <div className="flex items-center justify-between">
                 <div>
@@ -832,9 +833,9 @@ export default function AuditPage() {
             )}
           </Card>
 
-          <Card className="bg-bud-bg-secondary border-bud-border">
+          <Card className="bg-bud-bg-secondary border-bud-border relative">
             {isStatsLoading ? (
-              <Skeleton active paragraph={{ rows: 2 }} />
+              <LoadingWrapper />
             ) : (
               <div className="flex items-center justify-between">
                 <div>
@@ -860,9 +861,9 @@ export default function AuditPage() {
         </div>
 
         {/* Filters */}
-        <Card className="bg-bud-bg-secondary border-bud-border mb-6">
+        <Card className="bg-bud-bg-secondary border-bud-border mb-6 relative">
           {isStatsLoading ? (
-            <Skeleton active paragraph={{ rows: 2 }} />
+            <LoadingWrapper />
           ) : (
             <div className="flex items-center gap-4">
               <Input
@@ -1022,4 +1023,21 @@ export default function AuditPage() {
       </div>
     </DashboardLayout>
   );
+}
+
+export const LoadingWrapper = () => {
+  return <div className={styles.loadingWrapper}>
+    <div className={styles.loadingContainer}>
+      <motion.div
+        className={styles.loadingBar}
+        initial={{ width: "0%" }}
+        animate={{ width: "100%" }}
+        transition={{
+          duration: 1.5,
+          ease: "easeInOut",
+          repeat: Infinity,
+        }}
+      />
+    </div>
+  </div>
 }
