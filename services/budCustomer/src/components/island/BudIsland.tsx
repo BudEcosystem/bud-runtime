@@ -117,7 +117,10 @@ const BudIsland: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     refetch();
-    getWorkflowList();
+    // Only fetch workflow list when the island is actually opened
+    if (isOpen) {
+      getWorkflowList();
+    }
   }, [isOpen, user]);
 
   // Log session initialization status for debugging
