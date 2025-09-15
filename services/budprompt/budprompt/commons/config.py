@@ -21,7 +21,6 @@ from pathlib import Path
 from budmicroframe.commons.config import (
     BaseAppConfig,
     BaseSecretsConfig,
-    enable_periodic_sync_from_store,
     register_settings,
 )
 from pydantic import DirectoryPath, Field
@@ -42,49 +41,34 @@ class AppConfig(BaseAppConfig):
     bud_gateway_base_url: str = Field(..., alias="BUD_GATEWAY_BASE_URL")
     bud_default_model_name: str = Field(..., alias="BUD_DEFAULT_MODEL_NAME")
 
+    # Redis Configuration
+    redis_host: str = Field(..., alias="REDIS_HOST")
+    redis_port: int = Field(default=6379, alias="REDIS_PORT")
+    redis_db_index: int = Field(default=0, alias="REDIS_DB_INDEX")
+    redis_password: str = Field(default="", alias="REDIS_PASSWORD")
+
     # Redis TTL Configuration
     prompt_config_redis_ttl: int = Field(default=86400, alias="PROMPT_CONFIG_REDIS_TTL")
+
+    @property
+    def redis_url(self) -> str:
+        """Construct the complete Redis URL from individual components.
+
+        Returns:
+            Complete Redis connection URL with authentication if password is provided
+        """
+        if self.redis_password:
+            return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db_index}"
+        else:
+            return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db_index}"
 
 
 class SecretsConfig(BaseSecretsConfig):
     name: str = __version__.split("@")[0]
     version: str = __version__.split("@")[-1]
 
-    bud_redis_uri: str = Field(
-        ..., alias="BUD_REDIS_URI", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
-    )
-    bud_redis_password: str = Field(
-        ..., alias="BUD_REDIS_PASSWORD", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
-    )
-
-    @property
-    def redis_url(self) -> str:
-        """Construct the complete Redis URL with password.
-
-        Returns:
-            Complete Redis connection URL with authentication
-        """
-        # If URI already contains authentication, return as-is
-        if "@" in self.bud_redis_uri:
-            return self.bud_redis_uri
-
-        # Parse the URI to insert password
-        if self.bud_redis_uri.startswith("redis://") or self.bud_redis_uri.startswith("rediss://"):
-            # Extract protocol and the rest
-            protocol = "rediss://" if self.bud_redis_uri.startswith("rediss://") else "redis://"
-            uri_without_protocol = self.bud_redis_uri[len(protocol) :]
-
-            # Construct URL with password
-            if self.bud_redis_password:
-                return f"{protocol}:{self.bud_redis_password}@{uri_without_protocol}"
-            else:
-                return self.bud_redis_uri
-        else:
-            # Assume it's just host:port, add redis:// protocol
-            if self.bud_redis_password:
-                return f"redis://:{self.bud_redis_password}@{self.bud_redis_uri}"
-            else:
-                return f"redis://{self.bud_redis_uri}"
+    # Add any other secrets here that are not Redis-related
+    # For now, this class can remain empty or contain other secrets
 
 
 app_settings = AppConfig()

@@ -28,11 +28,8 @@ spec:
         ports:
         - containerPort: 3015
         env:
-          - name: BUD_GATEWAY_BASE_URL
+          # - name: BUD_GATEWAY_BASE_URL
             # value: {{ include "bud.ingress.url.budgateway" $ }}
-            value: "http://20.66.97.208/v1"
-          - name: BUD_DEFAULT_MODEL_NAME
-            value: "qwen3-32b"
         {{- $root := . }}
         {{- range $key, $value := .Values.microservices.budprompt.env }}
           - name: {{ $key }}

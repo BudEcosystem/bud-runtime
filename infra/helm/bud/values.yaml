@@ -175,6 +175,11 @@ microservices:
             PSQL_USER: budprompt
             PSQL_PASSWORD: budprompt
             PSQL_DB_NAME: budprompt
+
+            REDIS_HOST: "{{ .Release.Name }}-valkey-primary"
+            REDIS_PORT: "6379"
+            REDIS_DB_INDEX: "10"
+            REDIS_PASSWORD: "{{ .Values.valkey.auth.password }}"
     global:
         env:
             PROMETHEUS_URL: https://metric.bud.studio

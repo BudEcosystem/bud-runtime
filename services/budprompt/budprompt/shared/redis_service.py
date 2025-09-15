@@ -4,7 +4,7 @@ from typing import Optional, Union
 import redis.asyncio as aioredis
 from redis.typing import AbsExpiryT, EncodableT, ExpiryT, KeyT, PatternT, ResponseT
 
-from ..commons.config import secrets_settings
+from ..commons.config import app_settings
 from ..commons.exceptions import RedisException
 from .singleton import SingletonMeta
 
@@ -20,7 +20,7 @@ class RedisSingleton(metaclass=SingletonMeta):
     def __init__(self):
         """Initialize the Redis singleton."""
         if not self._redis_client:
-            pool = aioredis.ConnectionPool.from_url(secrets_settings.redis_url)
+            pool = aioredis.ConnectionPool.from_url(app_settings.redis_url)
             self._redis_client = aioredis.Redis.from_pool(pool)
 
     async def __aenter__(self):
