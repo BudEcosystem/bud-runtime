@@ -362,6 +362,31 @@ export const useEvaluations = create<{
 
       console.log('Saving workflow with steps:', workflow.workflow_steps);
       set({ currentWorkflow: workflow });
+
+      // Fetch the updated workflow data (similar to add model workflow)
+      const workflowId = workflow.workflow_id;
+      if (workflowId) {
+        try {
+          const workflowResponse: any = await AppRequest.Get(`${tempApiBaseUrl}/workflows/${workflowId}`);
+          if (workflowResponse && workflowResponse.data) {
+            // Update currentWorkflow with the fetched data
+            const fetchedWorkflow: EvaluationWorkflow = {
+              ...workflow,
+              ...workflowResponse.data,
+              workflow_steps: {
+                ...workflow.workflow_steps,
+                ...workflowResponse.data.workflow_steps
+              }
+            };
+            set({ currentWorkflow: fetchedWorkflow });
+            console.log('Updated workflow with fetched data:', fetchedWorkflow);
+          }
+        } catch (error) {
+          console.error("Error fetching workflow after creation:", error);
+          // Continue even if GET fails, we already have the workflow from POST
+        }
+      }
+
       return response.data;
     } catch (error) {
       console.error("Error creating evaluation workflow:", error);

@@ -127,6 +127,7 @@ export type WorkflowType = {
         delete_endpoint_events?: BudSimilatorEvent;
         model_security_scan_events?: BudSimilatorEvent;
         model_extraction_events?: BudSimilatorEvent;
+        evaluation_events?: BudSimilatorEvent;
         endpoint_name?: string;
         deploy_config?: any;
         icon?: string;

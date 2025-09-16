@@ -150,6 +150,7 @@ export function BudWidget({
 
   const openWidget = async () => {
     let workflow: WorkflowType;
+    console.log('WorkflowType', data)
     setLoading(true);
     if (data.workflow_type === "model_deployment") {
       workflow = await getWorkflowCloud(data.id);
