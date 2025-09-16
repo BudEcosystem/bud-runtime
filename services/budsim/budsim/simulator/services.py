@@ -1072,7 +1072,7 @@ class SimulationService:
                 # Run evolution once per device type with full cluster context
                 for device_type, device_group in device_groups.items():
                     for engine_device_combo in compatible_engines:
-                        if engine_device_combo["device"] == device_type:
+                        if engine_device_combo["device"].lower() == device_type.lower():
                             logger.debug(
                                 f"Processing engine-device combination: Engine={engine_device_combo['engine_name']}, "
                                 f"Device={device_type}"

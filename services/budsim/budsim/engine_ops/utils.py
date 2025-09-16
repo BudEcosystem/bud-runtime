@@ -48,7 +48,7 @@ def fetch_compatible_engines(
             compatible_engines.append(
                 {
                     "engine_name": engine["engine"],
-                    "device": engine["device_architecture"],
+                    "device": engine["device_architecture"].lower(),
                     "image": engine["container_image"],
                 }
             )
