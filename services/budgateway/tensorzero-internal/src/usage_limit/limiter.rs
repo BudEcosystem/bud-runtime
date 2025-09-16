@@ -3,19 +3,19 @@ use crate::usage_limit::{UsageLimitDecision, UsageLimitStatus};
 use moka::future::Cache;
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
 use tokio::time::{interval, timeout, Duration};
-use tracing::{debug, warn, error, info};
+use tracing::{debug, error, info, warn};
 
 /// Usage limit information from Redis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageLimitInfo {
     pub user_id: String,
     #[serde(default = "default_user_type")]
-    pub user_type: String,  // "admin" or "client"
+    pub user_type: String, // "admin" or "client"
     pub allowed: bool,
     pub status: String,
     pub tokens_quota: Option<i64>,
@@ -23,14 +23,14 @@ pub struct UsageLimitInfo {
     pub cost_quota: Option<f64>,
     pub cost_used: f64,
     #[serde(default)]
-    pub update_id: u64,  // Incremented by budapp on each update
+    pub update_id: u64, // Incremented by budapp on each update
     pub reason: Option<String>,
     pub reset_at: Option<String>,
     pub last_updated: Option<String>,
     #[serde(default)]
-    pub billing_cycle_start: Option<String>,  // Track billing cycle
+    pub billing_cycle_start: Option<String>, // Track billing cycle
     #[serde(default)]
-    pub billing_cycle_end: Option<String>,    // When cycle ends
+    pub billing_cycle_end: Option<String>, // When cycle ends
 }
 
 fn default_user_type() -> String {
@@ -132,7 +132,7 @@ impl UsageLimiter {
                 Ok(conn) => {
                     info!("Connected to Redis for usage limiting");
                     Some(conn)
-                },
+                }
                 Err(e) => {
                     warn!("Failed to connect to Redis for usage limiting: {}", e);
                     None
@@ -183,7 +183,12 @@ impl UsageLimiter {
     }
 
     /// Check usage limits for a user with optional consumption tracking
-    pub async fn check_usage(&self, user_id: &str, tokens_to_consume: Option<i64>, cost_to_consume: Option<f64>) -> UsageLimitDecision {
+    pub async fn check_usage(
+        &self,
+        user_id: &str,
+        tokens_to_consume: Option<i64>,
+        cost_to_consume: Option<f64>,
+    ) -> UsageLimitDecision {
         // Check local cache first
         if let Some(mut cached) = self.cache.get(user_id).await {
             self.metrics.record_cache_hit();
@@ -197,8 +202,14 @@ impl UsageLimiter {
 
             // If consuming, write atomic increments to Redis immediately
             if tokens_to_consume.is_some() || cost_to_consume.is_some() {
-                if let Err(e) = self.increment_realtime_usage(user_id, tokens_to_consume, cost_to_consume).await {
-                    warn!("Failed to increment realtime usage for user {}: {}", user_id, e);
+                if let Err(e) = self
+                    .increment_realtime_usage(user_id, tokens_to_consume, cost_to_consume)
+                    .await
+                {
+                    warn!(
+                        "Failed to increment realtime usage for user {}: {}",
+                        user_id, e
+                    );
                     // Continue with local tracking as fallback
                 }
 
@@ -218,14 +229,16 @@ impl UsageLimiter {
             let quota_allowed = self.check_quotas(&cached);
             let overall_allowed = cached.allowed && quota_allowed;
 
-
             let decision = if overall_allowed {
                 self.metrics.record_allowed();
                 UsageLimitDecision::Allow
             } else {
                 self.metrics.record_denied();
                 UsageLimitDecision::Deny {
-                    reason: cached.reason.clone().unwrap_or_else(|| "Usage limit exceeded".to_string()),
+                    reason: cached
+                        .reason
+                        .clone()
+                        .unwrap_or_else(|| "Usage limit exceeded".to_string()),
                 }
             };
             return decision;
@@ -275,20 +288,25 @@ impl UsageLimiter {
                 } else {
                     self.metrics.record_denied();
                     UsageLimitDecision::Deny {
-                        reason: limit_info.reason.unwrap_or_else(|| "Usage limit exceeded".to_string()),
+                        reason: limit_info
+                            .reason
+                            .unwrap_or_else(|| "Usage limit exceeded".to_string()),
                     }
                 };
                 decision
             }
             Ok(None) => {
                 // No limit info found - user has no billing plan (allow for freemium)
-                debug!("No usage limit info for user {} - allowing (freemium)", user_id);
+                debug!(
+                    "No usage limit info for user {} - allowing (freemium)",
+                    user_id
+                );
                 self.metrics.record_allowed();
 
                 // Cache the allow decision for freemium user
                 let status = UsageLimitStatus {
                     user_id: user_id.to_string(),
-                    user_type: "client".to_string(),  // Default to client for freemium
+                    user_type: "client".to_string(), // Default to client for freemium
                     allowed: true,
                     status: "no_billing_plan".to_string(),
                     tokens_quota: None,
@@ -327,7 +345,12 @@ impl UsageLimiter {
     }
 
     /// Update usage counters directly in the main usage_limit key
-    async fn increment_realtime_usage(&self, user_id: &str, tokens: Option<i64>, cost: Option<f64>) -> Result<(), Error> {
+    async fn increment_realtime_usage(
+        &self,
+        user_id: &str,
+        tokens: Option<i64>,
+        cost: Option<f64>,
+    ) -> Result<(), Error> {
         let redis_client = self.redis_client.read().await;
 
         if let Some(mut conn) = redis_client.as_ref().map(|c| c.clone()) {
@@ -372,11 +395,18 @@ impl UsageLimiter {
             // Execute atomic Lua script
             let result: Result<Vec<redis::Value>, _> = timeout(
                 Duration::from_millis(self.config.redis_timeout_ms),
-                redis::Script::new(lua_script).key(&key).arg(tokens_delta).arg(cost_delta).invoke_async(&mut conn)
-            ).await
-            .map_err(|_| Error::new(ErrorDetails::Config {
-                message: "Redis timeout on atomic increment".to_string(),
-            }))?;
+                redis::Script::new(lua_script)
+                    .key(&key)
+                    .arg(tokens_delta)
+                    .arg(cost_delta)
+                    .invoke_async(&mut conn),
+            )
+            .await
+            .map_err(|_| {
+                Error::new(ErrorDetails::Config {
+                    message: "Redis timeout on atomic increment".to_string(),
+                })
+            })?;
 
             match result {
                 Ok(values) => {
@@ -395,7 +425,7 @@ impl UsageLimiter {
                         }
                     }
                     Ok(())
-                },
+                }
                 Err(e) => {
                     warn!("Redis atomic increment failed for user {}: {}", user_id, e);
                     Err(Error::new(ErrorDetails::Config {
@@ -424,19 +454,26 @@ impl UsageLimiter {
             // Get usage limit data from Redis
             let result = timeout(
                 Duration::from_millis(self.config.redis_timeout_ms),
-                conn.get::<_, Option<String>>(&key)
-            ).await;
+                conn.get::<_, Option<String>>(&key),
+            )
+            .await;
 
             match result {
                 Ok(Ok(Some(data))) => {
                     // Parse the JSON data
                     match serde_json::from_str::<UsageLimitInfo>(&data) {
                         Ok(info) => {
-                            debug!("Fetched usage limit for user {}: allowed={}", user_id, info.allowed);
+                            debug!(
+                                "Fetched usage limit for user {}: allowed={}",
+                                user_id, info.allowed
+                            );
                             return Ok(Some(info));
-                        },
+                        }
                         Err(e) => {
-                            error!("Failed to parse usage limit data for user {}: {}", user_id, e);
+                            error!(
+                                "Failed to parse usage limit data for user {}: {}",
+                                user_id, e
+                            );
                             Ok(None)
                         }
                     }
@@ -444,9 +481,12 @@ impl UsageLimiter {
                 Ok(Ok(None)) => {
                     debug!("No usage limit found for user {}", user_id);
                     Ok(None)
-                },
+                }
                 Ok(Err(e)) => {
-                    warn!("Redis error fetching usage limit for user {}: {}", user_id, e);
+                    warn!(
+                        "Redis error fetching usage limit for user {}: {}",
+                        user_id, e
+                    );
                     Err(Error::new(ErrorDetails::Config {
                         message: format!("Redis error: {}", e),
                     }))
@@ -509,7 +549,10 @@ impl UsageLimiter {
 
                     // Check for cache clear signals
                     loop {
-                        let scan_result: Result<Result<(u64, Vec<String>), redis::RedisError>, tokio::time::error::Elapsed> = timeout(
+                        let scan_result: Result<
+                            Result<(u64, Vec<String>), redis::RedisError>,
+                            tokio::time::error::Elapsed,
+                        > = timeout(
                             redis_timeout,
                             redis::cmd("SCAN")
                                 .arg(clear_cursor)
@@ -517,8 +560,9 @@ impl UsageLimiter {
                                 .arg(clear_pattern)
                                 .arg("COUNT")
                                 .arg(100)
-                                .query_async(&mut conn)
-                        ).await;
+                                .query_async(&mut conn),
+                        )
+                        .await;
 
                         match scan_result {
                             Ok(Ok((new_cursor, keys))) => {
@@ -526,7 +570,10 @@ impl UsageLimiter {
                                     if let Some(user_id) = key.strip_prefix("usage_limit_clear:") {
                                         // Clear this user's cache
                                         cache.remove(user_id).await;
-                                        debug!("Cleared cache for user {} due to reset signal", user_id);
+                                        debug!(
+                                            "Cleared cache for user {} due to reset signal",
+                                            user_id
+                                        );
 
                                         // Delete the clear signal
                                         let _ = conn.del::<_, ()>(&key).await;
@@ -549,7 +596,10 @@ impl UsageLimiter {
                     let mut refreshed_count = 0;
 
                     loop {
-                        let scan_result: Result<Result<(u64, Vec<String>), redis::RedisError>, tokio::time::error::Elapsed> = timeout(
+                        let scan_result: Result<
+                            Result<(u64, Vec<String>), redis::RedisError>,
+                            tokio::time::error::Elapsed,
+                        > = timeout(
                             redis_timeout,
                             redis::cmd("SCAN")
                                 .arg(cursor)
@@ -557,8 +607,9 @@ impl UsageLimiter {
                                 .arg(pattern)
                                 .arg("COUNT")
                                 .arg(100)
-                                .query_async(&mut conn)
-                        ).await;
+                                .query_async(&mut conn),
+                        )
+                        .await;
 
                         match scan_result {
                             Ok(Ok((new_cursor, keys))) => {
@@ -566,9 +617,16 @@ impl UsageLimiter {
                                     // Extract user_id from key
                                     if let Some(user_id) = key.strip_prefix("usage_limit:") {
                                         // Fetch the main usage limit value
-                                        match timeout(redis_timeout, conn.get::<_, Option<String>>(&key)).await {
+                                        match timeout(
+                                            redis_timeout,
+                                            conn.get::<_, Option<String>>(&key),
+                                        )
+                                        .await
+                                        {
                                             Ok(Ok(Some(data))) => {
-                                                if let Ok(info) = serde_json::from_str::<UsageLimitInfo>(&data) {
+                                                if let Ok(info) =
+                                                    serde_json::from_str::<UsageLimitInfo>(&data)
+                                                {
                                                     // No need to fetch realtime usage - main key contains everything
 
                                                     // Simplified sync - just update cache with main usage_limit data
@@ -583,7 +641,8 @@ impl UsageLimiter {
                                                         cost_used: info.cost_used,
                                                         reason: info.reason,
                                                         reset_at: info.reset_at,
-                                                        billing_cycle_start: info.billing_cycle_start,
+                                                        billing_cycle_start: info
+                                                            .billing_cycle_start,
                                                         billing_cycle_end: info.billing_cycle_end,
                                                         last_updated: Instant::now(),
                                                         last_seen_update_id: info.update_id,
@@ -612,7 +671,10 @@ impl UsageLimiter {
                     }
 
                     if refreshed_count > 0 {
-                        debug!("Refreshed {} usage limit entries from Redis", refreshed_count);
+                        debug!(
+                            "Refreshed {} usage limit entries from Redis",
+                            refreshed_count
+                        );
                     }
                 }
             }
@@ -628,7 +690,6 @@ impl UsageLimiter {
     pub async fn clear_cache(&self) {
         self.cache.invalidate_all();
     }
-
 
     /// Get metrics
     pub fn get_metrics(&self) -> UsageLimiterMetrics {
@@ -646,7 +707,6 @@ impl UsageLimiter {
     pub fn get_cache_size(&self) -> u64 {
         self.cache.entry_count()
     }
-
 }
 
 // #[cfg(test)]

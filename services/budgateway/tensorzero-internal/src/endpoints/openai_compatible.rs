@@ -32,7 +32,6 @@ use crate::endpoints::inference::{
 };
 use crate::error::{Error, ErrorDetails};
 use crate::gateway_util::{AppState, AppStateData, StructuredJson};
-use crate::usage_limit::UsageLimitDecision;
 use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
 use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
 use crate::inference::types::{
@@ -43,6 +42,7 @@ use crate::inference::types::{
 use crate::tool::{
     DynamicToolParams, Tool, ToolCall, ToolCallChunk, ToolCallOutput, ToolChoice, ToolResult,
 };
+use crate::usage_limit::UsageLimitDecision;
 use crate::variant::JsonMode;
 
 use super::inference::{
@@ -177,13 +177,18 @@ pub async fn inference_handler(
 
     // Check usage limits BEFORE processing the request
     if let Some(usage_limiter) = &usage_limiter {
-        if let Some(user_id) = headers.get("x-tensorzero-user-id").and_then(|v| v.to_str().ok()) {
+        if let Some(user_id) = headers
+            .get("x-tensorzero-user-id")
+            .and_then(|v| v.to_str().ok())
+        {
             let usage_decision = usage_limiter.check_usage(user_id, None, None).await;
 
             if !usage_decision.is_allowed() {
                 return Err(Error::new(ErrorDetails::Config {
                     message: match usage_decision {
-                        UsageLimitDecision::Deny { reason } => format!("Usage limit exceeded: {}", reason),
+                        UsageLimitDecision::Deny { reason } => {
+                            format!("Usage limit exceeded: {}", reason)
+                        }
                         _ => "Usage limit exceeded".to_string(),
                     },
                 }));
@@ -264,24 +269,32 @@ pub async fn inference_handler(
         } => {
             // Extract model latency from the result (using the first model inference result) before moving result
             let model_latency_ms = match &result {
-                InferenceResult::Chat(chat_result) => {
-                    chat_result.model_inference_results.first()
-                        .and_then(|r| match &r.latency {
-                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Batch => None,
-                        })
-                        .unwrap_or(0)
-                },
-                InferenceResult::Json(json_result) => {
-                    json_result.model_inference_results.first()
-                        .and_then(|r| match &r.latency {
-                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Batch => None,
-                        })
-                        .unwrap_or(0)
-                },
+                InferenceResult::Chat(chat_result) => chat_result
+                    .model_inference_results
+                    .first()
+                    .and_then(|r| match &r.latency {
+                        crate::inference::types::Latency::NonStreaming { response_time } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Streaming { response_time, .. } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Batch => None,
+                    })
+                    .unwrap_or(0),
+                InferenceResult::Json(json_result) => json_result
+                    .model_inference_results
+                    .first()
+                    .and_then(|r| match &r.latency {
+                        crate::inference::types::Latency::NonStreaming { response_time } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Streaming { response_time, .. } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Batch => None,
+                    })
+                    .unwrap_or(0),
                 // For other result types, we don't have model_inference_results, so default to 0
                 _ => 0,
             };
@@ -305,20 +318,27 @@ pub async fn inference_handler(
                         let cost = if let Some(write_info) = &write_info {
                             if let Some(pricing) = &write_info.model_pricing {
                                 // Convert tokens to the pricing unit (e.g., if per_tokens is 1000, divide by 1000)
-                                let input_multiplier = openai_compatible_response.usage.prompt_tokens as f64 / pricing.per_tokens as f64;
-                                let output_multiplier = openai_compatible_response.usage.completion_tokens as f64 / pricing.per_tokens as f64;
+                                let input_multiplier =
+                                    openai_compatible_response.usage.prompt_tokens as f64
+                                        / pricing.per_tokens as f64;
+                                let output_multiplier =
+                                    openai_compatible_response.usage.completion_tokens as f64
+                                        / pricing.per_tokens as f64;
 
-                                (input_multiplier * pricing.input_cost) + (output_multiplier * pricing.output_cost)
+                                (input_multiplier * pricing.input_cost)
+                                    + (output_multiplier * pricing.output_cost)
                             } else {
                                 // Fallback to default pricing if not configured
                                 // Using reasonable defaults: $0.01 per 1K input tokens, $0.03 per 1K output tokens
-                                (openai_compatible_response.usage.prompt_tokens as f64 * 0.00001) +
-                                (openai_compatible_response.usage.completion_tokens as f64 * 0.00003)
+                                (openai_compatible_response.usage.prompt_tokens as f64 * 0.00001)
+                                    + (openai_compatible_response.usage.completion_tokens as f64
+                                        * 0.00003)
                             }
                         } else {
                             // No write_info, use default pricing
-                            (openai_compatible_response.usage.prompt_tokens as f64 * 0.00001) +
-                            (openai_compatible_response.usage.completion_tokens as f64 * 0.00003)
+                            (openai_compatible_response.usage.prompt_tokens as f64 * 0.00001)
+                                + (openai_compatible_response.usage.completion_tokens as f64
+                                    * 0.00003)
                         };
                         // Round to 4 decimal places for consistent precision
                         (cost * 10000.0).round() / 10000.0
@@ -332,7 +352,11 @@ pub async fn inference_handler(
                     let user_id_clone = user_id.to_string();
                     tokio::spawn(async move {
                         let _result = usage_limiter_clone
-                            .check_usage(&user_id_clone, Some(tokens_to_consume), Some(cost_to_consume))
+                            .check_usage(
+                                &user_id_clone,
+                                Some(tokens_to_consume),
+                                Some(cost_to_consume),
+                            )
                             .await;
                     });
                 }
@@ -460,13 +484,14 @@ pub async fn inference_handler(
             };
 
             // Create the stream with usage tracking
-            let openai_compatible_stream = prepare_serialized_openai_compatible_events_with_usage_tracking(
-                Box::pin(combined_stream),
-                original_model_name.clone(),
-                stream_options,
-                usage_limiter_for_tracking,
-                headers_for_tracking,
-            );
+            let openai_compatible_stream =
+                prepare_serialized_openai_compatible_events_with_usage_tracking(
+                    Box::pin(combined_stream),
+                    original_model_name.clone(),
+                    stream_options,
+                    usage_limiter_for_tracking,
+                    headers_for_tracking,
+                );
 
             let mut response = Sse::new(openai_compatible_stream)
                 .keep_alive(axum::response::sse::KeepAlive::new())
@@ -1757,7 +1782,8 @@ fn prepare_serialized_openai_compatible_events_with_usage_tracking(
         stream_options,
         usage_limiter,
         headers,
-    ).process_stream()
+    )
+    .process_stream()
 }
 
 impl From<ToolCallChunk> for OpenAICompatibleToolCall {
@@ -1978,7 +2004,9 @@ pub async fn embedding_handler(
                 inference_id,
                 created: response.created,
                 embeddings: response.embeddings.clone(),
-                embedding_dimensions: response.embeddings.first()
+                embedding_dimensions: response
+                    .embeddings
+                    .first()
                     .map(|e| e.len() as u32)
                     .unwrap_or(0),
                 input_count: response.embeddings.len() as u32,
@@ -2030,8 +2058,8 @@ pub async fn embedding_handler(
         // Use defaults for embedding requests since they don't have function/variant context
         let episode_id = Uuid::now_v7();
         let metadata = crate::endpoints::inference::InferenceDatabaseInsertMetadata {
-            function_name: "tensorzero::embedding".to_string(),  // Default function name for embeddings
-            variant_name: original_model_name.clone(),           // Use model name as variant
+            function_name: "tensorzero::embedding".to_string(), // Default function name for embeddings
+            variant_name: original_model_name.clone(),          // Use model name as variant
             episode_id,
             tool_config: None,
             processing_time: Some(match response.latency {
@@ -2040,7 +2068,8 @@ pub async fn embedding_handler(
             }),
             tags: HashMap::new(),
             extra_body: UnfilteredInferenceExtraBody::default(),
-            extra_headers: crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
+            extra_headers:
+                crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
         };
 
         // Convert EmbeddingInput to ResolvedInput for write_inference
@@ -2048,16 +2077,17 @@ pub async fn embedding_handler(
             messages: vec![ResolvedInputMessage {
                 role: Role::User,
                 content: match &embedding_request.input {
-                    crate::embeddings::EmbeddingInput::Single(text) => vec![
-                        ResolvedInputMessageContent::Text {
+                    crate::embeddings::EmbeddingInput::Single(text) => {
+                        vec![ResolvedInputMessageContent::Text {
                             value: serde_json::Value::String(text.clone()),
-                        }
-                    ],
-                    crate::embeddings::EmbeddingInput::Batch(texts) => texts.iter().map(|text| {
-                        ResolvedInputMessageContent::Text {
+                        }]
+                    }
+                    crate::embeddings::EmbeddingInput::Batch(texts) => texts
+                        .iter()
+                        .map(|text| ResolvedInputMessageContent::Text {
                             value: serde_json::Value::String(text.clone()),
-                        }
-                    }).collect(),
+                        })
+                        .collect(),
                 },
             }],
             system: None,
@@ -2338,8 +2368,10 @@ pub async fn moderation_handler(
 
     // Write observability data if configured
     if config.gateway.observability.enabled.unwrap_or(true) {
-        use crate::inference::types::{ResolvedInput, ResolvedInputMessage, ResolvedInputMessageContent, Role};
         use crate::endpoints::inference::write_inference;
+        use crate::inference::types::{
+            ResolvedInput, ResolvedInputMessage, ResolvedInputMessageContent, Role,
+        };
 
         // Generate inference ID
         let inference_id = Uuid::now_v7();
@@ -2368,41 +2400,77 @@ pub async fn moderation_handler(
             crate::inference::types::ModerationInferenceResult {
                 inference_id,
                 created: response.created,
-                results: response.results.iter().map(|r| {
-                    // Convert ModerationCategories struct to HashMap
-                    let mut categories_map = HashMap::new();
-                    categories_map.insert("hate".to_string(), r.categories.hate);
-                    categories_map.insert("hate/threatening".to_string(), r.categories.hate_threatening);
-                    categories_map.insert("harassment".to_string(), r.categories.harassment);
-                    categories_map.insert("harassment/threatening".to_string(), r.categories.harassment_threatening);
-                    categories_map.insert("self-harm".to_string(), r.categories.self_harm);
-                    categories_map.insert("self-harm/intent".to_string(), r.categories.self_harm_intent);
-                    categories_map.insert("self-harm/instructions".to_string(), r.categories.self_harm_instructions);
-                    categories_map.insert("sexual".to_string(), r.categories.sexual);
-                    categories_map.insert("sexual/minors".to_string(), r.categories.sexual_minors);
-                    categories_map.insert("violence".to_string(), r.categories.violence);
-                    categories_map.insert("violence/graphic".to_string(), r.categories.violence_graphic);
+                results: response
+                    .results
+                    .iter()
+                    .map(|r| {
+                        // Convert ModerationCategories struct to HashMap
+                        let mut categories_map = HashMap::new();
+                        categories_map.insert("hate".to_string(), r.categories.hate);
+                        categories_map.insert(
+                            "hate/threatening".to_string(),
+                            r.categories.hate_threatening,
+                        );
+                        categories_map.insert("harassment".to_string(), r.categories.harassment);
+                        categories_map.insert(
+                            "harassment/threatening".to_string(),
+                            r.categories.harassment_threatening,
+                        );
+                        categories_map.insert("self-harm".to_string(), r.categories.self_harm);
+                        categories_map.insert(
+                            "self-harm/intent".to_string(),
+                            r.categories.self_harm_intent,
+                        );
+                        categories_map.insert(
+                            "self-harm/instructions".to_string(),
+                            r.categories.self_harm_instructions,
+                        );
+                        categories_map.insert("sexual".to_string(), r.categories.sexual);
+                        categories_map
+                            .insert("sexual/minors".to_string(), r.categories.sexual_minors);
+                        categories_map.insert("violence".to_string(), r.categories.violence);
+                        categories_map.insert(
+                            "violence/graphic".to_string(),
+                            r.categories.violence_graphic,
+                        );
 
-                    // Convert ModerationCategoryScores struct to HashMap
-                    let mut scores_map = HashMap::new();
-                    scores_map.insert("hate".to_string(), r.category_scores.hate);
-                    scores_map.insert("hate/threatening".to_string(), r.category_scores.hate_threatening);
-                    scores_map.insert("harassment".to_string(), r.category_scores.harassment);
-                    scores_map.insert("harassment/threatening".to_string(), r.category_scores.harassment_threatening);
-                    scores_map.insert("self-harm".to_string(), r.category_scores.self_harm);
-                    scores_map.insert("self-harm/intent".to_string(), r.category_scores.self_harm_intent);
-                    scores_map.insert("self-harm/instructions".to_string(), r.category_scores.self_harm_instructions);
-                    scores_map.insert("sexual".to_string(), r.category_scores.sexual);
-                    scores_map.insert("sexual/minors".to_string(), r.category_scores.sexual_minors);
-                    scores_map.insert("violence".to_string(), r.category_scores.violence);
-                    scores_map.insert("violence/graphic".to_string(), r.category_scores.violence_graphic);
+                        // Convert ModerationCategoryScores struct to HashMap
+                        let mut scores_map = HashMap::new();
+                        scores_map.insert("hate".to_string(), r.category_scores.hate);
+                        scores_map.insert(
+                            "hate/threatening".to_string(),
+                            r.category_scores.hate_threatening,
+                        );
+                        scores_map.insert("harassment".to_string(), r.category_scores.harassment);
+                        scores_map.insert(
+                            "harassment/threatening".to_string(),
+                            r.category_scores.harassment_threatening,
+                        );
+                        scores_map.insert("self-harm".to_string(), r.category_scores.self_harm);
+                        scores_map.insert(
+                            "self-harm/intent".to_string(),
+                            r.category_scores.self_harm_intent,
+                        );
+                        scores_map.insert(
+                            "self-harm/instructions".to_string(),
+                            r.category_scores.self_harm_instructions,
+                        );
+                        scores_map.insert("sexual".to_string(), r.category_scores.sexual);
+                        scores_map
+                            .insert("sexual/minors".to_string(), r.category_scores.sexual_minors);
+                        scores_map.insert("violence".to_string(), r.category_scores.violence);
+                        scores_map.insert(
+                            "violence/graphic".to_string(),
+                            r.category_scores.violence_graphic,
+                        );
 
-                    crate::inference::types::ModerationResult {
-                        flagged: r.flagged,
-                        categories: categories_map,
-                        category_scores: scores_map,
-                    }
-                }).collect(),
+                        crate::inference::types::ModerationResult {
+                            flagged: r.flagged,
+                            categories: categories_map,
+                            category_scores: scores_map,
+                        }
+                    })
+                    .collect(),
                 usage: response.usage.clone(),
                 model_inference_results: vec![model_inference],
                 inference_params: crate::endpoints::inference::InferenceParams::default(),
@@ -2451,8 +2519,8 @@ pub async fn moderation_handler(
         // Use defaults for moderation requests
         let episode_id = Uuid::now_v7();
         let metadata = crate::endpoints::inference::InferenceDatabaseInsertMetadata {
-            function_name: "tensorzero::moderation".to_string(),  // Default function name for moderation
-            variant_name: resolved_model_name.clone(),            // Use model name as variant
+            function_name: "tensorzero::moderation".to_string(), // Default function name for moderation
+            variant_name: resolved_model_name.clone(),           // Use model name as variant
             episode_id,
             tool_config: None,
             processing_time: Some(match response.latency {
@@ -2460,8 +2528,10 @@ pub async fn moderation_handler(
                 _ => std::time::Duration::from_millis(0),
             }),
             tags: HashMap::new(),
-            extra_body: crate::inference::types::extra_body::UnfilteredInferenceExtraBody::default(),
-            extra_headers: crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
+            extra_body: crate::inference::types::extra_body::UnfilteredInferenceExtraBody::default(
+            ),
+            extra_headers:
+                crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
         };
 
         // Convert input to ResolvedInput for write_inference
@@ -3662,7 +3732,12 @@ pub async fn image_generation_handler(
             created: response.created,
             output: vec![],
             model_name: Arc::from(model_name.as_str()),
-            model_provider_name: model.providers.values().next().map(|p| p.name.clone()).unwrap_or_default(),
+            model_provider_name: model
+                .providers
+                .values()
+                .next()
+                .map(|p| p.name.clone())
+                .unwrap_or_default(),
             input_messages: vec![],
             raw_request: response.raw_request.clone(),
             raw_response: response.raw_response.clone(),
@@ -3680,14 +3755,24 @@ pub async fn image_generation_handler(
             crate::inference::types::ImageGenerationInferenceResult {
                 inference_id,
                 created: response.created,
-                images: response.data.iter().map(|d| crate::inference::types::ImageData {
-                    url: d.url.clone(),
-                    base64: d.b64_json.clone(),
-                    revised_prompt: d.revised_prompt.clone(),
-                }).collect(),
+                images: response
+                    .data
+                    .iter()
+                    .map(|d| crate::inference::types::ImageData {
+                        url: d.url.clone(),
+                        base64: d.b64_json.clone(),
+                        revised_prompt: d.revised_prompt.clone(),
+                    })
+                    .collect(),
                 image_count: response.data.len() as u8,
-                size: image_request.size.map(|s| s.as_str().to_string()).unwrap_or_else(|| "1024x1024".to_string()),
-                quality: image_request.quality.map(|q| q.as_str().to_string()).unwrap_or_else(|| "standard".to_string()),
+                size: image_request
+                    .size
+                    .map(|s| s.as_str().to_string())
+                    .unwrap_or_else(|| "1024x1024".to_string()),
+                quality: image_request
+                    .quality
+                    .map(|q| q.as_str().to_string())
+                    .unwrap_or_else(|| "standard".to_string()),
                 style: image_request.style.map(|s| s.as_str().to_string()),
                 usage: response.usage.clone(),
                 model_inference_results: vec![model_inference],
@@ -3737,8 +3822,8 @@ pub async fn image_generation_handler(
         // Use defaults for image generation requests
         let episode_id = Uuid::now_v7();
         let metadata = crate::endpoints::inference::InferenceDatabaseInsertMetadata {
-            function_name: "tensorzero::image_generation".to_string(),  // Default function name for images
-            variant_name: model_name.to_string(),           // Use model name as variant
+            function_name: "tensorzero::image_generation".to_string(), // Default function name for images
+            variant_name: model_name.to_string(),                      // Use model name as variant
             episode_id,
             tool_config: None,
             processing_time: Some(match response.latency {
@@ -3747,7 +3832,8 @@ pub async fn image_generation_handler(
             }),
             tags: HashMap::new(),
             extra_body: UnfilteredInferenceExtraBody::default(),
-            extra_headers: crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
+            extra_headers:
+                crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
         };
 
         // Convert prompt to ResolvedInput for write_inference
@@ -7153,8 +7239,6 @@ fn convert_openai_chunk_to_anthropic(openai_chunk: Value) -> Value {
     }
 }
 
-
-
 // Document processing handler
 /// Handler for document processing (POST /v1/documents)
 pub async fn document_processing_handler(
@@ -7168,7 +7252,9 @@ pub async fn document_processing_handler(
         ..
     }): AppState,
     headers: HeaderMap,
-    StructuredJson(openai_compatible_params): StructuredJson<crate::documents::OpenAICompatibleDocumentParams>,
+    StructuredJson(openai_compatible_params): StructuredJson<
+        crate::documents::OpenAICompatibleDocumentParams,
+    >,
 ) -> Result<Response<Body>, Error> {
     let unknown_fields: Vec<&str> = openai_compatible_params
         .unknown_fields
@@ -7192,7 +7278,8 @@ pub async fn document_processing_handler(
 
     let model_id = model_resolution.model_name.ok_or_else(|| {
         Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
-            message: "Document processing requests must specify a model, not a function".to_string(),
+            message: "Document processing requests must specify a model, not a function"
+                .to_string(),
         })
     })?;
 
@@ -7224,7 +7311,20 @@ pub async fn document_processing_handler(
         })?;
 
     // Merge credentials from the credential store
-    let credentials = merge_credentials_from_store(&model_credential_store);
+    let mut credentials = merge_credentials_from_store(&model_credential_store);
+
+    // Extract and forward the authorization header if present
+    if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            // Strip "Bearer " prefix if present
+            let token = auth_str.strip_prefix("Bearer ").unwrap_or(auth_str);
+            // Use "authorization" as the key so dynamic credential lookup can find it
+            credentials.insert(
+                "authorization".to_string(),
+                secrecy::SecretString::from(token.to_string()),
+            );
+        }
+    }
 
     // Create inference clients
     let cache_options = crate::cache::CacheOptions {
