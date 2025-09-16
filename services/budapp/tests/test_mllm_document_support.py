@@ -40,12 +40,27 @@ def test_buddoc_config_creation():
     assert config.model_name == "test-model"
 
 
+def test_buddoc_config_with_api_key_location():
+    """Test that BudDocConfig supports api_key_location field."""
+    config = BudDocConfig(
+        type="buddoc",
+        api_base="http://test-api/v1.0/invoke/buddoc/method",
+        model_name="test-model",
+        api_key_location="dynamic::authorization"
+    )
+
+    assert config.type == "buddoc"
+    assert config.api_base == "http://test-api/v1.0/invoke/buddoc/method"
+    assert config.model_name == "test-model"
+    assert config.api_key_location == "dynamic::authorization"
+
+
 @pytest.mark.asyncio
 async def test_mllm_endpoints_include_document():
     """Test that MLLM models get both CHAT and DOCUMENT endpoints."""
-    from budapp.commons.helpers import extract_modality_and_endpoints
+    from budapp.commons.helpers import determine_modality_endpoints
 
-    result = extract_modality_and_endpoints("mllm")
+    result = await determine_modality_endpoints("mllm")
 
     assert ModelEndpointEnum.CHAT in result["endpoints"]
     assert ModelEndpointEnum.DOCUMENT in result["endpoints"]
@@ -104,6 +119,9 @@ async def test_proxy_cache_includes_buddoc_for_document_endpoint():
         buddoc_config = model_config["providers"]["buddoc"]
         assert buddoc_config["type"] == "buddoc"
         assert "/v1.0/invoke/buddoc/method" in buddoc_config["api_base"]
+        # Verify api_key_location is set to forward authorization header
+        assert "api_key_location" in buddoc_config
+        assert buddoc_config["api_key_location"] == "dynamic::authorization"
 
 
 @pytest.mark.asyncio

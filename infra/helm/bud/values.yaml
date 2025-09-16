@@ -70,6 +70,7 @@ microservices:
 
             CLOUD_MODEL_SEEDER_ENGINE: tensorzero
             BUD_CONNECT_BASE_URL: https://budconnect.bud.studio
+            BUD_DOC_SERVICE_URL: "http://{{ $.Release.Name }}-buddoc:9081"
 
     # backend internal services
     budcluster:
@@ -169,7 +170,7 @@ microservices:
             PSQL_USER: buddoc
             PSQL_PASSWORD: buddoc
             PSQL_DB_NAME: buddoc
-            VLM_API_URL: "http://{{ $.Release.Name }}-budgateway:8000/v1/chat/completions"
+            VLM_API_URL: "http://{{ $.Release.Name }}-budgateway:3000/v1/chat/completions"
             VLM_API_TIMEOUT: "300"
             MAX_FILE_SIZE_MB: "50"
             TEMP_UPLOAD_DIR: /tmp/buddoc_uploads

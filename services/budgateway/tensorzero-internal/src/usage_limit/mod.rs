@@ -1,14 +1,14 @@
 pub mod limiter;
 pub mod middleware;
 
-pub use limiter::{UsageLimiter, UsageLimitInfo, UsageLimiterConfig};
+pub use limiter::{UsageLimitInfo, UsageLimiter, UsageLimiterConfig};
 pub use middleware::usage_limit_middleware;
 
 /// User usage limit status with usage tracking
 #[derive(Debug, Clone)]
 pub struct UsageLimitStatus {
     pub user_id: String,
-    pub user_type: String,  // "admin" or "client"
+    pub user_type: String, // "admin" or "client"
     pub allowed: bool,
     pub status: String,
     pub tokens_quota: Option<i64>,
