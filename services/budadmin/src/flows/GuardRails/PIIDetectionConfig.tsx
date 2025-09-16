@@ -114,7 +114,7 @@ export default function PIIDetectionConfig() {
       // Build the update payload with workflow_id if available
       const updatePayload: any = {
         step_number: 2, // Both probe selection and rule selection are step 2
-        workflow_total_steps: 6,
+        workflow_total_steps: 5, // Not counting the first step
         probe_selections: [
           {
             probe_id: selectedProbe?.id || "",

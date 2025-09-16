@@ -50,7 +50,7 @@ export default function SelectProject() {
       // Update workflow with selected project
       await updateWorkflow({
         step_number: 4, // Project selection is step 4
-        workflow_total_steps: 6,
+        workflow_total_steps: 5, // Not counting the first step
         project_id: selectedProject,
         trigger_workflow: false,
       });

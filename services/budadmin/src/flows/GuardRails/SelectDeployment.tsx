@@ -226,7 +226,7 @@ export default function SelectDeployment() {
       // Update workflow with selected deployment (endpoint)
       await updateWorkflow({
         step_number: 5, // Deployment/endpoint selection is step 5
-        workflow_total_steps: 6,
+        workflow_total_steps: 5, // Not counting the first step
         endpoint_id: selectedDeployment,
         trigger_workflow: false,
       });

@@ -37,7 +37,7 @@ export default function ProbeSettings() {
       // Update workflow with probe settings and trigger deployment
       await updateWorkflow({
         step_number: 6, // Probe settings is the final step 6
-        workflow_total_steps: 6,
+        workflow_total_steps: 5, // Not counting the first step
         probe_settings: {
           lifecycle_stages: selectedLifecycle,
           strictness_level: strictnessLevel,

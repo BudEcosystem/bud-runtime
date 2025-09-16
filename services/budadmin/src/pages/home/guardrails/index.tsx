@@ -184,29 +184,17 @@ function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
       <div className="flex items-center justify-between mt-auto pt-[1rem] border-t border-[#1F1F1F]">
         <div className="flex items-center gap-[0.5rem] flex-wrap">
           {item.category.slice(0, 3).map((cat, idx) => (
-            <Tag
+            <Tags
+              name={cat}
+              color="#1F1F1F"
               key={idx}
-              className="text-[#B3B3B3] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
-              style={{
-                backgroundColor: "#1F1F1F",
-              }}
-            >
-              <span className="text-[0.75rem] font-[400] capitalize">
-                {cat}
-              </span>
-            </Tag>
+            />
           ))}
           {item.category.length > 3 && (
-            <Tag
-              className="text-[#757575] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
-              style={{
-                backgroundColor: "#1F1F1F",
-              }}
-            >
-              <span className="text-[0.75rem] font-[400]">
-                +{item.category.length - 3}
-              </span>
-            </Tag>
+            <Tags
+              name={`+${item.category.length - 3}`}
+              color="#1F1F1F"
+            />
           )}
         </div>
         {item.deployments !== undefined && (

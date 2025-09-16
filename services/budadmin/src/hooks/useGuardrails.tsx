@@ -328,7 +328,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
         {
           provider_id: providerId,
           step_number: 1,
-          workflow_total_steps: 6,
+          workflow_total_steps: 5, // Not counting the first step
           trigger_workflow: false,
         },
       );
@@ -338,6 +338,9 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
           currentWorkflow: response.data,
           workflowLoading: false,
         });
+
+        // Fetch the workflow data after creation
+        await get().getWorkflow(response.data.workflow_id);
       }
     } catch (error: any) {
       errorToast(error?.message || "Failed to create workflow");
@@ -375,6 +378,9 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
           currentWorkflow: response.data,
           workflowLoading: false,
         });
+
+        // Fetch the workflow data after update
+        await get().getWorkflow(currentWorkflow.workflow_id);
       }
     } catch (error: any) {
       errorToast(error?.message || "Failed to update workflow");
