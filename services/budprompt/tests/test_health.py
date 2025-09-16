@@ -36,9 +36,9 @@ def http_client():
 def test_health_endpoint(http_client):
     """Test the /health endpoint returns expected response."""
     response = http_client.get("/health", headers={"accept": "application/json"})
-    
+
     assert response.status_code == 200
-    
+
     json_response = response.json()
     assert json_response == {
         "object": "info",
@@ -50,7 +50,7 @@ def test_health_endpoint(http_client):
 def test_health_endpoint_content_type(http_client):
     """Test the /health endpoint returns JSON content type."""
     response = http_client.get("/health", headers={"accept": "application/json"})
-    
+
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
 
