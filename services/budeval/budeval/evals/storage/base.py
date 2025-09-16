@@ -8,7 +8,7 @@ class StorageAdapter(ABC):
     """Abstract base class for storage adapters.
 
     Provides a common interface for storing and retrieving evaluation results
-    across different storage backends (filesystem, database, etc.).
+    across different storage backends.
     """
 
     @abstractmethod
@@ -22,7 +22,6 @@ class StorageAdapter(ABC):
         Returns:
             True if saved successfully, False otherwise
         """
-        pass
 
     @abstractmethod
     async def get_results(self, job_id: str) -> Optional[Dict]:
@@ -34,7 +33,6 @@ class StorageAdapter(ABC):
         Returns:
             Dictionary containing evaluation results or None if not found
         """
-        pass
 
     @abstractmethod
     async def delete_results(self, job_id: str) -> bool:
@@ -46,7 +44,6 @@ class StorageAdapter(ABC):
         Returns:
             True if deleted successfully, False otherwise
         """
-        pass
 
     @abstractmethod
     async def list_results(self) -> List[str]:
@@ -55,7 +52,6 @@ class StorageAdapter(ABC):
         Returns:
             List of job IDs that have stored results
         """
-        pass
 
     @abstractmethod
     async def exists(self, job_id: str) -> bool:
@@ -67,4 +63,3 @@ class StorageAdapter(ABC):
         Returns:
             True if results exist, False otherwise
         """
-        pass

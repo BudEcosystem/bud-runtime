@@ -19,6 +19,7 @@
         api_version: v1
         kind: Pod
         namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
       register: pods
 
     - name: Assert that pods were listed successfully

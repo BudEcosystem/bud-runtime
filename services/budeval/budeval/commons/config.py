@@ -16,79 +16,89 @@
 
 """Manages application and secret configurations, utilizing environment variables and Dapr's configuration store for syncing."""
 
+import os
 from pathlib import Path
 
 from budmicroframe.commons.config import BaseAppConfig, BaseSecretsConfig, register_settings
-from pydantic import DirectoryPath, Field
+from pydantic import Field
 
-from ..__about__ import __version__
+from budeval.__about__ import __version__
 
 
 class AppConfig(BaseAppConfig):
+    """Application configuration."""
+
     name: str = __version__.split("@")[0]
     version: str = __version__.split("@")[-1]
-    description: str = ""
-    api_root: str = ""
+    description: str = "BudEval - LLM Evaluation Platform"
 
-    # Base Directory
-    base_dir: DirectoryPath = Path(__file__).parent.parent.parent.resolve()
+    # Kubernetes
+    namespace: str = Field(default="budeval", alias="NAMESPACE")
 
-    # Dataset Configuration
-    opencompass_dataset_url: str = Field(
-        default="https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-complete-20240207.zip",
-        alias="OPENCOMPASS_DATASET_URL",
-    )
-    eval_datasets_pvc_name: str = Field(default="eval-datasets-pvc", alias="EVAL_DATASETS_PATH")
-    skip_volume_check: bool = Field(default=False, alias="SKIP_VOLUME_CHECK")
+    # OpenCompass Configuration
+    opencompass_image: str = Field(default="ghcr.io/rahulvramesh/opencompass:latest", alias="OPENCOMPASS_IMAGE")
+    opencompass_dataset_path: str = Field(default="bud-dev-budeval-dataset", alias="OPENCOMPASS_DATASET_PATH")
 
-    # Eval Sync Configuration
-    eval_sync_enabled: bool = Field(default=True, alias="EVAL_SYNC_ENABLED")
-    eval_sync_local_mode: bool = Field(default=True, alias="EVAL_SYNC_LOCAL_MODE")
-    eval_manifest_url: str = Field(
-        default="https://eval-datasets.bud.eco/v2/eval_manifest.json", alias="EVAL_MANIFEST_URL"
-    )
-    eval_sync_batch_size: int = Field(default=50, alias="EVAL_SYNC_BATCH_SIZE")
-    eval_manifest_local_path: str = Field(
-        default="budeval/data/eval_manifest_test.json", alias="EVAL_MANIFEST_LOCAL_PATH"
-    )
-    eval_sync_interval_seconds: int = Field(default=3600, alias="EVAL_SYNC_INTERVAL_SECONDS")
-    eval_sync_use_bundles: bool = Field(default=False, alias="EVAL_SYNC_USE_BUNDLES")
-    eval_datasets_path: str = Field(default="bud-dev-budeval-dataset", alias="EVAL_DATASETS_PATH")
-
-    # ClickHouse Configuration (moved from SecretsConfig)
-    clickhouse_host: str = Field(default="okb80nfy88.ap-southeast-1.aws.clickhouse.cloud", alias="CLICKHOUSE_HOST")
+    # ClickHouse Configuration
+    clickhouse_host: str = Field(default="localhost", alias="CLICKHOUSE_HOST")
     clickhouse_port: int = Field(default=9000, alias="CLICKHOUSE_PORT")
     clickhouse_database: str = Field(default="budeval", alias="CLICKHOUSE_DATABASE")
     clickhouse_user: str = Field(default="default", alias="CLICKHOUSE_USER")
-    clickhouse_password: str = Field(default="N_8Bq67UGItUD", alias="CLICKHOUSE_PASSWORD")
-
-    # ClickHouse Performance Settings
+    clickhouse_password: str = Field(default="", alias="CLICKHOUSE_PASSWORD")
+    clickhouse_secure: bool = Field(default=False, alias="CLICKHOUSE_SECURE")
     clickhouse_batch_size: int = Field(default=1000, alias="CLICKHOUSE_BATCH_SIZE")
     clickhouse_pool_min_size: int = Field(default=1, alias="CLICKHOUSE_POOL_MIN_SIZE")
     clickhouse_pool_max_size: int = Field(default=10, alias="CLICKHOUSE_POOL_MAX_SIZE")
-    clickhouse_async_insert: bool = Field(default=True, alias="CLICKHOUSE_ASYNC_INSERT")
-    clickhouse_compression: str = Field(default="zstd", alias="CLICKHOUSE_COMPRESSION")
-    clickhouse_secure: bool = Field(default=False, alias="CLICKHOUSE_SECURE")
 
-    # Storage Backend Selection
+    # Storage Backend (only ClickHouse now)
     storage_backend: str = Field(default="clickhouse", alias="STORAGE_BACKEND")
+
+    # Paths
+    base_dir: Path = Path(__file__).parent.parent.parent.resolve()
+    extraction_base_path: Path = Field(default=Path("/tmp/eval_results"), alias="EXTRACTION_BASE_PATH")
+
+    @property
+    def ansible_playbooks_dir(self) -> Path:
+        """Get the Ansible playbooks directory."""
+        return self.base_dir / "budeval" / "ansible" / "playbooks"
+
+    @classmethod
+    def get_current_namespace(cls) -> str:
+        """Get the current Kubernetes namespace."""
+        # First try environment variable
+        namespace = os.environ.get("NAMESPACE")
+        if namespace:
+            return namespace.lower()
+
+        # Try reading from serviceaccount if running in cluster
+        namespace_file = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+        try:
+            with open(namespace_file, "r") as f:
+                return f.read().strip().lower()
+        except FileNotFoundError:
+            pass
+
+        # Default fallback
+        return "budeval"
 
 
 class SecretsConfig(BaseSecretsConfig):
+    """Secrets configuration."""
+
     name: str = __version__.split("@")[0]
     version: str = __version__.split("@")[-1]
 
-    # PostgreSQL Configuration
-    psql_user: str = Field(alias="PSQL_USER")
-    psql_password: str = Field(alias="PSQL_PASSWORD")
-    psql_db_name: str = Field(alias="PSQL_DB_NAME")
-    psql_port: int = Field(default=5432, alias="PSQL_PORT")
-    psql_host: str = Field(alias="PSQL_HOST")
-
-    # (ClickHouse settings moved to AppConfig)
+    # PostgreSQL (if still needed for some features)
+    psql_user: str | None = Field(default="postgres", alias="PSQL_USER")
+    psql_password: str | None = Field(default="", alias="PSQL_PASSWORD")
+    psql_db_name: str | None = Field(default="budeval", alias="PSQL_DB_NAME")
+    psql_port: int | None = Field(default=5432, alias="PSQL_PORT")
+    psql_host: str | None = Field(default="localhost", alias="PSQL_HOST")
 
 
+# Global configuration instances
 app_settings = AppConfig()  # type: ignore[reportCallIssue]
 secrets_settings = SecretsConfig()  # type: ignore[reportCallIssue]
 
+# Register Config
 register_settings(app_settings, secrets_settings)

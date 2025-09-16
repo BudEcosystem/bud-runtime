@@ -4,43 +4,30 @@
   connection: local
   gather_facts: no
   collections:
-      - community.kubernetes
+    - kubernetes.core
 
   tasks:
-      - name: Deploy evaluation job
-        community.kubernetes.k8s:
-            state: present
-            definition: "{{ lookup('file', job_template_path) | from_yaml }}"
-            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-            namespace: "{{ namespace }}"
+    - name: Deploy evaluation job
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('file', job_template_path) | from_yaml_all | list }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        namespace: "{{ namespace }}"
 
-      - name: Verify job was created
-        community.kubernetes.k8s_info:
-            api_version: batch/v1
-            kind: Job
-            name: "{{ job_name }}"
-            namespace: "{{ namespace }}"
-            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-        register: job_creation_result
-        until: job_creation_result.resources | length > 0
-        retries: 10
-        delay: 3
+    - name: Verify job was created
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        name: "{{ job_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      register: job_creation_result
+      until: job_creation_result.resources | length > 0
+      retries: 10
+      delay: 3
 
-      - name: Get job status
-        community.kubernetes.k8s_info:
-            api_version: batch/v1
-            kind: Job
-            name: "{{ job_name }}"
-            namespace: "{{ namespace }}"
-            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-        register: job_status
-
-      - name: Display job information
-        debug:
-            msg: |
-                Job {{ job_name }} has been deployed successfully.
-                Status: {{ job_status.resources[0].status | default('Unknown') }}
-                Datasets: bud-dev-budeval-dataset mounted at /workspace/data (read-only)
-                Output: bud-dev-budeval-dataset/results/{{ job_name }} mounted at /workspace/outputs
-                Cache: emptyDir mounted at /workspace/cache
-                Configs: ConfigMap mounted at /workspace/configs (read-only)
+    - name: Display job information
+      debug:
+        msg: |
+          Job {{ job_name }} has been deployed successfully.
+          Namespace: {{ namespace }}

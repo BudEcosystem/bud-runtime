@@ -1,210 +1,142 @@
-from typing import Any, Dict, List, Optional
+"""Simplified schemas for OpenCompass evaluation requests and responses."""
+
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List
 from uuid import UUID
 
 from budmicroframe.commons.schemas import CloudEventBase
 from pydantic import BaseModel, Field
 
-from budeval.core.schemas import EvaluationEngine
+
+class ModelType(str, Enum):
+    """Supported model types."""
+
+    API = "api"
 
 
-# Sub-schemas for nested structure
-class EvalModelInfo(BaseModel):
-    """Model information for evaluation."""
+class Dataset(BaseModel):
+    """Dataset configuration for evaluation."""
 
-    model_name: str = Field(..., description="Name of the model to be evaluated")
-    endpoint: str = Field(..., description="Endpoint of the model to be evaluated")
-    api_key: str = Field(..., description="API key for authentication")
-    extra_args: Dict[str, Any] = Field(default_factory=dict, description="Extra arguments for the model")
+    name: str = Field(..., description="Dataset name (e.g., 'mmlu', 'gsm8k')")
 
 
-class EvalDataset(BaseModel):
-    """Dataset information for evaluation."""
+class ModelConfig(BaseModel):
+    """Model configuration for OpenCompass evaluation."""
 
-    dataset_id: str = Field(..., description="ID of the dataset to be evaluated")
+    name: str = Field(..., description="Model name/identifier")
+    api_key: str = Field(..., description="API key for the model")
+    base_url: str = Field(..., description="Base URL for the API")
+    type: ModelType = Field(default=ModelType.API, description="Model type")
 
-
-class EvalConfig(BaseModel):
-    """Configuration for evaluation."""
-
-    config_name: str = Field(..., description="Name of the evaluation configuration")
-    config_value: Dict[str, Any] = Field(..., description="Value of the evaluation configuration")
+    # OpenCompass specific parameters
+    max_out_len: int = Field(default=2048, description="Maximum output length")
+    max_seq_len: int = Field(default=4096, description="Maximum sequence length")
+    batch_size: int = Field(default=1, description="Batch size for evaluation")
+    query_per_second: int = Field(default=1, description="Rate limiting")
 
 
 class EvaluationRequest(CloudEventBase):
-    """Schema for evaluation request with nested structure."""
+    """Request to start an evaluation."""
 
-    # Using uuid as primary identifier to match bud-eval
-    uuid: UUID = Field(..., description="Unique identifier for the evaluation request")
+    eval_request_id: UUID = Field(..., description="Unique evaluation ID")
+    experiment_id: UUID | None = Field(None, description="Associated experiment ID")
 
-    # Experiment ID to track evaluation back to experiment
-    experiment_id: Optional[UUID] = Field(None, description="The experiment ID this evaluation belongs to")
+    model: ModelConfig = Field(..., description="Model configuration")
+    datasets: List[Dataset] = Field(..., description="Datasets to evaluate on")
 
-    # Nested model info structure
-    eval_model_info: EvalModelInfo = Field(..., description="Model information for evaluation")
+    # Kubernetes configuration
+    namespace: str = Field(default="budeval", description="K8s namespace")
+    kubeconfig: str | None = Field(None, description="Kubeconfig as JSON string")
 
-    # Structured datasets instead of simple strings
-    eval_datasets: List[EvalDataset] = Field(..., description="Evaluation datasets")
-
-    # New field for evaluation configurations
-    eval_configs: List[EvalConfig] = Field(default_factory=list, description="Evaluation configurations")
-
-    # Keep engine field for compatibility
-    engine: EvaluationEngine = Field(default=EvaluationEngine.OPENCOMPASS, description="Evaluation engine to use")
-
-    # Kubeconfig remains optional
-    kubeconfig: Optional[str] = Field(
-        None, description="Kubernetes configuration JSON content (optional, uses local config if not provided)"
-    )
-
-    class Config:  # noqa
-        json_schema_extra = {
-            "example": {
-                "uuid": "123e4567-e89b-12d3-a456-426614174000",
-                "experiment_id": "987f6543-e89b-12d3-a456-426614174000",
-                "engine": "opencompass",
-                "eval_model_info": {
-                    "model_name": "gpt-4",
-                    "endpoint": "https://api.openai.com/v1",
-                    "api_key": "sk-...",
-                    "extra_args": {},
-                },
-                "eval_datasets": [{"dataset_id": "mmlu"}, {"dataset_id": "gsm8k"}],
-                "eval_configs": [],
-                "kubeconfig": "<Kubernetes config JSON content>",
-            }
-        }
+    # Execution parameters
+    num_workers: int = Field(default=1, description="Number of parallel workers")
+    timeout_minutes: int = Field(default=60, description="Job timeout")
+    debug: bool = Field(default=False, description="Enable debug mode")
 
 
-# Workflow Schemas
-class StartEvaluationRequest(CloudEventBase):
-    """Schema for start evaluation request - matches EvaluationRequest structure."""
+class JobStatus(str, Enum):
+    """Job execution status."""
 
-    # Using uuid as primary identifier to match bud-eval
-    uuid: UUID = Field(..., description="Unique identifier for the evaluation request")
-
-    # Experiment ID to track evaluation back to experiment
-    experiment_id: Optional[UUID] = Field(None, description="The experiment ID this evaluation belongs to")
-
-    # Nested model info structure
-    eval_model_info: EvalModelInfo = Field(..., description="Model information for evaluation")
-
-    # Structured datasets instead of simple strings
-    eval_datasets: List[EvalDataset] = Field(..., description="Evaluation datasets")
-
-    # New field for evaluation configurations
-    eval_configs: List[EvalConfig] = Field(default_factory=list, description="Evaluation configurations")
-
-    # Keep engine field for compatibility
-    engine: EvaluationEngine = Field(default=EvaluationEngine.OPENCOMPASS, description="Evaluation engine to use")
-
-    # Kubeconfig remains optional
-    kubeconfig: Optional[str] = Field(
-        None, description="Kubernetes configuration JSON content (optional, uses local config if not provided)"
-    )
-
-    class Config:  # noqa
-        json_schema_extra = {
-            "example": {
-                "uuid": "123e4567-e89b-12d3-a456-426614174000",
-                "experiment_id": "987f6543-e89b-12d3-a456-426614174000",
-                "engine": "opencompass",
-                "eval_model_info": {
-                    "model_name": "gpt-4",
-                    "endpoint": "https://api.openai.com/v1",
-                    "api_key": "sk-...",
-                    "extra_args": {},
-                },
-                "eval_datasets": [{"dataset_id": "mmlu"}, {"dataset_id": "gsm8k"}],
-                "eval_configs": [],
-                "kubeconfig": "<Kubernetes config JSON content>",
-            }
-        }
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
-class DeployEvalJobRequest(BaseModel):
-    """Schema for deploy evaluation job request."""
+class JobStatusResponse(BaseModel):
+    """Response for job status query."""
 
-    engine: str = Field(..., description="Engine to use for the evaluation job")
-    eval_request_id: str = Field(..., description="Unique identifier for the job")
-    kubeconfig: Optional[str] = Field(
-        None, description="Kubernetes configuration JSON content (optional, uses local config if not provided)"
-    )
-    api_key: str = Field(..., description="API key for authentication")
-    base_url: str = Field(..., description="Base URL for the model API")
-    dataset: List[str] = Field(..., description="Datasets to evaluate on")
-
-    class Config:  # noqa
-        json_schema_extra = {
-            "example": {
-                "engine": "OpenCompass",
-                "eval_request_id": "123e4567-e89b-12d3-a456-426614174000",
-                "api_key": "sk-...",
-                "base_url": "https://api.openai.com/v1",
-                "kubeconfig": "<Kubernetes config JSON content>",
-                "dataset": ["dataset1"],
-            }
-        }
+    job_id: str
+    status: JobStatus
+    message: str | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    duration_seconds: float | None = None
 
 
-# Job Schemas
-class VolumeMount(BaseModel):
-    name: str = Field(..., description="Name of the volume")
-    claim_name: str = Field(..., description="Name of the PVC to use")
-    mount_path: str = Field(..., description="Path to mount in the container")
-
-
-class Job(BaseModel):
-    # Existing fields...
-
-    # Volume mount configurations
-    read_only_mounts: Optional[List[VolumeMount]] = Field(None, description="Read-only volume mounts for the job")
-    writable_mounts: Optional[List[VolumeMount]] = Field(None, description="Writable volume mounts for the job")
-
-    class Config:  # noqa
-        schema_extra = {
-            "example": {
-                # Existing example fields...
-                "read_only_mounts": [
-                    {"name": "datasets-volume", "claim_name": "datasets-pvc", "mount_path": "/data/datasets"}
-                ],
-                "writable_mounts": [
-                    {"name": "results-volume", "claim_name": "results-pvc", "mount_path": "/data/results"}
-                ],
-            }
-        }
-
-
-# Response schemas for evaluation results API
 class DatasetScore(BaseModel):
-    """Individual dataset score information."""
+    """Score for a single dataset."""
 
-    dataset_name: str = Field(..., description="Name of the dataset")
+    dataset_name: str
     accuracy: float = Field(..., description="Accuracy score (0-100)")
-    total_examples: int = Field(..., description="Total number of examples in the dataset")
-    correct_examples: int = Field(..., description="Number of correctly predicted examples")
+    total_examples: int
+    correct_examples: int
 
 
-class EvaluationScoresResponse(BaseModel):
-    """Response schema for evaluation scores endpoint."""
+class EvaluationResults(BaseModel):
+    """Complete evaluation results."""
 
-    evaluation_id: str = Field(..., description="Evaluation job ID")
-    model_name: str = Field(..., description="Name of the evaluated model")
-    engine: str = Field(..., description="Evaluation engine used")
-    overall_accuracy: float = Field(..., description="Overall accuracy across all datasets")
-    datasets: List[DatasetScore] = Field(..., description="List of dataset scores")
+    job_id: str
+    model_name: str
+    experiment_id: str | None = None
 
-    class Config:
-        """Configuration for the EvaluationScoresResponse model."""
+    overall_accuracy: float
+    datasets: List[DatasetScore]
 
-        json_schema_extra = {
-            "example": {
-                "evaluation_id": "eval-123e4567-e89b-12d3-a456-426614174000",
-                "model_name": "gpt-4",
-                "engine": "opencompass",
-                "overall_accuracy": 75.5,
-                "datasets": [
-                    {"dataset_name": "mmlu", "accuracy": 85.5, "total_examples": 200, "correct_examples": 171},
-                    {"dataset_name": "gsm8k", "accuracy": 65.5, "total_examples": 100, "correct_examples": 65},
-                ],
-            }
-        }
+    start_time: datetime
+    end_time: datetime
+    duration_seconds: float
+
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+# Legacy compatibility schemas for existing APIs
+class EvalModelInfo(BaseModel):
+    """Legacy model info structure for backward compatibility."""
+
+    model_name: str
+    endpoint: str
+    api_key: str
+    extra_args: Dict[str, Any] = Field(default_factory=dict)
+
+
+class EvalDataset(BaseModel):
+    """Legacy dataset structure for backward compatibility."""
+
+    dataset_id: str
+
+
+class LegacyEvaluationRequest(BaseModel):
+    """Legacy evaluation request format for backward compatibility."""
+
+    uuid: UUID
+    experiment_id: UUID | None = None
+    eval_model_info: EvalModelInfo
+    eval_datasets: List[EvalDataset]
+    kubeconfig: str | None = None
+
+    def to_new_format(self) -> EvaluationRequest:
+        """Convert legacy format to new simplified format."""
+        return EvaluationRequest(
+            eval_request_id=self.uuid,
+            experiment_id=self.experiment_id,
+            model=ModelConfig(
+                name=self.eval_model_info.model_name,
+                api_key=self.eval_model_info.api_key,
+                base_url=self.eval_model_info.endpoint,
+                **self.eval_model_info.extra_args,
+            ),
+            datasets=[Dataset(name=d.dataset_id) for d in self.eval_datasets],
+            kubeconfig=self.kubeconfig,
+        )

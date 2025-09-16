@@ -4,28 +4,13 @@
   connection: local
   gather_facts: no
   collections:
-    - community.kubernetes
+    - kubernetes.core
 
   vars:
     extractor_image: "busybox:1.35"
     wait_timeout: 180
-    kubectl_retries: 5
 
   tasks:
-    - name: Verify shared PVC exists before extraction
-      community.kubernetes.k8s_info:
-        api_version: v1
-        kind: PersistentVolumeClaim
-        name: "{{ pvc_name }}"
-        namespace: "{{ namespace }}"
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-      register: pvc_info
-      failed_when: pvc_info.resources | length == 0
-
-    - name: Display PVC status
-      debug:
-        msg: "Shared PVC {{ pvc_name }} found with status: {{ pvc_info.resources[0].status.phase }}. Will extract from subPath: {{ results_subpath }}"
-
     - name: Ensure local extraction directory exists
       file:
         path: "{{ local_extract_path }}"
@@ -33,7 +18,7 @@
         mode: '0755'
 
     - name: Create extraction pod
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         kubeconfig: "{{ kubeconfig_path | default(omit) }}"
         definition:
@@ -56,20 +41,13 @@
                 mountPath: /workspace/outputs
                 subPath: "{{ results_subpath }}"
                 readOnly: true
-              resources:
-                requests:
-                  memory: "64Mi"
-                  cpu: "50m"
-                limits:
-                  memory: "128Mi"
-                  cpu: "100m"
             volumes:
             - name: output
               persistentVolumeClaim:
                 claimName: "{{ pvc_name }}"
 
     - name: Wait for extraction pod to be ready
-      community.kubernetes.k8s_info:
+      kubernetes.core.k8s_info:
         api_version: v1
         kind: Pod
         name: "{{ job_id }}-extract"
@@ -82,22 +60,6 @@
         pod_info.resources[0].status.phase == "Running"
       retries: 20
       delay: 3
-      failed_when: >
-        pod_info.resources | length == 0 or
-        (pod_info.resources[0].status is defined and
-         pod_info.resources[0].status.phase == "Failed")
-
-    - name: Check if output directory exists in pod
-      shell: |
-        kubectl exec {{ job_id }}-extract -n {{ namespace }} \
-        {% if kubeconfig_path is defined %}--kubeconfig {{ kubeconfig_path }}{% endif %} \
-        -- ls -la /workspace/outputs
-      register: output_check
-      failed_when: output_check.rc != 0
-
-    - name: Display output directory contents
-      debug:
-        msg: "Output directory contents: {{ output_check.stdout_lines }}"
 
     - name: Create job-specific extraction directory
       file:
@@ -109,29 +71,12 @@
       shell: |
         kubectl cp {{ namespace }}/{{ job_id }}-extract:/workspace/outputs \
         "{{ local_extract_path }}/{{ job_id }}/outputs" \
-        {% if kubeconfig_path is defined %}--kubeconfig {{ kubeconfig_path }}{% endif %} \
-        --retries={{ kubectl_retries }}
+        {% if kubeconfig_path is defined %}--kubeconfig {{ kubeconfig_path }}{% endif %}
       register: copy_result
       failed_when: copy_result.rc != 0
 
-    - name: Verify copied files
-      find:
-        paths: "{{ local_extract_path }}/{{ job_id }}/outputs"
-        recurse: yes
-        file_type: file
-      register: copied_files
-
-    - name: Display extraction summary
-      debug:
-        msg: |
-          Extraction completed successfully:
-          - Job ID: {{ job_id }}
-          - Local path: {{ local_extract_path }}/{{ job_id }}/outputs
-          - Files extracted: {{ copied_files.files | length }}
-          - Total size: {{ copied_files.files | map(attribute='size') | sum | filesizeformat }}
-
     - name: Delete extraction pod
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: absent
         api_version: v1
         kind: Pod
@@ -145,6 +90,3 @@
           job_id: "{{ job_id }}"
           status: "success"
           local_path: "{{ local_extract_path }}/{{ job_id }}/outputs"
-          files_extracted: "{{ copied_files.files | length }}"
-          total_size_bytes: "{{ copied_files.files | map(attribute='size') | sum }}"
-          extracted_at: "{{ ansible_date_time.iso8601 | default(ansible_date_time) | default('unknown') }}"

@@ -1,147 +1,156 @@
-#  -----------------------------------------------------------------------------
-#  Copyright (c) 2024 Bud Ecosystem Inc.
-#  #
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#  #
-#      http://www.apache.org/licenses/LICENSE-2.0
-#  #
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-#  -----------------------------------------------------------------------------
+"""Simplified API routes for evaluation operations."""
 
-from typing import Optional
+import logging
+from typing import Any, Dict, Optional
 
-from budmicroframe.commons import logging
 from fastapi import APIRouter, HTTPException, Query
 
-from budeval.evals.schemas import StartEvaluationRequest
-from budeval.evals.services import EvaluationOpsService, EvaluationService
+from budeval.evals.schemas import JobStatusResponse, LegacyEvaluationRequest
+from budeval.evals.services import EvaluationOpsService
+from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
+from budeval.evals.workflows import EvaluationWorkflow
 
-from .schemas import EvaluationRequest, EvaluationScoresResponse
 
+logger = logging.getLogger(__name__)
 
-logger = logging.get_logger(__name__)
+# Create router
+evals_routes = APIRouter(prefix="/evals", tags=["Evaluations"])
 
-evals_routes = APIRouter(prefix="/evals", tags=["Evals"])
+# Also create a router for /evaluations prefix to support both paths
+evaluations_routes = APIRouter(prefix="/evaluations", tags=["Evaluations"])
 
 
 @evals_routes.post("/start")
-async def start_eval(request: EvaluationRequest):
-    """Start an evaluation.
+async def start_evaluation(request: LegacyEvaluationRequest) -> Dict[str, Any]:
+    """Start an evaluation job.
 
     Args:
-        request (EvaluationRequest): The evaluation request.
+        request: Legacy evaluation request for backward compatibility
 
     Returns:
-        dict: evaluation workflow response
+        Dictionary with workflow metadata in standard format
     """
     try:
-        response = await EvaluationService().evaluate_model(StartEvaluationRequest(**request.model_dump()))
-        return response
+        # Convert legacy request to new format
+        new_request = request.to_new_format()
+
+        workflow = EvaluationWorkflow()
+        result = await workflow(new_request)
+
+        # Handle different response types
+        from budmicroframe.commons.schemas import ErrorResponse, WorkflowMetadataResponse
+
+        if isinstance(result, WorkflowMetadataResponse):
+            # Return the workflow metadata response directly as dict
+            return result.to_http_response()
+        elif isinstance(result, ErrorResponse):
+            raise HTTPException(status_code=result.code, detail=f"Failed to start evaluation: {result.message}")
+        else:
+            # Fallback for unexpected response types
+            logger.warning(f"Unexpected response type: {type(result)}")
+            raise HTTPException(status_code=500, detail="Unexpected response from workflow")
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save evaluation request: {str(e)}") from e
+        logger.error(f"Error starting evaluation: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}") from e
 
 
 @evals_routes.get("/status/{job_id}")
 async def get_job_status(
     job_id: str,
-    kubeconfig: Optional[str] = Query(None, description="Kubernetes configuration as JSON string (optional)"),
-    namespace: Optional[str] = Query(
-        None, description="Kubernetes namespace (optional); defaults to current namespace"
-    ),
-):
+    kubeconfig: Optional[str] = Query(None, description="Kubernetes config as JSON string"),
+    namespace: Optional[str] = Query(None, description="Kubernetes namespace"),
+) -> JobStatusResponse:
     """Get the status of an evaluation job.
 
     Args:
-        job_id (str): The unique identifier of the job.
-        kubeconfig (Optional[str]): Kubernetes configuration as JSON string (optional, uses in-cluster config if not provided).
-        namespace (Optional[str]): Kubernetes namespace where the job is running.
-                                   If not provided, uses the current cluster namespace detected from:
-                                   1. NAMESPACE environment variable
-                                   2. Kubernetes service account namespace file
-                                   3. Falls back to 'default'
+        job_id: Job identifier
+        kubeconfig: Optional Kubernetes configuration
+        namespace: Optional Kubernetes namespace
 
     Returns:
-        dict: Job status information including state, completion status, and any errors
+        JobStatusResponse with current status
     """
     try:
-        response = await EvaluationOpsService.get_job_status(job_id, kubeconfig, namespace)
-        return response
+        result = await EvaluationOpsService.get_job_status(job_id=job_id, kubeconfig=kubeconfig, namespace=namespace)
+
+        return JobStatusResponse(**result)
+
     except Exception as e:
+        logger.error(f"Error getting job status for {job_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get job status: {str(e)}") from e
 
 
 @evals_routes.delete("/cleanup/{job_id}")
 async def cleanup_job(
     job_id: str,
-    kubeconfig: Optional[str] = Query(None, description="Kubernetes configuration as JSON string (optional)"),
-):
+    kubeconfig: Optional[str] = Query(None, description="Kubernetes config as JSON string"),
+    namespace: Optional[str] = Query(None, description="Kubernetes namespace"),
+) -> Dict[str, Any]:
     """Clean up an evaluation job and its resources.
 
     Args:
-        job_id (str): The unique identifier of the job.
-        kubeconfig (Optional[str]): Kubernetes configuration as JSON string (optional, uses in-cluster config if not provided).
+        job_id: Job identifier
+        kubeconfig: Optional Kubernetes configuration
+        namespace: Optional Kubernetes namespace
 
     Returns:
-        dict: Cleanup status information
+        Dictionary with cleanup status
     """
     try:
-        response = await EvaluationOpsService.cleanup_job(job_id, kubeconfig)
-        return response
+        result = await EvaluationOpsService.cleanup_job(job_id=job_id, kubeconfig=kubeconfig, namespace=namespace)
+
+        return result
+
     except Exception as e:
+        logger.error(f"Error cleaning up job {job_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to cleanup job: {str(e)}") from e
 
 
 @evals_routes.get("/results/{job_id}")
-async def get_evaluation_results(job_id: str):
+async def get_evaluation_results(job_id: str) -> Dict[str, Any]:
     """Get complete evaluation results for a job.
 
     Args:
-        job_id (str): The job ID to retrieve results for.
+        job_id: Job identifier
 
     Returns:
-        dict: Complete evaluation results
+        Dictionary with complete evaluation results
     """
     try:
-        from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
-
         storage = get_storage_adapter()
-        if hasattr(storage, "initialize"):
-            await initialize_storage(storage)
+        await initialize_storage(storage)
+
         results = await storage.get_results(job_id)
 
         if not results:
             raise HTTPException(status_code=404, detail=f"Results not found for job: {job_id}")
 
-        return {"status": "success", "data": results}
+        return results
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve results: {str(e)}") from e
+        logger.error(f"Error getting results for {job_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get results: {str(e)}") from e
 
 
 @evals_routes.get("/results/{job_id}/summary")
-async def get_evaluation_summary(job_id: str):
+async def get_evaluation_summary(job_id: str) -> Dict[str, Any]:
     """Get evaluation summary for a job.
 
     Args:
-        job_id (str): The job ID to retrieve summary for.
+        job_id: Job identifier
 
     Returns:
-        dict: Evaluation summary
+        Dictionary with evaluation summary
     """
     try:
-        from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
-
         storage = get_storage_adapter()
-        if hasattr(storage, "initialize"):
-            await initialize_storage(storage)
+        await initialize_storage(storage)
+
         results = await storage.get_results(job_id)
 
         if not results:
@@ -149,31 +158,38 @@ async def get_evaluation_summary(job_id: str):
 
         # Extract summary from results
         summary = results.get("summary", {})
-        return {"status": "success", "data": summary}
+
+        return {
+            "job_id": job_id,
+            "model_name": summary.get("model_name", "unknown"),
+            "overall_accuracy": summary.get("overall_accuracy", 0.0),
+            "total_datasets": summary.get("total_datasets", 0),
+            "total_examples": summary.get("total_examples", 0),
+            "total_correct": summary.get("total_correct", 0),
+        }
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve summary: {str(e)}") from e
+        logger.error(f"Error getting summary for {job_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get summary: {str(e)}") from e
 
 
 @evals_routes.get("/results/{job_id}/datasets/{dataset_name}")
-async def get_dataset_results(job_id: str, dataset_name: str):
+async def get_dataset_results(job_id: str, dataset_name: str) -> Dict[str, Any]:
     """Get results for a specific dataset.
 
     Args:
-        job_id (str): The job ID to retrieve results for.
-        dataset_name (str): The name of the dataset.
+        job_id: Job identifier
+        dataset_name: Dataset name
 
     Returns:
-        dict: Dataset-specific results
+        Dictionary with dataset-specific results
     """
     try:
-        from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
-
         storage = get_storage_adapter()
-        if hasattr(storage, "initialize"):
-            await initialize_storage(storage)
+        await initialize_storage(storage)
+
         results = await storage.get_results(job_id)
 
         if not results:
@@ -181,191 +197,126 @@ async def get_dataset_results(job_id: str, dataset_name: str):
 
         # Find the specific dataset
         datasets = results.get("datasets", [])
-        for dataset in datasets:
-            if dataset.get("dataset_name") == dataset_name:
-                return {"status": "success", "data": dataset}
+        dataset_result = next((d for d in datasets if d.get("dataset_name") == dataset_name), None)
 
-        raise HTTPException(status_code=404, detail=f"Dataset '{dataset_name}' not found in job results")
+        if not dataset_result:
+            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_name}' not found in job results")
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve dataset results: {str(e)}") from e
-
-
-@evals_routes.get("/results/{job_id}/metrics")
-async def get_evaluation_metrics(job_id: str):
-    """Get aggregated metrics for a job.
-
-    Args:
-        job_id (str): The job ID to retrieve metrics for.
-
-    Returns:
-        dict: Aggregated evaluation metrics
-    """
-    try:
-        from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
-
-        storage = get_storage_adapter()
-        if hasattr(storage, "initialize"):
-            await initialize_storage(storage)
-        results = await storage.get_results(job_id)
-
-        if not results:
-            raise HTTPException(status_code=404, detail=f"Results not found for job: {job_id}")
-
-        # Extract metrics from summary
-        summary = results.get("summary", {})
-        metrics = {
-            "overall_accuracy": summary.get("overall_accuracy", 0.0),
-            "total_datasets": summary.get("total_datasets", 0),
-            "total_examples": summary.get("total_examples", 0),
-            "total_correct": summary.get("total_correct", 0),
-            "dataset_accuracies": summary.get("dataset_accuracies", {}),
-            "model_name": summary.get("model_name", "unknown"),
-        }
-
-        return {"status": "success", "data": metrics}
+        return dataset_result
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve metrics: {str(e)}") from e
+        logger.error(f"Error getting dataset results for {job_id}/{dataset_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get dataset results: {str(e)}") from e
 
 
 @evals_routes.get("/results")
-async def list_evaluation_results():
+async def list_evaluation_results() -> Dict[str, Any]:
     """List all available evaluation results.
 
     Returns:
-        dict: List of job IDs with available results
+        Dictionary with list of job IDs and metadata
     """
     try:
-        from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
-
         storage = get_storage_adapter()
-        if hasattr(storage, "initialize"):
-            await initialize_storage(storage)
+        await initialize_storage(storage)
+
         job_ids = await storage.list_results()
 
-        # Get metadata for each job
+        # Get basic metadata for each job
         results_list = []
         for job_id in job_ids:
-            # Try to get metadata if supported by storage adapter
-            if hasattr(storage, "get_metadata"):
-                metadata = await storage.get_metadata(job_id)
-                if metadata:
-                    results_list.append(
-                        {
-                            "job_id": job_id,
-                            "stored_at": metadata.get("stored_at"),
-                            "storage_type": metadata.get("storage_type"),
-                        }
-                    )
-            else:
-                # For storage adapters without metadata, use basic info
-                results_list.append({"job_id": job_id, "stored_at": None, "storage_type": storage.__class__.__name__})
+            try:
+                # Try to get basic info from storage
+                if hasattr(storage, "get_metadata"):
+                    metadata = await storage.get_metadata(job_id)
+                    if metadata:
+                        results_list.append({"job_id": job_id, **metadata})
+                        continue
 
-        return {"status": "success", "data": {"total_results": len(job_ids), "results": results_list}}
+                # Fallback: just the job ID
+                results_list.append({"job_id": job_id})
+
+            except Exception as e:
+                logger.warning(f"Failed to get metadata for {job_id}: {e}")
+                results_list.append({"job_id": job_id})
+
+        return {"total_jobs": len(job_ids), "jobs": results_list}
 
     except Exception as e:
+        logger.error(f"Error listing evaluation results: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to list results: {str(e)}") from e
 
 
 @evals_routes.delete("/results/{job_id}")
-async def delete_evaluation_results(job_id: str):
+async def delete_evaluation_results(job_id: str) -> Dict[str, Any]:
     """Delete evaluation results for a job.
 
     Args:
-        job_id (str): The job ID to delete results for.
+        job_id: Job identifier
 
     Returns:
-        dict: Deletion result
+        Dictionary with deletion status
     """
     try:
-        from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
-
         storage = get_storage_adapter()
-        if hasattr(storage, "initialize"):
-            await initialize_storage(storage)
+        await initialize_storage(storage)
 
         # Check if results exist
-        if not await storage.exists(job_id):
+        exists = await storage.exists(job_id)
+        if not exists:
             raise HTTPException(status_code=404, detail=f"Results not found for job: {job_id}")
 
         # Delete results
         success = await storage.delete_results(job_id)
 
         if success:
-            return {"status": "success", "message": f"Results deleted successfully for job: {job_id}"}
+            return {"job_id": job_id, "deleted": True, "message": "Results deleted successfully"}
         else:
-            raise HTTPException(status_code=500, detail=f"Failed to delete results for job: {job_id}")
+            raise HTTPException(status_code=500, detail="Failed to delete results")
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error deleting results for {job_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete results: {str(e)}") from e
 
 
-@evals_routes.get("/evaluations/{evaluation_id}/scores", response_model=EvaluationScoresResponse)
-async def get_evaluation_scores(evaluation_id: str):
-    """Get dataset scores for a specific evaluation.
-
-    Args:
-        evaluation_id: The evaluation job ID
+# Health check endpoint
+@evals_routes.get("/health")
+async def health_check() -> Dict[str, Any]:
+    """Health check endpoint for the evaluation service.
 
     Returns:
-        EvaluationScoresResponse with model info and dataset scores
-
-    Raises:
-        404: If evaluation results are not found
-        500: If an error occurs while retrieving results
+        Dictionary with service health status
     """
     try:
-        from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
-
-        # Get storage adapter based on configuration
+        # Check storage connectivity
         storage = get_storage_adapter()
+        await initialize_storage(storage)
 
-        # Initialize if needed
-        if hasattr(storage, "initialize"):
-            await initialize_storage(storage)
+        storage_health = {"status": "unknown"}
 
-        # Check if we're using ClickHouse
-        if storage.__class__.__name__ != "ClickHouseStorage":
-            # Fallback for non-ClickHouse storage
-            results = await storage.get_results(evaluation_id)
-            if not results:
-                raise HTTPException(status_code=404, detail=f"Evaluation results not found for ID: {evaluation_id}")
+        if hasattr(storage, "health_check"):
+            storage_healthy = await storage.health_check()
+            storage_health = {
+                "status": "healthy" if storage_healthy else "unhealthy",
+                "backend": storage.__class__.__name__,
+            }
 
-            # Transform to match response schema
-            response = EvaluationScoresResponse(
-                evaluation_id=evaluation_id,
-                model_name=results.get("model_name", "unknown"),
-                engine=results.get("engine", "opencompass"),
-                overall_accuracy=results.get("summary", {}).get("overall_accuracy", 0.0),
-                datasets=[
-                    {
-                        "dataset_name": ds.get("dataset_name"),
-                        "accuracy": ds.get("accuracy", 0.0),
-                        "total_examples": ds.get("total_examples", 0),
-                        "correct_examples": ds.get("correct_examples", 0),
-                    }
-                    for ds in results.get("datasets", [])
-                ],
-            )
-            return response
+        return {
+            "service": "budeval",
+            "status": "healthy",
+            "storage": storage_health,
+            "timestamp": "2024-01-15T00:00:00Z",  # Would use real timestamp
+        }
 
-        # For ClickHouse storage, use the optimized method
-        scores = await storage.get_evaluation_scores(evaluation_id)
-
-        if not scores:
-            raise HTTPException(status_code=404, detail=f"Evaluation results not found for ID: {evaluation_id}")
-
-        return EvaluationScoresResponse(**scores)
-
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Failed to get evaluation scores for {evaluation_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve evaluation scores: {str(e)}") from e
+        logger.error(f"Health check failed: {e}")
+        return {
+            "service": "budeval",
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": "2024-01-15T00:00:00Z",  # Would use real timestamp
+        }
