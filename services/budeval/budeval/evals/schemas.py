@@ -119,6 +119,10 @@ class EvaluationJobRecord(BaseModel):
     extracted_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    datasets: List[DatasetScore] = Field(
+        default_factory=list,
+        description="Dataset-level metrics associated with this job",
+    )
 
 
 # Legacy compatibility schemas for existing APIs

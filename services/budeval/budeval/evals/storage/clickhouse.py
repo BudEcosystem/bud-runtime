@@ -207,6 +207,26 @@ class ClickHouseStorage(StorageAdapter):
                 if not row:
                     return None
 
+                dataset_query = """
+                    SELECT dataset_name, accuracy, total_examples, correct_examples
+                    FROM budeval.dataset_results
+                    WHERE job_id = %(job_id)s
+                """
+
+                await cursor.execute(dataset_query, {"job_id": job_id})
+                dataset_rows = await cursor.fetchall()
+
+                datasets: List[Dict[str, Any]] = []
+                for dataset_row in dataset_rows:
+                    datasets.append(
+                        {
+                            "dataset_name": dataset_row[0],
+                            "accuracy": float(dataset_row[1]) if dataset_row[1] is not None else 0.0,
+                            "total_examples": int(dataset_row[2]) if dataset_row[2] is not None else 0,
+                            "correct_examples": int(dataset_row[3]) if dataset_row[3] is not None else 0,
+                        }
+                    )
+
                 return {
                     "job_id": row[0],
                     "experiment_id": row[1],
@@ -223,6 +243,7 @@ class ClickHouseStorage(StorageAdapter):
                     "extracted_at": row[12],
                     "created_at": row[13],
                     "updated_at": row[14],
+                    "datasets": datasets,
                 }
 
         except Exception as e:
