@@ -11,7 +11,8 @@ import { useDeployModel } from "src/stores/useDeployModel";
 export default function ModelSource() {
   const { providerType, createCloudModelWorkflow, currentWorkflow, updateProviderType, createLocalModelWorkflow, updateProviderTypeLocal,
     setCloudModelDetails,
-    setLocalModelDetails
+    setLocalModelDetails,
+    modalityType
   } = useDeployModel();
 
   const { openDrawerWithStep, previousStep } = useDrawer();
@@ -43,7 +44,13 @@ export default function ModelSource() {
         tags: [],
         icon: currentWorkflow?.workflow_steps?.provider?.type == "huggingface" ? "" : ""
       });
-      openDrawerWithStep("add-local-model");
+
+      // Check if Document modality and Hugging Face are selected
+      if (modalityType?.id === "document" && providerType?.id === "hugging_face") {
+        openDrawerWithStep("document-model-list");
+      } else {
+        openDrawerWithStep("add-local-model");
+      }
     }
   }
 

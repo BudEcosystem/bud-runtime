@@ -97,7 +97,7 @@ function AddLocalModelForm() {
 
 export default function AddLocalModel() {
   const { openDrawerWithStep } = useDrawer()
-  const { currentWorkflow, updateModelDetailsLocal, updateCredentialsLocal, localModelDetails, deleteWorkflow, setLoading } = useDeployModel();
+  const { currentWorkflow, updateModelDetailsLocal, updateCredentialsLocal, localModelDetails, deleteWorkflow, setLoading, cameFromDocumentList, setCameFromDocumentList } = useDeployModel();
   const { values, form } = useContext(BudFormContext);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -124,8 +124,14 @@ export default function AddLocalModel() {
     <BudForm
       data={localModelDetails}
       onBack={async () => {
-        await deleteWorkflow(currentWorkflow.workflow_id, true);
-        openDrawerWithStep('model-source')
+        if (cameFromDocumentList) {
+          // Reset the flag for future use
+          setCameFromDocumentList(false);
+          openDrawerWithStep('document-model-list');
+        } else {
+          await deleteWorkflow(currentWorkflow.workflow_id, true);
+          openDrawerWithStep('model-source');
+        }
       }}
       disableNext={currentWorkflow?.workflow_steps?.provider?.type === "huggingface" ?
         !isValidModelName(values?.name) || !values?.uri || !values?.author :

@@ -72,6 +72,13 @@ const modalityTypeList = [
     name: "Action Transformers",
     description: "Add Action Transformers models",
   },
+  {
+    id: "document",
+    type: ["mllm"],
+    icon: "/images/drawer/document.png",
+    name: "Document",
+    description: "Add Document processing models",
+  },
 ];
 
 export type ModalityType = {
@@ -234,6 +241,8 @@ export const useDeployModel = create<{
   updateCredentialsLocal: (credentials: Credentials) => Promise<any>;
   localModelDetails: any;
   setLocalModelDetails: (details: any) => void;
+  cameFromDocumentList: boolean;
+  setCameFromDocumentList: (value: boolean) => void;
   startSecurityScan: () => Promise<any>;
 
   cancelModelDeployment: (id: string, projectId?: string) => Promise<any>;
@@ -283,6 +292,10 @@ export const useDeployModel = create<{
   modalityType: null,
   currentWorkflow: null,
   selectedProvider: null,
+  cameFromDocumentList: false,
+  setCameFromDocumentList: (value: boolean) => {
+    set({ cameFromDocumentList: value });
+  },
   setCurrentWorkflow: (workflow: WorkflowType) => {
     set({ currentWorkflow: workflow });
   },
@@ -395,6 +408,7 @@ export const useDeployModel = create<{
       status: {},
       selectedProvider: null,
       providerType: null,
+      cameFromDocumentList: false,
       cloudModelDetails: {
         name: "",
         tags: [],
