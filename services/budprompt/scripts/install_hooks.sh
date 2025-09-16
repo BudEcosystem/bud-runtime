@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Function to check if NVM is installed
 check_nvm_installed() {
     if command -v nvm >/dev/null 2>&1; then
