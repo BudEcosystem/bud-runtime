@@ -218,7 +218,7 @@ export default function SelectProvider() {
             </div>
 
             {/* Third Party Section */}
-            <div>
+            <div className="hidden">
               <Text_14_600_FFFFFF className="mb-[1rem]">
                 Third party
               </Text_14_600_FFFFFF>
