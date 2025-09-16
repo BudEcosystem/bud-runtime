@@ -25,6 +25,8 @@ from budmetrics.observability.schemas import (
     InferenceListResponse,
     LatencyDistributionRequest,
     LatencyDistributionResponse,
+    MetricsSyncRequest,
+    MetricsSyncResponse,
     ObservabilityMetricsRequest,
     ObservabilityMetricsResponse,
     TimeSeriesRequest,
@@ -505,6 +507,7 @@ async def get_geographic_distribution(
     group_by: str = Query("country", description="Group by: country, region, city"),
     limit: int = Query(50, description="Maximum number of locations to return"),
     project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+    api_key_project_id: Optional[UUID] = Query(None, description="Filter by API key's project ID (for CLIENT users)"),
     country_codes: Optional[str] = Query(None, description="Comma-separated country codes to filter by"),
 ) -> Response:
     """Get geographic distribution data from gateway analytics.
@@ -536,6 +539,8 @@ async def get_geographic_distribution(
         filters = {}
         if project_id:
             filters["project_id"] = project_id
+        if api_key_project_id:
+            filters["api_key_project_id"] = api_key_project_id
         if country_codes:
             filters["country_code"] = [code.strip() for code in country_codes.split(",")]
 
@@ -543,6 +548,33 @@ async def get_geographic_distribution(
             from_date=from_date, to_date=to_date, group_by=group_by, limit=limit, filters=filters if filters else None
         )
 
+        response = await service.get_geographic_data(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting geographic data: {e}")
+        response = ErrorResponse(message=f"Error getting geographic data: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.post("/metrics/geography", tags=["Aggregated Metrics"])
+async def get_geographic_distribution_post(request: GeographicDataRequest) -> Response:
+    """Get geographic distribution data from gateway analytics (POST version).
+
+    This endpoint is the POST version that properly handles complex filters including
+    lists of project IDs and api_key_project_ids for CLIENT users.
+
+    Args:
+        request (GeographicDataRequest): The geographic data request with filters.
+
+    Returns:
+        HTTP response containing geographic distribution data.
+    """
+    response: Union[GeographicDataResponse, ErrorResponse]
+
+    try:
         response = await service.get_geographic_data(request)
     except ValidationError as e:
         logger.error(f"Validation error: {e}")
@@ -617,5 +649,36 @@ async def get_credential_usage(request: CredentialUsageRequest) -> Response:
     except Exception as e:
         logger.error(f"Error getting credential usage: {e}")
         response = ErrorResponse(message=f"Error getting credential usage: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.post("/metrics-sync", tags=["Observability"])
+async def get_metrics_sync(request: MetricsSyncRequest) -> Response:
+    """Get unified metrics sync data for both credentials and users.
+
+    This endpoint provides a unified way to sync both credential usage and user usage data.
+    It supports two modes:
+    - incremental: Returns only entities with recent activity (based on threshold)
+    - full: Returns all entities regardless of activity
+
+    Used by budapp to efficiently sync both credential and user usage data in a single call.
+
+    Args:
+        request (MetricsSyncRequest): Request with sync mode and parameters.
+
+    Returns:
+        HTTP response containing unified metrics sync data.
+    """
+    response: Union[MetricsSyncResponse, ErrorResponse]
+
+    try:
+        response = await service.get_metrics_sync(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting metrics sync: {e}")
+        response = ErrorResponse(message=f"Error getting metrics sync: {str(e)}")
 
     return response.to_http_response()

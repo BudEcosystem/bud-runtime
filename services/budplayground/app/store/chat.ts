@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { subscribeWithSelector } from 'zustand/middleware';
 import { Note, Session, Settings } from '../types/chat';
 import { Endpoint } from '../types/deployment';
 import { SavedMessage } from '../types/chat';
@@ -16,6 +16,7 @@ interface ChatStore {
   enableChat: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
   syncWithServer: () => Promise<void>;
+  switchUser: () => void;
 
   messages: Record<string, SavedMessage[]>;
   addMessage: (chatId: string, message: SavedMessage) => void;
@@ -41,16 +42,51 @@ interface ChatStore {
   getNotes: (chatId: string) => Note[];
 }
 
-// Get a unique storage name from env or URL params
+// Generate user-specific storage key based on authentication method
+const getUserIdentifier = (): string | null => {
+  if (typeof window === 'undefined') return null;
+
+  // For JWT/refresh token auth, get user_id from session data
+  const isJWTAuth = localStorage.getItem('is_jwt_auth') === 'true';
+  if (isJWTAuth) {
+    const sessionData = localStorage.getItem('session_data');
+    if (sessionData) {
+      try {
+        const parsed = JSON.parse(sessionData);
+        return parsed.user_id;
+      } catch (error) {
+        console.error('Failed to parse session data:', error);
+      }
+    }
+  }
+
+  // For API key auth, use the API key itself as identifier
+  const apiKey = localStorage.getItem('token') || localStorage.getItem('access_key');
+  if (apiKey) {
+    // Create a hash of the API key for privacy (simple approach)
+    return btoa(apiKey).substring(0, 16); // Base64 encoded, first 16 chars
+  }
+
+  return null;
+};
+
+// Get a unique storage name with user identification
 const getStorageName = () => {
   // Check if window is defined (client-side)
   if (typeof window !== 'undefined') {
-    // Check for URL parameters
+    // Check for URL parameters first
     const urlParams = new URLSearchParams(window.location.search);
     const storageParam = urlParams.get('storage');
 
     if (storageParam) {
       return storageParam;
+    }
+
+    // Get user identifier
+    const userIdentifier = getUserIdentifier();
+    if (userIdentifier) {
+      const baseStorage = process.env.NEXT_PUBLIC_STORAGE_NAME || 'chat-storage';
+      return `${baseStorage}-${userIdentifier}`;
     }
   }
 
@@ -61,51 +97,157 @@ const getStorageName = () => {
   return envStorage || 'chat-storage';
 };
 
+// Track the current storage key to detect changes
+let currentStorageKey: string | null = null;
+let isStoreInitialized = false;
+let isTransitioningUser = false; // Flag to prevent saves during user switch
+
+// Custom persistence functions
+const saveToStorage = (state: Partial<ChatStore>) => {
+  if (typeof window === 'undefined') return;
+
+  // Don't save during user transitions
+  if (isTransitioningUser) {
+    return;
+  }
+
+  const storageKey = getStorageName();
+
+  // CRITICAL: Only prevent saves if we're truly switching between different authenticated users
+  // Allow saves when:
+  // 1. First time initialization (!currentStorageKey)
+  // 2. Store hasn't been initialized yet (!isStoreInitialized)
+  // 3. Same key (currentStorageKey === storageKey)
+  // 4. Moving from anonymous to authenticated (currentStorageKey === 'chat-storage')
+
+  if (currentStorageKey &&
+      isStoreInitialized &&
+      currentStorageKey !== storageKey &&
+      currentStorageKey !== 'chat-storage' &&
+      currentStorageKey !== `${process.env.NEXT_PUBLIC_STORAGE_NAME || 'chat-storage'}`) {
+    console.warn(`PREVENTED: Attempted to save to different user's storage!`, {
+      previousKey: currentStorageKey,
+      newKey: storageKey,
+      prevented: true
+    });
+    // Don't save - this would contaminate the new user's storage
+    return;
+  }
+
+  currentStorageKey = storageKey;
+
+  const dataToStore = {
+    state: {
+      activeChatList: state.activeChatList,
+      messages: state.messages,
+      settingPresets: state.settingPresets,
+      currentSettingPreset: state.currentSettingPreset,
+      notes: state.notes,
+    },
+    version: 0,
+  };
+
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(dataToStore));
+  } catch (error) {
+    console.error('Failed to save to storage:', error);
+  }
+};
+
+const loadFromStorage = (): Partial<ChatStore> | null => {
+  if (typeof window === 'undefined') return null;
+
+  const storageKey = getStorageName();
+  currentStorageKey = storageKey; // Update tracked key when loading
+
+  try {
+    const storedData = localStorage.getItem(storageKey);
+    if (storedData) {
+      const parsed = JSON.parse(storedData);
+      return parsed.state || null;
+    }
+  } catch (error) {
+    console.error('Failed to load from storage:', error);
+  }
+
+  return null;
+};
+
+// Create the store with custom persistence
 export const useChatStore = create<ChatStore>()(
-  persist(
-    (set, get) => ({
-      activeChatList: [],
-      setActiveChatList: (chatList: Session[]) => set((state) => {
-        // Sync with server if user is signed in
+  subscribeWithSelector((set, get) => {
+    // Delay initial load to prevent loading wrong user's data
+    // The useUserSwitching hook will handle proper initialization
+    // Don't load initially - let useUserSwitching handle it
+    const initialState = null;
+
+    const store = {
+      activeChatList: [],  // Start empty, will be loaded by initializeStore
+      setActiveChatList: (chatList: Session[]) => {
+        set({ activeChatList: chatList });
+        saveToStorage(get());
         get().syncWithServer();
-        return { activeChatList: chatList };
-      }),
-      getChat: (id: string): Session | undefined => {
-        return useChatStore.getState().activeChatList.find((chat: Session) => chat.id === id);
       },
-      setDeployment: (chatId: string, deployment: Endpoint) => set((state) => ({
-        activeChatList: state.activeChatList.map((chat: Session) =>
-          chat.id === chatId ? { ...chat, selectedDeployment: deployment as unknown as Endpoint } : chat
-        )
-      })),
-      createChat: (chat: Session) => set((state) => {
-        const newList = [...(state.activeChatList || []), chat];
-        const newState = { activeChatList: newList };
+
+      getChat: (id: string): Session | undefined => {
+        return get().activeChatList.find((chat: Session) => chat.id === id);
+      },
+
+      setDeployment: (chatId: string, deployment: Endpoint) => {
+        set((state) => ({
+          activeChatList: state.activeChatList.map((chat: Session) =>
+            chat.id === chatId ? { ...chat, selectedDeployment: deployment as unknown as Endpoint } : chat
+          )
+        }));
+        saveToStorage(get());
+      },
+
+      createChat: (chat: Session) => {
+        set((state) => ({
+          activeChatList: [...(state.activeChatList || []), chat]
+        }));
+        saveToStorage(get());
         get().syncWithServer();
-        return newState;
-      }),
-      updateChat: (chat: Session) => set((state) => ({
-        activeChatList: state.activeChatList.map((c: Session) =>
-          c.id === chat.id ? chat : c
-        )
-      })),
-      deleteChat: (chatId: string) => set((state) => {
-        const updatedChatList = state.activeChatList.filter((chat: Session) => chat.id !== chatId);
-        if (updatedChatList.length > 0) {
-          updatedChatList[0].active = true;
-        }
-        return { activeChatList: updatedChatList };
-      }),
-      disableChat: (chatId: string) => set((state) => ({
-        activeChatList: state.activeChatList.map((chat: Session) =>
-          chat.id === chatId ? { ...chat, active: false } : chat
-        )
-      })),
-      enableChat: (chatId: string) => set((state) => ({
-        activeChatList: state.activeChatList.map((chat: Session) =>
-          chat.id === chatId ? { ...chat, active: true } : chat
-        )
-      })),
+      },
+
+      updateChat: (chat: Session) => {
+        set((state) => ({
+          activeChatList: state.activeChatList.map((c: Session) =>
+            c.id === chat.id ? chat : c
+          )
+        }));
+        saveToStorage(get());
+      },
+
+      deleteChat: (chatId: string) => {
+        set((state) => {
+          const updatedChatList = state.activeChatList.filter((chat: Session) => chat.id !== chatId);
+          if (updatedChatList.length > 0) {
+            updatedChatList[0].active = true;
+          }
+          return { activeChatList: updatedChatList };
+        });
+        saveToStorage(get());
+      },
+
+      disableChat: (chatId: string) => {
+        set((state) => ({
+          activeChatList: state.activeChatList.map((chat: Session) =>
+            chat.id === chatId ? { ...chat, active: false } : chat
+          )
+        }));
+        saveToStorage(get());
+      },
+
+      enableChat: (chatId: string) => {
+        set((state) => ({
+          activeChatList: state.activeChatList.map((chat: Session) =>
+            chat.id === chatId ? { ...chat, active: true } : chat
+          )
+        }));
+        saveToStorage(get());
+      },
+
       syncWithServer: async () => {
         // Check if user is signed in (you'll need to implement this check)
         const isSignedIn = false; // Replace with actual auth check
@@ -123,44 +265,74 @@ export const useChatStore = create<ChatStore>()(
           }
         }
       },
-      messages: {},
 
-      addMessage: (chatId: string, message: SavedMessage) => set((state) => ({
-        messages: {
-          ...state.messages,
-          [chatId]: [...(state.messages[chatId] || []), message]
+      switchUser: () => {
+        // Clear current state when user changes
+        set({
+          activeChatList: [],
+          messages: {},
+          settingPresets: [],
+          currentSettingPreset: {} as Settings,
+          notes: [],
+        });
+
+        // Load new user's data
+        const newUserData = loadFromStorage();
+        if (newUserData) {
+          set(newUserData);
         }
-      })),
+      },
+
+      messages: {},  // Start empty, will be loaded by initializeStore
+
+      addMessage: (chatId: string, message: SavedMessage) => {
+        set((state) => ({
+          messages: {
+            ...state.messages,
+            [chatId]: [...(state.messages[chatId] || []), message]
+          }
+        }));
+        saveToStorage(get());
+      },
 
       getMessages: (chatId: string) => {
         return get().messages[chatId] || [];
       },
 
-      setMessages: (chatId: string, messages: SavedMessage[]) => set((state) => ({
-        messages: {
-          ...state.messages,
-          [chatId]: messages
-        }
-      })),
+      setMessages: (chatId: string, messages: SavedMessage[]) => {
+        set((state) => ({
+          messages: {
+            ...state.messages,
+            [chatId]: messages
+          }
+        }));
+        saveToStorage(get());
+      },
 
-      deleteMessageAfter: (chatId: string, messageId: string) => set((state) => ({
-        messages: {
-          ...state.messages,
-          [chatId]: state.messages[chatId].filter((message: SavedMessage, index, arr) => {
-            const messageIndex = arr.findIndex((msg) => msg.id === messageId);
-            return index <= messageIndex-1;
-          })
-        }
-      })),
+      deleteMessageAfter: (chatId: string, messageId: string) => {
+        set((state) => ({
+          messages: {
+            ...state.messages,
+            [chatId]: state.messages[chatId].filter((message: SavedMessage, index, arr) => {
+              const messageIndex = arr.findIndex((msg) => msg.id === messageId);
+              return index <= messageIndex - 1;
+            })
+          }
+        }));
+        saveToStorage(get());
+      },
 
-      setFeedback: (chatId: string, messageId: string, feedback: string) => set((state) => ({
-        messages: {
-          ...state.messages,
-          [chatId]: state.messages[chatId].map((message: SavedMessage) =>
-            message.id === messageId ? { ...message, feedback: feedback } : message
-          )
-        }
-      })),
+      setFeedback: (chatId: string, messageId: string, feedback: string) => {
+        set((state) => ({
+          messages: {
+            ...state.messages,
+            [chatId]: state.messages[chatId].map((message: SavedMessage) =>
+              message.id === messageId ? { ...message, feedback: feedback } : message
+            )
+          }
+        }));
+        saveToStorage(get());
+      },
 
       getFeedback: (chatId: string, messageId: string) => {
         const chatMessages = get().messages[chatId];
@@ -170,59 +342,124 @@ export const useChatStore = create<ChatStore>()(
         return chatMessages.find((message: SavedMessage) => message.id === messageId)?.feedback;
       },
 
-      settingPresets: [],
-      setSettingPresets: (settings: Settings[]) => set((state) => ({
-        settingPresets: settings
-      })),
+      settingPresets: [],  // Start empty, will be loaded by initializeStore
+      setSettingPresets: (settings: Settings[]) => {
+        set({ settingPresets: settings });
+        saveToStorage(get());
+      },
 
-      currentSettingPreset: {} as Settings,
+      currentSettingPreset: {} as Settings,  // Start empty, will be loaded by initializeStore
 
-      setCurrentSettingPreset: (settings: Settings) => set((state) => ({
-        currentSettingPreset: settings
-      })),
+      setCurrentSettingPreset: (settings: Settings) => {
+        set({ currentSettingPreset: settings });
+        saveToStorage(get());
+      },
 
-      addSettingPreset: (settings: Settings) => set((state) => ({
-        settingPresets: [...(state.settingPresets || []), settings]
-      })),
+      addSettingPreset: (settings: Settings) => {
+        set((state) => ({
+          settingPresets: [...(state.settingPresets || []), settings]
+        }));
+        saveToStorage(get());
+      },
 
-      updateSettingPreset: (settings: Settings) => set((state) => ({
-        settingPresets: state.settingPresets.map((preset: Settings) =>
-          preset.id === settings.id ? settings : preset
-        )
-      })),
+      updateSettingPreset: (settings: Settings) => {
+        set((state) => ({
+          settingPresets: state.settingPresets.map((preset: Settings) =>
+            preset.id === settings.id ? settings : preset
+          )
+        }));
+        saveToStorage(get());
+      },
 
-      notes: [],
-      setNotes: (notes: Note[]) => set((state) => ({
-        notes: notes
-      })),
+      notes: [],  // Start empty, will be loaded by initializeStore
+      setNotes: (notes: Note[]) => {
+        set({ notes });
+        saveToStorage(get());
+      },
 
-      addNote: (note: Note) => set((state) => ({
-        notes: [...(state.notes || []), note]
-      })),
+      addNote: (note: Note) => {
+        set((state) => ({
+          notes: [...(state.notes || []), note]
+        }));
+        saveToStorage(get());
+      },
 
-      updateNote: (note: Note) => set((state) => ({
-        notes: state.notes.map((n: Note) =>
-          n.id === note.id ? note : n
-        )
-      })),
+      updateNote: (note: Note) => {
+        set((state) => ({
+          notes: state.notes.map((n: Note) =>
+            n.id === note.id ? note : n
+          )
+        }));
+        saveToStorage(get());
+      },
 
-      deleteNote: (noteId: string) => set((state) => ({
-        notes: state.notes.filter((n: Note) => n.id !== noteId)
-      })),
+      deleteNote: (noteId: string) => {
+        set((state) => ({
+          notes: state.notes.filter((n: Note) => n.id !== noteId)
+        }));
+        saveToStorage(get());
+      },
 
       getNotes: (chatId: string) => {
         return get().notes.filter((n: Note) => n.chat_session_id === chatId);
       },
-    }),
-    {
-      name: getStorageName(),
-      partialize: (state) => ({
-        activeChatList: state.activeChatList,
-        messages: state.messages,
-        settingPresets: state.settingPresets,
-        currentSettingPreset: state.currentSettingPreset,
-        notes: state.notes,
-      }),
-    }
-  )
+    };
+
+    return store;
+  })
 );
+
+// Export helper function to reload store when user changes
+export const reloadStoreForUser = () => {
+  const newStorageKey = getStorageName();
+
+  // Set transition flag to prevent saves during switch
+  isTransitioningUser = true;
+
+  // CRITICAL: Clear the store FIRST to prevent old data contamination
+  useChatStore.setState({
+    activeChatList: [],
+    messages: {},
+    settingPresets: [],
+    currentSettingPreset: {} as Settings,
+    notes: [],
+  });
+
+  // Update the tracked storage key BEFORE loading and mark as initialized
+  currentStorageKey = newStorageKey;
+  isStoreInitialized = true;
+
+  // Now load the new user's data into the cleared store
+  const newUserData = loadFromStorage();
+  if (newUserData) {
+    useChatStore.setState(newUserData);
+  }
+
+  // Clear transition flag after a short delay
+  setTimeout(() => {
+    isTransitioningUser = false;
+  }, 500);
+};
+
+// Initialize store data on first load
+export const initializeStore = () => {
+  const storageKey = getStorageName();
+
+  // CRITICAL: Clear any existing state first
+  useChatStore.setState({
+    activeChatList: [],
+    messages: {},
+    settingPresets: [],
+    currentSettingPreset: {} as Settings,
+    notes: [],
+  });
+
+  // Set the initial storage key and mark as initialized
+  currentStorageKey = storageKey;
+  isStoreInitialized = true;
+
+  const userData = loadFromStorage();
+  if (userData) {
+    useChatStore.setState(userData);
+  }
+};

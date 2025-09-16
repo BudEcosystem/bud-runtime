@@ -8,11 +8,13 @@ locals {
   environments_pde = [
     "sinan",
     "ditto",
-    "adarsh"
+    "adarsh",
+    "varun",
   ]
 
   # a service can be only removed if it's not required by all the environments
   services = [
+    "s3",
     "admin",
     "customer",
     "playground",

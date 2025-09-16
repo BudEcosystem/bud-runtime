@@ -49,6 +49,8 @@ spec:
             value: {{ .Values.microservices.budsim.daprid }}
           - name: BUD_EVAL_APP_ID
             value: {{ .Values.microservices.budeval.daprid }}
+          - name: BUD_PROMPT_APP_ID
+            value: {{ .Values.microservices.budprompt.daprid }}
           - name: FRONTEND_URL
             value: {{ include "bud.ingress.url.budcustomer" . }}
           - name: CORS_ORIGINS

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Card,
   DatePicker,
@@ -23,19 +23,28 @@ const { Option } = Select;
 interface InferenceFiltersProps {
   projectId: string;
   onFiltersChange: () => void;
+  skipEndpointsFetch?: boolean;
 }
 
 const InferenceFilters: React.FC<InferenceFiltersProps> = ({
   projectId,
   onFiltersChange,
+  skipEndpointsFetch = false,
 }) => {
   const [form] = Form.useForm();
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingFiltersRef = useRef<any>({});
 
   const { filters, setFilters, resetFilters } = useInferences();
   const { endPoints, getEndPoints } = useEndPoints();
 
   // Fetch endpoints when component mounts or projectId changes
   useEffect(() => {
+    // Skip fetching if explicitly disabled
+    if (skipEndpointsFetch) {
+      return;
+    }
+
     if (projectId === "all") {
       // Fetch all endpoints across all projects (no project_id parameter)
       getEndPoints({
@@ -51,16 +60,33 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
         limit: 100,
       });
     }
-  }, [projectId]);
+  }, [projectId, skipEndpointsFetch]);
 
-  const handleFilterChange = (changedValues: any) => {
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleFilterChange = useCallback((changedValues: any) => {
+    // Determine if the change is for a numeric input field that needs debouncing
+    const numericFields = ["minTokens", "maxTokens", "maxLatency"];
+    const changedKeys = Object.keys(changedValues);
+    const hasNumericChange = changedKeys.some(key => numericFields.includes(key));
+    const hasNonNumericChange = changedKeys.some(key => !numericFields.includes(key) && key !== "dateRange");
+    const hasDateChange = "dateRange" in changedValues;
+
+    // Build filters update object
+    const filterUpdates: any = {};
+
     // Handle date range
     if (changedValues.dateRange) {
       const [fromDate, toDate] = changedValues.dateRange;
-      setFilters({
-        from_date: fromDate ? fromDate.toISOString() : undefined,
-        to_date: toDate ? toDate.toISOString() : undefined,
-      });
+      filterUpdates.from_date = fromDate ? fromDate.toISOString() : undefined;
+      filterUpdates.to_date = toDate ? toDate.toISOString() : undefined;
     }
 
     // Handle other filters
@@ -77,18 +103,53 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
       if (key !== "dateRange" && filterMap[key]) {
         // Special handling for isSuccess - if false/undefined, remove the filter
         if (key === "isSuccess") {
-          setFilters({ [filterMap[key]]: changedValues[key] || undefined });
+          filterUpdates[filterMap[key]] = changedValues[key] || undefined;
         } else {
-          setFilters({ [filterMap[key]]: changedValues[key] });
+          filterUpdates[filterMap[key]] = changedValues[key];
         }
       }
     });
 
-    // Trigger data refresh
-    onFiltersChange();
-  };
+    // Merge with pending filters
+    pendingFiltersRef.current = { ...pendingFiltersRef.current, ...filterUpdates };
+
+    // Clear existing debounce timer if any
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
+    }
+
+    // Function to apply the pending filters
+    const applyFilters = () => {
+      const filtersToApply = { ...pendingFiltersRef.current };
+      pendingFiltersRef.current = {};
+      setFilters(filtersToApply);
+      onFiltersChange();
+    };
+
+    // Apply debounce strategy based on what changed
+    if (hasNumericChange && !hasNonNumericChange && !hasDateChange) {
+      // Only numeric changes - debounce (use 300ms for better responsiveness)
+      debounceTimeoutRef.current = setTimeout(() => {
+        applyFilters();
+        debounceTimeoutRef.current = null;
+      }, 300);
+    } else {
+      // Non-numeric changes, date changes, or mixed - apply immediately
+      applyFilters();
+    }
+  }, [setFilters, onFiltersChange]);
 
   const handleReset = () => {
+    // Cancel any pending debounced calls
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
+    }
+
+    // Clear pending filters
+    pendingFiltersRef.current = {};
+
     form.resetFields();
     resetFilters();
     onFiltersChange();
@@ -103,6 +164,15 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
   ];
 
   const handleQuickDate = (hours: number) => {
+    // Cancel any pending debounced calls since this is an immediate action
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
+    }
+
+    // Clear pending filters
+    pendingFiltersRef.current = {};
+
     const now = dayjs();
     const fromDate = now.subtract(hours, "hour");
 
@@ -290,6 +360,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
                   }}
                   popupClassName="[&_.ant-select-item]:!text-white [&_.ant-select-item-option-content]:!text-white"
                   showSearch
+                  disabled={skipEndpointsFetch}
                   filterOption={(input, option) =>
                     option?.children
                       ?.toString()
@@ -297,7 +368,7 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
                       .includes(input.toLowerCase()) ?? false
                   }
                 >
-                  {endPoints?.map((endpoint: any) => (
+                  {!skipEndpointsFetch && endPoints?.map((endpoint: any) => (
                     <Option key={endpoint.id} value={endpoint.id}>
                       {endpoint.name}
                     </Option>

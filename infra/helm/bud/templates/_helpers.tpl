@@ -54,6 +54,13 @@
 {{- printf "ws.novu.%s" .Values.ingress.hosts.root }}
 {{- end }}
 {{- end }}
+{{- define "bud.ingress.hosts.s3" -}}
+{{- if .Values.ingress.hosts.s3 }}
+{{- .Values.ingress.hosts.s3 }}
+{{- else }}
+{{- printf "s3.%s" .Values.ingress.hosts.root }}
+{{- end }}
+{{- end }}
 
 
 {{- define "bud.ingress.url.budadmin" -}}
@@ -110,5 +117,12 @@
 {{- printf "https://%s" (include "bud.ingress.hosts.novuws" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.novuws" $) }}
+{{- end }}
+{{- end }}
+{{- define "bud.ingress.url.s3" -}}
+{{- if .Values.ingress.httpsEnabled }}
+{{- printf "https://%s" (include "bud.ingress.hosts.s3" $) }}
+{{- else }}
+{{- printf "http://%s" (include "bud.ingress.hosts.s3" $) }}
 {{- end }}
 {{- end }}

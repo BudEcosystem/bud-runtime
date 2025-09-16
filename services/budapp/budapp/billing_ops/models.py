@@ -33,6 +33,9 @@ class BillingPlan(Base, TimestampMixin):
         Numeric(10, 6), nullable=True
     )  # Price per 1K tokens
 
+    # Billing cycle configuration
+    billing_cycle_months: Mapped[int] = mapped_column(nullable=False, default=1)  # Default 1 month cycles
+
     # Features
     features: Mapped[dict] = mapped_column(JSON, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

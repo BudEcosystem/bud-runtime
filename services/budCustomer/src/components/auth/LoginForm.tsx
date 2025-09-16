@@ -17,9 +17,10 @@ import { OAuthButtons } from "@/components/auth/OAuthButtons";
 
 type LoginPageModalProps = {
   onSubmit: (formData: { [key: string]: string }) => void;
+  isLoading?: boolean;
 };
 
-const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
+const LoginForm = ({ onSubmit, isLoading = false }: LoginPageModalProps) => {
   const { setActivePage, authError, setAuthError } = useAuthNavigation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -74,7 +75,7 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
 
   const handleLogin = (e: { preventDefault: () => void }) => {
     e.preventDefault();
-    if (!submittable) return;
+    if (!submittable || isLoading) return;
     onSubmit({ email, password });
   };
 
@@ -265,6 +266,7 @@ const LoginForm = ({ onSubmit }: LoginPageModalProps) => {
           type="submit"
           classNames="w-[100%] mt-[1.6rem]"
           disabled={!submittable}
+          loading={isLoading}
         >
           Login
         </PrimaryButton>

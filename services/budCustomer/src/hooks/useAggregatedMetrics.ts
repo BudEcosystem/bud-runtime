@@ -68,7 +68,7 @@ export const useAggregatedMetrics = () => {
           const groupByMap = {
             model: ["model"],
             deployment: ["endpoint"],
-            project: ["project"],
+            project: ["user_project"],
             user: ["user"],
           };
           request.group_by = groupByMap[viewBy];
@@ -121,7 +121,7 @@ export const useAggregatedMetrics = () => {
           const groupByMap = {
             model: ["model"],
             deployment: ["endpoint"],
-            project: ["project"],
+            project: ["user_project"],
             user: ["user"],
           };
           request.group_by = groupByMap[viewBy];
@@ -211,7 +211,7 @@ export const useAggregatedMetrics = () => {
           const groupByMap = {
             model: ["model"],
             deployment: ["endpoint"],
-            project: ["project"],
+            project: ["user_project"],
             user: ["user"],
           };
           request.group_by = groupByMap[viewBy];
@@ -286,7 +286,9 @@ export const useAggregatedMetrics = () => {
               "p95_latency",
               "p99_latency",
               "total_tokens",
-              "avg_cost",
+              "total_input_tokens",
+              "total_output_tokens",
+              "total_cost",
               "throughput_avg",
               "ttft_avg",
               "ttft_p95",

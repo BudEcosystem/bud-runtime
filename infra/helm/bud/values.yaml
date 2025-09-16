@@ -15,6 +15,7 @@ ingress:
         budask: ""
         novuapi: ""
         novuws: ""
+        s3: ""
 
 microservices:
     # frontend services
@@ -80,11 +81,9 @@ microservices:
             RSA_KEY_NAME: rsa-private-key.pem
             VOLUME_TYPE: nfs
 
-            NOTIFY_SERVICE_NAME: "{{ .Release.Name }}-budnotify"
-            NOTIFY_SERVICE_TOPIC: notificationMessages
-
             CONFIGSTORE_NAME: "{{ .Release.Name }}-configstore"
             SECRETSTORE_SECRET_NAME: "{{ .Release.Name }}-secretstore"
+            STATESTORE_NAME: "{{ .Release.Name }}-dapr-statestore"
 
             PSQL_HOST: "{{ $.Release.Name }}-postgresql"
             PSQL_PORT: "5432"
@@ -103,8 +102,8 @@ microservices:
             LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
 
             MINIO_BUCKET: models-registry
-            MINIO_ENDPOINT: "{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}"
-            MINIO_SECURE: "false"
+            MINIO_ENDPOINT: '{{ include "bud.ingress.hosts.s3" $ }}'
+            MINIO_SECURE: "{{ .Values.ingress.httpsEnabled }}"
     budmetrics:
         daprid: budmetrics
         image: budstudio/budmetrics:nightly
@@ -160,6 +159,25 @@ microservices:
     budnotify:
         image: budstudio/budnotify:nightly
         daprid: budnotify
+        pubsubTopic: notificationMessages
+    budprompt:
+        daprid: budprompt
+        image: budstudio/budprompt:nightly
+        env:
+            LOG_LEVEL: INFO
+            BUD_GATEWAY_BASE_URL: http://20.66.97.208/v1
+            BUD_DEFAULT_MODEL_NAME: qwen3-32b
+
+            PSQL_HOST: "{{ $.Release.Name }}-postgresql"
+            PSQL_PORT: "5432"
+            PSQL_USER: budprompt
+            PSQL_PASSWORD: budprompt
+            PSQL_DB_NAME: budprompt
+
+            REDIS_HOST: "{{ .Release.Name }}-valkey-primary"
+            REDIS_PORT: "6379"
+            REDIS_DB_INDEX: "10"
+            REDIS_PASSWORD: "{{ .Values.valkey.auth.password }}"
     global:
         env:
             PROMETHEUS_URL: https://metric.bud.studio
@@ -208,10 +226,10 @@ microservices:
             LOG_LEVEL: INFO
             MINIO_ACCESS_KEY: "{{ .Values.minio.auth.rootUser }}"
             MINIO_BUCKET: models-registry
-            MINIO_ENDPOINT: "{{ .Release.Name }}-minio:{{ .Values.minio.service.ports.api }}"
+            MINIO_ENDPOINT: '{{ include "bud.ingress.hosts.s3" $ }}'
             MINIO_MODEL_BUCKET: model-info
             MINIO_SECRET_KEY: "{{ .Values.minio.auth.rootPassword }}"
-            MINIO_SECURE: "false"
+            MINIO_SECURE: "{{ .Values.ingress.httpsEnabled }}"
             MODEL_DOWNLOAD_DIR: /data/models-registry
             MODEL_DOWNLOAD_DIR_MAX_SIZE: "500"
             MODEL_REGISTRY_DIR: /data/models-registry
@@ -225,8 +243,8 @@ microservices:
             NODE_INFO_COLLECTOR_IMAGE_HPU: budimages.azurecr.io/budecosystem/node-info-collector-hpu:latest
             NODE_INFO_LABELER_IMAGE: budimages.azurecr.io/budecosystem/node-device-labeler:latest
             NODE_VERSION: 20.11.1
-            NOTIFY_SERVICE_NAME: budnotify
-            NOTIFY_SERVICE_TOPIC: notificationMessages
+            NOTIFY_SERVICE_NAME: "{{ .Values.microservices.budnotify.daprid }}"
+            NOTIFY_SERVICE_TOPIC: "{{ .Values.microservices.budnotify.pubsubTopic }}"
             NX_DAEMON: "false"
             PGADMIN_DEFAULT_EMAIL: user@bud.studio
             PGADMIN_DEFAULT_PASSWORD: budpassword
@@ -306,6 +324,7 @@ postgresqlExtra:
         - budmodel
         - budsim
         - budeval
+        - budprompt
 
 keycloak:
     proxy: edge

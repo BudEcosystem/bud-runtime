@@ -72,7 +72,7 @@ const GroupedBarChart: React.FC<GroupedBarChartProps> = ({ data }) => {
       grid: {
         left: "3%",
         right: "4%",
-        bottom: "15%",
+        bottom: "25%",
         top: "5%",
         containLabel: true,
       },

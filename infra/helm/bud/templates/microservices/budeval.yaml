@@ -103,7 +103,11 @@ spec:
           - name: CLICKHOUSE_SECURE
             value: "false"
           - name: EVAL_DATASETS_PATH
-            value: {{ .Release.Name }}-budeval-dataset-rwx
+            value: {{ .Release.Name }}-budeval-dataset
+          - name: NOTIFY_SERVICE_NAME
+            value: {{ .Values.microservices.budnotify.daprid }}
+          - name: NOTIFY_SERVICE_TOPIC
+            value: {{ .Values.microservices.budnotify.pubsubTopic }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budeval.env }}
           - name: {{ $key }}

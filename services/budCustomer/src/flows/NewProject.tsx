@@ -4,7 +4,8 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import ProjectNameInput from "@/components/ui/bud/dataEntry/ProjectNameInput";
+import TextInput from "@/components/ui/bud/dataEntry/TextInput";
+import { projectNameRegex } from "@/lib/utils";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 import React, { useContext, useEffect, useState, useCallback } from "react";
 import { useDrawer } from "@/hooks/useDrawer";
@@ -37,6 +38,7 @@ export default function NewProject() {
   const { openDrawerWithStep } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
   const [options, setOptions] = useState<{ name: string; color: string }[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
 
   const fetchList = useCallback(() => {
     const data =
@@ -114,10 +116,19 @@ export default function NewProject() {
           icon: "😍",
         }}
         onNext={(values) => {
+          // Prevent multiple submissions
+          if (isCreating) {
+            return;
+          }
+
           if (!submittable) {
             form.submit();
             return;
           }
+
+          // Set loading state to prevent multiple clicks
+          setIsCreating(true);
+
           // Ensure tags are in the correct format (array of objects with name and color)
           const formattedTags = values.tags
             ? (Array.isArray(values.tags) ? values.tags : [])
@@ -147,13 +158,19 @@ export default function NewProject() {
             : [];
 
           const projectData: ProjectData = {
-            name: values.name,
-            description: values.description,
+            name: values.name ? values.name.trim() : "",
+            description: values.description ? values.description.trim() : "",
             tags: formattedTags,
             icon: values.icon || "😍",
             project_type: "client_app",
             benchmark: false,
           };
+
+          // Additional validation to ensure name is not empty after trimming
+          if (!projectData.name) {
+            setIsCreating(false);
+            return;
+          }
 
           apiCreateProject(projectData)
             .then((result) => {
@@ -168,9 +185,15 @@ export default function NewProject() {
             })
             .catch((error) => {
               console.error("Error creating project:", error);
+            })
+            .finally(() => {
+              // Reset loading state in case of error or if user navigates back
+              setIsCreating(false);
             });
         }}
         nextText="Create Project"
+        disableNext={isCreating}
+        drawerLoading={isCreating}
       >
         <BudWraperBox center>
           <BudDrawerLayout>
@@ -179,23 +202,38 @@ export default function NewProject() {
               description="Let's get started by filling in the details below"
             />
             <DrawerCard classNames="pb-0">
-              <ProjectNameInput
+              <TextInput
+                name="name"
+                label="Project Name"
                 placeholder="Enter Project Name"
-                onChangeName={(name) => form.setFieldsValue({ name })}
-                onChangeIcon={(icon) => form.setFieldsValue({ icon })}
-                isEdit={true}
-                showIcon={false}
+                preventFirstSpace={true}
+                rules={[
+                  {
+                    required: true,
+                    message: "Please Enter Project Name",
+                  },
+                  {
+                    max: 30,
+                    message: "Project name should be less than 30 characters",
+                  },
+                  {
+                    pattern: projectNameRegex,
+                    message:
+                      "Project name should contain only alphanumeric characters, spaces, hyphens, and underscores",
+                  },
+                  {
+                    validator: (_, value) => {
+                      if (value && value.trim().length === 0) {
+                        return Promise.reject(
+                          new Error("Project name cannot be only spaces"),
+                        );
+                      }
+                      return Promise.resolve();
+                    },
+                  },
+                ]}
               />
-              <div className="flex justify-start items-center px-[.65rem] mb-[1.65rem]">
-                <Icon
-                  icon="ph:calendar"
-                  className="text-bud-text-disabled mr-2 text-[0.875rem]"
-                />
-                <Text_12_400_B3B3B3>Created on&nbsp;&nbsp;</Text_12_400_B3B3B3>
-                <Text_12_400_EEEEEE>
-                  {dayjs().format("DD MMM, YYYY")}
-                </Text_12_400_EEEEEE>
-              </div>
+
               <TagsInput
                 label="Tags"
                 required

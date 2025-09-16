@@ -1,7 +1,7 @@
 import asyncio
 import math
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Union
 from uuid import UUID
 
@@ -35,12 +35,15 @@ from budmetrics.observability.schemas import (
     LatencyDistributionRequest,
     LatencyDistributionResponse,
     MetricsData,
+    MetricsSyncRequest,
+    MetricsSyncResponse,
     ModerationInferenceDetail,
     ObservabilityMetricsRequest,
     ObservabilityMetricsResponse,
     PerformanceMetric,
     PeriodBin,
     TimeMetric,
+    UserUsageItem,
 )
 
 
@@ -745,20 +748,20 @@ class ObservabilityMetricsService:
             mi.timestamp,
             mi.model_name,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN substring(coalesce(ci.input, mi.input_messages), 1, 100)
-                WHEN mi.endpoint_type = 'embedding' THEN substring(ei.input, 1, 100)
-                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN substring(ai.input, 1, 100)
-                WHEN mi.endpoint_type = 'image_generation' THEN substring(ii.prompt, 1, 100)
-                WHEN mi.endpoint_type = 'moderation' THEN substring(modi.input, 1, 100)
-                ELSE substring(mi.input_messages, 1, 100)
+                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(coalesce(ci.input, mi.input_messages), 1, 100))
+                WHEN mi.endpoint_type = 'embedding' THEN toValidUTF8(substring(ei.input, 1, 100))
+                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.input, 1, 100))
+                WHEN mi.endpoint_type = 'image_generation' THEN toValidUTF8(substring(ii.prompt, 1, 100))
+                WHEN mi.endpoint_type = 'moderation' THEN toValidUTF8(substring(modi.input, 1, 100))
+                ELSE toValidUTF8(substring(mi.input_messages, 1, 100))
             END as prompt_preview,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN substring(coalesce(ci.output, mi.output), 1, 100)
+                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(coalesce(ci.output, mi.output), 1, 100))
                 WHEN mi.endpoint_type = 'embedding' THEN concat('Generated ', toString(ei.input_count), ' embeddings')
-                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN substring(ai.output, 1, 100)
+                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.output, 1, 100))
                 WHEN mi.endpoint_type = 'image_generation' THEN concat('Generated ', toString(ii.image_count), ' images')
                 WHEN mi.endpoint_type = 'moderation' THEN if(modi.flagged, 'Content flagged', 'Content passed')
-                ELSE substring(mi.output, 1, 100)
+                ELSE toValidUTF8(substring(mi.output, 1, 100))
             END as response_preview,
             mi.input_tokens,
             mi.output_tokens,
@@ -867,8 +870,8 @@ class ObservabilityMetricsService:
                 mi.model_provider_name,
                 mid.model_id,
                 mi.system,
-                coalesce(ci.input, mi.input_messages) as input_messages,
-                coalesce(ci.output, mi.output) as output,
+                toValidUTF8(coalesce(ci.input, mi.input_messages)) as input_messages,
+                toValidUTF8(coalesce(ci.output, mi.output)) as output,
                 ci.function_name,
                 ci.variant_name,
                 ci.episode_id,
@@ -887,10 +890,10 @@ class ObservabilityMetricsService:
                 mi.cached,
                 mi.finish_reason,
                 mid.cost,
-                mi.raw_request,
-                mi.raw_response,
-                mi.gateway_request,
-                mi.gateway_response,
+                toValidUTF8(mi.raw_request) as raw_request,
+                toValidUTF8(mi.raw_response) as raw_response,
+                toValidUTF8(mi.gateway_request) as gateway_request,
+                toValidUTF8(mi.gateway_response) as gateway_response,
                 coalesce(mi.endpoint_type, 'chat') as endpoint_type,
                 -- Gateway Analytics fields
                 ga.client_ip,
@@ -904,7 +907,7 @@ class ObservabilityMetricsService:
                 ga.timezone,
                 ga.asn,
                 ga.isp,
-                ga.user_agent,
+                toValidUTF8(ga.user_agent) as user_agent,
                 ga.device_type,
                 ga.browser_name,
                 ga.browser_version,
@@ -913,8 +916,8 @@ class ObservabilityMetricsService:
                 ga.is_bot,
                 ga.method,
                 ga.path,
-                ga.query_params,
-                ga.request_headers,
+                toValidUTF8(ga.query_params) as query_params,
+                toValidUTF8(ga.request_headers) as request_headers,
                 ga.body_size,
                 ga.api_key_id,
                 ga.auth_method,
@@ -955,8 +958,8 @@ class ObservabilityMetricsService:
                 mi.model_provider_name,
                 mid.model_id,
                 mi.system,
-                coalesce(ci.input, mi.input_messages) as input_messages,
-                coalesce(ci.output, mi.output) as output,
+                toValidUTF8(coalesce(ci.input, mi.input_messages)) as input_messages,
+                toValidUTF8(coalesce(ci.output, mi.output)) as output,
                 ci.function_name,
                 ci.variant_name,
                 ci.episode_id,
@@ -975,10 +978,10 @@ class ObservabilityMetricsService:
                 mi.cached,
                 mi.finish_reason,
                 mid.cost,
-                mi.raw_request,
-                mi.raw_response,
-                mi.gateway_request,
-                mi.gateway_response,
+                toValidUTF8(mi.raw_request) as raw_request,
+                toValidUTF8(mi.raw_response) as raw_response,
+                toValidUTF8(mi.gateway_request) as gateway_request,
+                toValidUTF8(mi.gateway_response) as gateway_response,
                 coalesce(mi.endpoint_type, 'chat') as endpoint_type
             FROM ModelInference mi
             INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
@@ -1804,6 +1807,9 @@ class ObservabilityMetricsService:
                 elif group == "user":
                     group_by_fields.append("ga.user_id")
                     select_fields.append("ga.user_id")
+                elif group == "user_project":
+                    group_by_fields.append("mid.api_key_project_id")
+                    select_fields.append("mid.api_key_project_id")
 
         # Build aggregation fields based on requested metrics
         for metric in request.metrics:
@@ -1819,6 +1825,10 @@ class ObservabilityMetricsService:
                 select_fields.append("quantile(0.99)(mi.response_time_ms) as p99_latency")
             elif metric == "total_tokens":
                 select_fields.append("SUM(mi.input_tokens + mi.output_tokens) as total_tokens")
+            elif metric == "total_input_tokens":
+                select_fields.append("SUM(mi.input_tokens) as total_input_tokens")
+            elif metric == "total_output_tokens":
+                select_fields.append("SUM(mi.output_tokens) as total_output_tokens")
             elif metric == "avg_tokens":
                 select_fields.append("AVG(mi.input_tokens + mi.output_tokens) as avg_tokens")
             elif metric == "total_cost":
@@ -1930,7 +1940,11 @@ class ObservabilityMetricsService:
                     for f in (
                         ["model_id", "model_name"]
                         if group == "model"
-                        else [f"{group}_id" if group != "user" else "user_id"]
+                        else [
+                            "api_key_project_id"
+                            if group == "user_project"
+                            else (f"{group}_id" if group != "user" else "user_id")
+                        ]
                     )
                 ]
             )
@@ -1953,6 +1967,9 @@ class ObservabilityMetricsService:
                         field_idx += 1
                     elif group_by == "user":
                         group.user_id = row[field_idx]
+                        field_idx += 1
+                    elif group_by == "user_project":
+                        group.api_key_project_id = row[field_idx]
                         field_idx += 1
 
                 # Extract metrics
@@ -2021,6 +2038,9 @@ class ObservabilityMetricsService:
                 elif group == "endpoint":
                     group_by_fields.append("mid.endpoint_id")
                     select_fields.append("mid.endpoint_id")
+                elif group == "user_project":
+                    group_by_fields.append("mid.api_key_project_id")
+                    select_fields.append("mid.api_key_project_id")
 
         # Add metric calculations
         for metric in request.metrics:
@@ -2128,6 +2148,11 @@ class ObservabilityMetricsService:
                         group_info["endpoint_id"] = endpoint_id
                         group_key_parts.append(f"endpoint:{endpoint_id}")
                         field_idx += 1
+                    elif group == "user_project":
+                        api_key_project_id = row[field_idx]
+                        group_info["api_key_project_id"] = api_key_project_id
+                        group_key_parts.append(f"api_key_project:{api_key_project_id}")
+                        field_idx += 1
 
                 group_key = "|".join(group_key_parts)
 
@@ -2154,6 +2179,7 @@ class ObservabilityMetricsService:
                 group.model_name = group_info.get("model_name")
                 group.project_id = group_info.get("project_id")
                 group.endpoint_id = group_info.get("endpoint_id")
+                group.api_key_project_id = group_info.get("api_key_project_id")
 
             groups.append(group)
 
@@ -2225,12 +2251,24 @@ class ObservabilityMetricsService:
         if request.filters:
             for filter_key, filter_value in request.filters.items():
                 if filter_key == "project_id":
-                    where_conditions.append("ga.project_id = %(project_id)s")
-                    params["project_id"] = filter_value
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
                 elif filter_key == "api_key_project_id":
                     # Support filtering by api_key_project_id for CLIENT users
-                    where_conditions.append("ga.api_key_project_id = %(api_key_project_id)s")
-                    params["api_key_project_id"] = filter_value
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
                 elif filter_key == "country_code":
                     if isinstance(filter_value, list):
                         placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
@@ -2264,7 +2302,6 @@ class ObservabilityMetricsService:
         """
 
         params["limit"] = request.limit
-
         # Execute query
         results = await self.clickhouse_client.execute_query(query, params)
 
@@ -2272,13 +2309,13 @@ class ObservabilityMetricsService:
         total_query = f"""
         SELECT COUNT(*) as total_requests
         FROM GatewayAnalytics ga
+        LEFT JOIN ModelInferenceDetails mid ON ga.inference_id = mid.inference_id
         WHERE {" AND ".join(where_conditions)}
         """
         total_result = await self.clickhouse_client.execute_query(
             total_query, {k: v for k, v in params.items() if k != "limit"}
         )
         total_requests = total_result[0][0] if total_result else 0
-
         # Process results
         locations = []
         for row in results:
@@ -2501,6 +2538,9 @@ class ObservabilityMetricsService:
             # User info would need additional joins - for now use project as proxy
             group_columns.extend(["toString(mdi.project_id) as user_id"])
 
+        if "user_project" in request.group_by:
+            group_columns.extend(["toString(mdi.api_key_project_id) as api_key_project_id"])
+
         group_by_clause = ", ".join([col.split(" as ")[1] if " as " in col else col for col in group_columns])
         select_columns = ", ".join(group_columns)
 
@@ -2567,6 +2607,11 @@ class ObservabilityMetricsService:
                 group_key.append(f"user:{group_values['user_id']}")
                 col_idx += 1
 
+            if "user_project" in request.group_by:
+                group_values["api_key_project_id"] = row[col_idx]
+                group_key.append(f"user_project:{group_values['api_key_project_id']}")
+                col_idx += 1
+
             group_key_str = "|".join(group_key)
             bucket = row[col_idx]
             request_count = row[col_idx + 1]
@@ -2624,6 +2669,13 @@ class ObservabilityMetricsService:
                 group_obj.endpoint_name = group_vals["endpoint_name"]
             if "user_id" in group_vals:
                 group_obj.user_id = group_vals["user_id"]
+            if "api_key_project_id" in group_vals:
+                try:
+                    group_obj.api_key_project_id = (
+                        UUID(group_vals["api_key_project_id"]) if group_vals["api_key_project_id"] else None
+                    )
+                except (ValueError, TypeError):
+                    group_obj.api_key_project_id = None
 
             groups.append(group_obj)
 
@@ -2706,7 +2758,7 @@ class ObservabilityMetricsService:
             return f"{value:.0f}ms", "ms"
 
         # Token metrics
-        elif metric in ["total_tokens", "avg_tokens"]:
+        elif metric in ["total_tokens", "total_input_tokens", "total_output_tokens", "avg_tokens"]:
             if value >= 1_000_000:
                 return f"{value / 1_000_000:.1f}M", "tokens"
             elif value >= 1_000:
@@ -3097,3 +3149,247 @@ class ObservabilityMetricsService:
                 },
             )
             return response
+
+    async def get_metrics_sync(
+        self,
+        request: MetricsSyncRequest,
+    ) -> MetricsSyncResponse:
+        """Get unified metrics sync data for both credentials and users.
+
+        This method provides efficient sync capabilities by combining credential usage
+        and user usage data in a single call. It supports both incremental (recent activity)
+        and full sync modes.
+
+        Args:
+            request: Request containing sync mode and parameters
+
+        Returns:
+            MetricsSyncResponse with both credential and user usage data
+        """
+        self._ensure_initialized()
+
+        query_timestamp = datetime.now()
+        credential_usage = []
+        user_usage = []
+        stats = {"active_credentials": 0, "active_users": 0, "total_users_checked": 0}
+
+        try:
+            # 1. Get credential usage data if requested
+            if request.credential_sync:
+                credential_usage = await self._get_sync_credential_data(
+                    request.sync_mode, request.activity_threshold_minutes
+                )
+                stats["active_credentials"] = len(credential_usage)
+
+            # 2. Get user usage data if requested
+            if request.user_usage_sync:
+                user_usage = await self._get_sync_user_data(
+                    request.sync_mode, request.activity_threshold_minutes, request.user_ids
+                )
+                stats["active_users"] = len(user_usage)
+                # For stats, estimate total users checked based on mode
+                if request.sync_mode == "full":
+                    stats["total_users_checked"] = await self._get_total_users_count()
+                else:
+                    stats["total_users_checked"] = len(user_usage)
+
+            response = MetricsSyncResponse(
+                sync_mode=request.sync_mode,
+                activity_threshold_minutes=request.activity_threshold_minutes,
+                query_timestamp=query_timestamp,
+                credential_usage=credential_usage,
+                user_usage=user_usage,
+                stats=stats,
+            )
+
+            logger.info(
+                f"Metrics sync completed: mode={request.sync_mode}, credentials={len(credential_usage)}, users={len(user_usage)}"
+            )
+            return response
+
+        except Exception as e:
+            logger.error(f"Error in metrics sync: {e}")
+            # Return empty response on error
+            return MetricsSyncResponse(
+                sync_mode=request.sync_mode,
+                activity_threshold_minutes=request.activity_threshold_minutes,
+                query_timestamp=query_timestamp,
+                credential_usage=[],
+                user_usage=[],
+                stats={"active_credentials": 0, "active_users": 0, "total_users_checked": 0},
+            )
+
+    async def _get_sync_credential_data(self, sync_mode: str, threshold_minutes: int) -> list[CredentialUsageItem]:
+        """Get credential usage data for sync based on mode."""
+        try:
+            # Base query for credential usage
+            query = """
+            SELECT
+                api_key_id as credential_id,
+                MAX(request_arrival_time) as last_used_at,
+                COUNT(*) as request_count
+            FROM ModelInferenceDetails
+            WHERE api_key_id IS NOT NULL
+            """
+
+            params = {}
+
+            if sync_mode == "incremental":
+                # Only credentials used within threshold
+                since_time = datetime.now() - timedelta(minutes=threshold_minutes)
+                query += " AND request_arrival_time >= %(since)s"
+                params["since"] = since_time
+
+            query += """
+            GROUP BY api_key_id
+            ORDER BY last_used_at DESC
+            """
+
+            results = await self.clickhouse_client.execute_query(query, params)
+
+            credentials = []
+            for row in results:
+                # Handle both UUID objects and strings from ClickHouse
+                cred_id = row[0]
+                if isinstance(cred_id, str):
+                    cred_id = UUID(cred_id)
+                elif not isinstance(cred_id, UUID):
+                    cred_id = UUID(str(cred_id))
+
+                credentials.append(
+                    CredentialUsageItem(
+                        credential_id=cred_id,
+                        last_used_at=row[1],
+                        request_count=row[2],
+                    )
+                )
+
+            return credentials
+
+        except Exception as e:
+            logger.error(f"Error getting sync credential data: {e}")
+            return []
+
+    async def _get_sync_user_data(
+        self, sync_mode: str, threshold_minutes: int, user_ids: Optional[list[UUID]] = None
+    ) -> list[UserUsageItem]:
+        """Get user usage data for sync based on mode."""
+        try:
+            from datetime import datetime, timezone
+
+            logger.info(f"_get_sync_user_data called: mode={sync_mode}, user_ids={len(user_ids) if user_ids else 0}")
+            # Base query for user usage - need to join with ModelInference for token data
+            query = """
+            SELECT
+                mid.user_id,
+                MAX(mid.request_arrival_time) as last_activity_at,
+                SUM(COALESCE(mi.input_tokens, 0) + COALESCE(mi.output_tokens, 0)) as total_tokens,
+                SUM(COALESCE(mid.cost, 0)) as total_cost,
+                COUNT(*) as request_count,
+                AVG(CASE WHEN mid.is_success THEN 1 ELSE 0 END) as success_rate
+            FROM ModelInferenceDetails mid
+            LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+            WHERE mid.user_id IS NOT NULL
+            """
+
+            params = {}
+
+            if sync_mode == "incremental":
+                # Only users with activity within threshold
+                since_time = datetime.now() - timedelta(minutes=threshold_minutes)
+                query += " AND mid.request_arrival_time >= %(since)s"
+                params["since"] = since_time
+            # For full sync, get ALL users with any activity (no time filter, no user filter)
+
+            query += """
+            GROUP BY mid.user_id
+            ORDER BY last_activity_at DESC
+            """
+
+            results = await self.clickhouse_client.execute_query(query, params)
+            logger.info(f"ClickHouse query returned {len(results)} rows")
+
+            users = []
+            found_user_ids = set()
+
+            for row in results:
+                # Handle both UUID objects and strings from ClickHouse
+                user_id = row[0]
+                if isinstance(user_id, str):
+                    user_id = UUID(user_id)
+                elif not isinstance(user_id, UUID):
+                    user_id = UUID(str(user_id))
+
+                found_user_ids.add(user_id)
+
+                usage_data = {
+                    "total_tokens": int(row[2]) if row[2] else 0,
+                    "total_cost": float(row[3]) if row[3] else 0.0,
+                    "request_count": int(row[4]) if row[4] else 0,
+                    "success_rate": float(row[5]) if row[5] else 0.0,
+                }
+
+                users.append(
+                    UserUsageItem(
+                        user_id=user_id,
+                        last_activity_at=row[1],
+                        usage_data=usage_data,
+                    )
+                )
+
+            # For full sync, include all users with active billing records (even if no activity)
+            if sync_mode == "full":
+                # Import the Dapr service function
+                from budmetrics.shared.dapr_service import get_users_with_active_billing
+
+                # Get users with active billing from budapp
+                billing_user_ids = await get_users_with_active_billing()
+                logger.info(
+                    f"Full sync: found {len(found_user_ids)} users with activity, {len(billing_user_ids)} users with active billing"
+                )
+
+                # Combine specific user_ids (if provided) with billing users
+                users_to_add = set(billing_user_ids)
+                if user_ids:
+                    users_to_add.update(user_ids)
+
+                no_activity_count = 0
+                for user_id in users_to_add:
+                    if user_id not in found_user_ids:
+                        # Create entry for users with no activity but who have billing records
+                        users.append(
+                            UserUsageItem(
+                                user_id=user_id,
+                                last_activity_at=datetime.now(
+                                    timezone.utc
+                                ),  # Use current time for users with no activity
+                                usage_data={
+                                    "total_tokens": 0,
+                                    "total_cost": 0.0,
+                                    "request_count": 0,
+                                    "success_rate": 0.0,
+                                },
+                            )
+                        )
+                        no_activity_count += 1
+
+                logger.info(
+                    f"Added {no_activity_count} users with no activity to sync data "
+                    f"({len(billing_user_ids)} with billing, {len(user_ids) if user_ids else 0} admin users)"
+                )
+
+            return users
+
+        except Exception as e:
+            logger.error(f"Error getting sync user data: {e}")
+            return []
+
+    async def _get_total_users_count(self) -> int:
+        """Get total count of users with activity for stats."""
+        try:
+            query = "SELECT COUNT(DISTINCT user_id) FROM ModelInferenceDetails WHERE user_id IS NOT NULL"
+            result = await self.clickhouse_client.execute_query(query, {})
+            return result[0][0] if result else 0
+        except Exception as e:
+            logger.error(f"Error getting total users count: {e}")
+            return 0

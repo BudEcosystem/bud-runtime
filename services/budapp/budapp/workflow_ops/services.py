@@ -204,6 +204,16 @@ class WorkflowService(SessionMixin):
                 if adapter_model_id
                 else None
             )
+            prompt_type = required_data.get("prompt_type")
+            prompt_schema = required_data.get("prompt_schema")
+            auto_scale = required_data.get("auto_scale")
+            caching = required_data.get("caching")
+            concurrency = required_data.get("concurrency")
+            rate_limit = required_data.get("rate_limit")
+            rate_limit_value = required_data.get("rate_limit_value")
+            bud_prompt_id = required_data.get("bud_prompt_id")
+            bud_prompt_version = required_data.get("bud_prompt_version")
+            prompt_schema_events = required_data.get(BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value)
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -359,6 +369,16 @@ class WorkflowService(SessionMixin):
                 probe_selections=probe_selections if probe_selections else None,
                 guard_types=guard_types if guard_types else None,
                 severity_threshold=severity_threshold if severity_threshold else None,
+                prompt_type=prompt_type if prompt_type else None,
+                prompt_schema=prompt_schema if prompt_schema else None,
+                auto_scale=auto_scale if auto_scale else None,
+                caching=caching if caching else None,
+                concurrency=concurrency if concurrency else None,
+                rate_limit=rate_limit if rate_limit else None,
+                rate_limit_value=rate_limit_value if rate_limit_value else None,
+                bud_prompt_id=bud_prompt_id if bud_prompt_id else None,
+                bud_prompt_version=bud_prompt_version if bud_prompt_version else None,
+                prompt_schema_events=prompt_schema_events if prompt_schema_events else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -510,6 +530,27 @@ class WorkflowService(SessionMixin):
                 "probe_selections",
                 "guard_types",
                 "severity_threshold",
+            ],
+            "prompt_creation": [
+                "model_id",
+                "project_id",
+                "cluster_id",
+                "endpoint_id",
+                "name",
+                "description",
+                "tags",
+                "prompt_type",
+                "auto_scale",
+                "caching",
+                "concurrency",
+                "rate_limit",
+                "rate_limit_value",
+                "prompt_schema",
+            ],
+            "prompt_schema_creation": [
+                "bud_prompt_id",
+                "bud_prompt_version",
+                BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value,
             ],
         }
 

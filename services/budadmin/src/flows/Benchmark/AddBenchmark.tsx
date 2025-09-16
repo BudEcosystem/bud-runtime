@@ -105,6 +105,7 @@ export default function AddBenchmark() {
               formItemClassnames="pb-[.6rem] mb-[1rem]"
               infoText="Enter the benchmark name"
               InputClasses="py-[.5rem]"
+              replaceSpacesWithHyphens={true}
             />
             <TagsInput
               label="Tags"

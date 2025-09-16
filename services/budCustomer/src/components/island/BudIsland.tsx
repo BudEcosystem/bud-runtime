@@ -117,7 +117,10 @@ const BudIsland: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     refetch();
-    getWorkflowList();
+    // Only fetch workflow list when the island is actually opened
+    if (isOpen) {
+      getWorkflowList();
+    }
   }, [isOpen, user]);
 
   // Log session initialization status for debugging
@@ -329,8 +332,8 @@ const BudIsland: React.FC = () => {
         classNames={{
           wrapper:
             "isLandWrapper overflow-hidden transition-all duration-500 ease-in-out",
-          mask: `${!isDrawerOpen ? "bg-[#060607] opacity-90" : "bg-transparent"} transition-all duration-500 ease-in-out`,
-          body: "islandBody rounded-[1rem] flex justify-end items-start relative w-full h-[100vh] gap-[1rem] pl-[2.25rem] pr-[2.45rem] pt-[4.6rem] pb-[.7rem]",
+          mask: `${!isDrawerOpen ? "bg-[#060607] opacity-95" : "bg-transparent"} transition-all duration-500 ease-in-out`,
+          body: "islandBody rounded-[1rem] flex justify-end items-start relative w-full h-[100vh] gap-[1rem] pl-[2.25rem] pr-[2.45rem] pt-[1.6rem] pb-[.7rem]",
           content: "p-0 h-full bg-transparent border-none",
         }}
         open={isOpen && !isDrawerOpen}
@@ -351,7 +354,7 @@ const BudIsland: React.FC = () => {
         footer={null}
       >
         <div
-          className="absolute custom-border w-[2rem] h-[2rem] flex justify-center items-center backdrop-blur-[34.40000534057617px] right-[2.05rem] top-[2.05rem] border-[1px] rounded-full"
+          className="absolute custom-border w-[2rem] h-[2rem] flex justify-center items-center backdrop-blur-[34.40000534057617px] right-[1.05rem] top-[1.05rem] border-[1px] rounded-full"
           onClick={() => {
             close();
           }}
@@ -387,13 +390,17 @@ const BudIsland: React.FC = () => {
   );
 };
 
-export default function BudIslandProvider() {
+function BudIslandWrapper() {
   const { user } = useUser();
-  if (!user) return null;
 
-  return (
-    // <NovuProvider applicationIdentifier={novuAppId} backendUrl={novuBackendUrl} socketUrl={novuSocketUrl} subscriberId={user?.id}>
-    <BudIsland />
-    // </NovuProvider>
-  );
+  // Check if we have a user before rendering BudIsland with Novu hooks
+  if (!user?.id) {
+    return null;
+  }
+
+  return <BudIsland />;
+}
+
+export default function BudIslandProvider() {
+  return <BudIslandWrapper />;
 }

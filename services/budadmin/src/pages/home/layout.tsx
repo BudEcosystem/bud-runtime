@@ -1,5 +1,10 @@
 "use client";
-import React, { ReactNode, useCallback, useEffect, useState } from "react";
+import React, {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
 import "@radix-ui/themes/styles.css";
 import { Theme } from "@radix-ui/themes";
@@ -30,6 +35,7 @@ import { useOverlay } from "src/context/overlayContext";
 import { useIsland } from "src/hooks/useIsland";
 import BudIsland from "@/components/island/BudIsland";
 import { PermissionEnum, useUser } from "src/stores/useUser";
+import pkg from '@novu/notification-center/package.json';
 
 interface LayoutProps {
   children: ReactNode;
@@ -50,7 +56,9 @@ function ShortCutComponent({
 
   if (metaKeyPressed) {
     return (
-      <div className="flex inline-flex justify-center items-center text-[0.625rem] py-0.5 bg-[#1F1F1F] rounded-sm text-[#B3B3B3] h-5 w-8 uppercase ">
+      <div
+        className="flex inline-flex justify-center items-center text-[0.625rem] py-0.5 bg-[#1F1F1F] rounded-sm text-[#B3B3B3] h-5 w-8 uppercase "
+      >
         <Icon
           icon="ph:command"
           className="text-[0.625rem] mr-0.5 text-[#B3B3B3]"
@@ -64,7 +72,7 @@ function ShortCutComponent({
     <div
       className="flex inline-flex justify-center items-center text-[0.625rem] py-0.5 bg-[#1F1F1F] rounded-sm text-[#B3B3B3] h-5 w-8 uppercase opacity-0 opacity-100"
       style={{
-        opacity: metaKeyPressed ? "1 !important" : "0 !important",
+        opacity: metaKeyPressed ? '1 !important' : '0 !important',
       }}
     >
       <Icon
@@ -90,40 +98,40 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     {
       label: "Projects",
       route: "/projects",
-      icon: "/images/icons/projectIcon.png",
-      iconWhite: "/images/icons/projectIconWhite.png",
+      icon: '/images/icons/projectIcon.png',
+      iconWhite: '/images/icons/projectIconWhite.png',
       cmd: "1",
       hide: !hasPermission(PermissionEnum.ProjectView),
     },
     {
       label: "Models",
       route: "/modelRepo",
-      icon: "/images/icons/modelRepo.png",
-      iconWhite: "/images/icons/modelRepoWhite.png",
+      icon: '/images/icons/modelRepo.png',
+      iconWhite: '/images/icons/modelRepoWhite.png',
       cmd: "2",
       hide: !hasPermission(PermissionEnum.ModelView),
     },
     {
       label: "Clusters",
       route: "/clusters",
-      icon: "/images/icons/cluster.png",
-      iconWhite: "/images/icons/clustersWhite.png",
+      icon: '/images/icons/cluster.png',
+      iconWhite: '/images/icons/clustersWhite.png',
       cmd: "3",
       hide: !hasPermission(PermissionEnum.ClusterView),
     },
     {
       label: "Dashboard",
       route: "/dashboard",
-      icon: "/images/icons/dashboard.png",
-      iconWhite: "/images/icons/dashboardWhite.png",
+      icon: '/images/icons/dashboard.png',
+      iconWhite: '/images/icons/dashboardWhite.png',
       cmd: "4",
     },
     // { label: 'End Points', route: '/endPoints', icon: endPointsIcon},
     {
       label: "Playground",
       route: "/playground",
-      icon: "/images/icons/play.png",
-      iconWhite: "/images/icons/playWhite.png",
+      icon: '/images/icons/play.png',
+      iconWhite: '/images/icons/playWhite.png',
       cmd: "5",
     },
     // {
@@ -136,8 +144,8 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     {
       label: "API Keys",
       route: "/apiKeys",
-      icon: "/images/icons/key.png",
-      iconWhite: "/images/icons/keyWhite.png",
+      icon: '/images/icons/key.png',
+      iconWhite: '/images/icons/keyWhite.png',
       cmd: "6",
     },
     {
@@ -149,24 +157,22 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     {
       label: "Evaluations",
       route: "/evaluations",
-      icon: "/icons/simulations.png",
-      iconWhite: "/icons/simulationsWhite.svg",
+      icon: '/icons/simulations.png',
+      iconWhite: '/icons/simulationsWhite.svg',
       cmd: "8",
     },
     {
       label: "Guard Rails",
       route: "/guardrails",
-      icon: "/icons/simulations.png",
-      iconWhite: "/icons/simulationsWhite.svg",
+      icon: '/icons/simulations.png',
+      iconWhite: '/icons/simulationsWhite.svg',
       cmd: "9",
     },
-  ];
+  ]
 
   const tabsTwo = [
     {
-      label: "User management",
-      route: "/users",
-      icon: PersonIcon,
+      label: "User Management", route: "/users", icon: PersonIcon,
       hide: !hasPermission(PermissionEnum.UserManage),
     },
     { label: "Settings", route: "/settings", icon: GearIcon },
@@ -188,16 +194,26 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     developer: "Developer",
     devops: "Devops",
     tester: "Tester",
-  };
+  }
 
   // logout
   const logOut = async () => {
     try {
+      const refreshToken = localStorage.getItem("refresh_token");
+
+      if (refreshToken) {
+        await AppRequest.Post("/auth/logout", {
+          refresh_token: refreshToken
+        });
+      }
+
       localStorage.clear();
       window.location.replace("/");
-      // If API call is successful, close the dialog
     } catch (error) {
-      console.error("Error creating model:", error);
+      console.error("Error during logout:", error);
+      // Clear localStorage and redirect even if API call fails
+      localStorage.clear();
+      window.location.replace("/");
     }
   };
 
@@ -209,7 +225,16 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     getUser();
   }, []);
 
-  const handleOpenChange = (open) => {
+
+  useEffect(() => {
+    console.log("Novu Notification Center version:", pkg.version);
+    console.log("process.env.NEXT_PUBLIC_BASE_URL", process.env.NEXT_PUBLIC_BASE_URL);
+    console.log("process.env.NEXT_PUBLIC_NOVU_SOCKET_URL", process.env.NEXT_PUBLIC_NOVU_SOCKET_URL);
+    console.log("process.env.NEXT_PUBLIC_NOVU_BASE_URL", process.env.NEXT_PUBLIC_NOVU_BASE_URL);
+    console.log("process.env.NEXT_PUBLIC_NOVU_APP_ID", process.env.NEXT_PUBLIC_NOVU_APP_ID);
+  }, []);
+
+  const handleOpenChange = (open: boolean) => {
     setGeneralOpen(open);
   };
   const content = (
@@ -220,7 +245,9 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       {pathname && (
         <>
           {/* <Text>{pathname}</Text> */}
-          <div className="flex justify-start items-start flex-col gap-1 menuWrap pt-[0.25em]">
+          <div
+            className="flex justify-start items-start flex-col gap-1 menuWrap pt-[0.25em]"
+          >
             {tabsTwo.map((tab) => {
               const Icon = tab.icon;
 
@@ -240,7 +267,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                       "flex items-center gap-2 group gap-x-[0.85em] rounded-md py-[0.25em] px-[1.3rem] font-light text-[#B3B3B3]",
                       "LinkDiv",
                       isVisible && "hover:font-semibold hover:text-[#EEEEEE]",
-                      isActive && "!text-[#EEEEEE]",
+                      isActive && "!text-[#EEEEEE]"
                     )}
                   >
                     <div className="LinkIcn">
@@ -250,8 +277,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                         className={classNames(
                           "w-[1.05em] h-[1.05em] 1920px:w-[1.2em] 1920px:h-[1.2em]",
                           isVisible && "group-hover:text-[#EEEEEE]",
-                          (isHovered === tab.route || isActive) &&
-                            "text-[#EEEEEE]",
+                          (isHovered === tab.route || isActive) && "text-[#EEEEEE]"
                         )}
                       />
                     </div>
@@ -259,8 +285,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                       className={classNames(
                         "pl-[0.25em] !text-[.875rem]",
                         isVisible && "group-hover:text-[#EEEEEE]",
-                        (isHovered === tab.route || isActive) &&
-                          "text-[#EEEEEE]",
+                        (isHovered === tab.route || isActive) && "text-[#EEEEEE]"
                       )}
                     >
                       {tab.label}
@@ -269,13 +294,14 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                 </Link>
               );
             })}
+
           </div>
         </>
       )}
       <div className="px-[1.1em] pb-[1rem]">
         <div
           className={classNames(
-            "flex items-center justify-start gap-[.5] LinkDiv cursor-pointer group flex gap-x-[0.85em] rounded-md py-[0.3em] pl-[.3rem] pr-[.6em] font-light text-[#B3B3B3] hover:font-semibold hover:text-[#EEEEEE]",
+            "flex items-center justify-start gap-[.5] LinkDiv cursor-pointer group flex gap-x-[0.85em] rounded-md py-[0.3em] pl-[.3rem] pr-[.6em] font-light text-[#B3B3B3] hover:font-semibold hover:text-[#EEEEEE]"
           )}
           onClick={logOut}
         >
@@ -298,16 +324,16 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       {/* <Theme accentColor="iris" appearance="dark" style={{ background: 'transparent' }} className=""> */}
       <Theme accentColor="iris" appearance="dark" className="">
         <div className="dashboardWrapper flex justify-between relative">
+          <div className={`dashboardOverlay absolute w-full h-full top-0 left-0 z-[1200] ${isVisible ? 'block' : 'hidden'}`}></div>
           <div
-            className={`dashboardOverlay absolute w-full h-full top-0 left-0 z-[1200] ${isVisible ? "block" : "hidden"}`}
-          ></div>
-          <div className="flex flex-col justify-between items-start gap-[2rem] leftDiv py-[1.55em] pb-[.7em] scroll-smooth custom-scrollbar overflow-auto open-sans">
+            className="flex flex-col justify-between items-start gap-[2rem] leftDiv py-[1.55em] pb-[.7em] scroll-smooth custom-scrollbar overflow-auto open-sans"
+          >
             <div className="w-full 1680px:text-[1rem]">
               <div className="flex justify-center leftLogo px-[7%] pb-[1.65rem]">
                 <Image
                   preview={false}
                   className="mainLogo"
-                  style={{ width: "auto", height: "1.4rem" }}
+                  style={{ width: 'auto', height: '1.4rem' }}
                   src="/images/logo.svg"
                   // src="/images/BudLogo.png"
                   alt="Logo"
@@ -316,7 +342,9 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
               <div className="px-[.75rem] mb-[7%]">
                 <BudIsland />
               </div>
-              <div className="flex justify-start items-center flex-col menuWrap pt-[0.235rem] px-[.6rem]">
+              <div
+                className="flex justify-start items-center flex-col menuWrap pt-[0.235rem] px-[.6rem]"
+              >
                 {tabs.map((tab) => {
                   const isActive = pathname?.includes(tab.route);
                   const isVisible = !tab.hide;
@@ -335,9 +363,8 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                         className={classNames(
                           "flex justify-between items-center gap-2 group gap-x-[0.75em] rounded-md py-[0.3em] px-[.7em] font-light text-[#B3B3B3]",
                           "LinkDiv",
-                          isVisible &&
-                            "hover:font-semibold hover:text-[#EEEEEE]",
-                          isActive && "!text-[#EEEEEE] bg-[#1F1F1F]",
+                          isVisible && "hover:font-semibold hover:text-[#EEEEEE]",
+                          isActive && "!text-[#EEEEEE] bg-[#1F1F1F]"
                         )}
                       >
                         <div className="flex items-center gap-2">
@@ -352,9 +379,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                                 fill="none"
                                 className={classNames(
                                   "w-[0.875em] h-[0.875em] 1920px:w-[1em] 1920px:h-[1em]",
-                                  isHovered === tab.route || isActive
-                                    ? "fill-[#EEEEEE]"
-                                    : "fill-[#B3B3B3]",
+                                  (isHovered === tab.route || isActive) ? "fill-[#EEEEEE]" : "fill-[#B3B3B3]"
                                 )}
                               >
                                 <path
@@ -370,9 +395,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                                 <div
                                   className={classNames(
                                     "icon",
-                                    isHovered === tab.route || isActive
-                                      ? "visible"
-                                      : "hidden",
+                                    (isHovered === tab.route || isActive) ? "visible" : "hidden"
                                   )}
                                 >
                                   <Image
@@ -387,9 +410,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                                 <div
                                   className={classNames(
                                     "icon",
-                                    isHovered !== tab.route && !isActive
-                                      ? "visible"
-                                      : "hidden",
+                                    (isHovered !== tab.route && !isActive) ? "visible" : "hidden"
                                   )}
                                 >
                                   <Image
@@ -406,8 +427,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                           <Text_14_400_B3B3B3
                             className={classNames(
                               "pl-[0.65em] tracking-[.03rem]",
-                              (isHovered === tab.route || isActive) &&
-                                "!text-[#EEE]",
+                              (isHovered === tab.route || isActive) && "!text-[#EEE]"
                             )}
                           >
                             {tab.label}
@@ -423,6 +443,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                     </Link>
                   );
                 })}
+
               </div>
             </div>
             <div className="block w-full">
@@ -433,9 +454,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                       sizePopupArrow: 0,
                     },
                   }}
-                  getPopupContainer={(trigger) =>
-                    (trigger.parentNode as HTMLElement) || document.body
-                  }
+                  getPopupContainer={(trigger) => (trigger.parentNode as HTMLElement) || document.body}
                 >
                   <Popover
                     open={generalOpen}
@@ -448,40 +467,37 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                     <div className="relative px-[.5em] pt-[.6rem] border-[#1F1F1F] border-t w-full">
                       <div className="relative px-[.6rem] py-[.6rem] flex items-center cursor-pointer hover:bg-[#1F1F1F] rounded-[0.5rem] group w-[full]">
                         <div className=" mr-3 ">
-                          {user && (
-                            <Tooltip
-                              // key={user?.email}
-                              // title={user?.name}
-                              placement="top"
-                            >
-                              <Avatar
-                                shape="square"
-                                className="w-[1.8rem] h-[1.8rem]"
-                                src={
-                                  <Image
-                                    preview={false}
-                                    src="/images/drawer/memoji.png"
-                                    alt="memoji"
-                                    className="w-full h-full rounded-full"
-                                    style={{
-                                      padding: "1px",
-                                    }}
-                                  />
-                                }
-                                style={{
-                                  backgroundColor: user?.color || "#965CDE",
-                                }}
-                              />
-                            </Tooltip>
-                          )}
+                          {user && <Tooltip
+                            // key={user?.email}
+                            // title={user?.name}
+                            placement="top"
+                          >
+                            <Avatar
+                              shape="square"
+                              className="w-[1.8rem] h-[1.8rem]"
+                              src={
+                                <Image
+                                  preview={false}
+                                  src="/images/drawer/memoji.png"
+                                  alt="memoji"
+                                  className="w-full h-full rounded-full"
+                                  style={{
+                                    padding: "1px"
+                                  }}
+                                />
+                              }
+                              style={{
+                                backgroundColor: user?.color || '#965CDE',
+                              }}
+                            />
+                          </Tooltip>}
                         </div>
                         <div className="max-w-[65%]">
                           <div className="flex items-center mb-[1]">
                             <Text_14_600_EEEEEE className="mr-2 truncate max-w-[100%] overflow-hidden">
                               {user?.name}
                             </Text_14_600_EEEEEE>
-                            {(user?.role === "admin" ||
-                              user?.role === "super_admin") && (
+                            {(user?.role === "admin" || user?.role === "super_admin") && (
                               <div className="bg-[#965CDE33] text-[#CFABFC] px-2 py-[3px] rounded-[50px] border border-[#CFABFC] text-[0.45rem] leading-[100%] text-nowrap">
                                 {roleMapping[user?.role]}
                               </div>
@@ -498,7 +514,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                             alt="memoji"
                             className="w-[1.1rem] h-[1.1rem] rounded-full rotate-[-90deg]"
                             style={{
-                              padding: "1px",
+                              padding: "1px"
                             }}
                           />
                         </div>
@@ -513,13 +529,14 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           <div className="blur-sm" />
           <div className="rightWrap py-[0.75rem] pr-[0.6875rem]">
             <div
-              className={`rightDiv rounded-[17px] overflow-hidden ${
-                isDrawerOpen && !showMinimizedItem ? "blur-sm" : ""
+              className={`rightDiv rounded-[17px] overflow-hidden ${isDrawerOpen && !showMinimizedItem ? "blur-sm" : ""
                 // className={`rightDiv rounded-xl overflow-hidden	my-[0.5em] mr-[0.5em] ${isDrawerOpen ? "blur-sm" : ""
-              }`}
+                }`}
             >
               {headerItems && (
-                <div className="headerWrap">
+                <div
+                  className="headerWrap"
+                >
                   <div className="pr-10">{headerItems}</div>
                 </div>
               )}
