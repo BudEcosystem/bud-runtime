@@ -382,7 +382,7 @@ class EvaluationWorkflow:
                 **request.model_dump(mode="json"),
                 "job_id": deployed_job_id,
                 "monitoring_attempt": 0,
-                "max_attempts": 360,  # 30 minutes with 5-second intervals
+                "max_attempts": 360,  # Max consecutive monitoring failures (not job runtime)
                 "phase": "monitoring",
                 "job_start_time": ctx.current_utc_datetime.isoformat(),
             }
@@ -449,43 +449,7 @@ class EvaluationWorkflow:
         )
         notification_req = notification_request.model_copy(deep=True)
 
-        # Check if we've exceeded max attempts
-        if monitoring_attempt > max_attempts:
-            logger.warning(f"Job {job_id} monitoring timed out after {max_attempts} attempts")
-
-            # Send timeout notification
-            notification_req.payload.event = "monitor_eval_job_progress"
-            notification_req.payload.content = NotificationContent(
-                title="Job monitoring timeout",
-                message=f"Job {job_id} monitoring timed out after 30 minutes",
-                status=WorkflowStatus.FAILED,
-                primary_action="retry",
-            )
-            dapr_workflows.publish_notification(
-                workflow_id=instance_id,
-                notification=notification_req,
-                target_topic_name=request.source_topic,
-                target_name=request.source,
-            )
-
-            # Send final results notification
-            notification_req.payload.event = "results"
-            notification_req.payload.content = NotificationContent(
-                title="Evaluation timeout",
-                message=f"Job {job_id} monitoring timed out",
-                status=WorkflowStatus.FAILED,
-                primary_action="retry",
-            )
-            dapr_workflows.publish_notification(
-                workflow_id=instance_id,
-                notification=notification_req,
-                target_topic_name=request.source_topic,
-                target_name=request.source,
-            )
-
-            return {"status": "timeout", "job_id": job_id}
-
-        # Check job status
+        # Check job status first
         monitor_request = {"job_id": job_id, "namespace": request.namespace, "kubeconfig": request.kubeconfig}
 
         monitor_result = yield ctx.call_activity(
@@ -495,6 +459,45 @@ class EvaluationWorkflow:
         # Handle monitoring activity failure
         if isinstance(monitor_result, dict) and monitor_result.get("error"):
             logger.warning(f"Monitoring attempt {monitoring_attempt} failed: {monitor_result.get('error')}")
+
+            # Only timeout after many consecutive monitoring failures (not job running time)
+            if monitoring_attempt > max_attempts:
+                logger.error(
+                    f"Monitoring failed after {max_attempts} consecutive attempts: {monitor_result.get('error')}"
+                )
+
+                # Send timeout notification
+                notification_req.payload.event = "monitor_eval_job_progress"
+                notification_req.payload.content = NotificationContent(
+                    title="Job monitoring failed",
+                    message=f"Unable to monitor job {job_id} after {max_attempts} attempts: {monitor_result.get('error')}",
+                    status=WorkflowStatus.FAILED,
+                    primary_action="retry",
+                )
+                dapr_workflows.publish_notification(
+                    workflow_id=instance_id,
+                    notification=notification_req,
+                    target_topic_name=request.source_topic,
+                    target_name=request.source,
+                )
+
+                # Send final results notification
+                notification_req.payload.event = "results"
+                notification_req.payload.content = NotificationContent(
+                    title="Evaluation monitoring failed",
+                    message=f"Unable to monitor job {job_id}",
+                    status=WorkflowStatus.FAILED,
+                    primary_action="retry",
+                )
+                dapr_workflows.publish_notification(
+                    workflow_id=instance_id,
+                    notification=notification_req,
+                    target_topic_name=request.source_topic,
+                    target_name=request.source,
+                )
+
+                return {"status": "monitoring_failed", "job_id": job_id, "error": monitor_result.get("error")}
+
             logger.debug("Will retry monitoring after 5 seconds delay")
 
             # Wait and continue monitoring
@@ -671,7 +674,7 @@ class EvaluationWorkflow:
             notification_req.payload.event = "monitor_eval_job_progress"
             notification_req.payload.content = NotificationContent(
                 title="Job monitoring in progress",
-                message=f"Job {job_id} is still running. Attempt: {monitoring_attempt}/{max_attempts}",
+                message=f"Job {job_id} is still running. Monitoring attempt: {monitoring_attempt}",
                 status=WorkflowStatus.RUNNING,
             )
             dapr_workflows.publish_notification(
