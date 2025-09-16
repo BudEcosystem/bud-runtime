@@ -166,7 +166,7 @@ microservices:
         daprid: budprompt
         image: budstudio/budprompt:nightly
         env:
-            LOG_LEVEL: DEBUG
+            LOG_LEVEL: INFO
             BUD_GATEWAY_BASE_URL: http://20.66.97.208/v1
             BUD_DEFAULT_MODEL_NAME: qwen3-32b
 
