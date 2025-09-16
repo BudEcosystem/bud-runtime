@@ -591,6 +591,8 @@ class WorkflowTypeEnum(StrEnum):
     EVALUATION_CREATION = auto()
     EVALUATE_MODEL = auto()
     GUARDRAIL_DEPLOYMENT = auto()
+    PROMPT_CREATION = auto()
+    PROMPT_SCHEMA_CREATION = auto()
 
 
 class NotificationType(Enum):
@@ -644,6 +646,7 @@ class PayloadType(str, Enum):
     ADD_ADAPTER = "add_adapter"
     DELETE_ADAPTER = "delete_adapter"
     EVALUATE_MODEL = "evaluate_model"
+    PERFORM_PROMPT_SCHEMA = "perform_prompt_schema"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -672,6 +675,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     ADAPTER_DELETE_EVENTS = "adapter_delete_events"
     EVALUATION_EVENTS = "evaluation_events"
     GUARDRAIL_DEPLOYMENT_EVENTS = "guardrail_deployment_events"
+    PROMPT_SCHEMA_EVENTS = "prompt_schema_events"
 
 
 # Mapping between payload types and workflow step event names.
@@ -869,6 +873,56 @@ class ModelStatusEnum(StrEnum):
 
     ACTIVE = auto()
     DELETED = auto()
+
+
+class PromptTypeEnum(StrEnum):
+    """Enumeration of prompt types.
+
+    Attributes:
+        SIMPLE_PROMPT: Represents a simple prompt type.
+    """
+
+    SIMPLE_PROMPT = auto()
+
+
+class PromptStatusEnum(StrEnum):
+    """Enumeration of prompt statuses.
+
+    Attributes:
+        ACTIVE: Represents an active prompt.
+        DELETED: Represents a deleted prompt.
+    """
+
+    ACTIVE = auto()
+    DELETED = auto()
+
+
+class PromptVersionStatusEnum(StrEnum):
+    """Enumeration of prompt version statuses.
+
+    Attributes:
+        ACTIVE: Represents an active prompt version.
+        DELETED: Represents a deleted prompt version.
+    """
+
+    ACTIVE = auto()
+    DELETED = auto()
+
+
+class RateLimitTypeEnum(StrEnum):
+    """Enumeration of rate limit types.
+
+    Attributes:
+        ENABLED: Rate limiting is enabled with default settings.
+        DISABLED: Rate limiting is disabled.
+        AUTO: Automatic rate limiting based on system load.
+        CUSTOM: Custom rate limiting with user-defined value.
+    """
+
+    ENABLED = auto()
+    DISABLED = auto()
+    AUTO = auto()
+    CUSTOM = auto()
 
 
 class CloudModelStatusEnum(StrEnum):

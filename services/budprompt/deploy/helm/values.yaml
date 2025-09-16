@@ -1,0 +1,30 @@
+namespace: bud-prompt
+name: bud-prompt
+image: "budstudio/budprompt:latest"
+
+host: "budprompt.bud.studio"
+
+env:
+  PSQL_HOST: "postgresql-service.bud-prompt"
+  PSQL_PORT: "5432"
+  PSQL_USER: ""
+  PSQL_PASSWORD: ""
+  PSQL_DB: "budprompt"
+  REDIS_URI: "redis-service.bud-prompt:6379"
+  REDIS_PASSWORD: ""
+
+  APP_PORT: 9088
+  APP_NAME: budprompt
+  NAMESPACE: development
+  LOG_LEVEL: DEBUG
+
+  SECRETSTORE_SECRET_NAME: "bud-prompt-secret"
+  SECRETSTORE_NAME: "budprompt-secret-store"
+
+redis:
+  storage_size: 1Gi
+  host_path: /datadisk/pvc/budprompt/redis
+
+postgres:
+  storage_size: 10Gi
+  host_path: /datadisk/pvc/budprompt/postgres

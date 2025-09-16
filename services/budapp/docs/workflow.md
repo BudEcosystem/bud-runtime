@@ -268,3 +268,137 @@ curl --location 'https://<base_url>/clusters/clusters' \
   "trigger_workflow": true
 }
 ```
+
+## Create Prompt
+
+```json
+// Select provider type
+{
+  "workflow_total_steps": 6,
+  "step_number": 1,
+  "project_id": "1cd00bfc-23c3-4b61-aea1-29b68966048b"
+}
+
+// Select prompt type
+{
+  "workflow_id": "0ed70061-361b-438d-b577-a8afb6847749",
+  "step_number": 2,
+  "prompt_type": "simple_prompt"
+}
+
+// Insert prompt schema
+{
+  "workflow_id": "0ed70061-361b-438d-b577-a8afb6847749",
+  "step_number": 3,
+  "prompt_schema": {
+    "deployment_name": "qwen3-32b",
+    "model_settings": {
+        "temperature": 0.5
+    },
+    "stream": true,
+    "input_schema": null,
+    "output_schema": {
+        "$defs": {
+            "Batch": {
+                "properties": {
+                    "name": {
+                        "description": "The name of the batch",
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "people": {
+                        "description": "The list of people",
+                        "items": {
+                            "$ref": "#/$defs/Person"
+                        },
+                        "title": "People",
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "name",
+                    "people"
+                ],
+                "title": "Batch",
+                "type": "object"
+            },
+            "Person": {
+                "properties": {
+                    "name": {
+                        "description": "The name of the person",
+                        "maxLength": 100,
+                        "minLength": 3,
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "age": {
+                        "description": "The age of the person",
+                        "maximum": 100,
+                        "minimum": 0,
+                        "title": "Age",
+                        "type": "integer"
+                    },
+                    "email": {
+                        "description": "The email of the person",
+                        "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+                        "title": "Email",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "age",
+                    "email"
+                ],
+                "title": "Person",
+                "type": "object"
+            }
+        },
+        "properties": {
+            "content": {
+                "$ref": "#/$defs/Batch"
+            }
+        },
+        "required": [
+            "content"
+        ],
+        "title": "Input",
+        "type": "object"
+    },
+    "messages": [
+        {
+            "role": "developer",
+            "content": "As a developer Give person details in specified format"
+        },
+        {
+            "role": "assistant",
+            "content": "As an assistant Give person details in specified format"
+        },
+        {
+            "role": "user",
+            "content": "As an User Give person details in specified format"
+        }
+    ],
+    "system_prompt": "You are a helpful assistant",
+    "input_data": "Create random person details and add them to a random batch",
+    "output_validation_prompt": "Name of branch should start with varun"
+  },
+  "endpoint_id": "096cee59-af1f-4fba-b873-7f540d77f7bf"
+}
+
+// Insert prompt metadata
+{
+  "workflow_id": "0ed70061-361b-438d-b577-a8afb6847749",
+  "step_number": 4,
+  "name": "test prompt",
+  "description": "This is a test prompt",
+  "tags": [{"name": "Tag1", "color": "#000000"}, {"name": "Tag2", "color": "#000000"}],
+  "auto_scale": true,
+  "caching": true,
+  "concurrency": [10, 100],
+  "rate_limit": true,
+  "rate_limit_value": 10,
+  "bud_prompt_id": "test-1234",
+  "trigger_workflow": true
+}
+```

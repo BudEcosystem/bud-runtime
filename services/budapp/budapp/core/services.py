@@ -38,6 +38,7 @@ from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 from ..benchmark_ops.services import BenchmarkService
 from ..endpoint_ops.services import EndpointService
 from ..model_ops.services import LocalModelWorkflowService, ModelService
+from ..prompt_ops.services import PromptWorkflowService
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from .crud import IconDataManager, ModelTemplateDataManager
 from .models import Icon as IconModel
@@ -413,6 +414,25 @@ class NotificationService(SessionMixin):
         if payload.event == "results":
             await EndpointService(self.session).delete_adapter_from_notification_event(payload)
 
+    async def update_prompt_schema_events(self, payload: NotificationPayload) -> None:
+        """Update the prompt schema events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        # Update workflow step data event
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value, payload)
+
+        # Create prompt_id in workflow response
+        if payload.event == "results":
+            await PromptWorkflowService(self.session).create_prompt_schema_from_notification_event(payload)
+
     async def update_eta_events(self, payload: NotificationPayload) -> None:
         """Update ETA value for workflow progress and step."""
         if not payload.workflow_id:
@@ -641,6 +661,7 @@ class SubscriberHandler:
             PayloadType.ADD_ADAPTER: self._handle_deploy_adapter,
             PayloadType.DELETE_ADAPTER: self._handle_delete_adapter,
             PayloadType.EVALUATE_MODEL: self._handle_evaluate_model,
+            PayloadType.PERFORM_PROMPT_SCHEMA: self._handle_perform_prompt_schema,
         }
 
         handler = handlers.get(payload.type)
@@ -786,6 +807,14 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Updated evaluation event in workflow step",
+        ).to_http_response()
+
+    async def _handle_perform_prompt_schema(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the perform prompt schema event."""
+        await NotificationService(self.session).update_prompt_schema_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated prompt schema event in workflow step",
         ).to_http_response()
 
 
