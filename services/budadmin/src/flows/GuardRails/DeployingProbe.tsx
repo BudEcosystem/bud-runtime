@@ -5,10 +5,7 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { Progress } from "antd";
 import React, { useState, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import {
-  Text_14_400_EEEEEE,
-  Text_16_600_FFFFFF,
-} from "@/components/ui/text";
+import { Text_14_400_EEEEEE, Text_16_600_FFFFFF } from "@/components/ui/text";
 
 export default function DeployingProbe() {
   const { openDrawerWithStep } = useDrawer();
@@ -25,7 +22,7 @@ export default function DeployingProbe() {
           setIsComplete(true);
           return 100;
         }
-        return prev + (100 / 30); // Complete in 30 seconds
+        return prev + 100 / 30; // Complete in 30 seconds
       });
     }, 1000);
 
@@ -50,9 +47,9 @@ export default function DeployingProbe() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     if (mins > 0) {
-      return `${mins} min${mins > 1 ? 's' : ''} ${secs} sec${secs !== 1 ? 's' : ''}`;
+      return `${mins} min${mins > 1 ? "s" : ""} ${secs} sec${secs !== 1 ? "s" : ""}`;
     }
-    return `${secs} sec${secs !== 1 ? 's' : ''}`;
+    return `${secs} sec${secs !== 1 ? "s" : ""}`;
   };
 
   const handleFinish = () => {
@@ -106,9 +103,13 @@ export default function DeployingProbe() {
             {/* Additional Information */}
             <div className="mt-[2rem] space-y-[1rem]">
               <div className="flex items-center gap-[0.5rem]">
-                <div className={`w-[8px] h-[8px] rounded-full ${isComplete ? 'bg-[#52C41A]' : 'bg-[#965CDE]'} animate-pulse`} />
+                <div
+                  className={`w-[8px] h-[8px] rounded-full ${isComplete ? "bg-[#52C41A]" : "bg-[#965CDE]"} animate-pulse`}
+                />
                 <Text_14_400_EEEEEE>
-                  {isComplete ? 'Probe successfully deployed' : 'Configuring probe settings...'}
+                  {isComplete
+                    ? "Probe successfully deployed"
+                    : "Configuring probe settings..."}
                 </Text_14_400_EEEEEE>
               </div>
 

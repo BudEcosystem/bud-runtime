@@ -1,6 +1,13 @@
 import { Tooltip } from "antd";
 import { type ClassValue, clsx } from "clsx";
-import { differenceInDays, differenceInHours, format, formatDistance, isToday, isYesterday } from "date-fns";
+import {
+  differenceInDays,
+  differenceInHours,
+  format,
+  formatDistance,
+  isToday,
+  isYesterday,
+} from "date-fns";
 import { validateHeaderValue } from "http";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
@@ -27,11 +34,16 @@ export const modelNameRegex = new RegExp("^[a-zA-Z0-9-./]+$");
 // allow only alphanumeric characters and hyphen and space
 export const projectNameRegex = new RegExp("^[a-zA-Z0-9- ]+$");
 export const clusterNameRegex = new RegExp("^[a-zA-Z0-9- ]+$");
-export const passwordRegex = new RegExp("^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$");
+export const passwordRegex = new RegExp(
+  "^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$",
+);
 
 export function isValidEndpointName(name: string) {
   return (
-    name && name.length > 0 && name.length <= 100 && endpointNameRegex.test(name)
+    name &&
+    name.length > 0 &&
+    name.length <= 100 &&
+    endpointNameRegex.test(name)
   );
 }
 
@@ -63,7 +75,7 @@ export function getSpecValueWidthOddEven(specs: any, index: number) {
   return index % 2 === 0
     ? getSpecValueWidth(specs?.filter((spec, i) => i % 2 === 0))
     : // even index value width
-    getSpecValueWidth(specs?.filter((spec, i) => i % 2 !== 0));
+      getSpecValueWidth(specs?.filter((spec, i) => i % 2 !== 0));
 }
 
 export function capitalize(str: string) {
@@ -73,7 +85,6 @@ export function capitalize(str: string) {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize each word
     .join(" "); // Join back with spaces
 }
-
 
 export function statusColor(status: string) {
   switch (status?.toLowerCase()) {
@@ -111,10 +122,13 @@ export function formdateDateTime(notificationDate: Date) {
           ? format(notificationDate, "MMM dd")
           : format(notificationDate, "MMM dd, yyyy");
 
-  return <Tooltip title={format(notificationDate, "MMM dd, yyyy HH:mm:ss")}>{time}</Tooltip>;
+  return (
+    <Tooltip title={format(notificationDate, "MMM dd, yyyy HH:mm:ss")}>
+      {time}
+    </Tooltip>
+  );
   // +" " + formatDate(notificationDate) + " " + differenceInDays(today, notificationDate);
 }
-
 
 export function formatDistanceCustom(date: string | Date) {
   console.log(date);
@@ -125,19 +139,19 @@ export function formatDistanceCustom(date: string | Date) {
     addSuffix: true,
     locale: {
       formatDistance: (token, count, options) => {
-        if (token === 'lessThanXMinutes') {
-          return '30 Seconds ago';
+        if (token === "lessThanXMinutes") {
+          return "30 Seconds ago";
         }
-        if (token === 'aboutXHours') {
+        if (token === "aboutXHours") {
           return `${count} hours ago`;
         }
-        if (token === 'xDays') {
+        if (token === "xDays") {
           return `${count} days ago`;
         }
-        if (token === 'xWeeks') {
+        if (token === "xWeeks") {
           return `${count} weeks ago`;
         }
-        if (token === 'aboutXMonths') {
+        if (token === "aboutXMonths") {
           return `${count} months ago`;
         }
         return `${count} ${token}`;
@@ -146,61 +160,66 @@ export function formatDistanceCustom(date: string | Date) {
   });
 }
 
-
 // input in from to format to B, KB, MB, GB
-export function formatStorageSize(size: number, from: 'B' | 'KB' | 'MB' | 'GB' | 'TB' | 'Mbps' | 'Gbps' | 'PB') {
-  if (size === 0) return '0 B';
+export function formatStorageSize(
+  size: number,
+  from: "B" | "KB" | "MB" | "GB" | "TB" | "Mbps" | "Gbps" | "PB",
+) {
+  if (size === 0) return "0 B";
   if (size < 1024) {
     return `${size.toFixed(0)} ${from}`;
   } else if (size > 1024) {
-    if (from === 'B') {
+    if (from === "B") {
       size = size / 1024;
-      from = 'KB';
-    } else if (from === 'KB') {
+      from = "KB";
+    } else if (from === "KB") {
       size = size / 1024;
-      from = 'MB';
-    } else if (from === 'MB') {
+      from = "MB";
+    } else if (from === "MB") {
       size = size / 1024;
-      from = 'GB';
-    } else if (from === 'GB') {
+      from = "GB";
+    } else if (from === "GB") {
       size = size / 1024;
-      from = 'TB';
-    } else if (from === 'TB') {
+      from = "TB";
+    } else if (from === "TB") {
       size = size / 1024;
-      from = 'PB';
-    } else if (from === 'Mbps') {
+      from = "PB";
+    } else if (from === "Mbps") {
       size = size / 1024;
-      from = 'Gbps';
+      from = "Gbps";
     }
     return `${size.toFixed(2)} ${from}`;
   }
-
 }
 
 export const mapTime = (time: number, selectedSegment: ClusterFilter) => {
-  if (selectedSegment === 'today') {
-    return format(new Date(time), 'HH:mm');
+  if (selectedSegment === "today") {
+    return format(new Date(time), "HH:mm");
   }
-  if (selectedSegment === '7days') {
-    return format(new Date(time), 'dd/MM');
+  if (selectedSegment === "7days") {
+    return format(new Date(time), "dd/MM");
   }
-  if (selectedSegment === 'month') {
-    return format(new Date(time), 'dd/MM');
+  if (selectedSegment === "month") {
+    return format(new Date(time), "dd/MM");
   }
-}
+};
 
-
-export function getCategories(selectedSegment: ClusterFilter, timeSeries: TimeSeriesData[]) {
+export function getCategories(
+  selectedSegment: ClusterFilter,
+  timeSeries: TimeSeriesData[],
+) {
   return timeSeries?.map((item) => mapTime(item.timestamp, selectedSegment));
 }
 
-export function getChartData(selectedSegment: ClusterFilter, timeSeries: TimeSeriesData[]) {
+export function getChartData(
+  selectedSegment: ClusterFilter,
+  timeSeries: TimeSeriesData[],
+) {
   return timeSeries?.map((item) => item.value);
 }
 
-
 export function getCommaSeparated(num: number) {
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 export function getFormattedToBillions(num: number) {
@@ -234,11 +253,11 @@ export function milliToSecUinit(val: number) {
   return `ms`;
 }
 export function removeUnderScoreAndCapatalise(value: string) {
-  if (value?.includes('_')) {
+  if (value?.includes("_")) {
     return value
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
   } else {
     return value?.charAt(0).toUpperCase() + value?.slice(1).toLowerCase();
   }

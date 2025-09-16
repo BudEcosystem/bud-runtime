@@ -116,33 +116,34 @@ const Evaluations = () => {
     });
   }, [searchValue, selectedFilter]);
 
-
-  const operations = <PrimaryButton onClick={() => openDrawer("new-experiment" as any)} classNames="mt-[.2rem] shadow-purple-glow">
-    <span className="flex items-center gap-2">
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 16 16"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M8 3V13M3 8H13"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      </svg>
-      New experiment
-    </span>
-  </PrimaryButton>
-
+  const operations = (
+    <PrimaryButton
+      onClick={() => openDrawer("new-experiment" as any)}
+      classNames="mt-[.2rem] shadow-purple-glow"
+    >
+      <span className="flex items-center gap-2">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M8 3V13M3 8H13"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+        New experiment
+      </span>
+    </PrimaryButton>
+  );
 
   return (
     <DashBoardLayout>
-      <div
-        className="temp-bg h-full w-full"
-      >
+      <div className="temp-bg h-full w-full">
         <div className="evalTab h-full">
           <Tabs
             defaultActiveKey="1"

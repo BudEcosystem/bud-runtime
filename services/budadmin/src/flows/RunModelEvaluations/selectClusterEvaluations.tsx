@@ -1,9 +1,13 @@
-
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import { Text_12_400_B3B3B3, Text_12_400_EEEEEE, Text_14_400_EEEEEE, Text_14_600_EEEEEE } from "@/components/ui/text";
+import {
+  Text_12_400_B3B3B3,
+  Text_12_400_EEEEEE,
+  Text_14_400_EEEEEE,
+  Text_14_600_EEEEEE,
+} from "@/components/ui/text";
 import React, { useContext } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { Image } from "antd"; // Added Checkbox import
@@ -11,58 +15,55 @@ import ChooseCluster from "@/components/ui/bud/deploymentDrawer/ChooseCluster";
 
 const tags = [
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'OpenAI',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "OpenAI",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Together.ai',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Together.ai",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Provider name',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Provider name",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Provider name',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Provider name",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Provider name',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Provider name",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Provider name',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Provider name",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
   {
-    icon: '/images/drawer/huggingface.png',
-    name: 'Provider name',
-    color: '#D1B854',
-    background: '#423A1A40'
+    icon: "/images/drawer/huggingface.png",
+    name: "Provider name",
+    color: "#D1B854",
+    background: "#423A1A40",
   },
-]
-
+];
 
 export default function SelectClusterEvaluations() {
-  const { closeDrawer, openDrawerWithStep } = useDrawer()
+  const { closeDrawer, openDrawerWithStep } = useDrawer();
   const { submittable, form } = useContext(BudFormContext);
   return (
     <BudForm
-      data={{
-
-      }}
+      data={{}}
       backText="Skip"
       nextText="Next"
       onBack={() => {
@@ -80,7 +81,7 @@ export default function SelectClusterEvaluations() {
                 preview={false}
                 src="/images/drawer/zephyr.png"
                 alt="info"
-                style={{ width: '1.75rem' }}
+                style={{ width: "1.75rem" }}
               />
             </div>
             <div>
@@ -93,7 +94,7 @@ export default function SelectClusterEvaluations() {
                     preview={false}
                     src="/images/drawer/edit.png"
                     alt="info"
-                    style={{ width: '.75rem', height: '.75rem' }}
+                    style={{ width: ".75rem", height: ".75rem" }}
                   />
                 </div>
               </div>
@@ -103,7 +104,7 @@ export default function SelectClusterEvaluations() {
                     key={index}
                     style={{
                       backgroundColor: `${tag.background}`,
-                      color: '#EEEEEE',
+                      color: "#EEEEEE",
                     }}
                     className="text-[0.625rem]  font-[400] rounded-[6px] px-[.3rem] py-[.2rem] leading-[100%] flex justify-center items-center"
                   >
@@ -112,13 +113,14 @@ export default function SelectClusterEvaluations() {
                         preview={false}
                         src={tag.icon}
                         className="!w-[.75rem] !h-[.75rem]"
-                        style={{ width: '.75rem', height: '.75rem' }}
+                        style={{ width: ".75rem", height: ".75rem" }}
                         alt="home"
                       />
                     </div>
-                    <span className={`text-[0.625] font-[400]`}
+                    <span
+                      className={`text-[0.625] font-[400]`}
                       style={{
-                        color: `${tag.color}`
+                        color: `${tag.color}`,
                       }}
                     >
                       {tag.name}
@@ -136,25 +138,31 @@ export default function SelectClusterEvaluations() {
                     preview={false}
                     src="/images/drawer/calander.png"
                     alt="info"
-                    style={{ width: '.75rem' }}
+                    style={{ width: ".75rem" }}
                   />
                 </div>
                 <Text_12_400_B3B3B3>Updated on</Text_12_400_B3B3B3>
               </div>
-              <Text_12_400_EEEEEE>
-                3rd July, 2024
-              </Text_12_400_EEEEEE>
+              <Text_12_400_EEEEEE>3rd July, 2024</Text_12_400_EEEEEE>
             </div>
             <Text_12_400_B3B3B3 className="mt-[1.2rem] leading-[1.1rem]">
-              InternLM 2.5 offers strong reasoning across the board as well as tool use for developers, while sitting at the sweet spot of size for those with 24GB GPUs.
+              InternLM 2.5 offers strong reasoning across the board as well as
+              tool use for developers, while sitting at the sweet spot of size
+              for those with 24GB GPUs.
             </Text_12_400_B3B3B3>
           </div>
           <div className="px-[1.4rem] pt-[1.1rem] mb-[1.4rem]">
             <Text_14_600_EEEEEE>Selected Evaluations</Text_14_600_EEEEEE>
             <div className="flex justify-start items-center flex-wrap	mt-[1.2rem] gap-[.5rem]">
-              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">MMLU</div>
-              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">Toxicity</div>
-              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">Finance</div>
+              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">
+                MMLU
+              </div>
+              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">
+                Toxicity
+              </div>
+              <div className="text-[#D1B854] text-[0.625rem] font-[400] bg-[#423A1A40] rounded-[6px] px-[.4rem] py-[.15rem]">
+                Finance
+              </div>
             </div>
           </div>
         </BudDrawerLayout>
@@ -163,7 +171,7 @@ export default function SelectClusterEvaluations() {
             title="Choose a Cluster"
             description="Clusters are listed in best fit order. Select suitable cluster from the list."
           /> */}
-          <ChooseCluster/>
+          <ChooseCluster />
         </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>

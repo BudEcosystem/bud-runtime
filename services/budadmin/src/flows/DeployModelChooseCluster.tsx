@@ -11,8 +11,9 @@ import { useDeployModel } from "src/stores/useDeployModel";
 
 export default function DeployModelChooseCluster() {
   const { openDrawerWithStep } = useDrawer();
-  const { deploymentCluster, updateCluster, } = useDeployModel();
-  const { recommendedCluster, getRecommendedClusterById, currentProcessId } = useCluster();
+  const { deploymentCluster, updateCluster } = useDeployModel();
+  const { recommendedCluster, getRecommendedClusterById, currentProcessId } =
+    useCluster();
 
   return (
     <BudForm

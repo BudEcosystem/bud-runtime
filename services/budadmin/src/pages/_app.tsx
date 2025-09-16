@@ -17,8 +17,17 @@ import Image from "next/image";
 import loaderIcn from "public/icons/loader.gif";
 import Head from "next/head";
 import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
-import { NotificationBell, NovuProvider, PopoverNotificationCenter } from "@novu/notification-center";
-import { apiBaseUrl, novuAppId, novuBackendUrl, novuSocketUrl } from "@/components/environment";
+import {
+  NotificationBell,
+  NovuProvider,
+  PopoverNotificationCenter,
+} from "@novu/notification-center";
+import {
+  apiBaseUrl,
+  novuAppId,
+  novuBackendUrl,
+  novuSocketUrl,
+} from "@/components/environment";
 import axios from "axios";
 import { OverlayProvider } from "src/context/overlayContext";
 import BudIsland from "@/components/island/BudIsland";
@@ -31,10 +40,10 @@ const secondaryTextColor = "#494F55";
 const unreadBackGroundColor = "#AFE1AF";
 const primaryButtonBackGroundColor = unreadBackGroundColor;
 const secondaryButtonBackGroundColor = "#C6DFCD";
-const popupBgColor = '#101010'
+const popupBgColor = "#101010";
 
 const axiosInstance = axios.create({
-  baseURL: apiBaseUrl
+  baseURL: apiBaseUrl,
 });
 
 export const styles = {
@@ -44,8 +53,8 @@ export const styles = {
         color: "#EEE",
         fill: "",
         maxHeight: "20px",
-        maxWidth: "20px"
-      }
+        maxWidth: "20px",
+      },
     },
     dot: {
       rect: {
@@ -54,12 +63,12 @@ export const styles = {
         width: "10px",
         height: "10px",
         x: 0,
-        y: 2
-      }
-    }
+        y: 2,
+      },
+    },
   },
   unseenBadge: {
-    root: { color: primaryTextColor, background: '#fff' }
+    root: { color: primaryTextColor, background: "#fff" },
   },
   popover: {
     arrow: {
@@ -67,101 +76,97 @@ export const styles = {
     },
     dropdown: {
       borderRadius: "10px",
-      border: '#1F1F1F'
-    }
+      border: "#1F1F1F",
+    },
   },
   layout: {
     root: {
       background: popupBgColor,
-      borderColor: '#1F1F1F'
-    }
+      borderColor: "#1F1F1F",
+    },
   },
   loader: {
     root: {
-      stroke: primaryColor
-    }
+      stroke: primaryColor,
+    },
   },
   notifications: {
     root: {
       ".nc-notifications-list-item": {
-        backgroundColor: secondaryColor
-      }
+        backgroundColor: secondaryColor,
+      },
     },
     listItem: {
       layout: {
         borderRadius: "7px",
-        color: '#FFF',
-        fontSize: '.85rem',
+        color: "#FFF",
+        fontSize: ".85rem",
         "div:has(> .mantine-Avatar-root)": {
           border: "none",
           width: "20px",
           height: "20px",
-          minWidth: "20px"
+          minWidth: "20px",
         },
         ".mantine-Avatar-root": {
           width: "20px",
           height: "20px",
-          minWidth: "20px"
+          minWidth: "20px",
         },
         ".mantine-Avatar-image": {
           width: "20px",
           height: "20px",
-          minWidth: "20px"
-        }
+          minWidth: "20px",
+        },
       },
-      timestamp: { color: secondaryTextColor, fontWeight: "bold", fontSize: '.65rem' },
+      timestamp: {
+        color: secondaryTextColor,
+        fontWeight: "bold",
+        fontSize: ".65rem",
+      },
       dotsButton: {
-        display: 'none',
+        display: "none",
         path: {
-          fill: secondaryTextColor
-        }
+          fill: secondaryTextColor,
+        },
       },
       unread: {
-        "::before": { background: unreadBackGroundColor }
+        "::before": { background: unreadBackGroundColor },
       },
       buttons: {
         primary: {
           background: primaryButtonBackGroundColor,
           color: primaryTextColor,
-          display: 'none',
+          display: "none",
           "&:hover": {
             background: primaryButtonBackGroundColor,
-            color: secondaryTextColor
-          }
+            color: secondaryTextColor,
+          },
         },
         secondary: {
           background: secondaryButtonBackGroundColor,
           color: secondaryTextColor,
-          display: 'none',
+          display: "none",
           "&:hover": {
             background: secondaryButtonBackGroundColor,
-            color: secondaryTextColor
-          }
-        }
-      }
-    }
+            color: secondaryTextColor,
+          },
+        },
+      },
+    },
   },
   actionsMenu: {
     // item: { "&:hover": { backgroundColor: secondaryColor } },
     dropdown: {
-      transform: 'translateX(-10px)'
+      transform: "translateX(-10px)",
     },
     arrow: {
       borderTop: "0",
-      borderLeft: "0"
-    }
+      borderLeft: "0",
+    },
   },
-}
+};
 
-function App(
-  {
-    Component,
-    pageProps,
-  }: {
-    Component: any;
-    pageProps: any;
-  }
-) {
+function App({ Component, pageProps }: { Component: any; pageProps: any }) {
   const { showLoader, hideLoader } = useLoader();
   const { user, getUser: fetchUser } = useUser();
   const router = useRouter();
@@ -173,11 +178,19 @@ function App(
       if (!userData && router.pathname !== "/login") {
         return router.push("/login");
       }
-      if(userData?.data?.result?.status === "invited"  && router.pathname !== "/login"){
-        errorToast(`Please complete your registration by setting your password`);
+      if (
+        userData?.data?.result?.status === "invited" &&
+        router.pathname !== "/login"
+      ) {
+        errorToast(
+          `Please complete your registration by setting your password`,
+        );
         return router.push("/login");
       }
-      if (userData && (router.pathname === "/" || router.pathname === '/auth/logIn')) {
+      if (
+        userData &&
+        (router.pathname === "/" || router.pathname === "/auth/logIn")
+      ) {
         return router.push("/dashboard");
       }
     } catch (error) {
@@ -195,18 +208,22 @@ function App(
   }, [router.pathname]);
 
   return (
-    <NovuProvider backendUrl={novuBackendUrl} socketUrl={novuSocketUrl} subscriberId={user?.id} applicationIdentifier={novuAppId} styles={styles}>
+    <NovuProvider
+      backendUrl={novuBackendUrl}
+      socketUrl={novuSocketUrl}
+      subscriberId={user?.id}
+      applicationIdentifier={novuAppId}
+      styles={styles}
+    >
       <Toast />
       <LoaderWrapper />
       <Component className="z-[999]" {...pageProps} />
       <BudDrawer />
     </NovuProvider>
-  )
+  );
 }
 
 function MyApp({ Component, pageProps }: AppProps) {
-
-
   return (
     <AuthNavigationProvider>
       <OverlayProvider>
@@ -218,13 +235,9 @@ function MyApp({ Component, pageProps }: AppProps) {
             />
             <title>Bud Serve</title>
           </Head>
-          <App
-            Component={Component}
-            pageProps={pageProps}
-          />
+          <App Component={Component} pageProps={pageProps} />
         </LoaderProvider>
       </OverlayProvider>
-
     </AuthNavigationProvider>
   );
 }

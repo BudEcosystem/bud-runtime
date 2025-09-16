@@ -1,8 +1,7 @@
-
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import React, { } from "react";
+import React from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
 import BudStepAlert from "./components/BudStepAlert";
@@ -41,30 +40,35 @@ export default function DeployModeStatus() {
             }}
           />
         </BudDrawerLayout>} */}
-        {showAlert && <BudDrawerLayout>
-          <BudStepAlert
-            type="warining"
-            title="You're about to cancel the deployment process"
-            description="Please note that if you cancel now, you will have to start the process again."
-            cancelText="Continue Deployment"
-            confirmText="Cancel Anyways"
-            confirmAction={async () => {
-              if (currentWorkflow?.workflow_id) {
-                const response = await cancelModelDeployment(currentWorkflow?.workflow_id, projectId);
-                if (response) {
-                  successToast("Deployment cancelled successfully");
-                  closeDrawer();
-                  return;
+        {showAlert && (
+          <BudDrawerLayout>
+            <BudStepAlert
+              type="warining"
+              title="You're about to cancel the deployment process"
+              description="Please note that if you cancel now, you will have to start the process again."
+              cancelText="Continue Deployment"
+              confirmText="Cancel Anyways"
+              confirmAction={async () => {
+                if (currentWorkflow?.workflow_id) {
+                  const response = await cancelModelDeployment(
+                    currentWorkflow?.workflow_id,
+                    projectId,
+                  );
+                  if (response) {
+                    successToast("Deployment cancelled successfully");
+                    closeDrawer();
+                    return;
+                  }
                 }
-              }
-              // TODO: Add cancel action
-              closeDrawer()
-            }}
-            cancelAction={() => {
-              setShowAlert(false)
-            }}
-          />
-        </BudDrawerLayout>}
+                // TODO: Add cancel action
+                closeDrawer();
+              }}
+              cancelAction={() => {
+                setShowAlert(false);
+              }}
+            />
+          </BudDrawerLayout>
+        )}
         <CommonStatus
           workflowId={currentWorkflow?.workflow_id}
           events_field_id="budserve_cluster_events"
@@ -78,9 +82,14 @@ export default function DeployModeStatus() {
           title={"Deployment In Progress"}
           description={
             <>
-              We’ve started deploying {currentWorkflow?.workflow_steps?.model?.name} in {currentWorkflow?.workflow_steps?.cluster?.name || 'Cluster'}. This process may take a while, depending on your configuration. Feel free to minimize the screen we’ll notify you once it’s done.
+              We’ve started deploying{" "}
+              {currentWorkflow?.workflow_steps?.model?.name} in{" "}
+              {currentWorkflow?.workflow_steps?.cluster?.name || "Cluster"}.
+              This process may take a while, depending on your configuration.
+              Feel free to minimize the screen we’ll notify you once it’s done.
             </>
-          } />
+          }
+        />
       </BudWraperBox>
     </BudForm>
   );

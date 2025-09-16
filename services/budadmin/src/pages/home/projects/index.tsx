@@ -1,10 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 import { Box, Flex } from "@radix-ui/themes";
-import {
-  PlusIcon,
-  Share1Icon,
-} from "@radix-ui/react-icons";
+import { PlusIcon, Share1Icon } from "@radix-ui/react-icons";
 import { useEffect, useState } from "react";
 import React from "react";
 import DashBoardLayout from "../layout";
@@ -32,7 +29,13 @@ import { PlusOutlined } from "@ant-design/icons";
 const Projects = () => {
   const [isMounted, setIsMounted] = useState(false);
   const { hasPermission, loadingUser, hasProjectPermission } = useUser();
-  const { globalProjects, getGlobalProjects, getProject, totalProjects, totalPages } = useProjects();
+  const {
+    globalProjects,
+    getGlobalProjects,
+    getProject,
+    totalProjects,
+    totalPages,
+  } = useProjects();
   const { openDrawer } = useDrawer();
 
   const [searchTerm, setSearchTerm] = React.useState<string>("");
@@ -53,7 +56,7 @@ const Projects = () => {
       await getGlobalProjects(page, size, searchTerm);
       hideLoader();
     }
-  }
+  };
 
   // useEffect(() => {
   //   load(currentPage, pageSize);
@@ -78,14 +81,20 @@ const Projects = () => {
   const handleScroll = (e) => {
     // console.log("scrolling");
     // is at the bottom
-    const bottom = document.getElementById("project-repo")?.scrollTop > globalProjects?.length * 30
-    if (bottom && globalProjects?.length < totalProjects && currentPage < totalPages) {
+    const bottom =
+      document.getElementById("project-repo")?.scrollTop >
+      globalProjects?.length * 30;
+    if (
+      bottom &&
+      globalProjects?.length < totalProjects &&
+      currentPage < totalPages
+    ) {
       setCurrentPage(currentPage + 1);
     }
-  }
+  };
 
   useEffect(() => {
-    setIsMounted(true)
+    setIsMounted(true);
   }, []);
 
   return (
@@ -99,18 +108,29 @@ const Projects = () => {
             buttonPermission={hasPermission(PermissionEnum.ProjectManage)}
             // buttonAction={() => openFlow("project-success")}
             buttonAction={() => {
-              openDrawer("new-project")
+              openDrawer("new-project");
             }}
-            rightComponent={hasPermission(PermissionEnum.ProjectManage) &&
-              <>
-                <SearchHeaderInput placeholder="Search by name or tags" searchValue={searchTerm} setSearchValue={setSearchTerm} classNames="mr-[.6rem]" />
-              </>
+            rightComponent={
+              hasPermission(PermissionEnum.ProjectManage) && (
+                <>
+                  <SearchHeaderInput
+                    placeholder="Search by name or tags"
+                    searchValue={searchTerm}
+                    setSearchValue={setSearchTerm}
+                    classNames="mr-[.6rem]"
+                  />
+                </>
+              )
             }
           />
         </Box>
         {/* <button onClick={() => openFlow("new-project")}>open</button> */}
         {hasPermission(PermissionEnum.ProjectView) ? (
-          <Box className="boardMainContainer listingContainer" id="project-repo" onScroll={handleScroll}>
+          <Box
+            className="boardMainContainer listingContainer"
+            id="project-repo"
+            onScroll={handleScroll}
+          >
             {!globalProjects?.length && !searchTerm && (
               <Text_12_400_6A6E76 className="mt-5">
                 Let’s start creating project on the Bud Inference engine.
@@ -123,7 +143,7 @@ const Projects = () => {
                 textMessage={`No projects found for the search term ${searchTerm}`}
               />
             )}
-            <div className="grid gap-[1.1rem] grid-cols-3 mt-[2.95rem] 1680px:mt-[1.75rem] pb-[1.1rem]" >
+            <div className="grid gap-[1.1rem] grid-cols-3 mt-[2.95rem] 1680px:mt-[1.75rem] pb-[1.1rem]">
               {globalProjects?.length > 0 ? (
                 <>
                   {globalProjects?.map((item: any, index) => (
@@ -151,7 +171,11 @@ const Projects = () => {
                               </div>
                             </Flex>
                             <Flex>
-                              {hasPermission(PermissionEnum.ProjectManage) || hasProjectPermission(item.project.id, PermissionEnum.ProjectManage) ? (
+                              {hasPermission(PermissionEnum.ProjectManage) ||
+                              hasProjectPermission(
+                                item.project.id,
+                                PermissionEnum.ProjectManage,
+                              ) ? (
                                 <Flex
                                   align={"center"}
                                   justify={"end"}
@@ -208,41 +232,48 @@ const Projects = () => {
                             Deployments
                           </Text_13_400_B3B3B3>
                         </Box>
-                        <SharedWithUsers users_count={item.users_count} users_colours={item.profile_colors} />
+                        <SharedWithUsers
+                          users_count={item.users_count}
+                          users_colours={item.profile_colors}
+                        />
                       </Flex>
                     </Flex>
                   ))}
                 </>
-              ) : !searchTerm && (
-                <>
-                  {(hasPermission(PermissionEnum.ProjectManage) ? (
-                    <Flex
-                      justify="center"
-                      align="center"
-                      className="w-[100%] min-h-[182px] border border-[#2F3035] rounded-lg bg-[#18191B] cursor-pointer"
-                      onClick={() => openDrawer("new-project")}
-                    >
-                      <Text_14_400_C7C7C7>+ Project</Text_14_400_C7C7C7>
-                    </Flex>
-                  ) : (
-                    <Flex
-                      justify="center"
-                      align="center"
-                      className="w-[100%] min-h-[182px] border border-[#2F3035] rounded-lg bg-[#18191B] cursor-pointer"
-                    >
-                      <Text_14_400_C7C7C7>
-                        No Projects available
-                      </Text_14_400_C7C7C7>
-                    </Flex>
-                  ))}
-                </>
+              ) : (
+                !searchTerm && (
+                  <>
+                    {hasPermission(PermissionEnum.ProjectManage) ? (
+                      <Flex
+                        justify="center"
+                        align="center"
+                        className="w-[100%] min-h-[182px] border border-[#2F3035] rounded-lg bg-[#18191B] cursor-pointer"
+                        onClick={() => openDrawer("new-project")}
+                      >
+                        <Text_14_400_C7C7C7>+ Project</Text_14_400_C7C7C7>
+                      </Flex>
+                    ) : (
+                      <Flex
+                        justify="center"
+                        align="center"
+                        className="w-[100%] min-h-[182px] border border-[#2F3035] rounded-lg bg-[#18191B] cursor-pointer"
+                      >
+                        <Text_14_400_C7C7C7>
+                          No Projects available
+                        </Text_14_400_C7C7C7>
+                      </Flex>
+                    )}
+                  </>
+                )
               )}
             </div>
           </Box>
         ) : (
-          !loadingUser && <>
-            <NoAccess textMessage="You do not have access to view projects, please ask admin to give you access to either view or edit for projects." />
-          </>
+          !loadingUser && (
+            <>
+              <NoAccess textMessage="You do not have access to view projects, please ask admin to give you access to either view or edit for projects." />
+            </>
+          )
         )}
       </Box>
     </DashBoardLayout>

@@ -20,9 +20,12 @@ function DeployModelSelect({
   selectedTags = [],
   children,
   hideSelect,
-  emptyComponent = <Text_12_300_EEEEEE>
-    To add new models for the provider, click the &quot;+Cloud Model&quot; button
-  </Text_12_300_EEEEEE>
+  emptyComponent = (
+    <Text_12_300_EEEEEE>
+      To add new models for the provider, click the &quot;+Cloud Model&quot;
+      button
+    </Text_12_300_EEEEEE>
+  ),
 }: {
   multiSelect?: boolean;
   multiSelectedModels?: Model[];
@@ -47,7 +50,9 @@ function DeployModelSelect({
       return true;
     }
 
-    return selectedTags.every((tag) => model.tags?.find((modelTag) => modelTag.name === tag.name));
+    return selectedTags.every((tag) =>
+      model.tags?.find((modelTag) => modelTag.name === tag.name),
+    );
   });
 
   const handleSelectAll = () => {
@@ -60,7 +65,8 @@ function DeployModelSelect({
       {children}
       <div className="px-[1.4rem] pb-[.5rem] flex justify-between items-center">
         <div className="text-[#757575] text-[.75rem] font-[400]">
-          Models Available <span className="text-[#EEEEEE]">{models?.length}</span>
+          Models Available{" "}
+          <span className="text-[#EEEEEE]">{models?.length}</span>
         </div>
         {multiSelect && (
           <div className="flex items-center justify-start gap-[.7rem]">
@@ -83,7 +89,7 @@ function DeployModelSelect({
                     hideSeeMore={hideSeeMore}
                     key={index}
                     selected={multiSelectedModels?.some(
-                      (selected) => selected.id === model.id
+                      (selected) => selected.id === model.id,
                     )}
                     data={model}
                     hideSelect={hideSelect}
@@ -93,9 +99,9 @@ function DeployModelSelect({
                       //   return;
                       // }
                       // setSelectedModel(model);
-                      setMultiSelectedModels(model)
+                      setMultiSelectedModels(model);
                       if (hideSelect) {
-                        openDrawer('view-model');
+                        openDrawer("view-model");
                       }
                     }}
                   />
@@ -113,7 +119,7 @@ function DeployModelSelect({
                       }
                       setSelectedModel(model);
                       if (hideSelect) {
-                        openDrawer('view-model');
+                        openDrawer("view-model");
                       }
                     }}
                   />

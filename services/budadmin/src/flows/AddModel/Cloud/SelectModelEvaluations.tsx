@@ -2,10 +2,15 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
+import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import {
-  PrimaryButton,
-} from "@/components/ui/bud/form/Buttons";
-import { Text_12_300_EEEEEE, Text_12_400_B3B3B3, Text_12_400_EEEEEE, Text_12_600_EEEEEE, Text_14_400_EEEEEE, Text_14_600_EEEEEE } from "@/components/ui/text";
+  Text_12_300_EEEEEE,
+  Text_12_400_B3B3B3,
+  Text_12_400_EEEEEE,
+  Text_12_600_EEEEEE,
+  Text_14_400_EEEEEE,
+  Text_14_600_EEEEEE,
+} from "@/components/ui/text";
 import React, { useContext } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { Image } from "antd";
@@ -18,26 +23,20 @@ import Leaderboards from "src/flows/components/LeaderboardsTable";
 import { Model, useModels } from "src/hooks/useModels";
 import ModelTags from "src/flows/components/ModelTags";
 
-
-
-
-export default function ModelEvaluations({
-  model
-}: {
-  model: Model
-}) {
+export default function ModelEvaluations({ model }: { model: Model }) {
   const { currentWorkflow } = useDeployModel();
   const { getModel } = useModels();
-  const { closeDrawer, openDrawerWithStep, openDrawer } = useDrawer()
+  const { closeDrawer, openDrawerWithStep, openDrawer } = useDrawer();
 
-  const imageUrl = currentWorkflow?.workflow_steps?.model?.icon ? assetBaseUrl + currentWorkflow?.workflow_steps?.model?.icon : '/images/drawer/zephyr.png';
+  const imageUrl = currentWorkflow?.workflow_steps?.model?.icon
+    ? assetBaseUrl + currentWorkflow?.workflow_steps?.model?.icon
+    : "/images/drawer/zephyr.png";
 
   return (
     <BudForm
-      data={{
-      }}
+      data={{}}
       onBack={() => {
-        openDrawerWithStep('cloud-model-success')
+        openDrawerWithStep("cloud-model-success");
       }}
       onNext={() => {
         closeDrawer();
@@ -52,7 +51,7 @@ export default function ModelEvaluations({
                 preview={false}
                 src={imageUrl}
                 alt="info"
-                style={{ width: '1.75rem' }}
+                style={{ width: "1.75rem" }}
               />
             </div>
             <div className="w-full">
@@ -60,20 +59,27 @@ export default function ModelEvaluations({
                 <Text_14_400_EEEEEE className="mb-[0.65rem]">
                   {currentWorkflow?.workflow_steps?.model?.name}
                 </Text_14_400_EEEEEE>
-                <div className="w-[.75rem] h-[.75rem] cursor-pointer" onClick={async () => {
-                  await getModel(currentWorkflow?.workflow_steps?.model?.id);
-                  openDrawer("edit-model");
-                }}>
+                <div
+                  className="w-[.75rem] h-[.75rem] cursor-pointer"
+                  onClick={async () => {
+                    await getModel(currentWorkflow?.workflow_steps?.model?.id);
+                    openDrawer("edit-model");
+                  }}
+                >
                   <Image
                     preview={false}
                     src="/images/drawer/edit.png"
                     alt="info"
-                    style={{ width: '.75rem', height: '.75rem' }}
+                    style={{ width: ".75rem", height: ".75rem" }}
                   />
                 </div>
               </div>
               <div className="flex items-center justify-start flex-wrap	gap-[.6rem]">
-                <ModelTags model={currentWorkflow?.workflow_steps?.model} hideLink hideEndPoints />
+                <ModelTags
+                  model={currentWorkflow?.workflow_steps?.model}
+                  hideLink
+                  hideEndPoints
+                />
               </div>
             </div>
           </div>
@@ -85,7 +91,7 @@ export default function ModelEvaluations({
                     preview={false}
                     src="/images/drawer/calander.png"
                     alt="info"
-                    style={{ width: '.75rem' }}
+                    style={{ width: ".75rem" }}
                   />
                 </div>
                 <Text_12_400_B3B3B3>Updated on</Text_12_400_B3B3B3>
@@ -99,9 +105,7 @@ export default function ModelEvaluations({
             </Text_12_400_B3B3B3>
           </div>
           <div className="px-[1.4rem] pt-[1.2rem]">
-            <Leaderboards runEval={true}
-              model={model}
-            />
+            <Leaderboards runEval={true} model={model} />
           </div>
         </BudDrawerLayout>
       </BudWraperBox>

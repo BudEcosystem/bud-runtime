@@ -16,15 +16,12 @@ export interface BudInputProps {
   style?: React.CSSProperties;
   compId: string;
   errors?: any;
-  rules: FormRule[]
+  rules: FormRule[];
 }
 
 function BudInput(props: BudInputProps) {
-
   return (
-    <Form.Item
-    hasFeedback
-    name={props.name} rules={props.rules}>
+    <Form.Item hasFeedback name={props.name} rules={props.rules}>
       <label className="pb-1 mt-3 block">
         <Text_12_400_787B83 className="pb-1">{props.label}</Text_12_400_787B83>
         <Input

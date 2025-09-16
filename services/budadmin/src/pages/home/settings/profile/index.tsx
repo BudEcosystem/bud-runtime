@@ -8,22 +8,22 @@ import { useUser } from "src/stores/useUser";
 import CustomInput from "src/flows/components/CustomInput";
 import { removeUnderScoreAndCapatalise } from "@/lib/utils";
 
-
 const Profile = () => {
   const { user } = useUser();
   const { isLoading, showLoader, hideLoader } = useLoader();
   const { openDrawer } = useDrawer();
 
-
   return (
-    <div className='pb-[60px] pt-[.5rem] relative CommonCustomPagination'>
+    <div className="pb-[60px] pt-[.5rem] relative CommonCustomPagination">
       <div className="flex flex items-center justify-between w-full">
-        <Text_16_600_FFFFFF className="">Your Profile Information</Text_16_600_FFFFFF>
+        <Text_16_600_FFFFFF className="">
+          Your Profile Information
+        </Text_16_600_FFFFFF>
         <PrimaryButton
           className="bg-[#1E1E2F] text-[#FFFFFF] border border-[#1E1E2F] rounded-[0.5rem] px-[1.5rem] py-[0.5rem] hover:bg-[#1E1E2F] hover:text-[#FFFFFF]"
           text="Edit Profile"
           onClick={() => {
-            openDrawer("edit-profile")
+            openDrawer("edit-profile");
           }}
         />
       </div>
@@ -40,12 +40,12 @@ const Profile = () => {
                   alt="memoji"
                   className="w-full h-full rounded-full"
                   style={{
-                    padding: "1px"
+                    padding: "1px",
                   }}
                 />
               }
               style={{
-                backgroundColor: user?.color || '#965CDE',
+                backgroundColor: user?.color || "#965CDE",
               }}
             />
           </div>
@@ -93,6 +93,6 @@ const Profile = () => {
       </div>
     </div>
   );
-}
+};
 
 export default Profile;

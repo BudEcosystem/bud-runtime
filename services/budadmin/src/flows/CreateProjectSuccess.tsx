@@ -19,13 +19,10 @@ export default function CreateProjectSuccess(props: Props) {
       onBack={() => {
         closeDrawer();
       }}
-
     >
       <BudWraperBox center={true}>
         <BudDrawerLayout>
-          <ProjectSuccessCard
-            text={props.text}
-          />
+          <ProjectSuccessCard text={props.text} />
         </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>

@@ -4,7 +4,6 @@ import { useRouter } from "next/router";
 import Login from "./logIn";
 import SignIn from "./register";
 
-
 const AuthPage = () => {
   const router = useRouter();
   const renderDashboardContent = () => {
@@ -17,11 +16,7 @@ const AuthPage = () => {
         return null;
     }
   };
-  return (
-    <AuthLayout>
-      {renderDashboardContent()}
-    </AuthLayout>
-  );
+  return <AuthLayout>{renderDashboardContent()}</AuthLayout>;
 };
 
 export default AuthPage;

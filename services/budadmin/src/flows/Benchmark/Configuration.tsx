@@ -1,4 +1,3 @@
-
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -18,7 +17,7 @@ export default function Configuration() {
   const { openDrawerWithStep, closeDrawer } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
   const [options, setOptions] = useState([]);
-  const [evalWith, setEvalWith] = useState('Dataset');
+  const [evalWith, setEvalWith] = useState("Dataset");
 
   async function fetchList(tagname) {
     await axiosInstance("/projects/tags?page=1&limit=1000").then((result) => {
@@ -42,17 +41,16 @@ export default function Configuration() {
         max_output_tokens: stepTwoData?.max_output_tokens || "",
       }}
       disableNext={!submittable}
-      onNext={async(values) => {
+      onNext={async (values) => {
         if (!submittable) {
           form.submit();
           return;
-        };
-        stepTwo(values)
-          .then((result) => {
-            if (result) {
-              openDrawerWithStep("Select-Cluster");
-            }
-          })
+        }
+        stepTwo(values).then((result) => {
+          if (result) {
+            openDrawerWithStep("Select-Cluster");
+          }
+        });
       }}
       backText="Back"
       onBack={() => {
@@ -90,7 +88,6 @@ export default function Configuration() {
               infoText="Enter number of tokens"
               InputClasses="py-[.5rem]"
             />
-
           </DrawerCard>
         </BudDrawerLayout>
       </BudWraperBox>

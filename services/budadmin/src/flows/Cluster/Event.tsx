@@ -82,7 +82,7 @@ export default function ClusterEvent() {
       selectedCluster?.id,
       selectedNode.hostname,
       1,
-      50
+      50,
     ).then((response) => {
       setClusterEvents(response?.events || []);
       setLoading(false);
@@ -103,7 +103,10 @@ export default function ClusterEvent() {
     >
       <BudWraperBox>
         <BudDrawerLayout>
-          <DrawerTitleCard title="Event" description="Significant occurrences or activities happening such as status changes, errors, warnings, or informational messages." />
+          <DrawerTitleCard
+            title="Event"
+            description="Significant occurrences or activities happening such as status changes, errors, warnings, or informational messages."
+          />
           <DrawerCard classNames="pb-0">
             <div className="flex flex-col justify-start items-start pt-[1.1rem]">
               {clusterEvents.map((event, index) => (

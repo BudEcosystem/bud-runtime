@@ -11,7 +11,6 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { useRouter } from "next/router";
 
-
 export default function AddWorkerClusterConfiguration() {
   const [selectedCluster, setSelectedCluster] = React.useState<Cluster>();
   const { submittable, values } = useContext(BudFormContext);
@@ -19,7 +18,8 @@ export default function AddWorkerClusterConfiguration() {
   const { createClusterWorkflow } = useCluster();
   const { openDrawerWithStep } = useDrawer();
 
-  const { getWorkflow, workerDetails, completeCreateWorkerFlow } = useDeployModel();
+  const { getWorkflow, workerDetails, completeCreateWorkerFlow } =
+    useDeployModel();
   const { currentWorkflow } = useDeployModel();
   const { getRecommendedClusterById, recommendedCluster } = useCluster();
   const router = useRouter();
@@ -27,10 +27,9 @@ export default function AddWorkerClusterConfiguration() {
 
   useEffect(() => {
     if (currentWorkflow?.workflow_id) {
-      getRecommendedClusterById(currentWorkflow?.workflow_id)
+      getRecommendedClusterById(currentWorkflow?.workflow_id);
     }
-  }, [currentWorkflow?.workflow_id])
-
+  }, [currentWorkflow?.workflow_id]);
 
   return (
     <BudForm
@@ -40,7 +39,10 @@ export default function AddWorkerClusterConfiguration() {
       }}
       disableNext={recommendedCluster?.clusters?.length === 0}
       onNext={async (values) => {
-        const result = await completeCreateWorkerFlow(currentWorkflow?.workflow_id, projectId);
+        const result = await completeCreateWorkerFlow(
+          currentWorkflow?.workflow_id,
+          projectId,
+        );
         if (result) {
           openDrawerWithStep("add-worker-deploy-status");
         }
@@ -52,16 +54,24 @@ export default function AddWorkerClusterConfiguration() {
         // } else {
         //   errorToast("Error creating cluster");
         // }
-
       }}
     >
       <BudWraperBox classNames="mt-[1.6rem]">
         <AddWorkerInfoCard />
         <BudDrawerLayout>
-          <DrawerTitleCard title="Cluster Configuration" description="Best configuration is generated based on the required concurrency" />
+          <DrawerTitleCard
+            title="Cluster Configuration"
+            description="Best configuration is generated based on the required concurrency"
+          />
           <div className="clusterCardWrap w-full ">
             <div className="clusterCard w-full">
-              <ClusterList clusters={recommendedCluster?.clusters} handleClusterSelection={(cluster) => { }} selectedCluster={selectedCluster} hideRank hideSelection />
+              <ClusterList
+                clusters={recommendedCluster?.clusters}
+                handleClusterSelection={(cluster) => {}}
+                selectedCluster={selectedCluster}
+                hideRank
+                hideSelection
+              />
             </div>
           </div>
         </BudDrawerLayout>

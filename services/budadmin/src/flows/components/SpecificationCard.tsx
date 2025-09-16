@@ -13,7 +13,6 @@ export const SpecificationCard = ({
   title: string;
   specifications: SpecificationTableItemProps[];
 }) => {
-
   return (
     <div className="p-[1.35rem] pt-0 flex justify-between items-center flex-wrap gap-y-[1.5rem]">
       {title && (

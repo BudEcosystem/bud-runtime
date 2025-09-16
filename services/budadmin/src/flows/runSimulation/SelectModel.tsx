@@ -16,41 +16,50 @@ export default function SelectModelForEvaluation() {
   const [limit, setLimit] = React.useState(100);
   const [models, setModels] = React.useState([]);
 
-  const {
-    loading,
-    fetchModels
-  } = useModels();
+  const { loading, fetchModels } = useModels();
   const [search, setSearch] = React.useState("");
   const { selectedProjectId } = useProjects();
-  const { selectedModel, currentWorkflow, createWorkflow, updateModel, setSelectedModel } = useDeployModel();
-  const { openDrawerWithStep, openDrawer, setPreviousStep, currentFlow, step } = useDrawer();
+  const {
+    selectedModel,
+    currentWorkflow,
+    createWorkflow,
+    updateModel,
+    setSelectedModel,
+  } = useDeployModel();
+  const { openDrawerWithStep, openDrawer, setPreviousStep, currentFlow, step } =
+    useDrawer();
 
   useEffect(() => {
     fetchModels({
-      page, limit,
-      table_source: "model"
+      page,
+      limit,
+      table_source: "model",
     }).then((data) => {
       setModels(data);
     });
   }, [page]);
 
   const filteredModels = models?.filter((model) => {
-    return model.name?.toLowerCase().includes(search.toLowerCase()) || model.tags?.some((task) => task?.name?.toLowerCase().includes(search.toLowerCase())) || `${model.model_size}`.includes(search.toLowerCase());
+    return (
+      model.name?.toLowerCase().includes(search.toLowerCase()) ||
+      model.tags?.some((task) =>
+        task?.name?.toLowerCase().includes(search.toLowerCase()),
+      ) ||
+      `${model.model_size}`.includes(search.toLowerCase())
+    );
   });
-
 
   return (
     <BudForm
       data={{}}
       onBack={async () => {
-        openDrawerWithStep('additional-settingse')
+        openDrawerWithStep("additional-settingse");
       }}
-      onNext={async ()=> {
-        openDrawerWithStep('model-quantisation')
+      onNext={async () => {
+        openDrawerWithStep("model-quantisation");
       }}
       nextText="Next"
     >
-
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard

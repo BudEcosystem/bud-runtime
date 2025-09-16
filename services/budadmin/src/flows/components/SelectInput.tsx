@@ -30,7 +30,9 @@ function SelectInput(props: SelectInputProps) {
       className={props.formItemClassnames}
       hasFeedback
     >
-      <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0] ${props.ClassNames}`}>
+      <div
+        className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0] ${props.ClassNames}`}
+      >
         <div className="w-full">
           <Text_12_300_EEEEEE className="absolute h-[3px] bg-[#0d0d0d] top-[0rem] left-[.75rem] px-[0.025rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap bg-[#0d0d0d] pl-[.35rem] pr-[.55rem]">
             {props.label}
@@ -43,7 +45,7 @@ function SelectInput(props: SelectInputProps) {
                   src="/images/info.png"
                   preview={false}
                   alt="info"
-                  style={{ width: '.75rem', height: '.75rem' }}
+                  style={{ width: ".75rem", height: ".75rem" }}
                 />
               </CustomPopover>
             )}
@@ -53,7 +55,7 @@ function SelectInput(props: SelectInputProps) {
           <ConfigProvider
             theme={{
               token: {
-                colorTextPlaceholder: '#808080',
+                colorTextPlaceholder: "#808080",
               },
             }}
           >
@@ -64,7 +66,7 @@ function SelectInput(props: SelectInputProps) {
                 color: "#EEEEEE",
                 border: "0.5px solid #757575",
                 width: "100%",
-                ...props.style
+                ...props.style,
               }}
               disabled={props.disabled}
               size="large"
@@ -73,14 +75,16 @@ function SelectInput(props: SelectInputProps) {
               onChange={props.onChange}
               mode={props.mode}
               tagRender={props.tagRender}
-              suffixIcon={props.suffixIcon || (
-                <Image
-                  src="/images/icons/dropD.png"
-                  preview={false}
-                  alt="dropdown"
-                  style={{ width: 'auto', height: 'auto' }}
-                />
-              )}
+              suffixIcon={
+                props.suffixIcon || (
+                  <Image
+                    src="/images/icons/dropD.png"
+                    preview={false}
+                    alt="dropdown"
+                    style={{ width: "auto", height: "auto" }}
+                  />
+                )
+              }
             />
           </ConfigProvider>
         </div>

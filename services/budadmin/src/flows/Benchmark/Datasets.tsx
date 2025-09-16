@@ -169,8 +169,8 @@ function CardWithCheckBox({
 
 export default function Datasets() {
   const [filterOpen, setFilterOpen] = React.useState(false);
-  const [order, setOrder] = useState<'-' | ''>('-');
-  const [orderBy, setOrderBy] = useState<string>('created_at');
+  const [order, setOrder] = useState<"-" | "">("-");
+  const [orderBy, setOrderBy] = useState<string>("created_at");
   const [currentPage, setPage] = React.useState(1);
   const [pageSize, setLimit] = React.useState(1000);
   const [models, setModels] = React.useState([]);
@@ -194,23 +194,19 @@ export default function Datasets() {
     name?: string;
   }>(defaultFilter);
 
-
   const load = useCallback(async () => {
-    getDataset(
-      {
-        ...filter,
-        page: currentPage,
-        limit: pageSize,
-        name: searchValue ? searchValue : undefined,
-        search: !!searchValue,
-        order_by: `${order}${orderBy}`,
-      }
-    );
+    getDataset({
+      ...filter,
+      page: currentPage,
+      limit: pageSize,
+      name: searchValue ? searchValue : undefined,
+      search: !!searchValue,
+      order_by: `${order}${orderBy}`,
+    });
   }, [currentPage, pageSize, searchValue]);
 
-
   useEffect(() => {
-    load()
+    load();
   }, []);
 
   useEffect(() => {
@@ -219,7 +215,6 @@ export default function Datasets() {
   useEffect(() => {
     console.log("selectedDataset", selectedDataset);
   }, [selectedDataset]);
-
 
   const handleOpenChange = (open) => {
     setFilterOpen(open);
@@ -448,7 +443,7 @@ export default function Datasets() {
                       setSelectedDataset(data);
                     }}
                     selected={selectedDataset?.some(
-                      (selected) => selected.id === data.id
+                      (selected) => selected.id === data.id,
                     )}
                   />
                 ))}
