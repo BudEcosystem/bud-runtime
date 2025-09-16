@@ -154,7 +154,7 @@ class SimulationWorkflows:
                             )
 
                         for engine_device_combo in compatible_engines:
-                            if device_type.lower() == engine_device_combo["device"].lower():
+                            if device_type.lower() == engine_device_combo["device"]:
                                 devices_found += 1
                                 # Prepare device config with proper memory conversion
                                 device_config = deepcopy(device)
