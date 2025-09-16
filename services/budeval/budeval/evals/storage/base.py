@@ -63,3 +63,7 @@ class StorageAdapter(ABC):
         Returns:
             True if results exist, False otherwise
         """
+
+    @abstractmethod
+    async def get_job_record(self, job_id: str) -> Optional[Dict]:
+        """Retrieve the raw evaluation job record for a job id."""

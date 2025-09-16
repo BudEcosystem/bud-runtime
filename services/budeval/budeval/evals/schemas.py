@@ -101,6 +101,26 @@ class EvaluationResults(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+class EvaluationJobRecord(BaseModel):
+    """Schema describing a single row from budeval.evaluation_jobs."""
+
+    job_id: str
+    experiment_id: str | None = None
+    model_name: str
+    engine: str
+    status: str | None = None
+    job_start_time: datetime | None = None
+    job_end_time: datetime | None = None
+    job_duration_seconds: float | None = None
+    overall_accuracy: float | None = None
+    total_datasets: int | None = None
+    total_examples: int | None = None
+    total_correct: int | None = None
+    extracted_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 # Legacy compatibility schemas for existing APIs
 class EvalModelInfo(BaseModel):
     """Legacy model info structure for backward compatibility."""

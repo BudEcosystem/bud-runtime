@@ -186,6 +186,49 @@ class ClickHouseStorage(StorageAdapter):
             logger.error(f"Failed to get results for job {job_id}: {e}")
             return None
 
+    async def get_job_record(self, job_id: str) -> Optional[Dict]:
+        """Retrieve the raw evaluation job row for a given job id."""
+        try:
+            async with self.get_connection() as conn, conn.cursor() as cursor:
+                query = """
+                    SELECT job_id, experiment_id, model_name, engine, status,
+                           job_start_time, job_end_time, job_duration_seconds,
+                           overall_accuracy, total_datasets, total_examples, total_correct,
+                           extracted_at, created_at, updated_at
+                    FROM budeval.evaluation_jobs
+                    WHERE job_id = %(job_id)s
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    """
+
+                await cursor.execute(query, {"job_id": job_id})
+                row = await cursor.fetchone()
+
+                if not row:
+                    return None
+
+                return {
+                    "job_id": row[0],
+                    "experiment_id": row[1],
+                    "model_name": row[2],
+                    "engine": row[3],
+                    "status": row[4],
+                    "job_start_time": row[5],
+                    "job_end_time": row[6],
+                    "job_duration_seconds": float(row[7]) if row[7] is not None else None,
+                    "overall_accuracy": float(row[8]) if row[8] is not None else None,
+                    "total_datasets": int(row[9]) if row[9] is not None else None,
+                    "total_examples": int(row[10]) if row[10] is not None else None,
+                    "total_correct": int(row[11]) if row[11] is not None else None,
+                    "extracted_at": row[12],
+                    "created_at": row[13],
+                    "updated_at": row[14],
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to get job record for {job_id}: {e}")
+            return None
+
     async def delete_results(self, job_id: str) -> bool:
         """Delete evaluation results for a job."""
         try:

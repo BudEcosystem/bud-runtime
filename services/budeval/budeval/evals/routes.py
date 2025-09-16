@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from budeval.evals.schemas import JobStatusResponse, LegacyEvaluationRequest
+from budeval.evals.schemas import EvaluationJobRecord, JobStatusResponse, LegacyEvaluationRequest
 from budeval.evals.services import EvaluationOpsService
 from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
 from budeval.evals.workflows import EvaluationWorkflow
@@ -81,6 +81,28 @@ async def get_job_status(
     except Exception as e:
         logger.error(f"Error getting job status for {job_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get job status: {str(e)}") from e
+
+
+@evals_routes.get("/jobs/{job_id}", response_model=EvaluationJobRecord)
+@evaluations_routes.get("/jobs/{job_id}", response_model=EvaluationJobRecord)
+async def get_evaluation_job(job_id: str) -> EvaluationJobRecord:
+    """Return the stored evaluation_jobs row for a specific job identifier."""
+    try:
+        storage = get_storage_adapter()
+        await initialize_storage(storage)
+
+        record = await storage.get_job_record(job_id)
+
+        if not record:
+            raise HTTPException(status_code=404, detail=f"Job not found for job_id: {job_id}")
+
+        return EvaluationJobRecord(**record)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving job record for {job_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get job record: {str(e)}") from e
 
 
 @evals_routes.delete("/cleanup/{job_id}")
