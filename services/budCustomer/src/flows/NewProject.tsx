@@ -218,28 +218,22 @@ export default function NewProject() {
                   },
                   {
                     pattern: projectNameRegex,
-                    message: "Project name should contain only alphanumeric characters, spaces, hyphens, and underscores",
+                    message:
+                      "Project name should contain only alphanumeric characters, spaces, hyphens, and underscores",
                   },
                   {
                     validator: (_, value) => {
                       if (value && value.trim().length === 0) {
-                        return Promise.reject(new Error("Project name cannot be only spaces"));
+                        return Promise.reject(
+                          new Error("Project name cannot be only spaces"),
+                        );
                       }
                       return Promise.resolve();
                     },
                   },
                 ]}
               />
-              <div className="flex justify-start items-center px-[.65rem] mb-[1.65rem] mt-4">
-                <Icon
-                  icon="ph:calendar"
-                  className="text-bud-text-disabled mr-2 text-[0.875rem]"
-                />
-                <Text_12_400_B3B3B3>Created on&nbsp;&nbsp;</Text_12_400_B3B3B3>
-                <Text_12_400_EEEEEE>
-                  {dayjs().format("DD MMM, YYYY")}
-                </Text_12_400_EEEEEE>
-              </div>
+
               <TagsInput
                 label="Tags"
                 required

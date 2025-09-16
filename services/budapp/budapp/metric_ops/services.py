@@ -268,6 +268,15 @@ class BudMetricService(SessionMixin):
 
             # Log the request data for debugging
             logger.info(f"CLIENT user inference request - api_key_project_id filter: {api_key_project_id_value}")
+        else:
+            # For ADMIN users, ensure filters dictionary exists if we need it
+            if request_data.get("filters") is None:
+                request_data["filters"] = {}
+
+            # Log the request data for debugging
+            logger.info(
+                f"ADMIN user inference request - project_id: {request.project_id}, filters: {request_data.get('filters', {})}"
+            )
 
         # Proxy request to budmetrics
         metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/inferences/list"

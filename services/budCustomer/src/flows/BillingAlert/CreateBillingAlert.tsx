@@ -19,14 +19,14 @@ export default function CreateBillingAlert() {
   const [alertType, setAlertType] = useState<"token_usage" | "cost_usage">(
     "cost_usage",
   );
-  const [alertThreshold, setAlertThreshold] = useState(75);
+  const [alertThreshold, setAlertThreshold] = useState<number | null>(null);
 
   const handleCreate = async () => {
     if (!alertName.trim()) {
       return;
     }
 
-    if (alertThreshold < 1 || alertThreshold > 100) {
+    if (!alertThreshold || alertThreshold < 1 || alertThreshold > 100) {
       return;
     }
 
@@ -77,6 +77,14 @@ export default function CreateBillingAlert() {
                   {
                     validator: (_, value) => {
                       if (!value) return Promise.resolve();
+
+                      // Check if first character is 0
+                      if (value.trim().startsWith('0')) {
+                        return Promise.reject(
+                          "Alert name cannot start with 0"
+                        );
+                      }
+
                       const existingAlert = alerts.find(
                         (alert) =>
                           alert.name.toLowerCase() ===
@@ -122,7 +130,7 @@ export default function CreateBillingAlert() {
                   name="threshold"
                   label="Threshold (%)"
                   type="number"
-                  value={alertThreshold.toString()}
+                  value={alertThreshold ? alertThreshold.toString() : ""}
                   placeholder="Enter threshold percentage (1-100)"
                   allowOnlyNumbers={true}
                   rules={[
@@ -141,16 +149,22 @@ export default function CreateBillingAlert() {
                   ]}
                   suffix={<span className="text-[#757575] text-xs">%</span>}
                   onChange={(value) => {
+                    if (!value) {
+                      setAlertThreshold(null);
+                      return;
+                    }
                     let numValue = Number(value);
                     if (numValue > 100) numValue = 100;
                     if (numValue < 0) numValue = 0;
                     setAlertThreshold(numValue);
                   }}
                 />
-                <Text_12_400_B3B3B3>
-                  You&apos;ll be notified when usage reaches {alertThreshold}%
-                  of your quota
-                </Text_12_400_B3B3B3>
+                {alertThreshold !== null && alertThreshold > 0 && (
+                  <Text_12_400_B3B3B3>
+                    You&apos;ll be notified when usage reaches {alertThreshold}%
+                    of your quota
+                  </Text_12_400_B3B3B3>
+                )}
               </div>
             </div>
           </DrawerCard>

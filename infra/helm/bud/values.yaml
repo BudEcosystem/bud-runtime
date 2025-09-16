@@ -162,6 +162,24 @@ microservices:
     budnotify:
         image: budstudio/budnotify:nightly
         daprid: budnotify
+    budprompt:
+        daprid: budprompt
+        image: budstudio/budprompt:nightly
+        env:
+            LOG_LEVEL: INFO
+            BUD_GATEWAY_BASE_URL: http://20.66.97.208/v1
+            BUD_DEFAULT_MODEL_NAME: qwen3-32b
+
+            PSQL_HOST: "{{ $.Release.Name }}-postgresql"
+            PSQL_PORT: "5432"
+            PSQL_USER: budprompt
+            PSQL_PASSWORD: budprompt
+            PSQL_DB_NAME: budprompt
+
+            REDIS_HOST: "{{ .Release.Name }}-valkey-primary"
+            REDIS_PORT: "6379"
+            REDIS_DB_INDEX: "10"
+            REDIS_PASSWORD: "{{ .Values.valkey.auth.password }}"
     global:
         env:
             PROMETHEUS_URL: https://metric.bud.studio
@@ -308,6 +326,7 @@ postgresqlExtra:
         - budmodel
         - budsim
         - budeval
+        - budprompt
 
 keycloak:
     proxy: edge

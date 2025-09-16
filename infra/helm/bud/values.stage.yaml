@@ -26,3 +26,5 @@ microservices:
         image: budstudio/budcustomer:nightly
     budnotify:
         image: budstudio/budnotify:nightly
+    budprompt:
+        image: budstudio/budprompt:nightly

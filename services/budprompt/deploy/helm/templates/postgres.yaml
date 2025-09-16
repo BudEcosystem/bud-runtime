@@ -1,0 +1,76 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+      - name: postgresql
+        image: postgres:latest
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: {{ .Values.env.PSQL_USER }}
+        - name: POSTGRES_PASSWORD
+          value: {{ .Values.env.PSQL_PASSWORD }}
+        - name: POSTGRES_DB
+          value: {{ .Values.env.PSQL_DB }}
+        volumeMounts:
+        - name: postgresql-data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: postgresql-data
+        persistentVolumeClaim:
+          claimName: "{{ .Values.name }}-postgresql-database-data-pvc"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-service
+  namespace: {{ .Values.namespace }}
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgresql
+  type: ClusterIP
+---
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: "{{ .Values.name }}-postgresql-pv"
+  namespace: {{ .Values.namespace }}
+spec:
+  capacity:
+    storage: {{ .Values.postgres.storage_size }}
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  hostPath:
+    path: {{ .Values.postgres.host_path }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "{{ .Values.name }}-postgresql-database-data-pvc"
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.postgres.storage_size | default "10Gi" }}
+  storageClassName: "local-path"
