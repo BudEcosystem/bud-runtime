@@ -2573,12 +2573,6 @@ class EvaluationWorkflowService:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
             workflow = cast(WorkflowModel, workflow)
 
-            # Verify workflow belongs to this experiment
-            if not workflow.title.endswith(str(experiment_id)):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, detail="Workflow does not belong to this experiment"
-                )
-
             # Return unified workflow response
             return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
 
