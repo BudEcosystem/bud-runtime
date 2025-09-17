@@ -33,7 +33,7 @@ interface EvaluationCard {
 }
 
 const Evaluations = () => {
-  const [activeTab, setActiveTab] = useState("3");
+  const [activeTab, setActiveTab] = useState("1");
   const router = useRouter();
   const { openDrawer } = useDrawer();
   const [searchValue, setSearchValue] = useState("");
@@ -151,6 +151,42 @@ const Evaluations = () => {
             tabBarExtraContent={operations}
             className="h-full"
             items={[
+              // {
+              //   label: (
+              //     <div className="flex items-center gap-[0.375rem]">
+              //       <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
+              //         <Image
+              //           preview={false}
+              //           className=""
+              //           style={{ width: "auto", height: "0.875rem" }}
+              //           src="/images/evaluations/icons/summary.svg"
+              //           alt="Logo"
+              //         />
+              //       </div>
+              //       <Text_14_600_B3B3B3>Summary</Text_14_600_B3B3B3>
+              //     </div>
+              //   ),
+              //   key: "1",
+              //   children: <EvaluationSumary />,
+              // },
+              // {
+              //   label: (
+              //     <div className="flex items-center gap-[0.375rem]">
+              //       <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
+              //         <Image
+              //           preview={false}
+              //           className=""
+              //           style={{ width: "auto", height: "0.875rem" }}
+              //           src="/images/evaluations/icons/leaderboard.svg"
+              //           alt="Logo"
+              //         />
+              //       </div>
+              //       <Text_14_600_B3B3B3>Leaderboard</Text_14_600_B3B3B3>
+              //     </div>
+              //   ),
+              //   key: "2",
+              //   children: <></>,
+              // },
               {
                 label: (
                   <div className="flex items-center gap-[0.375rem]">
@@ -159,33 +195,15 @@ const Evaluations = () => {
                         preview={false}
                         className=""
                         style={{ width: "auto", height: "0.875rem" }}
-                        src="/images/evaluations/icons/summary.svg"
+                        src="/images/evaluations/icons/evaluations.svg"
                         alt="Logo"
                       />
                     </div>
-                    <Text_14_600_B3B3B3>Summary</Text_14_600_B3B3B3>
+                    <Text_14_600_B3B3B3>Evaluations</Text_14_600_B3B3B3>
                   </div>
                 ),
                 key: "1",
-                children: <EvaluationSumary />,
-              },
-              {
-                label: (
-                  <div className="flex items-center gap-[0.375rem]">
-                    <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
-                      <Image
-                        preview={false}
-                        className=""
-                        style={{ width: "auto", height: "0.875rem" }}
-                        src="/images/evaluations/icons/leaderboard.svg"
-                        alt="Logo"
-                      />
-                    </div>
-                    <Text_14_600_B3B3B3>Leaderboard</Text_14_600_B3B3B3>
-                  </div>
-                ),
-                key: "2",
-                children: <></>,
+                children: <EvaluationList />,
               },
               {
                 label: (
@@ -202,45 +220,28 @@ const Evaluations = () => {
                     <Text_14_600_B3B3B3>Experiments</Text_14_600_B3B3B3>
                   </div>
                 ),
-                key: "3",
+                key: "2",
                 children: <ExperimentsTable />,
               },
-              {
-                label: (
-                  <div className="flex items-center gap-[0.375rem]">
-                    <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
-                      <Image
-                        preview={false}
-                        className=""
-                        style={{ width: "auto", height: "0.875rem" }}
-                        src="/images/evaluations/icons/evaluations.svg"
-                        alt="Logo"
-                      />
-                    </div>
-                    <Text_14_600_B3B3B3>Evaluations</Text_14_600_B3B3B3>
-                  </div>
-                ),
-                key: "4",
-                children: <EvaluationList />,
-              },
-              {
-                label: (
-                  <div className="flex items-center gap-[0.375rem]">
-                    <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
-                      <Image
-                        preview={false}
-                        className=""
-                        style={{ width: "auto", height: "0.875rem" }}
-                        src="/images/evaluations/icons/redTeam.svg"
-                        alt="Logo"
-                      />
-                    </div>
-                    <Text_14_600_B3B3B3>Red Team</Text_14_600_B3B3B3>
-                  </div>
-                ),
-                key: "5",
-                children: <></>,
-              },
+
+              // {
+              //   label: (
+              //     <div className="flex items-center gap-[0.375rem]">
+              //       <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
+              //         <Image
+              //           preview={false}
+              //           className=""
+              //           style={{ width: "auto", height: "0.875rem" }}
+              //           src="/images/evaluations/icons/redTeam.svg"
+              //           alt="Logo"
+              //         />
+              //       </div>
+              //       <Text_14_600_B3B3B3>Red Team</Text_14_600_B3B3B3>
+              //     </div>
+              //   ),
+              //   key: "5",
+              //   children: <></>,
+              // },
             ]}
           />
         </div>
