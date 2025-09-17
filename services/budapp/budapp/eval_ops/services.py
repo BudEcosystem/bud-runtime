@@ -1544,10 +1544,10 @@ class ExperimentWorkflowService:
             if request.step_number == 5 and request.trigger_workflow:
                 await self._create_experiment_from_workflow(workflow.id, current_user_id)
                 # Mark workflow as completed
-                await WorkflowDataManager(self.session).update_by_fields(
-                    workflow,
-                    {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
-                )
+                # await WorkflowDataManager(self.session).update_by_fields(
+                #     workflow,
+                #     {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
+                # )
 
                 # if experiment_id, then call the eval workflow
                 # if experiment_id:
