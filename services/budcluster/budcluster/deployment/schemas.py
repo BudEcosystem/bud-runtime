@@ -82,6 +82,7 @@ class CommonDeploymentParams(BaseModel):
     simulator_id: Optional[UUID] = None
     endpoint_name: str
     model: str
+    model_size: Optional[int] = None
     concurrency: int
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
