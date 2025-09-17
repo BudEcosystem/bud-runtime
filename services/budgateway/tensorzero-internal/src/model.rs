@@ -26,8 +26,8 @@ use crate::inference::providers::aws_sagemaker::AWSSagemakerProvider;
 use crate::inference::providers::dummy::DummyProvider;
 use crate::inference::providers::google_ai_studio_gemini::GoogleAIStudioGeminiProvider;
 
-use crate::inference::providers::helpers::peek_first_chunk;
 use crate::inference::providers::buddoc::BudDocProvider;
+use crate::inference::providers::helpers::peek_first_chunk;
 use crate::inference::providers::hyperbolic::HyperbolicProvider;
 use crate::inference::providers::provider_trait::WrappedProvider;
 use crate::inference::providers::sglang::SGLangProvider;
@@ -1609,7 +1609,8 @@ pub(super) enum UninitializedProviderConfig {
     },
     BudDoc {
         model_name: String,
-        api_url: Url,
+        api_base: Url,
+        api_key_location: Option<CredentialLocation>,
     },
     #[strum(serialize = "gcp_vertex_anthropic")]
     #[serde(rename = "gcp_vertex_anthropic")]
@@ -1768,9 +1769,14 @@ impl UninitializedProviderConfig {
                 endpoint,
                 api_key_location,
             )?),
-            UninitializedProviderConfig::BudDoc { model_name: _, api_url } => {
-                ProviderConfig::BudDoc(BudDocProvider::new(api_url.to_string()))
-            }
+            UninitializedProviderConfig::BudDoc {
+                model_name: _,
+                api_base,
+                api_key_location,
+            } => ProviderConfig::BudDoc(BudDocProvider::new(
+                api_base.to_string(),
+                api_key_location,
+            )?),
             UninitializedProviderConfig::Fireworks {
                 model_name,
                 api_key_location,
@@ -2146,11 +2152,9 @@ impl ModelProvider {
                     .start_batch_inference(requests, client, api_keys)
                     .await
             }
-            ProviderConfig::BudDoc(_) => {
-                Err(Error::new(ErrorDetails::Config {
-                    message: "BudDoc provider does not support batch inference".to_string(),
-                }))
-            }
+            ProviderConfig::BudDoc(_) => Err(Error::new(ErrorDetails::Config {
+                message: "BudDoc provider does not support batch inference".to_string(),
+            })),
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
@@ -2257,11 +2261,9 @@ impl ModelProvider {
                     .poll_batch_inference(batch_request, http_client, dynamic_api_keys)
                     .await
             }
-            ProviderConfig::BudDoc(_) => {
-                Err(Error::new(ErrorDetails::Config {
-                    message: "BudDoc provider does not support batch inference".to_string(),
-                }))
-            }
+            ProviderConfig::BudDoc(_) => Err(Error::new(ErrorDetails::Config {
+                message: "BudDoc provider does not support batch inference".to_string(),
+            })),
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
@@ -4414,7 +4416,7 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
-            pricing: None,
+                pricing: None,
             },
         );
         models.insert(
@@ -4426,7 +4428,7 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
-            pricing: None,
+                pricing: None,
             },
         );
         models.insert(
@@ -4438,7 +4440,7 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
-            pricing: None,
+                pricing: None,
             },
         );
 
@@ -4491,7 +4493,7 @@ mod tests {
                         fallback_models: None,
                         retry_config: None,
                         rate_limits: None,
-            pricing: None,
+                        pricing: None,
                     },
                 );
 

@@ -3934,10 +3934,10 @@ mod tests {
 
     #[test]
     fn test_embedding_database_insert_creation() {
-        use std::collections::HashMap;
-        use uuid::Uuid;
         use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
         use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
+        use std::collections::HashMap;
+        use uuid::Uuid;
 
         let inference_id = Uuid::now_v7();
         let embeddings = vec![vec![0.1, 0.2, 0.3], vec![0.4, 0.5, 0.6]];
@@ -3973,7 +3973,8 @@ mod tests {
             extra_headers: Default::default(),
         };
 
-        let database_insert = EmbeddingInferenceDatabaseInsert::new(embedding_result, input, metadata);
+        let database_insert =
+            EmbeddingInferenceDatabaseInsert::new(embedding_result, input, metadata);
 
         assert_eq!(database_insert.id, inference_id);
         assert_eq!(database_insert.function_name, "test-embedding-function");
@@ -3986,10 +3987,10 @@ mod tests {
 
     #[test]
     fn test_audio_transcription_database_insert_creation() {
-        use std::collections::HashMap;
-        use uuid::Uuid;
         use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
         use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
+        use std::collections::HashMap;
+        use uuid::Uuid;
 
         let inference_id = Uuid::now_v7();
 
@@ -4029,7 +4030,10 @@ mod tests {
 
         assert_eq!(database_insert.id, inference_id);
         assert_eq!(database_insert.function_name, "test-transcription-function");
-        assert_eq!(database_insert.audio_type as u8, AudioType::Transcription as u8);
+        assert_eq!(
+            database_insert.audio_type as u8,
+            AudioType::Transcription as u8
+        );
         assert_eq!(database_insert.input, "test_audio.wav");
         assert_eq!(database_insert.output, "Hello world transcription");
         assert_eq!(database_insert.language, Some("en".to_string()));
@@ -4039,10 +4043,10 @@ mod tests {
 
     #[test]
     fn test_moderation_database_insert_creation() {
-        use std::collections::HashMap;
-        use uuid::Uuid;
         use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
         use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
+        use std::collections::HashMap;
+        use uuid::Uuid;
 
         let inference_id = Uuid::now_v7();
 

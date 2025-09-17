@@ -26,7 +26,8 @@ repos:
               services/.*/charts/.*/templates/.*\.yaml|
               services/.*/examples/.*/templates/.*\.yaml|
               services/budnotify/deploy/kubernetes/.*\.yaml|
-              .*\.minijinja$
+              .*\.minijinja$|
+              services/budprompt/deploy/helm/templates/.*\.yaml
           )$
       - id: detect-private-key
         exclude: |

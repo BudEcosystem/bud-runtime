@@ -5,20 +5,81 @@ use crate::documents::{
 use crate::endpoints::inference::InferenceCredentials;
 use crate::error::{Error, ErrorDetails};
 use crate::inference::types::{Latency, Usage};
+use crate::model::{Credential, CredentialLocation};
 use reqwest::Client;
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct BudDocProvider {
-    pub api_url: String,
+    pub api_base: String,
+    pub credentials: BudDocCredentials,
 }
 
 impl BudDocProvider {
-    pub fn new(api_url: String) -> Self {
-        Self { api_url }
+    pub fn new(
+        api_base: String,
+        api_key_location: Option<CredentialLocation>,
+    ) -> Result<Self, Error> {
+        let credentials = if let Some(location) = api_key_location {
+            BudDocCredentials::try_from(
+                Credential::try_from((location, "BudDoc"))?,
+            )?
+        } else {
+            BudDocCredentials::None
+        };
+        Ok(Self {
+            api_base,
+            credentials,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum BudDocCredentials {
+    Static(SecretString),
+    Dynamic(String),
+    None,
+}
+
+impl TryFrom<Credential> for BudDocCredentials {
+    type Error = Error;
+
+    fn try_from(credentials: Credential) -> Result<Self, Error> {
+        match credentials {
+            Credential::Static(key) => Ok(BudDocCredentials::Static(key)),
+            Credential::Dynamic(key_name) => Ok(BudDocCredentials::Dynamic(key_name)),
+            Credential::None | Credential::Missing => Ok(BudDocCredentials::None),
+            _ => Err(Error::new(ErrorDetails::Config {
+                message: "Invalid api_key_location for BudDoc provider".to_string(),
+            })),
+        }
+    }
+}
+
+impl BudDocCredentials {
+    pub fn get_api_key<'a>(
+        &self,
+        dynamic_api_keys: &'a InferenceCredentials,
+    ) -> Option<&'a SecretString> {
+        match self {
+            BudDocCredentials::Static(_api_key) => {
+                // For static credentials, we need to return a reference from dynamic_api_keys
+                // This is a workaround - ideally we'd store the static key differently
+                None
+            }
+            BudDocCredentials::Dynamic(key_name) => dynamic_api_keys.get(key_name),
+            BudDocCredentials::None => None,
+        }
+    }
+
+    pub fn get_static_api_key(&self) -> Option<&SecretString> {
+        match self {
+            BudDocCredentials::Static(api_key) => Some(api_key),
+            _ => None,
+        }
     }
 }
 
@@ -95,18 +156,27 @@ impl DocumentProcessingProvider for BudDocProvider {
         })?;
 
         // Build the request (ensure no double slashes)
-        let url = if self.api_url.ends_with('/') {
-            format!("{}documents/ocr", self.api_url)
+        let url = if self.api_base.ends_with('/') {
+            format!("{}documents/ocr", self.api_base)
         } else {
-            format!("{}/documents/ocr", self.api_url)
+            format!("{}/documents/ocr", self.api_base)
         };
-        let mut req_builder = client
-            .post(url)
-            .json(&buddoc_request);
+        let mut req_builder = client.post(url).json(&buddoc_request);
 
-        // Add authorization header if API key is available
-        if let Some(api_key) = dynamic_api_keys.get(&self.api_url) {
-            req_builder = req_builder.header("Authorization", format!("Bearer {}", api_key.expose_secret()));
+        // Add authorization header based on credentials
+        // First check for dynamic API key
+        if let Some(api_key) = self.credentials.get_api_key(dynamic_api_keys) {
+            req_builder = req_builder.header(
+                "Authorization",
+                format!("Bearer {}", api_key.expose_secret()),
+            );
+        }
+        // Then check for static API key
+        else if let Some(api_key) = self.credentials.get_static_api_key() {
+            req_builder = req_builder.header(
+                "Authorization",
+                format!("Bearer {}", api_key.expose_secret()),
+            );
         }
 
         // Send the request
@@ -133,10 +203,7 @@ impl DocumentProcessingProvider for BudDocProvider {
 
         if !status.is_success() {
             return Err(Error::new(ErrorDetails::InferenceServer {
-                message: format!(
-                    "BudDoc returned error status {}: {}",
-                    status, raw_response
-                ),
+                message: format!("BudDoc returned error status {}: {}", status, raw_response),
                 provider_type: "BudDoc".to_string(),
                 raw_request: Some(raw_request.clone()),
                 raw_response: Some(raw_response.clone()),
@@ -144,11 +211,12 @@ impl DocumentProcessingProvider for BudDocProvider {
         }
 
         // Parse the response
-        let buddoc_response: BudDocOCRResponse = serde_json::from_str(&raw_response).map_err(|e| {
-            Error::new(ErrorDetails::Serialization {
-                message: format!("Failed to parse BudDoc response: {}", e),
-            })
-        })?;
+        let buddoc_response: BudDocOCRResponse =
+            serde_json::from_str(&raw_response).map_err(|e| {
+                Error::new(ErrorDetails::Serialization {
+                    message: format!("Failed to parse BudDoc response: {}", e),
+                })
+            })?;
 
         // Calculate latency
         let latency = Latency::NonStreaming {

@@ -123,7 +123,18 @@ class AppConfig(BaseAppConfig):
     bud_simulator_app_id: str = Field(alias="BUD_SIMULATOR_APP_ID")
     bud_metrics_app_id: str = Field(alias="BUD_METRICS_APP_ID")
     bud_notify_app_id: str = Field(alias="BUD_NOTIFY_APP_ID")
+    bud_doc_service_url: str = Field(
+        default="http://buddoc:9081",
+        description="BudDoc service URL for document processing",
+        alias="BUD_DOC_SERVICE_URL",
+    )
+    bud_doc_api_key_location: str = Field(
+        default="dynamic::authorization",
+        description="API key location for BudDoc provider (e.g., 'dynamic::authorization', 'env::BUDDOC_API_KEY', 'none')",
+        alias="BUD_DOC_API_KEY_LOCATION",
+    )
     bud_eval_app_id: str = Field(alias="BUD_EVAL_APP_ID", default="budeval")
+    bud_prompt_app_id: str = Field(alias="BUD_PROMPT_APP_ID")
     source_topic: str = Field(alias="SOURCE_TOPIC", default="budAppMessages")
 
     # Prometheus URL

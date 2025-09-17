@@ -227,24 +227,32 @@ pub async fn inference_handler(
         } => {
             // Extract model latency from the result (using the first model inference result) before moving result
             let model_latency_ms = match &result {
-                InferenceResult::Chat(chat_result) => {
-                    chat_result.model_inference_results.first()
-                        .and_then(|r| match &r.latency {
-                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Batch => None,
-                        })
-                        .unwrap_or(0)
-                },
-                InferenceResult::Json(json_result) => {
-                    json_result.model_inference_results.first()
-                        .and_then(|r| match &r.latency {
-                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Batch => None,
-                        })
-                        .unwrap_or(0)
-                },
+                InferenceResult::Chat(chat_result) => chat_result
+                    .model_inference_results
+                    .first()
+                    .and_then(|r| match &r.latency {
+                        crate::inference::types::Latency::NonStreaming { response_time } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Streaming { response_time, .. } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Batch => None,
+                    })
+                    .unwrap_or(0),
+                InferenceResult::Json(json_result) => json_result
+                    .model_inference_results
+                    .first()
+                    .and_then(|r| match &r.latency {
+                        crate::inference::types::Latency::NonStreaming { response_time } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Streaming { response_time, .. } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Batch => None,
+                    })
+                    .unwrap_or(0),
                 // For other result types, we don't have model_inference_results, so default to 0
                 _ => 0,
             };
@@ -659,15 +667,16 @@ pub async fn inference(
                 };
 
                 // Get model pricing from the result
-                let model_pricing = if let Some(first_result) = result.model_inference_results().first() {
-                    // Look up the model config to get pricing
-                    match models.get(&first_result.model_name).await {
-                        Ok(Some(model)) => model.pricing.clone(),
-                        _ => None,
-                    }
-                } else {
-                    None
-                };
+                let model_pricing =
+                    if let Some(first_result) = result.model_inference_results().first() {
+                        // Look up the model config to get pricing
+                        match models.get(&first_result.model_name).await {
+                            Ok(Some(model)) => model.pricing.clone(),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
 
                 Some(WriteInfo {
                     resolved_input: resolved_input.clone(),
@@ -1117,45 +1126,48 @@ pub async fn write_inference(
             }
             InferenceResult::TextToSpeech(result) => {
                 // Extract the text input from the input
-                let text_input = input.messages.first()
+                let text_input = input
+                    .messages
+                    .first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
-                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        ResolvedInputMessageContent::Text { value } => {
+                            value.as_str().map(|s| s.to_string())
+                        }
                         _ => None,
                     })
                     .unwrap_or_else(|| "text input".to_string());
 
-                let audio_inference = AudioInferenceDatabaseInsert::new_text_to_speech(
-                    result,
-                    text_input,
-                    metadata,
-                );
+                let audio_inference =
+                    AudioInferenceDatabaseInsert::new_text_to_speech(result, text_input, metadata);
                 let _ = clickhouse_connection_info
                     .write(&[audio_inference], "AudioInference")
                     .await;
             }
             InferenceResult::ImageGeneration(result) => {
                 // Extract the prompt from the input
-                let prompt = input.messages.first()
+                let prompt = input
+                    .messages
+                    .first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
-                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        ResolvedInputMessageContent::Text { value } => {
+                            value.as_str().map(|s| s.to_string())
+                        }
                         _ => None,
                     })
                     .unwrap_or_else(|| "image prompt".to_string());
 
-                let image_inference = ImageInferenceDatabaseInsert::new(
-                    result,
-                    prompt,
-                    metadata,
-                );
+                let image_inference = ImageInferenceDatabaseInsert::new(result, prompt, metadata);
                 let _ = clickhouse_connection_info
                     .write(&[image_inference], "ImageInference")
                     .await;
             }
             InferenceResult::Moderation(result) => {
                 // Extract the input text from the input
-                let input_text = input.messages.first()
+                let input_text = input
+                    .messages
+                    .first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
                         ResolvedInputMessageContent::Text { value } => {
@@ -1164,16 +1176,13 @@ pub async fn write_inference(
                                 serde_json::Value::String(s) => Some(s.clone()),
                                 _ => value.as_str().map(|s| s.to_string()),
                             }
-                        },
+                        }
                         _ => None,
                     })
                     .unwrap_or_else(|| "moderation input".to_string());
 
-                let moderation_inference = ModerationInferenceDatabaseInsert::new(
-                    result,
-                    input_text,
-                    metadata,
-                );
+                let moderation_inference =
+                    ModerationInferenceDatabaseInsert::new(result, input_text, metadata);
                 let _ = clickhouse_connection_info
                     .write(&[moderation_inference], "ModerationInference")
                     .await;
@@ -1268,8 +1277,8 @@ pub async fn write_inference(
                 let input_multiplier = usage.input_tokens as f64 / pricing.per_tokens as f64;
                 let output_multiplier = usage.output_tokens as f64 / pricing.per_tokens as f64;
 
-                let total_cost = (input_multiplier * pricing.input_cost) +
-                                (output_multiplier * pricing.output_cost);
+                let total_cost = (input_multiplier * pricing.input_cost)
+                    + (output_multiplier * pricing.output_cost);
                 Some(total_cost)
             } else {
                 // Fallback to default pricing if not configured
