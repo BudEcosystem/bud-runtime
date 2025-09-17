@@ -10,7 +10,7 @@ import {
   Text_12_600_EEEEEE,
   Text_14_400_EEEEEE,
 } from "@/components/ui/text";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import {
   Badge,
@@ -23,7 +23,6 @@ import {
   Table,
 } from "antd";
 import { errorToast, successToast } from "@/components/toast";
-import Tags from "../components/DrawerTags";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import TextInput from "../components/TextInput";
 import SelectInput from "../components/SelectInput";
@@ -85,12 +84,21 @@ export default function AddUser() {
   const { openDrawerWithStep } = useDrawer();
   const { closeDrawer } = useDrawer();
   const { userDetails, addUser, createdUser, setCreatedUser } = useUsers();
-  const [userRole, setUserRole] = useState(userDetails?.role || "");
+  const [userRole, setUserRole] = useState(userDetails?.role || "developer");
   const [userType, setUserType] = useState("client");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handlePasswordChange = (password: string) => {
     setGeneratedPassword(password);
   };
+
+  // Initialize password on component mount
+  useEffect(() => {
+    if (!generatedPassword) {
+      const defaultPassword = Math.random().toString(36).slice(-8) + "A1!";
+      setGeneratedPassword(defaultPassword);
+    }
+  }, []);
 
   const primaryTableData = [
     {
@@ -220,12 +228,24 @@ export default function AddUser() {
   });
 
   const handleSubmit = async (formValues: any) => {
+    // Prevent multiple submissions
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    // Generate a default password if none exists
+    if (!generatedPassword) {
+      const defaultPassword = Math.random().toString(36).slice(-8) + "A1!";
+      setGeneratedPassword(defaultPassword);
+    }
+
+    // Use the form values for role and user_type if they exist, otherwise fall back to state
     const data = {
       ...formValues,
-      role: userRole,
-      password: generatedPassword,
-      permissions: userType == "admin" ? selectedPermissions : [],
-      user_type: userType,
+      role: formValues.role || userRole || "developer",
+      password: generatedPassword || Math.random().toString(36).slice(-8) + "A1!",
+      permissions: (formValues.user_type || userType) === "admin" ? selectedPermissions : [],
+      user_type: formValues.user_type || userType || "client",
     };
     setCreatedUser(data);
     try {
@@ -236,19 +256,22 @@ export default function AddUser() {
       }
     } catch (error) {
       errorToast("Failed to add user");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <BudForm
       data={{
-        role: userRole,
-        user_type: userType,
+        role: userRole || "developer",
+        user_type: userType || "client",
       }}
       onNext={(formData) => {
         handleSubmit(formData);
       }}
-      nextText="Save"
+      nextText={isSubmitting ? "Saving..." : "Save"}
+      disableNext={isSubmitting}
     >
       <BudWraperBox classNames="mt-[2.2rem]">
         <BudDrawerLayout>
@@ -309,22 +332,6 @@ export default function AddUser() {
                 { label: "DevOps", value: "devops" },
               ]}
               onChange={(value) => setUserRole(value)}
-              tagRender={(props) => {
-                const { label, value, closable } = props;
-                return (
-                  <Tags
-                    name={label}
-                    color="#D1B854"
-                    closable={closable}
-                    classNames="text-center justify-center items-center my-[.4rem]"
-                    onClose={() => {
-                      setUserRole((prevRoles: any) =>
-                        prevRoles.filter((role: any) => role !== value),
-                      );
-                    }}
-                  />
-                );
-              }}
             />
             <SelectInput
               name="user_type"
