@@ -82,7 +82,6 @@ const CustomDropdownMenu: React.FC<DropDownProps> = ({
 
 export default CustomDropdownMenu;
 
-
 interface BudDropdownMenuProps {
   name: string;
   label: string;
@@ -98,7 +97,6 @@ interface BudDropdownMenuProps {
 }
 
 export const BudDropdownMenu = (props: BudDropdownMenuProps) => {
-
   const { values, form } = useContext(BudFormContext);
 
   // Component that receives value and onChange from Form.Item
@@ -106,14 +104,19 @@ export const BudDropdownMenu = (props: BudDropdownMenuProps) => {
     return (
       <div className="floating-textarea">
         <FloatLabel
-          label={<InfoLabel
-            text={props.label} content={props.infoText || props.placeholder} />}
-          value={value}>
+          label={
+            <InfoLabel
+              text={props.label}
+              content={props.infoText || props.placeholder}
+            />
+          }
+          value={value}
+        >
           <div className="custom-select-two w-full rounded-[6px] relative">
             <ConfigProvider
               theme={{
                 token: {
-                  colorTextPlaceholder: '#808080'
+                  colorTextPlaceholder: "#808080",
                 },
               }}
             >
@@ -144,8 +147,13 @@ export const BudDropdownMenu = (props: BudDropdownMenuProps) => {
   };
 
   return (
-    <Form.Item name={props.name} rules={props.rules}  hasFeedback className={`${props.formItemClassnames}`}>
+    <Form.Item
+      name={props.name}
+      rules={props.rules}
+      hasFeedback
+      className={`${props.formItemClassnames}`}
+    >
       <FormItemSelect />
     </Form.Item>
-  )
+  );
 };

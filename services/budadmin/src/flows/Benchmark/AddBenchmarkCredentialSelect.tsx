@@ -1,4 +1,3 @@
-
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
@@ -14,7 +13,7 @@ export default function AddBenchmarkCredentialSelect() {
   const { openDrawer, openDrawerWithStep } = useDrawer();
   const { selectedCredentials, setSelectedCredentials } = useDeployModel();
   useEffect(() => {
-    console.log('selectedCredentials', selectedCredentials)
+    console.log("selectedCredentials", selectedCredentials);
   }, [selectedCredentials]);
   return (
     <BudForm
@@ -22,7 +21,7 @@ export default function AddBenchmarkCredentialSelect() {
       disableNext={!selectedCredentials?.id}
       onNext={async () => {
         if (!currentWorkflow) {
-          return
+          return;
         } else {
           await updateCredentials(selectedCredentials);
           openDrawerWithStep("Benchmark-Configuration");
@@ -34,11 +33,13 @@ export default function AddBenchmarkCredentialSelect() {
       backText="Back"
       nextText="Next"
     >
-
       <BudWraperBox>
         <BudDrawerLayout>
           {/* <></> */}
-          <DeployModelSpecificationInfo showTemplate={false} showCredentials={false} />
+          <DeployModelSpecificationInfo
+            showTemplate={false}
+            showCredentials={false}
+          />
         </BudDrawerLayout>
         <ProprietaryCredentialsFormList
           providerType={currentWorkflow?.workflow_steps?.model?.source}

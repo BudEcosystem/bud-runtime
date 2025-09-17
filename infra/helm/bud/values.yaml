@@ -81,9 +81,6 @@ microservices:
             RSA_KEY_NAME: rsa-private-key.pem
             VOLUME_TYPE: nfs
 
-            NOTIFY_SERVICE_NAME: "{{ .Release.Name }}-budnotify"
-            NOTIFY_SERVICE_TOPIC: notificationMessages
-
             CONFIGSTORE_NAME: "{{ .Release.Name }}-configstore"
             SECRETSTORE_SECRET_NAME: "{{ .Release.Name }}-secretstore"
             STATESTORE_NAME: "{{ .Release.Name }}-dapr-statestore"
@@ -162,6 +159,7 @@ microservices:
     budnotify:
         image: budstudio/budnotify:nightly
         daprid: budnotify
+        pubsubTopic: notificationMessages
     budprompt:
         daprid: budprompt
         image: budstudio/budprompt:nightly
@@ -245,8 +243,8 @@ microservices:
             NODE_INFO_COLLECTOR_IMAGE_HPU: budimages.azurecr.io/budecosystem/node-info-collector-hpu:latest
             NODE_INFO_LABELER_IMAGE: budimages.azurecr.io/budecosystem/node-device-labeler:latest
             NODE_VERSION: 20.11.1
-            NOTIFY_SERVICE_NAME: budnotify
-            NOTIFY_SERVICE_TOPIC: notificationMessages
+            NOTIFY_SERVICE_NAME: "{{ .Values.microservices.budnotify.daprid }}"
+            NOTIFY_SERVICE_TOPIC: "{{ .Values.microservices.budnotify.pubsubTopic }}"
             NX_DAEMON: "false"
             PGADMIN_DEFAULT_EMAIL: user@bud.studio
             PGADMIN_DEFAULT_PASSWORD: budpassword

@@ -134,13 +134,14 @@ function ModelTag({ tag }) {
             preview={false}
             src={tag?.image}
             alt="info"
-            style={{ width: '0.625rem', height: '0.625rem' }}
+            style={{ width: "0.625rem", height: "0.625rem" }}
           />
         </div>
       )}
-      <div className={`text-[0.625rem] font-[400] leading-[100%]`}
+      <div
+        className={`text-[0.625rem] font-[400] leading-[100%]`}
         style={{
-          color: tag?.color || '#B3B3B3',
+          color: tag?.color || "#B3B3B3",
         }}
       >
         {tag?.name || tag}
@@ -149,19 +150,12 @@ function ModelTag({ tag }) {
   );
 }
 
-
 function SelectModel() {
-  const {
-    fetchModels
-  } = useModels();
+  const { fetchModels } = useModels();
   const [models, setModels] = React.useState([]);
   const [search, setSearch] = React.useState("");
   const [showAllTags, setShowAllTags] = React.useState(false);
-  const {
-    selectedModel,
-    setSelectedModel,
-    currentWorkflow
-  } = useDeployModel();
+  const { selectedModel, setSelectedModel, currentWorkflow } = useDeployModel();
 
   useEffect(() => {
     if (currentWorkflow?.workflow_steps?.model) {
@@ -178,7 +172,13 @@ function SelectModel() {
   }, []);
 
   const filteredModels = models?.filter((model) => {
-    return model.name?.toLowerCase().includes(search.toLowerCase()) || model.tasks?.some((task) => task.name?.toLowerCase().includes(search.toLowerCase())) || `${model.model_size}`.includes(search.toLowerCase());
+    return (
+      model.name?.toLowerCase().includes(search.toLowerCase()) ||
+      model.tasks?.some((task) =>
+        task.name?.toLowerCase().includes(search.toLowerCase()),
+      ) ||
+      `${model.model_size}`.includes(search.toLowerCase())
+    );
   });
 
   return (

@@ -108,8 +108,8 @@ const RunBenchmarkModel: React.FC<RunBenchmarkModelProps> = ({
     if (initialValues["modelData"]) {
       setEmbeddingModels(
         initialValues["modelData"].filter(
-          (each) => each["model"]["modality"] == "embedding"
-        )
+          (each) => each["model"]["modality"] == "embedding",
+        ),
       );
     }
     if (initialValues["clusterData"]) {

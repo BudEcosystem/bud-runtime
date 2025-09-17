@@ -5,4 +5,4 @@ export const formatTimeToHMS = (seconds: number): string => {
 
   // Format the result as 6h:8m:9s
   return `${hours}h:${minutes}m:${secs}s`;
-}
+};

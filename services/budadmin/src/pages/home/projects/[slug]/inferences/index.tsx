@@ -1,5 +1,5 @@
-import React from 'react';
-import InferenceListTable from '@/components/ui/bud/table/InferenceListTable';
+import React from "react";
+import InferenceListTable from "@/components/ui/bud/table/InferenceListTable";
 
 interface InferenceListViewProps {
   projectId?: string;

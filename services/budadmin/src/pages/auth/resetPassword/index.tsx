@@ -42,13 +42,15 @@ export default function ResetPassword() {
       const passwordsMatch = password === rePassword;
 
       setRePasswordError(
-        rePasswordValid ? "" : "Password must be at least 8 characters long"
+        rePasswordValid ? "" : "Password must be at least 8 characters long",
       );
       setPasswordError(
-        passwordValid ? "" : "Password must be at least 8 characters long"
+        passwordValid ? "" : "Password must be at least 8 characters long",
       );
       setError(
-        rePassword.length > 0 && !passwordsMatch ? "Passwords do not match" : ""
+        rePassword.length > 0 && !passwordsMatch
+          ? "Passwords do not match"
+          : "",
       );
       setIsFormValid(rePasswordValid && passwordValid && passwordsMatch);
     };

@@ -127,7 +127,7 @@ export default function BenchmarkHistory(props: Props) {
         console.error("Error creating model:", error);
       }
     },
-    [showLoader, hideLoader]
+    [showLoader, hideLoader],
   );
 
   useEffect(() => {
@@ -196,7 +196,7 @@ export default function BenchmarkHistory(props: Props) {
             <Popover.Trigger>
               <Text
                 className="h-[1.7rem] text-[#FFFFFF] mr-2 flex items-center !border !border-[#18191B] cursor-pointer text-xs font-normal leading-3 rounded-[6px] px-[0.8rem] shadow-none bg-transparent"
-                onClick={() => { }}
+                onClick={() => {}}
               >
                 <MixerHorizontalIcon width="14" height="14" className="mr-2" />
                 <Text_12_400_C7C7C7>Filter</Text_12_400_C7C7C7>
@@ -346,7 +346,7 @@ export default function BenchmarkHistory(props: Props) {
                           className={clsx(
                             item?.status === "success"
                               ? "cursor-pointer"
-                              : "cursor-default"
+                              : "cursor-default",
                           )}
                           key={index}
                           onClick={() => {
@@ -389,9 +389,7 @@ export default function BenchmarkHistory(props: Props) {
                             )}
                             {item?.status === "processing" && (
                               <Flex>
-                                <Text>
-                                  processing{" "}
-                                </Text>
+                                <Text>processing </Text>
                                 <DotFilledIcon className="h-4 w-4 text-orange-600" />
                               </Flex>
                             )}
@@ -406,7 +404,10 @@ export default function BenchmarkHistory(props: Props) {
                             {item.duration}
                           </Table.Cell>
                           <Table.Cell className="!shadow-none text-xs text-[#B0B4BA] text-nowrap rounded-e-[5px] pr-[4em]">
-                            {moment.utc(item.created_at).local().format("DD/MM/YYYY HH:mm")}
+                            {moment
+                              .utc(item.created_at)
+                              .local()
+                              .format("DD/MM/YYYY HH:mm")}
                           </Table.Cell>
                         </Table.Row>
                       );

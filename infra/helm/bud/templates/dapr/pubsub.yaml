@@ -123,7 +123,7 @@ kind: Subscription
 metadata:
   name: {{ .Release.Name }}-budnotify-pubsub-subscription
 spec:
-  topic: notificationMessages
+  topic: {{ .Values.microservices.budnotify.pubsubTopic }}
   routes:
     default: /notifications
   pubsubname: {{ .Release.Name }}-pubsub

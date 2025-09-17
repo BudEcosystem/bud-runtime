@@ -187,11 +187,11 @@ export function ClusterCard({
   const resource_details = {
     total: data.resource_details?.reduce(
       (sum, resource) => sum + resource.total,
-      0
+      0,
     ),
     available: data.resource_details?.reduce(
       (sum, resource) => sum + resource.available,
-      0
+      0,
     ),
   };
 
@@ -273,7 +273,12 @@ export function ClusterCard({
               </Text_10_400_B3B3B3>
             </div>
             <div className="flex justify-center items-baseline mt-[0.05rem]">
-              <Text_10_400_EEEEEE>{data?.network?.bandwidth[data?.network?.bandwidth.length - 1].mbps}</Text_10_400_EEEEEE>
+              <Text_10_400_EEEEEE>
+                {
+                  data?.network?.bandwidth[data?.network?.bandwidth.length - 1]
+                    .mbps
+                }
+              </Text_10_400_EEEEEE>
               <Text_8_400_EEEEEE>Mbps</Text_8_400_EEEEEE>
             </div>
             <div className="w-full flex justify-center items-start px-[30%]">
@@ -283,14 +288,14 @@ export function ClusterCard({
                   data?.network.bandwidth?.map((item) => ({
                     timestamp: item.timestamp,
                     value: item.mbps,
-                  }))
+                  })),
                 )}
                 data={getChartData(
                   "today",
                   data?.network.bandwidth?.map((item) => ({
                     timestamp: item.timestamp,
                     value: item.mbps,
-                  }))
+                  })),
                 )}
                 chartAdjust={{ top: "0" }}
                 classNames="h-[35px] pt-[5px]"
@@ -325,7 +330,7 @@ export default function NodesList({
       hideSelection={hideSelection}
       // selected={nodes[key].hostname === selectedNodes?.hostname} // Check if the cluster is selected
       selected={selectedNodes?.some(
-        (selected) => selected.hostname === nodes[key].hostname
+        (selected) => selected.hostname === nodes[key].hostname,
       )}
       handleClick={() => handleNodeSelection(nodes[key])} // Set the selected cluster
     />
