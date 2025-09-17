@@ -53,7 +53,10 @@ class AnsibleOrchestrator:
         # For Testing: Load from local yaml file if no kubeconfig provided
         if kubeconfig is None and Path("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml").exists():
             # Read the local k3s.yaml file
-            with open("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml", "r") as f:
+            with open(
+                "/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml",
+                "r",
+            ) as f:
                 kubeconfig_yaml_content = f.read()
             # Since it's already YAML, we don't need to parse/convert it
             files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml_content}
@@ -72,7 +75,10 @@ class AnsibleOrchestrator:
                 logger.warning(f"Invalid kubeconfig JSON provided: {e}. Falling back to local k3s.yaml if available.")
                 # Fall back to local k3s.yaml if available
                 if Path("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml").exists():
-                    with open("/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml", "r") as f:
+                    with open(
+                        "/mnt/HC_Volume_103274798/bud-runtime/services/budeval/k3s.yaml",
+                        "r",
+                    ) as f:
                         kubeconfig_yaml_content = f.read()
                     files = {f"{temp_id}_kubeconfig.yaml": kubeconfig_yaml_content}
                     extravars = {"kubeconfig_path": f"{temp_id}_kubeconfig.yaml"}
@@ -124,10 +130,17 @@ class AnsibleOrchestrator:
 
         try:
             self._run_ansible_playbook(playbook, temp_id, files, extravars)
-            logger.info("::: EVAL Ansible ::: Ansible-based cluster verification succeeded for %s", temp_id)
+            logger.info(
+                "::: EVAL Ansible ::: Ansible-based cluster verification succeeded for %s",
+                temp_id,
+            )
             return True
         except Exception as e:
-            logger.error("::: EVAL Ansible ::: Ansible-based cluster verification failed: %s", e, exc_info=True)
+            logger.error(
+                "::: EVAL Ansible ::: Ansible-based cluster verification failed: %s",
+                e,
+                exc_info=True,
+            )
             return False
 
     def run_job(
@@ -362,7 +375,10 @@ class AnsibleOrchestrator:
                     logger.warning(f"ConfigMap cleanup failed for {eval_request_id}: {configmap_e}")
 
         except Exception as e:
-            logger.error(f"Failed to cleanup resources for job {uuid}: {e}", exc_info=True)
+            logger.error(
+                f"Failed to cleanup resources for job {uuid}: {e}",
+                exc_info=True,
+            )
             raise e
 
     def get_job_status(
@@ -409,10 +425,21 @@ class AnsibleOrchestrator:
 
         except Exception as e:
             logger.error(f"Failed to get status for job {uuid}: {e}", exc_info=True)
-            return {"status": "error", "phase": "failed", "message": str(e), "active": 0, "succeeded": 0, "failed": 1}
+            return {
+                "status": "error",
+                "phase": "failed",
+                "message": str(e),
+                "active": 0,
+                "succeeded": 0,
+                "failed": 1,
+            }
 
     def _run_ansible_playbook(
-        self, playbook: str, uuid: str, files: Dict[str, str], extravars: Dict[str, Any]
+        self,
+        playbook: str,
+        uuid: str,
+        files: Dict[str, str],
+        extravars: Dict[str, Any],
     ) -> None:
         playbook_path = self._playbook_dir / playbook
         if not playbook_path.exists():
@@ -493,7 +520,11 @@ class AnsibleOrchestrator:
         logger.info("Playbook %s completed successfully for job %s", playbook, uuid)
 
     def _run_ansible_playbook_with_output(
-        self, playbook: str, uuid: str, files: Dict[str, str], extravars: Dict[str, Any]
+        self,
+        playbook: str,
+        uuid: str,
+        files: Dict[str, str],
+        extravars: Dict[str, Any],
     ) -> Any:
         """Run Ansible playbook and return the result object for output parsing."""
         playbook_path = self._playbook_dir / playbook
@@ -643,7 +674,8 @@ class AnsibleOrchestrator:
                                     job_status, ["start_time", "startTime"]
                                 ) or status_info.get("start_time")
                                 status_info["completion_time"] = _get_time(
-                                    job_status, ["completion_time", "completionTime"]
+                                    job_status,
+                                    ["completion_time", "completionTime"],
                                 ) or status_info.get("completion_time")
 
                                 break
@@ -652,7 +684,10 @@ class AnsibleOrchestrator:
             return status_info
 
         except Exception as e:
-            logger.error(f"Error parsing job status from Ansible output: {e}", exc_info=True)
+            logger.error(
+                f"Error parsing job status from Ansible output: {e}",
+                exc_info=True,
+            )
             return {
                 "status": "error",
                 "phase": "unknown",
@@ -662,7 +697,14 @@ class AnsibleOrchestrator:
                 "message": f"Error parsing status: {str(e)}",
             }
 
-    def _render_job_yaml(self, uuid: str, docker_image: str, args: Dict[str, Any], namespace: str, ttl: int) -> str:
+    def _render_job_yaml(
+        self,
+        uuid: str,
+        docker_image: str,
+        args: Dict[str, Any],
+        namespace: str,
+        ttl: int,
+    ) -> str:
         safe_args = json.dumps(args)
         return f"""apiVersion: batch/v1
 kind: Job
@@ -729,7 +771,12 @@ spec:
 """
 
     def _render_job_with_volumes_yaml(
-        self, uuid: str, docker_image: str, args: Dict[str, Any], namespace: str, ttl: int
+        self,
+        uuid: str,
+        docker_image: str,
+        args: Dict[str, Any],
+        namespace: str,
+        ttl: int,
     ) -> str:
         safe_args = json.dumps(args)
 
@@ -879,38 +926,99 @@ spec:
           configMap:
             name: {config_volume["configMapName"]}""")
 
-        # Data volumes (e.g., shared datasets)
-        for i, vol in enumerate(data_volumes):
-            vol_name = vol.get("name", f"data-{i}")
-            volume_mounts.append(f"""            - name: {vol_name}
+        # Check if we have the same PVC being mounted multiple times
+        pvc_usage = {}
+        for _i, vol in enumerate(data_volumes):
+            if vol.get("claimName"):
+                pvc_name = vol["claimName"]
+                if pvc_name not in pvc_usage:
+                    pvc_usage[pvc_name] = []
+                pvc_usage[pvc_name].append(("data", vol))
+
+        if output_volume and output_volume.get("claimName"):
+            pvc_name = output_volume["claimName"]
+            if pvc_name not in pvc_usage:
+                pvc_usage[pvc_name] = []
+            pvc_usage[pvc_name].append(("output", output_volume))
+
+        # If same PVC is used multiple times, consolidate to single mount
+        same_pvc_detected = any(len(usages) > 1 for usages in pvc_usage.values())
+
+        if same_pvc_detected:
+            logger.info("Detected same PVC being mounted multiple times, using consolidated mount approach")
+            # Use single mount point for shared PVC
+            for pvc_name, usages in pvc_usage.items():
+                if len(usages) > 1:
+                    # Use the first volume's mount settings as base
+                    first_vol = usages[0][1]
+                    volume_mounts.append(f"""            - name: shared-storage
+              mountPath: {first_vol.get("mountPath", "/workspace/shared")}
+              readOnly: false""")
+
+                    volumes.append(f"""        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: {pvc_name}""")
+                else:
+                    # Single usage, handle normally
+                    vol_type, vol = usages[0]
+                    vol_name = vol.get("name", "data-0" if vol_type == "data" else "output")
+
+                    if vol_type == "data":
+                        volume_mounts.append(f"""            - name: {vol_name}
+              mountPath: {vol["mountPath"]}
+              readOnly: {str(vol.get("readOnly", True)).lower()}""")
+                    else:  # output
+                        if vol.get("subPath"):
+                            volume_mounts.append(f"""            - name: {vol_name}
+              mountPath: {vol.get("mountPath", "/workspace/outputs")}
+              subPath: {vol["subPath"]}""")
+                        else:
+                            volume_mounts.append(f"""            - name: {vol_name}
+              mountPath: /workspace/outputs""")
+
+                    volumes.append(f"""        - name: {vol_name}
+          persistentVolumeClaim:
+            claimName: {pvc_name}""")
+
+            # Handle emptyDir volumes
+            for vol in data_volumes:
+                if vol.get("type") == "emptyDir":
+                    vol_name = vol.get("name", "cache")
+                    volume_mounts.append(f"""            - name: {vol_name}
+              mountPath: {vol["mountPath"]}""")
+                    volumes.append(f"""        - name: {vol_name}
+          emptyDir: {{}}""")
+        else:
+            # No same PVC detected, use original logic
+            for i, vol in enumerate(data_volumes):
+                vol_name = vol.get("name", f"data-{i}")
+                volume_mounts.append(f"""            - name: {vol_name}
               mountPath: {vol["mountPath"]}
               readOnly: {str(vol.get("readOnly", True)).lower()}""")
 
-            if vol.get("claimName"):
-                volumes.append(f"""        - name: {vol_name}
+                if vol.get("claimName"):
+                    volumes.append(f"""        - name: {vol_name}
           persistentVolumeClaim:
             claimName: {vol["claimName"]}""")
-            elif vol.get("type") == "emptyDir":
-                volumes.append(f"""        - name: {vol_name}
+                elif vol.get("type") == "emptyDir":
+                    volumes.append(f"""        - name: {vol_name}
           emptyDir: {{}}""")
 
-        # Output volume
-        if output_volume:
-            # Handle shared PVC with subPath for outputs
-            if output_volume.get("type") == "shared_pvc" and output_volume.get("subPath"):
-                volume_mounts.append(f"""            - name: output
+            # Output volume
+            if output_volume:
+                if output_volume.get("type") == "shared_pvc" and output_volume.get("subPath"):
+                    volume_mounts.append(f"""            - name: output
               mountPath: {output_volume.get("mountPath", "/workspace/outputs")}
               subPath: {output_volume["subPath"]}""")
 
-                volumes.append(f"""        - name: output
+                    volumes.append(f"""        - name: output
           persistentVolumeClaim:
             claimName: {output_volume["claimName"]}""")
-            else:
-                # Legacy approach for backward compatibility
-                volume_mounts.append("""            - name: output
+                else:
+                    volume_mounts.append("""            - name: output
               mountPath: /workspace/outputs""")
 
-                volumes.append(f"""        - name: output
+                    volumes.append(f"""        - name: output
           persistentVolumeClaim:
             claimName: {output_volume["claimName"]}""")
 
