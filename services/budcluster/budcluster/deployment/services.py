@@ -296,9 +296,9 @@ class DeploymentService(SessionMixin):
                 device_scale_factor = 1.5
                 if model_size is not None:
                     # Even longer for larger models on CPU
-                    if model_size > 7000000000 or (model_size < 100000 and model_size > 7):
+                    if model_size_in_params > 7000000000:  # 7B+ parameters
                         device_scale_factor = 2.5
-                    elif model_size > 3000000000 or (model_size < 100000 and model_size > 3):
+                    elif model_size_in_params > 3000000000:  # 3B+ parameters
                         device_scale_factor = 2.0
             elif device_type_lower in ["cuda", "gpu"]:
                 # GPU deployments are faster
