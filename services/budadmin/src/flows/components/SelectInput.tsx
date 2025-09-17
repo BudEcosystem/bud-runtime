@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useContext } from "react";
 import { Form, FormRule, Select, ConfigProvider, Image } from "antd";
 import { Text_12_300_EEEEEE } from "@/components/ui/text";
 import CustomPopover from "./customPopover";
+import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 
 export interface SelectInputProps {
   name: string;
@@ -23,6 +24,8 @@ export interface SelectInputProps {
 }
 
 function SelectInput(props: SelectInputProps) {
+  const { form } = useContext(BudFormContext);
+
   return (
     <Form.Item
       name={props.name}
@@ -72,7 +75,14 @@ function SelectInput(props: SelectInputProps) {
               size="large"
               className={`drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full indent-[.5rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] outline-none ${props.SelectClasses}`}
               options={props.options}
-              onChange={props.onChange}
+              onChange={(value) => {
+                // Update the form field value
+                form.setFieldValue(props.name, value);
+                // Call custom onChange if provided
+                if (props.onChange) {
+                  props.onChange(value);
+                }
+              }}
               mode={props.mode}
               tagRender={props.tagRender}
               suffixIcon={
