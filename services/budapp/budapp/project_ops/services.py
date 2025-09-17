@@ -393,6 +393,13 @@ class ProjectService(SessionMixin):
             if len(user_ids) != len(db_users):
                 raise ClientException("Found non active users in request")
 
+            # Validate user type and project type compatibility
+            for db_user in db_users:
+                # CLIENT users can only be associated with CLIENT_APP projects
+                if db_user.user_type == UserTypeEnum.CLIENT and db_project.project_type == ProjectTypeEnum.ADMIN_APP:
+                    raise ClientException(f"Client user '{db_user.email}' cannot be added to admin project")
+                # ADMIN users can be associated with both types - no validation needed
+
             for db_user in db_users:
                 # Add user to project instance
                 db_project.users.append(db_user)
@@ -431,6 +438,12 @@ class ProjectService(SessionMixin):
 
         # Handle non budserve users
         if emails:
+            # Validate that new users (which are CLIENT by default) can only be added to CLIENT_APP projects
+            if db_project.project_type == ProjectTypeEnum.ADMIN_APP:
+                raise ClientException(
+                    "New users cannot be added to admin projects. Only existing admin users can be added to admin projects."
+                )
+
             # User name, role will be static
             user_name = "Bud User"
             user_role = UserRoleEnum.DEVELOPER
@@ -442,6 +455,7 @@ class ProjectService(SessionMixin):
                 password = generate_valid_password()
 
                 # NOTE: New user created with help of auth service, it will handle different scenarios like notification, permission, etc.
+                # New users are created with default user_type=CLIENT
                 user_data = UserCreate(name=user_name, email=new_email, password=password, role=user_role)
                 db_user = await AuthService(self.session).register_user(user_data)
 
