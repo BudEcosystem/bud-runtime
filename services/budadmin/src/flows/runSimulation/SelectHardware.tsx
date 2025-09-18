@@ -1,4 +1,3 @@
-
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
@@ -10,36 +9,47 @@ import React, { useContext, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useModels } from "src/hooks/useModels";
 import { useDeployModel } from "src/stores/useDeployModel";
-import { Image, Checkbox } from 'antd'
-import { Text_10_400_B3B3B3, Text_12_300_EEEEEE, Text_12_400_757575, Text_12_600_EEEEEE, Text_14_400_EEEEEE } from "@/components/ui/text";
+import { Image, Checkbox } from "antd";
+import {
+  Text_10_400_B3B3B3,
+  Text_12_300_EEEEEE,
+  Text_12_400_757575,
+  Text_12_600_EEEEEE,
+  Text_14_400_EEEEEE,
+} from "@/components/ui/text";
 import Tags from "../components/DrawerTags";
 import SearchHeaderInput from "../components/SearchHeaderInput";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 
-
 const useCases = [
   {
     id: 1,
-    icon: '/images/drawer/intelimg.png',
-    title: 'Hardware Name',
-    description: 'Need to add hardware description here, to add hardware descrip...',
-    website: 'https://www.intel.com/content/www/us/en/events/on-event-series/vision.html'
+    icon: "/images/drawer/intelimg.png",
+    title: "Hardware Name",
+    description:
+      "Need to add hardware description here, to add hardware descrip...",
+    website:
+      "https://www.intel.com/content/www/us/en/events/on-event-series/vision.html",
   },
   {
     id: 2,
-    icon: '/images/drawer/nvdia.png',
-    title: 'Summarization',
-    description: 'Need to add hardware description here, to add hardware descrip...',
-    website: 'https://www.intel.com/content/www/us/en/events/on-event-series/vision.html'
+    icon: "/images/drawer/nvdia.png",
+    title: "Summarization",
+    description:
+      "Need to add hardware description here, to add hardware descrip...",
+    website:
+      "https://www.intel.com/content/www/us/en/events/on-event-series/vision.html",
   },
   {
     id: 3,
-    icon: '/images/drawer/zephyr.png',
-    title: 'Chat',
-    description: 'Need to add hardware description here, to add hardware descrip...',
-    website: 'https://www.intel.com/content/www/us/en/events/on-event-series/vision.html'
+    icon: "/images/drawer/zephyr.png",
+    title: "Chat",
+    description:
+      "Need to add hardware description here, to add hardware descrip...",
+    website:
+      "https://www.intel.com/content/www/us/en/events/on-event-series/vision.html",
   },
-]
+];
 
 type cardProps = {
   data?: any;
@@ -76,9 +86,11 @@ function CardWithCheckBox({
       <div className="flex-auto max-w-[91%]">
         <div className="flex items-center justify-between max-w-[100%]">
           <div className="flex justify-start items-center gap-[.6rem] pb-[0.625rem]">
-            <Text_14_400_EEEEEE className="leading-[100%]">{data.title}</Text_14_400_EEEEEE>
+            <Text_14_400_EEEEEE className="leading-[100%]">
+              {data.title}
+            </Text_14_400_EEEEEE>
             <Tags
-              name='Website Link'
+              name="Website Link"
               color="#965CDE"
               classNames="pt-[.1rem] pb-[0]"
               onTagClick={() => {
@@ -87,7 +99,7 @@ function CardWithCheckBox({
               image={
                 <Image
                   preview={false}
-                  src='/images/drawer/websiteLink.png'
+                  src="/images/drawer/websiteLink.png"
                   className="mr-[0.375rem]"
                   style={{ width: "0.625rem", height: "0.625rem" }}
                   alt="home"
@@ -121,21 +133,14 @@ export default function SelectHardware() {
 
   const { selectedProvider } = useDeployModel();
   const [models, setModels] = React.useState([]);
-  const { isExpandedViewOpen } = useContext(BudFormContext)
+  const { isExpandedViewOpen } = useContext(BudFormContext);
 
-  const {
-    loading,
-    fetchModels
-  } = useModels();
+  const { loading, fetchModels } = useModels();
 
   const [search, setSearch] = React.useState("");
   const [showAllTags, setShowAllTags] = React.useState(false);
-  const {
-    selectedModel,
-    setSelectedModel,
-    currentWorkflow,
-    updateCloudModel
-  } = useDeployModel();
+  const { selectedModel, setSelectedModel, currentWorkflow, updateCloudModel } =
+    useDeployModel();
 
   useEffect(() => {
     if (currentWorkflow?.workflow_steps?.model) {
@@ -148,24 +153,27 @@ export default function SelectHardware() {
       page,
       limit,
       table_source: "cloud_model",
-      source: selectedProvider?.type
+      source: selectedProvider?.type,
     }).then((data) => {
       setModels(data);
     });
   }, []);
 
-  const filteredModels = models?.filter(model => {
-    return model.name?.toLowerCase().includes(search.toLowerCase()) || model.tags?.some((task) => task.name?.toLowerCase().includes(search.toLowerCase())) || `${model.model_size}`.includes(search.toLowerCase());
+  const filteredModels = models?.filter((model) => {
+    return (
+      model.name?.toLowerCase().includes(search.toLowerCase()) ||
+      model.tags?.some((task) =>
+        task.name?.toLowerCase().includes(search.toLowerCase()),
+      ) ||
+      `${model.model_size}`.includes(search.toLowerCase())
+    );
   });
-
 
   return (
     <BudForm
-      data={{
-
-      }}
+      data={{}}
       onBack={() => {
-        openDrawerWithStep("model-quantisation")
+        openDrawerWithStep("model-quantisation");
       }}
       onNext={async () => {
         openDrawerWithStep("hardware-pecifications");
@@ -215,16 +223,15 @@ export default function SelectHardware() {
                     <CardWithCheckBox
                       key={index}
                       data={model}
-                      handleClick={() => {
-
-                      }}
+                      handleClick={() => {}}
                     />
                   ))}
                 </>
               ) : (
                 <div className="flex justify-center items-center min-h-[4rem]">
                   <Text_12_300_EEEEEE>
-                    To add new models for the provider, click the &quot;+Cloud Model&quot; button
+                    To add new models for the provider, click the &quot;+Cloud
+                    Model&quot; button
                   </Text_12_300_EEEEEE>
                 </div>
               )}

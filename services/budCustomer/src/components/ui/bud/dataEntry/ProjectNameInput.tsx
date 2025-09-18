@@ -1,6 +1,6 @@
 import { Button, Form, Image, Input, Popover } from "antd";
 import EmojiPicker, { Categories, EmojiStyle, Theme } from "emoji-picker-react";
-import React, { use, useContext, useEffect } from "react";
+import React, { useContext, useEffect } from "react";
 import { BudFormContext } from "../context/BudFormContext";
 import { pxToRem, Text_26_600_FFFFFF } from "../../text";
 import { assetBaseUrl } from "@/components/environment";
@@ -122,7 +122,6 @@ export function ModelNameInput({
   useEffect(() => {
     onChange && onChange(name);
   }, [icon, name, onChange]);
-  const imageUrl = assetBaseUrl + icon;
 
   return (
     <div className="drawerNameInput flex flex-row items-start justify-between">
@@ -273,7 +272,7 @@ export function NameIconInput({
       <Form.Item
         hasFeedback
         name={"name"}
-        className="w-full border-[1px] border-[#B1B1B1] dark:border-[#757575] box-border rounded-[6px] justify-center"
+        className="w-full border-[1px] border-[#B1B1B1] dark:border-[#757575] box-border rounded-[6px] justify-center [&_.ant-form-item-explain-error]:mt-0]"
         rules={[
           {
             required: true,
@@ -287,6 +286,14 @@ export function NameIconInput({
             pattern: projectNameRegex,
             message: `${placeholder} should contain only alphanumeric characters, spaces, hyphens, and underscores`,
           },
+          {
+            validator: (_, value) => {
+              if (value && value.trim().length === 0) {
+                return Promise.reject(new Error(`${placeholder} cannot be only spaces`));
+              }
+              return Promise.resolve();
+            },
+          },
         ]}
       >
         <Input
@@ -295,6 +302,13 @@ export function NameIconInput({
           type="text"
           placeholder={placeholder}
           disabled={disabled}
+          onKeyDown={(e) => {
+            // Prevent space as the first character
+            const currentValue = e.currentTarget.value;
+            if (e.key === ' ' && currentValue.length === 0) {
+              e.preventDefault();
+            }
+          }}
         />
       </Form.Item>
     </div>

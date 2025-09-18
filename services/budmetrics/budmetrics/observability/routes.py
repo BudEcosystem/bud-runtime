@@ -507,6 +507,7 @@ async def get_geographic_distribution(
     group_by: str = Query("country", description="Group by: country, region, city"),
     limit: int = Query(50, description="Maximum number of locations to return"),
     project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+    api_key_project_id: Optional[UUID] = Query(None, description="Filter by API key's project ID (for CLIENT users)"),
     country_codes: Optional[str] = Query(None, description="Comma-separated country codes to filter by"),
 ) -> Response:
     """Get geographic distribution data from gateway analytics.
@@ -538,6 +539,8 @@ async def get_geographic_distribution(
         filters = {}
         if project_id:
             filters["project_id"] = project_id
+        if api_key_project_id:
+            filters["api_key_project_id"] = api_key_project_id
         if country_codes:
             filters["country_code"] = [code.strip() for code in country_codes.split(",")]
 
@@ -545,6 +548,33 @@ async def get_geographic_distribution(
             from_date=from_date, to_date=to_date, group_by=group_by, limit=limit, filters=filters if filters else None
         )
 
+        response = await service.get_geographic_data(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting geographic data: {e}")
+        response = ErrorResponse(message=f"Error getting geographic data: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.post("/metrics/geography", tags=["Aggregated Metrics"])
+async def get_geographic_distribution_post(request: GeographicDataRequest) -> Response:
+    """Get geographic distribution data from gateway analytics (POST version).
+
+    This endpoint is the POST version that properly handles complex filters including
+    lists of project IDs and api_key_project_ids for CLIENT users.
+
+    Args:
+        request (GeographicDataRequest): The geographic data request with filters.
+
+    Returns:
+        HTTP response containing geographic distribution data.
+    """
+    response: Union[GeographicDataResponse, ErrorResponse]
+
+    try:
         response = await service.get_geographic_data(request)
     except ValidationError as e:
         logger.error(f"Validation error: {e}")

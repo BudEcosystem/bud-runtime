@@ -16,28 +16,32 @@ export default function SelectModelForNewEvaluation() {
   const [limit, setLimit] = React.useState(1000);
   const [models, setModels] = React.useState([]);
 
-  const {
-    loading,
-    fetchModels
-  } = useModels();
+  const { loading, fetchModels } = useModels();
   const [search, setSearch] = React.useState("");
   const { openDrawerWithStep, drawerProps } = useDrawer();
-  const { setSelectedModel, selectedModel, stepFive} = usePerfomanceBenchmark();
+  const { setSelectedModel, selectedModel, stepFive } =
+    usePerfomanceBenchmark();
   const { createEvaluationWorkflow, currentWorkflow } = useEvaluations();
 
   useEffect(() => {
     fetchModels({
-      page, limit,
-      table_source: "model"
+      page,
+      limit,
+      table_source: "model",
     }).then((data) => {
       setModels(data);
     });
   }, [page]);
 
   const filteredModels = models?.filter((model) => {
-    return model.name?.toLowerCase().includes(search.toLowerCase()) || model.tags?.some((task) => task?.name?.toLowerCase().includes(search.toLowerCase())) || `${model.model_size}`.includes(search.toLowerCase());
+    return (
+      model.name?.toLowerCase().includes(search.toLowerCase()) ||
+      model.tags?.some((task) =>
+        task?.name?.toLowerCase().includes(search.toLowerCase()),
+      ) ||
+      `${model.model_size}`.includes(search.toLowerCase())
+    );
   });
-
 
   return (
     <BudForm
@@ -61,7 +65,8 @@ export default function SelectModelForNewEvaluation() {
           }
 
           // Get experiment ID from workflow or drawer props
-          const experimentId = currentWorkflow.experiment_id || drawerProps?.experimentId;
+          const experimentId =
+            currentWorkflow.experiment_id || drawerProps?.experimentId;
 
           if (!experimentId) {
             errorToast("Experiment ID not found");
@@ -73,12 +78,15 @@ export default function SelectModelForNewEvaluation() {
             step_number: 2,
             workflow_id: currentWorkflow.workflow_id,
             stage_data: {
-              model_id: selectedModel.id
-            }
+              model_id: selectedModel.id,
+            },
           };
 
           // Call the API
-          const response = await createEvaluationWorkflow(experimentId, payload);
+          const response = await createEvaluationWorkflow(
+            experimentId,
+            payload,
+          );
 
           successToast("Model selected successfully");
 
@@ -91,7 +99,6 @@ export default function SelectModelForNewEvaluation() {
       }}
       nextText="Next"
     >
-
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
@@ -106,11 +113,7 @@ export default function SelectModelForNewEvaluation() {
             setSelectedModel={setSelectedModel}
             selectedModel={selectedModel}
           >
-            <ModelFilter
-              search={search}
-              setSearch={setSearch}
-
-            />
+            <ModelFilter search={search} setSearch={setSearch} />
           </DeployModelSelect>
         </BudDrawerLayout>
       </BudWraperBox>

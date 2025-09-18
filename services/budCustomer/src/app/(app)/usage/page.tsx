@@ -1,12 +1,12 @@
 "use client";
 import React, { use, useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useTheme } from "@/context/themeContext";
 import {
   Flex,
   Select,
   Button,
   ConfigProvider,
-  Tabs,
   Skeleton,
   Card,
   Switch,
@@ -61,6 +61,7 @@ interface UsageMetrics {
 }
 
 export default function UsagePage() {
+  const { effectiveTheme } = useTheme();
   const { notification: antNotification } = App.useApp();
   const { openDrawer } = useDrawer();
   const { globalProjects, getGlobalProjects, loading } = useProjects();
@@ -75,7 +76,7 @@ export default function UsagePage() {
   const [timeRange, setTimeRange] = useState("30d");
   const [selectedProject, setSelectedProject] = useState("all");
   const [availableProjects, setAvailableProjects] = useState<any>([]);
-  const [activeTab, setActiveTab] = useState("spend");
+  // Removed activeTab state - no longer needed without tabs
   const [isLoading, setIsLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(false);
 
@@ -112,21 +113,22 @@ export default function UsagePage() {
   const [chartData, setChartData] = useState<any[]>([]);
 
   const themeConfig = {
+    token: {
+      colorPrimary: "#965CDE",
+      colorPrimaryHover: "#a873e5",
+      colorPrimaryActive: "#8348c7",
+    },
     components: {
       Select: {
-        colorBgContainer: "var(--bg-tertiary)",
-        colorBorder: "var(--border-secondary)",
-        optionSelectedBg: "var(--bg-hover)",
-        colorBgElevated: "var(--bg-hover)",
-        colorText: "var(--text-primary)",
-        optionSelectedColor: "var(--text-primary)",
-        optionActiveBg: "var(--bg-hover)",
-      },
-      Tabs: {
-        colorBorderSecondary: "transparent",
-        itemSelectedColor: "var(--text-primary)",
-        itemColor: "var(--text-muted)",
-        inkBarColor: "var(--text-primary)",
+        colorBgContainer: effectiveTheme === 'light' ? '#ffffff' : '#1A1A1A',
+        colorBorder: effectiveTheme === 'light' ? '#e5e7eb' : '#1F1F1F',
+        colorText: effectiveTheme === 'light' ? '#111827' : '#EEEEEE',
+        colorTextPlaceholder: effectiveTheme === 'light' ? '#6b7280' : '#666666',
+        colorBgElevated: effectiveTheme === 'light' ? '#ffffff' : '#1A1A1A',
+        controlItemBgHover: effectiveTheme === 'light' ? '#f3f4f6' : '#2F2F2F',
+        optionSelectedBg: effectiveTheme === 'light' ? '#f3f4f6' : '#2A1F3D',
+        optionSelectedColor: effectiveTheme === 'light' ? '#111827' : '#EEEEEE',
+        optionActiveBg: effectiveTheme === 'light' ? '#f9fafb' : '#2F2F2F',
       },
     },
   };
@@ -299,22 +301,7 @@ export default function UsagePage() {
     fetchBillingHistoryData(params);
   }, [timeRange, selectedProject]);
 
-  const tabItems = [
-    {
-      key: "spend",
-      label: "Total Spend",
-      children: (
-        <div className="mt-6">
-          <UsageChart
-            data={chartData}
-            type="spend"
-            loading={chartLoading}
-            timeRange={timeRange}
-          />
-        </div>
-      ),
-    },
-  ];
+  // Removed tabItems - no longer needed without tabs
 
   const handleExport = () => {
     // Export functionality
@@ -384,7 +371,95 @@ export default function UsagePage() {
                   Usage
                 </Title>
               </div>
-              <div className={styles.headerActions}>
+            </div>
+
+            {/* Metrics Section */}
+            <div className={styles.metricsSection}>
+              <MetricCard
+                title="Total Spend"
+                value={`$${metrics.totalSpend.toFixed(2)}\nof $${billingPlan.usage.cost_quota.toFixed(2)}`}
+                loading={isLoading}
+                trend={
+                  metrics.previousSpend
+                    ? ((metrics.totalSpend - metrics.previousSpend) /
+                      metrics.previousSpend) *
+                    100
+                    : 0
+                }
+              />
+              <MetricCard
+                title="Total tokens"
+                value={
+                  metrics.totalTokens < 10000
+                    ? `${metrics.totalTokens.toLocaleString()}\nof ${billingPlan.usage.tokens_quota < 10000 ? billingPlan.usage.tokens_quota.toLocaleString() : `${(billingPlan.usage.tokens_quota / 1000).toFixed(0)}K`}`
+                    : `${(metrics.totalTokens / 1000).toFixed(0)}K\nof ${billingPlan.usage.tokens_quota < 10000 ? billingPlan.usage.tokens_quota.toLocaleString() : `${(billingPlan.usage.tokens_quota / 1000).toFixed(0)}K`}`
+                }
+                loading={isLoading}
+                trend={
+                  metrics.previousTokens
+                    ? ((metrics.totalTokens - metrics.previousTokens) /
+                      metrics.previousTokens) *
+                    100
+                    : 0
+                }
+              />
+              <MetricCard
+                title="Total requests"
+                value={metrics.totalRequests.toLocaleString()}
+                loading={isLoading}
+                trend={
+                  metrics.previousRequests
+                    ? ((metrics.totalRequests - metrics.previousRequests) /
+                      metrics.previousRequests) *
+                    100
+                    : 0
+                }
+              />
+
+              {/* Current Plan Section */}
+              <div className={styles.planSection}>
+                <div className={styles.sectionHeader}>
+                  <Text className={styles.sectionTitle}>Current Plan</Text>
+                  {billingPlan.billing_period_end && (
+                    <Text className={styles.nextBilling}>
+                      Next billing:{" "}
+                      {dayjs(billingPlan.billing_period_end).format(
+                        "MMM DD, YYYY",
+                      )}
+                    </Text>
+                  )}
+                </div>
+                <div className={styles.planDetails}>
+                  {isLoading ? (
+                    <div className={styles.loadingContainer}>
+                      <motion.div
+                        className={styles.loadingBar}
+                        initial={{ width: "0%" }}
+                        animate={{ width: "100%" }}
+                        transition={{
+                          duration: 1.5,
+                          ease: "easeInOut",
+                          repeat: Infinity,
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className={styles.planName}>
+                        <Icon
+                          icon="ph:crown-simple"
+                          className={styles.planIcon}
+                        />
+                        <Text className={styles.planTitle}>Free</Text>
+                      </div>
+                      <Text className={styles.planPrice}>$0/month</Text>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end mb-[1.5rem]">
+              <div className={`${styles.headerActions} flex !gap-[.75rem]`}>
                 <ConfigProvider theme={themeConfig}>
                   <Select
                     value={selectedProject}
@@ -411,107 +486,36 @@ export default function UsagePage() {
                 <Button
                   icon={<Icon icon="ph:export" />}
                   className={styles.exportBtn}
+                  style={{ height: '2rem' }}
                   onClick={handleExport}
                 >
                   Export
                 </Button>
-                {/* <Button
-                type="primary"
-                icon={<Icon icon="ph:bell" />}
-                className="bg-bud-purple border-bud-purple hover:bg-bud-purple-hover h-[2.5rem] px-[1.5rem]"
-                onClick={handleOpenCreateAlert}
-              >
-                Set Alert
-              </Button> */}
-              </div>
-            </div>
-
-            {/* Metrics Section */}
-            <div className={styles.metricsSection}>
-              <MetricCard
-                title="Total Spend"
-                value={`$${metrics.totalSpend.toFixed(2)}\nof $${billingPlan.usage.cost_quota.toFixed(2)}`}
-                loading={isLoading}
-                trend={
-                  metrics.previousSpend
-                    ? ((metrics.totalSpend - metrics.previousSpend) /
-                        metrics.previousSpend) *
-                      100
-                    : 0
-                }
-              />
-              <MetricCard
-                title="Total tokens"
-                value={
-                  metrics.totalTokens < 10000
-                    ? `${(metrics.totalTokens / 1000).toFixed(1)}K\nof ${(billingPlan.usage.tokens_quota / 1000).toFixed(1)}K`
-                    : `${(metrics.totalTokens / 1000).toFixed(0)}K\nof ${(billingPlan.usage.tokens_quota / 1000).toFixed(0)}K`
-                }
-                loading={isLoading}
-                trend={
-                  metrics.previousTokens
-                    ? ((metrics.totalTokens - metrics.previousTokens) /
-                        metrics.previousTokens) *
-                      100
-                    : 0
-                }
-              />
-              <MetricCard
-                title="Total requests"
-                value={metrics.totalRequests.toLocaleString()}
-                loading={isLoading}
-                trend={
-                  metrics.previousRequests
-                    ? ((metrics.totalRequests - metrics.previousRequests) /
-                        metrics.previousRequests) *
-                      100
-                    : 0
-                }
-              />
-
-              {/* Current Plan Section */}
-              <div className={styles.planSection}>
-                <div className={styles.sectionHeader}>
-                  <Text className={styles.sectionTitle}>Current Plan</Text>
-                  {billingPlan.billing_period_end && (
-                    <Text className={styles.nextBilling}>
-                      Next billing:{" "}
-                      {dayjs(billingPlan.billing_period_end).format(
-                        "MMM DD, YYYY",
-                      )}
-                    </Text>
-                  )}
-                </div>
-                <div className={styles.planDetails}>
-                  {isLoading ? (
-                    <Skeleton active paragraph={{ rows: 2 }} />
-                  ) : (
-                    <>
-                      <div className={styles.planName}>
-                        <Icon
-                          icon="ph:crown-simple"
-                          className={styles.planIcon}
-                        />
-                        <Text className={styles.planTitle}>Free</Text>
-                      </div>
-                      <Text className={styles.planPrice}>$0/month</Text>
-                    </>
-                  )}
-                </div>
               </div>
             </div>
 
             {/* Charts Section */}
-            <div className={styles.chartsSection}>
-              <ConfigProvider theme={themeConfig}>
-                <Tabs
-                  activeKey={activeTab}
-                  onChange={setActiveTab}
-                  items={tabItems}
-                  className={styles.chartTabs}
+            <Card className="bg-bud-bg-secondary border-bud-border rounded-[12px] mb-[2rem]">
+              <Flex
+                justify="space-between"
+                align="center"
+                className="mb-[1.5rem]"
+              >
+                <Text className="text-bud-text-primary font-semibold text-[15px]">
+                  Total Spend
+                </Text>
+
+              </Flex>
+
+              <div className="mt-6">
+                <UsageChart
+                  data={chartData}
+                  type="spend"
+                  loading={chartLoading}
+                  timeRange={timeRange}
                 />
-              </ConfigProvider>
-            </div>
+              </div>
+            </Card>
 
             {/* Billing Alerts */}
             <Card className="bg-bud-bg-secondary border-bud-border rounded-[12px] mb-[2rem]">

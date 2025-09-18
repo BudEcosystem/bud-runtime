@@ -103,11 +103,12 @@ export default function CommonStatus({
         if (data?.workflow_steps[events_field_id]?.eta) {
             calculateEta(data?.workflow_steps[events_field_id]?.eta, setEta);
         }
-
+        console.log('response', response)
         setLoading(false);
     }
 
     useEffect(() => {
+        console.log(`workflowId`, workflowId)
         if (workflowId) {
             getWorkflow();
         }

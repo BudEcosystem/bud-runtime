@@ -52,7 +52,10 @@ function Leaderboards({
           )}
         </div>
       )}
-      <LeaderboardsTable data={leaderboards} leaderboardClasses={leaderboardClasses}/>
+      <LeaderboardsTable
+        data={leaderboards}
+        leaderboardClasses={leaderboardClasses}
+      />
     </div>
   );
 }

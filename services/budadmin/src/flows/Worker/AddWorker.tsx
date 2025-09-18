@@ -29,15 +29,19 @@ export default function AddWorker() {
   return (
     <BudForm
       data={{
-        additonal_concurrency: '1',
+        additonal_concurrency: "1",
       }}
       disableNext={!submittable}
       onNext={async (values) => {
         if (!submittable) {
           form.submit();
           return;
-        };
-        const result = await createWorkerFlow(clusterDetails.id, values.additonal_concurrency, projectId);
+        }
+        const result = await createWorkerFlow(
+          clusterDetails.id,
+          values.additonal_concurrency,
+          projectId,
+        );
         if (result) {
           await getWorkflow(result.workflow_id);
           openDrawerWithStep("add-worker-cluster-config-status");
@@ -52,9 +56,9 @@ export default function AddWorker() {
             description="Enter the additional concurrency to identify the required hardware"
           />
           <DrawerCard classNames="pb-0 mt-[.2rem]">
-
             <Form.Item
-              name={"additonal_concurrency"} hasFeedback
+              name={"additonal_concurrency"}
+              hasFeedback
               rules={[
                 {
                   required: true,
@@ -64,7 +68,7 @@ export default function AddWorker() {
                 {
                   min: 1,
                   message: "Concurrent requests should be greater than 0",
-                }
+                },
               ]}
               className={`flex items-start rounded-[6px] relative !bg-[transparent] mb-[0]`}
             >
@@ -76,7 +80,7 @@ export default function AddWorker() {
                       preview={false}
                       src="/images/info.png"
                       alt="info"
-                      style={{ width: '.75rem', height: '.75rem' }}
+                      style={{ width: ".75rem", height: ".75rem" }}
                     />
                   </CustomPopover>
                 </Text_12_300_EEEEEE>
@@ -92,7 +96,10 @@ export default function AddWorker() {
                 min={1}
                 value={form.getFieldValue("additonal_concurrency")}
                 onChange={(e) => {
-                  if (e.target.value.startsWith("0") && e.target.value.length > 1) {
+                  if (
+                    e.target.value.startsWith("0") &&
+                    e.target.value.length > 1
+                  ) {
                     e.target.value = e.target.value.slice(1);
                   }
                   if (e.target.value.length > 3) {
@@ -103,8 +110,10 @@ export default function AddWorker() {
                     e.target.value = "";
                   }
 
-                  form.setFieldsValue({ additonal_concurrency: e.target.value });
-                  form.validateFields(['additonal_concurrency']);
+                  form.setFieldsValue({
+                    additonal_concurrency: e.target.value,
+                  });
+                  form.validateFields(["additonal_concurrency"]);
                 }}
                 size="large"
                 className="drawerInp py-[.65rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem]"

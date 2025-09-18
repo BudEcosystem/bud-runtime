@@ -14,27 +14,31 @@ export default function SelectModel() {
   const [limit, setLimit] = React.useState(1000);
   const [models, setModels] = React.useState([]);
 
-  const {
-    loading,
-    fetchModels
-  } = useModels();
+  const { loading, fetchModels } = useModels();
   const [search, setSearch] = React.useState("");
-  const { openDrawerWithStep} = useDrawer();
-  const { setSelectedModel, selectedModel, stepFive} = usePerfomanceBenchmark();
+  const { openDrawerWithStep } = useDrawer();
+  const { setSelectedModel, selectedModel, stepFive } =
+    usePerfomanceBenchmark();
 
   useEffect(() => {
     fetchModels({
-      page, limit,
-      table_source: "model"
+      page,
+      limit,
+      table_source: "model",
     }).then((data) => {
       setModels(data);
     });
   }, [page]);
 
   const filteredModels = models?.filter((model) => {
-    return model.name?.toLowerCase().includes(search.toLowerCase()) || model.tags?.some((task) => task?.name?.toLowerCase().includes(search.toLowerCase())) || `${model.model_size}`.includes(search.toLowerCase());
+    return (
+      model.name?.toLowerCase().includes(search.toLowerCase()) ||
+      model.tags?.some((task) =>
+        task?.name?.toLowerCase().includes(search.toLowerCase()),
+      ) ||
+      `${model.model_size}`.includes(search.toLowerCase())
+    );
   });
-
 
   return (
     <BudForm
@@ -45,26 +49,23 @@ export default function SelectModel() {
       // }}
       onBack={async () => {
         openDrawerWithStep("Select-Nodes");
-      }
-      }
+      }}
       backText="Back"
       onNext={() => {
-        stepFive()
-          .then((result) => {
-            if (result) {
-              console.log('result',result.data.workflow_steps.provider_type);
-              if(result.data.workflow_steps.provider_type === "cloud_model") {
-                openDrawerWithStep("model_benchmark-credential-select");
-              } else {
-                openDrawerWithStep("Benchmark-Configuration");
-              }
+        stepFive().then((result) => {
+          if (result) {
+            console.log("result", result.data.workflow_steps.provider_type);
+            if (result.data.workflow_steps.provider_type === "cloud_model") {
+              openDrawerWithStep("model_benchmark-credential-select");
+            } else {
+              openDrawerWithStep("Benchmark-Configuration");
             }
-          })
+          }
+        });
         // openDrawerWithStep("Select-Nodes");
       }}
       nextText="Next"
     >
-
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
@@ -79,11 +80,7 @@ export default function SelectModel() {
             setSelectedModel={setSelectedModel}
             selectedModel={selectedModel}
           >
-            <ModelFilter
-              search={search}
-              setSearch={setSearch}
-
-            />
+            <ModelFilter search={search} setSearch={setSearch} />
           </DeployModelSelect>
         </BudDrawerLayout>
       </BudWraperBox>

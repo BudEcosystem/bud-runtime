@@ -1,0 +1,665 @@
+#  -----------------------------------------------------------------------------
+#  Copyright (c) 2024 Bud Ecosystem Inc.
+#  #
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#  #
+#      http://www.apache.org/licenses/LICENSE-2.0
+#  #
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#  -----------------------------------------------------------------------------
+
+"""Unit tests for PromptService class."""
+
+import json
+import uuid
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
+from budprompt.commons.exceptions import ClientException
+from budprompt.prompt.schemas import (
+    Message,
+    ModelSettings,
+    PromptConfigRequest,
+    PromptConfigurationData,
+)
+from budprompt.prompt.services import PromptService
+
+
+class TestPromptService:
+    """Test cases for PromptService class."""
+
+    @pytest.fixture
+    def mock_redis_service(self):
+        """Create a mock Redis service."""
+        mock_redis = AsyncMock()
+        return mock_redis
+
+    @pytest.fixture
+    def prompt_service(self, mock_redis_service):
+        """Create PromptService instance with mocked Redis."""
+        service = PromptService()
+        service.redis_service = mock_redis_service
+        return service
+
+    @pytest.fixture
+    def sample_config_data(self):
+        """Create sample configuration data."""
+        return PromptConfigurationData(
+            deployment_name="gpt-4",
+            model_settings=ModelSettings(
+                temperature=0.7,
+                max_tokens=1000,
+            ),
+            stream=True,
+            messages=[
+                Message(role="system", content="You are a helpful assistant."),
+                Message(role="user", content="Hello!"),
+            ],
+            llm_retry_limit=3,
+            enable_tools=True,
+            allow_multiple_calls=True,
+            system_prompt_role="system",
+        )
+
+    @pytest.fixture
+    def sample_request(self):
+        """Create sample prompt config request."""
+        return PromptConfigRequest(
+            prompt_id="test-prompt-123",
+            deployment_name="gpt-4",
+            model_settings=ModelSettings(temperature=0.7),
+            stream=True,
+        )
+
+
+class TestSavePromptConfig(TestPromptService):
+    """Test cases for save_prompt_config method."""
+
+    @pytest.mark.asyncio
+    async def test_save_new_config_success(self, prompt_service, mock_redis_service, sample_request):
+        """Test successful saving of new configuration."""
+        # Arrange
+        mock_redis_service.get.return_value = None  # No existing config
+        mock_redis_service.set.return_value = True
+
+        # Act
+        with patch('budprompt.prompt.services.app_settings') as mock_settings:
+            mock_settings.prompt_config_redis_ttl = 86400
+            result = await prompt_service.save_prompt_config(sample_request)
+
+        # Assert
+        assert result.code == 200
+        assert result.message == "Prompt configuration saved successfully"
+        assert result.prompt_id == "test-prompt-123"
+
+        # Verify Redis interactions
+        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123:v1")
+        assert mock_redis_service.set.call_count == 2  # Main data + default_version
+
+        # Verify the stored data
+        call_args_list = mock_redis_service.set.call_args_list
+        assert call_args_list[0][0][0] == "prompt:test-prompt-123:v1"
+        assert call_args_list[1][0][0] == "prompt:test-prompt-123:default_version"
+        assert call_args_list[1][0][1] == "prompt:test-prompt-123:v1"
+        assert call_args_list[0][1]["ex"] == 86400
+
+    @pytest.mark.asyncio
+    async def test_update_existing_config_success(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test successful update of existing configuration."""
+        # Arrange
+        existing_data = sample_config_data.model_dump_json(exclude_none=True)
+        mock_redis_service.get.return_value = existing_data
+        mock_redis_service.set.return_value = True
+
+        # Create update request with partial fields
+        update_request = PromptConfigRequest(
+            prompt_id="test-prompt-123",
+            deployment_name="gpt-3.5-turbo",
+            llm_retry_limit=5,
+        )
+
+        # Act
+        with patch('budprompt.prompt.services.app_settings') as mock_settings:
+            mock_settings.prompt_config_redis_ttl = 86400
+            result = await prompt_service.save_prompt_config(update_request)
+
+        # Assert
+        assert result.code == 200
+        assert result.prompt_id == "test-prompt-123"
+
+        # Verify Redis was called correctly
+        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123:v1")
+        assert mock_redis_service.set.call_count == 2  # Main data + default_version
+
+    @pytest.mark.asyncio
+    async def test_save_config_redis_error(self, prompt_service, mock_redis_service, sample_request):
+        """Test handling of Redis errors during save."""
+        # Arrange
+        mock_redis_service.get.side_effect = Exception("Redis connection failed")
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            await prompt_service.save_prompt_config(sample_request)
+
+        assert exc_info.value.status_code == 500
+        assert "Failed to store prompt configuration" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_save_config_invalid_json(self, prompt_service, mock_redis_service, sample_request):
+        """Test handling of invalid JSON from Redis."""
+        # Arrange
+        mock_redis_service.get.return_value = "invalid json {{"
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            await prompt_service.save_prompt_config(sample_request)
+
+        assert exc_info.value.status_code == 500
+        assert "Invalid data format" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_save_config_tools_require_multiple_calls(self, prompt_service, mock_redis_service):
+        """Test validation that enable_tools=True requires allow_multiple_calls=True."""
+        # Arrange - Create request with enable_tools=True but allow_multiple_calls=False
+        invalid_request = PromptConfigRequest(
+            prompt_id="test-prompt-tools",
+            deployment_name="gpt-4",
+            enable_tools=True,
+            allow_multiple_calls=False  # This should cause validation error
+        )
+
+        # Mock Redis to return None (new config)
+        mock_redis_service.get.return_value = None
+        mock_redis_service.set.return_value = True
+
+        # Act & Assert - Should raise ClientException with status 400
+        with pytest.raises(ClientException) as exc_info:
+            with patch('budprompt.prompt.services.app_settings') as mock_settings:
+                mock_settings.prompt_config_redis_ttl = 86400
+                await prompt_service.save_prompt_config(invalid_request)
+
+        # Verify the correct exception and message
+        assert exc_info.value.status_code == 400
+        assert "Enabling tools requires multiple LLM calls." == exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_save_config_tools_require_multiple_calls_existing_config(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test validation with existing config where enable_tools=True and allow_multiple_calls=False."""
+        # Arrange - Modify existing config to have conflicting settings
+        existing_config = sample_config_data.model_copy(deep=True)
+        existing_config.enable_tools = False  # Start with valid settings
+        existing_config.allow_multiple_calls = True
+        existing_config_json = existing_config.model_dump_json(exclude_none=True)
+
+        # Create request that updates to conflicting settings
+        update_request = PromptConfigRequest(
+            prompt_id="test-prompt-existing",
+            enable_tools=True,  # Enable tools
+            allow_multiple_calls=False  # But disallow multiple calls - should fail
+        )
+
+        # Mock Redis to return existing config
+        mock_redis_service.get.return_value = existing_config_json
+        mock_redis_service.set.return_value = True
+
+        # Act & Assert - Should raise ClientException with status 400
+        with pytest.raises(ClientException) as exc_info:
+            with patch('budprompt.prompt.services.app_settings') as mock_settings:
+                mock_settings.prompt_config_redis_ttl = 86400
+                await prompt_service.save_prompt_config(update_request)
+
+        # Verify the correct exception and message
+        assert exc_info.value.status_code == 400
+        assert "Enabling tools requires multiple LLM calls." == exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_save_config_tools_with_multiple_calls_allowed(self, prompt_service, mock_redis_service):
+        """Test that enable_tools=True with allow_multiple_calls=True is accepted."""
+        # Arrange - Create request with valid combination
+        valid_request = PromptConfigRequest(
+            prompt_id="test-prompt-valid-tools",
+            deployment_name="gpt-4",
+            enable_tools=True,
+            allow_multiple_calls=True  # Valid combination
+        )
+
+        # Mock Redis to return None (new config)
+        mock_redis_service.get.return_value = None
+        mock_redis_service.set.return_value = True
+
+        # Act - Should not raise an exception
+        with patch('budprompt.prompt.services.app_settings') as mock_settings:
+            mock_settings.prompt_config_redis_ttl = 86400
+            result = await prompt_service.save_prompt_config(valid_request)
+
+        # Assert - Should succeed
+        assert result.code == 200
+        assert result.message == "Prompt configuration saved successfully"
+        assert result.prompt_id == "test-prompt-valid-tools"
+
+    @pytest.mark.asyncio
+    async def test_update_config_with_null_values(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test that fields can be updated to null values using model_dump(exclude_unset=True)."""
+        # Arrange - Start with existing config that has values
+        existing_data = sample_config_data.model_dump_json(exclude_none=True)
+        mock_redis_service.get.return_value = existing_data
+        mock_redis_service.set.return_value = True
+
+        # Create update request setting some fields to null
+        update_request = PromptConfigRequest(
+            prompt_id="test-null-update",
+            deployment_name="gpt-3.5-turbo",  # Keep deployment_name
+            model_settings=None,  # Set to null
+            messages=None,  # Set to null
+            llm_retry_limit=None,  # Set to null
+        )
+
+        # Act
+        with patch('budprompt.prompt.services.app_settings') as mock_settings:
+            mock_settings.prompt_config_redis_ttl = 86400
+            result = await prompt_service.save_prompt_config(update_request)
+
+        # Assert
+        assert result.code == 200
+        assert result.prompt_id == "test-null-update"
+
+        # Get the saved data and verify nulls were applied
+        saved_json = mock_redis_service.set.call_args_list[0][0][1]
+        saved_data = json.loads(saved_json)
+
+        assert saved_data["deployment_name"] == "gpt-3.5-turbo"
+        assert saved_data.get("model_settings") is None
+        assert saved_data.get("messages") is None
+        assert saved_data.get("llm_retry_limit") is None
+
+    @pytest.mark.asyncio
+    async def test_deployment_name_cannot_be_null(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test that deployment_name cannot be set to null."""
+        # Arrange - Start with existing config
+        existing_data = sample_config_data.model_dump_json(exclude_none=True)
+        mock_redis_service.get.return_value = existing_data
+
+        # Try to set deployment_name to null
+        update_request = PromptConfigRequest(
+            prompt_id="test-deployment-null",
+            deployment_name=None,  # This should be rejected
+            llm_retry_limit=5,
+        )
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            with patch('budprompt.prompt.services.app_settings') as mock_settings:
+                mock_settings.prompt_config_redis_ttl = 86400
+                await prompt_service.save_prompt_config(update_request)
+
+        assert exc_info.value.status_code == 400
+        assert "deployment_name cannot be set to null" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_partial_update_preserves_unset_fields(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test that partial updates only modify explicitly set fields."""
+        # Arrange - Start with full config
+        existing_data = sample_config_data.model_dump_json(exclude_none=True)
+        mock_redis_service.get.return_value = existing_data
+        mock_redis_service.set.return_value = True
+
+        # Update only specific fields
+        update_request = PromptConfigRequest(
+            prompt_id="test-partial-update",
+            llm_retry_limit=10,  # Only update this field
+        )
+
+        # Act
+        with patch('budprompt.prompt.services.app_settings') as mock_settings:
+            mock_settings.prompt_config_redis_ttl = 86400
+            result = await prompt_service.save_prompt_config(update_request)
+
+        # Assert
+        assert result.code == 200
+
+        # Get the saved data and verify only llm_retry_limit was changed
+        saved_json = mock_redis_service.set.call_args_list[0][0][1]
+        saved_data = json.loads(saved_json)
+
+        # Original values should be preserved
+        assert saved_data["deployment_name"] == sample_config_data.deployment_name
+        assert saved_data["stream"] == sample_config_data.stream
+        assert saved_data["enable_tools"] == sample_config_data.enable_tools
+        assert saved_data["allow_multiple_calls"] == sample_config_data.allow_multiple_calls
+
+        # Only this should be updated
+        assert saved_data["llm_retry_limit"] == 10
+
+    @pytest.mark.asyncio
+    async def test_new_config_with_deployment_name_null_rejected(self, prompt_service, mock_redis_service):
+        """Test that creating new config with null deployment_name is rejected."""
+        # Arrange - No existing config
+        mock_redis_service.get.return_value = None
+
+        # Try to create new config with null deployment_name
+        invalid_request = PromptConfigRequest(
+            prompt_id="test-new-null-deployment",
+            deployment_name=None,  # This should be rejected
+            model_settings=ModelSettings(temperature=0.7),
+        )
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            with patch('budprompt.prompt.services.app_settings') as mock_settings:
+                mock_settings.prompt_config_redis_ttl = 86400
+                await prompt_service.save_prompt_config(invalid_request)
+
+        assert exc_info.value.status_code == 400
+        assert "deployment_name cannot be set to null" in exc_info.value.message
+
+
+class TestGetPromptConfig(TestPromptService):
+    """Test cases for get_prompt_config method."""
+
+    @pytest.mark.asyncio
+    async def test_get_config_success(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test successful retrieval of configuration via default version."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+        config_json = sample_config_data.model_dump_json(exclude_none=True)
+
+        # Mock the default_version lookup to return v1 key
+        mock_redis_service.get.side_effect = [
+            "prompt:test-prompt-123:v1",  # First call returns the default version key
+            config_json  # Second call returns the actual data
+        ]
+
+        # Act
+        result = await prompt_service.get_prompt_config(prompt_id)
+
+        # Assert
+        assert result.code == 200
+        assert result.message == "Prompt configuration retrieved successfully"
+        assert result.prompt_id == prompt_id
+        assert result.data.deployment_name == "gpt-4"
+        assert result.data.model_settings.temperature == 0.7
+        assert len(result.data.messages) == 2
+
+        # Verify Redis was called correctly
+        assert mock_redis_service.get.call_count == 2
+        mock_redis_service.get.assert_any_call("prompt:test-prompt-123:default_version")
+        mock_redis_service.get.assert_any_call("prompt:test-prompt-123:v1")
+
+    @pytest.mark.asyncio
+    async def test_get_config_not_found(self, prompt_service, mock_redis_service):
+        """Test retrieval when default version doesn't exist."""
+        # Arrange
+        prompt_id = "non-existent-id"
+        mock_redis_service.get.return_value = None  # Default version not found
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            await prompt_service.get_prompt_config(prompt_id)
+
+        assert exc_info.value.status_code == 404
+        assert f"Default version not found for prompt_id: {prompt_id}" in exc_info.value.message
+
+        # Verify Redis was called
+        mock_redis_service.get.assert_called_once_with("prompt:non-existent-id:default_version")
+
+    @pytest.mark.asyncio
+    async def test_get_config_invalid_json(self, prompt_service, mock_redis_service):
+        """Test handling of invalid JSON data from Redis."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+        # First call returns default version key, second returns invalid JSON
+        mock_redis_service.get.side_effect = [
+            "prompt:test-prompt-123:v1",  # Default version key
+            "invalid json {{"  # Invalid JSON data
+        ]
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            await prompt_service.get_prompt_config(prompt_id)
+
+        assert exc_info.value.status_code == 500
+        # The error message could be either from JSON parsing or general exception
+        assert "Failed to retrieve prompt configuration" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_get_config_redis_error(self, prompt_service, mock_redis_service):
+        """Test handling of Redis connection errors."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+        mock_redis_service.get.side_effect = Exception("Redis connection failed")
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            await prompt_service.get_prompt_config(prompt_id)
+
+        assert exc_info.value.status_code == 500
+        assert "Failed to retrieve prompt configuration" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_get_config_with_partial_data(self, prompt_service, mock_redis_service):
+        """Test retrieval of configuration with partial fields."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+        partial_config = PromptConfigurationData(
+            deployment_name="gpt-4",
+            stream=False,
+        )
+        config_json = partial_config.model_dump_json(exclude_none=True)
+
+        # Mock default version lookup
+        mock_redis_service.get.side_effect = [
+            "prompt:test-prompt-123:v1",  # Default version key
+            config_json  # Actual data
+        ]
+
+        # Act
+        result = await prompt_service.get_prompt_config(prompt_id)
+
+        # Assert
+        assert result.code == 200
+        assert result.prompt_id == prompt_id
+        assert result.data.deployment_name == "gpt-4"
+        assert result.data.stream == False
+        assert result.data.model_settings is None
+        assert result.data.messages is None
+
+
+class TestGetPromptConfigVersioning(TestPromptService):
+    """Test cases for versioned retrieval of prompt configuration."""
+
+    @pytest.mark.asyncio
+    async def test_get_specific_version_success(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test successful retrieval of specific version."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+        version = 1
+        config_json = sample_config_data.model_dump_json(exclude_none=True)
+
+        # When requesting specific version, only one Redis call is made
+        mock_redis_service.get.return_value = config_json
+
+        # Act
+        result = await prompt_service.get_prompt_config(prompt_id, version=version)
+
+        # Assert
+        assert result.code == 200
+        assert result.message == "Prompt configuration retrieved successfully"
+        assert result.prompt_id == prompt_id
+        assert result.data.deployment_name == "gpt-4"
+
+        # Verify Redis was called correctly with version-specific key
+        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123:v1")
+
+    @pytest.mark.asyncio
+    async def test_get_specific_version_not_found(self, prompt_service, mock_redis_service):
+        """Test retrieval when specific version doesn't exist."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+        version = 2
+        mock_redis_service.get.return_value = None  # Version not found
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            await prompt_service.get_prompt_config(prompt_id, version=version)
+
+        assert exc_info.value.status_code == 404
+        assert f"Version {version} not found for prompt_id: {prompt_id}" in exc_info.value.message
+
+        # Verify Redis was called with version-specific key
+        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123:v2")
+
+    @pytest.mark.asyncio
+    async def test_get_default_version_when_data_missing(self, prompt_service, mock_redis_service):
+        """Test retrieval when default version points to non-existent data."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+
+        # Default version exists but points to non-existent data
+        mock_redis_service.get.side_effect = [
+            "prompt:test-prompt-123:v1",  # Default version key exists
+            None  # But the actual data doesn't exist
+        ]
+
+        # Act & Assert
+        with pytest.raises(ClientException) as exc_info:
+            await prompt_service.get_prompt_config(prompt_id)
+
+        assert exc_info.value.status_code == 404
+        assert f"Configuration not found for prompt_id: {prompt_id}" in exc_info.value.message
+
+        # Verify both Redis calls were made
+        assert mock_redis_service.get.call_count == 2
+        mock_redis_service.get.assert_any_call("prompt:test-prompt-123:default_version")
+        mock_redis_service.get.assert_any_call("prompt:test-prompt-123:v1")
+
+    @pytest.mark.asyncio
+    async def test_get_higher_version(self, prompt_service, mock_redis_service, sample_config_data):
+        """Test retrieval of a higher version number."""
+        # Arrange
+        prompt_id = "test-prompt-123"
+        version = 5
+        config_json = sample_config_data.model_dump_json(exclude_none=True)
+        mock_redis_service.get.return_value = config_json
+
+        # Act
+        result = await prompt_service.get_prompt_config(prompt_id, version=version)
+
+        # Assert
+        assert result.code == 200
+        mock_redis_service.get.assert_called_once_with("prompt:test-prompt-123:v5")
+
+
+class TestPromptServiceIntegration(TestPromptService):
+    """Integration tests for save and get operations."""
+
+    @pytest.mark.asyncio
+    async def test_save_and_get_config_flow(self, prompt_service, mock_redis_service):
+        """Test complete flow of saving and retrieving configuration."""
+        # Arrange
+        prompt_id = str(uuid.uuid4())
+        request = PromptConfigRequest(
+            prompt_id=prompt_id,
+            deployment_name="gpt-4",
+            model_settings=ModelSettings(
+                temperature=0.8,
+                max_tokens=1500,
+            ),
+            stream=True,
+            messages=[
+                Message(role="system", content="Test system message"),
+            ],
+            enable_tools=True,
+        )
+
+        # Mock Redis for save operation
+        mock_redis_service.get.return_value = None  # No existing config
+        mock_redis_service.set.return_value = True
+
+        # Act - Save configuration
+        with patch('budprompt.prompt.services.app_settings') as mock_settings:
+            mock_settings.prompt_config_redis_ttl = 86400
+            save_result = await prompt_service.save_prompt_config(request)
+
+        # Assert save operation
+        assert save_result.code == 200
+        assert save_result.prompt_id == prompt_id
+
+        # Get the saved data from the first set call (the actual data, not the default_version pointer)
+        saved_json = mock_redis_service.set.call_args_list[0][0][1]
+
+        # Mock Redis for get operation - need to mock the versioning flow
+        mock_redis_service.get.side_effect = [
+            f"prompt:{prompt_id}:v1",  # Default version lookup
+            saved_json  # Actual data
+        ]
+
+        # Act - Get configuration
+        get_result = await prompt_service.get_prompt_config(prompt_id)
+
+        # Assert get operation
+        assert get_result.code == 200
+        assert get_result.prompt_id == prompt_id
+        assert get_result.data.deployment_name == "gpt-4"
+        assert get_result.data.model_settings.temperature == 0.8
+        assert get_result.data.stream == True
+        assert len(get_result.data.messages) == 1
+        assert get_result.data.enable_tools == True
+
+    @pytest.mark.asyncio
+    async def test_update_and_get_config_flow(self, prompt_service, mock_redis_service):
+        """Test updating existing configuration and retrieving it."""
+        # Arrange
+        prompt_id = "update-test-123"
+
+        # Initial configuration
+        initial_config = PromptConfigurationData(
+            deployment_name="gpt-4",
+            model_settings=ModelSettings(temperature=0.7),
+            stream=True,
+        )
+        initial_json = initial_config.model_dump_json(exclude_none=True)
+
+        # Update request with partial fields
+        update_request = PromptConfigRequest(
+            prompt_id=prompt_id,
+            deployment_name="gpt-3.5-turbo",
+            llm_retry_limit=10,
+        )
+
+        # Mock Redis for update operation
+        mock_redis_service.get.return_value = initial_json
+        mock_redis_service.set.return_value = True
+
+        # Act - Update configuration
+        with patch('budprompt.prompt.services.app_settings') as mock_settings:
+            mock_settings.prompt_config_redis_ttl = 86400
+            update_result = await prompt_service.save_prompt_config(update_request)
+
+        # Get the updated data from the first set call (the actual data, not the default_version pointer)
+        updated_json = mock_redis_service.set.call_args_list[0][0][1]
+
+        # Mock Redis for get operation - need to mock the versioning flow
+        mock_redis_service.get.side_effect = [
+            f"prompt:{prompt_id}:v1",  # Default version lookup
+            updated_json  # Actual data
+        ]
+
+        # Act - Get updated configuration
+        get_result = await prompt_service.get_prompt_config(prompt_id)
+
+        # Assert
+        assert get_result.code == 200
+        assert get_result.data.deployment_name == "gpt-3.5-turbo"  # Updated
+        assert get_result.data.model_settings.temperature == 0.7  # Preserved
+        assert get_result.data.stream == True  # Preserved
+        assert get_result.data.llm_retry_limit == 10  # Updated
+
+
+# docker exec -it budserve-development-budprompt bash -c "PYTHONPATH=/app pytest tests/test_unit_tests/test_prompt_service.py -v"

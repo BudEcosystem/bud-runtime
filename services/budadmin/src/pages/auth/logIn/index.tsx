@@ -23,8 +23,9 @@ interface DataInterface {
 }
 
 export default function Login() {
-  const {  user } = useUser();
-  const { activePage, setActivePage, setAuthError, authError } = useAuthNavigation();
+  const { user } = useUser();
+  const { activePage, setActivePage, setAuthError, authError } =
+    useAuthNavigation();
   const { isLoading, showLoader, hideLoader } = useLoader();
   const router = useRouter();
   const [userId, setUserId] = useState("");
@@ -58,11 +59,12 @@ export default function Login() {
       const response: any = await AppRequest.Post("auth/login", {
         email: payload.email,
         password: payload.password,
+        user_type: "admin",
       });
       const data = response.data;
       if (data.success) {
         successToast(data.message);
-        setAuthError('')
+        setAuthError("");
       }
 
       setUserData(data.token);
@@ -80,9 +82,9 @@ export default function Login() {
       }
     } catch (error) {
       console.error("Login error:", error);
-      console.error(typeof (error));
-      if (typeof (error.message) === 'string') {
-        setAuthError(error.message)
+      console.error(typeof error);
+      if (typeof error.message === "string") {
+        setAuthError(error.message);
       }
       hideLoader();
     }
@@ -156,12 +158,10 @@ export default function Login() {
       console.error("Reset password error:", error);
       hideLoader();
     }
-  }
+  };
   return (
     <AuthLayout>
-      <div
-        className="flex flex-col justify-center items-center  h-full overflow-hidden"
-      >
+      <div className="flex flex-col justify-center items-center  h-full overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
             key={activePage}
@@ -179,7 +179,9 @@ export default function Login() {
               {activePage === 3 && (
                 <HuggingfaceKeyPage onSubmit={handleAddHuggingFaceKey} />
               )}
-              {activePage === 4 && <ContactAdmin onSubmit={handleForgetPassword} />}
+              {activePage === 4 && (
+                <ContactAdmin onSubmit={handleForgetPassword} />
+              )}
               {activePage === 5 && <RequestSent />}
             </>
           </motion.div>

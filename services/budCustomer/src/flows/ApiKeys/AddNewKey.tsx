@@ -42,7 +42,17 @@ function AddKeyForm({
         label="Credential Name"
         placeholder="Enter name"
         infoText="This is the name"
-        rules={[{ required: true, message: "Please input name!" }]}
+        rules={[
+          { required: true, message: "Please input name!" },
+          {
+            validator: (_, value) => {
+              if (value && value.trim().length === 0) {
+                return Promise.reject(new Error("Name cannot be only spaces"));
+              }
+              return Promise.resolve();
+            },
+          },
+        ]}
         ClassNames="mt-[.1rem] mb-[0rem]"
         InputClasses="py-[.5rem]"
         formItemClassnames="mb-[0]"
@@ -51,7 +61,7 @@ function AddKeyForm({
           form.validateFields(["name"]);
           setApiKeyData((prev: any) => ({
             ...prev,
-            name: value,
+            name: value ? value.trim() : "",
           }));
         }}
       />
@@ -107,16 +117,26 @@ export default function AddNewKey() {
 
   const handleSubmit = async (values: any) => {
     // Prevent double submission
-    if (isSubmitting) return;
+    if (isSubmitting) {
+      console.log("Submission already in progress, ignoring click");
+      return;
+    }
+
+    // Validate required fields before proceeding
+    const payload = {
+      name: (apiKeyData.name || values.name || "").trim(),
+      project_id: apiKeyData.project_id || values.project,
+      expiry: apiKeyData.expiry || values.SetExpiry,
+      credential_type: "client_app",
+    };
+
+    if (!payload.name || !payload.project_id || !payload.expiry) {
+      errorToast("Please fill in all required fields");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const payload = {
-        name: apiKeyData.name || values.name,
-        project_id: apiKeyData.project_id || values.project,
-        expiry: apiKeyData.expiry || values.SetExpiry,
-        credential_type: "client_app",
-      };
 
       const response = await AppRequest.Post("/credentials/", payload);
 

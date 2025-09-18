@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 import { Form, FormRule, Image } from "antd";
 import { BudFormContext } from "../context/BudFormContext";
 import { Text_12_300_EEEEEE, Text_12_400_808080 } from "../../text";
-import { components, MenuPlacement } from 'react-select';
+import { components, MenuPlacement } from "react-select";
 import CreatableSelect from "react-select/creatable";
 import {
   colourOptions,
@@ -44,32 +44,33 @@ export default function TagsInput(props: SelectProps) {
   const ref = React.useRef(null);
 
   useEffect(() => {
-    const element = document.getElementById('next-button');
+    const element = document.getElementById("next-button");
     if (element) {
-      element.addEventListener('click', () => {
+      element.addEventListener("click", () => {
         setOnTouched(true);
         form.validateFields([fieldName]);
       });
     }
     return () => {
       if (element) {
-        element.removeEventListener('click', () => {
+        element.removeEventListener("click", () => {
           setOnTouched(true);
           form.validateFields([fieldName]);
         });
       }
-    }
+    };
   }, []);
-
 
   useEffect(() => {
     const updated: Tag[] = selected?.map((item) => ({
       name: item.name,
       color: item.color,
     }));
-    form && form.setFieldsValue && form.setFieldsValue({
-      [fieldName]: updated,
-    });
+    form &&
+      form.setFieldsValue &&
+      form.setFieldsValue({
+        [fieldName]: updated,
+      });
     props.onChange && props.onChange(updated);
   }, [selected]);
 
@@ -94,7 +95,7 @@ export default function TagsInput(props: SelectProps) {
     } catch (error) {
       console.error("Error", error);
     }
-  }
+  };
 
   useEffect(() => {
     if (props.defaultValue) {
@@ -113,19 +114,20 @@ export default function TagsInput(props: SelectProps) {
     >
       <div className="w-full">
         <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-[.75rem] text-[#EEEEEE] font-[400]">
-          {props.label || "Tags"} {required && <b className="text-[#FF4D4F]">*</b>}
+          {props.label || "Tags"}{" "}
+          {required && <b className="text-[#FF4D4F]">*</b>}
           <CustomPopover title={props.info}>
             <Image
               preview={false}
               src="/images/info.png"
               alt="info"
-              style={{ width: '.75rem' }}
+              style={{ width: ".75rem" }}
             />
           </CustomPopover>
         </Text_12_300_EEEEEE>
       </div>
       <CreatableSelect
-        menuPlacement={props.menuplacement || 'auto'}
+        menuPlacement={props.menuplacement || "auto"}
         ref={ref}
         className={`drawerSelect w-full placeholder:text-xs text-xs  text-[#EEEEEE] indent-[.5rem]  placeholder:text-[#808080] font-light outline-none !bg-[transparent] rounded-[6px] hover:!bg-[#FFFFFF08] ${props.SelectClassNames}`}
         closeMenuOnSelect={false}
@@ -141,10 +143,12 @@ export default function TagsInput(props: SelectProps) {
           value: item.color,
         }))}
         onChange={(newValue) => {
-          setSelected(newValue.map((item) => ({
-            name: item.label,
-            color: item.value,
-          })));
+          setSelected(
+            newValue.map((item) => ({
+              name: item.label,
+              color: item.value,
+            })),
+          );
         }}
         onBlur={() => {
           setOnTouched(true);
@@ -172,18 +176,29 @@ export default function TagsInput(props: SelectProps) {
         }}
         onCreateOption={handleCreate}
         components={{
-          DropdownIndicator: required &&  onTouched && selected.length === 0 ? () => <Image
-          preview={false}
-          className="absolute right-[.5rem] cursor-pointer"
-          src="/icons/warning.svg" alt="error" width={"1rem"} height={"1rem"} /> : null,
+          DropdownIndicator:
+            required && onTouched && selected.length === 0
+              ? () => (
+                  <Image
+                    preview={false}
+                    className="absolute right-[.5rem] cursor-pointer"
+                    src="/icons/warning.svg"
+                    alt="error"
+                    width={"1rem"}
+                    height={"1rem"}
+                  />
+                )
+              : null,
           MenuList: (props) => {
             return (
               <components.MenuList {...props}>
                 <Text_12_400_808080
                   style={{
-                    marginBottom: '16px',
+                    marginBottom: "16px",
                   }}
-                >Select an option or create one</Text_12_400_808080>
+                >
+                  Select an option or create one
+                </Text_12_400_808080>
                 {props.children}
               </components.MenuList>
             );
@@ -195,7 +210,7 @@ export default function TagsInput(props: SelectProps) {
               colourOptions.find((option) => option.value === props.data.value)
                 ?.value || "#FFF";
             const selectedTag = selected?.find(
-              (tag) => tag.name === props.data.label
+              (tag) => tag.name === props.data.label,
             );
 
             return (
@@ -217,8 +232,8 @@ export default function TagsInput(props: SelectProps) {
                       e.stopPropagation();
                       setSelected(
                         selected.filter(
-                          (item) => item.name !== props.data.label
-                        )
+                          (item) => item.name !== props.data.label,
+                        ),
                       );
                     }
                   }}
@@ -244,7 +259,7 @@ export default function TagsInput(props: SelectProps) {
                           style={{
                             width: ".75rem",
                             height: ".75rem",
-                            color: '#B3B3B3 !important'
+                            color: "#B3B3B3 !important",
                           }}
                         />
                       )}

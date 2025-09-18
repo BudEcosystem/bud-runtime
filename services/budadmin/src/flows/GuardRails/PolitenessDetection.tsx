@@ -40,7 +40,7 @@ export default function PolitenessDetection() {
       nextText="Create"
       disableNext={!config.name}
     >
-      <BudWraperBox >
+      <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Politeness Detection"
@@ -52,15 +52,17 @@ export default function PolitenessDetection() {
           <div className="px-[1.35rem] pb-[1.35rem]">
             {/* Name Input */}
             <div className="mb-[1.5rem]">
-              <Text_14_400_EEEEEE className="mb-[0.5rem]">Name</Text_14_400_EEEEEE>
+              <Text_14_400_EEEEEE className="mb-[0.5rem]">
+                Name
+              </Text_14_400_EEEEEE>
               <Input
                 placeholder="Enter guardrail name"
                 value={config.name}
                 onChange={(e) => setConfig({ ...config, name: e.target.value })}
                 className="bg-transparent text-[#EEEEEE] border-[#757575] hover:border-[#EEEEEE] focus:border-[#EEEEEE]"
                 style={{
-                  backgroundColor: 'transparent',
-                  color: '#EEEEEE',
+                  backgroundColor: "transparent",
+                  color: "#EEEEEE",
                 }}
               />
             </div>
@@ -78,7 +80,9 @@ export default function PolitenessDetection() {
                 <Slider
                   className="flex-1"
                   value={config.sensitivity}
-                  onChange={(value) => setConfig({ ...config, sensitivity: value })}
+                  onChange={(value) =>
+                    setConfig({ ...config, sensitivity: value })
+                  }
                   min={0}
                   max={100}
                   tooltip={{
@@ -116,7 +120,9 @@ export default function PolitenessDetection() {
                   <Select
                     placeholder="Select Action"
                     value={config.action}
-                    onChange={(value) => setConfig({ ...config, action: value })}
+                    onChange={(value) =>
+                      setConfig({ ...config, action: value })
+                    }
                     style={{
                       backgroundColor: "transparent",
                       color: "#EEEEEE",
@@ -137,12 +143,22 @@ export default function PolitenessDetection() {
 
             {/* Configuration Summary */}
             <div className="p-[1rem] bg-[#FFFFFF08] rounded-[8px] border border-[#1F1F1F]">
-              <Text_12_400_757575 className="mb-[0.5rem]">Configuration Summary</Text_12_400_757575>
+              <Text_12_400_757575 className="mb-[0.5rem]">
+                Configuration Summary
+              </Text_12_400_757575>
               <div className="space-y-[0.25rem]">
-                <Text_12_400_B3B3B3>• Provider: Azure AI Foundry</Text_12_400_B3B3B3>
-                <Text_12_400_B3B3B3>• Type: Politeness Detection</Text_12_400_B3B3B3>
-                <Text_12_400_B3B3B3>• Sensitivity: {config.sensitivity}%</Text_12_400_B3B3B3>
-                <Text_12_400_B3B3B3>• Action: {config.action}</Text_12_400_B3B3B3>
+                <Text_12_400_B3B3B3>
+                  • Provider: Azure AI Foundry
+                </Text_12_400_B3B3B3>
+                <Text_12_400_B3B3B3>
+                  • Type: Politeness Detection
+                </Text_12_400_B3B3B3>
+                <Text_12_400_B3B3B3>
+                  • Sensitivity: {config.sensitivity}%
+                </Text_12_400_B3B3B3>
+                <Text_12_400_B3B3B3>
+                  • Action: {config.action}
+                </Text_12_400_B3B3B3>
               </div>
             </div>
           </div>

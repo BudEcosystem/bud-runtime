@@ -4,9 +4,7 @@ import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { CheckCircleOutlined } from "@ant-design/icons";
 import React from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import {
-  Text_16_600_FFFFFF,
-} from "@/components/ui/text";
+import { Text_16_600_FFFFFF } from "@/components/ui/text";
 
 export default function ProbeDeploymentSuccess() {
   const { closeDrawer } = useDrawer();
@@ -16,12 +14,7 @@ export default function ProbeDeploymentSuccess() {
   };
 
   return (
-    <BudForm
-      data={{}}
-      onNext={handleDone}
-      nextText="Done"
-      showBack={false}
-    >
+    <BudForm data={{}} onNext={handleDone} nextText="Done" showBack={false}>
       <BudWraperBox>
         <BudDrawerLayout>
           <div className="flex flex-col items-center justify-center min-h-[400px] px-[2rem] py-[3rem]">
@@ -43,7 +36,8 @@ export default function ProbeDeploymentSuccess() {
             {/* Additional Success Details (optional) */}
             <div className="mt-[2rem] text-center space-y-[0.5rem]">
               <div className="text-[#B3B3B3] text-[14px]">
-                Your guardrail probe has been successfully deployed and is now active.
+                Your guardrail probe has been successfully deployed and is now
+                active.
               </div>
               <div className="text-[#757575] text-[12px]">
                 You can monitor its performance in the Guardrails dashboard.

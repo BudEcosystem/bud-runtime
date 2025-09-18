@@ -39,7 +39,7 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
 
   const handleScrollToContainer = () => {
     if (containerRef.current) {
-      containerRef.current.scrollIntoView({ behavior: 'smooth' });
+      containerRef.current.scrollIntoView({ behavior: "smooth" });
     }
   };
   useEffect(() => {
@@ -55,7 +55,7 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
           value: `${data?.quantizations_count} models`,
           color: "#B3B3B3",
           key: "adapter",
-        })
+        });
       }, 500);
     }
   }, [goToAdapter]);
@@ -152,8 +152,9 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
             <div className="pt-[1.3rem]">
               <div
                 ref={descriptionRef}
-                className={`leading-[1.05rem] tracking-[.01em max-w-[100%] ${isExpanded ? "" : "line-clamp-2"
-                  } overflow-hidden`}
+                className={`leading-[1.05rem] tracking-[.01em max-w-[100%] ${
+                  isExpanded ? "" : "line-clamp-2"
+                } overflow-hidden`}
                 style={{ display: "-webkit-box", WebkitBoxOrient: "vertical" }}
               >
                 <Text_12_400_B3B3B3 className="leading-[180%]">
@@ -201,23 +202,35 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
         <div>
           <div className="pt-[1.3rem]">
             <Text_14_400_EEEEEE>Modalities</Text_14_400_EEEEEE>
-            <Text_12_400_757575 className="pt-[.33rem]">Following is the list of things model is really good at doing</Text_12_400_757575>
+            <Text_12_400_757575 className="pt-[.33rem]">
+              Following is the list of things model is really good at doing
+            </Text_12_400_757575>
             <div className="modality flex items-center justify-start gap-[.5rem] mt-[1rem]">
               <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-[#ffffff08] w-[50%] p-[1rem] rounded-[6px]">
-                <Text_14_400_EEEEEE className="leading-[100%]">Input</Text_14_400_EEEEEE>
+                <Text_14_400_EEEEEE className="leading-[100%]">
+                  Input
+                </Text_14_400_EEEEEE>
                 <div className="flex justify-center items-center gap-x-[.5rem]">
                   <div className="h-[1.25rem]">
                     <Image
                       preview={false}
-                      src={data.modality.text.input ? "/images/drawer/endpoints/text.png" : "/images/drawer/endpoints/text-not.png"}
+                      src={
+                        data.modality.text.input
+                          ? "/images/drawer/endpoints/text.png"
+                          : "/images/drawer/endpoints/text-not.png"
+                      }
                       alt={data.modality.text.label}
-                      style={{ width: '1.25rem', height: "1.25rem" }}
+                      style={{ width: "1.25rem", height: "1.25rem" }}
                     />
                   </div>
                   <div className="h-[1.25rem]">
                     <Image
                       preview={false}
-                      src={data.modality.image.input ? "/images/drawer/endpoints/image.png" : "/images/drawer/endpoints/image-not.png"}
+                      src={
+                        data.modality.image.input
+                          ? "/images/drawer/endpoints/image.png"
+                          : "/images/drawer/endpoints/image-not.png"
+                      }
                       alt={data.modality.image.label}
                       style={{ height: "1.25rem" }}
                     />
@@ -225,7 +238,11 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
                   <div className="h-[1.25rem]">
                     <Image
                       preview={false}
-                      src={data.modality.audio.input ? "/images/drawer/endpoints/audio_speech.png" : "/images/drawer/endpoints/audio_speech-not.png"}
+                      src={
+                        data.modality.audio.input
+                          ? "/images/drawer/endpoints/audio_speech.png"
+                          : "/images/drawer/endpoints/audio_speech-not.png"
+                      }
                       alt={data.modality.audio.label}
                       style={{ height: "1.25rem" }}
                     />
@@ -235,19 +252,25 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
                   {[
                     data.modality.text.input && data.modality.text.label,
                     data.modality.image.input && data.modality.image.label,
-                    data.modality.audio.input && data.modality.audio.label
+                    data.modality.audio.input && data.modality.audio.label,
                   ]
                     .filter(Boolean)
-                    .join(', ')}
+                    .join(", ")}
                 </Text_12_400_EEEEEE>
               </div>
               <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-[#ffffff08] w-[50%] p-[1rem] rounded-[6px]">
-                <Text_14_400_EEEEEE className="leading-[100%]">Output</Text_14_400_EEEEEE>
+                <Text_14_400_EEEEEE className="leading-[100%]">
+                  Output
+                </Text_14_400_EEEEEE>
                 <div className="flex justify-center items-center gap-x-[.5rem]">
                   <div className="h-[1.25rem]">
                     <Image
                       preview={false}
-                      src={data.modality.text.output ? "/images/drawer/endpoints/text.png" : "/images/drawer/endpoints/text-not.png"}
+                      src={
+                        data.modality.text.output
+                          ? "/images/drawer/endpoints/text.png"
+                          : "/images/drawer/endpoints/text-not.png"
+                      }
                       alt={data.modality.text.label}
                       style={{ height: "1.25rem" }}
                     />
@@ -255,7 +278,11 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
                   <div className="h-[1.25rem]">
                     <Image
                       preview={false}
-                      src={data.modality.image.output ? "/images/drawer/endpoints/image.png" : "/images/drawer/endpoints/image-not.png"}
+                      src={
+                        data.modality.image.output
+                          ? "/images/drawer/endpoints/image.png"
+                          : "/images/drawer/endpoints/image-not.png"
+                      }
                       alt={data.modality.image.label}
                       style={{ height: "1.25rem" }}
                     />
@@ -263,7 +290,11 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
                   <div className="h-[1.25rem]">
                     <Image
                       preview={false}
-                      src={data.modality.audio.output ? "/images/drawer/endpoints/audio_speech.png" : "/images/drawer/endpoints/audio_speech-not.png"}
+                      src={
+                        data.modality.audio.output
+                          ? "/images/drawer/endpoints/audio_speech.png"
+                          : "/images/drawer/endpoints/audio_speech-not.png"
+                      }
                       alt={data.modality.audio.label}
                       style={{ height: "1.25rem" }}
                     />
@@ -273,10 +304,10 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
                   {[
                     data.modality.text.output && data.modality.text.label,
                     data.modality.image.output && data.modality.image.label,
-                    data.modality.audio.output && data.modality.audio.label
+                    data.modality.audio.output && data.modality.audio.label,
                   ]
                     .filter(Boolean)
-                    .join(', ')}
+                    .join(", ")}
                 </Text_12_400_EEEEEE>
               </div>
             </div>
@@ -286,12 +317,19 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
         <div>
           <div className="pt-[1.3rem]">
             <Text_14_400_EEEEEE>Supported Endpoints</Text_14_400_EEEEEE>
-            <Text_12_400_757575 className="pt-[.33rem]">Following is the list of things model is really good at doing</Text_12_400_757575>
+            <Text_12_400_757575 className="pt-[.33rem]">
+              Following is the list of things model is really good at doing
+            </Text_12_400_757575>
             <div className="modality flex flex-wrap items-start justify-between gap-y-[.5rem] gap-x-[.75rem] mt-[1.5rem]">
               {Object.entries(data.supported_endpoints).map(([key, value]) => {
-                const iconName = value.enabled ? `${key}.png` : `${key}-not.png`;
+                const iconName = value.enabled
+                  ? `${key}.png`
+                  : `${key}-not.png`;
                 return (
-                  <div key={key} className="flex items-center justify-start gap-[.8rem] w-[calc(50%-0.4rem)] bg-[#ffffff08] p-[1rem] rounded-[6px]">
+                  <div
+                    key={key}
+                    className="flex items-center justify-start gap-[.8rem] w-[calc(50%-0.4rem)] bg-[#ffffff08] p-[1rem] rounded-[6px]"
+                  >
                     <div className="h-[1.25rem]">
                       <Image
                         preview={false}
@@ -316,14 +354,11 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
                       ) : (
                         <>
                           <Text_14_400_757575>{value.label}</Text_14_400_757575>
-                           <Text_12_400_757575 className="leading-[180%]">
+                          <Text_12_400_757575 className="leading-[180%]">
                             {value.path}
                           </Text_12_400_757575>
                         </>
                       )}
-
-
-
                     </div>
                   </div>
                 );
@@ -597,7 +632,7 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
         )}
         <div className="hR"></div>
 
-        {data?.provider_type !== 'cloud_model' && (
+        {data?.provider_type !== "cloud_model" && (
           <div className="mt-[1.4rem] mb-[1.4rem]" ref={containerRef}>
             <div
               className="w-full mb-[1rem] py-[1.5rem] px-[1rem] cursor-pointer bg-[#101010] hover:bg-[#1F1F1F]  border border-[#1F1F1F] rounded-[8px]"

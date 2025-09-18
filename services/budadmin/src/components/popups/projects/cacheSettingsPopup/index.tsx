@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Dialog, Button, Text, TextField, Flex, Box, VisuallyHidden } from "@radix-ui/themes";
+import {
+  Dialog,
+  Button,
+  Text,
+  TextField,
+  Flex,
+  Box,
+  VisuallyHidden,
+} from "@radix-ui/themes";
 import { Cross1Icon } from "@radix-ui/react-icons";
 import {
   SelectInput,
@@ -39,11 +47,14 @@ const CacheSettingsPopup: React.FC<CacheSettingsPopupProps> = ({
   onSubmit,
   // saveForm
 }) => {
-  const [formData, setFormData] = useState<any>({...initialValues?.cachedValues,
+  const [formData, setFormData] = useState<any>({
+    ...initialValues?.cachedValues,
     maxCache: initialValues.cachedValues.maxCache || 1000,
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
-  const [sliderValue, setSliderValue] = useState(initialValues.cachedValues.score || [0.90]);
+  const [sliderValue, setSliderValue] = useState(
+    initialValues.cachedValues.score || [0.9],
+  );
   const evictionList = [
     {
       code: "LRU",
@@ -94,23 +105,34 @@ const CacheSettingsPopup: React.FC<CacheSettingsPopupProps> = ({
   // };
 
   const defaultEvictionPolicy = evictionList.find(
-    (policy) => policy.code === 'LFU'
+    (policy) => policy.code === "LFU",
   );
   const EmbeddingModel = [
     {
       model: {
-        name: 'sentence-transformers/all-mpnet-base-v2',
-        uri: 'sentence-transformers/all-mpnet-base-v2',
+        name: "sentence-transformers/all-mpnet-base-v2",
+        uri: "sentence-transformers/all-mpnet-base-v2",
       },
     },
   ];
   const defaultEmbeddingModle = EmbeddingModel.find(
-    (obj) => obj.model.name === 'sentence-transformers/all-mpnet-base-v2'
+    (obj) => obj.model.name === "sentence-transformers/all-mpnet-base-v2",
   );
-  const [embeddingModel, setEmbeddingModel] = useState<any>(defaultEmbeddingModle);
-  const [evictionPolicy, setEvictionPolicy] = useState<any>(initialValues.cachedValues.evictionPolicy ?
-    evictionList?.filter((el: any)=> el.name === initialValues.cachedValues.evictionPolicy)[0] : defaultEvictionPolicy);
-  const [isTtl, setIsTtl] = useState<any>(evictionList?.filter((el: any)=> el.name === initialValues?.cachedValues?.evictionPolicy)[0]?.code === 'TTL');
+  const [embeddingModel, setEmbeddingModel] = useState<any>(
+    defaultEmbeddingModle,
+  );
+  const [evictionPolicy, setEvictionPolicy] = useState<any>(
+    initialValues.cachedValues.evictionPolicy
+      ? evictionList?.filter(
+          (el: any) => el.name === initialValues.cachedValues.evictionPolicy,
+        )[0]
+      : defaultEvictionPolicy,
+  );
+  const [isTtl, setIsTtl] = useState<any>(
+    evictionList?.filter(
+      (el: any) => el.name === initialValues?.cachedValues?.evictionPolicy,
+    )[0]?.code === "TTL",
+  );
 
   const handleSubmitCache = () => {
     onSubmit(formData);
@@ -142,7 +164,7 @@ const CacheSettingsPopup: React.FC<CacheSettingsPopupProps> = ({
     setFormData(initialValues?.cachedValues);
     setEmbeddingModel("");
     setEvictionPolicy("");
-    setSliderValue([0.90]);
+    setSliderValue([0.9]);
     setErrors({});
   }, [
     setFormData,
@@ -153,15 +175,15 @@ const CacheSettingsPopup: React.FC<CacheSettingsPopupProps> = ({
     setErrors,
   ]);
 
-  useEffect(()=>{
-    if(initialValues.cachedValues) {
+  useEffect(() => {
+    if (initialValues.cachedValues) {
       const prevVal = {
-        embeddingModel : initialValues.cachedValues.embeddingModel,
-        evictionPolicy : initialValues.cachedValues.evictionPolicy
-      }
-      setFormData({...formData, ...initialValues.cachedValues})
+        embeddingModel: initialValues.cachedValues.embeddingModel,
+        evictionPolicy: initialValues.cachedValues.evictionPolicy,
+      };
+      setFormData({ ...formData, ...initialValues.cachedValues });
     }
-  }, [initialValues.cachedValues])
+  }, [initialValues.cachedValues]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -200,8 +222,8 @@ const CacheSettingsPopup: React.FC<CacheSettingsPopupProps> = ({
         aria-describedby={undefined}
       >
         <Dialog.Title>
-            <VisuallyHidden>Endpoint</VisuallyHidden>
-          </Dialog.Title>
+          <VisuallyHidden>Endpoint</VisuallyHidden>
+        </Dialog.Title>
         <Box className="pb-3">
           <Flex justify="between" align="center">
             <Text_16_600_FFFFFF className="p-0 pt-1 m-0">
@@ -266,7 +288,7 @@ const CacheSettingsPopup: React.FC<CacheSettingsPopupProps> = ({
               </Flex>
 
               <SliderInput
-                defaultValue={[0.90]}
+                defaultValue={[0.9]}
                 value={formData.score}
                 onValueChange={handleSliderValueChange}
                 max={1}

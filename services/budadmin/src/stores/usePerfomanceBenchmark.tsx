@@ -183,7 +183,7 @@ export const usePerfomanceBenchmark = create<{
     get().setSearchText(text);
     let nodeMetrics = get().nodeMetrics;
     const filtered = Object.values(nodeMetrics).filter((node: any) =>
-      node.hostname.toLowerCase().includes(get().searchText.toLowerCase())
+      node.hostname.toLowerCase().includes(get().searchText.toLowerCase()),
     );
     set({ filteredNodeMetrics: filtered });
   },
@@ -216,7 +216,7 @@ export const usePerfomanceBenchmark = create<{
     get().setLoading(true);
     try {
       const response: any = await AppRequest.Get(`${tempApiBaseUrl}/dataset`, {
-        params
+        params,
       });
       if (response) {
         const workflow: WorkflowType = response.data;
@@ -240,7 +240,7 @@ export const usePerfomanceBenchmark = create<{
     get().setLoading(true);
     try {
       const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/workflows/${workflowId}`
+        `${tempApiBaseUrl}/workflows/${workflowId}`,
       );
       if (response) {
         const workflow: WorkflowType = response.data;
@@ -259,7 +259,7 @@ export const usePerfomanceBenchmark = create<{
   deleteWorkflow: async (id: string, suppressToast?: boolean) => {
     try {
       const response: any = await AppRequest.Delete(
-        `${tempApiBaseUrl}/workflows/${id}`
+        `${tempApiBaseUrl}/workflows/${id}`,
       );
       if (!suppressToast) {
         successToast(response.data.message);
@@ -284,20 +284,20 @@ export const usePerfomanceBenchmark = create<{
     } else {
       let nodes = get().filteredNodeMetrics;
       Object.keys(nodes).map((key, index) =>
-        get().setSelectedNodes(nodes[key])
+        get().setSelectedNodes(nodes[key]),
       );
     }
   },
   setSelectedNodes: (node) => {
     set((state) => {
       const isAlreadySelected = state.selectedNodes.some(
-        (selected) => selected.hostname === node.hostname
+        (selected) => selected.hostname === node.hostname,
       );
 
       return {
         selectedNodes: isAlreadySelected
           ? state.selectedNodes.filter(
-              (selected) => selected.hostname !== node.hostname
+              (selected) => selected.hostname !== node.hostname,
             ) // Remove if already selected
           : [...state.selectedNodes, node], // Add if not selected
       };
@@ -307,13 +307,13 @@ export const usePerfomanceBenchmark = create<{
   setSelectedDataset: (dataset) => {
     set((state) => {
       const isAlreadySelected = state.selectedDataset.some(
-        (selected) => selected.id === dataset.id
+        (selected) => selected.id === dataset.id,
       );
 
       return {
         selectedDataset: isAlreadySelected
           ? state.selectedDataset.filter(
-              (selected) => selected.id !== dataset.id
+              (selected) => selected.id !== dataset.id,
             ) // Remove if already selected
           : [...state.selectedDataset, dataset], // Add if not selected
       };
@@ -344,7 +344,7 @@ export const usePerfomanceBenchmark = create<{
           workflow_total_steps: 9,
           step_number: 1,
           trigger_workflow: false,
-        }
+        },
       );
       set({ currentWorkflow: response.data });
       set({ currentWorkflowId: response.data.workflow_id });
@@ -374,7 +374,7 @@ export const usePerfomanceBenchmark = create<{
           workflow_id: workflowId,
           step_number: 2,
           trigger_workflow: false,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -402,7 +402,7 @@ export const usePerfomanceBenchmark = create<{
           step_number: 2,
           trigger_workflow: false,
           datasets: get().selectedDataset.map((dataset) => dataset.id),
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -432,7 +432,7 @@ export const usePerfomanceBenchmark = create<{
           step_number: 3,
           trigger_workflow: false,
           cluster_id: cluster?.id,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -461,7 +461,7 @@ export const usePerfomanceBenchmark = create<{
           step_number: 4,
           trigger_workflow: false,
           nodes: nodes,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -490,7 +490,7 @@ export const usePerfomanceBenchmark = create<{
           step_number: 5,
           // "trigger_workflow": false,
           model_id: modelId,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -518,7 +518,7 @@ export const usePerfomanceBenchmark = create<{
           trigger_workflow: false,
           workflow_id: workflowId,
           credential_id: credentials?.id,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -544,7 +544,7 @@ export const usePerfomanceBenchmark = create<{
           workflow_id: workflowId,
           step_number: 6,
           // "trigger_workflow": false,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -572,7 +572,7 @@ export const usePerfomanceBenchmark = create<{
           step_number: 7,
           // "trigger_workflow": false,
           user_confirmation: true,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -601,7 +601,7 @@ export const usePerfomanceBenchmark = create<{
           model_id: modelId,
           provider_type: "",
           simulator_id: "",
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);

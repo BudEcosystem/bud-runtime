@@ -9,12 +9,15 @@ export interface BudInputProps {
   onFocus?: () => void;
   onBlur?: () => void;
   onChange?: (value: string) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   name: string;
   label?: string;
   value?: any;
+  defaultValue?: any;
   placeholder?: string;
   disabled?: boolean;
   allowOnlyNumbers?: boolean;
+  preventFirstSpace?: boolean;
   ClassNames?: string;
   InputClasses?: string;
   formItemClassnames?: string;
@@ -66,6 +69,10 @@ function TextInput(props: BudInputProps) {
             <Input
               name={props.name}
               placeholder={props.placeholder}
+              value={props.value}
+              defaultValue={
+                props.value === undefined ? props.defaultValue : undefined
+              }
               style={{
                 ...props.style,
                 paddingTop: ".75rem",
@@ -81,6 +88,17 @@ function TextInput(props: BudInputProps) {
                 }
                 props.onChange?.(newValue);
               }}
+              onKeyDown={(e) => {
+                // Prevent space as first character if preventFirstSpace is true
+                if (
+                  props.preventFirstSpace &&
+                  e.key === " " &&
+                  e.currentTarget.value.length === 0
+                ) {
+                  e.preventDefault();
+                }
+                props.onKeyDown?.(e);
+              }}
               suffix={props.suffix}
               type={props.type}
               className={`text-[black] dark:text-[#EEEEEE] border border-[#B1B1B1] dark:border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] !placeholder:font-[300] ${props.InputClasses}`}
@@ -90,6 +108,10 @@ function TextInput(props: BudInputProps) {
           <Input
             name={props.name}
             placeholder={props.placeholder}
+            value={props.value}
+            defaultValue={
+              props.value === undefined ? props.defaultValue : undefined
+            }
             style={{
               ...props.style,
               paddingTop: ".75rem",
@@ -104,6 +126,17 @@ function TextInput(props: BudInputProps) {
                 newValue = newValue.replace(/[^0-9]/g, "");
               }
               props.onChange?.(newValue);
+            }}
+            onKeyDown={(e) => {
+              // Prevent space as first character if preventFirstSpace is true
+              if (
+                props.preventFirstSpace &&
+                e.key === " " &&
+                e.currentTarget.value.length === 0
+              ) {
+                e.preventDefault();
+              }
+              props.onKeyDown?.(e);
             }}
             suffix={props.suffix}
             type={props.type}

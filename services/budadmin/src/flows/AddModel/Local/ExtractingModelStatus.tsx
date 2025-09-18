@@ -149,10 +149,13 @@ export default function ExtractingModel() {
                 //   />
                 // )
                 <IconOnlyRender
-                    icon={currentWorkflow?.workflow_steps?.icon || currentWorkflow?.workflow_steps?.provider?.icon}
-                    imageSize={26}
-                    type={currentWorkflow?.workflow_steps?.provider_type}
-                  />
+                  icon={
+                    currentWorkflow?.workflow_steps?.icon ||
+                    currentWorkflow?.workflow_steps?.provider?.icon
+                  }
+                  imageSize={26}
+                  type={currentWorkflow?.workflow_steps?.provider_type}
+                />
                 // <Image
                 //   preview={false}
                 //   src={currentWorkflow?.workflow_steps?.icon ? assetBaseUrl + currentWorkflow?.workflow_steps?.icon
