@@ -83,6 +83,7 @@ microservices:
 
             CLOUD_MODEL_SEEDER_ENGINE: tensorzero
             BUD_CONNECT_BASE_URL: https://budconnect.bud.studio
+            BUD_DOC_SERVICE_URL: "http://{{ $.Release.Name }}-buddoc:9081"
 
     # backend internal services
     budcluster:
@@ -169,6 +170,20 @@ microservices:
             PSQL_USER: budsim
             PSQL_PASSWORD: budsim
             PSQL_DB_NAME: budsim
+    buddoc:
+        image: budstudio/buddoc:nightly
+        daprid: buddoc
+        env:
+            LOG_LEVEL: INFO
+            PSQL_HOST: "{{ $.Release.Name }}-postgresql"
+            PSQL_PORT: "5432"
+            PSQL_USER: buddoc
+            PSQL_PASSWORD: buddoc
+            PSQL_DB_NAME: buddoc
+            VLM_API_URL: "http://{{ $.Release.Name }}-budgateway:3000/v1/chat/completions"
+            VLM_API_TIMEOUT: "300"
+            MAX_FILE_SIZE_MB: "50"
+            TEMP_UPLOAD_DIR: /tmp/buddoc_uploads
     budnotify:
         image: budstudio/budnotify:nightly
         daprid: budnotify
@@ -345,6 +360,7 @@ postgresqlExtra:
         - budmodel
         - budsim
         - budeval
+        - buddoc
         - budprompt
 
 keycloak:

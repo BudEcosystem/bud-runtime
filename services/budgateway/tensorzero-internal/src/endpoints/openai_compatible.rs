@@ -7904,3 +7904,139 @@ fn convert_openai_chunk_to_anthropic(openai_chunk: Value) -> Value {
         })
     }
 }
+
+// Document processing handler
+/// Handler for document processing (POST /v1/documents)
+pub async fn document_processing_handler(
+    State(AppStateData {
+        config,
+        http_client,
+        clickhouse_connection_info,
+        kafka_connection_info: _,
+        authentication_info: _,
+        model_credential_store,
+        ..
+    }): AppState,
+    headers: HeaderMap,
+    StructuredJson(openai_compatible_params): StructuredJson<
+        crate::documents::OpenAICompatibleDocumentParams,
+    >,
+) -> Result<Response<Body>, Error> {
+    let unknown_fields: Vec<&str> = openai_compatible_params
+        .unknown_fields
+        .keys()
+        .map(|k| k.as_str())
+        .collect();
+
+    if !unknown_fields.is_empty() {
+        tracing::warn!(
+            "Ignoring unknown fields in document processing request: {:?}",
+            unknown_fields
+        );
+    }
+
+    // Resolve the model name based on authentication state
+    let model_resolution = model_resolution::resolve_model_name(
+        &openai_compatible_params.model,
+        &headers,
+        false, // not for embeddings
+    )?;
+
+    let model_id = model_resolution.model_name.ok_or_else(|| {
+        Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
+            message: "Document processing requests must specify a model, not a function"
+                .to_string(),
+        })
+    })?;
+
+    let original_model_name = model_resolution.original_model_name.to_string();
+
+    // Convert OpenAI request to internal format
+    let document_request = crate::documents::DocumentProcessingRequest {
+        id: Uuid::now_v7(),
+        model: Arc::from(openai_compatible_params.model.as_str()),
+        document: openai_compatible_params.document.clone(),
+        prompt: openai_compatible_params.prompt.clone(),
+    };
+
+    // Extract model configuration
+    use crate::model::ModelTableExt;
+    let models = config.models.read().await;
+    let model = models
+        .get_with_capability(
+            &model_id,
+            crate::endpoints::capability::EndpointCapability::Document,
+        )
+        .await?
+        .ok_or_else(|| {
+            Error::new(ErrorDetails::Config {
+                message: format!(
+                    "Model '{original_model_name}' not found or does not support document processing"
+                ),
+            })
+        })?;
+
+    // Merge credentials from the credential store
+    let mut credentials = merge_credentials_from_store(&model_credential_store);
+
+    // Extract and forward the authorization header if present
+    if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            // Strip "Bearer " prefix if present
+            let token = auth_str.strip_prefix("Bearer ").unwrap_or(auth_str);
+            // Use "authorization" as the key so dynamic credential lookup can find it
+            credentials.insert(
+                "authorization".to_string(),
+                secrecy::SecretString::from(token.to_string()),
+            );
+        }
+    }
+
+    // Create inference clients
+    let cache_options = crate::cache::CacheOptions {
+        max_age_s: None,
+        enabled: crate::cache::CacheEnabledMode::Off,
+    }; // No caching for documents yet
+    let clients = super::inference::InferenceClients {
+        http_client: &http_client,
+        credentials: &credentials,
+        clickhouse_connection_info: &clickhouse_connection_info,
+        cache_options: &cache_options,
+    };
+
+    // Call the model's document processing capability
+    let response = model
+        .process_document(&document_request, &original_model_name, &clients)
+        .await?;
+
+    // Convert to OpenAI-compatible format
+    let openai_response = crate::documents::OpenAICompatibleDocumentResponse {
+        id: format!("doc_{}", response.id),
+        object: "document".to_string(),
+        created: chrono::Utc::now().timestamp() as u64,
+        model: original_model_name.clone(),
+        document_id: response.document_id.to_string(),
+        pages: response.pages.clone(),
+        usage_info: response.usage_info.clone(),
+    };
+
+    // Convert response to JSON
+    let json_response = serde_json::to_string(&openai_response).map_err(|e| {
+        Error::new(ErrorDetails::Serialization {
+            message: format!("Failed to serialize document response: {}", e),
+        })
+    })?;
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .body(Body::from(json_response))
+        .map_err(|e| {
+            Error::new(ErrorDetails::InferenceServer {
+                message: format!("Failed to build response: {}", e),
+                provider_type: "BudDoc".to_string(),
+                raw_request: None,
+                raw_response: None,
+            })
+        })?)
+}

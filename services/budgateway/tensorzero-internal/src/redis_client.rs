@@ -364,7 +364,7 @@ impl RedisClient {
                 // Usage limit keys are handled by other components, ignore silently
             }
             _ => {
-                tracing::info!("Received message from unknown key pattern: {key}");
+                tracing::debug!("Received message from unknown key pattern: {key}");
             }
         }
 
@@ -432,7 +432,7 @@ impl RedisClient {
                 // Usage limit keys are handled by other components, ignore silently
             }
             _ => {
-                tracing::info!("Received message from unknown key pattern: {key}");
+                tracing::debug!("Received message from unknown key pattern: {key}");
             }
         }
 
