@@ -4,7 +4,11 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
-import { Text_12_300_EEEEEE, Text_12_400_B3B3B3, Text_24_600_EEEEEE } from "@/components/ui/text";
+import {
+  Text_12_300_EEEEEE,
+  Text_12_400_B3B3B3,
+  Text_24_600_EEEEEE,
+} from "@/components/ui/text";
 import { Image } from "antd";
 import React, { useEffect } from "react";
 import { useCluster } from "src/hooks/useCluster";
@@ -23,12 +27,10 @@ export default function CreateClusterSuccess(props: Props) {
   const { closeDrawer, openDrawer } = useDrawer();
   const router = useRouter();
   useEffect(() => {
-    console.log('currentWorkflow', currentWorkflow)
-  }, [currentWorkflow])
+    console.log("currentWorkflow", currentWorkflow);
+  }, [currentWorkflow]);
   return (
-    <BudForm
-      data={{}}
-    >
+    <BudForm data={{}}>
       <BudWraperBox center={true}>
         <BudDrawerLayout>
           <div className="flex flex-col	justify-start items-center p-[2.5rem]">
@@ -38,14 +40,15 @@ export default function CreateClusterSuccess(props: Props) {
                 src="/images/successHand.png"
                 alt="info"
                 style={{
-                  width: '8.75rem',
-                  height: '8.0625'
+                  width: "8.75rem",
+                  height: "8.0625",
                 }}
               />
             </div>
             <div className="max-w-[75%] mt-[1.3rem] pb-[1.6rem]">
               <Text_24_600_EEEEEE className="text-center leading-[2rem] mb-[1.2rem]">
-                Cluster Successfully<br /> added to the repository
+                Cluster Successfully
+                <br /> added to the repository
               </Text_24_600_EEEEEE>
               <Text_12_400_B3B3B3 className="text-center">
                 You can view the cluster now
@@ -59,13 +62,10 @@ export default function CreateClusterSuccess(props: Props) {
                 }}
               >
                 <div className="flex items-center justify-center gap">
-                  <Text_12_300_EEEEEE>
-                    View Cluster
-                  </Text_12_300_EEEEEE>
+                  <Text_12_300_EEEEEE>View Cluster</Text_12_300_EEEEEE>
                 </div>
               </PrimaryButton>
             )}
-
           </div>
         </BudDrawerLayout>
       </BudWraperBox>

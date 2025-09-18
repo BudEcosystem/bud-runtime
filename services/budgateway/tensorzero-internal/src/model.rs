@@ -49,8 +49,8 @@ use crate::{
     inference::{
         providers::{
             anthropic::AnthropicProvider, aws_bedrock::AWSBedrockProvider, azure::AzureProvider,
-            deepseek::DeepSeekProvider, fireworks::FireworksProvider,
-            gcp_vertex_anthropic::GCPVertexAnthropicProvider,
+            azure_content_safety::AzureContentSafetyProvider, deepseek::DeepSeekProvider,
+            fireworks::FireworksProvider, gcp_vertex_anthropic::GCPVertexAnthropicProvider,
             gcp_vertex_gemini::GCPVertexGeminiProvider, mistral::MistralProvider,
             openai::OpenAIProvider, openrouter::OpenRouterProvider,
             provider_trait::InferenceProvider, together::TogetherProvider, vllm::VLLMProvider,
@@ -106,6 +106,7 @@ pub struct ModelConfig {
     pub retry_config: Option<RetryConfig>, // Optional model-level retry configuration
     pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
     pub pricing: Option<ModelPricing>, // Optional pricing information
+    pub guardrail_profile: Option<Arc<str>>, // Optional guardrail profile ID for wrapped inference
 }
 
 #[derive(Debug, Deserialize)]
@@ -121,6 +122,7 @@ pub(crate) struct UninitializedModelConfig {
     pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
     #[serde(default)]
     pub pricing: Option<ModelPricing>, // Optional pricing information
+    pub guardrail_profile: Option<Arc<str>>, // Optional guardrail profile ID for wrapped inference
 }
 
 /// Determine endpoint capabilities based on model name patterns
@@ -627,6 +629,46 @@ impl ModelConfig {
         }
         Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
     }
+
+    /// Moderation method (when model supports moderation capability)
+    #[instrument(skip_all)]
+    pub async fn moderate(
+        &self,
+        request: &crate::moderation::ModerationRequest,
+        model_name: &str,
+        clients: &crate::endpoints::inference::InferenceClients<'_>,
+    ) -> Result<crate::moderation::ModerationResponse, Error> {
+        // Verify this model supports moderation
+        if !self.supports_endpoint(EndpointCapability::Moderation) {
+            return Err(Error::new(ErrorDetails::ModelNotConfiguredForCapability {
+                model_name: model_name.to_string(),
+                capability: EndpointCapability::Moderation.as_str().to_string(),
+            }));
+        }
+
+        let mut provider_errors: HashMap<String, Error> = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::ProviderNotFound {
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+
+            let response = provider
+                .moderate(request, clients.http_client, clients.credentials)
+                .await;
+            match response {
+                Ok(response) => {
+                    // TODO: Add caching support here
+                    return Ok(response);
+                }
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+        Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
+    }
 }
 
 impl UninitializedModelConfig {
@@ -665,6 +707,7 @@ impl UninitializedModelConfig {
             retry_config: self.retry_config,
             rate_limits: self.rate_limits,
             pricing: self.pricing,
+            guardrail_profile: self.guardrail_profile,
         })
     }
 }
@@ -1472,6 +1515,7 @@ impl ModelProvider {
             ProviderConfig::AWSBedrock(_) => "aws_bedrock",
             ProviderConfig::AWSSagemaker(_) => "aws_sagemaker",
             ProviderConfig::Azure(_) => "azure",
+            ProviderConfig::AzureContentSafety(_) => "azure_content_safety",
             ProviderConfig::BudDoc(_) => "buddoc",
             ProviderConfig::Fireworks(_) => "fireworks",
             ProviderConfig::GCPVertexAnthropic(_) => "gcp_vertex_anthropic",
@@ -1500,6 +1544,7 @@ impl ModelProvider {
             // SageMaker doesn't have a meaningful model name concept, as we just invoke an endpoint
             ProviderConfig::AWSSagemaker(_) => None,
             ProviderConfig::Azure(provider) => Some(provider.deployment_id()),
+            ProviderConfig::AzureContentSafety(_) => None, // Content Safety doesn't have a model name
             ProviderConfig::Fireworks(provider) => Some(provider.model_name()),
             ProviderConfig::GCPVertexAnthropic(provider) => Some(provider.model_id()),
             ProviderConfig::GCPVertexGemini(provider) => Some(provider.model_id()),
@@ -1545,6 +1590,7 @@ pub enum ProviderConfig {
     AWSBedrock(AWSBedrockProvider),
     AWSSagemaker(AWSSagemakerProvider),
     Azure(AzureProvider),
+    AzureContentSafety(AzureContentSafetyProvider),
     BudDoc(BudDocProvider),
     DeepSeek(DeepSeekProvider),
     Fireworks(FireworksProvider),
@@ -1604,6 +1650,12 @@ pub(super) enum UninitializedProviderConfig {
     },
     Azure {
         deployment_id: String,
+        endpoint: Url,
+        api_key_location: Option<CredentialLocation>,
+    },
+    #[strum(serialize = "azure_content_safety")]
+    #[serde(rename = "azure_content_safety")]
+    AzureContentSafety {
         endpoint: Url,
         api_key_location: Option<CredentialLocation>,
     },
@@ -1769,6 +1821,17 @@ impl UninitializedProviderConfig {
                 endpoint,
                 api_key_location,
             )?),
+            UninitializedProviderConfig::AzureContentSafety {
+                endpoint,
+                api_key_location,
+            } => {
+                use crate::inference::providers::azure_content_safety::ProbeType;
+                ProviderConfig::AzureContentSafety(AzureContentSafetyProvider::new(
+                    endpoint,
+                    api_key_location,
+                    ProbeType::Moderation, // Default to Moderation for model-based configuration
+                )?)
+            }
             UninitializedProviderConfig::BudDoc {
                 model_name: _,
                 api_base,
@@ -1917,6 +1980,12 @@ impl ModelProvider {
             ProviderConfig::Azure(provider) => {
                 provider.infer(request, client, api_keys, self).await
             }
+            ProviderConfig::AzureContentSafety(_) => {
+                Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "inference".to_string(),
+                    provider: self.name.to_string(),
+                }))
+            }
             ProviderConfig::Fireworks(provider) => {
                 provider.infer(request, client, api_keys, self).await
             }
@@ -1994,6 +2063,12 @@ impl ModelProvider {
             }
             ProviderConfig::Azure(provider) => {
                 provider.infer_stream(request, client, api_keys, self).await
+            }
+            ProviderConfig::AzureContentSafety(_) => {
+                return Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "inference_stream".to_string(),
+                    provider: self.name.to_string(),
+                }))
             }
             ProviderConfig::Fireworks(provider) => {
                 provider.infer_stream(request, client, api_keys, self).await
@@ -2081,6 +2156,12 @@ impl ModelProvider {
                 provider
                     .start_batch_inference(requests, client, api_keys)
                     .await
+            }
+            ProviderConfig::AzureContentSafety(_) => {
+                Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "batch_inference".to_string(),
+                    provider: self.name.to_string(),
+                }))
             }
             ProviderConfig::Fireworks(provider) => {
                 provider
@@ -2190,6 +2271,12 @@ impl ModelProvider {
                 provider
                     .poll_batch_inference(batch_request, http_client, dynamic_api_keys)
                     .await
+            }
+            ProviderConfig::AzureContentSafety(_) => {
+                Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "batch_inference".to_string(),
+                    provider: self.name.to_string(),
+                }))
             }
             ProviderConfig::Fireworks(provider) => {
                 provider
@@ -3039,6 +3126,58 @@ impl ModelProvider {
             })),
         }
     }
+
+    /// Moderation method
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_moderation"))]
+    pub async fn moderate(
+        &self,
+        request: &crate::moderation::ModerationRequest,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<crate::moderation::ModerationResponse, Error> {
+        use crate::moderation::ModerationProvider;
+
+        match &self.config {
+            ProviderConfig::AzureContentSafety(provider) => {
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
+                Ok(crate::moderation::ModerationResponse::new(
+                    provider_response,
+                    self.name.clone(),
+                ))
+            }
+            ProviderConfig::OpenAI(provider) => {
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
+                Ok(crate::moderation::ModerationResponse::new(
+                    provider_response,
+                    self.name.clone(),
+                ))
+            }
+            ProviderConfig::Mistral(provider) => {
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
+                Ok(crate::moderation::ModerationResponse::new(
+                    provider_response,
+                    self.name.clone(),
+                ))
+            }
+            #[cfg(any(test, feature = "e2e_tests"))]
+            ProviderConfig::Dummy(provider) => {
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
+                Ok(crate::moderation::ModerationResponse::new(
+                    provider_response,
+                    self.name.clone(),
+                ))
+            }
+            // Other providers don't support moderation yet
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Moderation.as_str().to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -3380,11 +3519,12 @@ impl ShorthandModelConfig for ModelConfig {
                     extra_headers: Default::default(),
                 },
             )]),
-            endpoints,             // Use pre-computed endpoints based on model name
-            fallback_models: None, // Shorthand models don't support fallback
-            retry_config: None,    // Shorthand models don't have retry config
-            rate_limits: None,     // Shorthand models don't have rate limits
-            pricing: None,         // Shorthand models don't have pricing
+            endpoints,               // Use pre-computed endpoints based on model name
+            fallback_models: None,   // Shorthand models don't support fallback
+            retry_config: None,      // Shorthand models don't have retry config
+            rate_limits: None,       // Shorthand models don't have rate limits
+            pricing: None,           // Shorthand models don't have pricing
+            guardrail_profile: None, // Shorthand models don't have guardrail profiles
         })
     }
 
@@ -3499,6 +3639,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3570,6 +3711,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let response = model_config
             .infer(&request, &clients, model_name)
@@ -3670,6 +3812,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         let model_name = "test model";
@@ -3740,6 +3883,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let (
             StreamResponse {
@@ -3814,6 +3958,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let response = model_config
             .infer_stream(
@@ -3916,6 +4061,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let (
             StreamResponse {
@@ -3998,6 +4144,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -4109,6 +4256,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -4236,6 +4384,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let model_table: ModelTable = HashMap::from([("claude".into(), anthropic_model_config)])
             .try_into()
@@ -4348,6 +4497,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         assert!(model.supports_endpoint(EndpointCapability::Chat));
@@ -4376,6 +4526,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         let result = model.validate("test_model");
@@ -4417,6 +4568,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                guardrail_profile: None,
             },
         );
         models.insert(
@@ -4429,6 +4581,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                guardrail_profile: None,
             },
         );
         models.insert(
@@ -4441,6 +4594,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                guardrail_profile: None,
             },
         );
 
@@ -4494,6 +4648,7 @@ mod tests {
                         retry_config: None,
                         rate_limits: None,
                         pricing: None,
+                        guardrail_profile: None,
                     },
                 );
 
@@ -4539,6 +4694,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         let request = crate::embeddings::EmbeddingRequest {

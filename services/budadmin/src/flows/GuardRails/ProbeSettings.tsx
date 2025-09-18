@@ -5,6 +5,7 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { Checkbox, Slider } from "antd";
 import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
+import useGuardrails from "src/hooks/useGuardrails";
 import {
   Text_12_400_757575,
   Text_14_400_EEEEEE,
@@ -15,6 +16,10 @@ export default function ProbeSettings() {
   const { openDrawerWithStep } = useDrawer();
   const [selectedLifecycle, setSelectedLifecycle] = useState<string[]>([]);
   const [strictnessLevel, setStrictnessLevel] = useState(0.75);
+
+  // Use the guardrails hook
+  const { updateWorkflow, workflowLoading, selectedProbe, selectedDeployment } =
+    useGuardrails();
 
   const lifecycleOptions = [
     { value: "input", label: "Input" },
@@ -27,16 +32,31 @@ export default function ProbeSettings() {
     openDrawerWithStep("select-deployment");
   };
 
-  const handleDeploy = () => {
-    // Navigate to deployment progress screen
-    openDrawerWithStep("deploying-probe");
+  const handleDeploy = async () => {
+    try {
+      // Update workflow with probe settings and trigger deployment
+      await updateWorkflow({
+        step_number: 6, // Probe settings is the final step 6
+        workflow_total_steps: 5, // Not counting the first step
+        probe_settings: {
+          lifecycle_stages: selectedLifecycle,
+          strictness_level: strictnessLevel,
+        },
+        trigger_workflow: true, // This triggers the actual deployment
+      });
+
+      // Navigate to deployment progress screen
+      openDrawerWithStep("deploying-probe");
+    } catch (error) {
+      console.error("Failed to trigger workflow:", error);
+    }
   };
 
   const handleLifecycleChange = (value: string, checked: boolean) => {
     if (checked) {
       setSelectedLifecycle([...selectedLifecycle, value]);
     } else {
-      setSelectedLifecycle(selectedLifecycle.filter(item => item !== value));
+      setSelectedLifecycle(selectedLifecycle.filter((item) => item !== value));
     }
   };
 
@@ -51,13 +71,13 @@ export default function ProbeSettings() {
       onNext={handleDeploy}
       backText="Back"
       nextText="Deploy"
-      disableNext={selectedLifecycle.length === 0}
+      disableNext={selectedLifecycle.length === 0 || workflowLoading}
     >
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Probe Settings"
-            description="You are now adding {Probe Name} Probe to {Deployment Name} deployment."
+            description={`You are now adding ${selectedProbe?.name || "selected"} Probe to ${selectedDeployment?.name || selectedDeployment?.endpoint_name || "selected"} deployment.`}
             classNames="pt-[.8rem]"
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />
@@ -65,20 +85,26 @@ export default function ProbeSettings() {
           <div className="px-[1.35rem] pb-[1.35rem]">
             {/* Add To Section */}
             <div className="mb-[2rem]">
-              <div className="bg-[#1F1F1F] border border-[#757575] rounded-[8px] p-[1.5rem]">
+              <div className="bg-[#ffffff07] border border-[#757575] rounded-[8px] p-[1.5rem]">
                 <Text_14_600_FFFFFF className="mb-[0.5rem]">
                   Add To:
                 </Text_14_600_FFFFFF>
                 <Text_12_400_757575 className="mb-[1rem] block">
-                  Select which part of Inference lifecycle you would like to add the probe to
+                  Select which part of Inference lifecycle you would like to add
+                  the probe to
                 </Text_12_400_757575>
 
                 <div className="flex items-center gap-[2rem] flex-wrap">
                   {lifecycleOptions.map((option) => (
-                    <div key={option.value} className="flex items-center gap-[0.5rem]">
+                    <div
+                      key={option.value}
+                      className="flex items-center gap-[0.5rem]"
+                    >
                       <Checkbox
                         checked={selectedLifecycle.includes(option.value)}
-                        onChange={(e) => handleLifecycleChange(option.value, e.target.checked)}
+                        onChange={(e) =>
+                          handleLifecycleChange(option.value, e.target.checked)
+                        }
                         className="AntCheckbox"
                       />
                       <Text_14_400_EEEEEE>{option.label}</Text_14_400_EEEEEE>
@@ -90,21 +116,22 @@ export default function ProbeSettings() {
 
             {/* Strictness Level Section */}
             <div>
-              <div className="bg-[#1F1F1F] border border-[#757575] rounded-[8px] p-[1.5rem]">
+              <div className="bg-[#ffffff07] border border-[#757575] rounded-[8px] p-[1.5rem]">
                 <Text_14_600_FFFFFF className="mb-[0.5rem]">
                   Strictness Level:
                 </Text_14_600_FFFFFF>
                 <Text_12_400_757575 className="mb-[1.5rem] block">
-                  Level of strictness, the more strict it is more chance for False negatives but better protection
+                  Level of strictness, the more strict it is more chance for
+                  False negatives but better protection
                 </Text_12_400_757575>
 
                 <div className="relative px-[1rem]">
                   {/* Slider Value Display */}
                   <div
-                    className="absolute -top-[2rem] bg-[#757575] text-white px-[0.5rem] py-[0.25rem] rounded-[4px] text-[12px]"
+                    className="absolute -top-[2rem] bg-[#965CDE] text-white px-[0.5rem] py-[0.25rem] rounded-[4px] text-[12px] font-medium"
                     style={{
                       left: `calc(${strictnessLevel * 100}% - 1.5rem)`,
-                      transition: 'left 0.2s'
+                      transition: "left 0.2s",
                     }}
                   >
                     {formatSliderValue(strictnessLevel)}
@@ -117,16 +144,7 @@ export default function ProbeSettings() {
                     step={0.01}
                     value={strictnessLevel}
                     onChange={(value) => setStrictnessLevel(value)}
-                    className="mb-[0.5rem]"
-                    trackStyle={{ backgroundColor: "#965CDE" }}
-                    handleStyle={{
-                      backgroundColor: "#757575",
-                      borderColor: "#757575",
-                      width: "16px",
-                      height: "16px",
-                      marginTop: "-6px"
-                    }}
-                    railStyle={{ backgroundColor: "#3F3F3F" }}
+                    className="mb-[0.5rem] [&_.ant-slider-handle]:!w-[16px] [&_.ant-slider-handle]:!h-[16px] [&_.ant-slider-handle]:!bg-transparent [&_.ant-slider-handle]:!border-transparent [&_.ant-slider-handle]:!shadow-md [&_.ant-slider-handle]:!top-[50%] [&_.ant-slider-handle]:!transform [&_.ant-slider-handle]:!-translate-y-1/2 [&_.ant-slider-track]:!bg-[#965CDE] [&_.ant-slider-rail]:!bg-[#3F3F3F] [&_.ant-slider-track]:!h-[4px] [&_.ant-slider-rail]:!h-[4px]"
                     tooltip={{ open: false }}
                   />
 

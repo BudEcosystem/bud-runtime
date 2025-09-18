@@ -1140,6 +1140,7 @@ class ModelDeploymentRequest(BaseModel):
     endpoint_name: str
     hf_token: str | None = None
     model: str
+    model_size: Optional[int] = None
     target_ttft: Optional[int] = None
     target_e2e_latency: Optional[int] = None
     target_throughput_per_user: Optional[int] = None

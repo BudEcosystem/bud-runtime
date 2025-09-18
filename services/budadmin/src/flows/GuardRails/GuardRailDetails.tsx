@@ -18,7 +18,8 @@ export default function GuardRailDetails() {
   // This would typically come from the previous steps or context
   const guardrailData = {
     name: "Custom Greeting Filter",
-    description: "A custom guardrail that filters greeting messages and validates input patterns using RegEx and semantic matching to ensure appropriate responses.",
+    description:
+      "A custom guardrail that filters greeting messages and validates input patterns using RegEx and semantic matching to ensure appropriate responses.",
     guardTypes: ["Input", "Output"],
     modality: "Text",
     rules: [
@@ -36,12 +37,7 @@ export default function GuardRailDetails() {
   };
 
   return (
-    <BudForm
-      data={{}}
-      showBack={false}
-      onNext={handleFinish}
-      nextText="Finish"
-    >
+    <BudForm data={{}} showBack={false} onNext={handleFinish} nextText="Finish">
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
@@ -75,7 +71,9 @@ export default function GuardRailDetails() {
                 Guardrail Description
               </Text_12_400_757575>
               <div className="p-[0.75rem] bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] min-h-[80px]">
-                <Text_14_400_EEEEEE>{guardrailData.description}</Text_14_400_EEEEEE>
+                <Text_14_400_EEEEEE>
+                  {guardrailData.description}
+                </Text_14_400_EEEEEE>
               </div>
             </div>
 
@@ -87,7 +85,10 @@ export default function GuardRailDetails() {
               <div className="p-[0.75rem] bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px]">
                 <div className="flex gap-[0.5rem] flex-wrap">
                   {guardrailData.guardTypes.map((type) => (
-                    <Tag key={type} className="bg-[#965CDE20] border-[#965CDE] text-[#EEEEEE]">
+                    <Tag
+                      key={type}
+                      className="bg-[#965CDE20] border-[#965CDE] text-[#EEEEEE]"
+                    >
                       {type}
                     </Tag>
                   ))}
@@ -101,7 +102,9 @@ export default function GuardRailDetails() {
                 Modality
               </Text_12_400_757575>
               <div className="p-[0.75rem] bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px]">
-                <Text_14_400_EEEEEE>{guardrailData.modality}</Text_14_400_EEEEEE>
+                <Text_14_400_EEEEEE>
+                  {guardrailData.modality}
+                </Text_14_400_EEEEEE>
               </div>
             </div>
 
@@ -113,7 +116,10 @@ export default function GuardRailDetails() {
               <div className="p-[0.75rem] bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px]">
                 <div className="space-y-[0.5rem]">
                   {guardrailData.rules.map((rule, index) => (
-                    <div key={index} className="flex items-center gap-[0.75rem]">
+                    <div
+                      key={index}
+                      className="flex items-center gap-[0.75rem]"
+                    >
                       <Tag className="bg-[#757575] border-none text-[#EEEEEE]">
                         {rule.type}
                       </Tag>
@@ -145,7 +151,9 @@ export default function GuardRailDetails() {
                   Created Date
                 </Text_12_400_757575>
                 <div className="p-[0.5rem] bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px]">
-                  <Text_14_400_EEEEEE>{guardrailData.createdAt}</Text_14_400_EEEEEE>
+                  <Text_14_400_EEEEEE>
+                    {guardrailData.createdAt}
+                  </Text_14_400_EEEEEE>
                 </div>
               </div>
             </div>

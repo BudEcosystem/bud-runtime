@@ -125,6 +125,7 @@ export const useEvaluations = create<{
   experimentBenchmarks: any;
   experimentRuns: any;
   currentWorkflow: EvaluationWorkflow | null;
+  currentWorkflowId: string | null;
   workflowData: any;
   evaluationDetails: any;
 
@@ -153,6 +154,7 @@ export const useEvaluations = create<{
   experimentBenchmarks: null,
   experimentRuns: null,
   currentWorkflow: null,
+  currentWorkflowId: null,
   workflowData: null,
   evaluationDetails: null,
 
@@ -362,6 +364,7 @@ export const useEvaluations = create<{
 
       console.log('Saving workflow with steps:', workflow.workflow_steps);
       set({ currentWorkflow: workflow });
+      set({ currentWorkflowId: workflow.workflow_id });
 
       // Fetch the updated workflow data (similar to add model workflow)
       const workflowId = workflow.workflow_id;
@@ -398,6 +401,7 @@ export const useEvaluations = create<{
 
   setCurrentWorkflow: (workflow: EvaluationWorkflow | null) => {
     set({ currentWorkflow: workflow });
+    set({ currentWorkflowId: workflow?.workflow_id || null });
   },
 
   getCurrentWorkflow: () => {

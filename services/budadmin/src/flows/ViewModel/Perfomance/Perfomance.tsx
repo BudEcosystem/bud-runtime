@@ -303,13 +303,13 @@ function ClusterFilter() {
 
 export default function PerformanceDetailed({ data }: { data: Model }) {
   const { hasPermission } = useUser();
- const { openDrawer } = useDrawer();
+  const { openDrawer } = useDrawer();
   const [search, setSearch] = React.useState("");
   const { deploymentCluster, setDeploymentCluster } = useDeployModel();
   const { recommendedCluster, getRecommendedClusterById, currentProcessId } =
     useCluster();
   const filteredClusters = recommendedCluster?.clusters?.filter((cluster) =>
-    cluster.name.toLowerCase().includes(search.toLowerCase())
+    cluster.name.toLowerCase().includes(search.toLowerCase()),
   );
   const [openDetails, setOpenDetails] = useState<number | null>(null); // State to track which cluster's detail is open
   const toggleDetail = (index: number) => {
@@ -328,15 +328,15 @@ export default function PerformanceDetailed({ data }: { data: Model }) {
           Recommended clusters
         </Text_12_400_757575>
         <PrimaryButton
-            type="submit"
-            onClick={() => {
-              openDrawer("model_benchmark", { source: 'modelDetails'});
-            }}
-            className="min-w-[7.7rem]"
-            permission={hasPermission(PermissionEnum.ModelManage)}
-          >
-            Run Performance Benchmark
-          </PrimaryButton>
+          type="submit"
+          onClick={() => {
+            openDrawer("model_benchmark", { source: "modelDetails" });
+          }}
+          className="min-w-[7.7rem]"
+          permission={hasPermission(PermissionEnum.ModelManage)}
+        >
+          Run Performance Benchmark
+        </PrimaryButton>
       </div>
       <div className="clusterCard w-full">
         {recommendedCluster?.clusters?.length > 0 ? (
@@ -395,15 +395,15 @@ export default function PerformanceDetailed({ data }: { data: Model }) {
             />
           </div>
           <PrimaryButton
-              type="submit"
-              onClick={() => {
-                openDrawer("model_benchmark", { source: 'modelDetails'});
-              }}
-              className="min-w-[7.7rem]"
-              permission={hasPermission(PermissionEnum.ModelManage)}
-            >
-              Run Another Benchmark
-            </PrimaryButton>
+            type="submit"
+            onClick={() => {
+              openDrawer("model_benchmark", { source: "modelDetails" });
+            }}
+            className="min-w-[7.7rem]"
+            permission={hasPermission(PermissionEnum.ModelManage)}
+          >
+            Run Another Benchmark
+          </PrimaryButton>
           <div className="ml-[.2rem]">
             <ClusterFilter />
           </div>

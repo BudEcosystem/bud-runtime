@@ -17,16 +17,17 @@ const ComingSoon: React.FC<ComingSoonProps> = ({
   classNames,
   shrink = false,
   scaleValue = 1,
-  comingYpos = '0',
-  comingXpos = '0',
-  comingOverlay = '#141414',
+  comingYpos = "0",
+  comingXpos = "0",
+  comingOverlay = "#141414",
 }) => {
   return (
     <div className="absolute w-full h-full top-0 left-0 z-[1100] flex justify-center items-center">
-      <div className={`absolute z-[1100] w-full h-full top-0 left-0 bg-[${comingOverlay}] opacity-[.7]`}
-      style={{
-        background: comingOverlay
-      }}
+      <div
+        className={`absolute z-[1100] w-full h-full top-0 left-0 bg-[${comingOverlay}] opacity-[.7]`}
+        style={{
+          background: comingOverlay,
+        }}
       ></div>
       <div
         className={`relative z-[1201] justify-center items-center px-[1rem] py-[.35rem] rounded-[6px] border border-[1px solid #1F1F1F] bg-[#161616] max-h-[2.1875rem]`}
@@ -56,7 +57,6 @@ const ComingSoon: React.FC<ComingSoonProps> = ({
 
 export default ComingSoon;
 
-
 // function ModelCard({
 //   selected,
 //   handleClick,
@@ -73,7 +73,6 @@ export default ComingSoon;
 //     name,
 //     description,
 //   } = data;
-
 
 //   return (
 //     <div

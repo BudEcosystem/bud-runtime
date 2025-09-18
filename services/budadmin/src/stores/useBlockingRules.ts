@@ -1,9 +1,19 @@
-import { create } from 'zustand';
-import { AppRequest } from '../pages/api/requests';
-import { successToast, errorToast } from '@/components/toast';
+import { create } from "zustand";
+import { AppRequest } from "../pages/api/requests";
+import { successToast, errorToast } from "@/components/toast";
 
-export type BlockingRuleType = 'ip_blocking' | 'country_blocking' | 'user_agent_blocking' | 'rate_based_blocking';
-export type BlockingRuleStatus = 'active' | 'inactive' | 'expired' | 'ACTIVE' | 'INACTIVE' | 'EXPIRED';
+export type BlockingRuleType =
+  | "ip_blocking"
+  | "country_blocking"
+  | "user_agent_blocking"
+  | "rate_based_blocking";
+export type BlockingRuleStatus =
+  | "active"
+  | "inactive"
+  | "expired"
+  | "ACTIVE"
+  | "INACTIVE"
+  | "EXPIRED";
 
 export interface BlockingRule {
   id: string;
@@ -75,7 +85,7 @@ interface BlockingRulesState {
   createRule: (rule: BlockingRuleCreate) => Promise<boolean>;
   updateRule: (ruleId: string, update: BlockingRuleUpdate) => Promise<boolean>;
   deleteRule: (ruleId: string) => Promise<boolean>;
-  setFilters: (filters: Partial<BlockingRulesState['filters']>) => void;
+  setFilters: (filters: Partial<BlockingRulesState["filters"]>) => void;
   setPagination: (page: number, pageSize: number) => void;
   clearFilters: () => void;
 }
@@ -102,7 +112,9 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
         ...filters,
       };
 
-      const response = await AppRequest.Get('/metrics/gateway/blocking-rules', { params });
+      const response = await AppRequest.Get("/metrics/gateway/blocking-rules", {
+        params,
+      });
 
       if (response.data) {
         set({
@@ -112,7 +124,10 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
         });
       }
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to fetch rules';
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch rules";
       errorToast(errorMsg);
       set({ isLoading: false });
     }
@@ -125,25 +140,36 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
       if (endTime) params.end_time = endTime;
 
       // Call the new dashboard stats endpoint that queries directly from source databases
-      const response = await AppRequest.Get('/metrics/gateway/blocking-dashboard-stats', { params });
+      const response = await AppRequest.Get(
+        "/metrics/gateway/blocking-dashboard-stats",
+        { params },
+      );
 
       if (response.data) {
         set({ stats: response.data });
       }
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to fetch statistics';
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch statistics";
       errorToast(errorMsg);
-      console.error('Failed to fetch dashboard stats:', error);
+      console.error("Failed to fetch dashboard stats:", error);
     }
   },
 
   createRule: async (rule: BlockingRuleCreate) => {
     set({ isCreating: true });
     try {
-      const response = await AppRequest.Post('/metrics/gateway/blocking-rules', rule);
+      const response = await AppRequest.Post(
+        "/metrics/gateway/blocking-rules",
+        rule,
+      );
 
       if (response.data?.data) {
-        successToast(response.data?.message || 'Blocking rule created successfully');
+        successToast(
+          response.data?.message || "Blocking rule created successfully",
+        );
         await get().fetchRules();
         set({ isCreating: false });
         return true;
@@ -151,7 +177,10 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
       set({ isCreating: false });
       return false;
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to create rule';
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to create rule";
       errorToast(errorMsg);
       set({ isCreating: false });
       return false;
@@ -163,14 +192,14 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
     try {
       const response = await AppRequest.Put(
         `/metrics/gateway/blocking-rules/${ruleId}`,
-        update
+        update,
       );
 
       if (response.data?.data) {
         // Override the message to ensure it says "updated" not "retrieved"
-        const message = response.data?.message?.includes('retrieved')
-          ? 'Blocking rule updated successfully'
-          : (response.data?.message || 'Blocking rule updated successfully');
+        const message = response.data?.message?.includes("retrieved")
+          ? "Blocking rule updated successfully"
+          : response.data?.message || "Blocking rule updated successfully";
         successToast(message);
         await get().fetchRules();
         set({ isUpdating: false });
@@ -179,7 +208,10 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
       set({ isUpdating: false });
       return false;
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to update rule';
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update rule";
       errorToast(errorMsg);
       set({ isUpdating: false });
       return false;
@@ -190,11 +222,13 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
     set({ isDeleting: true });
     try {
       const response = await AppRequest.Delete(
-        `/metrics/gateway/blocking-rules/${ruleId}`
+        `/metrics/gateway/blocking-rules/${ruleId}`,
       );
 
       if (response.data?.id) {
-        successToast(response.data?.message || 'Blocking rule deleted successfully');
+        successToast(
+          response.data?.message || "Blocking rule deleted successfully",
+        );
         await get().fetchRules();
         set({ isDeleting: false });
         return true;
@@ -202,13 +236,15 @@ export const useBlockingRules = create<BlockingRulesState>((set, get) => ({
       set({ isDeleting: false });
       return false;
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to delete rule';
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete rule";
       errorToast(errorMsg);
       set({ isDeleting: false });
       return false;
     }
   },
-
 
   setFilters: (filters) => {
     set((state) => ({

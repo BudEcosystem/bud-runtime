@@ -1,4 +1,3 @@
-
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 
@@ -11,50 +10,59 @@ import TextInput from "src/flows/components/TextInput";
 import TagsInput from "@/components/ui/bud/dataEntry/TagsInput";
 import { axiosInstance } from "src/pages/api/requests";
 import { tempApiBaseUrl } from "@/components/environment";
-import { ModelNameInput, NameIconInput } from "@/components/ui/bud/dataEntry/ProjectNameInput";
+import {
+  ModelNameInput,
+  NameIconInput,
+} from "@/components/ui/bud/dataEntry/ProjectNameInput";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { useDeployModel } from "src/stores/useDeployModel";
 import { isValidModelName } from "@/lib/utils";
 import CustomSelect from "../components/CustomSelect";
-import { Image } from 'antd'
-import { Text_10_400_B3B3B3, Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
+import { Image } from "antd";
+import {
+  Text_10_400_B3B3B3,
+  Text_12_400_757575,
+  Text_14_400_EEEEEE,
+} from "@/components/ui/text";
 import Tags from "../components/DrawerTags";
 
-
 export default function SimulationDetails() {
-  const { openDrawerWithStep } = useDrawer()
-  const { currentWorkflow, updateModelDetailsLocal, updateCredentialsLocal, localModelDetails, deleteWorkflow } = useDeployModel();
+  const { openDrawerWithStep } = useDrawer();
+  const {
+    currentWorkflow,
+    updateModelDetailsLocal,
+    updateCredentialsLocal,
+    localModelDetails,
+    deleteWorkflow,
+  } = useDeployModel();
   const { values, form } = useContext(BudFormContext);
   const [hover, setHover] = React.useState(false);
 
   const statusOptions = [
     {
-      value: 'value 1',
-      label: 'value 1',
+      value: "value 1",
+      label: "value 1",
     },
     {
-      value: 'value 2',
-      label: 'value 2',
+      value: "value 2",
+      label: "value 2",
     },
-
-  ]
+  ];
 
   return (
     <BudForm
       data={localModelDetails}
       onBack={async () => {
-        openDrawerWithStep('hardware-pecifications')
+        openDrawerWithStep("hardware-pecifications");
       }}
-
       onNext={async () => {
-        openDrawerWithStep('simulation-details')
+        openDrawerWithStep("simulation-details");
       }}
     >
       <BudWraperBox>
         <BudDrawerLayout>
           <div
             onMouseEnter={() => setHover(true)}
-
             onMouseLeave={() => setHover(false)}
             className={`py-[1.5rem] hover:bg-[#FFFFFF03] cursor-pointer hover:shadow-lg px-[1.5rem] flex-row flex items-start border-box`}
           >
@@ -71,18 +79,23 @@ export default function SimulationDetails() {
             <div className="flex-auto max-w-[91%]">
               <div className="flex items-center justify-between max-w-[100%]">
                 <div className="flex justify-start items-center gap-[.6rem] pb-[0.625rem]">
-                  <Text_14_400_EEEEEE className="leading-[100%]">Hardware name</Text_14_400_EEEEEE>
+                  <Text_14_400_EEEEEE className="leading-[100%]">
+                    Hardware name
+                  </Text_14_400_EEEEEE>
                   <Tags
-                    name='Website Link'
+                    name="Website Link"
                     color="#965CDE"
                     classNames="pt-[.1rem] pb-[0]"
                     onTagClick={() => {
-                      window.open('https://www.intel.com/content/www/us/en/events/on-event-series/vision.html', "_blank");
+                      window.open(
+                        "https://www.intel.com/content/www/us/en/events/on-event-series/vision.html",
+                        "_blank",
+                      );
                     }}
                     image={
                       <Image
                         preview={false}
-                        src='/images/drawer/websiteLink.png'
+                        src="/images/drawer/websiteLink.png"
                         className="mr-[0.375rem]"
                         style={{ width: "0.625rem", height: "0.625rem" }}
                         alt="home"
@@ -92,7 +105,8 @@ export default function SimulationDetails() {
                 </div>
               </div>
               <Text_12_400_757575 className="overflow-hidden truncate max-w-[95%]">
-                Need to add hardware description here, to add hardware descrip...
+                Need to add hardware description here, to add hardware
+                descrip...
               </Text_12_400_757575>
             </div>
           </div>
@@ -100,22 +114,24 @@ export default function SimulationDetails() {
         <BudDrawerLayout>
           <div
             onMouseEnter={() => setHover(true)}
-
             onMouseLeave={() => setHover(false)}
             className={`py-[1.5rem] hover:bg-[#FFFFFF03] cursor-pointer hover:shadow-lg px-[1.5rem] flex-row flex items-start border-box`}
           >
             <div className="flex-auto max-w-[91%]">
               <div className="flex items-center justify-between max-w-[100%]">
                 <div className="flex justify-start items-center gap-[.6rem] pb-[0.625rem]">
-                  <Text_14_400_EEEEEE className="leading-[100%]">Hardware name</Text_14_400_EEEEEE>
+                  <Text_14_400_EEEEEE className="leading-[100%]">
+                    Hardware name
+                  </Text_14_400_EEEEEE>
                 </div>
               </div>
               <Text_12_400_757575 className="overflow-hidden truncate max-w-[95%]">
-                Need to add hardware description here, to add hardware descrip...
+                Need to add hardware description here, to add hardware
+                descrip...
               </Text_12_400_757575>
               <div className="flex justify-start items-center gap-[.5rem] mt-[1rem]">
                 <Tags
-                  name='Chat (QA)'
+                  name="Chat (QA)"
                   color="#D1B854"
                   classNames="pt-[.4rem] pb-[.3rem]"
                 />
@@ -125,25 +141,22 @@ export default function SimulationDetails() {
         </BudDrawerLayout>
         <BudDrawerLayout>
           <DrawerTitleCard
-            title={'Simulation Details'}
+            title={"Simulation Details"}
             description="Description for Simulation Details"
           />
           <DrawerCard classNames="">
-
             <TextInput
               name="SimulationName"
-              label={'Simulation Name'}
-              placeholder={'Enter Simulation Name'}
-              rules={[{ message: 'Please Simulation Name' }]}
+              label={"Simulation Name"}
+              placeholder={"Enter Simulation Name"}
+              rules={[{ message: "Please Simulation Name" }]}
               ClassNames="mt-[.55rem]"
               InputClasses="pt-[.6rem] pb-[.4rem]"
               formItemClassnames="mb-[1.25rem]"
-              infoText={'Enter Simulation Name'}
+              infoText={"Enter Simulation Name"}
             />
-
           </DrawerCard>
         </BudDrawerLayout>
-
       </BudWraperBox>
     </BudForm>
   );

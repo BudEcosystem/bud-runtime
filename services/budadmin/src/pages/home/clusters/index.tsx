@@ -119,8 +119,8 @@ export default function Clusters() {
   };
 
   useEffect(() => {
-      setIsMounted(true)
-    }, []);
+    setIsMounted(true);
+  }, []);
 
   return (
     <DashBoardLayout>

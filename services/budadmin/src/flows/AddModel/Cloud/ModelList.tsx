@@ -1,4 +1,3 @@
-
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
@@ -11,7 +10,6 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useModels } from "src/hooks/useModels";
 import { useDeployModel } from "src/stores/useDeployModel";
 
-
 export default function ModelList() {
   const { openDrawerWithStep } = useDrawer();
 
@@ -20,21 +18,14 @@ export default function ModelList() {
 
   const { selectedProvider, modalityType } = useDeployModel();
   const [models, setModels] = React.useState([]);
-  const { isExpandedViewOpen } = useContext(BudFormContext)
+  const { isExpandedViewOpen } = useContext(BudFormContext);
 
-  const {
-    loading,
-    fetchModels
-  } = useModels();
+  const { loading, fetchModels } = useModels();
 
   const [search, setSearch] = React.useState("");
   const [showAllTags, setShowAllTags] = React.useState(false);
-  const {
-    selectedModel,
-    setSelectedModel,
-    currentWorkflow,
-    updateCloudModel
-  } = useDeployModel();
+  const { selectedModel, setSelectedModel, currentWorkflow, updateCloudModel } =
+    useDeployModel();
 
   useEffect(() => {
     if (currentWorkflow?.workflow_steps?.model) {
@@ -77,18 +68,21 @@ export default function ModelList() {
     }
   }, [models, selectedModel, setSelectedModel]);
 
-  const filteredModels = models?.filter(model => {
-    return model.name?.toLowerCase().includes(search.toLowerCase()) || model.tags?.some((task) => task.name?.toLowerCase().includes(search.toLowerCase())) || `${model.model_size}`.includes(search.toLowerCase());
+  const filteredModels = models?.filter((model) => {
+    return (
+      model.name?.toLowerCase().includes(search.toLowerCase()) ||
+      model.tags?.some((task) =>
+        task.name?.toLowerCase().includes(search.toLowerCase()),
+      ) ||
+      `${model.model_size}`.includes(search.toLowerCase())
+    );
   });
-
 
   return (
     <BudForm
-      data={{
-
-      }}
+      data={{}}
       onBack={() => {
-        openDrawerWithStep("cloud-providers")
+        openDrawerWithStep("cloud-providers");
       }}
       disableNext={!selectedModel?.id || isExpandedViewOpen}
       onNext={async () => {
@@ -121,7 +115,7 @@ export default function ModelList() {
               buttonLabel="+&nbsp;Cloud&nbsp;Model"
               onButtonClick={() => {
                 setSelectedModel(null);
-                openDrawerWithStep("add-model")
+                openDrawerWithStep("add-model");
               }}
             />
           </DeployModelSelect>

@@ -1,8 +1,20 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Dialog, Button, Text, TextField, Flex, Box, VisuallyHidden } from '@radix-ui/themes';
-import { Cross1Icon } from '@radix-ui/react-icons';
-import { TextAreaInput, TextInput } from '@/components/ui/input';
-import { Text_12_300_44474D, Text_12_400_787B83, Text_16_600_FFFFFF } from '@/components/ui/text';
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Dialog,
+  Button,
+  Text,
+  TextField,
+  Flex,
+  Box,
+  VisuallyHidden,
+} from "@radix-ui/themes";
+import { Cross1Icon } from "@radix-ui/react-icons";
+import { TextAreaInput, TextInput } from "@/components/ui/input";
+import {
+  Text_12_300_44474D,
+  Text_12_400_787B83,
+  Text_16_600_FFFFFF,
+} from "@/components/ui/text";
 
 interface AddProjectsPopupProps {
   isOpen: boolean;
@@ -24,7 +36,7 @@ const AddProjectsPopup: React.FC<AddProjectsPopupProps> = ({
   onOpenChange,
   title,
   description,
-  initialValues = { name: '', description: '' },
+  initialValues = { name: "", description: "" },
   onSubmit,
 }) => {
   const [formData, setFormData] = useState<FormData>(initialValues);
@@ -35,7 +47,7 @@ const AddProjectsPopup: React.FC<AddProjectsPopupProps> = ({
     const newErrors = { ...errors };
     if (name === "name" && value.trim() === "") {
       newErrors.name = "Project name is required";
-    } else if (name === "description" && value.trim().split(' ').length > 50) {
+    } else if (name === "description" && value.trim().split(" ").length > 50) {
       newErrors.description = "Description cannot exceed 50 words";
     } else {
       delete newErrors[name];
@@ -55,7 +67,7 @@ const AddProjectsPopup: React.FC<AddProjectsPopupProps> = ({
     }
     if (!description) {
       newErrors.description = "Description is required";
-    } else if (description.trim().split(' ').length > 50) {
+    } else if (description.trim().split(" ").length > 50) {
       newErrors.description = "Description cannot exceed 50 words";
     }
     setErrors(newErrors);
@@ -76,17 +88,26 @@ const AddProjectsPopup: React.FC<AddProjectsPopupProps> = ({
   }, [isOpen, onDialogClose]);
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={onOpenChange} >
-      <Dialog.Content maxWidth="370px" className="w-[29%] p-[1.5rem] bg-[#111113] border-0 shadow-none" aria-describedby={undefined}>
-      <Dialog.Title>
+    <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>
+      <Dialog.Content
+        maxWidth="370px"
+        className="w-[29%] p-[1.5rem] bg-[#111113] border-0 shadow-none"
+        aria-describedby={undefined}
+      >
+        <Dialog.Title>
           <VisuallyHidden>add project</VisuallyHidden>
         </Dialog.Title>
-        <Box className='pb-3'>
+        <Box className="pb-3">
           <Flex justify="between" align="center">
-            <Text_16_600_FFFFFF className="p-0 pt-1 m-0">{title}</Text_16_600_FFFFFF>
+            <Text_16_600_FFFFFF className="p-0 pt-1 m-0">
+              {title}
+            </Text_16_600_FFFFFF>
             <Dialog.Close>
-              <Button className="m-0 p-0 pt-[.1rem] bg-[transparent] h-[1.1rem]" size="1">
-                <Cross1Icon className='text-[#787B83]'/>
+              <Button
+                className="m-0 p-0 pt-[.1rem] bg-[transparent] h-[1.1rem]"
+                size="1"
+              >
+                <Cross1Icon className="text-[#787B83]" />
               </Button>
             </Dialog.Close>
           </Flex>
@@ -102,13 +123,15 @@ const AddProjectsPopup: React.FC<AddProjectsPopupProps> = ({
             <TextInput
               textFieldSlot=""
               name="name"
-              value={formData.name || ''}
+              value={formData.name || ""}
               onChange={handleChange}
               placeholder="Enter name"
               maxLength={50}
               className="text-[#FFFFFF]"
             />
-            {errors.name && <Text className="text-red-500 text-[.7rem]">{errors.name}</Text>}
+            {errors.name && (
+              <Text className="text-red-500 text-[.7rem]">{errors.name}</Text>
+            )}
           </label>
           <label className="pb-1 mt-3 block">
             <Text_12_400_787B83 className="pb-1">
@@ -116,18 +139,26 @@ const AddProjectsPopup: React.FC<AddProjectsPopupProps> = ({
             </Text_12_400_787B83>
             <TextAreaInput
               name="description"
-              value={formData.description || ''}
+              value={formData.description || ""}
               className="!min-h-[90px] text-[#FFFFFF] customPlaceholder !text-[0.740625rem]"
               onChange={handleChange}
               placeholder="Enter description here"
               maxLength={200} // Assuming 50 words can be approximated to 200 characters
             />
-            {errors.description && <Text className="text-red-500 text-[.7rem]">{errors.description}</Text>}
+            {errors.description && (
+              <Text className="text-red-500 text-[.7rem]">
+                {errors.description}
+              </Text>
+            )}
           </label>
         </Box>
 
         <Flex gap="3" mt="4" justify="center">
-          <Button size="1" className="h-[1.75rem] w-full text-xs font-normal" onClick={handleSubmit}>
+          <Button
+            size="1"
+            className="h-[1.75rem] w-full text-xs font-normal"
+            onClick={handleSubmit}
+          >
             Create Project
           </Button>
         </Flex>

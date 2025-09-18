@@ -1,4 +1,3 @@
-
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
@@ -10,46 +9,54 @@ import React, { useContext, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useModels } from "src/hooks/useModels";
 import { useDeployModel } from "src/stores/useDeployModel";
-import { Image, Checkbox } from 'antd'
-import { Text_10_400_B3B3B3, Text_12_300_EEEEEE, Text_12_400_757575, Text_12_600_EEEEEE, Text_14_400_EEEEEE } from "@/components/ui/text";
+import { Image, Checkbox } from "antd";
+import {
+  Text_10_400_B3B3B3,
+  Text_12_300_EEEEEE,
+  Text_12_400_757575,
+  Text_12_600_EEEEEE,
+  Text_14_400_EEEEEE,
+} from "@/components/ui/text";
 import Tags from "../components/DrawerTags";
 import SearchHeaderInput from "../components/SearchHeaderInput";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 
-
 const useCases = [
   {
     id: 1,
-    icon: '/images/drawer/question.png',
-    title: 'Question Answering',
-    description: 'Here we can add why or when the user should choose this template'
+    icon: "/images/drawer/question.png",
+    title: "Question Answering",
+    description:
+      "Here we can add why or when the user should choose this template",
   },
   {
     id: 2,
-    icon: '/images/drawer/summary.png',
-    title: 'Summarization',
-    description: 'Here we can add why or when the user should choose this template'
+    icon: "/images/drawer/summary.png",
+    title: "Summarization",
+    description:
+      "Here we can add why or when the user should choose this template",
   },
   {
     id: 3,
-    icon: '/images/drawer/chatIcon.png',
-    title: 'Chat',
-    description: 'parallel beams: 5, input tokens : 500, output tokens: 1000'
+    icon: "/images/drawer/chatIcon.png",
+    title: "Chat",
+    description: "parallel beams: 5, input tokens : 500, output tokens: 1000",
   },
   {
     id: 4,
-    icon: '/images/drawer/chatIcon.png',
-    title: 'Chat',
-    description: 'parallel beams: 5, input tokens : 500, output tokens: 1000'
+    icon: "/images/drawer/chatIcon.png",
+    title: "Chat",
+    description: "parallel beams: 5, input tokens : 500, output tokens: 1000",
   },
 
   {
     id: 5,
-    icon: '/images/drawer/code.png',
-    title: 'Code Gen',
-    description: 'Here we can add why or when the user should choose this template'
-  }
-]
+    icon: "/images/drawer/code.png",
+    title: "Code Gen",
+    description:
+      "Here we can add why or when the user should choose this template",
+  },
+];
 
 type cardProps = {
   data?: any;
@@ -115,21 +122,14 @@ export default function SelectUseCase() {
 
   const { selectedProvider } = useDeployModel();
   const [models, setModels] = React.useState([]);
-  const { isExpandedViewOpen } = useContext(BudFormContext)
+  const { isExpandedViewOpen } = useContext(BudFormContext);
 
-  const {
-    loading,
-    fetchModels
-  } = useModels();
+  const { loading, fetchModels } = useModels();
 
   const [search, setSearch] = React.useState("");
   const [showAllTags, setShowAllTags] = React.useState(false);
-  const {
-    selectedModel,
-    setSelectedModel,
-    currentWorkflow,
-    updateCloudModel
-  } = useDeployModel();
+  const { selectedModel, setSelectedModel, currentWorkflow, updateCloudModel } =
+    useDeployModel();
 
   useEffect(() => {
     if (currentWorkflow?.workflow_steps?.model) {
@@ -142,24 +142,27 @@ export default function SelectUseCase() {
       page,
       limit,
       table_source: "cloud_model",
-      source: selectedProvider?.type
+      source: selectedProvider?.type,
     }).then((data) => {
       setModels(data);
     });
   }, []);
 
-  const filteredModels = models?.filter(model => {
-    return model.name?.toLowerCase().includes(search.toLowerCase()) || model.tags?.some((task) => task.name?.toLowerCase().includes(search.toLowerCase())) || `${model.model_size}`.includes(search.toLowerCase());
+  const filteredModels = models?.filter((model) => {
+    return (
+      model.name?.toLowerCase().includes(search.toLowerCase()) ||
+      model.tags?.some((task) =>
+        task.name?.toLowerCase().includes(search.toLowerCase()),
+      ) ||
+      `${model.model_size}`.includes(search.toLowerCase())
+    );
   });
-
 
   return (
     <BudForm
-      data={{
-
-      }}
+      data={{}}
       onBack={() => {
-        openDrawerWithStep("select-evaluation-type")
+        openDrawerWithStep("select-evaluation-type");
       }}
       onNext={async () => {
         openDrawerWithStep("additional-settingse");
@@ -181,11 +184,11 @@ export default function SelectUseCase() {
                   setSearchValue={setSearch}
                   classNames="border border-[.5px] border-[#757575]"
                 />
-                <PrimaryButton classNames="!min-w-[120px] !px-[2.6rem]"
+                <PrimaryButton
+                  classNames="!min-w-[120px] !px-[2.6rem]"
                   onClick={null}
-                  text={'+ Add a custom use case'}
-                >
-                </PrimaryButton>
+                  text={"+ Add a custom use case"}
+                ></PrimaryButton>
               </div>
             </div>
 
@@ -209,16 +212,15 @@ export default function SelectUseCase() {
                     <CardWithCheckBox
                       key={index}
                       data={model}
-                      handleClick={() => {
-
-                      }}
+                      handleClick={() => {}}
                     />
                   ))}
                 </>
               ) : (
                 <div className="flex justify-center items-center min-h-[4rem]">
                   <Text_12_300_EEEEEE>
-                    To add new models for the provider, click the &quot;+Cloud Model&quot; button
+                    To add new models for the provider, click the &quot;+Cloud
+                    Model&quot; button
                   </Text_12_300_EEEEEE>
                 </div>
               )}

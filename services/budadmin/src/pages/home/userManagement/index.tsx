@@ -447,6 +447,7 @@ export default function UserManagement() {
             <div className=" userTable relative CommonCustomPagination">
               <Table<User>
                 columns={columns}
+                rowKey="id"
                 pagination={{
                   className: 'small-pagination',
                   current: getCurrentPage(),

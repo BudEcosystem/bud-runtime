@@ -1,6 +1,6 @@
 "use client";
 import DashBoardLayout from "../layout";
-import dynamic from 'next/dynamic';
+import dynamic from "next/dynamic";
 import {
   Text_12_400_6A6E76,
   Text_16_600_FFFFFF,
@@ -8,13 +8,13 @@ import {
 } from "@/components/ui/text";
 // import EmbeddedIframe from "./iFrame";
 
-const EmbeddedIframe = dynamic(() => import('./iFrame'), { ssr: false });
+const EmbeddedIframe = dynamic(() => import("./iFrame"), { ssr: false });
 
 export default function Help() {
   return (
     <DashBoardLayout>
       <div className="boardPageView flex justify-center items-center">
-         <EmbeddedIframe />
+        <EmbeddedIframe />
       </div>
     </DashBoardLayout>
   );

@@ -365,6 +365,7 @@ impl From<EmbeddingResponseWithMetadata> for ModelInferenceResponseWithMetadata 
             finish_reason: None,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }
     }
 }

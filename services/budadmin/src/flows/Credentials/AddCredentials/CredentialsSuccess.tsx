@@ -4,7 +4,11 @@ import { Image } from "antd";
 
 import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
-import { Text_12_300_EEEEEE, Text_12_400_B3B3B3, Text_24_600_EEEEEE } from "@/components/ui/text";
+import {
+  Text_12_300_EEEEEE,
+  Text_12_400_B3B3B3,
+  Text_24_600_EEEEEE,
+} from "@/components/ui/text";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -12,9 +16,7 @@ import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { useProprietaryCredentials } from "src/stores/useProprietaryCredentials";
 import { useCredentials } from "src/stores/useCredentials";
 
-const CredentialsSuccessCard = (props: {
-  text?: string;
-}) => {
+const CredentialsSuccessCard = (props: { text?: string }) => {
   const { closeDrawer } = useDrawer();
   const { reset } = useDeployModel();
   const { refresh } = useProprietaryCredentials();
@@ -26,10 +28,7 @@ const CredentialsSuccessCard = (props: {
   }, []);
 
   return (
-    <BudForm
-      data={{
-      }}
-    >
+    <BudForm data={{}}>
       <BudWraperBox center={true}>
         <BudDrawerLayout>
           <div className="flex flex-col	justify-start items-center p-[2.5rem]">

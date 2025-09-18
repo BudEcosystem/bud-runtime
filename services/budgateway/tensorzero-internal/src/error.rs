@@ -252,6 +252,12 @@ pub enum ErrorDetails {
     InvalidRequest {
         message: String,
     },
+    GuardrailInputViolation {
+        message: String,
+    },
+    GuardrailOutputViolation {
+        message: String,
+    },
     InvalidTemplatePath,
     InvalidTool {
         message: String,
@@ -468,6 +474,8 @@ impl ErrorDetails {
             ErrorDetails::InvalidOpenAICompatibleRequest { .. } => tracing::Level::ERROR,
             ErrorDetails::InvalidProviderConfig { .. } => tracing::Level::ERROR,
             ErrorDetails::InvalidRequest { .. } => tracing::Level::WARN,
+            ErrorDetails::GuardrailInputViolation { .. } => tracing::Level::WARN,
+            ErrorDetails::GuardrailOutputViolation { .. } => tracing::Level::ERROR,
             ErrorDetails::InvalidTemplatePath => tracing::Level::ERROR,
             ErrorDetails::InvalidTool { .. } => tracing::Level::ERROR,
             ErrorDetails::InvalidUuid { .. } => tracing::Level::ERROR,
@@ -568,6 +576,8 @@ impl ErrorDetails {
             ErrorDetails::InvalidOpenAICompatibleRequest { .. } => StatusCode::BAD_REQUEST,
             ErrorDetails::InvalidProviderConfig { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorDetails::InvalidRequest { .. } => StatusCode::BAD_REQUEST,
+            ErrorDetails::GuardrailInputViolation { .. } => StatusCode::FORBIDDEN,
+            ErrorDetails::GuardrailOutputViolation { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorDetails::InvalidTemplatePath => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorDetails::InvalidTool { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorDetails::InvalidVariantForOptimization { .. } => StatusCode::BAD_REQUEST,
@@ -858,6 +868,8 @@ impl std::fmt::Display for ErrorDetails {
             ),
             ErrorDetails::InvalidProviderConfig { message } => write!(f, "{message}"),
             ErrorDetails::InvalidRequest { message } => write!(f, "{message}"),
+            ErrorDetails::GuardrailInputViolation { message } => write!(f, "{message}"),
+            ErrorDetails::GuardrailOutputViolation { message } => write!(f, "{message}"),
             ErrorDetails::InvalidTemplatePath => {
                 write!(f, "Template path failed to convert to Rust string")
             }

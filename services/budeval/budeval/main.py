@@ -186,8 +186,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.info("Storage backend initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize storage backend: {e}")
+            raise
             # Don't fail startup if storage initialization fails
-
+        # ---
         # Check volume for dataset storage exists
         # try:
         #     volume_init = VolumeInitializer()

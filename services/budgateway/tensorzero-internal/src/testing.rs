@@ -29,5 +29,6 @@ pub fn get_unit_test_app_state_data(
         geoip_service: None,
         ua_parser: None,
         blocking_manager: None,
+        guardrails: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
     }
 }

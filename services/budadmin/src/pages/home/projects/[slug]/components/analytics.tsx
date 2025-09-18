@@ -55,7 +55,6 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
   const [averageRequestData, setAverageRequestData] = useState<any>();
   const [averageChartData, setAverageChartData] = useState<any>(null);
 
-
   const [ttftInterval, setTtftInterval] = useState<any>("daily");
   const [ttftRequestData, setTtftRequestData] = useState<any>();
   const [ttftChartData, setTtftChartData] = useState<any>(null);
@@ -81,7 +80,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
       total_input_value: "",
       total_output_value: "",
       input_avg: "",
-      output_avg: ""
+      output_avg: "",
     },
     ttft: {
       total_value: "",
@@ -94,7 +93,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
     throughput: {
       total_value: "",
       avg: "",
-    }
+    },
   });
   const segmentOptions = ["LAST 24 HRS", "LAST 7 DAYS", "LAST 30 DAYS"];
 
@@ -118,7 +117,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         total_input_value: "",
         total_output_value: "",
         input_avg: "",
-        output_avg: ""
+        output_avg: "",
       },
       ttft: {
         total_value: "",
@@ -131,7 +130,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
       throughput: {
         total_value: "",
         avg: "",
-      }
+      },
     });
   }, [projectId]);
   const requestOptions = [
@@ -141,9 +140,9 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
   ];
   // For delta calculations, we need double the time period
   const numberOfDaysForDelta = {
-    daily: 2,    // Last 48 hours (to get delta for last 24 hours)
-    weekly: 14,   // Last 14 days (to get delta for last 7 days)
-    monthly: 60  // Last 60 days (to get delta for last 30 days)
+    daily: 2, // Last 48 hours (to get delta for last 24 hours)
+    weekly: 14, // Last 14 days (to get delta for last 7 days)
+    monthly: 60, // Last 60 days (to get delta for last 30 days)
   };
 
   const handleChartFilter = (val: any) => {
@@ -219,7 +218,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
       // Aggregate request counts across all time periods
       data.items.forEach((timePeriod) => {
         timePeriod.items.forEach((item) => {
-          const name = item.endpoint_name || item.model_name || 'Unknown';
+          const name = item.endpoint_name || item.model_name || "Unknown";
           const requestCount = item.data?.request_count?.count || 0;
 
           if (!endpointMap[name]) {
@@ -231,7 +230,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
       });
 
       const endpoints = Object.keys(endpointMap);
-      const counts = endpoints.map(name => endpointMap[name]);
+      const counts = endpoints.map((name) => endpointMap[name]);
 
       // Calculate total requests
       const totalRequests = counts.reduce((sum, count) => sum + count, 0);
@@ -255,7 +254,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         ...chartData,
         label1: "Requests",
         label2: "Endpoints",
-        barColor: "#9462D5"
+        barColor: "#9462D5",
       });
     } else {
       // Clear the data when empty
@@ -272,7 +271,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         data: [],
         label1: "Requests",
         label2: "Endpoints",
-        barColor: "#9462D5"
+        barColor: "#9462D5",
       });
     }
   };
@@ -310,7 +309,10 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
   }, [averageMetricsData]);
 
   const createAverageChartData = (data) => {
-    if (data?.input_output_tokens_metrics?.items?.length && data.input_output_tokens_metrics.items[0]?.items?.length) {
+    if (
+      data?.input_output_tokens_metrics?.items?.length &&
+      data.input_output_tokens_metrics.items[0]?.items?.length
+    ) {
       const items = data.input_output_tokens_metrics.items[0].items;
       const summaryMetrics = data.input_output_tokens_metrics.summary_metrics;
 
@@ -324,8 +326,8 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
           total_input_value: summaryMetrics.input_tokens_delta_value || 0,
           total_output_value: summaryMetrics.output_tokens_delta_value || 0,
           input_avg: summaryMetrics.input_tokens_delta_percentage || 0,
-          output_avg: summaryMetrics.output_tokens_delta_percentage || 0
-        }
+          output_avg: summaryMetrics.output_tokens_delta_percentage || 0,
+        },
       }));
 
       // Create data structure for token metrics chart
@@ -353,8 +355,8 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
           total_input_value: "0",
           total_output_value: "0",
           input_avg: "0",
-          output_avg: "0"
-        }
+          output_avg: "0",
+        },
       }));
 
       setAverageChartData({
@@ -373,7 +375,6 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
     setAverageInterval(handleChartFilter(data));
   };
   // token metrics code block ----------------------------------
-
 
   // TTFT code block ----------------------------------
   const getTtftData = async () => {
@@ -436,8 +437,10 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         });
 
         const endpoints = Object.keys(endpointTotals);
-        const averages = endpoints.map(name =>
-          endpointCounts[name] > 0 ? endpointTotals[name] / endpointCounts[name] : 0
+        const averages = endpoints.map((name) =>
+          endpointCounts[name] > 0
+            ? endpointTotals[name] / endpointCounts[name]
+            : 0,
         );
 
         chartData = {
@@ -463,7 +466,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
       // Aggregate data across all time periods
       data.items.forEach((timePeriod) => {
         timePeriod.items.forEach((item) => {
-          const name = item.endpoint_name || item.model_name || 'Unknown';
+          const name = item.endpoint_name || item.model_name || "Unknown";
           const ttftData = item.data?.ttft;
           const value = ttftData?.avg || 0;
 
@@ -477,8 +480,10 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
       });
 
       const endpoints = Object.keys(endpointMap);
-      const values = endpoints.map(name =>
-        endpointMap[name].count > 0 ? endpointMap[name].total / endpointMap[name].count : 0
+      const values = endpoints.map((name) =>
+        endpointMap[name].count > 0
+          ? endpointMap[name].total / endpointMap[name].count
+          : 0,
       );
 
       // Calculate overall average
@@ -505,7 +510,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         ...chartData,
         label1: "TTFT (ms)",
         label2: "Endpoints",
-        barColor: "#32D583"
+        barColor: "#32D583",
       });
     } else {
       // Clear the data when empty
@@ -522,7 +527,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         data: [],
         label1: "TTFT (ms)",
         label2: "Endpoints",
-        barColor: "#32D583"
+        barColor: "#32D583",
       });
     }
   };
@@ -578,7 +583,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         data: items.map((item) => item.total_value || 0),
         label1: "Latency (ms)",
         label2: "Endpoints",
-        barColor: "#4A90E2"
+        barColor: "#4A90E2",
       });
     } else {
       // Clear the data when empty
@@ -595,7 +600,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         data: [],
         label1: "Latency (ms)",
         label2: "Endpoints",
-        barColor: "#4A90E2"
+        barColor: "#4A90E2",
       });
     }
   };
@@ -640,7 +645,8 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
       setExtraChartDetails((prev) => ({
         ...prev,
         throughput: {
-          total_value: data.throughput_metrics.summary_metrics.total_value || "0",
+          total_value:
+            data.throughput_metrics.summary_metrics.total_value || "0",
           avg: data.throughput_metrics.summary_metrics.delta_percentage || "0",
         },
       }));
@@ -651,7 +657,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         data: items.map((item) => item.total_value || 0),
         label1: "Throughput (tokens/s)",
         label2: "Endpoints",
-        barColor: "#F39C12"
+        barColor: "#F39C12",
       });
     } else {
       // Clear the data when empty
@@ -668,7 +674,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
         data: [],
         label1: "Throughput (tokens/s)",
         label2: "Endpoints",
-        barColor: "#F39C12"
+        barColor: "#F39C12",
       });
     }
   };
@@ -711,7 +717,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
             <Segmented
               options={segmentOptions}
               value={segmentOptions.find(
-                (opt) => handleChartFilter(opt) === modelRequestInterval
+                (opt) => handleChartFilter(opt) === modelRequestInterval,
               )} // Ensure correct default selection
               onChange={(value) => {
                 handleModelChange(value); // string
@@ -734,7 +740,8 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
                   } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem] mt-[0.82rem]`}
                 >
                   <span className="font-[400] text-[0.8125rem] leading-[100%]">
-                    Avg. {Number(extraChartDetails.modelUsage.avg).toFixed(2)}%{" "}
+                    Avg. {Number(extraChartDetails.modelUsage.avg).toFixed(2)}
+                    %{" "}
                   </span>
                   {Number(extraChartDetails.modelUsage.avg) >= 0 ? (
                     <Image
@@ -775,7 +782,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
             <Segmented
               options={segmentOptions}
               value={segmentOptions.find(
-                (opt) => handleChartFilter(opt) === averageInterval
+                (opt) => handleChartFilter(opt) === averageInterval,
               )} // Ensure correct default selection
               onChange={(value) => {
                 handleAverageChange(value); // string
@@ -785,7 +792,6 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
           </div>
           {averageChartData?.source?.length ? (
             <>
-
               <div className="h-[232px]">
                 <TokenMetricsChart
                   key={averageChartData?.source?.length}
@@ -809,7 +815,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
             <Segmented
               options={segmentOptions}
               value={segmentOptions.find(
-                (opt) => handleChartFilter(opt) === ttftInterval
+                (opt) => handleChartFilter(opt) === ttftInterval,
               )}
               onChange={(value) => {
                 handleTtftChange(value);
@@ -874,7 +880,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
             <Segmented
               options={segmentOptions}
               value={segmentOptions.find(
-                (opt) => handleChartFilter(opt) === latencyInterval
+                (opt) => handleChartFilter(opt) === latencyInterval,
               )}
               onChange={(value) => {
                 handleLatencyChange(value);
@@ -896,7 +902,8 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
                   } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem] mt-[0.82rem]`}
                 >
                   <span className="font-[400] text-[0.8125rem] leading-[100%]">
-                    Avg. {Number(extraChartDetails.latency.avg).toFixed(2)}%{" "}
+                    Avg. {Number(extraChartDetails.latency.avg).toFixed(2)}
+                    %{" "}
                   </span>
                   {Number(extraChartDetails.latency.avg) >= 0 ? (
                     <Image
@@ -939,7 +946,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
             <Segmented
               options={segmentOptions}
               value={segmentOptions.find(
-                (opt) => handleChartFilter(opt) === throughputInterval
+                (opt) => handleChartFilter(opt) === throughputInterval,
               )}
               onChange={(value) => {
                 handleThroughputChange(value);
@@ -951,7 +958,8 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
             <>
               <div className="flex flex-col items-start	mt-[1.3rem]">
                 <p className="text-[1.625rem] text-[#EEEEEE] leading-[100%] font-[400] mb-0">
-                  {Number(extraChartDetails.throughput.total_value).toFixed(2)} tokens/s
+                  {Number(extraChartDetails.throughput.total_value).toFixed(2)}{" "}
+                  tokens/s
                 </p>
                 <div
                   className={`flex ${
@@ -961,7 +969,8 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
                   } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem] mt-[0.82rem]`}
                 >
                   <span className="font-[400] text-[0.8125rem] leading-[100%]">
-                    Avg. {Number(extraChartDetails.throughput.avg).toFixed(2)}%{" "}
+                    Avg. {Number(extraChartDetails.throughput.avg).toFixed(2)}
+                    %{" "}
                   </span>
                   {Number(extraChartDetails.throughput.avg) >= 0 ? (
                     <Image

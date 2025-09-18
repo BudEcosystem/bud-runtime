@@ -1544,10 +1544,10 @@ class ExperimentWorkflowService:
             if request.step_number == 5 and request.trigger_workflow:
                 await self._create_experiment_from_workflow(workflow.id, current_user_id)
                 # Mark workflow as completed
-                await WorkflowDataManager(self.session).update_by_fields(
-                    workflow,
-                    {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
-                )
+                # await WorkflowDataManager(self.session).update_by_fields(
+                #     workflow,
+                #     {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
+                # )
 
                 # if experiment_id, then call the eval workflow
                 # if experiment_id:
@@ -2004,9 +2004,15 @@ class EvaluationWorkflowService:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST, detail="workflow_id is required for steps 2-5"
                     )
+                workflow_title = request.stage_data.get("name") if isinstance(request.stage_data, dict) else None
+                if isinstance(workflow_title, str) and workflow_title.strip():
+                    workflow_title = workflow_title.strip()
+                else:
+                    workflow_title = "New Model Evaualtion"
+
                 workflow = await WorkflowDataManager(self.session).insert_one(
                     WorkflowModel(
-                        title=f"evaluation_workflow_{experiment_id}",
+                        title=workflow_title,
                         workflow_type=WorkflowTypeEnum.EVALUATE_MODEL,
                         status=WorkflowStatusEnum.IN_PROGRESS,
                         current_step=0,  # Start at 0, will be updated to 1 after first step
@@ -2047,10 +2053,10 @@ class EvaluationWorkflowService:
             # If this is the final step and trigger_workflow is True, create the runs
             if request.step_number == 5 and request.trigger_workflow:
                 await self._create_runs_from_workflow(workflow.id, experiment_id, current_user_id)
-                # await WorkflowDataManager(self.session).update_by_fields(
-                #     workflow,
-                #     {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
-                # )
+                await WorkflowDataManager(self.session).update_by_fields(
+                    workflow,
+                    {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
+                )
 
             # After storing the workflow step, retrieve all accumulated data
             all_step_data = await self._get_accumulated_step_data(workflow.id)
@@ -2566,12 +2572,6 @@ class EvaluationWorkflowService:
             if not workflow:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
             workflow = cast(WorkflowModel, workflow)
-
-            # Verify workflow belongs to this experiment
-            if not workflow.title.endswith(str(experiment_id)):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, detail="Workflow does not belong to this experiment"
-                )
 
             # Return unified workflow response
             return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)

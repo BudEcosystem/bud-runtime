@@ -2,95 +2,74 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import { Input, Checkbox, Image } from "antd";
+import { Input, Checkbox, Spin } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { errorToast } from "@/components/toast";
-import {
-  Text_12_400_757575,
-  Text_14_400_EEEEEE,
-} from "@/components/ui/text";
-
-interface Project {
-  id: string;
-  name: string;
-  description?: string;
-  icon?: string;
-  deploymentCount?: number;
-}
+import { useProjects } from "src/hooks/useProjects";
+import useGuardrails from "src/hooks/useGuardrails";
+import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 
 export default function SelectProject() {
   const { openDrawerWithStep } = useDrawer();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("");
+  const [selectedProjectData, setSelectedProjectData] = useState<any>(null);
 
-  // Mock project data - would typically come from API
-  const projects: Project[] = [
-    {
-      id: "proj-1",
-      name: "Project Name 1",
-      description: "Production AI Services",
-      icon: "🚀",
-      deploymentCount: 5
-    },
-    {
-      id: "proj-2",
-      name: "Project Name 2",
-      description: "Development Environment",
-      icon: "🔧",
-      deploymentCount: 3
-    },
-    {
-      id: "proj-3",
-      name: "Project Name 3",
-      description: "Testing and QA",
-      icon: "🧪",
-      deploymentCount: 2
-    },
-    {
-      id: "proj-4",
-      name: "AI Research Lab",
-      description: "Experimental Models",
-      icon: "🔬",
-      deploymentCount: 8
-    },
-    {
-      id: "proj-5",
-      name: "Customer Portal",
-      description: "Client-facing Services",
-      icon: "👥",
-      deploymentCount: 4
-    },
-  ];
+  // Use the projects hook to fetch actual project data
+  const { projects, loading, getProjects } = useProjects();
+
+  // Use guardrails hook to store selected project and update workflow
+  const {
+    setSelectedProject: setSelectedProjectInStore,
+    updateWorkflow,
+    workflowLoading,
+  } = useGuardrails();
+
+  // Fetch projects on component mount and when search changes
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      getProjects(1, 50, searchTerm || undefined);
+    }, 300); // Debounce search
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
 
   const handleBack = () => {
     openDrawerWithStep("deployment-types");
   };
 
-  const handleNext = () => {
-    if (!selectedProject) {
+  const handleNext = async () => {
+    if (!selectedProject || !selectedProjectData) {
       errorToast("Please select a project");
       return;
     }
-    // Move to deployment selection
-    openDrawerWithStep("select-deployment");
+
+    try {
+      // Update workflow with selected project
+      await updateWorkflow({
+        step_number: 4, // Project selection is step 4
+        workflow_total_steps: 5, // Not counting the first step
+        project_id: selectedProject,
+        trigger_workflow: false,
+      });
+
+      // Save selected project to guardrails store
+      setSelectedProjectInStore(selectedProjectData);
+      // Move to deployment selection
+      openDrawerWithStep("select-deployment");
+    } catch (error) {
+      console.error("Failed to update workflow:", error);
+    }
   };
 
-  const handleProjectSelect = (projectId: string) => {
+  const handleProjectSelect = (project: any) => {
+    // Handle nested project structure
+    const projectId = project.project?.id || project.id;
     setSelectedProject(projectId);
+    setSelectedProjectData(project);
   };
-
-  const getFilteredProjects = () => {
-    if (!searchTerm) return projects;
-
-    return projects.filter(project =>
-      project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  };
-
-  const filteredProjects = getFilteredProjects();
 
   return (
     <BudForm
@@ -99,7 +78,7 @@ export default function SelectProject() {
       onNext={handleNext}
       backText="Back"
       nextText="Next"
-      disableNext={!selectedProject}
+      disableNext={!selectedProject || workflowLoading}
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -110,9 +89,9 @@ export default function SelectProject() {
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />
 
-          <div className="px-[1.35rem] pb-[1.35rem]">
+          <div className="pb-[1.35rem]">
             {/* Search Bar */}
-            <div className="mb-[1.5rem]">
+            <div className="mb-[1.5rem] px-[1.35rem]">
               <Input
                 placeholder="Search"
                 prefix={<SearchOutlined className="text-[#757575]" />}
@@ -128,58 +107,73 @@ export default function SelectProject() {
 
             {/* Project List */}
             <div className="space-y-0">
-              {filteredProjects.map((project, index) => (
-                <div
-                  key={project.id}
-                  onClick={() => handleProjectSelect(project.id)}
-                  className={`pt-[1.05rem] pb-[.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] flex-row flex hover:bg-[#FFFFFF08] transition-all ${
-                    index === 0 ? "border-t-[#1F1F1F]" : ""
-                  } ${
-                    selectedProject === project.id
-                      ? "border-y-[#965CDE] bg-[#965CDE10]"
-                      : "border-y-[#1F1F1F] hover:border-[#757575]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-[1rem]">
-                      {/* Project Icon */}
-                      <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center shrink-0">
-                        <span className="text-[1.2rem]">{project.icon}</span>
-                      </div>
+              {loading ? (
+                <div className="flex justify-center py-[3rem]">
+                  <Spin size="large" />
+                </div>
+              ) : (
+                <>
+                  {projects?.map((project, index) => (
+                    <div
+                      key={project.project?.id || project.id || index}
+                      onClick={() => handleProjectSelect(project)}
+                      className={`pt-[1.05rem] pb-[.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] flex-row flex hover:bg-[#FFFFFF08] transition-all ${
+                        index === 0 ? "border-t-[#1F1F1F]" : ""
+                      } ${
+                        selectedProject === (project.project?.id || project.id)
+                          ? "border-y-[#965CDE] bg-[#965CDE10]"
+                          : "border-y-[#1F1F1F] hover:border-[#757575]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-[1rem]">
+                          {/* Project Icon */}
+                          <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center shrink-0">
+                            <span className="text-[1.2rem]">
+                              {project.project.icon &&
+                              project.project.icon != "string"
+                                ? project.project.icon
+                                : "📁"}
+                            </span>
+                          </div>
 
-                      {/* Project Details */}
-                      <div className="flex flex-col">
-                        <Text_14_400_EEEEEE className="mb-[0.25rem]">
-                          {project.name}
-                        </Text_14_400_EEEEEE>
-                        {project.description && (
-                          <Text_12_400_757575>
-                            {project.description}
-                          </Text_12_400_757575>
-                        )}
+                          {/* Project Details */}
+                          <div className="flex flex-col">
+                            <Text_14_400_EEEEEE className="mb-[0.25rem]">
+                              {project.project.name}
+                            </Text_14_400_EEEEEE>
+                            {project.project.description && (
+                              <Text_12_400_757575 className="line-clamp-1">
+                                {project.project.description}
+                              </Text_12_400_757575>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Selection Indicator */}
+                        <div className="flex items-center gap-[0.75rem]">
+                          {project.endpoints_count !== undefined && (
+                            <Text_12_400_757575>
+                              {project.endpoints_count} endpoints
+                            </Text_12_400_757575>
+                          )}
+                          <Checkbox
+                            checked={selectedProject === project.project.id}
+                            className="AntCheckbox pointer-events-none"
+                          />
+                        </div>
                       </div>
                     </div>
+                  ))}
 
-                    {/* Selection Indicator */}
-                    <div className="flex items-center gap-[0.75rem]">
-                      {project.deploymentCount && (
-                        <Text_12_400_757575>
-                          {project.deploymentCount} deployments
-                        </Text_12_400_757575>
-                      )}
-                      <Checkbox
-                        checked={selectedProject === project.id}
-                        className="AntCheckbox pointer-events-none"
-                      />
+                  {(!projects || projects.length === 0) && (
+                    <div className="text-center py-[2rem]">
+                      <Text_12_400_757575>
+                        No projects found matching your search
+                      </Text_12_400_757575>
                     </div>
-                  </div>
-                </div>
-              ))}
-
-              {filteredProjects.length === 0 && (
-                <div className="text-center py-[2rem]">
-                  <Text_12_400_757575>No projects found matching your search</Text_12_400_757575>
-                </div>
+                  )}
+                </>
               )}
             </div>
           </div>

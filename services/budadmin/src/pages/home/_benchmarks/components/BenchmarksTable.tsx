@@ -1,9 +1,21 @@
 "use client";
 import { useRouter } from "next/router";
 import React, { useCallback, useEffect, useState } from "react";
-import { Text_12_300_EEEEEE, Text_12_400_EEEEEE, Text_16_600_FFFFFF } from "@/components/ui/text";
+import {
+  Text_12_300_EEEEEE,
+  Text_12_400_EEEEEE,
+  Text_16_600_FFFFFF,
+} from "@/components/ui/text";
 import { useDrawer } from "src/hooks/useDrawer";
-import { Tabs, Image, Popover, ConfigProvider, Select, Table, Slider } from "antd";
+import {
+  Tabs,
+  Image,
+  Popover,
+  ConfigProvider,
+  Select,
+  Table,
+  Slider,
+} from "antd";
 import { formatDate } from "src/utils/formatDate";
 import { notification } from "antd";
 import useHandleRouteChange from "@/lib/useHandleRouteChange";
@@ -18,7 +30,10 @@ import { IconOnlyRender } from "src/flows/components/BudIconRender";
 import { usePerfomanceBenchmark } from "src/stores/usePerfomanceBenchmark";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import CustomPopover from "src/flows/components/customPopover";
-import { PrimaryButton, SecondaryButton } from "@/components/ui/bud/form/Buttons";
+import {
+  PrimaryButton,
+  SecondaryButton,
+} from "@/components/ui/bud/form/Buttons";
 import Tags from "src/flows/components/DrawerTags";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
 
@@ -46,12 +61,7 @@ interface DataType {
   id?: string;
 }
 
-
-const BenchmarksTable = ({
-  showTableTitle,
-}: {
-  showTableTitle?: boolean,
-}) => {
+const BenchmarksTable = ({ showTableTitle }: { showTableTitle?: boolean }) => {
   const { reset } = usePerfomanceBenchmark();
   const {
     benchmarks,
@@ -62,7 +72,7 @@ const BenchmarksTable = ({
     getBenchmarkModelClusterDetails,
     getfilterList,
     modelFilterList,
-    clusterFilterList
+    clusterFilterList,
   } = useBenchmarks();
   const { isLoading, showLoader, hideLoader } = useLoader();
   const [selectedRow, setSelectedRow] = useState<DataType | null>(null);
@@ -82,22 +92,20 @@ const BenchmarksTable = ({
 
   const [isMounted, setIsMounted] = useState(false);
 
-
   useEffect(() => {
     getfilterList({
       page: 1,
       limit: 10000,
       search: false,
-      resource: 'model'
-    })
+      resource: "model",
+    });
     getfilterList({
       page: 1,
       limit: 10000,
       search: false,
-      resource: 'cluster'
-    })
+      resource: "cluster",
+    });
   }, []);
-
 
   useEffect(() => {
     setIsMounted(true);
@@ -152,7 +160,7 @@ const BenchmarksTable = ({
       });
       hideLoader();
     },
-    [currentPage, pageSize, getBenchmarks]
+    [currentPage, pageSize, getBenchmarks],
   );
 
   useEffect(() => {
@@ -165,8 +173,6 @@ const BenchmarksTable = ({
       applyFilter();
     }
   }, [filterReset]);
-
-
 
   const handlePageChange = (currentPage, pageSize) => {
     setCurrentPage(currentPage);
@@ -181,9 +187,7 @@ const BenchmarksTable = ({
             title: "Benchmark Name",
             dataIndex: "name",
             key: "name",
-            render: (text) => (
-              <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-            ),
+            render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
             sortOrder:
               orderBy === "name"
                 ? order === "-"
@@ -210,8 +214,7 @@ const BenchmarksTable = ({
             dataIndex: "model",
             key: "model",
             width: "auto",
-            className:
-              "min-w-[280px] 1680px:min-w-[300px] 1920:min-w-[500px]",
+            className: "min-w-[280px] 1680px:min-w-[300px] 1920:min-w-[500px]",
             render: (text, record) => (
               <div className="flex justify-start items-center gap-[.5rem]">
                 {/* {record.modelImage && (
@@ -273,9 +276,7 @@ const BenchmarksTable = ({
             key: "node_type",
             render: (text) => (
               <div className="flex gap-[.4rem]">
-                <Text_12_400_EEEEEE>
-                  {text.toUpperCase()}
-                </Text_12_400_EEEEEE>
+                <Text_12_400_EEEEEE>{text.toUpperCase()}</Text_12_400_EEEEEE>
               </div>
             ),
             sortIcon: SortIcon,
@@ -407,7 +408,7 @@ const BenchmarksTable = ({
             order: "ascend" | "descend";
             field: string;
           },
-          extra
+          extra,
         ) => {
           setOrder(sorter.order === "ascend" ? "" : "-");
           setOrderBy(sorter.field);
@@ -416,9 +417,9 @@ const BenchmarksTable = ({
         title={() => (
           <div>
             {showTableTitle && (
-              <div className='flex justify-between items-center px-[0.75rem] py-[1rem]'>
+              <div className="flex justify-between items-center px-[0.75rem] py-[1rem]">
                 <div></div>
-                <div className='flex items-center justify-between gap-x-[0rem]'>
+                <div className="flex items-center justify-between gap-x-[0rem]">
                   <SearchHeaderInput
                     classNames="mr-[1rem]"
                     placeholder="Search by name or tags"
@@ -438,8 +439,8 @@ const BenchmarksTable = ({
                             Filter
                           </div>
                           <div className="text-12 font-400 text-[#757575]">
-                            Apply the following filters to find benchmark of your
-                            choice.
+                            Apply the following filters to find benchmark of
+                            your choice.
                           </div>
                         </div>
                         <div className="height-1 bg-[#1F1F1F] mb-[1.5rem] w-full"></div>
@@ -502,7 +503,10 @@ const BenchmarksTable = ({
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#D1B854"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#D1B854"
+                                        ></Tags>
                                       );
                                     }}
                                   />
@@ -562,7 +566,10 @@ const BenchmarksTable = ({
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#D1B854"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#D1B854"
+                                        ></Tags>
                                       );
                                     }}
                                   />
@@ -622,7 +629,10 @@ const BenchmarksTable = ({
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#D1B854"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#D1B854"
+                                        ></Tags>
                                       );
                                     }}
                                   />
@@ -775,7 +785,7 @@ const BenchmarksTable = ({
                   >
                     <label
                       className="h-[1.7rem] text-[#FFFFFF] ml-0 mr-1 flex items-center cursor-pointer text-xs font-normal leading-3 rounded-[6px] shadow-none bg-transparent"
-                      onClick={() => { }}
+                      onClick={() => {}}
                     >
                       <MixerHorizontalIcon
                         style={{ width: "0.875rem", height: "0.875rem" }}
@@ -789,8 +799,7 @@ const BenchmarksTable = ({
                     onClick={() => {
                       reset();
                       openDrawer("model_benchmark");
-                    }
-                    }
+                    }}
                     classNames="!pr-[.8rem] tracking-[.02rem]"
                   >
                     <div className="flex items-center justify-center gap-[.2rem]">

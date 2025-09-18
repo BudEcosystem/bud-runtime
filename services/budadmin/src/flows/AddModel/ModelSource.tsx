@@ -1,4 +1,3 @@
-
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
@@ -9,7 +8,13 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
 
 export default function ModelSource() {
-  const { providerType, createCloudModelWorkflow, currentWorkflow, updateProviderType, createLocalModelWorkflow, updateProviderTypeLocal,
+  const {
+    providerType,
+    createCloudModelWorkflow,
+    currentWorkflow,
+    updateProviderType,
+    createLocalModelWorkflow,
+    updateProviderTypeLocal,
     setCloudModelDetails,
     setLocalModelDetails,
     modalityType
@@ -28,11 +33,10 @@ export default function ModelSource() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍"
+        icon: "😍",
       });
       openDrawerWithStep("cloud-providers");
-    }
-    else {
+    } else {
       const result = await createLocalModelWorkflow();
       if (!result) {
         return;
@@ -42,7 +46,10 @@ export default function ModelSource() {
         name: "",
         description: "",
         tags: [],
-        icon: currentWorkflow?.workflow_steps?.provider?.type == "huggingface" ? "" : ""
+        icon:
+          currentWorkflow?.workflow_steps?.provider?.type == "huggingface"
+            ? ""
+            : "",
       });
 
       // Check if Document modality and Hugging Face are selected
@@ -52,7 +59,7 @@ export default function ModelSource() {
         openDrawerWithStep("add-local-model");
       }
     }
-  }
+  };
 
   return (
     <BudForm
@@ -60,7 +67,7 @@ export default function ModelSource() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍"
+        icon: "😍",
       }}
       nextText="Next"
       disableNext={!providerType?.id}

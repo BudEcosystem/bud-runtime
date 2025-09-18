@@ -67,23 +67,22 @@ let dummyProviders: Provider[] = [
 export const useCloudProviders = create<{
   providers: Provider[];
   loading: boolean;
-  getProviders: (page: any, limit: any, search?: string) => void;
+  getProviders: (page: any, limit: any, search?: string, capabilities?: string) => void;
 }>((set) => ({
   providers: [],
   loading: true,
-  getProviders: async (page: any, limit: any, search?: string) => {
+  getProviders: async (page: any, limit: any, search?: string, capabilities?: string) => {
     const params: Record<string, any> = {
       page,
       limit,
       search: Boolean(search),
       order_by: "-created_at",
-      capabilities: "model",
+      capabilities: capabilities || "model", // Use provided capabilities or default to "model"
     };
 
     if (search) {
       params.name = search;
     }
-
     set({ loading: true });
     try {
       const response: any = await AppRequest.Get(`${tempApiBaseUrl}/models/providers`, {

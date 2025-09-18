@@ -569,6 +569,9 @@ pub struct ModelInferenceResponseWithMetadata {
     /// The response sent by the gateway back to the client
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gateway_response: Option<String>,
+    /// Guardrail scan summary (JSON string)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guardrail_scan_summary: Option<String>,
 }
 
 impl ModelInferenceResponseWithMetadata {
@@ -1003,6 +1006,9 @@ pub struct ModelInferenceDatabaseInsert {
     pub gateway_request: Option<String>,
     /// The response sent by the gateway back to the client
     pub gateway_response: Option<String>,
+    /// Summary of guardrail scans performed for this inference, if available
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guardrail_scan_summary: Option<String>,
     /// The type of endpoint that generated this inference
     #[serde(default = "default_endpoint_type")]
     pub endpoint_type: String,
@@ -1152,6 +1158,7 @@ impl ModelInferenceResponseWithMetadata {
             cached: model_inference_response.cached,
             gateway_request: model_inference_response.gateway_request,
             gateway_response: model_inference_response.gateway_response,
+            guardrail_scan_summary: None,
         }
     }
 }
@@ -1366,6 +1373,7 @@ impl ModelInferenceDatabaseInsert {
         };
         let serialized_input_messages = serialize_or_log(&result.input_messages);
         let serialized_output = serialize_or_log(&result.output);
+        let guardrail_scan_summary = result.guardrail_scan_summary.clone();
 
         // A usage of 0 indicates that something went wrong, since a model
         // should always consume and produce at least one token.
@@ -1400,6 +1408,7 @@ impl ModelInferenceDatabaseInsert {
             finish_reason: result.finish_reason,
             gateway_request: result.gateway_request,
             gateway_response: result.gateway_response,
+            guardrail_scan_summary,
             endpoint_type: endpoint_type.to_string(),
         }
     }
@@ -2370,6 +2379,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
         let chat_inference_response = ChatInferenceResult::new(
             inference_id,
@@ -2422,6 +2432,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let weather_tool_config = get_temperature_tool_config();
@@ -2476,6 +2487,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2526,6 +2538,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2596,6 +2609,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2684,6 +2698,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2779,6 +2794,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2832,6 +2848,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2907,6 +2924,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2966,6 +2984,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(

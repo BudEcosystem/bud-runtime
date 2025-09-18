@@ -1,21 +1,18 @@
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import React, { } from "react";
+import React from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import BudStepAlert from "../components/BudStepAlert";
 import { successToast } from "@/components/toast";
 import { useCluster } from "src/hooks/useCluster";
 
 export default function DeleteCluster() {
-  const { closeDrawer } = useDrawer()
+  const { closeDrawer } = useDrawer();
   const { selectedCluster, deleteCluster, refresh } = useCluster();
 
   return (
-    <BudForm
-      data={{
-      }}
-    >
+    <BudForm data={{}}>
       <BudWraperBox>
         <BudDrawerLayout>
           <BudStepAlert
@@ -25,15 +22,15 @@ export default function DeleteCluster() {
             confirmText="Delete Cluster"
             cancelText="Cancel"
             confirmAction={async () => {
-              const result = await deleteCluster(selectedCluster?.id)
+              const result = await deleteCluster(selectedCluster?.id);
               if (result) {
-                successToast('Cluster deleted successfully')
-                await refresh()
+                successToast("Cluster deleted successfully");
+                await refresh();
               }
-              closeDrawer()
+              closeDrawer();
             }}
             cancelAction={() => {
-              closeDrawer()
+              closeDrawer();
             }}
           />
         </BudDrawerLayout>

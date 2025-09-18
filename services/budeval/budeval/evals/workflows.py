@@ -341,12 +341,12 @@ class EvaluationWorkflow:
             from budeval.evals.results_processor import ResultsProcessor
             from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
 
-            # Initialize processor with configured storage backend
-            storage = get_storage_adapter()
-            processor = ResultsProcessor(storage)
-
-            # Initialize storage and extract results in the same event loop
+            # Run async operations in a new event loop
             async def extract_with_storage():
+                # Create storage adapter within this event loop context
+                storage = get_storage_adapter()
+                processor = ResultsProcessor(storage)
+
                 # Initialize storage if needed (e.g., ClickHouse connection pool)
                 if hasattr(storage, "initialize"):
                     await initialize_storage(storage)
@@ -360,7 +360,7 @@ class EvaluationWorkflow:
                     experiment_id=experiment_id,
                 )
 
-            # Run both operations in the same event loop
+            # Run in a new event loop (Dapr workflows run in threads)
             results = asyncio.run(extract_with_storage())
 
             logger.info(f"Successfully processed results for job {job_id}")

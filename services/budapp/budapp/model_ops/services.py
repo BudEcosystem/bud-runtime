@@ -3594,6 +3594,7 @@ class ModelService(SessionMixin):
             simulator_id=simulator_id,
             endpoint_name=endpoint_name,
             model=deploy_model_uri,
+            model_size=db_model.model_size,
             target_ttft=ttft_min,
             target_e2e_latency=e2e_latency_min,
             target_throughput_per_user=target_throughput_per_user_max,
