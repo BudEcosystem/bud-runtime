@@ -72,15 +72,23 @@ export const useCloudProviders = create<{
   providers: [],
   loading: true,
   getProviders: async (page: any, limit: any, search?: string) => {
-    let url;
+    const params: Record<string, any> = {
+      page,
+      limit,
+      search: Boolean(search),
+      order_by: "-created_at",
+      capabilities: "model",
+    };
+
     if (search) {
-      url = `${tempApiBaseUrl}/models/providers?page=${page}&limit=${limit}&search=true&name=${search}&order_by=-created_at`;
-    } else {
-      url = `${tempApiBaseUrl}/models/providers?page=${page}&limit=${limit}&search=false&order_by=-created_at`;
+      params.name = search;
     }
+
     set({ loading: true });
     try {
-      const response: any = await AppRequest.Get(url);
+      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/models/providers`, {
+        params,
+      });
       const listData = response.data.providers;
       const updatedListData = listData.map((item) => {
         return {

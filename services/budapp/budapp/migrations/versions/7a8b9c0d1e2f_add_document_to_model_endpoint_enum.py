@@ -1,7 +1,7 @@
 """add DOCUMENT to model_endpoint_enum
 
 Revision ID: 7a8b9c0d1e2f
-Revises: 53c43a46147b
+Revises: de33c215c978
 Create Date: 2025-09-15 20:35:00.000000
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "7a8b9c0d1e2f"
-down_revision = "53c43a46147b"
+down_revision = "de33c215c978"
 branch_labels = None
 depends_on = None
 

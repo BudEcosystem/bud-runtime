@@ -3198,10 +3198,12 @@ class ProviderCapabilityEnum(Enum):
                to model inference endpoints.
         MODERATION: Represents providers that offer content moderation, safety, or
                     guardrail endpoints.
+        LOCAL: Represents providers that expose local or user-managed runtimes.
     """
 
     MODEL = "model"
     MODERATION = "moderation"
+    LOCAL = "local"
 
 
 class AuditActionEnum(StrEnum):

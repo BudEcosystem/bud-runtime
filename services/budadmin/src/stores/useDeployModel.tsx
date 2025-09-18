@@ -43,6 +43,8 @@ const modalityTypeList = [
   {
     id: "1",
     type: ["llm", "mllm"],
+    modalities: ["text_input", "text_output"],
+    endpoints: [],
     icon: "/images/drawer/brain.png",
     name: "LLM, Multi-Model LLM",
     description: "Add LLM, Multi-Model LLM",
@@ -50,24 +52,32 @@ const modalityTypeList = [
   {
     id: "2",
     type: ["embedding"],
+    modalities: ["text_input"],
+    endpoints: ["/v1/embeddings"],
     icon: "/images/drawer/embedding.png",
     name: "Embedding models",
     description: "Add Embedding models",
   },
   {
     id: "speech_to_text",
+    modalities: ["audio_input", "text_output"],
+    endpoints: ["/v1/audio/transcriptions", "/v1/audio/translations"],
     icon: "/images/drawer/speachToText.png",
     name: "Speech to text",
     description: "Add Speech to text models",
   },
   {
     id: "text_to_speech",
+    modalities: ["text_input", "audio_output"],
+    endpoints: ["/v1/audio/speech"],
     icon: "/images/drawer/textToSpeach.png",
     name: "Text to Speech",
     description: "Add Text to Speech models",
   },
   {
     id: "action_transformers",
+    modalities: [],
+    endpoints: [],
     icon: "/images/drawer/compare.png",
     name: "Action Transformers",
     description: "Add Action Transformers models",
@@ -75,6 +85,8 @@ const modalityTypeList = [
   {
     id: "document",
     type: ["mllm"],
+    modalities: ["image_input", "text_output"],
+    endpoints: ["/v1/documents"],
     icon: "/images/drawer/document.png",
     name: "Document",
     description: "Add Document processing models",
@@ -84,6 +96,8 @@ const modalityTypeList = [
 export type ModalityType = {
   id: string;
   type?: string[];
+  modalities?: string[];
+  endpoints?: string[];
   icon: string;
   name: string;
   description: string;

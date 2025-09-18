@@ -217,6 +217,7 @@ type GetModelParams = {
     source?: string;
     base_model?: string;
     base_model_relation?: string;
+    supported_endpoints?: string[];
 };
 
 // create zustand store
