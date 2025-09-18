@@ -1,3 +1,8 @@
+# TODO: migrate from bitnami (oss rugpull)
+global:
+    security:
+        allowInsecureImages: true
+
 imagePullPolicy: "Always"
 
 ingress:
@@ -278,6 +283,8 @@ microservices:
             YARN_VERSION: 1.22.19
             RSA_KEY_NAME: rsa-private-key.pem
 valkey:
+    image:
+        repository: bitnamilegacy/valkey
     enabled: true
     architecture: standalone
     commonConfiguration: |-
@@ -290,6 +297,8 @@ valkey:
         password: bud
 clickhouse:
     enabled: true
+    image:
+        repository: bitnamilegacy/clickhouse
     replicaCount: 1
     shards: 1
     auth:
@@ -297,11 +306,15 @@ clickhouse:
         password: bud
     keeper:
         replicaCount: 1
+        image:
+            repository: bitnamilegacy/clickhouse-keeper
 clickhouseExtra:
     autoCreateDB:
         - budproxy
         - budeval
 postgresql:
+    image:
+        repository: bitnamilegacy/postgresql
     enabled: true
     primary:
         resources:
@@ -327,6 +340,8 @@ postgresqlExtra:
         - budprompt
 
 keycloak:
+    image:
+        repository: bitnamilegacy/keycloak
     proxy: edge
     resources:
         limits:
@@ -340,6 +355,8 @@ keycloak:
         password: keycloak
         database: keycloak
 kafka:
+    image:
+        repository: bitnamilegacy/kafka
     enabled: true
     clusterId: bud
     controller:
@@ -361,6 +378,8 @@ kafka:
                 - budproxy
                 - dapr
 mongodb:
+    image:
+        repository: bitnamilegacy/mongodb
     enabled: true
     architecture: standalone
     auth:
@@ -388,6 +407,16 @@ novu:
     externalS3:
         existingSecret: "{{ $.Release.Name }}-novu-externals3"
 minio:
+    defaultInitContainers:
+        volumePermissions:
+            image:
+                repository: bitnamilegacy/os-shell
+    image:
+        repository: bitnamilegacy/minio
+    console:
+        image:
+            digest:
+            repository: bitnamilegacy/minio-object-browser
     enabled: true
     resources:
         requests:
