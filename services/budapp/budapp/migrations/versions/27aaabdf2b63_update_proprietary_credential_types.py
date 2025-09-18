@@ -1,7 +1,7 @@
 """Update proprietary credential types
 
 Revision ID: 27aaabdf2b63
-Revises: 1433e70d23ab
+Revises: de33c215c978
 Create Date: 2025-09-15 19:33:46.487734
 
 """
@@ -16,7 +16,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "27aaabdf2b63"
-down_revision: Union[str, None] = "1433e70d23ab"
+down_revision: Union[str, None] = "de33c215c978"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
