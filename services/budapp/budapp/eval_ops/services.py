@@ -374,24 +374,14 @@ class ExperimentService:
 
         exp_data.objective = ev.description or ""
 
+        # Get real current metrics from experiment runs
+        exp_data.current_metrics = self._get_current_metrics(ev.id)
+
         import uuid as uuid_lib
 
-        # Generate actual UUIDs for run IDs
+        # Generate actual UUIDs for run IDs (for progress_overview demo data)
         run_id_1 = str(uuid_lib.uuid4())
         run_id_2 = str(uuid_lib.uuid4())
-        latest_run_id = str(uuid_lib.uuid4())
-
-        exp_data.current_metrics = [
-            CurrentMetric(
-                evaluation="TruthfulQA",
-                dataset="dataset_name",
-                deployment_name="deployment_name",
-                judge=None,
-                traits=["trait_name_1", "trait_name_2"],
-                last_run_at=datetime.fromisoformat("2024-01-13T00:00:00Z"),
-                run_id=latest_run_id,
-            )
-        ]
 
         exp_data.progress_overview = [
             ProgressOverview(
@@ -1566,6 +1556,63 @@ class ExperimentService:
             )
 
         return traits_with_datasets
+
+    def _get_current_metrics(self, experiment_id: uuid.UUID) -> List["CurrentMetric"]:
+        """Get current metrics for an experiment based on real run data.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+
+        Returns:
+            List[CurrentMetric]: List of current metrics derived from experiment runs.
+        """
+        from budapp.eval_ops.schemas import CurrentMetric
+
+        # Query active runs for the experiment
+        runs = (
+            self.session.query(RunModel)
+            .filter(
+                RunModel.experiment_id == experiment_id,
+                RunModel.status != RunStatusEnum.DELETED.value,
+            )
+            .order_by(RunModel.updated_at.desc())  # Most recently updated first
+            .all()
+        )
+
+        current_metrics = []
+        for run in runs:
+            try:
+                # Get model details
+                model_detail = self.get_model_details(run.model_id)
+
+                # Get dataset information
+                dataset_version = self.session.get(ExpDatasetVersion, run.dataset_version_id)
+                dataset_name = "Unknown Dataset"
+                if dataset_version and dataset_version.dataset:
+                    dataset_name = dataset_version.dataset.name
+
+                # Get traits for this run's dataset
+                traits_with_datasets = self.get_traits_with_datasets_for_run(run.dataset_version_id)
+                trait_names = [trait.name for trait in traits_with_datasets]
+
+                # Create CurrentMetric object
+                current_metric = CurrentMetric(
+                    evaluation=f"{model_detail.name} on {dataset_name}",  # Descriptive evaluation name
+                    dataset=dataset_name,
+                    deployment_name=model_detail.deployment_name or model_detail.name,
+                    judge=None,  # Judge models not available yet
+                    traits=trait_names,
+                    last_run_at=run.updated_at or run.created_at,
+                    run_id=str(run.id),
+                )
+
+                current_metrics.append(current_metric)
+
+            except Exception as e:
+                logger.warning(f"Failed to process run {run.id} for current_metrics: {e}")
+                continue
+
+        return current_metrics
 
 
 class ExperimentWorkflowService:
