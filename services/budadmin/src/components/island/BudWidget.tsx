@@ -138,7 +138,7 @@ export function BudWidget({
 
   useEffect(() => {
     console.log("flowMapping", flowMapping);
-  }, [flowMapping]);
+  }, []);
 
   // useEffect(() => {
   //     console.log('index', index)
