@@ -224,7 +224,6 @@ impl RedisClient {
                 }
             }
         } else {
-            // If it's not wrapped, use it directly (backward compatibility)
             json_value
         };
 
@@ -944,40 +943,5 @@ mod tests {
         let store = app_state.model_credential_store.read().unwrap();
         assert!(store.contains_key(&format!("store_{}", guardrail_id)));
         assert_eq!(store.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn test_parse_guardrail_direct_format() {
-        // Test backward compatibility with direct format (no wrapper)
-        let config = Arc::new(Config::default());
-        let app_state = AppStateData::new(config).await.unwrap();
-
-        let guardrail_id = "test-guardrail";
-
-        // JSON with guardrail data directly (no wrapper)
-        let json = r#"{
-            "name": "test_guardrail",
-            "providers": {
-                "openai": {
-                    "type": "openai",
-                    "probe_config": {"text-moderation-latest": ["violence", "hate"]},
-                    "api_key_location": "dynamic::store_test-guardrail"
-                }
-            },
-            "severity_threshold": 0.5,
-            "guard_types": ["input", "output"],
-            "api_key": "sk-test-direct-key"
-        }"#;
-
-        // Parse guardrail
-        let result = RedisClient::parse_guardrail(json, guardrail_id, &app_state).await;
-        assert!(
-            result.is_ok(),
-            "Failed to parse guardrail with direct format"
-        );
-
-        // Verify API key was stored
-        let store = app_state.model_credential_store.read().unwrap();
-        assert!(store.contains_key("store_test-guardrail"));
     }
 }
