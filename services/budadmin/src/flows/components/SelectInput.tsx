@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useContext } from "react";
 import { Form, FormRule, Select, ConfigProvider, Image } from "antd";
 import { Text_12_300_EEEEEE } from "@/components/ui/text";
 import CustomPopover from "./customPopover";
+import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 
 export interface SelectInputProps {
   name: string;
@@ -23,6 +24,8 @@ export interface SelectInputProps {
 }
 
 function SelectInput(props: SelectInputProps) {
+  const { form } = useContext(BudFormContext);
+
   return (
     <Form.Item
       name={props.name}
@@ -30,7 +33,9 @@ function SelectInput(props: SelectInputProps) {
       className={props.formItemClassnames}
       hasFeedback
     >
-      <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0] ${props.ClassNames}`}>
+      <div
+        className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0] ${props.ClassNames}`}
+      >
         <div className="w-full">
           <Text_12_300_EEEEEE className="absolute h-[3px] bg-[#0d0d0d] top-[0rem] left-[.75rem] px-[0.025rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap bg-[#0d0d0d] pl-[.35rem] pr-[.55rem]">
             {props.label}
@@ -43,7 +48,7 @@ function SelectInput(props: SelectInputProps) {
                   src="/images/info.png"
                   preview={false}
                   alt="info"
-                  style={{ width: '.75rem', height: '.75rem' }}
+                  style={{ width: ".75rem", height: ".75rem" }}
                 />
               </CustomPopover>
             )}
@@ -53,7 +58,7 @@ function SelectInput(props: SelectInputProps) {
           <ConfigProvider
             theme={{
               token: {
-                colorTextPlaceholder: '#808080',
+                colorTextPlaceholder: "#808080",
               },
             }}
           >
@@ -64,23 +69,32 @@ function SelectInput(props: SelectInputProps) {
                 color: "#EEEEEE",
                 border: "0.5px solid #757575",
                 width: "100%",
-                ...props.style
+                ...props.style,
               }}
               disabled={props.disabled}
               size="large"
               className={`drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full indent-[.5rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] outline-none ${props.SelectClasses}`}
               options={props.options}
-              onChange={props.onChange}
+              onChange={(value) => {
+                // Update the form field value
+                form.setFieldValue(props.name, value);
+                // Call custom onChange if provided
+                if (props.onChange) {
+                  props.onChange(value);
+                }
+              }}
               mode={props.mode}
               tagRender={props.tagRender}
-              suffixIcon={props.suffixIcon || (
-                <Image
-                  src="/images/icons/dropD.png"
-                  preview={false}
-                  alt="dropdown"
-                  style={{ width: 'auto', height: 'auto' }}
-                />
-              )}
+              suffixIcon={
+                props.suffixIcon || (
+                  <Image
+                    src="/images/icons/dropD.png"
+                    preview={false}
+                    alt="dropdown"
+                    style={{ width: "auto", height: "auto" }}
+                  />
+                )
+              }
             />
           </ConfigProvider>
         </div>

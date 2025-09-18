@@ -65,7 +65,6 @@ export default function ProjectUsersInput(props: SelectProps) {
 
   const [search, setSearch] = useState("");
 
-
   const load = useCallback(async () => {
     await getUsers({
       page: 1,
@@ -259,7 +258,7 @@ export default function ProjectUsersInput(props: SelectProps) {
                         e.stopPropagation();
                         form.setFieldsValue({
                           [fieldName]: selected.filter(
-                            (item) => item.label !== props.data.label
+                            (item) => item.label !== props.data.label,
                           ),
                         });
                       }}
@@ -292,7 +291,7 @@ export default function ProjectUsersInput(props: SelectProps) {
               colourOptions.find((option) => option.value === props.data.value)
                 ?.value || "#FFF";
             const selectedTag = selected?.find(
-              (tag) => tag.label === props.data.label
+              (tag) => tag.label === props.data.label,
             );
             return (
               <div
@@ -314,7 +313,7 @@ export default function ProjectUsersInput(props: SelectProps) {
                       e.stopPropagation();
                       form.setFieldsValue({
                         [fieldName]: selected.filter(
-                          (item) => item.label !== props.data.label
+                          (item) => item.label !== props.data.label,
                         ),
                       });
                     }

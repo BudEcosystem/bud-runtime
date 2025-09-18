@@ -4,7 +4,6 @@ import FloatLabel from "@/components/ui/bud/dataEntry/FloatLabel";
 import InfoLabel from "@/components/ui/bud/dataEntry/InfoLabel";
 import { EyeInvisibleOutlined, EyeOutlined } from "@ant-design/icons";
 
-
 interface BudInputPasswordProps {
   name: string;
   label: string;
@@ -24,7 +23,12 @@ interface BudInputPasswordProps {
 
 export const CustomPasswordInput: React.FC<BudInputPasswordProps> = (props) => {
   return (
-    <Form.Item name={props.name} rules={props.rules} className="mb-0" hasFeedback>
+    <Form.Item
+      name={props.name}
+      rules={props.rules}
+      className="mb-0"
+      hasFeedback
+    >
       <div className={`floating-textarea ${props.ClassNames}`}>
         <FloatLabel
           classNames="mx-[.2rem] floatingLabel"
@@ -45,7 +49,17 @@ export const CustomPasswordInput: React.FC<BudInputPasswordProps> = (props) => {
             disabled={props.disabled}
             value={props.value}
             onChange={(e) => props.onChange?.(e.target.value)}
-            iconRender={(visible) => visible ? <span><EyeOutlined className="text-[#B3B3B3]" /></span> : <span><EyeInvisibleOutlined className="text-[#B3B3B3]" /></span>}
+            iconRender={(visible) =>
+              visible ? (
+                <span>
+                  <EyeOutlined className="text-[#B3B3B3]" />
+                </span>
+              ) : (
+                <span>
+                  <EyeInvisibleOutlined className="text-[#B3B3B3]" />
+                </span>
+              )
+            }
             className={`!border !border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] ${props.InputClasses}`}
             styles={{
               input: {

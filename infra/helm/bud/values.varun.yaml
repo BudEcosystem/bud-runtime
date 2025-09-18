@@ -1,0 +1,12 @@
+ingress:
+    hosts:
+        root: varun.bud.studio
+
+# disable keel
+deploymentAnnotations: null
+
+microservices:
+    budprompt:
+        image: vsrvarun/budprompt:vsr
+    budapp:
+        image: vsrvarun/budapp:vsr

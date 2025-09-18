@@ -19,7 +19,7 @@
 from typing import Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated, List, Optional
 
@@ -33,13 +33,18 @@ from budapp.commons.dependencies import (
     get_user_realm,
     parse_ordering_fields,
 )
-from budapp.commons.exceptions import ClientException
+from budapp.commons.exceptions import BudNotifyException, ClientException
 from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
+from budapp.core.schemas import SubscriberCreate
+from budapp.shared.notification_service import BudNotifyHandler
+from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.schemas import (
     MyPermissions,
     ResetPasswordRequest,
     ResetPasswordResponse,
+    ResetPasswordWithTokenRequest,
+    ResetPasswordWithTokenResponse,
     User,
     UserCreate,
     UserListFilter,
@@ -47,6 +52,8 @@ from budapp.user_ops.schemas import (
     UserPermissions,
     UserResponse,
     UserUpdate,
+    ValidateResetTokenRequest,
+    ValidateResetTokenResponse,
 )
 from budapp.user_ops.services import UserService
 
@@ -158,11 +165,12 @@ async def complete_user_onboarding(
 )
 async def reset_password(
     request: ResetPasswordRequest,
+    request_obj: Request,
     session: Session = Depends(get_session),
 ) -> Union[ResetPasswordResponse, ErrorResponse]:
-    """Trigger a reset password email notification."""
+    """Trigger a reset password email notification with token."""
     try:
-        response = await UserService(session).reset_password_email(request)
+        response = await UserService(session).reset_password_email(request, request_obj)
         logger.debug("Email notification triggered for reset password. %s", response)
 
         return ResetPasswordResponse(
@@ -180,6 +188,97 @@ async def reset_password(
         logger.exception(f"Failed to trigger reset password email: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to trigger reset password email"
+        ).to_http_response()
+
+
+@user_router.post(
+    "/validate-reset-token",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ValidateResetTokenResponse,
+            "description": "Token validation result",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Validate a password reset token",
+)
+async def validate_reset_token(
+    request: ValidateResetTokenRequest,
+    session: Session = Depends(get_session),
+) -> Union[ValidateResetTokenResponse, ErrorResponse]:
+    """Validate a password reset token."""
+    try:
+        response = await UserService(session).validate_reset_token(request)
+        logger.debug("Reset token validation completed. %s", response)
+
+        return ValidateResetTokenResponse(
+            object="user.validate-reset-token",
+            code=status.HTTP_200_OK,
+            message="Token validation completed",
+            is_valid=response["is_valid"],
+            email=response["email"],
+            expires_at=response["expires_at"],
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to validate reset token: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to validate reset token: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to validate reset token"
+        ).to_http_response()
+
+
+@user_router.post(
+    "/reset-password-with-token",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ResetPasswordWithTokenResponse,
+            "description": "Password reset successfully",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid token or password validation failed",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "User not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Reset password using a valid reset token",
+)
+async def reset_password_with_token(
+    request: ResetPasswordWithTokenRequest,
+    session: Session = Depends(get_session),
+) -> Union[ResetPasswordWithTokenResponse, ErrorResponse]:
+    """Reset password using a valid reset token."""
+    try:
+        response = await UserService(session).reset_password_with_token(request)
+        logger.info("Password reset completed successfully")
+
+        return ResetPasswordWithTokenResponse(
+            object="user.reset-password-with-token",
+            code=status.HTTP_200_OK,
+            message=response["message"],
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to reset password with token: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to reset password with token: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to reset password"
         ).to_http_response()
 
 
@@ -551,4 +650,92 @@ async def reactivate_user(
         logger.exception(f"Failed to reactivate user: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to reactivate user"
+        ).to_http_response()
+
+
+@user_router.post(
+    "/{user_id}/subscribe",
+    response_model=SuccessResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "User not found",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully subscribed user to notifications",
+        },
+    },
+    description="Subscribe an existing user to notifications (Admin only)",
+)
+@require_permissions(permissions=[PermissionEnum.USER_MANAGE])
+async def subscribe_user_to_notifications(
+    user_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Subscribe an existing user to notifications.
+
+    This endpoint allows administrators to add existing users as notification subscribers.
+    Only users with USER_MANAGE permission can access this endpoint.
+    """
+    try:
+        user_service = UserService(session)
+
+        # Get the user to subscribe
+        db_user = await user_service.retrieve_active_user(user_id)
+        if not db_user:
+            return ErrorResponse(
+                code=status.HTTP_404_NOT_FOUND, message=f"User with id {user_id} not found"
+            ).to_http_response()
+
+        # Check if user is already a subscriber
+        if db_user.is_subscriber:
+            return SuccessResponse(
+                object="user.subscribe",
+                code=status.HTTP_200_OK,
+                message=f"User {db_user.email} is already a notification subscriber",
+            ).to_http_response()
+
+        # Create subscriber in BudNotify
+        try:
+            subscriber_data = SubscriberCreate(
+                subscriber_id=str(db_user.id),
+                email=db_user.email,
+                first_name=db_user.name,
+            )
+            await BudNotifyHandler().create_subscriber(subscriber_data)
+            logger.info(f"User {db_user.email} added to budnotify subscriber by admin {current_user.email}")
+
+            # Update user's subscriber status
+            await UserDataManager(session).update_subscriber_status(user_ids=[db_user.id], is_subscriber=True)
+
+            return SuccessResponse(
+                object="user.subscribe",
+                code=status.HTTP_200_OK,
+                message=f"Successfully subscribed user {db_user.email} to notifications",
+            ).to_http_response()
+
+        except BudNotifyException as e:
+            logger.error(f"Failed to create notification subscriber for user {db_user.email}: {e}")
+            return ErrorResponse(
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"Failed to create notification subscriber: {str(e)}",
+            ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to subscribe user to notifications: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to subscribe user to notifications: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to subscribe user to notifications"
         ).to_http_response()

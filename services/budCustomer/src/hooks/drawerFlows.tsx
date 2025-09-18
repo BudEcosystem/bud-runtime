@@ -2200,6 +2200,27 @@ const clusterEvent: DrawerFlowType = {
   ],
 };
 
+const createBillingAlert: DrawerFlowType = {
+  title: "Create Billing Alert",
+  description: "Set up usage threshold notifications",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Billing", "Create Alert"],
+      id: "create-billing-alert",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["create-billing-alert"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Create Alert",
+        },
+      ],
+    },
+  ],
+};
+
 const viewUser: DrawerFlowType = {
   title: "User Management",
   description: "User Management",
@@ -3475,7 +3496,7 @@ const editApiKey: DrawerFlowType = {
           title: "Edit Key",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
   ],
 };
@@ -3511,6 +3532,7 @@ const flows = {
   "license-Details": licenseDetails,
   "derived-model-list": derivedModelList,
   "cluster-event": clusterEvent,
+  "create-billing-alert": createBillingAlert,
   "deleting-worker": deletingWorker,
   "view-user": viewUser,
   "edit-user": editUser,

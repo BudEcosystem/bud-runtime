@@ -37,30 +37,30 @@ const formatDateByScale = (dateStr: string, scale: string): string => {
   // The API returns time without timezone indicator, so we need to treat it as UTC
   // Check if it has a timezone indicator at the end (Z, +XX:XX, -XX:XX)
   const hasTimezone = /[Z]$|[+-]\d{2}:\d{2}$/.test(dateStr);
-  const utcDateStr = hasTimezone ? dateStr : dateStr + 'Z';
+  const utcDateStr = hasTimezone ? dateStr : dateStr + "Z";
 
   const date = new Date(utcDateStr);
 
   if (scale === "hourly") {
     // For hourly data (24hrs view), show only time without date
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
     });
   } else if (scale === "daily") {
     // For daily data, show date
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
     });
   } else if (scale === "weekly") {
     // For weekly data, show week range
     const weekStart = new Date(date);
     weekStart.setDate(date.getDate() - date.getDay());
-    return weekStart.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
+    return weekStart.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
     });
   }
 
@@ -69,7 +69,10 @@ const formatDateByScale = (dateStr: string, scale: string): string => {
 import ComingSoon from "@/components/ui/comingSoon";
 import { useEndPoints } from "src/hooks/useEndPoint";
 import { useLoader } from "src/context/appContext";
-import { convertToObservabilityRequest, convertObservabilityResponse } from "@/utils/metricsAdapter";
+import {
+  convertToObservabilityRequest,
+  convertObservabilityResponse,
+} from "@/utils/metricsAdapter";
 
 const computeHoursData = {
   categories: ["2000", "2005", "2010", "2015", "2020", "2025"],
@@ -83,16 +86,16 @@ const computeHoursData = {
 };
 
 const numberOfDays = {
-  daily: 1,    // Last 24 hours
-  weekly: 7,   // Last 7 days
-  monthly: 30  // Last 30 days
+  daily: 1, // Last 24 hours
+  weekly: 7, // Last 7 days
+  monthly: 30, // Last 30 days
 };
 
 // For delta calculations, we need double the time period
 const numberOfDaysForDelta = {
-  daily: 2,    // Last 48 hours (to get delta for last 24 hours)
-  weekly: 14,   // Last 14 days (to get delta for last 7 days)
-  monthly: 60  // Last 60 days (to get delta for last 30 days)
+  daily: 2, // Last 48 hours (to get delta for last 24 hours)
+  weekly: 14, // Last 14 days (to get delta for last 7 days)
+  monthly: 60, // Last 60 days (to get delta for last 30 days)
 };
 
 const calculateFromDate = (daysToReduce: number) => {
@@ -521,11 +524,11 @@ function APICallsTimeSeriesChart({
         },
         formatter: function (params) {
           if (!params || !Array.isArray(params) || params.length === 0) {
-            return '';
+            return "";
           }
           const param = params[0];
-          if (!param) return '';
-          return `${param.name || ''}<br/>API Calls: ${param.value || 0}`;
+          if (!param) return "";
+          return `${param.name || ""}<br/>API Calls: ${param.value || 0}`;
         },
       },
     };
@@ -544,12 +547,7 @@ function APICallsTimeSeriesChart({
     };
   }, [data]);
 
-  return (
-    <div
-      id="api-calls-time-series-chart"
-      className="w-full h-full"
-    />
-  );
+  return <div id="api-calls-time-series-chart" className="w-full h-full" />;
 }
 
 export function CircleProgress({
@@ -614,17 +612,23 @@ export function CircleProgress({
   );
 }
 
-function WorkersCard({ switchTab, clusterdata }: { switchTab: (key: string) => void; clusterdata?: any }) {
+function WorkersCard({
+  switchTab,
+  clusterdata,
+}: {
+  switchTab: (key: string) => void;
+  clusterdata?: any;
+}) {
   const [data, setData] = React.useState([
     {
       color: "#4077E6",
       title: "Running workers",
-      value: clusterdata?.running_worker_count || '-',
+      value: clusterdata?.running_worker_count || "-",
     },
     {
       color: "#E36E4F",
       title: "Crashed workers",
-      value: clusterdata?.crashed_worker_count || '-',
+      value: clusterdata?.crashed_worker_count || "-",
     },
   ]);
 
@@ -709,8 +713,9 @@ function TokenUsageCard(deployment) {
             name: "Task 1",
             data: data?.concurrency_metrics?.items
               .map((period) =>
-                period.items && period.items.length > 0 ?
-                  period.items[0].total_value || 0 : 0
+                period.items && period.items.length > 0
+                  ? period.items[0].total_value || 0
+                  : 0,
               )
               .reverse(),
             lineColor: "#479D5F",
@@ -753,7 +758,7 @@ function TokenUsageCard(deployment) {
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       setTokenUsageRequestData(convertedData);
@@ -786,10 +791,11 @@ function TokenUsageCard(deployment) {
         <div className="flex items-center justify-between w-full mt-[.95rem]">
           {/* <Tags name={ */}
           <Flex
-            className={`${Number(extraChartDetails.apiCalls.avg) >= 0
+            className={`${
+              Number(extraChartDetails.apiCalls.avg) >= 0
                 ? "text-[#479D5F] bg-[#122F1140]"
                 : "bg-[#861A1A33] text-[#EC7575]"
-              } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]`}
+            } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]`}
           >
             <span className="font-[400] text-[0.8125rem] leading-[100%]">
               Avg.{" "}
@@ -820,9 +826,10 @@ function TokenUsageCard(deployment) {
         </div>
       </div>
       <div className="w-full flex flex-col justify-end">
-        {tokenUsageChartData?.series?.length > 0 && tokenUsageChartData?.categories?.length > 0 && (
-          <TokenUsageChart data={tokenUsageChartData} />
-        )}
+        {tokenUsageChartData?.series?.length > 0 &&
+          tokenUsageChartData?.categories?.length > 0 && (
+            <TokenUsageChart data={tokenUsageChartData} />
+          )}
       </div>
     </div>
   );
@@ -923,7 +930,7 @@ function APICallsCard(endpoint) {
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       setRequestCounts(convertedData);
@@ -937,7 +944,6 @@ function APICallsCard(endpoint) {
   }, [requestCounts, apiRequestInterval]);
 
   const createApiChartData = (data) => {
-
     if (data?.overall_metrics?.items?.length) {
       // Create time series data
       const categories = [];
@@ -964,14 +970,18 @@ function APICallsCard(endpoint) {
         let periodTotal = 0;
         timePeriod.items.forEach((item) => {
           // Check different possible fields for the count value
-          const count = item.total_requests || item.total_value || item.request_count || item.count || 0;
+          const count =
+            item.total_requests ||
+            item.total_value ||
+            item.request_count ||
+            item.count ||
+            0;
           periodTotal += count;
         });
 
         counts.push(periodTotal);
         totalCount += periodTotal;
       });
-
 
       setExtraChartDetails((prev) => ({
         ...prev,
@@ -987,7 +997,7 @@ function APICallsCard(endpoint) {
         data: counts.reverse(),
         label1: "Requests",
         label2: "Date",
-        barColor: "#9462D5"
+        barColor: "#9462D5",
       });
     } else {
       // No data available
@@ -1034,7 +1044,7 @@ function APICallsCard(endpoint) {
             <Segmented
               options={segmentOptions}
               value={segmentOptions.find(
-                (opt) => handleChartFilter(opt) === apiRequestInterval
+                (opt) => handleChartFilter(opt) === apiRequestInterval,
               )} // Ensure correct default selection
               onChange={(value) => {
                 handleApiRequestChange(value); // string
@@ -1053,13 +1063,15 @@ function APICallsCard(endpoint) {
               <div className="flex items-center justify-between w-full mt-[.95rem]">
                 {/* <Tags name={ */}
                 <Flex
-                  className={`${Number(extraChartDetails.apiCalls.avg) >= 0
+                  className={`${
+                    Number(extraChartDetails.apiCalls.avg) >= 0
                       ? "text-[#479D5F] bg-[#122F1140]"
                       : "bg-[#861A1A33] text-[#EC7575]"
-                    } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]`}
+                  } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]`}
                 >
                   <span className="font-[400] text-[0.8125rem] leading-[100%]">
-                    Avg. {Number(extraChartDetails.apiCalls.avg).toFixed(2)}%{" "}
+                    Avg. {Number(extraChartDetails.apiCalls.avg).toFixed(2)}
+                    %{" "}
                   </span>
                   $
                   {Number(extraChartDetails.apiCalls.avg) >= 0 ? (
@@ -1151,7 +1163,7 @@ function TTFTCard(endpoint) {
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       setRequestData(convertedData);
@@ -1267,7 +1279,7 @@ function TTFTCard(endpoint) {
             <Segmented
               options={segmentOptions}
               value={segmentOptions.find(
-                (opt) => handleChartFilter(opt) === ttftInterval
+                (opt) => handleChartFilter(opt) === ttftInterval,
               )}
               onChange={(value) => {
                 handleIntervalChange(value);
@@ -1285,10 +1297,11 @@ function TTFTCard(endpoint) {
               </Text_26_400_EEEEEE>
               <div className="flex items-center justify-between w-full mt-[.95rem]">
                 <Flex
-                  className={`${Number(extraChartDetails.ttft.avg) >= 0
+                  className={`${
+                    Number(extraChartDetails.ttft.avg) >= 0
                       ? "text-[#479D5F] bg-[#122F1140]"
                       : "bg-[#861A1A33] text-[#EC7575]"
-                    } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]`}
+                  } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]`}
                 >
                   <span className="font-[400] text-[0.8125rem] leading-[100%]">
                     Avg. {Number(extraChartDetails.ttft.avg).toFixed(2)}%{" "}
@@ -1323,9 +1336,7 @@ function TTFTCard(endpoint) {
             </div>
           </>
         ) : (
-          <NoChartData
-            image="/images/dashboard/noData.png"
-          ></NoChartData>
+          <NoChartData image="/images/dashboard/noData.png"></NoChartData>
         )}
       </div>
     </div>
@@ -1375,7 +1386,7 @@ function LatencyCard(endpoint) {
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       setRequestData(convertedData);
@@ -1484,7 +1495,7 @@ function LatencyCard(endpoint) {
             <Segmented
               options={segmentOptions}
               value={segmentOptions.find(
-                (opt) => handleChartFilter(opt) === latencyInterval
+                (opt) => handleChartFilter(opt) === latencyInterval,
               )}
               onChange={(value) => {
                 handleIntervalChange(value);
@@ -1502,13 +1513,15 @@ function LatencyCard(endpoint) {
               </Text_26_400_EEEEEE>
               <div className="flex items-center justify-between w-full mt-[.95rem]">
                 <Flex
-                  className={`${Number(extraChartDetails.latency.avg) >= 0
+                  className={`${
+                    Number(extraChartDetails.latency.avg) >= 0
                       ? "text-[#479D5F] bg-[#122F1140]"
                       : "bg-[#861A1A33] text-[#EC7575]"
-                    } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]`}
+                  } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]`}
                 >
                   <span className="font-[400] text-[0.8125rem] leading-[100%]">
-                    Avg. {Number(extraChartDetails.latency.avg).toFixed(2)}%{" "}
+                    Avg. {Number(extraChartDetails.latency.avg).toFixed(2)}
+                    %{" "}
                   </span>
                   {Number(extraChartDetails.latency.avg) >= 0 ? (
                     <Image
@@ -1540,9 +1553,7 @@ function LatencyCard(endpoint) {
             </div>
           </>
         ) : (
-          <NoChartData
-            image="/images/dashboard/noData.png"
-          ></NoChartData>
+          <NoChartData image="/images/dashboard/noData.png"></NoChartData>
         )}
       </div>
     </div>
@@ -1591,7 +1602,7 @@ function ThroughputCard(endpoint) {
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       setRequestData(convertedData);
@@ -1628,7 +1639,8 @@ function ThroughputCard(endpoint) {
         let periodCount = 0;
         if (timePeriod.items && timePeriod.items.length > 0) {
           timePeriod.items.forEach((item) => {
-            const throughputValue = item.avg_throughput || item.total_value || 0;
+            const throughputValue =
+              item.avg_throughput || item.total_value || 0;
             periodSum += throughputValue;
             periodCount++;
           });
@@ -1699,7 +1711,7 @@ function ThroughputCard(endpoint) {
             <Segmented
               options={segmentOptions}
               value={segmentOptions.find(
-                (opt) => handleChartFilter(opt) === throughputInterval
+                (opt) => handleChartFilter(opt) === throughputInterval,
               )}
               onChange={(value) => {
                 handleIntervalChange(value);
@@ -1713,17 +1725,20 @@ function ThroughputCard(endpoint) {
           <>
             <div className="flex items-center justify-between flex-col w-full mt-[1.95rem]">
               <Text_26_400_EEEEEE className="text-[#EEEEEE] font-medium w-full leading-[26px]">
-                {Number(extraChartDetails.throughput.total_value).toFixed(2)} tokens/s
+                {Number(extraChartDetails.throughput.total_value).toFixed(2)}{" "}
+                tokens/s
               </Text_26_400_EEEEEE>
               <div className="flex items-center justify-between w-full mt-[.95rem]">
                 <Flex
-                  className={`${Number(extraChartDetails.throughput.avg) >= 0
+                  className={`${
+                    Number(extraChartDetails.throughput.avg) >= 0
                       ? "text-[#479D5F] bg-[#122F1140]"
                       : "bg-[#861A1A33] text-[#EC7575]"
-                    } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]`}
+                  } rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]`}
                 >
                   <span className="font-[400] text-[0.8125rem] leading-[100%]">
-                    Avg. {Number(extraChartDetails.throughput.avg).toFixed(2)}%{" "}
+                    Avg. {Number(extraChartDetails.throughput.avg).toFixed(2)}
+                    %{" "}
                   </span>
                   {Number(extraChartDetails.throughput.avg) >= 0 ? (
                     <Image
@@ -1755,9 +1770,7 @@ function ThroughputCard(endpoint) {
             </div>
           </>
         ) : (
-          <NoChartData
-            image="/images/dashboard/noData.png"
-          ></NoChartData>
+          <NoChartData image="/images/dashboard/noData.png"></NoChartData>
         )}
       </div>
     </div>
@@ -1808,7 +1821,7 @@ function TokenMetricsCard(endpoint) {
       const convertedData = convertObservabilityResponse(
         response.data,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       setRequestData(convertedData);
@@ -1867,8 +1880,12 @@ function TokenMetricsCard(endpoint) {
         tokens: {
           input_total: totalInput.toString(),
           output_total: totalOutput.toString(),
-          input_avg: data?.input_output_tokens_metrics?.summary_metrics?.input_tokens_delta_percentage || 0,
-          output_avg: data?.input_output_tokens_metrics?.summary_metrics?.output_tokens_delta_percentage || 0,
+          input_avg:
+            data?.input_output_tokens_metrics?.summary_metrics
+              ?.input_tokens_delta_percentage || 0,
+          output_avg:
+            data?.input_output_tokens_metrics?.summary_metrics
+              ?.output_tokens_delta_percentage || 0,
         },
       }));
 
@@ -1923,7 +1940,7 @@ function TokenMetricsCard(endpoint) {
             <Segmented
               options={segmentOptions}
               value={segmentOptions.find(
-                (opt) => handleChartFilter(opt) === tokenInterval
+                (opt) => handleChartFilter(opt) === tokenInterval,
               )}
               onChange={(value) => {
                 handleIntervalChange(value);
@@ -1940,33 +1957,39 @@ function TokenMetricsCard(endpoint) {
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-[#4077E6]"></div>
-                    <Text_14_400_EEEEEE className="text-[#B3B3B3]">Input</Text_14_400_EEEEEE>
+                    <Text_14_400_EEEEEE className="text-[#B3B3B3]">
+                      Input
+                    </Text_14_400_EEEEEE>
                   </div>
                   <Text_20_400_EEEEEE className="text-[#EEEEEE] font-medium">
-                    {Number(extraChartDetails.tokens.input_total).toLocaleString()} tokens
+                    {Number(
+                      extraChartDetails.tokens.input_total,
+                    ).toLocaleString()}{" "}
+                    tokens
                   </Text_20_400_EEEEEE>
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-[#E36E4F]"></div>
-                    <Text_14_400_EEEEEE className="text-[#B3B3B3]">Output</Text_14_400_EEEEEE>
+                    <Text_14_400_EEEEEE className="text-[#B3B3B3]">
+                      Output
+                    </Text_14_400_EEEEEE>
                   </div>
                   <Text_20_400_EEEEEE className="text-[#EEEEEE] font-medium">
-                    {Number(extraChartDetails.tokens.output_total).toLocaleString()} tokens
+                    {Number(
+                      extraChartDetails.tokens.output_total,
+                    ).toLocaleString()}{" "}
+                    tokens
                   </Text_20_400_EEEEEE>
                 </div>
               </div>
             </div>
             <div className="w-full relative h-[180px] 1680px:h-[210px] 1920px:h-[230px] relative">
-              <TokenTimeSeriesChart
-                data={tokenData}
-              />
+              <TokenTimeSeriesChart data={tokenData} />
             </div>
           </>
         ) : (
-          <NoChartData
-            image="/images/dashboard/noData.png"
-          ></NoChartData>
+          <NoChartData image="/images/dashboard/noData.png"></NoChartData>
         )}
       </div>
     </div>
@@ -1978,7 +2001,7 @@ function MetricTimeSeriesChart({
   data,
   color,
   unit,
-  metricName
+  metricName,
 }: {
   data: {
     categories: string[];
@@ -2039,7 +2062,7 @@ function MetricTimeSeriesChart({
         min: 0,
         max: yAxisMax,
         axisLabel: {
-          formatter: (value: number) => `${value}${unit ? ' ' + unit : ''}`,
+          formatter: (value: number) => `${value}${unit ? " " + unit : ""}`,
           color: "#EEEEEE",
           fontSize: 12,
           fontWeight: 300,
@@ -2091,11 +2114,11 @@ function MetricTimeSeriesChart({
         },
         formatter: function (params) {
           if (!params || !Array.isArray(params) || params.length === 0) {
-            return '';
+            return "";
           }
           const param = params[0];
-          if (!param) return '';
-          return `${param.name || ''}<br/>${metricName}: ${param.value || 0} ${unit}`;
+          if (!param) return "";
+          return `${param.name || ""}<br/>${metricName}: ${param.value || 0} ${unit}`;
         },
       },
     };
@@ -2115,16 +2138,13 @@ function MetricTimeSeriesChart({
   }, [data, color, unit, metricName]);
 
   return (
-    <div
-      id={`${metricName}-time-series-chart`}
-      className="w-full h-full"
-    />
+    <div id={`${metricName}-time-series-chart`} className="w-full h-full" />
   );
 }
 
 // Token Time Series Chart Component
 function TokenTimeSeriesChart({
-  data
+  data,
 }: {
   data: {
     categories: string[];
@@ -2156,7 +2176,7 @@ function TokenTimeSeriesChart({
         containLabel: true,
       },
       legend: {
-        show: false
+        show: false,
       },
       xAxis: {
         type: "category",
@@ -2267,10 +2287,10 @@ function TokenTimeSeriesChart({
         },
         formatter: function (params) {
           if (!params || !Array.isArray(params) || params.length === 0) {
-            return '';
+            return "";
           }
-          let result = params[0].name + '<br/>';
-          params.forEach(param => {
+          let result = params[0].name + "<br/>";
+          params.forEach((param) => {
             result += `${param.seriesName}: ${param.value?.toLocaleString() || 0} tokens<br/>`;
           });
           return result;
@@ -2292,12 +2312,7 @@ function TokenTimeSeriesChart({
     };
   }, [data]);
 
-  return (
-    <div
-      id="token-time-series-chart"
-      className="w-full h-full"
-    />
-  );
+  return <div id="token-time-series-chart" className="w-full h-full" />;
 }
 
 export default function DeploymentAnalysis({
@@ -2313,23 +2328,23 @@ export default function DeploymentAnalysis({
     inferenceQualityAnalytics,
     setPromptPage,
     getInferenceQualityPrompts,
-    clusterDetails
+    clusterDetails,
   } = useEndPoints();
   useEffect(() => {
-    console.log('projectId', projectId)
-    console.log('projectId', projectId)
+    console.log("projectId", projectId);
+    console.log("projectId", projectId);
   }, [router.isReady]);
   const navigateToHarmfulness = (key, title) => {
     if (deploymentId) {
       setPromptPage(key, title);
       router.push(
-        `/${projectId ? 'projects' : 'clusters'}/${projectId ? projectId : clustersId}/deployments/${deploymentId}/${key}`
+        `/${projectId ? "projects" : "clusters"}/${projectId ? projectId : clustersId}/deployments/${deploymentId}/${key}`,
       );
     }
   };
   useEffect(() => {
-    console.log('getInferenceQualityAnalytics', inferenceQualityAnalytics)
-  }, [inferenceQualityAnalytics])
+    console.log("getInferenceQualityAnalytics", inferenceQualityAnalytics);
+  }, [inferenceQualityAnalytics]);
   const [data, setData] = React.useState([
     {
       title: "Harmfulness",
@@ -2349,7 +2364,7 @@ export default function DeploymentAnalysis({
       name: "hallucination_score",
       percent:
         Number(inferenceQualityAnalytics?.hallucination_score * 100).toFixed(
-          0
+          0,
         ) || 0,
       size: 49,
       strokeWidth: 4,
@@ -2362,7 +2377,7 @@ export default function DeploymentAnalysis({
       name: "sensitive_info_score",
       percent:
         Number(inferenceQualityAnalytics?.sensitive_info_score * 100).toFixed(
-          0
+          0,
         ) || 0,
       size: 49,
       strokeWidth: 4,
@@ -2375,7 +2390,7 @@ export default function DeploymentAnalysis({
       name: "prompt_injection_score",
       percent:
         Number(inferenceQualityAnalytics?.prompt_injection_score * 100).toFixed(
-          0
+          0,
         ) || 0,
       size: 49,
       strokeWidth: 4,
@@ -2399,9 +2414,9 @@ export default function DeploymentAnalysis({
       prevState.map((item) => ({
         ...item,
         percent: Number(inferenceQualityAnalytics?.[item.name] * 100).toFixed(
-          0
+          0,
         ),
-      }))
+      })),
     );
   }, [inferenceQualityAnalytics]);
 

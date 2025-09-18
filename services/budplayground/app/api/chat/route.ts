@@ -15,6 +15,14 @@ export async function POST(req: Request) {
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
 
+  // Extract client IP from headers
+  const xForwardedFor = req.headers.get('x-forwarded-for');
+  const xRealIp = req.headers.get('x-real-ip');
+  // In production, Next.js will set x-forwarded-for with the client's IP
+  const clientIp = xForwardedFor?.split(',')[0].trim() || xRealIp || 'unknown';
+
+  console.log(`Client IP detection - X-Forwarded-For: ${xForwardedFor}, X-Real-IP: ${xRealIp}, Final IP: ${clientIp}`);
+
   // Accept either JWT (Bearer token) or API key
   if (!authorization && !apiKey) {
     return new Response('Unauthorized', { status: 401 });
@@ -34,7 +42,10 @@ export async function POST(req: Request) {
           // Pass through the authorization header (JWT Bearer token)
           ...(authorization && { 'Authorization': authorization }),
           // Pass through the API key header if present
-          ...(apiKey && { 'api-key': apiKey })
+          ...(apiKey && { 'api-key': apiKey }),
+          // Forward the client IP to budgateway for accurate geolocation
+          'X-Forwarded-For': clientIp,
+          'X-Real-IP': clientIp
         },
         body: JSON.stringify({
           id,

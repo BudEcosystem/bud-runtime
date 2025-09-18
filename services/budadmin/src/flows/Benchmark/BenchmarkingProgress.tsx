@@ -10,7 +10,10 @@ import { useProjects } from "src/hooks/useProjects";
 import { useDeployModel } from "src/stores/useDeployModel";
 import ModelFilter from "@/components/ui/bud/deploymentDrawer/ModelFilter";
 import { StepComponentsType } from "..";
-import { SpecificationTableItem, SpecificationTableItemProps } from "../components/SpecificationTableItem";
+import {
+  SpecificationTableItem,
+  SpecificationTableItemProps,
+} from "../components/SpecificationTableItem";
 import { capitalize, getFormattedToBillions } from "@/lib/utils";
 import CommonStatus from "../components/CommonStatus";
 import { successToast } from "@/components/toast";
@@ -23,16 +26,18 @@ export default function BenchmarkingProgress() {
   const [models, setModels] = React.useState([]);
   const [isFailed, setIsFailed] = React.useState(false);
 
-  const {
-    loading,
-    fetchModels
-  } = useModels();
+  const { loading, fetchModels } = useModels();
   const [search, setSearch] = React.useState("");
   const { selectedProjectId } = useProjects();
   const { currentWorkflow } = usePerfomanceBenchmark();
-  const { openDrawerWithStep, openDrawer, setPreviousStep, currentFlow, step, closeDrawer } = useDrawer();
-
-
+  const {
+    openDrawerWithStep,
+    openDrawer,
+    setPreviousStep,
+    currentFlow,
+    step,
+    closeDrawer,
+  } = useDrawer();
 
   return (
     <BudForm
@@ -42,7 +47,6 @@ export default function BenchmarkingProgress() {
       }}
       backText="Cancel"
     >
-
       <BudWraperBox>
         {/* <BudDrawerLayout>
           <DrawerTitleCard
@@ -54,19 +58,19 @@ export default function BenchmarkingProgress() {
 
         </BudDrawerLayout> */}
         <CommonStatus
-            workflowId={currentWorkflow?.workflow_id}
-            events_field_id="budserve_cluster_events"
-            onCompleted={() => {
-              closeDrawer();
-              successToast("Cluster deleted successfully");
-            }}
-            onFailed={() => {
-              setIsFailed(true);
-            }}
-            success_payload_type="performance_benchmark"
-            title={"Benchmarking in Progress"}
-            description="We’ve started performance benchmark. This process may take a while, depending on the benchmark"
-          />
+          workflowId={currentWorkflow?.workflow_id}
+          events_field_id="budserve_cluster_events"
+          onCompleted={() => {
+            closeDrawer();
+            successToast("Cluster deleted successfully");
+          }}
+          onFailed={() => {
+            setIsFailed(true);
+          }}
+          success_payload_type="performance_benchmark"
+          title={"Benchmarking in Progress"}
+          description="We’ve started performance benchmark. This process may take a while, depending on the benchmark"
+        />
       </BudWraperBox>
     </BudForm>
   );

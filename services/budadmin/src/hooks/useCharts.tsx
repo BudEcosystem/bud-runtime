@@ -3,10 +3,13 @@ import { useCallback, useEffect, useState } from "react";
 import { successToast } from "../components/toast";
 import { AppRequest } from "../pages/api/requests";
 import { useLoader } from "../context/appContext";
-import { create } from 'zustand';
+import { create } from "zustand";
 import { tempApiBaseUrl } from "@/components/environment";
-import { convertToObservabilityRequest, convertObservabilityResponse, ObservabilityMetricsResponse } from "@/utils/metricsAdapter";
-
+import {
+  convertToObservabilityRequest,
+  convertObservabilityResponse,
+  ObservabilityMetricsResponse,
+} from "@/utils/metricsAdapter";
 
 interface RequestCountsResponse {
   data: any[]; // Replace with the actual data structure
@@ -23,25 +26,24 @@ interface GetRequestCountsParams {
   metrics?: string | null;
 }
 
-
-export const useCharts = create<
-  {
-    accuracyData: any;
-    tokenMetrics: any;
-    requestCounts: any;
-    loading: boolean;
-    throughputCount: any;
-    latencyCount: any;
-    dashboardCount: any;
-    totalRequests: any;
-    modelCounts: any;
-    getRequestCounts: (params: GetRequestCountsParams) => Promise<void>;
-    getThroughputAndLatencyData: (params: GetRequestCountsParams) => Promise<void>;
-    getDashboardCountData: () => Promise<any>;
-    getTotalRequests: (params) => Promise<any>;
-    getAccuracyChart: (params) => Promise<any>;
-  }
->((set, get) => ({
+export const useCharts = create<{
+  accuracyData: any;
+  tokenMetrics: any;
+  requestCounts: any;
+  loading: boolean;
+  throughputCount: any;
+  latencyCount: any;
+  dashboardCount: any;
+  totalRequests: any;
+  modelCounts: any;
+  getRequestCounts: (params: GetRequestCountsParams) => Promise<void>;
+  getThroughputAndLatencyData: (
+    params: GetRequestCountsParams,
+  ) => Promise<void>;
+  getDashboardCountData: () => Promise<any>;
+  getTotalRequests: (params) => Promise<any>;
+  getAccuracyChart: (params) => Promise<any>;
+}>((set, get) => ({
   accuracyData: null,
   requestCounts: null,
   tokenMetrics: null,
@@ -57,17 +59,26 @@ export const useCharts = create<
     set({ loading: true });
     try {
       // Convert old params to new observability format
-      const observabilityRequest = convertToObservabilityRequest({ ...params, to_date });
+      const observabilityRequest = convertToObservabilityRequest({
+        ...params,
+        to_date,
+      });
       const response: any = await AppRequest.Post(url, observabilityRequest);
 
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
-      set(params.filter_by === 'project' ? { requestCounts: convertedData } : params.metrics == 'input_output_tokens' ? {tokenMetrics : convertedData}: { modelCounts: convertedData });
+      set(
+        params.filter_by === "project"
+          ? { requestCounts: convertedData }
+          : params.metrics == "input_output_tokens"
+            ? { tokenMetrics: convertedData }
+            : { modelCounts: convertedData },
+      );
       successToast(response.message);
     } catch (error) {
       console.error("Error fetching metrics:", error);
@@ -81,17 +92,24 @@ export const useCharts = create<
     set({ loading: true });
     try {
       // Convert old params to new observability format
-      const observabilityRequest = convertToObservabilityRequest({ ...params, to_date });
+      const observabilityRequest = convertToObservabilityRequest({
+        ...params,
+        to_date,
+      });
       const response: any = await AppRequest.Post(url, observabilityRequest);
 
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
-      set(params.metrics === 'throughput' ? { throughputCount: convertedData } : { latencyCount: convertedData });
+      set(
+        params.metrics === "throughput"
+          ? { throughputCount: convertedData }
+          : { latencyCount: convertedData },
+      );
       successToast(response.message);
     } catch (error) {
       console.error("Error fetching performance metrics:", error);
@@ -119,14 +137,17 @@ export const useCharts = create<
     set({ loading: true });
     try {
       // Convert old params to new observability format
-      const observabilityRequest = convertToObservabilityRequest({ ...params, to_date });
+      const observabilityRequest = convertToObservabilityRequest({
+        ...params,
+        to_date,
+      });
       const response: any = await AppRequest.Post(url, observabilityRequest);
 
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       set({ totalRequests: convertedData });
@@ -142,14 +163,17 @@ export const useCharts = create<
     // const url = `${tempApiBaseUrl}/models/top-leaderboards\\`, {};
     set({ loading: true });
     try {
-      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/models/top-leaderboards`, {
-        // params: {
-        //     benchmarks: params.benchmarks,
-        //     k: params.k,
-        // },
-        benchmarks: params.benchmarks,
-        k: params.k,
-      });
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/models/top-leaderboards`,
+        {
+          // params: {
+          //     benchmarks: params.benchmarks,
+          //     k: params.k,
+          // },
+          benchmarks: params.benchmarks,
+          k: params.k,
+        },
+      );
       const listData = response.data;
       set({ accuracyData: listData.leaderboards });
       // set({ totalRequests: listData.global_metrics });
@@ -160,5 +184,4 @@ export const useCharts = create<
       set({ loading: false });
     }
   },
-
 }));

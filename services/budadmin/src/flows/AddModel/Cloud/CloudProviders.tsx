@@ -1,4 +1,3 @@
-
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
@@ -15,7 +14,8 @@ import { useDeployModel } from "src/stores/useDeployModel";
 export default function ModelCloudProviders() {
   const [page, setPage] = React.useState(1);
   const [limit, setLimit] = React.useState(100);
-  const { selectedProvider, setSelectedProvider, deleteWorkflow } = useDeployModel();
+  const { selectedProvider, setSelectedProvider, deleteWorkflow } =
+    useDeployModel();
   const { getProviders, providers } = useCloudProviders();
   const [search, setSearch] = React.useState("");
   const { openDrawerWithStep } = useDrawer();
@@ -25,12 +25,13 @@ export default function ModelCloudProviders() {
     getProviders(page, limit, search);
   }, []);
 
-  const filteredProviders = providers?.filter((provider) => provider.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredProviders = providers?.filter((provider) =>
+    provider.name.toLowerCase().includes(search.toLowerCase()),
+  );
 
   return (
     <BudForm
-      data={{
-      }}
+      data={{}}
       onBack={async () => {
         await deleteWorkflow(currentWorkflow.workflow_id, true);
         openDrawerWithStep("model-source");

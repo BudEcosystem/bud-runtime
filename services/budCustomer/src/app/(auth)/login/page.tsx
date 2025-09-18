@@ -24,6 +24,8 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const [isBackToLogin, setIsBackToLogin] = useState(false);
   const [oauthProcessing, setOauthProcessing] = useState(false);
+  const [exchangeProcessed, setExchangeProcessed] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Use the new environment system
 
@@ -48,8 +50,25 @@ function LoginContent() {
       const provider = searchParams.get("provider");
       const exchangeToken = searchParams.get("exchange_token");
 
+      // Check if this exchange token was already processed
+      const processedExchangeTokens = localStorage.getItem("processed_exchange_tokens");
+      let processedTokensList: string[] = [];
+      try {
+        processedTokensList = processedExchangeTokens ? JSON.parse(processedExchangeTokens) : [];
+      } catch (error) {
+        console.error("Failed to parse processed_exchange_tokens from localStorage:", error);
+        // Clear corrupted data
+        localStorage.removeItem("processed_exchange_tokens");
+        processedTokensList = [];
+      }
+
       // Handle token exchange flow
-      if (exchangeToken) {
+      if (exchangeToken && !processedTokensList.includes(exchangeToken) && !oauthProcessing) {
+        // Mark this exchange token as processed in local storage
+        processedTokensList.push(exchangeToken);
+        localStorage.setItem("processed_exchange_tokens", JSON.stringify(processedTokensList));
+
+        setExchangeProcessed(true); // Prevent re-entry
         setOauthProcessing(true);
         showLoader();
 
@@ -72,10 +91,19 @@ function LoginContent() {
             console.log("Failed to get user data, continuing anyway:", error);
           }
 
-          // Redirect to models page
-          router.push("/models");
+          // Clean up old processed tokens (keep only last 10)
+          const updatedTokensList = processedTokensList.slice(-10);
+          localStorage.setItem("processed_exchange_tokens", JSON.stringify(updatedTokensList));
+
+          // Redirect to models page using window.location for clean redirect
+          window.location.href = "/models";
         } catch (error: any) {
           console.error("OAuth token exchange error:", error);
+          // Remove the token from processed list if it failed
+          const updatedTokens = processedTokensList.filter(token => token !== exchangeToken);
+          if (updatedTokens.length < processedTokensList.length) {
+            localStorage.setItem("processed_exchange_tokens", JSON.stringify(updatedTokens));
+          }
           errorToast(
             error.message || "Authentication failed. Please try again.",
           );
@@ -87,8 +115,26 @@ function LoginContent() {
         return;
       }
 
+      // Check if this auth code was already processed (for authorization code flow)
+      const processedAuthCodes = localStorage.getItem("processed_auth_codes");
+      let processedCodesList: string[] = [];
+      try {
+        processedCodesList = processedAuthCodes ? JSON.parse(processedAuthCodes) : [];
+      } catch (error) {
+        console.error("Failed to parse processed_auth_codes from localStorage:", error);
+        // Clear corrupted data
+        localStorage.removeItem("processed_auth_codes");
+        processedCodesList = [];
+      }
+      const authCodeKey = `${provider}_${code}_${state}`;
+
       // Handle authorization code flow (fallback)
-      if (code && state && provider) {
+      if (code && state && provider && !processedCodesList.includes(authCodeKey) && !oauthProcessing) {
+        // Mark this auth code as processed in local storage
+        processedCodesList.push(authCodeKey);
+        localStorage.setItem("processed_auth_codes", JSON.stringify(processedCodesList));
+
+        setExchangeProcessed(true); // Prevent re-entry
         setOauthProcessing(true);
         showLoader();
 
@@ -113,10 +159,19 @@ function LoginContent() {
             console.log("Failed to get user data, continuing anyway:", error);
           }
 
-          // Redirect to models page
-          router.push("/models");
+          // Clean up old processed codes (keep only last 10)
+          const updatedCodesList = processedCodesList.slice(-10);
+          localStorage.setItem("processed_auth_codes", JSON.stringify(updatedCodesList));
+
+          // Redirect to models page using window.location for clean redirect
+          window.location.href = "/models";
         } catch (error: any) {
           console.error("OAuth callback error:", error);
+          // Remove the code from processed list if it failed
+          const updatedCodes = processedCodesList.filter(code => code !== authCodeKey);
+          if (updatedCodes.length < processedCodesList.length) {
+            localStorage.setItem("processed_auth_codes", JSON.stringify(updatedCodes));
+          }
           errorToast(
             error.message || "Authentication failed. Please try again.",
           );
@@ -133,7 +188,7 @@ function LoginContent() {
   }, [searchParams, router, showLoader, hideLoader]);
 
   useEffect(() => {
-    console.log("Environment variables from provider:");
+
     console.log("baseUrl:", environment.baseUrl);
     console.log("novuBaseUrl:", environment.novuBaseUrl);
 
@@ -153,6 +208,7 @@ function LoginContent() {
   const handleLogin = async (payload: DataInterface) => {
     console.log("=== LOGIN HANDLER CALLED ===");
     console.log("Login payload:", payload);
+    setIsLoggingIn(true);
     showLoader();
     try {
       // Prepare the payload
@@ -193,18 +249,22 @@ function LoginContent() {
         });
 
         // Handle different login scenarios
+        hideLoader();
+        setIsLoggingIn(false);
+
         if (response.data.is_reset_password) {
-          router.push("/auth/resetPassword");
+          router.replace("/auth/resetPassword");
         } else {
-          router.push("/models");
+          // Use replace to avoid history stack issues and window.location for clean redirect
+          window.location.href = "/models";
         }
       } else if (response.data) {
         // Handle case where login is successful but no token (shouldn't happen normally)
         setAuthError("");
-        router.push("/models");
+        hideLoader();
+        setIsLoggingIn(false);
+        window.location.href = "/models";
       }
-
-      hideLoader();
     } catch (error: any) {
       console.error("Login error:", error);
       const errorMessage =
@@ -214,12 +274,13 @@ function LoginContent() {
         "Login failed. Please check your credentials and try again.";
       setAuthError(errorMessage);
       hideLoader();
+      setIsLoggingIn(false);
     }
   };
   const handleForgetPassword = async (email: string) => {
     showLoader();
     try {
-      const response = await AppRequest.Post(`users/reset-password`, {
+      const response = await AppRequest.Post(`/users/reset-password`, {
         email,
       });
       if (response) {
@@ -260,7 +321,7 @@ function LoginContent() {
               </div>
             ) : (
               <>
-                {activePage === 1 && <LoginForm onSubmit={handleLogin} />}
+                {activePage === 1 && <LoginForm onSubmit={handleLogin} isLoading={isLoggingIn} />}
                 {activePage === 4 && (
                   <ContactAdmin onSubmit={handleForgetPassword} />
                 )}

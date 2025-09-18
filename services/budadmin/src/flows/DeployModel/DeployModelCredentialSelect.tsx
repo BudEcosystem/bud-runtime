@@ -1,4 +1,3 @@
-
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
@@ -31,14 +30,16 @@ export default function DeployModelCredentialSelect() {
       backText="Back"
       nextText="Next"
     >
-
       <BudWraperBox>
         <BudDrawerLayout>
-          <DeployModelSpecificationInfo showTemplate={false} showCredentials={false} />
+          <DeployModelSpecificationInfo
+            showTemplate={false}
+            showCredentials={false}
+          />
         </BudDrawerLayout>
         <ProprietaryCredentialsFormList
-            providerType={currentWorkflow?.workflow_steps?.model?.source}
-          />
+          providerType={currentWorkflow?.workflow_steps?.model?.source}
+        />
       </BudWraperBox>
     </BudForm>
   );

@@ -141,9 +141,9 @@ export default function UserUsageDrawer() {
           {/* Header Section */}
           <div className="flex flex-col items-start justify-start w-full px-[1.4rem] py-[1.05rem] pb-[1.4rem] border-b-[.5px] border-b-[#1F1F1F]">
             <Text_14_400_EEEEEE className="mb-[0.35rem]">
-              Usage Values
+              {userDetails?.email || "User Usage"}
             </Text_14_400_EEEEEE>
-            <Text_12_400_757575>Description for usage values...</Text_12_400_757575>
+            <Text_12_400_757575>View and manage token usage, costs, and billing quotas for this user</Text_12_400_757575>
           </div>
 
           {/* Content Section */}
@@ -157,7 +157,9 @@ export default function UserUsageDrawer() {
                   <div className="w-[1.6491rem] h-[0.1832rem] bg-[#6B46C1] mt-[.1rem]"></div>
                 </Text_14_400_EEEEEE>
                 <Text_24_400_EEEEEE className="text-2xl">
-                  {usageData.usedToken}
+                  {usageData.usedToken >= 100000
+                    ? `${(usageData.usedToken / 1000).toFixed(1)}k`
+                    : usageData.usedToken}
                 </Text_24_400_EEEEEE>
               </div>
 
@@ -168,7 +170,7 @@ export default function UserUsageDrawer() {
                   <div className="w-[1.6491rem] h-[0.1832rem] bg-[#6B46C1] mt-[.1rem]"></div>
                 </Text_14_400_EEEEEE>
                 <Text_24_400_EEEEEE className="text-2xl">
-                  {usageData.cost} $
+                  {usageData.cost.toFixed(3)} $
                 </Text_24_400_EEEEEE>
               </div>
 
@@ -195,7 +197,9 @@ export default function UserUsageDrawer() {
                   </Text_14_400_EEEEEE>
                 </div>
                 <Text_24_400_EEEEEE className="text-2xl">
-                  {usageData.tokenQuota}
+                  {usageData.tokenQuota >= 100000
+                    ? `${(usageData.tokenQuota / 1000).toFixed(1)}k`
+                    : usageData.tokenQuota}
                 </Text_24_400_EEEEEE>
               </div>
 
@@ -208,7 +212,7 @@ export default function UserUsageDrawer() {
                   </Text_14_400_EEEEEE>
                 </div>
                 <Text_24_400_EEEEEE className="text-2xl">
-                  {usageData.costQuota} $
+                  {usageData.costQuota.toFixed(3)} $
                 </Text_24_400_EEEEEE>
               </div>
 

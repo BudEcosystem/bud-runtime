@@ -5,7 +5,7 @@ import Dashboard from "./dashboard";
 import Clusters from "./clusters";
 import ModelRepo from "./modelRepo";
 import Settings from "./settings";
-import Chat from "./chat"
+import Chat from "./chat";
 import ApiKeys from "./apiKeys";
 
 const DashboardPage = () => {

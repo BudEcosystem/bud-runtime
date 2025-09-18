@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Card, Row, Col, Flex, Dropdown, Button, Spin, App } from "antd";
+import { Card, Row, Col, Flex, Dropdown, Button, Spin, App, Empty } from "antd";
 import { Typography } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
 import { PrimaryButton } from "@/components/ui/button";
@@ -412,14 +412,21 @@ export default function ProjectsPage() {
           )}
           {/* Empty State */}
           {!loading && activeProjects.length === 0 && (
-            <div className="text-center py-16">
-              <Text className="text-bud-text-primary text-lg mb-2 block">
-                No projects found
-              </Text>
-              <Text className="text-bud-text-muted mb-6 block">
-                Create your first project to start organizing your AI resources
-              </Text>
-            </div>
+            // <div className="text-center py-16">
+            //   <Text className="text-bud-text-primary text-lg mb-2 block">
+            //     No projects found
+            //   </Text>
+            // </div>
+            <Empty
+              description={
+                <Text className="text-bud-text-muted">
+                  {searchValue
+                    ? "No projects found"
+                    : "No projects available"}
+                </Text>
+              }
+              className="mt-16"
+            />
           )}
         </div>
       </div>

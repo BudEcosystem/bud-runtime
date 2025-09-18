@@ -3,12 +3,16 @@ import { useCallback, useEffect, useState } from "react";
 import { successToast } from "../components/toast";
 import { AppRequest } from "../pages/api/requests";
 import { useLoader } from "../context/appContext";
-import { create } from 'zustand';
+import { create } from "zustand";
 import { useRouter } from "next/router";
 import { Tag } from "@/components/ui/bud/dataEntry/TagsInput";
 import { Cluster } from "./useCluster";
 import { tempApiBaseUrl } from "@/components/environment";
-import { convertToObservabilityRequest, convertObservabilityResponse, ObservabilityMetricsResponse } from "@/utils/metricsAdapter";
+import {
+  convertToObservabilityRequest,
+  convertObservabilityResponse,
+  ObservabilityMetricsResponse,
+} from "@/utils/metricsAdapter";
 
 export type Project = {
   id: string;
@@ -25,7 +29,7 @@ export type Project = {
   };
   created_at: string;
   endpoints_count: number;
-  project?: any
+  project?: any;
 };
 
 export interface IProject {
@@ -35,7 +39,11 @@ export interface IProject {
   profile_colors: string[];
 }
 
-export type Scopes = 'endpoint:view' | 'endpoint:manage' | 'project:view' | 'project:manage'
+export type Scopes =
+  | "endpoint:view"
+  | "endpoint:manage"
+  | "project:view"
+  | "project:manage";
 
 export type InviteUser = {
   user_id?: string;
@@ -63,52 +71,58 @@ export type ProjectTags = {
   color: string;
 };
 
-export const useProjects = create<
-  {
-    projects: Project[];
-    projectTags: ProjectTags[];
-    totalProjects: number;
-    loading: boolean;
-    selectedProjectId: string;
-    projectMetricsData: any;
-    averageMetricsData: any;
-    concurrentMetricsData: any;
-    ttftMetricsData: any;
-    latencyMetricsData: any;
-    throughputMetricsData: any;
-    selectedProject: Project | null;
-    getProjects: (page: any, limit: any, search?: string) => Promise<any>;
-    createProject: (data: any) => Promise<any>;
-    deleteProject: (projectId: string, router: any) => Promise<any>;
-    updateProject: (projectId: string, data: any) => Promise<any>;
-    inviteMembers: (projectId: string, data: {
-      users: InviteUser[]
-    }, toast?: boolean) => Promise<any>;
-    getProject: (projectId: string) => void;
-    getProjectTags: () => void;
-    setSelectedProjectId: (projectId: string) => void;
-    setSelectedProject: (project: Project) => void;
-    projectValues: any;
-    setProjectValues: (values: any) => void;
-    removeMembers: (projectId: string, userIds: string[]) => Promise<any>;
-    getMembers: (projectId: string) => Promise<any>;
-    projectMembers: ProjectMember[];
-    updatePermissions: (projectId: string, userId: string, scopes: Permission[]) => Promise<any>;
-    getClusters: (projectId: string) => Promise<any>;
-    projectClusters: Cluster[];
-    totalPages: number;
-    globalProjects: Project[];
-    globalSelectedProject: Project | null;
-    getGlobalProjects: (page: any, limit: any, search?: string) => void;
-    getGlobalProject: (projectId: string) => void;
-    getProjectMetrics: (params: any) => Promise<any>;
-    getQueingMetrics: (params: any) => Promise<any>;
-    getConcurrentMetrics: (params: any) => Promise<any>;
-    getTtftMetrics: (params: any) => Promise<any>;
-    getLatencyMetrics: (params: any) => Promise<any>;
-    getThroughputMetrics: (params: any) => Promise<any>;
-  }
->((set, get) => ({
+export const useProjects = create<{
+  projects: Project[];
+  projectTags: ProjectTags[];
+  totalProjects: number;
+  loading: boolean;
+  selectedProjectId: string;
+  projectMetricsData: any;
+  averageMetricsData: any;
+  concurrentMetricsData: any;
+  ttftMetricsData: any;
+  latencyMetricsData: any;
+  throughputMetricsData: any;
+  selectedProject: Project | null;
+  getProjects: (page: any, limit: any, search?: string) => Promise<any>;
+  createProject: (data: any) => Promise<any>;
+  deleteProject: (projectId: string, router: any) => Promise<any>;
+  updateProject: (projectId: string, data: any) => Promise<any>;
+  inviteMembers: (
+    projectId: string,
+    data: {
+      users: InviteUser[];
+    },
+    toast?: boolean,
+  ) => Promise<any>;
+  getProject: (projectId: string) => void;
+  getProjectTags: () => void;
+  setSelectedProjectId: (projectId: string) => void;
+  setSelectedProject: (project: Project) => void;
+  projectValues: any;
+  setProjectValues: (values: any) => void;
+  removeMembers: (projectId: string, userIds: string[]) => Promise<any>;
+  getMembers: (projectId: string) => Promise<any>;
+  projectMembers: ProjectMember[];
+  updatePermissions: (
+    projectId: string,
+    userId: string,
+    scopes: Permission[],
+  ) => Promise<any>;
+  getClusters: (projectId: string) => Promise<any>;
+  projectClusters: Cluster[];
+  totalPages: number;
+  globalProjects: Project[];
+  globalSelectedProject: Project | null;
+  getGlobalProjects: (page: any, limit: any, search?: string) => void;
+  getGlobalProject: (projectId: string) => void;
+  getProjectMetrics: (params: any) => Promise<any>;
+  getQueingMetrics: (params: any) => Promise<any>;
+  getConcurrentMetrics: (params: any) => Promise<any>;
+  getTtftMetrics: (params: any) => Promise<any>;
+  getLatencyMetrics: (params: any) => Promise<any>;
+  getThroughputMetrics: (params: any) => Promise<any>;
+}>((set, get) => ({
   globalProjects: [],
   globalSelectedProject: null,
   projects: [],
@@ -142,7 +156,7 @@ export const useProjects = create<
       set({
         projects: response.data.projects,
         totalProjects: response.data.total_record,
-        totalPages: response.data.total_pages
+        totalPages: response.data.total_pages,
       });
       return response.data;
     } catch (error) {
@@ -185,22 +199,24 @@ export const useProjects = create<
   },
   deleteProject: async (projectId: string, router: any): Promise<any> => {
     try {
-      const response: any = await AppRequest.Delete(`${tempApiBaseUrl}/projects/${projectId}`);
+      const response: any = await AppRequest.Delete(
+        `${tempApiBaseUrl}/projects/${projectId}`,
+      );
       successToast(response.data.message);
       setTimeout(() => {
         router.back();
-      }, 600)
+      }, 600);
       return response.data;
     } catch (error) {
       // console.error("Error creating model:", error);
-      return error
+      return error;
     }
   },
   updateProject: async (projectId: string, data: any) => {
     try {
       const response: any = await AppRequest.Patch(
         `${tempApiBaseUrl}/projects/${projectId}`,
-        data
+        data,
       );
       successToast(response.data.message);
       return response;
@@ -208,13 +224,17 @@ export const useProjects = create<
       console.error("Error creating model:", error);
     }
   },
-  inviteMembers: async (projectId: string, data: any, toast: boolean = true) => {
+  inviteMembers: async (
+    projectId: string,
+    data: any,
+    toast: boolean = true,
+  ) => {
     try {
       const response: any = await AppRequest.Post(
         `${tempApiBaseUrl}/projects/${projectId}/add-users`,
-        data
+        data,
       );
-      if(toast) {
+      if (toast) {
         successToast(response.data.message);
       }
       return response.data;
@@ -224,7 +244,9 @@ export const useProjects = create<
   },
   getGlobalProject: async (projectId: string) => {
     try {
-      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/projects/${projectId}`);
+      const response: any = await AppRequest.Get(
+        `${tempApiBaseUrl}/projects/${projectId}`,
+      );
       await get().getMembers(projectId);
       set({
         globalSelectedProject: {
@@ -240,13 +262,16 @@ export const useProjects = create<
   getProject: async (projectId) => {
     set({ loading: true });
     try {
-      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/projects/${projectId}`);
+      const response: any = await AppRequest.Get(
+        `${tempApiBaseUrl}/projects/${projectId}`,
+      );
       await get().getMembers(projectId);
       set({
         selectedProject: {
           ...response.data?.project,
           endpoints_count: response.data?.endpoints_count,
-        }, selectedProjectId: projectId
+        },
+        selectedProjectId: projectId,
       });
       successToast(response.message);
       set({ loading: false });
@@ -265,7 +290,10 @@ export const useProjects = create<
   },
   removeMembers: async (projectId: string, userIds: string[]) => {
     try {
-      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/projects/${projectId}/remove-users`, { user_ids: userIds });
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/projects/${projectId}/remove-users`,
+        { user_ids: userIds },
+      );
       successToast(response.data.message);
       return response.data;
     } catch (error) {
@@ -274,20 +302,28 @@ export const useProjects = create<
   },
   getMembers: async (projectId: string) => {
     try {
-      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/projects/${projectId}/users?page=1&limit=10000&search=false`);
-      console.log('response', response)
+      const response: any = await AppRequest.Get(
+        `${tempApiBaseUrl}/projects/${projectId}/users?page=1&limit=10000&search=false`,
+      );
+      console.log("response", response);
       set({ projectMembers: response.data.users });
     } catch (error) {
       console.error("Error creating model:", error);
     }
   },
-  updatePermissions: async (projectId: string, userId: string, permissions: Permission[]) => {
+  updatePermissions: async (
+    projectId: string,
+    userId: string,
+    permissions: Permission[],
+  ) => {
     try {
-      const response: any = await AppRequest.Patch(`/permissions/project`, [{
-        user_id: userId,
-        project_id: projectId,
-        permissions: permissions
-      }]);
+      const response: any = await AppRequest.Patch(`/permissions/project`, [
+        {
+          user_id: userId,
+          project_id: projectId,
+          permissions: permissions,
+        },
+      ]);
       successToast(response.data.message);
       return response.data;
     } catch (error) {
@@ -296,7 +332,9 @@ export const useProjects = create<
   },
   getClusters: async (projectId: string) => {
     try {
-      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/projects/${projectId}/clusters`);
+      const response: any = await AppRequest.Get(
+        `${tempApiBaseUrl}/projects/${projectId}/clusters`,
+      );
       set({ projectClusters: response.data.clusters });
       return response.data;
     } catch (error) {
@@ -309,13 +347,16 @@ export const useProjects = create<
     try {
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
-      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/metrics/analytics`,
+        observabilityRequest,
+      );
 
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       set({ projectMetricsData: convertedData });
@@ -328,13 +369,16 @@ export const useProjects = create<
     try {
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
-      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/metrics/analytics`,
+        observabilityRequest,
+      );
 
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       set({ averageMetricsData: convertedData });
@@ -343,17 +387,20 @@ export const useProjects = create<
       console.error("Error fetching queuing metrics:", error);
     }
   },
-    getConcurrentMetrics: async (params: any) => {
+  getConcurrentMetrics: async (params: any) => {
     try {
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
-      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/metrics/analytics`,
+        observabilityRequest,
+      );
 
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       set({ concurrentMetricsData: convertedData });
@@ -366,13 +413,16 @@ export const useProjects = create<
     try {
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
-      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/metrics/analytics`,
+        observabilityRequest,
+      );
 
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       set({ ttftMetricsData: convertedData });
@@ -385,13 +435,16 @@ export const useProjects = create<
     try {
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
-      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/metrics/analytics`,
+        observabilityRequest,
+      );
 
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       set({ latencyMetricsData: convertedData });
@@ -404,13 +457,16 @@ export const useProjects = create<
     try {
       // Convert old params to new observability format
       const observabilityRequest = convertToObservabilityRequest(params);
-      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, observabilityRequest);
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/metrics/analytics`,
+        observabilityRequest,
+      );
 
       // Convert response to old format for backward compatibility
       const convertedData = convertObservabilityResponse(
         response.data as ObservabilityMetricsResponse,
         params.metrics,
-        params.filter_by
+        params.filter_by,
       );
 
       set({ throughputMetricsData: convertedData });
@@ -419,6 +475,4 @@ export const useProjects = create<
       console.error("Error fetching throughput metrics:", error);
     }
   },
-
-
 }));

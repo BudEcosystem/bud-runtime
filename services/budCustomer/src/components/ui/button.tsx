@@ -10,6 +10,7 @@ interface PrimaryButtonProps {
   type?: "button" | "submit" | "reset";
   children?: React.ReactNode;
   text?: string;
+  loading?: boolean;
   [key: string]: any;
 }
 
@@ -23,15 +24,16 @@ export function PrimaryButton({
   type = "button",
   children,
   text,
+  loading = false,
   ...props
 }: PrimaryButtonProps) {
   return (
     <button
       type={type}
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       className={`flex justify-center items-center h-[1.75rem] border-[.5px] border-[#965CDE] font-normal bg-[#1E0C34] hover:bg-[#965CDE] transition-colors duration-200 rounded-md ${classNames}
-        ${disabled ? "!bg-[#1E0C34] hover:!bg-[#1E0C34] border-[#965CDE] text-[#888888] cursor-not-allowed" : "bg-[#1E0C34] hover:bg-[#965CDE]"} `}
+        ${disabled || loading ? "!bg-[#1E0C34] hover:!bg-[#1E0C34] border-[#965CDE] text-[#888888] cursor-not-allowed" : "bg-[#1E0C34] hover:bg-[#965CDE]"} `}
       style={{
         minWidth: "4rem",
         paddingLeft: ".7rem",
@@ -40,10 +42,34 @@ export function PrimaryButton({
       {...props}
     >
       {Children}
-      <div
-        className={`font-[600] text-[#EEEEEE] text-[0.75rem] leading-[100%] ${textClass || ""}`}
-      >
-        {children || text || "Next"}
+      <div className="flex items-center justify-center gap-2">
+        {loading && (
+          <svg
+            className="animate-spin h-3 w-3 text-[#EEEEEE]"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+        )}
+        <div
+          className={`font-[600] text-[#EEEEEE] text-[0.75rem] leading-[100%] ${textClass || ""}`}
+        >
+          {loading ? "Loading..." : (children || text || "Next")}
+        </div>
       </div>
     </button>
   );

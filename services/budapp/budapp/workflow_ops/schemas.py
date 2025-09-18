@@ -11,6 +11,8 @@ from ..commons.constants import (
     AddModelModalityEnum,
     GuardrailProviderTypeEnum,
     ModelProviderTypeEnum,
+    PromptTypeEnum,
+    RateLimitTypeEnum,
     VisibilityEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
@@ -28,6 +30,7 @@ from ..model_ops.schemas import (
     ScalingSpecification,
 )
 from ..project_ops.schemas import ProjectResponse
+from ..prompt_ops.schemas import PromptSchemaConfig
 
 
 class RetrieveWorkflowStepData(BaseModel):
@@ -97,6 +100,16 @@ class RetrieveWorkflowStepData(BaseModel):
     probe_selections: list[GuardrailProfileProbeSelection] | None = None
     guard_types: list[str] | None = None
     severity_threshold: float | None = None
+    prompt_type: PromptTypeEnum | None = None
+    prompt_schema: PromptSchemaConfig | None = None
+    auto_scale: bool | None = None
+    caching: bool | None = None
+    concurrency: list[int] | None = None
+    rate_limit: bool | None = None
+    rate_limit_value: int | None = None
+    bud_prompt_id: str | None = None
+    bud_prompt_version: int | str | None = None
+    prompt_schema_events: dict | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

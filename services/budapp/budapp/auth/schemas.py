@@ -68,6 +68,10 @@ class UserLogin(BaseModel):
         None,
         description="The ID of the tenant. If not provided, the user will be logged in to the first tenant they belong to.",
     )
+    user_type: UserTypeEnum = Field(
+        UserTypeEnum.CLIENT,
+        description="Type of user (admin or client). Defaults to client.",
+    )
 
 
 class UserLoginData(BaseModel):

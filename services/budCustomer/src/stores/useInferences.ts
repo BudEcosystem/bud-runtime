@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { AppRequest } from "@/services/api/requests";
+import { AppRequest, axiosInstance } from "@/services/api/requests";
 import { message } from "antd";
 
 // Gateway metadata interfaces for components
@@ -110,6 +110,7 @@ export interface InferenceListItem {
   model_name: string;
   model_display_name?: string;
   project_name?: string;
+  api_key_project_name?: string;
   endpoint_name?: string;
   prompt_preview: string;
   response_preview: string;
@@ -136,6 +137,7 @@ export interface InferenceDetail {
   // Project/Endpoint info
   project_id: string;
   project_name?: string;
+  api_key_project_name?: string;
   endpoint_id: string;
   endpoint_name?: string;
 
@@ -230,6 +232,7 @@ interface InferenceStore {
   isLoadingDetail: boolean;
   isLoadingFeedback: boolean;
   error: string | null;
+  abortController: AbortController | null;
 
   // Actions
   setFilters: (filters: Partial<InferenceFilters>) => void;
@@ -275,6 +278,7 @@ export const useInferences = create<InferenceStore>((set, get) => ({
   isLoadingDetail: false,
   isLoadingFeedback: false,
   error: null,
+  abortController: null,
 
   // Filter management
   setFilters: (filters) => {
@@ -302,8 +306,16 @@ export const useInferences = create<InferenceStore>((set, get) => ({
     projectId?: string,
     overrideFilters?: Partial<InferenceFilters>,
   ) => {
-    const { filters, pagination } = get();
-    set({ isLoading: true, error: null });
+    const { filters, pagination, abortController } = get();
+
+    // Cancel any existing request
+    if (abortController) {
+      abortController.abort();
+    }
+
+    // Create new AbortController for this request
+    const newAbortController = new AbortController();
+    set({ isLoading: true, error: null, abortController: newAbortController });
 
     try {
       // Use override filters if provided, otherwise use store filters
@@ -318,9 +330,12 @@ export const useInferences = create<InferenceStore>((set, get) => ({
         limit: pagination.limit,
       };
 
-      const response = await AppRequest.Post(
+      const response = await axiosInstance.post(
         "/metrics/inferences/list",
         requestBody,
+        {
+          signal: newAbortController.signal,
+        }
       );
 
       // Check if response is successful (could be 200 or undefined)
@@ -336,17 +351,24 @@ export const useInferences = create<InferenceStore>((set, get) => ({
             has_more: data.has_more || false,
           },
           isLoading: false,
+          abortController: null,
         });
       } else {
         throw new Error(response.data?.message || "Failed to fetch inferences");
       }
     } catch (error: any) {
+      // Don't show error if request was aborted (user changed filters)
+      if (error.name === "AbortError" || newAbortController.signal.aborted) {
+        set({ isLoading: false, abortController: null });
+        return;
+      }
+
       const errorMsg =
         error?.response?.data?.message ||
         error?.message ||
         "Failed to fetch inferences";
       message.error(errorMsg);
-      set({ error: errorMsg, isLoading: false });
+      set({ error: errorMsg, isLoading: false, abortController: null });
     }
   },
 

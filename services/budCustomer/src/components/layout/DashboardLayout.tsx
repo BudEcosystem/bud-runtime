@@ -20,6 +20,7 @@ import { useTheme } from "@/context/themeContext";
 import { useUser } from "@/stores/useUser";
 import BudIsland from "@/components/island/BudIsland";
 import { useOverlay } from "@/context/overlayContext";
+import pkg from "@novu/notification-center/package.json";
 
 const { Text } = Typography;
 
@@ -110,35 +111,35 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       route: "/logs",
       icon: "/icons/logsDark.png",
       iconWhite: "/icons/logsLight.png",
-      shortcut: "3",
+      shortcut: "2",
     },
     {
       label: "Usage & Billing",
       route: "/usage",
       icon: "/icons/billingDark.png",
       iconWhite: "/icons/billingWhite.png",
-      shortcut: "4",
+      shortcut: "3",
     },
     {
       label: "Audit",
       route: "/audit",
       icon: "/icons/auditDark.png", // Using logs icon as fallback
       iconWhite: "/icons/auditLight.png",
-      shortcut: "5",
+      shortcut: "4",
     },
     {
       label: "API Keys",
       route: "/api-keys",
       icon: "/icons/key.png",
       iconWhite: "/icons/keyWhite.png",
-      shortcut: "6",
+      shortcut: "5",
     },
     {
       label: "Projects",
       route: "/projects",
       icon: "/icons/projectIcon.png",
       iconWhite: "/icons/projectsLight.png",
-      shortcut: "7",
+      shortcut: "6",
     },
   ];
 
@@ -152,25 +153,52 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     try {
       const userData: any = await fetchUser();
       if (!userData && pathname !== "/login") {
-        return router.push("/login");
+        return router.replace("/login");
       }
       if (
         userData?.data?.result?.status === "invited" &&
         pathname !== "/login"
       ) {
         console.log("User needs to complete registration");
-        return router.push("/login");
+        return router.replace("/login");
       }
     } catch (error) {
       console.error("Error fetching user", error);
-      return router.push("/login");
+      return router.replace("/login");
     }
   };
+
   useEffect(() => {
-    if (!user?.id) {
+    // Only fetch user if we don't have user data AND we have a token
+    // This prevents duplicate fetches since AuthGuard already handles initial auth
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("access_token")
+        : null;
+    if (!user?.id && token) {
       getUser();
     }
   }, [pathname]); // Re-run on pathname change like budadmin
+
+  useEffect(() => {
+    console.log("Novu Notification Center version:", pkg.version);
+    console.log(
+      "process.env.NEXT_PUBLIC_BASE_URL",
+      process.env.NEXT_PUBLIC_BASE_URL,
+    );
+    console.log(
+      "process.env.NEXT_PUBLIC_NOVU_SOCKET_URL",
+      process.env.NEXT_PUBLIC_NOVU_SOCKET_URL,
+    );
+    console.log(
+      "process.env.NEXT_PUBLIC_NOVU_BASE_URL",
+      process.env.NEXT_PUBLIC_NOVU_BASE_URL,
+    );
+    console.log(
+      "process.env.NEXT_PUBLIC_NOVU_APP_ID",
+      process.env.NEXT_PUBLIC_NOVU_APP_ID,
+    );
+  }, []);
 
   return (
     <div className="flex h-screen bg-[#f2f2f2] dark:bg-bud-bg-primary">

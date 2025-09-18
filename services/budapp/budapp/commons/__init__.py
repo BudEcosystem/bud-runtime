@@ -59,4 +59,6 @@ from ..guardrails.models import GuardrailRule as GuardrailRule
 from ..playground_ops.models import ChatSession as ChatSession
 from ..playground_ops.models import Message as Message
 from ..playground_ops.models import Note as Note
+from ..prompt_ops.models import Prompt as Prompt
+from ..prompt_ops.models import PromptVersion as PromptVersion
 from .database import Base as Base

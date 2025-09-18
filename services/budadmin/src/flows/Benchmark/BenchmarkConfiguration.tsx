@@ -16,7 +16,7 @@ export default function BenchmarkConfiguration() {
     useDrawer();
   const { stepSix, currentWorkflow, stepSeven } = usePerfomanceBenchmark();
   const [workflowData, setWorkflowData] = useState<any>(
-    currentWorkflow?.workflow_steps
+    currentWorkflow?.workflow_steps,
   );
 
   let architectureArrayAdditional: SpecificationTableItemProps[] = [
@@ -142,7 +142,7 @@ export default function BenchmarkConfiguration() {
                 (item) =>
                   Array.isArray(item.value) &&
                   item.value.length > 0 &&
-                  item.value.some(Boolean)
+                  item.value.some(Boolean),
               )
               .map((item, index) => (
                 <SpecificationTableItem

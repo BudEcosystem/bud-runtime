@@ -12,6 +12,7 @@ import ProjectEditSuccess from "./Projects/ProjectEditSuccess";
 import EditApiKey from "./ApiKeys/EditApiKey";
 import ViewModelDetails from "./ViewModelDetails";
 import ViewProjectDetails from "./ViewProjectDetails";
+import CreateBillingAlert from "./BillingAlert/CreateBillingAlert";
 
 // Placeholder component factory
 const createPlaceholderComponent = (name: string) => {
@@ -146,6 +147,7 @@ const stepComponentNames = [
   "project-success",
   "project-edit-success",
   "edit-api-key",
+  "create-billing-alert",
 ];
 
 // Create StepComponents object with placeholder components
@@ -171,5 +173,6 @@ StepComponents["view-api-key"] = ViewApiKey;
 StepComponents["edit-api-key"] = EditApiKey;
 StepComponents["view-model-details"] = ViewModelDetails;
 StepComponents["view-project-details"] = ViewProjectDetails;
+StepComponents["create-billing-alert"] = CreateBillingAlert;
 
 export type StepComponentsType = keyof typeof StepComponents;

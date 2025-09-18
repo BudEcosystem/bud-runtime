@@ -1,26 +1,25 @@
-
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import React, { } from "react";
+import React from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import ProprietaryCredentialsFormList from "src/flows/components/ProprietaryCredentialsFormList";
 import { useDeployModel } from "src/stores/useDeployModel";
 
 export default function SelectOrAddCredentials() {
-  const { openDrawerWithStep, openDrawer } = useDrawer()
-  const { selectedCredentials, currentWorkflow, updateCredentialsLocal } = useDeployModel();
+  const { openDrawerWithStep, openDrawer } = useDrawer();
+  const { selectedCredentials, currentWorkflow, updateCredentialsLocal } =
+    useDeployModel();
 
   return (
     <BudForm
-      data={{
-      }}
+      data={{}}
       onNext={async () => {
         if (!currentWorkflow) {
           openDrawer("deploy-model");
         } else {
           const result = await updateCredentialsLocal(selectedCredentials);
           if (result) {
-            openDrawerWithStep('extracting-model-status')
+            openDrawerWithStep("extracting-model-status");
           }
           //   openDrawer('run-model-evaluations');
         }

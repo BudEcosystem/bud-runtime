@@ -38,8 +38,10 @@ from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import OAuthProviderEnum, UserColorEnum, UserRoleEnum, UserStatusEnum, UserTypeEnum
 from budapp.commons.db_utils import SessionMixin
-from budapp.commons.exceptions import ClientException
+from budapp.commons.exceptions import BudNotifyException, ClientException
 from budapp.commons.keycloak import KeycloakManager
+from budapp.core.schemas import SubscriberCreate
+from budapp.shared.notification_service import BudNotifyHandler
 from budapp.user_ops.crud import UserDataManager
 from budapp.user_ops.models import Tenant, TenantClient, TenantUserMapping, User
 from budapp.user_ops.oauth_models import OAuthSession, TenantOAuthConfig, UserOAuthProvider
@@ -889,6 +891,22 @@ class OAuthService(SessionMixin):
                 logger.error(f"Failed to lookup user in Keycloak after creation failure: {lookup_error}")
 
         self.session.commit()
+
+        # Create notification subscriber for the new user
+        try:
+            subscriber_data = SubscriberCreate(
+                subscriber_id=str(user.id),
+                email=user.email,
+                first_name=user.name,
+            )
+            await BudNotifyHandler().create_subscriber(subscriber_data)
+            logger.info(f"User {user.email} added to budnotify subscriber")
+
+            # Update user's subscriber status
+            _ = await UserDataManager(self.session).update_subscriber_status(user_ids=[user.id], is_subscriber=True)
+        except Exception as e:
+            logger.error(f"Failed to set up notification subscription for user {user.email}: {e}")
+            # Don't fail the OAuth registration if subscriber creation fails
 
         # Set up billing and create default project for new CLIENT users
         logger.info(f"User type for {user.email}: {user.user_type}")

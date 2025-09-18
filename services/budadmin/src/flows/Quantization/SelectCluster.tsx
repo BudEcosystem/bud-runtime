@@ -7,35 +7,49 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
 import QuantizationSpecificationCard from "./QuantizationSpecificationCard";
 
-
 export default function QuantizationSelectCluster() {
-    const { openDrawerWithStep } = useDrawer();
-  const { updateQuantizationCluster, quantizationWorkflow, setQuantizationWorkflow } = useDeployModel();
+  const { openDrawerWithStep } = useDrawer();
+  const {
+    updateQuantizationCluster,
+    quantizationWorkflow,
+    setQuantizationWorkflow,
+  } = useDeployModel();
 
-    const handleNext = async () => {
-        const result = await updateQuantizationCluster(quantizationWorkflow.clusterId);
-        if (result.status === 200) {
-            openDrawerWithStep("quantization-deployment-status");
-        }
+  const handleNext = async () => {
+    const result = await updateQuantizationCluster(
+      quantizationWorkflow.clusterId,
+    );
+    if (result.status === 200) {
+      openDrawerWithStep("quantization-deployment-status");
     }
+  };
 
-    const handleClusterSelected = (cluster: any) => {
-        setQuantizationWorkflow({...quantizationWorkflow, clusterId: cluster.cluster_id})
-    }
+  const handleClusterSelected = (cluster: any) => {
+    setQuantizationWorkflow({
+      ...quantizationWorkflow,
+      clusterId: cluster.cluster_id,
+    });
+  };
 
-    return <BudForm
-    data={quantizationWorkflow}
-    onBack={() => {
+  return (
+    <BudForm
+      data={quantizationWorkflow}
+      onBack={() => {
         openDrawerWithStep("advanced-settings");
-    }}
-    disableNext={!quantizationWorkflow?.clusterId}
-    onNext={handleNext}
+      }}
+      disableNext={!quantizationWorkflow?.clusterId}
+      onNext={handleNext}
     >
-        <BudWraperBox>
-            <QuantizationSpecificationCard />
-            <BudDrawerLayout>
-                <ChooseCluster onClusterSelected={handleClusterSelected} hidePerformance={true} hideRank={true} />
-            </BudDrawerLayout>
+      <BudWraperBox>
+        <QuantizationSpecificationCard />
+        <BudDrawerLayout>
+          <ChooseCluster
+            onClusterSelected={handleClusterSelected}
+            hidePerformance={true}
+            hideRank={true}
+          />
+        </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>
+  );
 }

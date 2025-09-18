@@ -3182,7 +3182,6 @@ class ModelService(SessionMixin):
         db_current_workflow_step = None
 
         if db_workflow_steps:
-            db_step_project_id = None
             db_step_endpoint_name = None
 
             for db_step in db_workflow_steps:
@@ -3190,48 +3189,32 @@ class ModelService(SessionMixin):
                 if db_step.step_number == current_step_number:
                     db_current_workflow_step = db_step
 
-                if "project_id" in db_step.data:
-                    db_step_project_id = db_step.data["project_id"]
                 if "endpoint_name" in db_step.data:
                     db_step_endpoint_name = db_step.data["endpoint_name"]
 
-            # Check duplicate endpoint in project
+            # Check duplicate endpoint globally (irrespective of project)
             query_endpoint_name = None
-            query_project_id = None
-            if project_id and db_step_endpoint_name:
-                # If user gives project_id but endpoint_name given in earlier step
+            if db_step_endpoint_name:
+                # If endpoint_name given in earlier step
                 query_endpoint_name = db_step_endpoint_name
-                query_project_id = project_id
-            elif endpoint_name and db_step_project_id:
-                # If user gives endpoint_name but project_id given in earlier step
+            elif endpoint_name:
+                # If user gives endpoint_name
                 query_endpoint_name = endpoint_name
-                query_project_id = db_step_project_id
-            elif endpoint_name and project_id:
-                # if user gives both endpoint_name and project_id
-                query_endpoint_name = endpoint_name
-                query_project_id = project_id
-            elif db_step_endpoint_name and db_step_project_id:
-                # if user gives endpoint_name and project_id in earlier step
-                query_endpoint_name = db_step_endpoint_name
-                query_project_id = db_step_project_id
 
-            if query_endpoint_name and query_project_id:
-                # NOTE: A model can only be deployed once in a project
+            if query_endpoint_name:
+                # NOTE: Endpoint names must be globally unique
                 db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
                     EndpointModel,
                     {
                         "name": query_endpoint_name,
-                        "project_id": query_project_id,
                     },
                     exclude_fields={"status": EndpointStatusEnum.DELETED},
                     missing_ok=True,
                     case_sensitive=False,
                 )
                 if db_endpoint:
-                    logger.info(
-                        f"An endpoint with name {query_endpoint_name} already exists in project: {query_project_id}"
-                    )
-                    raise ClientException("An endpoint with this name already exists in this project")
+                    logger.info(f"An endpoint with name {query_endpoint_name} already exists.")
+                    raise ClientException("An endpoint with this name already exists")
 
         if db_current_workflow_step:
             logger.debug(f"Workflow {db_workflow.id} step {current_step_number} already exists")
@@ -3381,12 +3364,11 @@ class ModelService(SessionMixin):
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
 
-            # Perform duplicate endpoint check
+            # Perform duplicate endpoint check globally (irrespective of project)
             db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
                 EndpointModel,
                 {
                     "name": required_data["endpoint_name"],
-                    "project_id": required_data["project_id"],
                 },
                 exclude_fields={"status": EndpointStatusEnum.DELETED},
                 missing_ok=True,
@@ -3394,7 +3376,7 @@ class ModelService(SessionMixin):
             )
 
             if db_endpoint:
-                raise ClientException("An endpoint with this name already exists in this project")
+                raise ClientException("An endpoint with this name already exists")
 
             # Check if this is a cloud model that should use direct endpoint creation
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
@@ -3612,6 +3594,7 @@ class ModelService(SessionMixin):
             simulator_id=simulator_id,
             endpoint_name=endpoint_name,
             model=deploy_model_uri,
+            model_size=db_model.model_size,
             target_ttft=ttft_min,
             target_e2e_latency=e2e_latency_min,
             target_throughput_per_user=target_throughput_per_user_max,

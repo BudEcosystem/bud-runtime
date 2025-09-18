@@ -48,7 +48,16 @@ const MetricCard: React.FC<MetricCardProps> = ({
           </div>
 
           <div className={styles.valueContainer}>
-            <span className={styles.value}>{value}</span>
+            {typeof value === "string" && value.includes("\n") ? (
+              <div className={styles.stackedValue}>
+                <span className={styles.value}>{value.split("\n")[0]}</span>
+                <span className={styles.quotaValue}>
+                  {value.split("\n")[1]}
+                </span>
+              </div>
+            ) : (
+              <span className={styles.value}>{value}</span>
+            )}
             {trend !== undefined && trend !== 0 && (
               <div
                 className={`${styles.trend} ${trend > 0 ? styles.positive : styles.negative}`}

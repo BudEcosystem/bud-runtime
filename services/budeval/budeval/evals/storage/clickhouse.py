@@ -1,11 +1,13 @@
 """ClickHouse storage adapter for evaluation results."""
 
 import asyncio
+import hashlib
 import json
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from asynch.pool import Pool
 
@@ -75,53 +77,216 @@ class ClickHouseStorage(StorageAdapter):
             raise
 
     async def _run_migrations(self) -> None:
-        """Run ClickHouse database migrations."""
-        logger.info("Running ClickHouse database migrations")
+        """Run ClickHouse database migrations with tracking."""
+        logger.info("Checking and running pending ClickHouse migrations")
 
         try:
-            # List of migration files in order
-            migration_files = [
-                "001_initial_schema.sql",
-                "002_add_experiment_id.sql",
-                "003_add_status.sql",
-            ]
             migrations_dir = Path(__file__).parent.parent.parent.parent / "migrations"
 
-            # Collect all commands first so we can run them over a single connection
-            all_commands: list[str] = []
+            # First, ensure migration tracking table exists
+            await self._ensure_migration_tracking_table()
 
-            for migration_filename in migration_files:
-                migration_file = migrations_dir / migration_filename
+            # Get list of already applied migrations
+            applied_migrations = await self._get_applied_migrations()
+            logger.info(f"Found {len(applied_migrations)} already applied migrations")
 
-                if not migration_file.exists():
-                    logger.warning(f"Migration file not found: {migration_file}")
+            # Get all migration files sorted by name
+            migration_files = sorted(migrations_dir.glob("*.sql"))
+            if not migration_files:
+                logger.warning(f"No migration files found in {migrations_dir}")
+                return
+
+            # Process each migration
+            pending_count = 0
+            for migration_file in migration_files:
+                migration_name = migration_file.stem  # filename without extension
+
+                # Skip if already applied
+                if migration_name in applied_migrations:
+                    logger.debug(f"Skipping already applied migration: {migration_name}")
                     continue
 
-                logger.info(f"Running migration: {migration_filename}")
-                with open(migration_file, "r") as f:
-                    migration_sql = f.read()
+                # Calculate checksum for the migration file
+                checksum = self._calculate_checksum(migration_file)
 
-                # Parse SQL into executable commands (strip comments, respect quotes)
-                commands = self._split_sql_commands(migration_sql)
-                all_commands.extend(commands)
+                # Apply the migration
+                logger.info(f"Applying migration: {migration_name}")
+                success = await self._apply_migration(migration_file, migration_name, checksum)
 
-            # Execute all migration commands using a single connection from the pool
-            if all_commands:
-                async with self.get_connection() as conn, conn.cursor() as cursor:
-                    for command in all_commands:
-                        try:
-                            logger.debug(f"Executing migration command: {command[:80]}...")
-                            await cursor.execute(command)
-                        except Exception as e:
-                            # Log error but continue with other commands (some may already exist)
-                            logger.warning(f"Migration command failed (might already exist): {str(e)[:200]}")
-                            continue
+                if success:
+                    pending_count += 1
+                else:
+                    logger.error(f"Failed to apply migration {migration_name}, stopping migration process")
+                    break
 
-            logger.info("ClickHouse database migrations completed successfully")
+            if pending_count > 0:
+                logger.info(f"Successfully applied {pending_count} pending migrations")
+            else:
+                logger.info("No pending migrations to apply")
 
         except Exception as e:
-            logger.error(f"Failed to run ClickHouse migrations: {e}")
+            logger.error(f"Failed to run ClickHouse migrations: {e}", exc_info=True)
             # Don't raise - allow app to continue even if migrations fail
+
+    async def _ensure_migration_tracking_table(self) -> None:
+        """Ensure the migration tracking table exists."""
+        try:
+            # Run the migration tracking setup directly
+            tracking_migration = (
+                Path(__file__).parent.parent.parent.parent / "migrations" / "000_migration_tracking.sql"
+            )
+
+            if tracking_migration.exists():
+                with open(tracking_migration, "r") as f:
+                    migration_sql = f.read()
+
+                commands = self._split_sql_commands(migration_sql)
+
+                async with self.get_connection() as conn, conn.cursor() as cursor:
+                    for command in commands:
+                        try:
+                            await cursor.execute(command)
+                        except Exception as e:
+                            # Table might already exist, which is fine
+                            if "already exists" not in str(e).lower():
+                                logger.warning(f"Migration tracking setup warning: {str(e)[:200]}")
+
+        except Exception as e:
+            logger.error(f"Failed to ensure migration tracking table: {e}")
+            raise
+
+    async def _get_applied_migrations(self) -> Set[str]:
+        """Get set of already applied migration versions."""
+        try:
+            async with self.get_connection() as conn, conn.cursor() as cursor:
+                query = """
+                SELECT DISTINCT version
+                FROM budeval.schema_migrations
+                WHERE success = 1
+                ORDER BY version
+                """
+                await cursor.execute(query)
+                rows = await cursor.fetchall()
+                return {row[0] for row in rows}
+
+        except Exception as e:
+            # If table doesn't exist yet, return empty set
+            if "doesn't exist" in str(e).lower() or "unknown table" in str(e).lower():
+                logger.debug("Migration tracking table doesn't exist yet")
+                return set()
+            else:
+                logger.error(f"Failed to get applied migrations: {e}")
+                return set()
+
+    def _calculate_checksum(self, migration_file: Path) -> str:
+        """Calculate SHA256 checksum of migration file content."""
+        try:
+            with open(migration_file, "rb") as f:
+                content = f.read()
+                return hashlib.sha256(content).hexdigest()
+        except Exception as e:
+            logger.error(f"Failed to calculate checksum for {migration_file}: {e}")
+            return "error"
+
+    async def _apply_migration(self, migration_file: Path, version: str, checksum: str) -> bool:
+        """Apply a single migration and record it."""
+        start_time = time.time()
+        error_message = None
+        success = True
+
+        try:
+            with open(migration_file, "r") as f:
+                migration_sql = f.read()
+
+            # Parse SQL into executable commands
+            commands = self._split_sql_commands(migration_sql)
+
+            # Execute migration commands
+            async with self.get_connection() as conn, conn.cursor() as cursor:
+                for command in commands:
+                    # Skip migration tracking related commands in regular migrations
+                    if version != "000_migration_tracking" and "schema_migrations" in command:
+                        continue
+
+                    try:
+                        logger.debug(f"Executing: {command[:80]}...")
+                        await cursor.execute(command)
+                    except Exception as e:
+                        error_str = str(e)
+                        # Some errors are acceptable (IF NOT EXISTS clauses)
+                        if any(phrase in error_str.lower() for phrase in ["already exists", "if not exists"]):
+                            logger.debug(f"Skipping (already exists): {command[:50]}...")
+                        else:
+                            logger.error(f"Migration command failed: {error_str[:200]}")
+                            error_message = error_str[:500]
+                            success = False
+                            break
+
+                # Record the migration if successful
+                if success:
+                    execution_time_ms = int((time.time() - start_time) * 1000)
+                    await self._record_migration(
+                        cursor,
+                        version,
+                        checksum,
+                        execution_time_ms,
+                        success,
+                        error_message,
+                    )
+
+        except Exception as e:
+            logger.error(f"Failed to apply migration {version}: {e}")
+            error_message = str(e)[:500]
+            success = False
+
+            # Try to record the failure
+            try:
+                async with self.get_connection() as conn, conn.cursor() as cursor:
+                    execution_time_ms = int((time.time() - start_time) * 1000)
+                    await self._record_migration(
+                        cursor,
+                        version,
+                        checksum,
+                        execution_time_ms,
+                        success,
+                        error_message,
+                    )
+            except Exception:
+                pass
+
+        return success
+
+    async def _record_migration(
+        self,
+        cursor,
+        version: str,
+        checksum: str,
+        execution_time_ms: int,
+        success: bool,
+        error_message: Optional[str],
+    ) -> None:
+        """Record a migration execution in the tracking table."""
+        try:
+            record = {
+                "version": version,
+                "checksum": checksum,
+                "executed_at": datetime.now(),
+                "execution_time_ms": execution_time_ms,
+                "success": success,
+                "error_message": error_message,
+            }
+
+            query = """
+            INSERT INTO budeval.schema_migrations
+            (version, checksum, executed_at, execution_time_ms, success, error_message)
+            VALUES
+            """
+
+            await cursor.execute(query, [record])
+            logger.debug(f"Recorded migration {version} (success={success})")
+
+        except Exception as e:
+            logger.error(f"Failed to record migration {version}: {e}")
 
     def _split_sql_commands(self, sql_text: str) -> list[str]:
         """Split a .sql file into individual statements.
@@ -254,34 +419,58 @@ class ClickHouseStorage(StorageAdapter):
             return False
 
     async def _save_evaluation_job(self, conn, job_id: str, results: Dict) -> None:
-        """Save the main evaluation job record."""
-        job_data = {
-            "job_id": job_id,
-            "experiment_id": results.get("experiment_id"),
-            "model_name": results.get("model_name", ""),
-            "engine": results.get("engine", "opencompass"),
-            "status": results.get("status", "succeeded"),
-            "job_start_time": self._parse_datetime(results.get("job_start_time")),
-            "job_end_time": self._parse_datetime(results.get("job_end_time")),
-            "job_duration_seconds": float(results.get("job_duration_seconds") or 0.0),
-            "overall_accuracy": float(results.get("summary", {}).get("overall_accuracy") or 0.0),
-            "total_datasets": int(results.get("summary", {}).get("total_datasets") or 0),
-            "total_examples": int(results.get("summary", {}).get("total_examples") or 0),
-            "total_correct": int(results.get("summary", {}).get("total_correct") or 0),
-            "extracted_at": self._parse_datetime(results.get("extracted_at")),
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
-        }
-
-        query = """
-        INSERT INTO budeval.evaluation_jobs
-        (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
-         overall_accuracy, total_datasets, total_examples, total_correct,
-         extracted_at, created_at, updated_at)
-        VALUES
-        """
-
+        """Save the main evaluation job record with proper upsert logic."""
         async with conn.cursor() as cursor:
+            # First, get the existing job record to preserve original timing and created_at
+            existing_query = """
+            SELECT job_start_time, created_at
+            FROM budeval.evaluation_jobs
+            WHERE job_id = %(job_id)s
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """
+
+            await cursor.execute(existing_query, {"job_id": job_id})
+            existing_record = await cursor.fetchone()
+
+            if existing_record:
+                # Use original start time and created_at from existing record
+                original_start_time = existing_record[0]
+                original_created_at = existing_record[1]
+                logger.debug(f"Found existing record for {job_id}, preserving start_time={original_start_time}")
+            else:
+                # Fallback if no existing record found
+                logger.debug(f"No existing record for {job_id}, using new start_time")
+                original_start_time = self._parse_datetime(results.get("job_start_time"))
+                original_created_at = datetime.now()
+
+            job_data = {
+                "job_id": job_id,
+                "experiment_id": results.get("experiment_id"),
+                "model_name": results.get("model_name", ""),
+                "engine": results.get("engine", "opencompass"),
+                "status": results.get("status", "succeeded"),
+                "job_start_time": original_start_time,  # Preserve original start time
+                "job_end_time": self._parse_datetime(results.get("job_end_time")),
+                "job_duration_seconds": float(results.get("job_duration_seconds") or 0.0),
+                "overall_accuracy": float(results.get("summary", {}).get("overall_accuracy") or 0.0),
+                "total_datasets": int(results.get("summary", {}).get("total_datasets") or 0),
+                "total_examples": int(results.get("summary", {}).get("total_examples") or 0),
+                "total_correct": int(results.get("summary", {}).get("total_correct") or 0),
+                "extracted_at": self._parse_datetime(results.get("extracted_at")),
+                "created_at": original_created_at,  # Preserve original created_at
+                "updated_at": datetime.now(),  # Update the timestamp
+            }
+
+            # Insert new record - ReplacingMergeTree will deduplicate based on ORDER BY key
+            query = """
+            INSERT INTO budeval.evaluation_jobs
+            (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
+             overall_accuracy, total_datasets, total_examples, total_correct,
+             extracted_at, created_at, updated_at)
+            VALUES
+            """
+
             await cursor.execute(query, [job_data])
 
     async def create_initial_job_record(
@@ -326,6 +515,7 @@ class ClickHouseStorage(StorageAdapter):
 
         async with self.get_connection() as conn, conn.cursor() as cursor:
             await cursor.execute(query, [job_row])
+            logger.info(f"Created initial job record for {job_id} with status={status}, start_time={start_time}")
 
     async def update_job_status(
         self,
@@ -338,48 +528,72 @@ class ClickHouseStorage(StorageAdapter):
         job_end_time: Optional[datetime] = None,
         job_duration_seconds: Optional[float] = None,
     ) -> None:
-        """Insert an updated job row to reflect new status and timing."""
-        start_time = job_start_time or datetime.now()
-        end_time = job_end_time or datetime.now()
-        duration = (
-            job_duration_seconds
-            if job_duration_seconds is not None
-            else max((end_time - start_time).total_seconds(), 0.0)
-        )
-
-        job_row = {
-            "job_id": job_id,
-            "experiment_id": experiment_id,
-            "model_name": model_name,
-            "engine": engine,
-            "status": status,
-            "job_start_time": start_time,
-            "job_end_time": end_time,
-            "job_duration_seconds": float(duration),
-            "overall_accuracy": 0.0,
-            "total_datasets": 0,
-            "total_examples": 0,
-            "total_correct": 0,
-            "extracted_at": end_time,
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
-        }
-
-        query = """
-        INSERT INTO budeval.evaluation_jobs
-        (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
-         overall_accuracy, total_datasets, total_examples, total_correct,
-         extracted_at, created_at, updated_at)
-        VALUES
-        """
-
+        """Update job status using ClickHouse-specific upsert pattern."""
         async with self.get_connection() as conn, conn.cursor() as cursor:
+            # First, get the existing job record to preserve original job_start_time and created_at
+            existing_query = """
+            SELECT job_start_time, created_at
+            FROM budeval.evaluation_jobs
+            WHERE job_id = %(job_id)s
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """
+
+            await cursor.execute(existing_query, {"job_id": job_id})
+            existing_record = await cursor.fetchone()
+
+            if existing_record:
+                # Use original start time and created_at from existing record
+                original_start_time = existing_record[0]
+                original_created_at = existing_record[1]
+            else:
+                # Fallback if no existing record found
+                original_start_time = job_start_time or datetime.now()
+                original_created_at = datetime.now()
+
+            # Calculate proper timing
+            start_time = original_start_time  # Always use original start time
+            end_time = job_end_time or datetime.now()
+            duration = (
+                job_duration_seconds
+                if job_duration_seconds is not None
+                else max((end_time - start_time).total_seconds(), 0.0)
+            )
+
+            job_row = {
+                "job_id": job_id,
+                "experiment_id": experiment_id,
+                "model_name": model_name,
+                "engine": engine,
+                "status": status,
+                "job_start_time": start_time,  # Preserve original start time
+                "job_end_time": end_time,
+                "job_duration_seconds": float(duration),
+                "overall_accuracy": 0.0,
+                "total_datasets": 0,
+                "total_examples": 0,
+                "total_correct": 0,
+                "extracted_at": end_time,
+                "created_at": original_created_at,  # Preserve original created_at
+                "updated_at": datetime.now(),  # Update the timestamp
+            }
+
+            # Insert new record - ReplacingMergeTree will deduplicate based on ORDER BY key
+            query = """
+            INSERT INTO budeval.evaluation_jobs
+            (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
+             overall_accuracy, total_datasets, total_examples, total_correct,
+             extracted_at, created_at, updated_at)
+            VALUES
+            """
+
             await cursor.execute(query, [job_row])
 
     async def _save_dataset_results(self, conn, job_id: str, results: Dict) -> None:
         """Save dataset-level results."""
         datasets = results.get("datasets", [])
         if not datasets:
+            logger.warning(f"No datasets found in results for job {job_id}")
             return
 
         dataset_records = []
@@ -389,14 +603,17 @@ class ClickHouseStorage(StorageAdapter):
                 "experiment_id": results.get("experiment_id"),
                 "model_name": results.get("model_name", ""),
                 "dataset_name": dataset.get("dataset_name", ""),
-                "accuracy": dataset.get("accuracy", 0.0),
-                "total_examples": dataset.get("total_examples", 0),
-                "correct_examples": dataset.get("correct_examples", 0),
+                "accuracy": float(dataset.get("accuracy", 0.0)),
+                "total_examples": int(dataset.get("total_examples", 0)),
+                "correct_examples": int(dataset.get("correct_examples", 0)),
                 "evaluated_at": self._parse_datetime(results.get("extracted_at")),
                 "metadata": json.dumps(dataset.get("metadata", {})),
                 "created_at": datetime.now(),
             }
             dataset_records.append(record)
+            logger.debug(
+                f"Prepared dataset record for {dataset.get('dataset_name')}: accuracy={record['accuracy']}, examples={record['total_examples']}"
+            )
 
         query = """
         INSERT INTO budeval.dataset_results
@@ -405,8 +622,14 @@ class ClickHouseStorage(StorageAdapter):
         VALUES
         """
 
-        async with conn.cursor() as cursor:
-            await cursor.execute(query, dataset_records)
+        try:
+            async with conn.cursor() as cursor:
+                await cursor.execute(query, dataset_records)
+                logger.info(f"Successfully inserted {len(dataset_records)} dataset results for job {job_id}")
+        except Exception as e:
+            logger.error(f"Failed to insert dataset results for job {job_id}: {e}")
+            logger.error(f"Dataset records sample: {dataset_records[0] if dataset_records else 'No records'}")
+            raise
 
     async def _save_predictions_batch(self, conn, job_id: str, results: Dict) -> None:
         """Save predictions in batches for optimal performance."""
@@ -415,24 +638,38 @@ class ClickHouseStorage(StorageAdapter):
         experiment_id = results.get("experiment_id")
         evaluated_at = self._parse_datetime(results.get("extracted_at"))
 
+        total_predictions = 0
         for dataset in datasets:
             dataset_name = dataset.get("dataset_name", "")
             predictions = dataset.get("predictions", [])
 
             if not predictions:
+                logger.warning(f"No predictions found for dataset {dataset_name} in job {job_id}")
                 continue
+
+            logger.info(f"Processing {len(predictions)} predictions for dataset {dataset_name}")
 
             # Process predictions in batches
             batch_size = self._config.clickhouse_batch_size
             for i in range(0, len(predictions), batch_size):
                 batch = predictions[i : i + batch_size]
                 await self._insert_prediction_batch(
-                    conn, job_id, experiment_id, model_name, dataset_name, evaluated_at, batch
+                    conn,
+                    job_id,
+                    experiment_id,
+                    model_name,
+                    dataset_name,
+                    evaluated_at,
+                    batch,
                 )
 
                 # Small delay between batches to avoid overwhelming ClickHouse
                 if i + batch_size < len(predictions):
                     await asyncio.sleep(0.01)
+
+                total_predictions += len(batch)
+
+        logger.info(f"Successfully processed {total_predictions} total predictions for job {job_id}")
 
     async def _insert_prediction_batch(
         self,
@@ -464,6 +701,10 @@ class ClickHouseStorage(StorageAdapter):
             }
             prediction_records.append(record)
 
+        if not prediction_records:
+            logger.warning(f"No prediction records to insert for dataset {dataset_name}")
+            return
+
         query = """
         INSERT INTO budeval.predictions
         (job_id, experiment_id, model_name, dataset_name, example_id, prediction_text, origin_prompt,
@@ -471,9 +712,14 @@ class ClickHouseStorage(StorageAdapter):
         VALUES
         """
 
-        async with conn.cursor() as cursor:
-            await cursor.execute(query, prediction_records)
-        logger.debug(f"Inserted batch of {len(prediction_records)} predictions for {dataset_name}")
+        try:
+            async with conn.cursor() as cursor:
+                await cursor.execute(query, prediction_records)
+            logger.debug(f"Inserted batch of {len(prediction_records)} predictions for {dataset_name}")
+        except Exception as e:
+            logger.error(f"Failed to insert predictions batch for {dataset_name}: {e}")
+            logger.error(f"Sample prediction record: {prediction_records[0] if prediction_records else 'No records'}")
+            raise
 
     async def get_results(self, job_id: str) -> Optional[Dict]:
         """Retrieve evaluation results for a job.
@@ -597,7 +843,11 @@ class ClickHouseStorage(StorageAdapter):
         try:
             async with self.get_connection() as conn, conn.cursor() as cursor:
                 # Delete in reverse dependency order
-                tables = ["budeval.predictions", "budeval.dataset_results", "budeval.evaluation_jobs"]
+                tables = [
+                    "budeval.predictions",
+                    "budeval.dataset_results",
+                    "budeval.evaluation_jobs",
+                ]
 
                 for table in tables:
                     query = f"DELETE FROM {table} WHERE job_id = %(job_id)s"
@@ -618,7 +868,11 @@ class ClickHouseStorage(StorageAdapter):
         """
         try:
             async with self.get_connection() as conn, conn.cursor() as cursor:
-                tables = ["budeval.predictions", "budeval.dataset_results", "budeval.evaluation_jobs"]
+                tables = [
+                    "budeval.predictions",
+                    "budeval.dataset_results",
+                    "budeval.evaluation_jobs",
+                ]
 
                 for table in tables:
                     query = f"ALTER TABLE {table} DELETE WHERE 1"
@@ -756,7 +1010,10 @@ class ClickHouseStorage(StorageAdapter):
         return datetime.now()
 
     async def get_model_performance_trends(
-        self, model_name: Optional[str] = None, dataset_name: Optional[str] = None, days: int = 30
+        self,
+        model_name: Optional[str] = None,
+        dataset_name: Optional[str] = None,
+        days: int = 30,
     ) -> List[Dict]:
         """Get model performance trends using the materialized view."""
         try:
@@ -808,3 +1065,6 @@ class ClickHouseStorage(StorageAdapter):
         except Exception as e:
             logger.error(f"Failed to get performance trends: {e}")
             return []
+
+
+# Test comment to trigger reload
