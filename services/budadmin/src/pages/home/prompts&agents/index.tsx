@@ -29,6 +29,8 @@ import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import NoDataFount from "@/components/ui/noDataFount";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import { PlusOutlined } from "@ant-design/icons";
+import { useAgentStore } from "@/stores/useAgentStore";
+import AgentDrawer from "@/components/agents/AgentDrawer";
 
 // Types
 interface PromptAgent {
@@ -340,6 +342,7 @@ export default function PromptsAgents() {
   const { hasPermission, loadingUser } = useUser();
   const { showLoader, hideLoader } = useLoader();
   const { openDrawer } = useDrawer();
+  const { openAgentDrawer } = useAgentStore();
 
   // State
   const [filteredData, setFilteredData] = useState<PromptAgent[]>(mockPromptsAgents);
@@ -456,8 +459,7 @@ export default function PromptsAgents() {
             buttonLabel="Agent"
             buttonPermission={hasPermission(PermissionEnum.ModelManage)}
             buttonAction={() => {
-              // Will need to implement add prompt/agent flow
-              console.log("Add new prompt/agent");
+              openAgentDrawer();
             }}
             ButtonIcon={PlusOutlined}
             rightComponent={
@@ -810,6 +812,9 @@ export default function PromptsAgents() {
           )
         )}
       </div>
+
+      {/* Agent Drawer - Independent from existing drawer */}
+      <AgentDrawer />
     </DashBoardLayout>
   );
 }
