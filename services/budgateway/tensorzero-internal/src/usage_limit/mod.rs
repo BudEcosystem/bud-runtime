@@ -8,7 +8,7 @@ pub use middleware::usage_limit_middleware;
 #[derive(Debug, Clone)]
 pub struct UsageLimitStatus {
     pub user_id: String,
-    pub user_type: String,  // "admin" or "client"
+    pub user_type: String, // "admin" or "client"
     pub allowed: bool,
     pub status: String,
     pub tokens_quota: Option<i64>,

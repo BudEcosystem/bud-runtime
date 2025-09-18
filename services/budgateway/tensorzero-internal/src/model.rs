@@ -48,8 +48,8 @@ use crate::{
     inference::{
         providers::{
             anthropic::AnthropicProvider, aws_bedrock::AWSBedrockProvider, azure::AzureProvider,
-            azure_content_safety::AzureContentSafetyProvider, deepseek::DeepSeekProvider, fireworks::FireworksProvider,
-            gcp_vertex_anthropic::GCPVertexAnthropicProvider,
+            azure_content_safety::AzureContentSafetyProvider, deepseek::DeepSeekProvider,
+            fireworks::FireworksProvider, gcp_vertex_anthropic::GCPVertexAnthropicProvider,
             gcp_vertex_gemini::GCPVertexGeminiProvider, mistral::MistralProvider,
             openai::OpenAIProvider, openrouter::OpenRouterProvider,
             provider_trait::InferenceProvider, together::TogetherProvider, vllm::VLLMProvider,
@@ -3036,21 +3036,24 @@ impl ModelProvider {
 
         match &self.config {
             ProviderConfig::AzureContentSafety(provider) => {
-                let provider_response = provider.moderate(request, client, dynamic_api_keys).await?;
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
                 Ok(crate::moderation::ModerationResponse::new(
                     provider_response,
                     self.name.clone(),
                 ))
             }
             ProviderConfig::OpenAI(provider) => {
-                let provider_response = provider.moderate(request, client, dynamic_api_keys).await?;
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
                 Ok(crate::moderation::ModerationResponse::new(
                     provider_response,
                     self.name.clone(),
                 ))
             }
             ProviderConfig::Mistral(provider) => {
-                let provider_response = provider.moderate(request, client, dynamic_api_keys).await?;
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
                 Ok(crate::moderation::ModerationResponse::new(
                     provider_response,
                     self.name.clone(),
@@ -3058,7 +3061,8 @@ impl ModelProvider {
             }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
-                let provider_response = provider.moderate(request, client, dynamic_api_keys).await?;
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
                 Ok(crate::moderation::ModerationResponse::new(
                     provider_response,
                     self.name.clone(),
@@ -3412,11 +3416,11 @@ impl ShorthandModelConfig for ModelConfig {
                     extra_headers: Default::default(),
                 },
             )]),
-            endpoints,             // Use pre-computed endpoints based on model name
-            fallback_models: None, // Shorthand models don't support fallback
-            retry_config: None,    // Shorthand models don't have retry config
-            rate_limits: None,     // Shorthand models don't have rate limits
-            pricing: None,         // Shorthand models don't have pricing
+            endpoints,               // Use pre-computed endpoints based on model name
+            fallback_models: None,   // Shorthand models don't support fallback
+            retry_config: None,      // Shorthand models don't have retry config
+            rate_limits: None,       // Shorthand models don't have rate limits
+            pricing: None,           // Shorthand models don't have pricing
             guardrail_profile: None, // Shorthand models don't have guardrail profiles
         })
     }
@@ -3532,6 +3536,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3603,6 +3608,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let response = model_config
             .infer(&request, &clients, model_name)
@@ -3703,6 +3709,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         let model_name = "test model";
@@ -3773,6 +3780,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let (
             StreamResponse {
@@ -3847,6 +3855,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let response = model_config
             .infer_stream(
@@ -3949,6 +3958,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let (
             StreamResponse {
@@ -4031,6 +4041,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -4142,6 +4153,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -4269,6 +4281,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let model_table: ModelTable = HashMap::from([("claude".into(), anthropic_model_config)])
             .try_into()
@@ -4381,6 +4394,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         assert!(model.supports_endpoint(EndpointCapability::Chat));
@@ -4409,6 +4423,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         let result = model.validate("test_model");
@@ -4450,6 +4465,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                guardrail_profile: None,
             },
         );
         models.insert(
@@ -4462,6 +4478,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                guardrail_profile: None,
             },
         );
         models.insert(
@@ -4474,6 +4491,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                guardrail_profile: None,
             },
         );
 
@@ -4527,6 +4545,7 @@ mod tests {
                         retry_config: None,
                         rate_limits: None,
                         pricing: None,
+                        guardrail_profile: None,
                     },
                 );
 
@@ -4572,6 +4591,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         let request = crate::embeddings::EmbeddingRequest {

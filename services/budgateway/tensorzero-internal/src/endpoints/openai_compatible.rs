@@ -90,7 +90,10 @@ fn merge_credentials_from_store(
 }
 
 /// Helper function to create OpenAI-compatible error response for guardrail violations
-fn create_guardrail_error_response(message: &str, is_input_violation: bool) -> (StatusCode, serde_json::Value) {
+fn create_guardrail_error_response(
+    message: &str,
+    is_input_violation: bool,
+) -> (StatusCode, serde_json::Value) {
     let (error_type, status_code) = if is_input_violation {
         ("invalid_request_error", StatusCode::BAD_REQUEST)
     } else {
@@ -310,7 +313,7 @@ pub async fn inference_handler(
                     if let Some(text) = sys_msg.content.as_str() {
                         input_texts.push(text.to_string());
                     }
-                },
+                }
                 OpenAICompatibleMessage::User(user_msg) => {
                     match &user_msg.content {
                         Value::String(text) => input_texts.push(text.clone()),
@@ -319,23 +322,24 @@ pub async fn inference_handler(
                             for item in arr {
                                 if let Some(obj) = item.as_object() {
                                     if obj.get("type").and_then(|t| t.as_str()) == Some("text") {
-                                        if let Some(text) = obj.get("text").and_then(|t| t.as_str()) {
+                                        if let Some(text) = obj.get("text").and_then(|t| t.as_str())
+                                        {
                                             input_texts.push(text.to_string());
                                         }
                                     }
                                 }
                             }
-                        },
+                        }
                         _ => {}
                     }
-                },
+                }
                 OpenAICompatibleMessage::Assistant(asst_msg) => {
                     if let Some(content) = &asst_msg.content {
                         if let Some(text) = content.as_str() {
                             input_texts.push(text.to_string());
                         }
                     }
-                },
+                }
                 OpenAICompatibleMessage::Tool(tool_msg) => {
                     if let Some(content) = &tool_msg.content {
                         if let Some(text) = content.as_str() {
@@ -353,218 +357,237 @@ pub async fn inference_handler(
                 crate::moderation::ModerationInput::Batch(input_texts.clone())
             };
 
-        // Get guardrail configuration
-        let guardrails_read = guardrails.read().await;
-        if let Some(guardrail_config) = guardrails_read.get(guardrail_profile.as_ref()) {
-            let guardrail_config = guardrail_config.clone();
-            drop(guardrails_read);
+            // Get guardrail configuration
+            let guardrails_read = guardrails.read().await;
+            if let Some(guardrail_config) = guardrails_read.get(guardrail_profile.as_ref()) {
+                let guardrail_config = guardrail_config.clone();
+                drop(guardrails_read);
 
-            // Prepare credentials
-            let credentials = merge_credentials_from_store(&model_credential_store);
+                // Prepare credentials
+                let credentials = merge_credentials_from_store(&model_credential_store);
 
-            // Create inference clients for guardrail execution
-            let cache_options = crate::cache::CacheOptions {
-                enabled: crate::cache::CacheEnabledMode::Off,
-                max_age_s: None,
-            };
-            let clients = super::inference::InferenceClients {
-                http_client: &http_client,
-                credentials: &credentials,
-                clickhouse_connection_info: &clickhouse_connection_info,
-                cache_options: &cache_options,
-            };
+                // Create inference clients for guardrail execution
+                let cache_options = crate::cache::CacheOptions {
+                    enabled: crate::cache::CacheEnabledMode::Off,
+                    max_age_s: None,
+                };
+                let clients = super::inference::InferenceClients {
+                    http_client: &http_client,
+                    credentials: &credentials,
+                    clickhouse_connection_info: &clickhouse_connection_info,
+                    cache_options: &cache_options,
+                };
 
-            // Execute input guardrail with timing
-            let input_scan_start = tokio::time::Instant::now();
-            let guardrail_result = crate::guardrail::execute_guardrail(
-                &guardrail_config,
-                moderation_input.clone(),
-                crate::guardrail_table::GuardType::Input,
-                &clients,
-                None,
-            ).await?;
-            let input_scan_duration = input_scan_start.elapsed();
+                // Execute input guardrail with timing
+                let input_scan_start = tokio::time::Instant::now();
+                let guardrail_result = crate::guardrail::execute_guardrail(
+                    &guardrail_config,
+                    moderation_input.clone(),
+                    crate::guardrail_table::GuardType::Input,
+                    &clients,
+                    None,
+                )
+                .await?;
+                let input_scan_duration = input_scan_start.elapsed();
 
-            // Store the input guardrail result for later (we need the inference_id from the response)
-            // For now, store with a placeholder UUID
-            let placeholder_id = uuid::Uuid::nil();
-            let scan_record = crate::guardrail::GuardrailInferenceDatabaseInsert::from_result(
-                placeholder_id,
-                guardrail_profile.to_string(),
-                crate::guardrail_table::GuardType::Input,
-                "l1".to_string(),
-                crate::guardrail::ScanMode::Single,
-                &guardrail_result,
-                Some(input_scan_duration),
-                &input_texts.join(" "),
-                None,
-            );
-            guardrail_context.add_scan_record(scan_record);
+                // Store the input guardrail result for later (we need the inference_id from the response)
+                // For now, store with a placeholder UUID
+                let placeholder_id = uuid::Uuid::nil();
+                let scan_record = crate::guardrail::GuardrailInferenceDatabaseInsert::from_result(
+                    placeholder_id,
+                    guardrail_profile.to_string(),
+                    crate::guardrail_table::GuardType::Input,
+                    "l1".to_string(),
+                    crate::guardrail::ScanMode::Single,
+                    &guardrail_result,
+                    Some(input_scan_duration),
+                    &input_texts.join(" "),
+                    None,
+                );
+                guardrail_context.add_scan_record(scan_record);
 
-            // If input is flagged, handle the blocked request with full observability
-            if guardrail_result.flagged {
-                guardrail_context.response_terminated = true;
+                // If input is flagged, handle the blocked request with full observability
+                if guardrail_result.flagged {
+                    guardrail_context.response_terminated = true;
 
-                // Generate IDs for tracking the blocked request
-                let blocked_inference_id = uuid::Uuid::now_v7();
-                let episode_id = uuid::Uuid::now_v7();
+                    // Generate IDs for tracking the blocked request
+                    let blocked_inference_id = uuid::Uuid::now_v7();
+                    let episode_id = uuid::Uuid::now_v7();
 
-                // Update guardrail records with the actual inference_id
-                for record in &mut guardrail_context.scan_records {
-                    record.inference_id = blocked_inference_id;
-                }
+                    // Update guardrail records with the actual inference_id
+                    for record in &mut guardrail_context.scan_records {
+                        record.inference_id = blocked_inference_id;
+                    }
 
-                // Write blocked inference with guardrail records
-                if config.gateway.observability.enabled.unwrap_or(true) {
-                    // Get model info or use defaults if model not found
-                    let (model_name, model_provider) = if let Some(name) = &resolved_model_name {
-                        (name.clone(), "openai".to_string())
-                    } else {
-                        ("unknown".to_string(), "unknown".to_string())
-                    };
-
-                    let clickhouse = clickhouse_connection_info.clone();
-                    let kafka = kafka_connection_info.clone();
-                    let config_clone = config.clone();
-                    let records = guardrail_context.scan_records.clone();
-                    let async_writes = config.gateway.observability.async_writes;
-                    let obs_metadata = observability_metadata.clone();
-
-                    // Get the resolved input and gateway request before moving params
-                    let resolved_input = params.input.resolve(&crate::inference::types::FetchContext {
-                        client: &http_client,
-                        object_store_info: &config.object_store_info,
-                    }).await.unwrap_or_else(|_| crate::inference::types::ResolvedInput {
-                        system: None,
-                        messages: vec![],
-                    });
-                    let gateway_request = params.gateway_request.clone();
-
-                    let write_future = tokio::spawn(async move {
-                        use crate::inference::types::{
-                            ChatInferenceResult, ContentBlockOutput,
-                            Latency, Text, current_timestamp, RequestMessage,
-                            ModelInferenceResponseWithMetadata,
+                    // Write blocked inference with guardrail records
+                    if config.gateway.observability.enabled.unwrap_or(true) {
+                        // Get model info or use defaults if model not found
+                        let (model_name, model_provider) = if let Some(name) = &resolved_model_name
+                        {
+                            (name.clone(), "openai".to_string())
+                        } else {
+                            ("unknown".to_string(), "unknown".to_string())
                         };
-                        use crate::endpoints::inference::InferenceParams;
 
-                        // Create blocked content
-                        let blocked_content = vec![ContentBlockChatOutput::Text(Text {
-                            text: "Request blocked by content policy".to_string(),
-                        })];
+                        let clickhouse = clickhouse_connection_info.clone();
+                        let kafka = kafka_connection_info.clone();
+                        let config_clone = config.clone();
+                        let records = guardrail_context.scan_records.clone();
+                        let async_writes = config.gateway.observability.async_writes;
+                        let obs_metadata = observability_metadata.clone();
 
-                        // Create the gateway response that would be sent to the client
-                        let (_, gateway_response_json) = create_guardrail_error_response(
-                            "Input content violates content policy",
-                            true
-                        );
-                        let gateway_response_str = gateway_response_json.to_string();
+                        // Get the resolved input and gateway request before moving params
+                        let resolved_input = params
+                            .input
+                            .resolve(&crate::inference::types::FetchContext {
+                                client: &http_client,
+                                object_store_info: &config.object_store_info,
+                            })
+                            .await
+                            .unwrap_or_else(|_| crate::inference::types::ResolvedInput {
+                                system: None,
+                                messages: vec![],
+                            });
+                        let gateway_request = params.gateway_request.clone();
 
-                        // Create blocked model inference response
-                        let model_response = ModelInferenceResponseWithMetadata {
-                            id: Uuid::now_v7(),
-                            created: current_timestamp(),
-                            output: vec![ContentBlockOutput::Text(Text {
+                        let write_future = tokio::spawn(async move {
+                            use crate::endpoints::inference::InferenceParams;
+                            use crate::inference::types::{
+                                current_timestamp, ChatInferenceResult, ContentBlockOutput,
+                                Latency, ModelInferenceResponseWithMetadata, RequestMessage, Text,
+                            };
+
+                            // Create blocked content
+                            let blocked_content = vec![ContentBlockChatOutput::Text(Text {
                                 text: "Request blocked by content policy".to_string(),
-                            })],
-                            system: resolved_input.system.clone().and_then(|v| v.as_str().map(|s| s.to_string())),
-                            input_messages: resolved_input.messages.iter().map(|msg| RequestMessage {
-                                role: msg.role.clone(),
-                                content: vec![], // Empty content for blocked messages
-                            }).collect(),
-                            // Since we never made it to the provider, we don't have a raw request/response
-                            // Use empty objects to indicate no provider interaction occurred
-                            raw_request: "{}".to_string(),
-                            raw_response: "{}".to_string(),
-                            usage: Usage::default(),
-                            latency: Latency::NonStreaming {
-                                response_time: std::time::Duration::from_millis(0),
-                            },
-                            model_provider_name: model_provider.to_string().into(),
-                            model_name: model_name.to_string().into(),
-                            cached: false,
-                            finish_reason: Some(FinishReason::ContentFilter),
-                            gateway_request: gateway_request.clone(),
-                            gateway_response: Some(gateway_response_str.clone()),
-                            guardrail_scan_summary: if !records.is_empty() {
-                                let context = crate::guardrail::GuardrailExecutionContext {
-                                    scan_records: records.clone(),
-                                    input_scan_time_ms: records.iter()
-                                        .filter(|r| r.guard_type == 1) // Input guard type
-                                        .filter_map(|r| r.scan_latency_ms)
-                                        .sum::<u32>().into(),
-                                    output_scan_time_ms: None,
-                                    response_terminated: true,
-                                };
-                                Some(serde_json::to_string(&context.build_summary()).unwrap_or_default())
-                            } else {
-                                None
-                            },
-                        };
+                            })];
 
-                        // Create blocked result
-                        let blocked_result = InferenceResult::Chat(ChatInferenceResult {
-                            inference_id: blocked_inference_id,
-                            created: current_timestamp(),
-                            content: blocked_content,
-                            usage: Usage::default(),
-                            model_inference_results: vec![model_response],
-                            inference_params: InferenceParams::default(),
-                            original_response: None,
-                            finish_reason: Some(FinishReason::ContentFilter),
+                            // Create the gateway response that would be sent to the client
+                            let (_, gateway_response_json) = create_guardrail_error_response(
+                                "Input content violates content policy",
+                                true,
+                            );
+                            let gateway_response_str = gateway_response_json.to_string();
+
+                            // Create blocked model inference response
+                            let model_response = ModelInferenceResponseWithMetadata {
+                                id: Uuid::now_v7(),
+                                created: current_timestamp(),
+                                output: vec![ContentBlockOutput::Text(Text {
+                                    text: "Request blocked by content policy".to_string(),
+                                })],
+                                system: resolved_input
+                                    .system
+                                    .clone()
+                                    .and_then(|v| v.as_str().map(|s| s.to_string())),
+                                input_messages: resolved_input
+                                    .messages
+                                    .iter()
+                                    .map(|msg| RequestMessage {
+                                        role: msg.role.clone(),
+                                        content: vec![], // Empty content for blocked messages
+                                    })
+                                    .collect(),
+                                // Since we never made it to the provider, we don't have a raw request/response
+                                // Use empty objects to indicate no provider interaction occurred
+                                raw_request: "{}".to_string(),
+                                raw_response: "{}".to_string(),
+                                usage: Usage::default(),
+                                latency: Latency::NonStreaming {
+                                    response_time: std::time::Duration::from_millis(0),
+                                },
+                                model_provider_name: model_provider.to_string().into(),
+                                model_name: model_name.to_string().into(),
+                                cached: false,
+                                finish_reason: Some(FinishReason::ContentFilter),
+                                gateway_request: gateway_request.clone(),
+                                gateway_response: Some(gateway_response_str.clone()),
+                                guardrail_scan_summary: if !records.is_empty() {
+                                    let context = crate::guardrail::GuardrailExecutionContext {
+                                        scan_records: records.clone(),
+                                        input_scan_time_ms: records
+                                            .iter()
+                                            .filter(|r| r.guard_type == 1) // Input guard type
+                                            .filter_map(|r| r.scan_latency_ms)
+                                            .sum::<u32>()
+                                            .into(),
+                                        output_scan_time_ms: None,
+                                        response_terminated: true,
+                                    };
+                                    Some(
+                                        serde_json::to_string(&context.build_summary())
+                                            .unwrap_or_default(),
+                                    )
+                                } else {
+                                    None
+                                },
+                            };
+
+                            // Create blocked result
+                            let blocked_result = InferenceResult::Chat(ChatInferenceResult {
+                                inference_id: blocked_inference_id,
+                                created: current_timestamp(),
+                                content: blocked_content,
+                                usage: Usage::default(),
+                                model_inference_results: vec![model_response],
+                                inference_params: InferenceParams::default(),
+                                original_response: None,
+                                finish_reason: Some(FinishReason::ContentFilter),
+                            });
+
+                            // Create metadata
+                            let metadata = super::inference::InferenceDatabaseInsertMetadata {
+                                function_name: "openai_compatible".to_string(),
+                                variant_name: model_name.to_string(),
+                                episode_id,
+                                tool_config: None,
+                                processing_time: Some(std::time::Duration::from_millis(0)),
+                                tags: HashMap::new(),
+                                extra_body: UnfilteredInferenceExtraBody::default(),
+                                extra_headers: UnfilteredInferenceExtraHeaders::default(),
+                            };
+
+                            // Write inference and guardrail records
+                            super::inference::write_inference(
+                                &clickhouse,
+                                &kafka,
+                                &config_clone,
+                                resolved_input,
+                                blocked_result,
+                                metadata,
+                                obs_metadata,
+                                gateway_request, // Pass the actual gateway_request
+                                Some(gateway_response_str), // Pass the actual gateway_response
+                                model_pricing,
+                                Some(records),
+                            )
+                            .await;
                         });
 
-                        // Create metadata
-                        let metadata = super::inference::InferenceDatabaseInsertMetadata {
-                            function_name: "openai_compatible".to_string(),
-                            variant_name: model_name.to_string(),
-                            episode_id,
-                            tool_config: None,
-                            processing_time: Some(std::time::Duration::from_millis(0)),
-                            tags: HashMap::new(),
-                            extra_body: UnfilteredInferenceExtraBody::default(),
-                            extra_headers: UnfilteredInferenceExtraHeaders::default(),
-                        };
-
-                        // Write inference and guardrail records
-                        super::inference::write_inference(
-                            &clickhouse,
-                            &kafka,
-                            &config_clone,
-                            resolved_input,
-                            blocked_result,
-                            metadata,
-                            obs_metadata,
-                            gateway_request,  // Pass the actual gateway_request
-                            Some(gateway_response_str),  // Pass the actual gateway_response
-                            model_pricing,
-                            Some(records),
-                        )
-                        .await;
-                    });
-
-                    if !async_writes {
-                        write_future.await.map_err(|e| {
-                            Error::new(ErrorDetails::InternalError {
-                                message: format!("Failed to join blocked inference write task: {e}"),
-                            })
-                        })?;
+                        if !async_writes {
+                            write_future.await.map_err(|e| {
+                                Error::new(ErrorDetails::InternalError {
+                                    message: format!(
+                                        "Failed to join blocked inference write task: {e}"
+                                    ),
+                                })
+                            })?;
+                        }
                     }
+
+                    // Return OpenAI-compatible error response
+                    let (status_code, error_response) = create_guardrail_error_response(
+                        "Input content violates content policy",
+                        true,
+                    );
+
+                    return Ok(Response::builder()
+                        .status(status_code)
+                        .header("Content-Type", "application/json")
+                        .body(Body::from(error_response.to_string()))
+                        .unwrap());
                 }
-
-                // Return OpenAI-compatible error response
-                let (status_code, error_response) = create_guardrail_error_response(
-                    "Input content violates content policy",
-                    true
-                );
-
-                return Ok(Response::builder()
-                    .status(status_code)
-                    .header("Content-Type", "application/json")
-                    .body(Body::from(error_response.to_string()))
-                    .unwrap());
             }
-        }
         }
     }
 
@@ -624,14 +647,23 @@ pub async fn inference_handler(
                 // Check if guardrail supports output guard type
                 let guardrails_read = guardrails.read().await;
                 if let Some(guardrail_config) = guardrails_read.get(guardrail_profile.as_ref()) {
-                    if guardrail_config.guard_types.contains(&crate::guardrail_table::GuardType::Output) {
+                    if guardrail_config
+                        .guard_types
+                        .contains(&crate::guardrail_table::GuardType::Output)
+                    {
                         let guardrail_config = guardrail_config.clone();
                         drop(guardrails_read);
 
                         // Extract output text from response
-                        let output_texts: Vec<String> = openai_compatible_response.choices.iter()
+                        let output_texts: Vec<String> = openai_compatible_response
+                            .choices
+                            .iter()
                             .filter_map(|choice| {
-                                choice.message.content.as_ref().map(|content| content.clone())
+                                choice
+                                    .message
+                                    .content
+                                    .as_ref()
+                                    .map(|content| content.clone())
                             })
                             .collect();
 
@@ -665,22 +697,24 @@ pub async fn inference_handler(
                                 crate::guardrail_table::GuardType::Output,
                                 &clients,
                                 None,
-                            ).await?;
+                            )
+                            .await?;
                             let output_scan_duration = output_scan_start.elapsed();
 
                             // Create guardrail inference record with placeholder ID (will be updated later)
                             let placeholder_id = uuid::Uuid::nil();
-                            let scan_record = crate::guardrail::GuardrailInferenceDatabaseInsert::from_result(
-                                placeholder_id,
-                                guardrail_profile.to_string(),
-                                crate::guardrail_table::GuardType::Output,
-                                "l1".to_string(),
-                                crate::guardrail::ScanMode::Single,
-                                &guardrail_result,
-                                Some(output_scan_duration),
-                                &output_texts.join(" "),
-                                None,
-                            );
+                            let scan_record =
+                                crate::guardrail::GuardrailInferenceDatabaseInsert::from_result(
+                                    placeholder_id,
+                                    guardrail_profile.to_string(),
+                                    crate::guardrail_table::GuardType::Output,
+                                    "l1".to_string(),
+                                    crate::guardrail::ScanMode::Single,
+                                    &guardrail_result,
+                                    Some(output_scan_duration),
+                                    &output_texts.join(" "),
+                                    None,
+                                );
                             guardrail_context.add_scan_record(scan_record);
 
                             // If output is flagged, return an error
@@ -689,8 +723,12 @@ pub async fn inference_handler(
 
                                 // Extract inference_id from the response
                                 let inference_id = match &response {
-                                    InferenceResponse::Chat(chat_response) => chat_response.inference_id,
-                                    InferenceResponse::Json(json_response) => json_response.inference_id,
+                                    InferenceResponse::Chat(chat_response) => {
+                                        chat_response.inference_id
+                                    }
+                                    InferenceResponse::Json(json_response) => {
+                                        json_response.inference_id
+                                    }
                                 };
 
                                 // Update guardrail records with the actual inference_id
@@ -705,14 +743,17 @@ pub async fn inference_handler(
                                         let clickhouse = clickhouse_connection_info.clone();
                                         let kafka = kafka_connection_info.clone();
                                         let records = guardrail_context.scan_records.clone();
-                                        let async_writes = config.gateway.observability.async_writes;
+                                        let async_writes =
+                                            config.gateway.observability.async_writes;
 
                                         // Create the gateway response that would be sent to the client
-                                        let (_, gateway_response_json) = create_guardrail_error_response(
-                                            "Output content violates content policy",
-                                            false
-                                        );
-                                        let gateway_response_str = gateway_response_json.to_string();
+                                        let (_, gateway_response_json) =
+                                            create_guardrail_error_response(
+                                                "Output content violates content policy",
+                                                false,
+                                            );
+                                        let gateway_response_str =
+                                            gateway_response_json.to_string();
 
                                         let write_future = tokio::spawn(async move {
                                             write_inference(
@@ -744,7 +785,7 @@ pub async fn inference_handler(
                                 // Return OpenAI-compatible error response
                                 let (status_code, error_response) = create_guardrail_error_response(
                                     "Output content violates content policy",
-                                    false
+                                    false,
                                 );
 
                                 return Ok(Response::builder()
@@ -878,12 +919,14 @@ pub async fn inference_handler(
                         match &mut result {
                             InferenceResult::Chat(chat_result) => {
                                 for model_result in &mut chat_result.model_inference_results {
-                                    model_result.guardrail_scan_summary = Some(serde_json::to_string(&summary).unwrap_or_default());
+                                    model_result.guardrail_scan_summary =
+                                        Some(serde_json::to_string(&summary).unwrap_or_default());
                                 }
                             }
                             InferenceResult::Json(json_result) => {
                                 for model_result in &mut json_result.model_inference_results {
-                                    model_result.guardrail_scan_summary = Some(serde_json::to_string(&summary).unwrap_or_default());
+                                    model_result.guardrail_scan_summary =
+                                        Some(serde_json::to_string(&summary).unwrap_or_default());
                                 }
                             }
                             _ => {} // Other types don't have model_inference_results
@@ -2721,7 +2764,13 @@ pub async fn moderation_handler(
         provider_params: if openai_compatible_params.unknown_fields.is_empty() {
             None
         } else {
-            Some(serde_json::Value::Object(openai_compatible_params.unknown_fields.clone().into_iter().collect()))
+            Some(serde_json::Value::Object(
+                openai_compatible_params
+                    .unknown_fields
+                    .clone()
+                    .into_iter()
+                    .collect(),
+            ))
         },
     };
 
@@ -2764,15 +2813,20 @@ pub async fn moderation_handler(
 
     // Check if the model has a guardrail profile configured
     if let Some(guardrail_profile) = &model_config.guardrail_profile {
-        tracing::info!("Model has guardrail profile configured: {}", guardrail_profile);
+        tracing::info!(
+            "Model has guardrail profile configured: {}",
+            guardrail_profile
+        );
 
         // Get the guardrail configuration
         let guardrails_read = guardrails.read().await;
         let guardrail_config = guardrails_read
             .get(guardrail_profile.as_ref())
-            .ok_or_else(|| Error::new(ErrorDetails::Config {
-                message: format!("Guardrail profile '{}' not found", guardrail_profile),
-            }))?
+            .ok_or_else(|| {
+                Error::new(ErrorDetails::Config {
+                    message: format!("Guardrail profile '{}' not found", guardrail_profile),
+                })
+            })?
             .clone();
         drop(guardrails_read);
 
@@ -2784,7 +2838,8 @@ pub async fn moderation_handler(
             crate::guardrail_table::GuardType::Input,
             &clients,
             moderation_request.provider_params.clone(),
-        ).await?;
+        )
+        .await?;
         let latency = start_time.elapsed();
 
         // Convert guardrail result to moderation response
@@ -2792,7 +2847,9 @@ pub async fn moderation_handler(
             flagged: guardrail_result.flagged,
             categories: guardrail_result.merged_categories.clone(),
             category_scores: guardrail_result.merged_scores.clone(),
-            category_applied_input_types: guardrail_result.merged_category_applied_input_types.clone(),
+            category_applied_input_types: guardrail_result
+                .merged_category_applied_input_types
+                .clone(),
             hallucination_details: guardrail_result.hallucination_details.clone(),
             ip_violation_details: guardrail_result.ip_violation_details.clone(),
         }];
@@ -2830,115 +2887,115 @@ pub async fn moderation_handler(
         // For now, we'll use the first provider in routing that supports moderation
         // This is a temporary solution until we fully integrate moderation into the regular model system
         for provider_name in &model_config.routing {
-        let provider = match model_config.providers.get(provider_name) {
-            Some(p) => &p.config,
-            None => {
-                tracing::warn!("Provider {} not found in model config", provider_name);
-                continue;
-            }
-        };
+            let provider = match model_config.providers.get(provider_name) {
+                Some(p) => &p.config,
+                None => {
+                    tracing::warn!("Provider {} not found in model config", provider_name);
+                    continue;
+                }
+            };
 
-        // Check if this provider supports moderation
-        tracing::info!("Checking provider {} for moderation support", provider_name);
-        match provider {
-            crate::model::ProviderConfig::OpenAI(openai_provider) => {
-                tracing::info!("Found OpenAI provider for moderation");
-                // For OpenAI, we need to use the provider's configured model name
-                let mut provider_request = moderation_request.clone();
-                provider_request.model = Some(openai_provider.model_name().to_string());
-                // Use the OpenAI provider's moderation capability
-                match openai_provider
-                    .moderate(&provider_request, clients.http_client, &credentials)
-                    .await
-                {
-                    Ok(provider_response) => {
-                        response = Some(crate::moderation::ModerationResponse::new(
-                            provider_response,
-                            provider_name.clone(),
-                        ));
-                        break;
-                    }
-                    Err(e) => {
-                        provider_errors.insert(provider_name.to_string(), e);
-                        continue;
-                    }
-                }
-            }
-            crate::model::ProviderConfig::Mistral(mistral_provider) => {
-                tracing::info!("Found Mistral provider for moderation");
-                // For Mistral, we need to use the provider's configured model name
-                let mut provider_request = moderation_request.clone();
-                provider_request.model = Some(mistral_provider.model_name().to_string());
-                // Use the Mistral provider's moderation capability
-                match mistral_provider
-                    .moderate(&provider_request, clients.http_client, &credentials)
-                    .await
-                {
-                    Ok(provider_response) => {
-                        response = Some(crate::moderation::ModerationResponse::new(
-                            provider_response,
-                            provider_name.clone(),
-                        ));
-                        break;
-                    }
-                    Err(e) => {
-                        provider_errors.insert(provider_name.to_string(), e);
-                        continue;
+            // Check if this provider supports moderation
+            tracing::info!("Checking provider {} for moderation support", provider_name);
+            match provider {
+                crate::model::ProviderConfig::OpenAI(openai_provider) => {
+                    tracing::info!("Found OpenAI provider for moderation");
+                    // For OpenAI, we need to use the provider's configured model name
+                    let mut provider_request = moderation_request.clone();
+                    provider_request.model = Some(openai_provider.model_name().to_string());
+                    // Use the OpenAI provider's moderation capability
+                    match openai_provider
+                        .moderate(&provider_request, clients.http_client, &credentials)
+                        .await
+                    {
+                        Ok(provider_response) => {
+                            response = Some(crate::moderation::ModerationResponse::new(
+                                provider_response,
+                                provider_name.clone(),
+                            ));
+                            break;
+                        }
+                        Err(e) => {
+                            provider_errors.insert(provider_name.to_string(), e);
+                            continue;
+                        }
                     }
                 }
-            }
-            crate::model::ProviderConfig::AzureContentSafety(azure_cs_provider) => {
-                tracing::info!("Found Azure Content Safety provider for moderation");
-                // Azure Content Safety doesn't require a model name
-                let provider_request = moderation_request.clone();
-                // Use the Azure Content Safety provider's moderation capability
-                match azure_cs_provider
-                    .moderate(&provider_request, clients.http_client, &credentials)
-                    .await
-                {
-                    Ok(provider_response) => {
-                        response = Some(crate::moderation::ModerationResponse::new(
-                            provider_response,
-                            provider_name.clone(),
-                        ));
-                        break;
-                    }
-                    Err(e) => {
-                        provider_errors.insert(provider_name.to_string(), e);
-                        continue;
-                    }
-                }
-            }
-            #[cfg(any(test, feature = "e2e_tests"))]
-            crate::model::ProviderConfig::Dummy(dummy_provider) => {
-                tracing::info!("Found Dummy provider for moderation");
-                // For Dummy provider, use the provider's configured model name
-                let mut provider_request = moderation_request.clone();
-                provider_request.model = Some(dummy_provider.model_name().to_string());
-                // Use the Dummy provider's moderation capability
-                match dummy_provider
-                    .moderate(&provider_request, clients.http_client, &credentials)
-                    .await
-                {
-                    Ok(provider_response) => {
-                        response = Some(crate::moderation::ModerationResponse::new(
-                            provider_response,
-                            provider_name.clone(),
-                        ));
-                        break;
-                    }
-                    Err(e) => {
-                        provider_errors.insert(provider_name.to_string(), e);
-                        continue;
+                crate::model::ProviderConfig::Mistral(mistral_provider) => {
+                    tracing::info!("Found Mistral provider for moderation");
+                    // For Mistral, we need to use the provider's configured model name
+                    let mut provider_request = moderation_request.clone();
+                    provider_request.model = Some(mistral_provider.model_name().to_string());
+                    // Use the Mistral provider's moderation capability
+                    match mistral_provider
+                        .moderate(&provider_request, clients.http_client, &credentials)
+                        .await
+                    {
+                        Ok(provider_response) => {
+                            response = Some(crate::moderation::ModerationResponse::new(
+                                provider_response,
+                                provider_name.clone(),
+                            ));
+                            break;
+                        }
+                        Err(e) => {
+                            provider_errors.insert(provider_name.to_string(), e);
+                            continue;
+                        }
                     }
                 }
-            }
-            _ => {
-                // Other providers don't support moderation yet
-                continue;
+                crate::model::ProviderConfig::AzureContentSafety(azure_cs_provider) => {
+                    tracing::info!("Found Azure Content Safety provider for moderation");
+                    // Azure Content Safety doesn't require a model name
+                    let provider_request = moderation_request.clone();
+                    // Use the Azure Content Safety provider's moderation capability
+                    match azure_cs_provider
+                        .moderate(&provider_request, clients.http_client, &credentials)
+                        .await
+                    {
+                        Ok(provider_response) => {
+                            response = Some(crate::moderation::ModerationResponse::new(
+                                provider_response,
+                                provider_name.clone(),
+                            ));
+                            break;
+                        }
+                        Err(e) => {
+                            provider_errors.insert(provider_name.to_string(), e);
+                            continue;
+                        }
+                    }
+                }
+                #[cfg(any(test, feature = "e2e_tests"))]
+                crate::model::ProviderConfig::Dummy(dummy_provider) => {
+                    tracing::info!("Found Dummy provider for moderation");
+                    // For Dummy provider, use the provider's configured model name
+                    let mut provider_request = moderation_request.clone();
+                    provider_request.model = Some(dummy_provider.model_name().to_string());
+                    // Use the Dummy provider's moderation capability
+                    match dummy_provider
+                        .moderate(&provider_request, clients.http_client, &credentials)
+                        .await
+                    {
+                        Ok(provider_response) => {
+                            response = Some(crate::moderation::ModerationResponse::new(
+                                provider_response,
+                                provider_name.clone(),
+                            ));
+                            break;
+                        }
+                        Err(e) => {
+                            provider_errors.insert(provider_name.to_string(), e);
+                            continue;
+                        }
+                    }
+                }
+                _ => {
+                    // Other providers don't support moderation yet
+                    continue;
+                }
             }
         }
-    }
     } // End of if response.is_none()
 
     let response = response
@@ -3006,10 +3063,8 @@ pub async fn moderation_handler(
                             r.categories.harassment_threatening,
                         );
                         categories_map.insert("illicit".to_string(), r.categories.illicit);
-                        categories_map.insert(
-                            "illicit/violent".to_string(),
-                            r.categories.illicit_violent,
-                        );
+                        categories_map
+                            .insert("illicit/violent".to_string(), r.categories.illicit_violent);
                         categories_map.insert("self-harm".to_string(), r.categories.self_harm);
                         categories_map.insert(
                             "self-harm/intent".to_string(),
@@ -3031,7 +3086,8 @@ pub async fn moderation_handler(
                         categories_map.insert("insult".to_string(), r.categories.insult);
                         categories_map.insert("toxicity".to_string(), r.categories.toxicity);
                         categories_map.insert("malicious".to_string(), r.categories.malicious);
-                        categories_map.insert("ip-violation".to_string(), r.categories.ip_violation);
+                        categories_map
+                            .insert("ip-violation".to_string(), r.categories.ip_violation);
 
                         // Convert ModerationCategoryScores struct to HashMap
                         let mut scores_map = HashMap::new();
@@ -5225,7 +5281,7 @@ pub async fn response_create_handler(
 /// it defaults to 'gpt-4-responses'.
 ///
 /// Example:
-/// ```
+/// ```text
 /// curl -X GET http://localhost:3000/v1/responses/resp_123 \
 ///   -H "Authorization: Bearer YOUR_API_KEY" \
 ///   -H "x-model-name: your-model-name"
@@ -5310,7 +5366,7 @@ pub async fn response_retrieve_handler(
 /// it defaults to 'gpt-4-responses'.
 ///
 /// Example:
-/// ```
+/// ```text
 /// curl -X DELETE http://localhost:3000/v1/responses/resp_123 \
 ///   -H "Authorization: Bearer YOUR_API_KEY" \
 ///   -H "x-model-name: your-model-name"
@@ -5391,7 +5447,7 @@ pub async fn response_delete_handler(
 /// it defaults to 'gpt-4-responses'.
 ///
 /// Example:
-/// ```
+/// ```text
 /// curl -X POST http://localhost:3000/v1/responses/resp_123/cancel \
 ///   -H "Authorization: Bearer YOUR_API_KEY" \
 ///   -H "x-model-name: your-model-name"
@@ -5472,7 +5528,7 @@ pub async fn response_cancel_handler(
 /// it defaults to 'gpt-4-responses'.
 ///
 /// Example:
-/// ```
+/// ```text
 /// curl -X GET http://localhost:3000/v1/responses/resp_123/input_items \
 ///   -H "Authorization: Bearer YOUR_API_KEY" \
 ///   -H "x-model-name: your-model-name"

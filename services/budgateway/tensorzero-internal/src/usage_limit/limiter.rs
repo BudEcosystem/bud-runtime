@@ -15,7 +15,7 @@ use tracing::{debug, error, info, warn};
 pub struct UsageLimitInfo {
     pub user_id: String,
     #[serde(default = "default_user_type")]
-    pub user_type: String,  // "admin" or "client"
+    pub user_type: String, // "admin" or "client"
     pub allowed: bool,
     pub status: String,
     pub tokens_quota: Option<i64>,
@@ -306,7 +306,7 @@ impl UsageLimiter {
                 // Cache the allow decision for freemium user
                 let status = UsageLimitStatus {
                     user_id: user_id.to_string(),
-                    user_type: "client".to_string(),  // Default to client for freemium
+                    user_type: "client".to_string(), // Default to client for freemium
                     allowed: true,
                     status: "no_billing_plan".to_string(),
                     tokens_quota: None,
@@ -463,9 +463,12 @@ impl UsageLimiter {
                     // Parse the JSON data
                     match serde_json::from_str::<UsageLimitInfo>(&data) {
                         Ok(info) => {
-                            debug!("Fetched usage limit for user {}: allowed={}", user_id, info.allowed);
+                            debug!(
+                                "Fetched usage limit for user {}: allowed={}",
+                                user_id, info.allowed
+                            );
                             return Ok(Some(info));
-                        },
+                        }
                         Err(e) => {
                             error!(
                                 "Failed to parse usage limit data for user {}: {}",

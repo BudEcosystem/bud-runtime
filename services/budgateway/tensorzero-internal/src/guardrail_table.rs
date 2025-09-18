@@ -1,7 +1,7 @@
+use crate::error::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::error::Error;
 
 /// Represents a guardrail configuration that can include multiple providers
 /// and probes/rules for comprehensive content moderation
@@ -189,7 +189,6 @@ impl GuardrailConfig {
     }
 }
 
-
 /// Helper function to merge two string vectors keeping unique values
 fn merge_string_vec(target: &mut Vec<String>, source: Vec<String>) {
     for item in source {
@@ -207,7 +206,9 @@ pub fn merge_moderation_results(
     crate::moderation::ModerationCategoryScores,
     Option<crate::moderation::CategoryAppliedInputTypes>,
 ) {
-    use crate::moderation::{ModerationCategories, ModerationCategoryScores, CategoryAppliedInputTypes};
+    use crate::moderation::{
+        CategoryAppliedInputTypes, ModerationCategories, ModerationCategoryScores,
+    };
 
     let mut merged_categories = ModerationCategories::default();
     let mut merged_scores = ModerationCategoryScores::default();
@@ -276,22 +277,41 @@ pub fn merge_moderation_results(
 
         // Merge category applied input types
         if let Some(applied_types) = result.category_applied_input_types {
-            let merged_types = merged_applied_input_types.get_or_insert_with(CategoryAppliedInputTypes::default);
+            let merged_types =
+                merged_applied_input_types.get_or_insert_with(CategoryAppliedInputTypes::default);
 
             // Merge all unique values for each category
             merge_string_vec(&mut merged_types.hate, applied_types.hate);
-            merge_string_vec(&mut merged_types.hate_threatening, applied_types.hate_threatening);
+            merge_string_vec(
+                &mut merged_types.hate_threatening,
+                applied_types.hate_threatening,
+            );
             merge_string_vec(&mut merged_types.harassment, applied_types.harassment);
-            merge_string_vec(&mut merged_types.harassment_threatening, applied_types.harassment_threatening);
+            merge_string_vec(
+                &mut merged_types.harassment_threatening,
+                applied_types.harassment_threatening,
+            );
             merge_string_vec(&mut merged_types.illicit, applied_types.illicit);
-            merge_string_vec(&mut merged_types.illicit_violent, applied_types.illicit_violent);
+            merge_string_vec(
+                &mut merged_types.illicit_violent,
+                applied_types.illicit_violent,
+            );
             merge_string_vec(&mut merged_types.self_harm, applied_types.self_harm);
-            merge_string_vec(&mut merged_types.self_harm_intent, applied_types.self_harm_intent);
-            merge_string_vec(&mut merged_types.self_harm_instructions, applied_types.self_harm_instructions);
+            merge_string_vec(
+                &mut merged_types.self_harm_intent,
+                applied_types.self_harm_intent,
+            );
+            merge_string_vec(
+                &mut merged_types.self_harm_instructions,
+                applied_types.self_harm_instructions,
+            );
             merge_string_vec(&mut merged_types.sexual, applied_types.sexual);
             merge_string_vec(&mut merged_types.sexual_minors, applied_types.sexual_minors);
             merge_string_vec(&mut merged_types.violence, applied_types.violence);
-            merge_string_vec(&mut merged_types.violence_graphic, applied_types.violence_graphic);
+            merge_string_vec(
+                &mut merged_types.violence_graphic,
+                applied_types.violence_graphic,
+            );
             merge_string_vec(&mut merged_types.malicious, applied_types.malicious);
             merge_string_vec(&mut merged_types.ip_violation, applied_types.ip_violation);
             merge_string_vec(&mut merged_types.hallucination, applied_types.hallucination);
@@ -352,33 +372,40 @@ pub struct UninitializedGuardrailProvider {
 impl UninitializedGuardrailConfig {
     /// Convert from Redis format to internal format
     pub fn load(self, id: &str) -> Result<GuardrailConfig, Error> {
-        let providers = self.providers.into_iter().map(|(_provider_name, redis_provider)| {
-            // Extract enabled probes and rules from probe_config
-            let mut enabled_probes = Vec::new();
-            let mut enabled_rules = HashMap::new();
+        let providers = self
+            .providers
+            .into_iter()
+            .map(|(_provider_name, redis_provider)| {
+                // Extract enabled probes and rules from probe_config
+                let mut enabled_probes = Vec::new();
+                let mut enabled_rules = HashMap::new();
 
-            for (probe_name, rules) in redis_provider.probe_config {
-                enabled_probes.push(probe_name.clone());
-                if !rules.is_empty() {
-                    enabled_rules.insert(probe_name, rules);
+                for (probe_name, rules) in redis_provider.probe_config {
+                    enabled_probes.push(probe_name.clone());
+                    if !rules.is_empty() {
+                        enabled_rules.insert(probe_name, rules);
+                    }
                 }
-            }
 
-            // Build provider config including api_key_location and extra fields
-            let mut provider_config = redis_provider.extra_config;
-            if let serde_json::Value::Object(ref mut obj) = provider_config {
-                if let Some(api_key_location) = redis_provider.api_key_location {
-                    obj.insert("api_key_location".to_string(), serde_json::Value::String(api_key_location));
+                // Build provider config including api_key_location and extra fields
+                let mut provider_config = redis_provider.extra_config;
+                if let serde_json::Value::Object(ref mut obj) = provider_config {
+                    if let Some(api_key_location) = redis_provider.api_key_location {
+                        obj.insert(
+                            "api_key_location".to_string(),
+                            serde_json::Value::String(api_key_location),
+                        );
+                    }
                 }
-            }
 
-            GuardrailProvider {
-                provider_type: redis_provider.provider_type,
-                enabled_probes,
-                enabled_rules,
-                provider_config,
-            }
-        }).collect();
+                GuardrailProvider {
+                    provider_type: redis_provider.provider_type,
+                    enabled_probes,
+                    enabled_rules,
+                    provider_config,
+                }
+            })
+            .collect();
 
         let config = GuardrailConfig {
             id: id.to_string(),

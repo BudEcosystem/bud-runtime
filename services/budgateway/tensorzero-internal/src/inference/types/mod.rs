@@ -1006,6 +1006,9 @@ pub struct ModelInferenceDatabaseInsert {
     pub gateway_request: Option<String>,
     /// The response sent by the gateway back to the client
     pub gateway_response: Option<String>,
+    /// Summary of guardrail scans performed for this inference, if available
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guardrail_scan_summary: Option<String>,
     /// The type of endpoint that generated this inference
     #[serde(default = "default_endpoint_type")]
     pub endpoint_type: String,
@@ -1370,6 +1373,7 @@ impl ModelInferenceDatabaseInsert {
         };
         let serialized_input_messages = serialize_or_log(&result.input_messages);
         let serialized_output = serialize_or_log(&result.output);
+        let guardrail_scan_summary = result.guardrail_scan_summary.clone();
 
         // A usage of 0 indicates that something went wrong, since a model
         // should always consume and produce at least one token.
@@ -1404,6 +1408,7 @@ impl ModelInferenceDatabaseInsert {
             finish_reason: result.finish_reason,
             gateway_request: result.gateway_request,
             gateway_response: result.gateway_response,
+            guardrail_scan_summary,
             endpoint_type: endpoint_type.to_string(),
         }
     }

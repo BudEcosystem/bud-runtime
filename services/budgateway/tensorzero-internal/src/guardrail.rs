@@ -10,12 +10,10 @@ use uuid::Uuid;
 use crate::endpoints::inference::InferenceClients;
 use crate::error::{Error, ErrorDetails};
 use crate::guardrail_table::{
-    ExecutionMode, FailureMode, GuardType, GuardrailConfig, GuardrailResult, GuardrailTable,
-    ProviderGuardrailResult, merge_moderation_results,
+    merge_moderation_results, ExecutionMode, FailureMode, GuardType, GuardrailConfig,
+    GuardrailResult, GuardrailTable, ProviderGuardrailResult,
 };
-use crate::moderation::{
-    ModerationInput, ModerationProvider, ModerationRequest, ModerationResult,
-};
+use crate::moderation::{ModerationInput, ModerationProvider, ModerationRequest, ModerationResult};
 
 /// Execute a guardrail configuration against input text
 /// This version creates separate provider instances for each probe
@@ -48,10 +46,24 @@ pub async fn execute_guardrail<'a>(
 
     let provider_results = match guardrail_config.execution_mode {
         ExecutionMode::Parallel => {
-            execute_parallel(probe_tasks, guardrail_config, input.clone(), clients, provider_params.clone()).await?
+            execute_parallel(
+                probe_tasks,
+                guardrail_config,
+                input.clone(),
+                clients,
+                provider_params.clone(),
+            )
+            .await?
         }
         ExecutionMode::Sequential => {
-            execute_sequential(probe_tasks, guardrail_config, input.clone(), clients, provider_params.clone()).await?
+            execute_sequential(
+                probe_tasks,
+                guardrail_config,
+                input.clone(),
+                clients,
+                provider_params.clone(),
+            )
+            .await?
         }
     };
 
@@ -67,7 +79,8 @@ pub async fn execute_guardrail<'a>(
         })
         .collect();
 
-    let (merged_categories, merged_scores, merged_category_applied_input_types) = merge_moderation_results(moderation_results);
+    let (merged_categories, merged_scores, merged_category_applied_input_types) =
+        merge_moderation_results(moderation_results);
 
     // Extract special details from provider results
     let mut hallucination_details = None;
@@ -87,7 +100,9 @@ pub async fn execute_guardrail<'a>(
     // Determine overall flagged status
     // Each provider determines its own flagged status based on its internal logic
     // The guardrail is flagged if any provider flagged the content
-    let flagged = provider_results.iter().any(|pr| pr.error.is_none() && pr.flagged);
+    let flagged = provider_results
+        .iter()
+        .any(|pr| pr.error.is_none() && pr.flagged);
 
     Ok(GuardrailResult {
         guardrail_id: guardrail_config.id.clone(),
@@ -118,13 +133,16 @@ fn create_probe_tasks(
 
     for provider_config in &guardrail_config.providers {
         for probe_id in &provider_config.enabled_probes {
-            let rules = provider_config.enabled_rules
+            let rules = provider_config
+                .enabled_rules
                 .get(probe_id)
                 .cloned()
                 .unwrap_or_default();
 
             // Special handling for protected-material-detection
-            if probe_id == "protected-material-detection" && provider_config.provider_type == "azure_content_safety" {
+            if probe_id == "protected-material-detection"
+                && provider_config.provider_type == "azure_content_safety"
+            {
                 // Create separate probe tasks for each rule type
                 for rule in &rules {
                     let specific_probe_id = match rule.as_str() {
@@ -243,7 +261,6 @@ async fn execute_single_probe<'a>(
     clients: &InferenceClients<'a>,
     request_provider_params: Option<serde_json::Value>,
 ) -> Result<ProviderGuardrailResult, Error> {
-
     match task.provider_type.as_str() {
         "azure_content_safety" => {
             execute_azure_content_safety_probe(
@@ -254,7 +271,8 @@ async fn execute_single_probe<'a>(
                 input,
                 clients,
                 request_provider_params.clone(),
-            ).await
+            )
+            .await
         }
         "openai" => {
             execute_openai_probe(
@@ -265,7 +283,8 @@ async fn execute_single_probe<'a>(
                 input,
                 clients,
                 request_provider_params.clone(),
-            ).await
+            )
+            .await
         }
         _ => Err(Error::new(ErrorDetails::Config {
             message: format!("Unsupported provider type: {}", task.provider_type),
@@ -283,37 +302,46 @@ async fn execute_azure_content_safety_probe<'a>(
     clients: &InferenceClients<'a>,
     request_provider_params: Option<serde_json::Value>,
 ) -> Result<ProviderGuardrailResult, Error> {
-    use crate::inference::providers::azure_content_safety::{AzureContentSafetyProvider, ProbeType};
+    use crate::inference::providers::azure_content_safety::{
+        AzureContentSafetyProvider, ProbeType,
+    };
     use crate::model::CredentialLocation;
 
     // Map probe ID to probe type
-    let probe_type = ProbeType::from_probe_id(&probe_id)
-        .ok_or_else(|| Error::new(ErrorDetails::Config {
+    let probe_type = ProbeType::from_probe_id(&probe_id).ok_or_else(|| {
+        Error::new(ErrorDetails::Config {
             message: format!("Unknown Azure Content Safety probe: {}", probe_id),
-        }))?;
+        })
+    })?;
 
     // Extract Azure Content Safety configuration from provider_config
     let endpoint = provider_config
         .get("endpoint")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| Error::new(ErrorDetails::Config {
-            message: "Missing 'endpoint' in Azure Content Safety provider configuration".to_string(),
-        }))?;
+        .ok_or_else(|| {
+            Error::new(ErrorDetails::Config {
+                message: "Missing 'endpoint' in Azure Content Safety provider configuration"
+                    .to_string(),
+            })
+        })?;
 
-    let endpoint_url = url::Url::parse(endpoint)
-        .map_err(|e| Error::new(ErrorDetails::Config {
+    let endpoint_url = url::Url::parse(endpoint).map_err(|e| {
+        Error::new(ErrorDetails::Config {
             message: format!("Invalid Azure Content Safety endpoint URL: {}", e),
-        }))?;
+        })
+    })?;
 
     let api_key_location = provider_config
         .get("api_key_location")
         .and_then(|v| serde_json::from_value::<CredentialLocation>(v.clone()).ok());
 
     // Create a new Azure Content Safety provider instance for this specific probe
-    let probe_provider = AzureContentSafetyProvider::new(endpoint_url, api_key_location, probe_type)?;
+    let probe_provider =
+        AzureContentSafetyProvider::new(endpoint_url, api_key_location, probe_type)?;
 
     // Prepare provider parameters based on probe type and rules
-    let provider_params = build_azure_probe_params(&probe_id, &rules, &provider_config, request_provider_params);
+    let provider_params =
+        build_azure_probe_params(&probe_id, &rules, &provider_config, request_provider_params);
 
     let request = ModerationRequest {
         input: input.clone(),
@@ -322,18 +350,23 @@ async fn execute_azure_content_safety_probe<'a>(
     };
 
     // Execute moderation
-    match probe_provider.moderate(&request, clients.http_client, clients.credentials).await {
+    match probe_provider
+        .moderate(&request, clients.http_client, clients.credentials)
+        .await
+    {
         Ok(response) => {
-            let result = response.results.first().cloned().unwrap_or_else(|| {
-                ModerationResult {
+            let result = response
+                .results
+                .first()
+                .cloned()
+                .unwrap_or_else(|| ModerationResult {
                     flagged: false,
                     categories: crate::moderation::ModerationCategories::default(),
                     category_scores: crate::moderation::ModerationCategoryScores::default(),
                     category_applied_input_types: None,
                     hallucination_details: None,
                     ip_violation_details: None,
-                }
-            });
+                });
 
             // Apply threshold check for Azure Content Safety
             // If we have scores, use our threshold check exclusively
@@ -410,11 +443,7 @@ async fn execute_openai_probe<'a>(
 
     // The probe_id is used as the model name for OpenAI moderation
     // (e.g., "omni-moderation-latest")
-    let openai_provider = OpenAIProvider::new(
-        probe_id.clone(),
-        api_base,
-        api_key_location,
-    )?;
+    let openai_provider = OpenAIProvider::new(probe_id.clone(), api_base, api_key_location)?;
 
     let request = ModerationRequest {
         input,
@@ -423,18 +452,23 @@ async fn execute_openai_probe<'a>(
     };
 
     // Execute moderation
-    match openai_provider.moderate(&request, clients.http_client, clients.credentials).await {
+    match openai_provider
+        .moderate(&request, clients.http_client, clients.credentials)
+        .await
+    {
         Ok(response) => {
-            let result = response.results.first().cloned().unwrap_or_else(|| {
-                ModerationResult {
+            let result = response
+                .results
+                .first()
+                .cloned()
+                .unwrap_or_else(|| ModerationResult {
                     flagged: false,
                     categories: crate::moderation::ModerationCategories::default(),
                     category_scores: crate::moderation::ModerationCategoryScores::default(),
                     category_applied_input_types: None,
                     hallucination_details: None,
                     ip_violation_details: None,
-                }
-            });
+                });
 
             // Apply threshold check for OpenAI
             // If we have scores, use our threshold check exclusively
@@ -505,7 +539,11 @@ fn build_azure_probe_params(
 
     // Merge request-specific provider params if provided
     if let Some(request_params) = request_provider_params {
-        if let (serde_json::Value::Object(ref mut params_obj), serde_json::Value::Object(request_obj)) = (&mut params, request_params) {
+        if let (
+            serde_json::Value::Object(ref mut params_obj),
+            serde_json::Value::Object(request_obj),
+        ) = (&mut params, request_params)
+        {
             for (key, value) in request_obj {
                 params_obj.insert(key, value);
             }
@@ -546,7 +584,6 @@ fn build_azure_probe_params(
     params
 }
 
-
 /// Get the maximum score from ModerationCategoryScores
 fn get_max_score(scores: &crate::moderation::ModerationCategoryScores) -> f64 {
     vec![
@@ -570,7 +607,6 @@ fn get_max_score(scores: &crate::moderation::ModerationCategoryScores) -> f64 {
     .into_iter()
     .fold(0.0_f64, |max, val| max.max(val as f64))
 }
-
 
 /// Get the maximum score for specific categories only
 fn get_max_score_for_categories(
@@ -687,7 +723,7 @@ pub struct GuardrailInferenceDatabaseInsert {
     pub flagged: bool,
     pub confidence_score: Option<f32>,
     pub provider_results: String, // JSON
-    pub scan_status: u8, // Enum representation
+    pub scan_status: u8,          // Enum representation
     pub scan_latency_ms: Option<u32>,
     #[serde(serialize_with = "serialize_datetime64")]
     pub scan_started_at: chrono::DateTime<chrono::Utc>,
@@ -700,7 +736,10 @@ pub struct GuardrailInferenceDatabaseInsert {
 }
 
 /// Serialize DateTime to ClickHouse DateTime64(3) format
-fn serialize_datetime64<S>(dt: &chrono::DateTime<chrono::Utc>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_datetime64<S>(
+    dt: &chrono::DateTime<chrono::Utc>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -709,7 +748,10 @@ where
 }
 
 /// Serialize Optional DateTime to ClickHouse DateTime64(3) format
-fn serialize_optional_datetime64<S>(dt: &Option<chrono::DateTime<chrono::Utc>>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_optional_datetime64<S>(
+    dt: &Option<chrono::DateTime<chrono::Utc>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -741,8 +783,8 @@ impl GuardrailInferenceDatabaseInsert {
         let input_hash = format!("{:x}", hasher.finalize());
 
         // Serialize provider results
-        let provider_results = serde_json::to_string(&result.provider_results)
-            .unwrap_or_else(|_| "[]".to_string());
+        let provider_results =
+            serde_json::to_string(&result.provider_results).unwrap_or_else(|_| "[]".to_string());
 
         // Determine action taken based on result
         let action_taken = if result.flagged {
@@ -752,7 +794,8 @@ impl GuardrailInferenceDatabaseInsert {
             }
         } else {
             "allow"
-        }.to_string();
+        }
+        .to_string();
 
         // Build scan metadata
         let scan_metadata = serde_json::json!({
@@ -761,7 +804,8 @@ impl GuardrailInferenceDatabaseInsert {
             "merged_scores": result.merged_scores,
             "hallucination_details": result.hallucination_details,
             "ip_violation_details": result.ip_violation_details,
-        }).to_string();
+        })
+        .to_string();
 
         Self {
             id: Uuid::now_v7(),
@@ -821,14 +865,17 @@ impl GuardrailExecutionContext {
 
     pub fn add_scan_record(&mut self, record: GuardrailInferenceDatabaseInsert) {
         match record.guard_type {
-            1 => { // Input
+            1 => {
+                // Input
                 if let Some(latency) = record.scan_latency_ms {
                     self.input_scan_time_ms = Some(self.input_scan_time_ms.unwrap_or(0) + latency);
                 }
             }
-            2 => { // Output
+            2 => {
+                // Output
                 if let Some(latency) = record.scan_latency_ms {
-                    self.output_scan_time_ms = Some(self.output_scan_time_ms.unwrap_or(0) + latency);
+                    self.output_scan_time_ms =
+                        Some(self.output_scan_time_ms.unwrap_or(0) + latency);
                 }
             }
             _ => {}
@@ -840,29 +887,30 @@ impl GuardrailExecutionContext {
         let mut summary = GuardrailScanSummary::default();
 
         // Group by guard type
-        let input_records: Vec<_> = self.scan_records.iter()
+        let input_records: Vec<_> = self
+            .scan_records
+            .iter()
             .filter(|r| r.guard_type == 1)
             .collect();
 
-        let output_records: Vec<_> = self.scan_records.iter()
+        let output_records: Vec<_> = self
+            .scan_records
+            .iter()
             .filter(|r| r.guard_type == 2)
             .collect();
 
         // Build input scan summary
         if !input_records.is_empty() {
-            let stages: Vec<_> = input_records.iter()
-                .map(|r| r.scan_stage.clone())
-                .collect();
+            let stages: Vec<_> = input_records.iter().map(|r| r.scan_stage.clone()).collect();
 
             let final_decision = if input_records.iter().any(|r| r.flagged) {
                 "blocked"
             } else {
                 "allowed"
-            }.to_string();
+            }
+            .to_string();
 
-            let scan_chain: Vec<_> = input_records.iter()
-                .map(|r| r.id)
-                .collect();
+            let scan_chain: Vec<_> = input_records.iter().map(|r| r.id).collect();
 
             summary.input_scans = Some(ScanSummary {
                 stages_completed: stages,
@@ -874,7 +922,8 @@ impl GuardrailExecutionContext {
 
         // Build output scan summary
         if !output_records.is_empty() {
-            let stages: Vec<_> = output_records.iter()
+            let stages: Vec<_> = output_records
+                .iter()
                 .map(|r| r.scan_stage.clone())
                 .collect();
 
@@ -882,11 +931,10 @@ impl GuardrailExecutionContext {
                 "blocked"
             } else {
                 "allowed"
-            }.to_string();
+            }
+            .to_string();
 
-            let scan_chain: Vec<_> = output_records.iter()
-                .map(|r| r.id)
-                .collect();
+            let scan_chain: Vec<_> = output_records.iter().map(|r| r.id).collect();
 
             summary.output_scans = Some(ScanSummary {
                 stages_completed: stages,

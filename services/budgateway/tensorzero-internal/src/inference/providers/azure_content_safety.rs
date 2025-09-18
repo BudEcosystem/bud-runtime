@@ -12,8 +12,8 @@ use crate::error::{DisplayOrDebugGateway, Error, ErrorDetails};
 use crate::inference::types::{current_timestamp, Latency, Usage};
 use crate::model::{build_creds_caching_default, Credential, CredentialLocation};
 use crate::moderation::{
-    ModerationCategories, ModerationCategoryScores, ModerationProvider,
-    ModerationProviderResponse, ModerationRequest, ModerationResult,
+    ModerationCategories, ModerationCategoryScores, ModerationProvider, ModerationProviderResponse,
+    ModerationRequest, ModerationResult,
 };
 
 const PROVIDER_NAME: &str = "Azure Content Safety";
@@ -23,7 +23,7 @@ const PROVIDER_TYPE: &str = "azure_content_safety";
 pub struct AzureContentSafetyProvider {
     endpoint: Url,
     credentials: AzureContentSafetyCredentials,
-    probe_type: ProbeType,  // New field to specify which probe this instance handles
+    probe_type: ProbeType, // New field to specify which probe this instance handles
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -335,7 +335,10 @@ struct AzureGroundednessResponse {
     ungrounded_percentage: f32,
     #[serde(rename = "ungroundedDetails")]
     ungrounded_details: Vec<UngroundedDetail>,
-    #[serde(rename = "groundednessReasoning", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "groundednessReasoning",
+        skip_serializing_if = "Option::is_none"
+    )]
     groundedness_reasoning: Option<String>,
 }
 
@@ -462,19 +465,24 @@ impl ModerationProvider for AzureContentSafetyProvider {
         // Execute the appropriate probe based on probe_type
         let results = match self.probe_type {
             ProbeType::Moderation => {
-                self.handle_text_moderation(request, &text_strings, api_key, client).await?
+                self.handle_text_moderation(request, &text_strings, api_key, client)
+                    .await?
             }
             ProbeType::PromptShields => {
-                self.handle_prompt_shields(request, &text_strings, api_key, client).await?
+                self.handle_prompt_shields(request, &text_strings, api_key, client)
+                    .await?
             }
             ProbeType::GroundednessDetection => {
-                self.handle_groundedness(request, &text_strings, api_key, client).await?
+                self.handle_groundedness(request, &text_strings, api_key, client)
+                    .await?
             }
             ProbeType::ProtectedMaterialText => {
-                self.handle_protected_material(request, &text_strings, api_key, client).await?
+                self.handle_protected_material(request, &text_strings, api_key, client)
+                    .await?
             }
             ProbeType::ProtectedMaterialCode => {
-                self.handle_protected_material_code(request, &text_strings, api_key, client).await?
+                self.handle_protected_material_code(request, &text_strings, api_key, client)
+                    .await?
             }
         };
 
@@ -500,7 +508,10 @@ impl ModerationProvider for AzureContentSafetyProvider {
             raw_request,
             raw_response: serde_json::to_string(&results).unwrap_or_default(),
             usage: Usage {
-                input_tokens: texts.iter().map(|t| t.split_whitespace().count() as u32).sum(),
+                input_tokens: texts
+                    .iter()
+                    .map(|t| t.split_whitespace().count() as u32)
+                    .sum(),
                 output_tokens: 0,
             },
             latency,
@@ -526,7 +537,10 @@ impl AzureContentSafetyProvider {
         if let Some(provider_params) = &request.provider_params {
             if let Some(obj) = provider_params.as_object() {
                 // Extract blocklistNames
-                if let Some(names) = obj.get("blocklistNames").or_else(|| obj.get("blocklist_names")) {
+                if let Some(names) = obj
+                    .get("blocklistNames")
+                    .or_else(|| obj.get("blocklist_names"))
+                {
                     if let Some(names_array) = names.as_array() {
                         blocklist_names = names_array
                             .iter()
@@ -549,7 +563,10 @@ impl AzureContentSafetyProvider {
                 }
 
                 // Extract halt flag
-                if let Some(halt) = obj.get("haltOnBlocklistHit").or_else(|| obj.get("halt_on_blocklist_hit")) {
+                if let Some(halt) = obj
+                    .get("haltOnBlocklistHit")
+                    .or_else(|| obj.get("halt_on_blocklist_hit"))
+                {
                     halt_on_blocklist_hit = halt.as_bool();
                 }
 
@@ -570,7 +587,8 @@ impl AzureContentSafetyProvider {
             output_type,
             api_key,
             client,
-        ).await
+        )
+        .await
     }
 
     /// Handle prompt shields probe
@@ -597,7 +615,9 @@ impl AzureContentSafetyProvider {
         }
 
         let user_prompt = texts[0].to_string();
-        let result = self.analyze_prompt_shield(user_prompt, documents, api_key, client).await?;
+        let result = self
+            .analyze_prompt_shield(user_prompt, documents, api_key, client)
+            .await?;
         Ok(vec![result])
     }
 
@@ -620,7 +640,10 @@ impl AzureContentSafetyProvider {
         if let Some(provider_params) = &request.provider_params {
             if let Some(obj) = provider_params.as_object() {
                 // Extract grounding sources
-                if let Some(sources) = obj.get("grounding_sources").or_else(|| obj.get("groundingSources")) {
+                if let Some(sources) = obj
+                    .get("grounding_sources")
+                    .or_else(|| obj.get("groundingSources"))
+                {
                     if let Some(sources_array) = sources.as_array() {
                         grounding_sources = sources_array
                             .iter()
@@ -666,8 +689,12 @@ impl AzureContentSafetyProvider {
                 if let Some(llm) = obj.get("llm_resource") {
                     if let Some(llm_obj) = llm.as_object() {
                         if let (Some(endpoint), Some(deployment)) = (
-                            llm_obj.get("azure_openai_endpoint").and_then(|v| v.as_str()),
-                            llm_obj.get("azure_openai_deployment_name").and_then(|v| v.as_str())
+                            llm_obj
+                                .get("azure_openai_endpoint")
+                                .and_then(|v| v.as_str()),
+                            llm_obj
+                                .get("azure_openai_deployment_name")
+                                .and_then(|v| v.as_str()),
                         ) {
                             llm_resource = Some(LLMResource {
                                 resource_type: "AzureOpenAI".to_string(),
@@ -686,18 +713,20 @@ impl AzureContentSafetyProvider {
             }));
         }
 
-        let result = self.analyze_groundedness(
-            texts[0].to_string(),
-            grounding_sources,
-            domain,
-            task_type,
-            query,
-            reasoning,
-            correction,
-            llm_resource,
-            api_key,
-            client,
-        ).await?;
+        let result = self
+            .analyze_groundedness(
+                texts[0].to_string(),
+                grounding_sources,
+                domain,
+                task_type,
+                query,
+                reasoning,
+                correction,
+                llm_resource,
+                api_key,
+                client,
+            )
+            .await?;
         Ok(vec![result])
     }
 
@@ -709,11 +738,9 @@ impl AzureContentSafetyProvider {
         api_key: Option<&SecretString>,
         client: &reqwest::Client,
     ) -> Result<Vec<ModerationResult>, Error> {
-        let result = self.analyze_protected_material(
-            texts[0].to_string(),
-            api_key,
-            client,
-        ).await?;
+        let result = self
+            .analyze_protected_material(texts[0].to_string(), api_key, client)
+            .await?;
         Ok(vec![result])
     }
 
@@ -725,11 +752,9 @@ impl AzureContentSafetyProvider {
         api_key: Option<&SecretString>,
         client: &reqwest::Client,
     ) -> Result<Vec<ModerationResult>, Error> {
-        let result = self.analyze_protected_material_code(
-            texts[0].to_string(),
-            api_key,
-            client,
-        ).await?;
+        let result = self
+            .analyze_protected_material_code(texts[0].to_string(), api_key, client)
+            .await?;
         Ok(vec![result])
     }
 
@@ -745,7 +770,8 @@ impl AzureContentSafetyProvider {
         client: &reqwest::Client,
     ) -> Result<Vec<ModerationResult>, Error> {
         let mut results = Vec::new();
-        let is_eight_levels = output_type.as_ref()
+        let is_eight_levels = output_type
+            .as_ref()
             .map(|s| s == "EightSeverityLevels")
             .unwrap_or(true);
 
@@ -760,12 +786,11 @@ impl AzureContentSafetyProvider {
 
             let url = get_azure_content_safety_text_moderation_url(&self.endpoint)?;
 
-            let mut request_builder = client
-                .post(url)
-                .header("Content-Type", "application/json");
+            let mut request_builder = client.post(url).header("Content-Type", "application/json");
 
             if let Some(api_key) = api_key {
-                request_builder = request_builder.header("Ocp-Apim-Subscription-Key", api_key.expose_secret());
+                request_builder =
+                    request_builder.header("Ocp-Apim-Subscription-Key", api_key.expose_secret());
             }
 
             let res = request_builder
@@ -781,7 +806,9 @@ impl AzureContentSafetyProvider {
                         ),
                         status_code: status,
                         provider_type: PROVIDER_TYPE.to_string(),
-                        raw_request: Some(serde_json::to_string(&azure_request).unwrap_or_default()),
+                        raw_request: Some(
+                            serde_json::to_string(&azure_request).unwrap_or_default(),
+                        ),
                         raw_response: None,
                     })
                 })?;
@@ -794,26 +821,31 @@ impl AzureContentSafetyProvider {
                             DisplayOrDebugGateway::new(e)
                         ),
                         provider_type: PROVIDER_TYPE.to_string(),
-                        raw_request: Some(serde_json::to_string(&azure_request).unwrap_or_default()),
+                        raw_request: Some(
+                            serde_json::to_string(&azure_request).unwrap_or_default(),
+                        ),
                         raw_response: None,
                     })
                 })?;
 
-                let azure_response: AzureModerationResponse =
-                    serde_json::from_str(&raw_response).map_err(|e| {
-                        Error::new(ErrorDetails::InferenceServer {
-                            message: format!(
-                                "Error parsing JSON response: {}",
-                                DisplayOrDebugGateway::new(e)
-                            ),
-                            provider_type: PROVIDER_TYPE.to_string(),
-                            raw_request: Some(serde_json::to_string(&azure_request).unwrap_or_default()),
-                            raw_response: Some(raw_response.clone()),
-                        })
-                    })?;
+                let azure_response: AzureModerationResponse = serde_json::from_str(&raw_response)
+                    .map_err(|e| {
+                    Error::new(ErrorDetails::InferenceServer {
+                        message: format!(
+                            "Error parsing JSON response: {}",
+                            DisplayOrDebugGateway::new(e)
+                        ),
+                        provider_type: PROVIDER_TYPE.to_string(),
+                        raw_request: Some(
+                            serde_json::to_string(&azure_request).unwrap_or_default(),
+                        ),
+                        raw_response: Some(raw_response.clone()),
+                    })
+                })?;
 
                 // Convert Azure response to OpenAI-compatible format
-                let moderation_result = convert_azure_response_to_openai(&azure_response, is_eight_levels);
+                let moderation_result =
+                    convert_azure_response_to_openai(&azure_response, is_eight_levels);
                 results.push(moderation_result);
             } else {
                 let status = res.status();
@@ -861,12 +893,11 @@ impl AzureContentSafetyProvider {
 
         let url = get_azure_content_safety_groundedness_url(&self.endpoint)?;
 
-        let mut request_builder = client
-            .post(url)
-            .header("Content-Type", "application/json");
+        let mut request_builder = client.post(url).header("Content-Type", "application/json");
 
         if let Some(api_key) = api_key {
-            request_builder = request_builder.header("Ocp-Apim-Subscription-Key", api_key.expose_secret());
+            request_builder =
+                request_builder.header("Ocp-Apim-Subscription-Key", api_key.expose_secret());
         }
 
         let res = request_builder
@@ -908,13 +939,17 @@ impl AzureContentSafetyProvider {
                             DisplayOrDebugGateway::new(e)
                         ),
                         provider_type: PROVIDER_TYPE.to_string(),
-                        raw_request: Some(serde_json::to_string(&azure_request).unwrap_or_default()),
+                        raw_request: Some(
+                            serde_json::to_string(&azure_request).unwrap_or_default(),
+                        ),
                         raw_response: Some(raw_response.clone()),
                     })
                 })?;
 
             // Convert groundedness response to OpenAI-compatible format
-            Ok(convert_groundedness_response_to_openai(&groundedness_response))
+            Ok(convert_groundedness_response_to_openai(
+                &groundedness_response,
+            ))
         } else {
             let status = res.status();
             let error_text = res.text().await.unwrap_or_default();
@@ -937,12 +972,11 @@ impl AzureContentSafetyProvider {
 
         let url = get_azure_content_safety_protected_material_url(&self.endpoint)?;
 
-        let mut request_builder = client
-            .post(url)
-            .header("Content-Type", "application/json");
+        let mut request_builder = client.post(url).header("Content-Type", "application/json");
 
         if let Some(api_key) = api_key {
-            request_builder = request_builder.header("Ocp-Apim-Subscription-Key", api_key.expose_secret());
+            request_builder =
+                request_builder.header("Ocp-Apim-Subscription-Key", api_key.expose_secret());
         }
 
         let res = request_builder
@@ -984,13 +1018,17 @@ impl AzureContentSafetyProvider {
                             DisplayOrDebugGateway::new(e)
                         ),
                         provider_type: PROVIDER_TYPE.to_string(),
-                        raw_request: Some(serde_json::to_string(&azure_request).unwrap_or_default()),
+                        raw_request: Some(
+                            serde_json::to_string(&azure_request).unwrap_or_default(),
+                        ),
                         raw_response: Some(raw_response.clone()),
                     })
                 })?;
 
             // Convert protected material response to OpenAI-compatible format
-            Ok(convert_protected_material_response_to_openai(&protected_material_response))
+            Ok(convert_protected_material_response_to_openai(
+                &protected_material_response,
+            ))
         } else {
             let status = res.status();
             let error_text = res.text().await.unwrap_or_default();
@@ -1013,12 +1051,11 @@ impl AzureContentSafetyProvider {
 
         let url = get_azure_content_safety_protected_material_code_url(&self.endpoint)?;
 
-        let mut request_builder = client
-            .post(url)
-            .header("Content-Type", "application/json");
+        let mut request_builder = client.post(url).header("Content-Type", "application/json");
 
         if let Some(api_key) = api_key {
-            request_builder = request_builder.header("Ocp-Apim-Subscription-Key", api_key.expose_secret());
+            request_builder =
+                request_builder.header("Ocp-Apim-Subscription-Key", api_key.expose_secret());
         }
 
         let res = request_builder
@@ -1060,13 +1097,17 @@ impl AzureContentSafetyProvider {
                             DisplayOrDebugGateway::new(e)
                         ),
                         provider_type: PROVIDER_TYPE.to_string(),
-                        raw_request: Some(serde_json::to_string(&azure_request).unwrap_or_default()),
+                        raw_request: Some(
+                            serde_json::to_string(&azure_request).unwrap_or_default(),
+                        ),
                         raw_response: Some(raw_response.clone()),
                     })
                 })?;
 
             // Convert protected material code response to OpenAI-compatible format
-            Ok(convert_protected_material_code_response_to_openai(&protected_material_code_response))
+            Ok(convert_protected_material_code_response_to_openai(
+                &protected_material_code_response,
+            ))
         } else {
             let status = res.status();
             let error_text = res.text().await.unwrap_or_default();
@@ -1093,12 +1134,11 @@ impl AzureContentSafetyProvider {
 
         let url = get_azure_content_safety_prompt_shield_url(&self.endpoint)?;
 
-        let mut request_builder = client
-            .post(url)
-            .header("Content-Type", "application/json");
+        let mut request_builder = client.post(url).header("Content-Type", "application/json");
 
         if let Some(api_key) = api_key {
-            request_builder = request_builder.header("Ocp-Apim-Subscription-Key", api_key.expose_secret());
+            request_builder =
+                request_builder.header("Ocp-Apim-Subscription-Key", api_key.expose_secret());
         }
 
         let res = request_builder
@@ -1140,13 +1180,17 @@ impl AzureContentSafetyProvider {
                             DisplayOrDebugGateway::new(e)
                         ),
                         provider_type: PROVIDER_TYPE.to_string(),
-                        raw_request: Some(serde_json::to_string(&azure_request).unwrap_or_default()),
+                        raw_request: Some(
+                            serde_json::to_string(&azure_request).unwrap_or_default(),
+                        ),
                         raw_response: Some(raw_response.clone()),
                     })
                 })?;
 
             // Convert prompt shield response to OpenAI-compatible format
-            Ok(convert_prompt_shield_response_to_openai(&prompt_shield_response))
+            Ok(convert_prompt_shield_response_to_openai(
+                &prompt_shield_response,
+            ))
         } else {
             let status = res.status();
             let error_text = res.text().await.unwrap_or_default();
@@ -1159,8 +1203,12 @@ impl AzureContentSafetyProvider {
     }
 }
 
-fn convert_groundedness_response_to_openai(groundedness_response: &AzureGroundednessResponse) -> ModerationResult {
-    use crate::moderation::{HallucinationDetails, HallucinationSegment, CategoryAppliedInputTypes};
+fn convert_groundedness_response_to_openai(
+    groundedness_response: &AzureGroundednessResponse,
+) -> ModerationResult {
+    use crate::moderation::{
+        CategoryAppliedInputTypes, HallucinationDetails, HallucinationSegment,
+    };
 
     // For groundedness detection, we use the ungrounded flag to indicate hallucinated content
     let flagged = groundedness_response.ungrounded_detected;
@@ -1208,14 +1256,17 @@ fn convert_groundedness_response_to_openai(groundedness_response: &AzureGrounded
     }
 }
 
-fn convert_prompt_shield_response_to_openai(prompt_shield_response: &AzurePromptShieldResponse) -> ModerationResult {
+fn convert_prompt_shield_response_to_openai(
+    prompt_shield_response: &AzurePromptShieldResponse,
+) -> ModerationResult {
     use crate::moderation::CategoryAppliedInputTypes;
 
     // Check if prompt attack is detected
     let prompt_attack = prompt_shield_response.user_prompt_analysis.attack_detected;
 
     // Check if any document attack is detected
-    let document_attack = prompt_shield_response.documents_analysis
+    let document_attack = prompt_shield_response
+        .documents_analysis
         .iter()
         .any(|doc| doc.attack_detected);
 
@@ -1239,7 +1290,7 @@ fn convert_prompt_shield_response_to_openai(prompt_shield_response: &AzurePrompt
     ModerationResult {
         flagged,
         categories: ModerationCategories {
-            malicious: flagged,  // Prompt injection attacks are flagged as malicious
+            malicious: flagged, // Prompt injection attacks are flagged as malicious
             ..Default::default()
         },
         category_scores: ModerationCategoryScores::default(), // No scores for prompt shield
@@ -1249,11 +1300,15 @@ fn convert_prompt_shield_response_to_openai(prompt_shield_response: &AzurePrompt
     }
 }
 
-fn convert_protected_material_response_to_openai(protected_material_response: &AzureProtectedMaterialResponse) -> ModerationResult {
+fn convert_protected_material_response_to_openai(
+    protected_material_response: &AzureProtectedMaterialResponse,
+) -> ModerationResult {
     use crate::moderation::CategoryAppliedInputTypes;
 
     // For protected material, we map detected to the ip_violation category
-    let flagged = protected_material_response.protected_material_analysis.detected;
+    let flagged = protected_material_response
+        .protected_material_analysis
+        .detected;
 
     // Build category_applied_input_types - always return it with all fields
     let mut category_applied_input_types = CategoryAppliedInputTypes::default();
@@ -1264,7 +1319,7 @@ fn convert_protected_material_response_to_openai(protected_material_response: &A
     ModerationResult {
         flagged,
         categories: ModerationCategories {
-            ip_violation: flagged,  // Protected/copyrighted material is flagged as ip_violation
+            ip_violation: flagged, // Protected/copyrighted material is flagged as ip_violation
             ..Default::default()
         },
         category_scores: ModerationCategoryScores::default(), // No scores for protected material
@@ -1274,11 +1329,15 @@ fn convert_protected_material_response_to_openai(protected_material_response: &A
     }
 }
 
-fn convert_protected_material_code_response_to_openai(protected_material_code_response: &AzureProtectedMaterialCodeResponse) -> ModerationResult {
-    use crate::moderation::{IPViolationDetails, Citation, CategoryAppliedInputTypes};
+fn convert_protected_material_code_response_to_openai(
+    protected_material_code_response: &AzureProtectedMaterialCodeResponse,
+) -> ModerationResult {
+    use crate::moderation::{CategoryAppliedInputTypes, Citation, IPViolationDetails};
 
     // For protected material code, we map detected to the ip_violation category
-    let flagged = protected_material_code_response.protected_material_analysis.detected;
+    let flagged = protected_material_code_response
+        .protected_material_analysis
+        .detected;
 
     // Build category_applied_input_types - always return it with all fields
     let mut category_applied_input_types = CategoryAppliedInputTypes::default();
@@ -1287,8 +1346,15 @@ fn convert_protected_material_code_response_to_openai(protected_material_code_re
     }
 
     // Convert Azure code citations to our Citation format
-    let ip_violation_details = if flagged && !protected_material_code_response.protected_material_analysis.code_citations.is_empty() {
-        let citations = protected_material_code_response.protected_material_analysis.code_citations
+    let ip_violation_details = if flagged
+        && !protected_material_code_response
+            .protected_material_analysis
+            .code_citations
+            .is_empty()
+    {
+        let citations = protected_material_code_response
+            .protected_material_analysis
+            .code_citations
             .iter()
             .map(|azure_citation| Citation {
                 license: azure_citation.license.clone(),
@@ -1304,7 +1370,7 @@ fn convert_protected_material_code_response_to_openai(protected_material_code_re
     ModerationResult {
         flagged,
         categories: ModerationCategories {
-            ip_violation: flagged,  // Protected/copyrighted code is flagged as ip_violation
+            ip_violation: flagged, // Protected/copyrighted code is flagged as ip_violation
             ..Default::default()
         },
         category_scores: ModerationCategoryScores::default(), // No scores for protected material
@@ -1314,7 +1380,10 @@ fn convert_protected_material_code_response_to_openai(protected_material_code_re
     }
 }
 
-fn convert_azure_response_to_openai(azure_response: &AzureModerationResponse, is_eight_levels: bool) -> ModerationResult {
+fn convert_azure_response_to_openai(
+    azure_response: &AzureModerationResponse,
+    is_eight_levels: bool,
+) -> ModerationResult {
     use crate::moderation::CategoryAppliedInputTypes;
 
     let mut categories = ModerationCategories::default();
@@ -1403,10 +1472,7 @@ fn handle_azure_content_safety_error(
     }
 
     let error_details = if let Ok(azure_error) = serde_json::from_str::<AzureError>(response_text) {
-        format!(
-            "{}: {}",
-            azure_error.error.code, azure_error.error.message
-        )
+        format!("{}: {}", azure_error.error.code, azure_error.error.message)
     } else {
         response_text.to_string()
     };
@@ -1425,11 +1491,26 @@ mod tests {
 
     #[test]
     fn test_probe_type_from_probe_id() {
-        assert_eq!(ProbeType::from_probe_id("moderation"), Some(ProbeType::Moderation));
-        assert_eq!(ProbeType::from_probe_id("prompt-shields"), Some(ProbeType::PromptShields));
-        assert_eq!(ProbeType::from_probe_id("groundedness-detection-preview"), Some(ProbeType::GroundednessDetection));
-        assert_eq!(ProbeType::from_probe_id("protected-material-detection-text"), Some(ProbeType::ProtectedMaterialText));
-        assert_eq!(ProbeType::from_probe_id("protected-material-detection-code"), Some(ProbeType::ProtectedMaterialCode));
+        assert_eq!(
+            ProbeType::from_probe_id("moderation"),
+            Some(ProbeType::Moderation)
+        );
+        assert_eq!(
+            ProbeType::from_probe_id("prompt-shields"),
+            Some(ProbeType::PromptShields)
+        );
+        assert_eq!(
+            ProbeType::from_probe_id("groundedness-detection-preview"),
+            Some(ProbeType::GroundednessDetection)
+        );
+        assert_eq!(
+            ProbeType::from_probe_id("protected-material-detection-text"),
+            Some(ProbeType::ProtectedMaterialText)
+        );
+        assert_eq!(
+            ProbeType::from_probe_id("protected-material-detection-code"),
+            Some(ProbeType::ProtectedMaterialCode)
+        );
         assert_eq!(ProbeType::from_probe_id("unknown-probe"), None);
     }
 
@@ -1573,13 +1654,15 @@ mod tests {
             "https://my-content-safety.cognitiveservices.azure.com/contentsafety/text:shieldPrompt?api-version=2024-09-01"
         );
 
-        let protected_material_url = get_azure_content_safety_protected_material_url(&endpoint).unwrap();
+        let protected_material_url =
+            get_azure_content_safety_protected_material_url(&endpoint).unwrap();
         assert_eq!(
             protected_material_url.as_str(),
             "https://my-content-safety.cognitiveservices.azure.com/contentsafety/text:detectProtectedMaterial?api-version=2024-09-01"
         );
 
-        let protected_material_code_url = get_azure_content_safety_protected_material_code_url(&endpoint).unwrap();
+        let protected_material_code_url =
+            get_azure_content_safety_protected_material_code_url(&endpoint).unwrap();
         assert_eq!(
             protected_material_code_url.as_str(),
             "https://my-content-safety.cognitiveservices.azure.com/contentsafety/text:detectProtectedMaterialForCode?api-version=2024-09-15-preview"
@@ -1588,8 +1671,8 @@ mod tests {
 
     #[test]
     fn test_provider_params_extraction() {
-        use serde_json::json;
         use crate::moderation::ModerationInput;
+        use serde_json::json;
 
         // Test with all parameters in camelCase (Azure style)
         let provider_params = json!({
@@ -1664,12 +1747,17 @@ mod tests {
                 attack_detected: false,
             },
             documents_analysis: vec![
-                DocumentAnalysis { attack_detected: true },
-                DocumentAnalysis { attack_detected: false },
+                DocumentAnalysis {
+                    attack_detected: true,
+                },
+                DocumentAnalysis {
+                    attack_detected: false,
+                },
             ],
         };
 
-        let result_doc = convert_prompt_shield_response_to_openai(&prompt_shield_response_doc_attack);
+        let result_doc =
+            convert_prompt_shield_response_to_openai(&prompt_shield_response_doc_attack);
         assert!(result_doc.flagged);
         assert!(result_doc.categories.malicious);
         assert!(result_doc.category_applied_input_types.is_some());
@@ -1682,8 +1770,12 @@ mod tests {
                 attack_detected: true,
             },
             documents_analysis: vec![
-                DocumentAnalysis { attack_detected: false },
-                DocumentAnalysis { attack_detected: true },
+                DocumentAnalysis {
+                    attack_detected: false,
+                },
+                DocumentAnalysis {
+                    attack_detected: true,
+                },
             ],
         };
 
@@ -1700,8 +1792,12 @@ mod tests {
                 attack_detected: false,
             },
             documents_analysis: vec![
-                DocumentAnalysis { attack_detected: false },
-                DocumentAnalysis { attack_detected: false },
+                DocumentAnalysis {
+                    attack_detected: false,
+                },
+                DocumentAnalysis {
+                    attack_detected: false,
+                },
             ],
         };
 
@@ -1718,8 +1814,8 @@ mod tests {
 
     #[test]
     fn test_enabled_features_extraction() {
-        use serde_json::json;
         use crate::moderation::ModerationInput;
+        use serde_json::json;
 
         // Test with enabled_features parameter
         let provider_params = json!({
@@ -1781,14 +1877,20 @@ mod tests {
         let groundedness_response = AzureGroundednessResponse {
             ungrounded_detected: true,
             ungrounded_percentage: 25.5,
-            ungrounded_details: vec![
-                UngroundedDetail {
-                    text: "This is ungrounded".to_string(),
-                    offset: UngroundedOffset { utf8: 0, utf16: 0, code_point: 0 },
-                    length: UngroundedLength { utf8: 18, utf16: 18, code_point: 18 },
-                    correction_text: None,
-                }
-            ],
+            ungrounded_details: vec![UngroundedDetail {
+                text: "This is ungrounded".to_string(),
+                offset: UngroundedOffset {
+                    utf8: 0,
+                    utf16: 0,
+                    code_point: 0,
+                },
+                length: UngroundedLength {
+                    utf8: 18,
+                    utf16: 18,
+                    code_point: 18,
+                },
+                correction_text: None,
+            }],
             groundedness_reasoning: Some("The text contains unsupported claims".to_string()),
         };
 
@@ -1819,28 +1921,38 @@ mod tests {
         let groundedness_response_with_correction = AzureGroundednessResponse {
             ungrounded_detected: true,
             ungrounded_percentage: 15.0,
-            ungrounded_details: vec![
-                UngroundedDetail {
-                    text: "The sky is green".to_string(),
-                    offset: UngroundedOffset { utf8: 0, utf16: 0, code_point: 0 },
-                    length: UngroundedLength { utf8: 16, utf16: 16, code_point: 16 },
-                    correction_text: Some("The sky is blue".to_string()),
-                }
-            ],
+            ungrounded_details: vec![UngroundedDetail {
+                text: "The sky is green".to_string(),
+                offset: UngroundedOffset {
+                    utf8: 0,
+                    utf16: 0,
+                    code_point: 0,
+                },
+                length: UngroundedLength {
+                    utf8: 16,
+                    utf16: 16,
+                    code_point: 16,
+                },
+                correction_text: Some("The sky is blue".to_string()),
+            }],
             groundedness_reasoning: Some("Corrected factual error about sky color".to_string()),
         };
 
-        let result_with_correction = convert_groundedness_response_to_openai(&groundedness_response_with_correction);
+        let result_with_correction =
+            convert_groundedness_response_to_openai(&groundedness_response_with_correction);
         assert!(result_with_correction.flagged);
         assert!(result_with_correction.hallucination_details.is_some());
         let details_correction = result_with_correction.hallucination_details.unwrap();
-        assert_eq!(details_correction.ungrounded_segments[0].correction, Some("The sky is blue".to_string()));
+        assert_eq!(
+            details_correction.ungrounded_segments[0].correction,
+            Some("The sky is blue".to_string())
+        );
     }
 
     #[test]
     fn test_groundedness_params_extraction() {
-        use serde_json::json;
         use crate::moderation::ModerationInput;
+        use serde_json::json;
 
         // Test with all groundedness parameters
         let provider_params = json!({
@@ -1890,7 +2002,10 @@ mod tests {
             domain: DomainType::Medical,
             task: TaskType::QnA,
             text: "Sample medical text".to_string(),
-            grounding_sources: vec!["Medical Source 1".to_string(), "Medical Source 2".to_string()],
+            grounding_sources: vec![
+                "Medical Source 1".to_string(),
+                "Medical Source 2".to_string(),
+            ],
             qna: Some(QnAInfo {
                 query: "What are the side effects?".to_string(),
             }),
@@ -1928,23 +2043,30 @@ mod tests {
 
     #[test]
     fn test_task_type_serialization() {
-        assert_eq!(serde_json::to_string(&TaskType::Summarization).unwrap(), "\"SUMMARIZATION\"");
+        assert_eq!(
+            serde_json::to_string(&TaskType::Summarization).unwrap(),
+            "\"SUMMARIZATION\""
+        );
         assert_eq!(serde_json::to_string(&TaskType::QnA).unwrap(), "\"QNA\"");
     }
 
     #[test]
     fn test_domain_type_serialization() {
-        assert_eq!(serde_json::to_string(&DomainType::Medical).unwrap(), "\"MEDICAL\"");
-        assert_eq!(serde_json::to_string(&DomainType::Generic).unwrap(), "\"GENERIC\"");
+        assert_eq!(
+            serde_json::to_string(&DomainType::Medical).unwrap(),
+            "\"MEDICAL\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DomainType::Generic).unwrap(),
+            "\"GENERIC\""
+        );
     }
 
     #[test]
     fn test_convert_protected_material_response_to_openai() {
         // Test when protected material is detected
         let protected_response = AzureProtectedMaterialResponse {
-            protected_material_analysis: ProtectedMaterialAnalysis {
-                detected: true,
-            },
+            protected_material_analysis: ProtectedMaterialAnalysis { detected: true },
         };
 
         let result = convert_protected_material_response_to_openai(&protected_response);
@@ -1960,9 +2082,7 @@ mod tests {
 
         // Test when no protected material is detected
         let safe_response = AzureProtectedMaterialResponse {
-            protected_material_analysis: ProtectedMaterialAnalysis {
-                detected: false,
-            },
+            protected_material_analysis: ProtectedMaterialAnalysis { detected: false },
         };
 
         let result_safe = convert_protected_material_response_to_openai(&safe_response);
@@ -1972,8 +2092,8 @@ mod tests {
 
     #[test]
     fn test_protected_material_params_extraction() {
-        use serde_json::json;
         use crate::moderation::ModerationInput;
+        use serde_json::json;
 
         // Test with protected_material feature enabled
         let provider_params = json!({
@@ -1982,7 +2102,9 @@ mod tests {
         });
 
         let request = ModerationRequest {
-            input: ModerationInput::Single("test text with potential copyrighted content".to_string()),
+            input: ModerationInput::Single(
+                "test text with potential copyrighted content".to_string(),
+            ),
             model: None,
             provider_params: Some(provider_params),
         };
@@ -2021,9 +2143,7 @@ mod tests {
                     },
                     CodeCitation {
                         license: "Apache-2.0".to_string(),
-                        source_urls: vec![
-                            "https://github.com/example/repo3".to_string(),
-                        ],
+                        source_urls: vec!["https://github.com/example/repo3".to_string()],
                     },
                 ],
             },
@@ -2046,7 +2166,10 @@ mod tests {
         assert_eq!(ip_details.citations.len(), 2);
         assert_eq!(ip_details.citations[0].license, "MIT");
         assert_eq!(ip_details.citations[0].source_urls.len(), 2);
-        assert_eq!(ip_details.citations[0].source_urls[0], "https://github.com/example/repo1");
+        assert_eq!(
+            ip_details.citations[0].source_urls[0],
+            "https://github.com/example/repo1"
+        );
         assert_eq!(ip_details.citations[1].license, "Apache-2.0");
         assert_eq!(ip_details.citations[1].source_urls.len(), 1);
 
@@ -2066,8 +2189,8 @@ mod tests {
 
     #[test]
     fn test_protected_material_code_params_extraction() {
-        use serde_json::json;
         use crate::moderation::ModerationInput;
+        use serde_json::json;
 
         // Test with protected_material_code feature enabled
         let provider_params = json!({

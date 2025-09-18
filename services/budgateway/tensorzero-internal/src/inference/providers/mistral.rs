@@ -1163,11 +1163,11 @@ impl ModerationProvider for MistralProvider {
                         sexual_minors: result.categories.sexual, // Mistral doesn't distinguish minors
                         violence: result.categories.violence_and_threats,
                         violence_graphic: result.categories.violence_and_threats,
-                        profanity: false,    // Mistral doesn't have this category
-                        insult: false,       // Mistral doesn't have this category
-                        toxicity: false,     // Mistral doesn't have this category
-                        malicious: false,    // Mistral doesn't have this category
-                        ip_violation: false, // Mistral doesn't have this category
+                        profanity: false,     // Mistral doesn't have this category
+                        insult: false,        // Mistral doesn't have this category
+                        toxicity: false,      // Mistral doesn't have this category
+                        malicious: false,     // Mistral doesn't have this category
+                        ip_violation: false,  // Mistral doesn't have this category
                         hallucination: false, // Mistral doesn't have this category
                     };
 

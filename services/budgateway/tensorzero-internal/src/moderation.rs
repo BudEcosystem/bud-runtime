@@ -217,22 +217,22 @@ pub struct ModerationCategoryScores {
 impl ModerationCategoryScores {
     /// Check if any scores are non-zero (indicating this contains actual scoring data)
     pub fn has_non_zero_scores(&self) -> bool {
-        self.hate > 0.0 ||
-        self.hate_threatening > 0.0 ||
-        self.harassment > 0.0 ||
-        self.harassment_threatening > 0.0 ||
-        self.illicit > 0.0 ||
-        self.illicit_violent > 0.0 ||
-        self.self_harm > 0.0 ||
-        self.self_harm_intent > 0.0 ||
-        self.self_harm_instructions > 0.0 ||
-        self.sexual > 0.0 ||
-        self.sexual_minors > 0.0 ||
-        self.violence > 0.0 ||
-        self.violence_graphic > 0.0 ||
-        self.profanity > 0.0 ||
-        self.insult > 0.0 ||
-        self.toxicity > 0.0
+        self.hate > 0.0
+            || self.hate_threatening > 0.0
+            || self.harassment > 0.0
+            || self.harassment_threatening > 0.0
+            || self.illicit > 0.0
+            || self.illicit_violent > 0.0
+            || self.self_harm > 0.0
+            || self.self_harm_intent > 0.0
+            || self.self_harm_instructions > 0.0
+            || self.sexual > 0.0
+            || self.sexual_minors > 0.0
+            || self.violence > 0.0
+            || self.violence_graphic > 0.0
+            || self.profanity > 0.0
+            || self.insult > 0.0
+            || self.toxicity > 0.0
     }
 }
 

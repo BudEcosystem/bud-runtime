@@ -148,7 +148,11 @@ impl AppStateData {
     }
 
     /// Update guardrail configuration
-    pub async fn update_guardrail(&self, guardrail_id: &str, config: Arc<crate::guardrail_table::GuardrailConfig>) {
+    pub async fn update_guardrail(
+        &self,
+        guardrail_id: &str,
+        config: Arc<crate::guardrail_table::GuardrailConfig>,
+    ) {
         let mut guardrails = self.guardrails.write().await;
         guardrails.insert(Arc::from(guardrail_id), config);
     }

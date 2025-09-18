@@ -1695,8 +1695,7 @@ pub async fn write_blocked_inference(
     gateway_request: Option<String>,
 ) {
     use crate::inference::types::{
-        ChatInferenceResult, ContentBlockOutput,
-        Latency, Text, current_timestamp, RequestMessage,
+        current_timestamp, ChatInferenceResult, ContentBlockOutput, Latency, RequestMessage, Text,
     };
     // Create blocked content
     let blocked_content = vec![ContentBlockChatOutput::Text(Text {
@@ -1720,11 +1719,18 @@ pub async fn write_blocked_inference(
         output: vec![ContentBlockOutput::Text(Text {
             text: "Request blocked by content policy".to_string(),
         })],
-        system: resolved_input.system.clone().and_then(|v| v.as_str().map(|s| s.to_string())),
-        input_messages: resolved_input.messages.iter().map(|msg| RequestMessage {
-            role: msg.role.clone(),
-            content: vec![], // Empty content for blocked messages
-        }).collect(),
+        system: resolved_input
+            .system
+            .clone()
+            .and_then(|v| v.as_str().map(|s| s.to_string())),
+        input_messages: resolved_input
+            .messages
+            .iter()
+            .map(|msg| RequestMessage {
+                role: msg.role.clone(),
+                content: vec![], // Empty content for blocked messages
+            })
+            .collect(),
         // Since we never made it to the provider, we don't have a raw request/response
         // Use empty objects to indicate no provider interaction occurred
         raw_request: "{}".to_string(),
@@ -1742,10 +1748,12 @@ pub async fn write_blocked_inference(
         guardrail_scan_summary: if !guardrail_records.is_empty() {
             let context = crate::guardrail::GuardrailExecutionContext {
                 scan_records: guardrail_records.clone(),
-                input_scan_time_ms: guardrail_records.iter()
+                input_scan_time_ms: guardrail_records
+                    .iter()
                     .filter(|r| r.guard_type == 1) // Input guard type
                     .filter_map(|r| r.scan_latency_ms)
-                    .sum::<u32>().into(),
+                    .sum::<u32>()
+                    .into(),
                 output_scan_time_ms: None,
                 response_terminated: true,
             };

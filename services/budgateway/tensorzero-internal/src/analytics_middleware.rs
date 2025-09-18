@@ -169,7 +169,6 @@ pub async fn analytics_middleware(
 
 /// Extract client IP from headers only (when ConnectInfo is not available)
 fn get_client_ip_fallback(headers: &HeaderMap) -> String {
-
     // Check X-Forwarded-For first
     if let Some(forwarded_for) = headers.get("x-forwarded-for") {
         if let Ok(forwarded_str) = forwarded_for.to_str() {

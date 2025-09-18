@@ -1251,6 +1251,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                guardrail_profile: None,
             },
         )]))
         .expect("Failed to create model table");
@@ -1354,6 +1355,7 @@ mod tests {
                     retry_config: None,
                     rate_limits: None,
                     pricing: None,
+                    guardrail_profile: None,
                 },
             );
             ModelTable::try_from(map).expect("Failed to create model table")
@@ -1423,6 +1425,7 @@ mod tests {
                     retry_config: None,
                     rate_limits: None,
                     pricing: None,
+                    guardrail_profile: None,
                 },
             );
             ModelTable::try_from(map).expect("Failed to create model table")
@@ -1509,6 +1512,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                guardrail_profile: None,
             },
         );
         let big_models = ModelTable::try_from(big_models).expect("Failed to create model table");

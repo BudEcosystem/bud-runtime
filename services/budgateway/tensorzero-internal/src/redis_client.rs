@@ -216,7 +216,10 @@ impl RedisClient {
                     data.take()
                 } else {
                     return Err(Error::new(ErrorDetails::Config {
-                        message: format!("Expected guardrail data for '{}' in redis JSON", guardrail_id),
+                        message: format!(
+                            "Expected guardrail data for '{}' in redis JSON",
+                            guardrail_id
+                        ),
                     }));
                 }
             }
@@ -242,10 +245,13 @@ impl RedisClient {
         }
 
         // Parse the guardrail configuration
-        let uninitialized_config: UninitializedGuardrailConfig = serde_json::from_value(guardrail_data)
-            .map_err(|e| {
+        let uninitialized_config: UninitializedGuardrailConfig =
+            serde_json::from_value(guardrail_data).map_err(|e| {
                 Error::new(ErrorDetails::Config {
-                    message: format!("Failed to parse guardrail '{}' from redis: {e}", guardrail_id),
+                    message: format!(
+                        "Failed to parse guardrail '{}' from redis: {e}",
+                        guardrail_id
+                    ),
                 })
             })?;
 
@@ -345,7 +351,9 @@ impl RedisClient {
 
                 match Self::parse_guardrail(&value, guardrail_id, app_state).await {
                     Ok(config) => {
-                        app_state.update_guardrail(guardrail_id, Arc::new(config)).await;
+                        app_state
+                            .update_guardrail(guardrail_id, Arc::new(config))
+                            .await;
                         tracing::debug!("Updated guardrail config: {guardrail_id}");
                     }
                     Err(e) => {
@@ -551,7 +559,9 @@ impl RedisClient {
                     let guardrail_id = key.strip_prefix(GUARDRAIL_KEY_PREFIX).unwrap_or(&key);
                     match Self::parse_guardrail(&json, guardrail_id, &self.app_state).await {
                         Ok(config) => {
-                            self.app_state.update_guardrail(guardrail_id, Arc::new(config)).await;
+                            self.app_state
+                                .update_guardrail(guardrail_id, Arc::new(config))
+                                .await;
                         }
                         Err(e) => tracing::error!(
                             "Failed to parse initial guardrail from redis (key: {key}): {e}"
@@ -904,7 +914,8 @@ mod tests {
         let guardrail_id = "3ef707ff-ca1d-413a-8807-e5c8bb819c43";
 
         // JSON with guardrail data wrapped in {profile_id: data} format
-        let json = format!(r#"{{
+        let json = format!(
+            r#"{{
             "{}": {{
                 "name": "oai_omni_moderation_guardrail",
                 "providers": {{
@@ -918,11 +929,16 @@ mod tests {
                 "guard_types": ["input"],
                 "api_key": "sk-test-guardrail-key-12345"
             }}
-        }}"#, guardrail_id, guardrail_id);
+        }}"#,
+            guardrail_id, guardrail_id
+        );
 
         // Parse guardrail
         let result = RedisClient::parse_guardrail(&json, guardrail_id, &app_state).await;
-        assert!(result.is_ok(), "Failed to parse guardrail with wrapper format");
+        assert!(
+            result.is_ok(),
+            "Failed to parse guardrail with wrapper format"
+        );
 
         // Verify API key was stored
         let store = app_state.model_credential_store.read().unwrap();
@@ -955,7 +971,10 @@ mod tests {
 
         // Parse guardrail
         let result = RedisClient::parse_guardrail(json, guardrail_id, &app_state).await;
-        assert!(result.is_ok(), "Failed to parse guardrail with direct format");
+        assert!(
+            result.is_ok(),
+            "Failed to parse guardrail with direct format"
+        );
 
         // Verify API key was stored
         let store = app_state.model_credential_store.read().unwrap();
