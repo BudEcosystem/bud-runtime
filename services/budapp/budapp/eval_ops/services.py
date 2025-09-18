@@ -386,11 +386,7 @@ class ExperimentService:
                 evaluation="TruthfulQA",
                 dataset="dataset_name",
                 deployment_name="deployment_name",
-                judge=JudgeInfo(
-                    mode="llm_as_judge",
-                    model_name="Judge model name 1",
-                    score_pct=75,
-                ),
+                judge=None,
                 traits=["trait_name_1", "trait_name_2"],
                 last_run_at=datetime.fromisoformat("2024-01-13T00:00:00Z"),
                 run_id=latest_run_id,
