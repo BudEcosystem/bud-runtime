@@ -214,7 +214,6 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       if (params?.search) {
         queryParams.search = params.search;
       }
-
       const response = await AppRequest.Get("/guardrails/probes", {
         params: queryParams,
       });
@@ -402,7 +401,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
 
     try {
       const response = await AppRequest.Get(
-        `/guardrails/deployment-workflow/${id}`,
+        `/workflows/${id}`,
       );
 
       if (response.data) {

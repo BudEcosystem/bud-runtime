@@ -97,7 +97,6 @@ export default function BudSentinelProbes() {
         // Update workflow with selected probe
         await updateWorkflow({
           step_number: 2,
-          workflow_total_steps: 5, // Not counting the first step
           probe_selections: [
             {
               id: selectedProbe,

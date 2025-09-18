@@ -176,7 +176,7 @@ export default function PIIDetectionConfig() {
       onNext={handleNext}
       backText="Back"
       nextText="Next"
-      disableNext={selectedRules.length === 0}
+      disableNext={selectedRules.length === 0 || workflowLoading}
     >
       <BudWraperBox>
         <BudDrawerLayout>

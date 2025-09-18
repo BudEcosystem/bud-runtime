@@ -39,7 +39,6 @@ export default function DeploymentTypes() {
       // Update workflow with deployment type
       await updateWorkflow({
         step_number: 3, // Deployment type selection is step 3
-        workflow_total_steps: 5, // Not counting the first step
         deployment_type: deploymentTypeMapping[selectedType],
         trigger_workflow: false,
       });
