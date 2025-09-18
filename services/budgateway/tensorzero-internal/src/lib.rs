@@ -21,6 +21,8 @@ pub mod file_storage; // file storage for OpenAI batch API
 pub mod function; // types and methods for working with TensorZero functions
 pub mod gateway_util; // utilities for gateway
 pub mod geoip; // GeoIP lookup service
+pub mod guardrail; // guardrail execution logic
+pub mod guardrail_table; // guardrail configurations for advanced moderation
 pub mod images; // image generation, editing, and variations
 pub mod inference; // model inference
 pub mod jsonl_processor; // JSONL processing for OpenAI batch API

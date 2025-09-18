@@ -17,6 +17,7 @@ use crate::model::{ModelTable, UninitializedModelConfig};
 const MODEL_TABLE_KEY_PREFIX: &str = "model_table:";
 const API_KEY_KEY_PREFIX: &str = "api_key:";
 const PUBLISHED_MODEL_INFO_KEY: &str = "published_model_info";
+const GUARDRAIL_KEY_PREFIX: &str = "guardrail_table:";
 
 pub struct RedisClient {
     pub(crate) client: redis::Client,
@@ -142,7 +143,9 @@ impl RedisClient {
         })
     }
 
-    async fn parse_api_keys(json: &str) -> Result<(APIConfig, Option<crate::auth::AuthMetadata>), Error> {
+    async fn parse_api_keys(
+        json: &str,
+    ) -> Result<(APIConfig, Option<crate::auth::AuthMetadata>), Error> {
         // Parse as generic JSON first to extract metadata
         let json_value: serde_json::Value = serde_json::from_str(json).map_err(|e| {
             Error::new(ErrorDetails::Config {
@@ -176,6 +179,95 @@ impl RedisClient {
                 message: format!("Failed to parse published model info from redis: {e}"),
             })
         })
+    }
+
+    async fn parse_guardrail(
+        json: &str,
+        guardrail_id: &str,
+        app_state: &AppStateData,
+    ) -> Result<crate::guardrail_table::GuardrailConfig, Error> {
+        use crate::guardrail_table::UninitializedGuardrailConfig;
+
+        // First parse as generic JSON to extract API keys
+        let mut json_value: serde_json::Value = serde_json::from_str(json).map_err(|e| {
+            Error::new(ErrorDetails::Config {
+                message: format!("Failed to parse guardrail JSON from redis: {e}"),
+            })
+        })?;
+
+        let mut api_key_to_store = None;
+
+        // Load RSA private key if decryption is enabled
+        let private_key = if is_decryption_enabled() {
+            load_private_key()?
+        } else {
+            None
+        };
+
+        // The guardrail data is stored as {profile_id: data}, so we need to extract the data
+        let mut guardrail_data = if let serde_json::Value::Object(ref mut wrapper) = json_value {
+            // Get the guardrail data from the wrapper object
+            if let Some(data) = wrapper.remove(guardrail_id) {
+                data
+            } else {
+                // If the guardrail_id key doesn't exist, try to use the first (and should be only) entry
+                if wrapper.len() == 1 {
+                    let (_, data) = wrapper.iter_mut().next().unwrap();
+                    data.take()
+                } else {
+                    return Err(Error::new(ErrorDetails::Config {
+                        message: format!(
+                            "Expected guardrail data for '{}' in redis JSON",
+                            guardrail_id
+                        ),
+                    }));
+                }
+            }
+        } else {
+            json_value
+        };
+
+        // Extract api_key if present
+        if let serde_json::Value::Object(ref mut obj) = guardrail_data {
+            if let Some(serde_json::Value::String(key_string)) = obj.remove("api_key") {
+                let decrypted_key = if let Some(ref pk) = private_key {
+                    // Decrypt the key using RSA
+                    decrypt_api_key(pk, &key_string)?
+                } else {
+                    // No decryption configured, use the key as-is
+                    SecretString::from(key_string)
+                };
+
+                let credential_key = format!("store_{guardrail_id}");
+                api_key_to_store = Some((credential_key, decrypted_key));
+            }
+        }
+
+        // Parse the guardrail configuration
+        let uninitialized_config: UninitializedGuardrailConfig =
+            serde_json::from_value(guardrail_data).map_err(|e| {
+                Error::new(ErrorDetails::Config {
+                    message: format!(
+                        "Failed to parse guardrail '{}' from redis: {e}",
+                        guardrail_id
+                    ),
+                })
+            })?;
+
+        // Store API key in the credential store if present
+        if let Some((key, secret)) = api_key_to_store {
+            if let Ok(mut credential_store) = app_state.model_credential_store.write() {
+                credential_store.insert(key, secret);
+            } else {
+                tracing::error!("Failed to acquire credential store write lock (poisoned) when storing guardrail API key");
+                return Err(Error::new(ErrorDetails::InternalError {
+                    message: "Credential store lock is poisoned".to_string(),
+                }));
+            }
+        }
+
+        // Load the configuration
+        uninitialized_config.load(guardrail_id)
     }
 
     async fn handle_set_key_event(
@@ -246,6 +338,28 @@ impl RedisClient {
                     }
                 }
             }
+            k if k.starts_with(GUARDRAIL_KEY_PREFIX) => {
+                let value = conn.get::<_, String>(key).await.map_err(|e| {
+                    Error::new(ErrorDetails::Config {
+                        message: format!("Failed to get value for key {key} from Redis: {e}"),
+                    })
+                })?;
+
+                // Extract the guardrail ID from Redis key format "guardrail_table:id"
+                let guardrail_id = key.strip_prefix(GUARDRAIL_KEY_PREFIX).unwrap_or(key);
+
+                match Self::parse_guardrail(&value, guardrail_id, app_state).await {
+                    Ok(config) => {
+                        app_state
+                            .update_guardrail(guardrail_id, Arc::new(config))
+                            .await;
+                        tracing::debug!("Updated guardrail config: {guardrail_id}");
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to parse guardrail from redis (key: {key}): {e}")
+                    }
+                }
+            }
             k if k.starts_with("usage_limit:") => {
                 // Usage limit keys are handled by other components, ignore silently
             }
@@ -309,6 +423,11 @@ impl RedisClient {
                 auth.clear_published_model_info();
                 tracing::debug!("Cleared published model info");
             }
+            k if k.starts_with(GUARDRAIL_KEY_PREFIX) => {
+                let guardrail_id = key.strip_prefix(GUARDRAIL_KEY_PREFIX).unwrap_or(key);
+                app_state.remove_guardrail(guardrail_id).await;
+                tracing::info!("Deleted guardrail: {guardrail_id}");
+            }
             k if k.starts_with("usage_limit:") => {
                 // Usage limit keys are handled by other components, ignore silently
             }
@@ -324,7 +443,6 @@ impl RedisClient {
     pub async fn get_connection(&self) -> Result<MultiplexedConnection, redis::RedisError> {
         self.client.get_multiplexed_async_connection().await
     }
-
 
     /// Publish rate limit configuration updates for models with rate limits
     async fn publish_rate_limit_updates(models: &ModelTable, app_state: &AppStateData) {
@@ -397,7 +515,8 @@ impl RedisClient {
                     match Self::parse_api_keys(&json).await {
                         Ok((api_config, metadata)) => {
                             // Extract the actual API key from Redis key format "api_key:actual_key"
-                            let actual_api_key = key.strip_prefix(API_KEY_KEY_PREFIX).unwrap_or(&key);
+                            let actual_api_key =
+                                key.strip_prefix(API_KEY_KEY_PREFIX).unwrap_or(&key);
 
                             // Update the API configuration for this key
                             self.auth.update_api_keys(actual_api_key, api_config);
@@ -422,9 +541,32 @@ impl RedisClient {
                     self.auth.update_published_model_info(model_info);
                     tracing::debug!("Loaded initial published model info");
                 }
-                Err(e) => tracing::error!(
-                    "Failed to parse initial published model info from redis: {e}"
-                ),
+                Err(e) => {
+                    tracing::error!("Failed to parse initial published model info from redis: {e}")
+                }
+            }
+        }
+
+        // Fetch all guardrail:* keys
+        if let Ok(guardrail_keys) = self
+            .conn
+            .keys::<_, Vec<String>>(format!("{GUARDRAIL_KEY_PREFIX}*"))
+            .await
+        {
+            for key in guardrail_keys {
+                if let Ok(json) = self.conn.get::<_, String>(&key).await {
+                    let guardrail_id = key.strip_prefix(GUARDRAIL_KEY_PREFIX).unwrap_or(&key);
+                    match Self::parse_guardrail(&json, guardrail_id, &self.app_state).await {
+                        Ok(config) => {
+                            self.app_state
+                                .update_guardrail(guardrail_id, Arc::new(config))
+                                .await;
+                        }
+                        Err(e) => tracing::error!(
+                            "Failed to parse initial guardrail from redis (key: {key}): {e}"
+                        ),
+                    }
+                }
             }
         }
 
@@ -463,7 +605,6 @@ impl RedisClient {
             })?;
 
         // Subscribe to usage limit update channels
-
 
         let app_state = self.app_state.clone();
         let auth = self.auth.clone();
@@ -761,5 +902,46 @@ mod tests {
 
         // Clean up
         std::env::remove_var("TENSORZERO_RSA_PRIVATE_KEY");
+    }
+
+    #[tokio::test]
+    async fn test_parse_guardrail_with_wrapper() {
+        // Create a mock AppStateData
+        let config = Arc::new(Config::default());
+        let app_state = AppStateData::new(config).await.unwrap();
+
+        let guardrail_id = "3ef707ff-ca1d-413a-8807-e5c8bb819c43";
+
+        // JSON with guardrail data wrapped in {profile_id: data} format
+        let json = format!(
+            r#"{{
+            "{}": {{
+                "name": "oai_omni_moderation_guardrail",
+                "providers": {{
+                    "openai": {{
+                        "type": "openai",
+                        "probe_config": {{"omni-moderation-latest": ["harassment", "hate"]}},
+                        "api_key_location": "dynamic::store_{}"
+                    }}
+                }},
+                "severity_threshold": 0.75,
+                "guard_types": ["input"],
+                "api_key": "sk-test-guardrail-key-12345"
+            }}
+        }}"#,
+            guardrail_id, guardrail_id
+        );
+
+        // Parse guardrail
+        let result = RedisClient::parse_guardrail(&json, guardrail_id, &app_state).await;
+        assert!(
+            result.is_ok(),
+            "Failed to parse guardrail with wrapper format"
+        );
+
+        // Verify API key was stored
+        let store = app_state.model_credential_store.read().unwrap();
+        assert!(store.contains_key(&format!("store_{}", guardrail_id)));
+        assert_eq!(store.len(), 1);
     }
 }

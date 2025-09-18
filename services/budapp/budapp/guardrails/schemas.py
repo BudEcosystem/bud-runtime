@@ -43,6 +43,7 @@ class GuardrailFilter(BaseModel):
 
     name: str | None = None
     status: GuardrailStatusEnum | None = None
+    provider_id: UUID4 | None = None
 
 
 # Rule schemas
@@ -391,8 +392,6 @@ class GuardrailDeploymentWorkflowRequest(BaseModel):
 
         if self.endpoint_ids and self.is_standalone:
             raise ValueError("endpoint_ids and is_standalone can't be used together, choose either one.")
-        elif self.is_standalone:
-            raise ValueError("Standalone guardrail deployments are not supported, set is_standalone to false or null.")
 
         return self
 

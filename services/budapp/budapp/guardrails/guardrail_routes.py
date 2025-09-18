@@ -120,6 +120,7 @@ async def list_all_probes(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[GuardrailFilter, Depends()],
+    provider_id: Optional[UUID] = Query(None, description="Filter by provider ID"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=0),
     order_by: Optional[list[str]] = Depends(parse_ordering_fields),
@@ -130,6 +131,10 @@ async def list_all_probes(
 
     # Construct filters
     filters_dict = filters.model_dump(exclude_none=True, exclude_unset=True)
+
+    # Provider ID from query parameter takes precedence over filter
+    if provider_id is not None:
+        filters_dict["provider_id"] = provider_id
 
     try:
         db_probes, count = await GuardrailProbeRuleService(session).get_all_probes(

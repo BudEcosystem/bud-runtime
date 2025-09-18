@@ -822,7 +822,7 @@ impl DistributedRateLimiter {
                     }
                 }
 
-                debug!("Background sync completed");
+                // debug!("Background sync completed");
             }
         });
 
