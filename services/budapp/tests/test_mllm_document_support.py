@@ -118,7 +118,7 @@ async def test_proxy_cache_includes_buddoc_for_document_endpoint():
         assert "buddoc" in model_config["providers"]
         buddoc_config = model_config["providers"]["buddoc"]
         assert buddoc_config["type"] == "buddoc"
-        assert "/v1.0/invoke/buddoc/method" in buddoc_config["api_base"]
+        assert "http://buddoc:9081/v1" in buddoc_config["api_base"]
         # Verify api_key_location is set to forward authorization header
         assert "api_key_location" in buddoc_config
         assert buddoc_config["api_key_location"] == "dynamic::authorization"
