@@ -182,7 +182,7 @@ export function NotificationsWidget({
         ) : (
           notifications?.length > 0 && (
             <div
-              className={`notificationList mt-[1.3rem] max-h-[93%] flex flex-col gap-[.7rem] ${isClosed && notifications?.length > 1 ? "closed" : "showing"} ${notifications?.length == 2 && "twoData"}  px-[1.5rem] transition-all duration-300`}
+              className={`notificationList mt-[1.3rem] max-h-[93%] overflow-auto flex flex-col gap-[.7rem] ${isClosed && notifications?.length > 1 ? "closed" : "showing"} ${notifications?.length == 2 && "twoData"}  px-[1.5rem] transition-all duration-300`}
             >
               {[...notifications]
                 ?.splice(0, isClosed ? 1 : notifications.length)
