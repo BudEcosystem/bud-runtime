@@ -41,7 +41,6 @@ export async function POST(req: Request) {
   // Enhanced logging for debugging IP forwarding
   console.log('========== BUDPLAYGROUND IP FORWARDING DEBUG ==========');
   console.log(`[BUDPLAYGROUND] Incoming request headers:`);
-  console.log(req.headers);
   console.log(`  - X-Forwarded-For: ${xForwardedFor || 'not present'}`);
   console.log(`  - X-Real-IP: ${xRealIp || 'not present'}`);
   console.log(`  - CF-Connecting-IP: ${cfConnectingIp || 'not present'}`);
@@ -50,7 +49,9 @@ export async function POST(req: Request) {
   console.log(`[BUDPLAYGROUND] Will forward to budgateway with:`);
   console.log(`  - X-Forwarded-For: ${clientIp}`);
   console.log(`  - X-Real-IP: ${xRealIp || clientIp}`);
-  console.log('[BUDPLAYGROUND] Note: BudGateway will extract the first public IP from the chain');
+  console.log(`  - X-Original-Client-IP: ${clientIp}`);
+  console.log(`  - X-Playground-Client-IP: ${xForwardedFor || xRealIp || cfConnectingIp || trueClientIp || 'unknown'}`);
+  console.log('[BUDPLAYGROUND] Note: BudGateway will check custom headers first');
   console.log('========================================================');
 
   // Accept either JWT (Bearer token) or API key
@@ -77,7 +78,10 @@ export async function POST(req: Request) {
           // Pass the entire chain for X-Forwarded-For so budgateway can find the public IP
           'X-Forwarded-For': clientIp,
           // For X-Real-IP, prefer the original value if present, otherwise use clientIp
-          'X-Real-IP': xRealIp || clientIp
+          'X-Real-IP': xRealIp || clientIp,
+          // Add custom headers that won't be modified by intermediate proxies
+          'X-Original-Client-IP': clientIp,
+          'X-Playground-Client-IP': xForwardedFor || xRealIp || cfConnectingIp || trueClientIp || 'unknown'
         },
         body: JSON.stringify({
           id,
@@ -107,6 +111,8 @@ export async function POST(req: Request) {
       console.log(`[BUDPLAYGROUND] Headers being sent:`);
       console.log(`  - X-Forwarded-For: ${request.headers['X-Forwarded-For']}`);
       console.log(`  - X-Real-IP: ${request.headers['X-Real-IP']}`);
+      console.log(`  - X-Original-Client-IP: ${request.headers['X-Original-Client-IP']}`);
+      console.log(`  - X-Playground-Client-IP: ${request.headers['X-Playground-Client-IP']}`);
       console.log(`  - project-id: ${request.headers['project-id']}`);
       console.log('==========================================================');
 

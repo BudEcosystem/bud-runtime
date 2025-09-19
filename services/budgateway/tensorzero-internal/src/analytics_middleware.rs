@@ -189,6 +189,83 @@ fn get_client_ip_fallback(headers: &HeaderMap) -> String {
     // Enhanced logging for IP detection debugging
     tracing::info!("========== BUDGATEWAY IP DETECTION DEBUG ==========");
 
+    // First check for custom headers from BudPlayground (these won't be modified by proxies)
+    // Priority 1: X-Playground-Client-IP (contains the original header chain)
+    if let Some(playground_ip) = headers.get("x-playground-client-ip") {
+        if let Ok(ip_str) = playground_ip.to_str() {
+            tracing::info!("[BUDGATEWAY] Found X-Playground-Client-IP header: {}", ip_str);
+            // Split and find first public IP if it's a chain
+            let ips: Vec<&str> = ip_str.split(',').map(|s| s.trim()).collect();
+            for ip in &ips {
+                if let Ok(parsed_ip) = ip.parse::<IpAddr>() {
+                    // Check if it's a public IP
+                    let is_private = match parsed_ip {
+                        IpAddr::V4(ipv4) => {
+                            ipv4.is_private() ||
+                            ipv4.is_loopback() ||
+                            ipv4.is_link_local() ||
+                            ipv4.is_unspecified() ||
+                            ipv4.octets()[0] == 10 ||
+                            (ipv4.octets()[0] == 172 && ipv4.octets()[1] >= 16 && ipv4.octets()[1] <= 31) ||
+                            (ipv4.octets()[0] == 192 && ipv4.octets()[1] == 168)
+                        },
+                        IpAddr::V6(ipv6) => {
+                            ipv6.is_loopback() ||
+                            ipv6.is_unspecified() ||
+                            (ipv6.segments()[0] & 0xfe00) == 0xfc00
+                        }
+                    };
+
+                    if !is_private {
+                        tracing::info!("[BUDGATEWAY] Using public IP from X-Playground-Client-IP: {}", ip);
+                        tracing::info!("====================================================");
+                        return ip.to_string();
+                    } else {
+                        tracing::info!("[BUDGATEWAY] Skipping private IP in X-Playground-Client-IP: {}", ip);
+                    }
+                }
+            }
+        }
+    }
+
+    // Priority 2: X-Original-Client-IP (fallback if X-Playground-Client-IP not available)
+    if let Some(original_client_ip) = headers.get("x-original-client-ip") {
+        if let Ok(ip_str) = original_client_ip.to_str() {
+            tracing::info!("[BUDGATEWAY] Found X-Original-Client-IP header: {}", ip_str);
+            // Split and find first public IP if it's a chain
+            let ips: Vec<&str> = ip_str.split(',').map(|s| s.trim()).collect();
+            for ip in &ips {
+                if let Ok(parsed_ip) = ip.parse::<IpAddr>() {
+                    // Check if it's a public IP
+                    let is_private = match parsed_ip {
+                        IpAddr::V4(ipv4) => {
+                            ipv4.is_private() ||
+                            ipv4.is_loopback() ||
+                            ipv4.is_link_local() ||
+                            ipv4.is_unspecified() ||
+                            ipv4.octets()[0] == 10 ||
+                            (ipv4.octets()[0] == 172 && ipv4.octets()[1] >= 16 && ipv4.octets()[1] <= 31) ||
+                            (ipv4.octets()[0] == 192 && ipv4.octets()[1] == 168)
+                        },
+                        IpAddr::V6(ipv6) => {
+                            ipv6.is_loopback() ||
+                            ipv6.is_unspecified() ||
+                            (ipv6.segments()[0] & 0xfe00) == 0xfc00
+                        }
+                    };
+
+                    if !is_private {
+                        tracing::info!("[BUDGATEWAY] Using public IP from X-Original-Client-IP: {}", ip);
+                        tracing::info!("====================================================");
+                        return ip.to_string();
+                    } else {
+                        tracing::info!("[BUDGATEWAY] Skipping private IP in X-Original-Client-IP: {}", ip);
+                    }
+                }
+            }
+        }
+    }
+
     // Helper function to check if an IP is private/local
     let is_private_ip = |ip_str: &str| -> bool {
         if let Ok(ip) = ip_str.parse::<IpAddr>() {
