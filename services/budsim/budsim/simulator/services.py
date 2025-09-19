@@ -216,11 +216,13 @@ class SimulationService:
             group["min_devices_per_node"] = (
                 min(group["node_distribution"].values()) if group["node_distribution"] else 0
             )
+            # Add total_devices field for proper validation later
+            group["total_devices"] = sum(group["node_distribution"].values()) if group["node_distribution"] else 0
 
             logger.debug(
                 f"Device type {device_type}: {len(group['devices'])} devices across "
                 f"{group['total_nodes_with_device']} nodes, max_per_node={group['max_devices_per_node']}, "
-                f"node_distribution={group['node_distribution']}"
+                f"total_devices={group['total_devices']}, node_distribution={group['node_distribution']}"
             )
 
         return device_groups
@@ -525,11 +527,12 @@ class SimulationService:
                             "node_id": node_id,
                             "node_name": device.get("node_name", node_id),
                             "cluster_id": device_config["cluster_id"],
-                            "available_count": device.get("available_count", 1),
+                            "available_count": device_config.get("total_devices", device.get("available_count", 1)),
                             **{
                                 k.lower(): v
                                 for k, v in device.items()
-                                if k not in ["id", "type", "name", "node_id", "node_name", "cluster_id"]
+                                if k
+                                not in ["id", "type", "name", "node_id", "node_name", "cluster_id", "available_count"]
                             },
                         }
 
@@ -559,6 +562,9 @@ class SimulationService:
                 device_config["device_id"] = device_config.pop("id", str(uuid.uuid4()))
                 device_config["device_type"] = device_config.pop("type")
                 device_config["device_name"] = device_config.pop("name", device_config["device_id"])
+                # Ensure available_count is present for legacy configs
+                if "available_count" not in device_config:
+                    device_config["available_count"] = 1
                 device_config = {k.lower(): v for k, v in device_config.items()}
 
                 return ensure_json_serializable(
