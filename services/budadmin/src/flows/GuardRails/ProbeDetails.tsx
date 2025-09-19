@@ -80,7 +80,7 @@ export default function ProbeDetails({ probeData }: ProbeDetailsProps) {
   const fetchProbeDetails = async (probeId: string) => {
     setLoading(true);
     try {
-      const response = await AppRequest.Get(`/guardrails/probes/${probeId}`, {
+      const response = await AppRequest.Get(`/guardrails/probe/${probeId}`, {
         params: { include_rules: false },
       });
       if (response.data) {

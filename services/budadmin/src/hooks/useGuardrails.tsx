@@ -243,7 +243,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
     set({ probesLoading: true, probesError: null });
 
     try {
-      const response = await AppRequest.Get(`/guardrails/probes/${id}`);
+      const response = await AppRequest.Get(`/guardrails/probe/${id}`);
 
       if (response.data) {
         set({
@@ -455,7 +455,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       }
 
       const response = await AppRequest.Get(
-        `/guardrails/probes/${probeId}/rules`,
+        `/guardrails/probe/${probeId}/rules`,
         {
           params: queryParams,
         },
