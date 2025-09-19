@@ -1287,16 +1287,16 @@ class ClickHouseClient:
             logger.warning(f"Warmup query failed: {e}")
 
     async def _cleanup_cursor_state(self, cursor):
-        """Helper method to clean up any pending cursor state."""
+        """Clean up pending cursor state."""
         try:
             # Try to consume any remaining results
             while True:
                 result = await cursor.fetchmany(1000)
                 if not result:
                     break
-        except Exception:
-            # Ignore errors during cleanup
-            pass
+        except Exception as e:
+            # Ignore errors during cleanu
+            logger.warning(f"Cleanup state failed: {e}")
 
     async def close(self):
         """Close the ClickHouse connection pool."""
@@ -1378,17 +1378,17 @@ class ClickHouseClient:
                 # Try to consume any pending results to clean up cursor state
                 try:
                     await self._cleanup_cursor_state(cursor)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"cleanup state failed: {e}")
                 raise
             finally:
                 # Ensure all remaining results are consumed to avoid "records not fetched" errors
                 try:
                     while await cursor.fetchone():
                         pass  # Consume all remaining records
-                except Exception:
+                except Exception as e:
                     # Ignore errors when consuming remaining results
-                    pass
+                    logger.warning(f"consume remaining failed: {e}")
 
     async def execute_many(self, queries: list[str]) -> list[list[tuple]]:
         """Execute multiple queries concurrently with proper error handling."""
@@ -1408,7 +1408,9 @@ class ClickHouseClient:
 
         async with self._semaphore, self._pool.connection() as conn, conn.cursor() as cursor:
             try:
-                query = f"INSERT INTO {table} ({','.join(columns)}) VALUES" if columns else f"INSERT INTO {table} VALUES"
+                query = (
+                    f"INSERT INTO {table} ({','.join(columns)}) VALUES" if columns else f"INSERT INTO {table} VALUES"
+                )
 
                 # Execute the insert with data
                 await cursor.execute(query, data)
@@ -1416,9 +1418,9 @@ class ClickHouseClient:
                 # Consume any results to ensure cursor is clean
                 try:
                     await cursor.fetchall()
-                except Exception:
+                except Exception as e:
                     # Some insert queries may not return results, ignore errors
-                    pass
+                    logger.warning(f"consume remaining in insert failed: {e}")
             except Exception as e:
                 logger.error(f"Insert data failed: {e}. Table: {table}")
                 raise
