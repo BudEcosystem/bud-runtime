@@ -5,15 +5,19 @@ import React from "react";
 import Tags from "./DrawerTags";
 
 type cardProps = {
-  data?: any,
+  data?: any;
   ClassNames?: string;
   selected?: boolean;
   handleClick?: () => void;
 };
 
-
-export default function QuantizationMethodCard({ data, ClassNames, selected, handleClick }: cardProps) {
-    const [hover, setHover] = React.useState(false);
+export default function QuantizationMethodCard({
+  data,
+  ClassNames,
+  selected,
+  handleClick,
+}: cardProps) {
+  const [hover, setHover] = React.useState(false);
 
   return (
     <div
@@ -41,10 +45,22 @@ export default function QuantizationMethodCard({ data, ClassNames, selected, han
           {data.description}
         </Text_10_400_B3B3B3>
         <div className="flex flex-row flex-wrap gap-[0.375rem] row-gap-[0.375rem]">
-          <Tags name={`Quantisation Hardware: ${data.hardware_support}`} color={'#479D5F'} textClass="text-[.625rem]" />
-            <Tags name={`Quantisation Type: ${data.method_type}`} color={'#D1B854'} textClass="text-[.625rem]" />
-            <Tags name={`Runtime Hardware: ${data.runtime_hardware_support}`} color={'#965CDE'} textClass="text-[.625rem]" />
-          </div>
+          <Tags
+            name={`Quantisation Hardware: ${data.hardware_support}`}
+            color={"#479D5F"}
+            textClass="text-[.625rem]"
+          />
+          <Tags
+            name={`Quantisation Type: ${data.method_type}`}
+            color={"#D1B854"}
+            textClass="text-[.625rem]"
+          />
+          <Tags
+            name={`Runtime Hardware: ${data.runtime_hardware_support}`}
+            color={"#965CDE"}
+            textClass="text-[.625rem]"
+          />
+        </div>
       </div>
     </div>
   );

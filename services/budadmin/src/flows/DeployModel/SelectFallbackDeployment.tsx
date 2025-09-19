@@ -8,7 +8,12 @@ import { useRouter } from "next/router";
 import { IEndPoint, useEndPoints } from "src/hooks/useEndPoint";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import SearchHeaderInput from "../components/SearchHeaderInput";
-import { Text_12_300_EEEEEE, Text_12_400_757575, Text_12_600_EEEEEE, Text_14_400_EEEEEE } from "@/components/ui/text";
+import {
+  Text_12_300_EEEEEE,
+  Text_12_400_757575,
+  Text_12_600_EEEEEE,
+  Text_14_400_EEEEEE,
+} from "@/components/ui/text";
 import { Image } from "antd";
 import Tags from "src/flows/components/DrawerTags";
 import ProjectTags from "src/flows/components/ProjectTags";
@@ -16,13 +21,15 @@ import { endpointStatusMapping } from "@/lib/colorMapping";
 import { IconOnlyRender } from "src/flows/components/BudIconRender";
 import { errorToast } from "@/components/toast";
 
-const capitalize = (str) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
+const capitalize = (str) =>
+  str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
 export default function SelectFallbackDeployment() {
   const router = useRouter();
   const { drawerProps, closeDrawer } = useDrawer();
   const [searchValue, setSearchValue] = useState("");
-  const [selectedDeployment, setSelectedDeployment] = useState<IEndPoint | null>(null);
+  const [selectedDeployment, setSelectedDeployment] =
+    useState<IEndPoint | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { endPoints, getEndPoints, loading } = useEndPoints();
 
@@ -30,9 +37,10 @@ export default function SelectFallbackDeployment() {
   const currentDeploymentId = drawerProps?.currentDeploymentId;
 
   // Extract project ID from router
-  const projectId = router.query.projectId ||
-    (router.asPath.includes('/projects/')
-      ? router.asPath.split('/projects/')[1]?.split('/')[0]
+  const projectId =
+    router.query.projectId ||
+    (router.asPath.includes("/projects/")
+      ? router.asPath.split("/projects/")[1]?.split("/")[0]
       : null);
 
   useEffect(() => {
@@ -46,11 +54,11 @@ export default function SelectFallbackDeployment() {
             page: 1,
             limit: 100,
             name: searchValue,
-            order_by: '-created_at',
+            order_by: "-created_at",
           });
         } catch (error) {
-          console.error('Error loading deployments:', error);
-          const errorMessage = 'Failed to load deployments. Please try again.';
+          console.error("Error loading deployments:", error);
+          const errorMessage = "Failed to load deployments. Please try again.";
           setLoadError(errorMessage);
           errorToast(errorMessage);
         }
@@ -58,24 +66,29 @@ export default function SelectFallbackDeployment() {
     };
 
     // Debounce search
-    const timer = setTimeout(() => {
-      loadDeployments();
-    }, searchValue ? 300 : 0);
+    const timer = setTimeout(
+      () => {
+        loadDeployments();
+      },
+      searchValue ? 300 : 0,
+    );
 
     return () => clearTimeout(timer);
   }, [projectId, searchValue, getEndPoints]);
 
   // Filter out current deployment
-  const availableDeployments = endPoints?.filter(
-    deployment => deployment.id !== currentDeploymentId
-  ) || [];
+  const availableDeployments =
+    endPoints?.filter((deployment) => deployment.id !== currentDeploymentId) ||
+    [];
 
   const handleDeploymentSelect = (deployment: IEndPoint) => {
     // Only allow selection of running deployments
-    if (deployment.status === 'running') {
+    if (deployment.status === "running") {
       setSelectedDeployment(deployment);
-    } else if (deployment.status !== 'running') {
-      errorToast(`Cannot select deployment with status: ${deployment.status}. Only running deployments can be used as fallbacks.`);
+    } else if (deployment.status !== "running") {
+      errorToast(
+        `Cannot select deployment with status: ${deployment.status}. Only running deployments can be used as fallbacks.`,
+      );
     }
   };
 
@@ -118,7 +131,9 @@ export default function SelectFallbackDeployment() {
                 <Text_12_400_757575>
                   Available Deployments&nbsp;
                 </Text_12_400_757575>
-                <Text_12_600_EEEEEE>{availableDeployments.length}</Text_12_600_EEEEEE>
+                <Text_12_600_EEEEEE>
+                  {availableDeployments.length}
+                </Text_12_600_EEEEEE>
               </div>
             </div>
           </DrawerCard>
@@ -128,13 +143,17 @@ export default function SelectFallbackDeployment() {
               <div className="flex justify-center items-center py-8">
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-8 h-8 border-2 border-[#965CDE] border-t-transparent rounded-full animate-spin"></div>
-                  <Text_12_300_EEEEEE>Loading deployments...</Text_12_300_EEEEEE>
+                  <Text_12_300_EEEEEE>
+                    Loading deployments...
+                  </Text_12_300_EEEEEE>
                 </div>
               </div>
             ) : loadError ? (
               <div className="flex justify-center items-center min-h-[4rem] py-8">
                 <div className="text-center">
-                  <Text_12_300_EEEEEE className="text-[#FF6B6B]">{loadError}</Text_12_300_EEEEEE>
+                  <Text_12_300_EEEEEE className="text-[#FF6B6B]">
+                    {loadError}
+                  </Text_12_300_EEEEEE>
                   <button
                     onClick={() => {
                       setLoadError(null);
@@ -144,7 +163,7 @@ export default function SelectFallbackDeployment() {
                           page: 1,
                           limit: 100,
                           name: searchValue,
-                          order_by: '-created_at',
+                          order_by: "-created_at",
                         });
                       }
                     }}
@@ -156,7 +175,9 @@ export default function SelectFallbackDeployment() {
               </div>
             ) : !projectId ? (
               <div className="flex justify-center items-center min-h-[4rem] py-8">
-                <Text_12_300_EEEEEE className="text-[#FF6B6B]">Unable to determine project. Please try again.</Text_12_300_EEEEEE>
+                <Text_12_300_EEEEEE className="text-[#FF6B6B]">
+                  Unable to determine project. Please try again.
+                </Text_12_300_EEEEEE>
               </div>
             ) : availableDeployments.length > 0 ? (
               availableDeployments.map((deployment: IEndPoint) => (
@@ -164,11 +185,11 @@ export default function SelectFallbackDeployment() {
                   key={deployment.id}
                   onClick={() => handleDeploymentSelect(deployment)}
                   className={`py-[.85rem] px-[1.4rem] border-b-[0.5px] border-t-[0.5px] flex-row flex items-start ${
-                    deployment.status !== 'running'
-                      ? 'opacity-50 cursor-not-allowed border-t-[transparent] border-b-[#1F1F1F]'
+                    deployment.status !== "running"
+                      ? "opacity-50 cursor-not-allowed border-t-[transparent] border-b-[#1F1F1F]"
                       : selectedDeployment?.id === deployment.id
-                        ? 'bg-[#FFFFFF0A] border-[#965CDE] border-t-[#965CDE] cursor-pointer hover:shadow-lg'
-                        : 'border-t-[transparent] border-b-[#1F1F1F] hover:border-t-[.5px] hover:border-[#757575] hover:bg-[#FFFFFF03] cursor-pointer hover:shadow-lg'
+                        ? "bg-[#FFFFFF0A] border-[#965CDE] border-t-[#965CDE] cursor-pointer hover:shadow-lg"
+                        : "border-t-[transparent] border-b-[#1F1F1F] hover:border-t-[.5px] hover:border-[#757575] hover:bg-[#FFFFFF03] cursor-pointer hover:shadow-lg"
                   }`}
                 >
                   <div className="mr-[1rem] flex flex-col justify-center">
@@ -191,11 +212,15 @@ export default function SelectFallbackDeployment() {
                         {deployment.status && (
                           <ProjectTags
                             name={capitalize(deployment.status)}
-                            color={endpointStatusMapping[capitalize(deployment.status)]}
+                            color={
+                              endpointStatusMapping[
+                                capitalize(deployment.status)
+                              ]
+                            }
                             textClass="text-[.625rem]"
                           />
                         )}
-                        {deployment.status !== 'running' && (
+                        {deployment.status !== "running" && (
                           <div className="text-[#FF6B6B] text-xs">
                             (Not available)
                           </div>
@@ -213,14 +238,25 @@ export default function SelectFallbackDeployment() {
                       </div>
                       {selectedDeployment?.id === deployment.id && (
                         <div className="w-[1rem] h-[1rem] rounded-full bg-[#965CDE] flex items-center justify-center">
-                          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          <svg
+                            width="10"
+                            height="8"
+                            viewBox="0 0 10 8"
+                            fill="none"
+                          >
+                            <path
+                              d="M1 4L3.5 6.5L9 1"
+                              stroke="white"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
                           </svg>
                         </div>
                       )}
                     </div>
                     <Text_12_300_EEEEEE className="overflow-hidden truncate max-w-[95%]">
-                      {deployment.model?.name || 'No model information'}
+                      {deployment.model?.name || "No model information"}
                     </Text_12_300_EEEEEE>
                   </div>
                 </div>
@@ -228,7 +264,9 @@ export default function SelectFallbackDeployment() {
             ) : (
               <div className="flex justify-center items-center min-h-[4rem] py-8">
                 <div className="text-center">
-                  <Text_12_300_EEEEEE>No other deployments available in this project</Text_12_300_EEEEEE>
+                  <Text_12_300_EEEEEE>
+                    No other deployments available in this project
+                  </Text_12_300_EEEEEE>
                   <Text_12_300_EEEEEE className="text-[#757575] mt-2">
                     Deploy more models to use them as fallbacks
                   </Text_12_300_EEEEEE>

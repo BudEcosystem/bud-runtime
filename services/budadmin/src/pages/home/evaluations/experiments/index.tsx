@@ -134,38 +134,104 @@ const ExperimentsTable = () => {
       title: "Models",
       dataIndex: "models",
       key: "models",
+      ellipsis: true,
       render: (models) => {
         // Handle both string and object/array formats
+        let displayText = '-';
+
         if (typeof models === 'string') {
-          return <Text_12_400_EEEEEE>{models}</Text_12_400_EEEEEE>;
+          displayText = models;
         } else if (Array.isArray(models)) {
           // If it's an array of objects with name property
-          const modelNames = models.map(m => m.name || m).join(', ');
-          return <Text_12_400_EEEEEE>{modelNames}</Text_12_400_EEEEEE>;
+          displayText = models.map(m => m.name || m).join(', ');
         } else if (models && typeof models === 'object') {
           // If it's a single object with name property
-          return <Text_12_400_EEEEEE>{models.name || models.deployment_name || JSON.stringify(models)}</Text_12_400_EEEEEE>;
+          displayText = models.name || models.deployment_name || JSON.stringify(models);
         }
-        return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+
+        if (displayText === '-') {
+          return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+        }
+
+        // Check if text needs truncation (approximately 30 chars for ellipsis)
+        const needsTruncation = displayText.length > 30;
+        const truncatedText = needsTruncation ? displayText.substring(0, 30) + '...' : displayText;
+
+        if (needsTruncation) {
+          return (
+            <Popover
+              content={
+                <div className="max-w-[400px] break-words p-[.8rem]">
+                  <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
+                </div>
+              }
+              placement="top"
+              rootClassName="models-popover"
+            >
+              <div className="cursor-pointer" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Text_12_400_EEEEEE>{truncatedText}</Text_12_400_EEEEEE>
+              </div>
+            </Popover>
+          );
+        }
+
+        return (
+          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
+          </div>
+        );
       },
     },
     {
       title: "Traits",
       dataIndex: "traits",
       key: "traits",
+      ellipsis: true,
       render: (traits) => {
         // Handle both string and object/array formats
+        let displayText = '-';
+
         if (typeof traits === 'string') {
-          return <Text_12_400_EEEEEE>{traits}</Text_12_400_EEEEEE>;
+          displayText = traits;
         } else if (Array.isArray(traits)) {
           // If it's an array of objects with name property
-          const traitNames = traits.map(t => t.name || t).join(', ');
-          return <Text_12_400_EEEEEE>{traitNames}</Text_12_400_EEEEEE>;
+          displayText = traits.map(t => t.name || t).join(', ');
         } else if (traits && typeof traits === 'object') {
           // If it's a single object with name property
-          return <Text_12_400_EEEEEE>{traits.name || JSON.stringify(traits)}</Text_12_400_EEEEEE>;
+          displayText = traits.name || JSON.stringify(traits);
         }
-        return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+
+        if (displayText === '-') {
+          return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+        }
+
+        // Check if text needs truncation (approximately 30 chars for ellipsis)
+        const needsTruncation = displayText.length > 30;
+        const truncatedText = needsTruncation ? displayText.substring(0, 30) + '...' : displayText;
+
+        if (needsTruncation) {
+          return (
+            <Popover
+              content={
+                <div className="max-w-[400px] break-words p-[.8rem]">
+                  <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
+                </div>
+              }
+              placement="top"
+              rootClassName="traits-popover"
+            >
+              <div className="cursor-pointer" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Text_12_400_EEEEEE>{truncatedText}</Text_12_400_EEEEEE>
+              </div>
+            </Popover>
+          );
+        }
+
+        return (
+          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
+          </div>
+        );
       },
     },
     {
@@ -250,15 +316,17 @@ const ExperimentsTable = () => {
     {
       title: "",
       key: "action",
-      width: 150,
+      width: 140,
+      align: 'left' as const,
+      className: "px-0",
       render: (_, record) => (
-        <div className="flex justify-end">
+        <div className="">
           <PrimaryButton
-            onClick={(e) => {
+            onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               router.push(`/home/evaluations/experiments/${record.id}`);
             }}
-            classNames="!px-4 !py-1 !text-xs opacity-0 group-hover:opacity-100"
+            classNames="!px-4 !py-1 !text-xs opacity-0 group-hover:opacity-100 whitespace-nowrap"
           >
             View Experiment
           </PrimaryButton>
@@ -285,7 +353,7 @@ const ExperimentsTable = () => {
     return experimentsList;
   }, [experimentsList]);
 
-  const handleTableChange = (pagination: any, filters: any, sorter: any) => {
+  const handleTableChange = (_pagination: any, _filters: any, sorter: any) => {
     if (sorter.field) {
       setOrder(sorter.order === "ascend" ? "" : "-");
       setOrderBy(sorter.field);
@@ -310,19 +378,20 @@ const ExperimentsTable = () => {
     setCurrentPage(1); // Reset to first page when resetting filters
   };
 
-  const removeSelectedTag = (key: string, value: string) => {
-    if (key === "status") {
-      setFilter({
-        ...filter,
-        status: filter.status?.filter((s) => s !== value) || [],
-      });
-    } else if (key === "tags") {
-      setFilter({
-        ...filter,
-        tags: filter.tags?.filter((t) => t !== value) || [],
-      });
-    }
-  };
+  // Commented out for future use when filter tags display is re-enabled
+  // const removeSelectedTag = (key: string, value: string) => {
+  //   if (key === "status") {
+  //     setFilter({
+  //       ...filter,
+  //       status: filter.status?.filter((s) => s !== value) || [],
+  //     });
+  //   } else if (key === "tags") {
+  //     setFilter({
+  //       ...filter,
+  //       tags: filter.tags?.filter((t) => t !== value) || [],
+  //     });
+  //   }
+  // };
 
   // Get unique tags from all experiments for filter options
   const availableTags = useMemo(() => {
@@ -372,6 +441,7 @@ const ExperimentsTable = () => {
         <Table<ExperimentData>
           columns={columns}
           dataSource={Array.isArray(filteredData) ? filteredData : []}
+          tableLayout="fixed"
           pagination={{
             className: 'small-pagination',
             current: currentPage,
@@ -562,7 +632,7 @@ const ExperimentsTable = () => {
                   >
                     <label
                       className="group h-[1.7rem] text-[#EEEEEE] mx-2 flex items-center cursor-pointer text-xs font-normal leading-3 rounded-[6px] shadow-none bg-transparent"
-                      onClick={() => { }}
+                      onClick={(e: React.MouseEvent) => { e.stopPropagation(); }}
                     >
                       <MixerHorizontalIcon
                         style={{ width: "0.875rem", height: "0.875rem" }}

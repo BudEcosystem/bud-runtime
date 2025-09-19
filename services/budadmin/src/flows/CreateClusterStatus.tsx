@@ -31,29 +31,33 @@ export default function CreateClusterStatus() {
       }}
     >
       <BudWraperBox>
-        {showAlert && <BudDrawerLayout>
-          <BudStepAlert
-            type="warining"
-            title="You're about to cancel the cluster creation process"
-            description="Please note that this will stop the process of adding the cluster to the repository"
-            cancelText="Continue Creating"
-            confirmText="Cancel Anyways"
-            confirmAction={async () => {
-              if(currentWorkflow?.workflow_id) {
-                const response = await cancelClusterOnboarding(currentWorkflow?.workflow_id);
-                if (response) {
-                  successToast("Cluster onboarding cancelled successfully");
-                  closeDrawer();
-                  return;
+        {showAlert && (
+          <BudDrawerLayout>
+            <BudStepAlert
+              type="warining"
+              title="You're about to cancel the cluster creation process"
+              description="Please note that this will stop the process of adding the cluster to the repository"
+              cancelText="Continue Creating"
+              confirmText="Cancel Anyways"
+              confirmAction={async () => {
+                if (currentWorkflow?.workflow_id) {
+                  const response = await cancelClusterOnboarding(
+                    currentWorkflow?.workflow_id,
+                  );
+                  if (response) {
+                    successToast("Cluster onboarding cancelled successfully");
+                    closeDrawer();
+                    return;
+                  }
                 }
-              }
-              closeDrawer()
-            }}
-            cancelAction={() => {
-              setShowAlert(false)
-            }}
-          />
-        </BudDrawerLayout>}
+                closeDrawer();
+              }}
+              cancelAction={() => {
+                setShowAlert(false);
+              }}
+            />
+          </BudDrawerLayout>
+        )}
         <CommonStatus
           workflowId={currentWorkflow?.workflow_id}
           events_field_id="create_cluster_events"
@@ -67,10 +71,9 @@ export default function CreateClusterStatus() {
           success_payload_type="register_cluster"
           title={"Adding cluster to the repository"}
           description={
-            <>
-              In process of verification, downloading and scanning the model
-            </>
-          } />
+            <>In process of verification, downloading and scanning the model</>
+          }
+        />
       </BudWraperBox>
     </BudForm>
   );

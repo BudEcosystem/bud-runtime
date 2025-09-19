@@ -14,7 +14,11 @@ import { usePerfomanceBenchmark } from "src/stores/usePerfomanceBenchmark";
 import { useRoutes } from "src/hooks/useRoutes";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import SearchHeaderInput from "../components/SearchHeaderInput";
-import { Text_12_300_EEEEEE, Text_12_400_757575, Text_12_600_EEEEEE } from "@/components/ui/text";
+import {
+  Text_12_300_EEEEEE,
+  Text_12_400_757575,
+  Text_12_600_EEEEEE,
+} from "@/components/ui/text";
 import { Checkbox } from "antd";
 import router from "next/router";
 import { IEndPoint, useEndPoints } from "src/hooks/useEndPoint";
@@ -22,8 +26,8 @@ import EndpointCardWithCheckBox from "@/components/ui/CardWithCheckBox/EndpointC
 
 export default function SelectEndpointsForRoutes() {
   const { projectId } = router.query;
-  const [order, setOrder] = useState<'-' | ''>('-');
-  const [orderBy, setOrderBy] = useState<string>('created_at');
+  const [order, setOrder] = useState<"-" | "">("-");
+  const [orderBy, setOrderBy] = useState<string>("created_at");
 
   const [page, setPage] = React.useState(1);
   const [limit, setLimit] = React.useState(1000);
@@ -41,7 +45,7 @@ export default function SelectEndpointsForRoutes() {
     setEndpoints,
     endpoints,
     createRoute,
-    setStepTwoData
+    setStepTwoData,
   } = useRoutes();
 
   const getData = async () => {
@@ -51,33 +55,32 @@ export default function SelectEndpointsForRoutes() {
       limit: limit,
       name: searchValue,
       order_by: `${order}${orderBy}`,
-    })
-  }
+    });
+  };
 
   useEffect(() => {
     setStepTwoData();
-  }, [multiSelectedEndpoints])
+  }, [multiSelectedEndpoints]);
 
   useEffect(() => {
     if (projectId) {
       getData();
     }
-  }, [projectId, searchValue])
+  }, [projectId, searchValue]);
 
   useEffect(() => {
-    setEndpoints(endPoints)
-  }, [endPoints])
+    setEndpoints(endPoints);
+  }, [endPoints]);
 
   const handleSelectAll = () => {
     setSelectAllEndpoints(!selectAllEndpoints);
     setSelecteUnselectAllEndpoints(selectAllEndpoints);
   };
 
-
   return (
     <BudForm
       data={{
-        "endpoints": [...multiSelectedEndpoints]
+        endpoints: [...multiSelectedEndpoints],
       }}
       disableNext={!multiSelectedEndpoints.length}
       onNext={async () => {
@@ -86,12 +89,10 @@ export default function SelectEndpointsForRoutes() {
       }}
       onBack={async () => {
         openDrawerWithStep("create-route-data");
-      }
-      }
+      }}
       backText="Back"
       nextText="Next"
     >
-
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
@@ -140,7 +141,7 @@ export default function SelectEndpointsForRoutes() {
                       setMultiSelectedEndpoints(data);
                     }}
                     selected={multiSelectedEndpoints?.some(
-                      (selected) => selected.id === data.id
+                      (selected) => selected.id === data.id,
                     )}
                   />
                 ))}

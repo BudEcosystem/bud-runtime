@@ -28,15 +28,17 @@ const NewExperimentSuccess: React.FC = () => {
 
   useEffect(() => {
     if (currentWorkflow?.workflow_steps?.endpoint?.id) {
-      getEndpointClusterDetails(currentWorkflow?.workflow_steps?.endpoint?.id, projectId);
+      getEndpointClusterDetails(
+        currentWorkflow?.workflow_steps?.endpoint?.id,
+        projectId,
+      );
       getWorkers(currentWorkflow?.workflow_steps?.endpoint?.id, projectId);
     }
   }, [currentWorkflow]);
 
   return (
     <BudForm
-      data={{
-      }}
+      data={{}}
       onBack={async () => {
         closeDrawer();
       }}

@@ -1,5 +1,4 @@
-
-import axios from 'axios';
+import axios from "axios";
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
 const apiClient = (function () {
@@ -15,11 +14,11 @@ const apiClient = (function () {
   });
 
   instance.interceptors.request.use(async (config) => {
-    config.headers['x-token'] = 'Nc5C00ZCyObhJuE5XDapaZH1';
+    config.headers["x-token"] = "Nc5C00ZCyObhJuE5XDapaZH1";
 
     if (config.data instanceof FormData) {
       // Set 'multipart/form-data' content type for FormData requests
-      config.headers['Content-Type'] = 'multipart/form-data';
+      config.headers["Content-Type"] = "multipart/form-data";
     }
 
     return config;

@@ -36,7 +36,8 @@ export default function UploadDataset() {
     multiple: false,
     fileList,
     beforeUpload: (file: any) => {
-      const isValidType = file.type === "text/csv" || file.type === "application/json";
+      const isValidType =
+        file.type === "text/csv" || file.type === "application/json";
       if (!isValidType) {
         message.error("You can only upload CSV or JSON files!");
         return false;

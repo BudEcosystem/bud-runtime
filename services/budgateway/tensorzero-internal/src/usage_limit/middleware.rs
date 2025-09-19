@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tracing::{debug, warn};
 
 use crate::auth::Auth;
-use crate::usage_limit::{UsageLimiter, UsageLimitDecision};
+use crate::usage_limit::{UsageLimitDecision, UsageLimiter};
 
 /// Middleware for checking usage limits
 pub async fn usage_limit_middleware(
@@ -48,10 +48,9 @@ pub async fn usage_limit_middleware(
                             }
                         });
 
-                        return Err((
-                            StatusCode::PAYMENT_REQUIRED,
-                            axum::Json(error_body)
-                        ).into_response());
+                        return Err(
+                            (StatusCode::PAYMENT_REQUIRED, axum::Json(error_body)).into_response()
+                        );
                     }
                 }
             }

@@ -31,6 +31,10 @@ spec:
         env:
           - name: BUD_SERVE_URL
             value: {{ include "bud.ingress.url.budapp" $ }}
+          - name: NOTIFY_SERVICE_NAME
+            value: "{{ .Values.microservices.budnotify.daprid }}"
+          - name: NOTIFY_SERVICE_TOPIC
+            value: "{{ .Values.microservices.budnotify.pubsubTopic }}"
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcluster.env }}
           - name: {{ $key }}

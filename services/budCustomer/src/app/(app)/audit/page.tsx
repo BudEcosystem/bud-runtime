@@ -378,8 +378,8 @@ export default function AuditPage() {
     }
   };
 
-  const getAuditList = async () => {
-    setLoading(true);
+  const getAuditList = async (loader?: boolean) => {
+    setLoading(!loader);
     try {
       const params = {
         page: currentPage,
@@ -414,8 +414,8 @@ export default function AuditPage() {
     failedActions: 0,
     resourcesModified: 0,
   });
-  const getAuditSummary = async () => {
-    setIsStatsLoading(true);
+  const getAuditSummary = async (loader?: boolean) => {
+    setIsStatsLoading(!loader);
     try {
       // const params = {
       //   start_date: dateRange?.[0] ? formatDateString(dateRange[0]?.toDate(), false) : undefined,
@@ -601,11 +601,13 @@ export default function AuditPage() {
   }, [selectedAction, selectedResource, dateRange, currentPage, pageSize]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      getAuditList();
-      getAuditSummary();
-    }, 500);
-    return () => clearTimeout(timer);
+    if(searchText) {
+      const timer = setTimeout(() => {
+        getAuditList(true);
+        getAuditSummary(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
   }, [searchText]);
 
   return (

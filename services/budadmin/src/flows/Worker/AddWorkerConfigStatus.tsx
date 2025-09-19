@@ -1,9 +1,8 @@
-
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import React, {  } from "react";
+import React from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import BudStepAlert from "src/flows/components/BudStepAlert";
 import { useDeployModel } from "src/stores/useDeployModel";
@@ -21,8 +20,7 @@ export default function AddWorkerConfigStatus() {
 
   return (
     <BudForm
-      data={{
-      }}
+      data={{}}
       backText={isFailed ? "Close" : "Cancel"}
       onBack={() => {
         if (isFailed) {
@@ -33,21 +31,23 @@ export default function AddWorkerConfigStatus() {
       }}
     >
       <BudWraperBox>
-        {showAlert && <BudDrawerLayout>
-          <BudStepAlert
-            type="warining"
-            title="You're about to stop finding the hardware for deployment"
-            description="We highly recommend that you continue the process to find the best hardware for the required concurrency"
-            cancelText="Continue Scanning"
-            confirmText="Cancel Anyways"
-            confirmAction={() => {
-              openDrawerWithStep("add-worker-cluster-config");
-            }}
-            cancelAction={() => {
-              setShowAlert(false)
-            }}
-          />
-        </BudDrawerLayout>}
+        {showAlert && (
+          <BudDrawerLayout>
+            <BudStepAlert
+              type="warining"
+              title="You're about to stop finding the hardware for deployment"
+              description="We highly recommend that you continue the process to find the best hardware for the required concurrency"
+              cancelText="Continue Scanning"
+              confirmText="Cancel Anyways"
+              confirmAction={() => {
+                openDrawerWithStep("add-worker-cluster-config");
+              }}
+              cancelAction={() => {
+                setShowAlert(false);
+              }}
+            />
+          </BudDrawerLayout>
+        )}
         <CommonStatus
           workflowId={currentWorkflow?.workflow_id}
           events_field_id="bud_simulator_events"
@@ -59,9 +59,11 @@ export default function AddWorkerConfigStatus() {
             setIsFailed(true);
           }}
           title="Finding the hardware for deployment"
-          description={"Based on the deployment specification, we are calculating what will be the best hardware for the required concurrency"}
+          description={
+            "Based on the deployment specification, we are calculating what will be the best hardware for the required concurrency"
+          }
         />
       </BudWraperBox>
-    </BudForm >
+    </BudForm>
   );
 }

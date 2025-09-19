@@ -19,14 +19,20 @@ export default function AddCredentials() {
   const [search, setSearch] = React.useState("");
   const { openDrawerWithStep } = useDrawer();
   const { currentWorkflow, updateProvider } = useDeployModel();
-  const { credentials, getCredentials, setSelectedCredential, selectedCredential, getProviderInfo } = useProprietaryCredentials();
+  const {
+    credentials,
+    getCredentials,
+    setSelectedCredential,
+    selectedCredential,
+    getProviderInfo,
+  } = useProprietaryCredentials();
 
   useEffect(() => {
     getProviders(page, limit, search);
   }, [page, limit, search, getProviders]);
 
   const filteredProviders = providers?.filter((provider) =>
-    provider.name.toLowerCase().includes(search.toLowerCase())
+    provider.name.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -34,7 +40,9 @@ export default function AddCredentials() {
       data={{}}
       disableNext={!selectedProvider?.id}
       onNext={async () => {
-        const providerInfoSuccess = await getProviderInfo(selectedProvider?.type);
+        const providerInfoSuccess = await getProviderInfo(
+          selectedProvider?.type,
+        );
         if (providerInfoSuccess) {
           openDrawerWithStep("add-credentials-form");
         } else {

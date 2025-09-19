@@ -38,24 +38,23 @@ interface EvaluationCard {
 }
 
 const sampletags = [
-  { name: 'text', color: '#D1B854' },
-  { name: 'image', color: '#D1B854' },
-  { name: 'video', color: '#D1B854' },
-  { name: 'actions', color: '#D1B854' },
-  { name: 'embeddings', color: '#D1B854' },
-  { name: 'text', color: '#D1B854' },
-  { name: 'text', color: '#D1B854' },
-  { name: 'text', color: '#D1B854' },
-  { name: 'text', color: '#D1B854' },
-  { name: 'text', color: '#D1B854' },
-]
+  { name: "text", color: "#D1B854" },
+  { name: "image", color: "#D1B854" },
+  { name: "video", color: "#D1B854" },
+  { name: "actions", color: "#D1B854" },
+  { name: "embeddings", color: "#D1B854" },
+  { name: "text", color: "#D1B854" },
+  { name: "text", color: "#D1B854" },
+  { name: "text", color: "#D1B854" },
+  { name: "text", color: "#D1B854" },
+  { name: "text", color: "#D1B854" },
+];
 
 const EvalDetailed = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [activeTab, setActiveTab] = useState("3");
   const [showAllTags, setShowAllTags] = useState(false);
   const router = useRouter();
-
 
   const goBack = () => {
     router.back();
@@ -74,27 +73,27 @@ const EvalDetailed = () => {
               onClick={goBack}
             >
               <div className="flex justify-center h-[0.55rem] w-[auto]">
-              <Image
-                preview={false}
-                className=""
-                style={{ width: "auto", height: "0.55rem" }}
-                src="/images/evaluations/icons/left.svg"
-                alt="Logo"
-              />
+                <Image
+                  preview={false}
+                  className=""
+                  style={{ width: "auto", height: "0.55rem" }}
+                  src="/images/evaluations/icons/left.svg"
+                  alt="Logo"
+                />
               </div>
             </button>
             <CustomBreadcrumb
               urls={["/evaluations", `name`]}
-              data={["Evaluations", `name`]} />
+              data={["Evaluations", `name`]}
+            />
           </div>
         )}
       </div>
     );
   };
 
-
   useEffect(() => {
-    setIsMounted(true)
+    setIsMounted(true);
   }, []);
 
   return (
@@ -110,18 +109,31 @@ const EvalDetailed = () => {
           <div className="w-full pt-[1.8rem]">
             <div className="w-full flex justify-between items-center">
               <Text_28_600_FFFFFF>LiveMathBench</Text_28_600_FFFFFF>
-              <PrimaryButton classNames="shadow-purple-glow" textClass="text-[0.8125rem]">Run Evaluation</PrimaryButton>
+              <PrimaryButton
+                classNames="shadow-purple-glow"
+                textClass="text-[0.8125rem]"
+              >
+                Run Evaluation
+              </PrimaryButton>
             </div>
-            <Text_14_400_FFFFFF className="leading-[140%] mt-[.5rem] max-w-[80%]">LiveMathBench can capture LLM capabilities in complex reasoning tasks, including challenging latest question sets from various mathematical competitions.</Text_14_400_FFFFFF>
+            <Text_14_400_FFFFFF className="leading-[140%] mt-[.5rem] max-w-[80%]">
+              LiveMathBench can capture LLM capabilities in complex reasoning
+              tasks, including challenging latest question sets from various
+              mathematical competitions.
+            </Text_14_400_FFFFFF>
             <div className="flex flex-wrap justify-start items-center gap-[.3rem] mt-[1.3rem] max-w-[80%]">
-              {(showAllTags ? sampletags : sampletags.slice(0, 5)).map((item, index) => (
-                <Tags
-                  key={index}
-                  name={item.name}
-                  color={item.color}
-                  classNames={showAllTags && index >= 5 ? "animate-fadeIn" : ""}
-                />
-              ))}
+              {(showAllTags ? sampletags : sampletags.slice(0, 5)).map(
+                (item, index) => (
+                  <Tags
+                    key={index}
+                    name={item.name}
+                    color={item.color}
+                    classNames={
+                      showAllTags && index >= 5 ? "animate-fadeIn" : ""
+                    }
+                  />
+                ),
+              )}
               {sampletags.length > 5 && (
                 <button
                   onClick={() => setShowAllTags(!showAllTags)}
@@ -131,7 +143,6 @@ const EvalDetailed = () => {
                 </button>
               )}
             </div>
-
           </div>
           <div className="evalsTabDetail">
             <Tabs
@@ -189,13 +200,14 @@ const EvalDetailed = () => {
                           alt="Logo"
                         />
                       </div>
-                      <Text_14_600_B3B3B3>Evaluations Explorer</Text_14_600_B3B3B3>
+                      <Text_14_600_B3B3B3>
+                        Evaluations Explorer
+                      </Text_14_600_B3B3B3>
                     </div>
                   ),
                   key: "3",
                   children: <EvalExplorerTable />,
                 },
-
               ]}
             />
           </div>

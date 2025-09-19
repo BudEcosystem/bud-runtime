@@ -159,14 +159,20 @@ class BaseTransformer(ABC):
                 "configMapName": f"{self.engine.value}-config-{request.eval_request_id}",
                 "files": list(config_files.keys()),
             },
-            data_volumes=self.get_volume_mounts(),
-            output_volume={
-                "name": "output",
-                "type": "shared_pvc",
-                "claimName": StorageConfig.get_eval_datasets_pvc_name(),
-                "subPath": f"results/{request.eval_request_id}",
-                "mountPath": "/workspace/outputs",
-            },
+            data_volumes=[
+                {
+                    "name": "shared-storage",
+                    "mountPath": "/workspace/shared",
+                    "readOnly": False,
+                    "claimName": StorageConfig.get_eval_datasets_pvc_name(),
+                },
+                {
+                    "name": "cache",
+                    "mountPath": "/workspace/cache",
+                    "type": "emptyDir",
+                },
+            ],
+            output_volume={},  # No separate output volume since we're using shared-storage
             cpu_request=resources["cpu_request"],
             cpu_limit=resources["cpu_limit"],
             memory_request=resources["memory_request"],

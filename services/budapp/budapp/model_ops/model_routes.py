@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
-from budapp.commons.constants import ModalityEnum, PermissionEnum
+from budapp.commons.constants import ModalityEnum, ModelEndpointEnum, PermissionEnum
 from budapp.commons.dependencies import (
     get_current_active_user,
     get_session,
@@ -110,6 +110,7 @@ async def list_all_models(
     filters: Annotated[ModelFilter, Depends()],
     author: List[str] = Query(default=[]),
     modality: List[ModalityEnum] = Query(default=[]),
+    supported_endpoints: List[ModelEndpointEnum] = Query(default=[]),
     tags: List[str] = Query(default=[]),
     tasks: List[str] = Query(default=[]),
     page: int = Query(1, ge=1),
@@ -125,7 +126,13 @@ async def list_all_models(
     filters_dict = filters.model_dump(exclude_none=True, exclude={"table_source"})
 
     # Update filters_dict only for non-empty lists
-    filter_updates = {"tags": tags, "tasks": tasks, "author": author, "modality": modality}
+    filter_updates = {
+        "tags": tags,
+        "tasks": tasks,
+        "author": author,
+        "modality": modality,
+        "supported_endpoints": supported_endpoints,
+    }
     filters_dict.update({k: v for k, v in filter_updates.items() if v})
 
     # Perform router level validation

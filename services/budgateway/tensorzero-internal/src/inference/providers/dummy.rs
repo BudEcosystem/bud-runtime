@@ -814,6 +814,9 @@ impl ModerationProvider for DummyProvider {
                 flagged,
                 categories,
                 category_scores,
+                category_applied_input_types: None,
+                hallucination_details: None,
+                ip_violation_details: None,
             });
         }
 

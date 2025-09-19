@@ -1,64 +1,67 @@
 /* eslint-disable react/no-unescaped-entities */
-'use client';
-import React, { createContext, useContext, useState } from 'react';
+"use client";
+import React, { createContext, useContext, useState } from "react";
 import Image from "next/image";
 import * as Form from "@radix-ui/react-form";
 import { Flex } from "@radix-ui/themes";
-import { useRouter } from 'next/router';
+import { useRouter } from "next/router";
 
 // const inter = Inter({ subsets: ["latin"] });
 
 export default function Register() {
   const router = useRouter();
-  const [firstName, setFirstName] = useState('');
-  const [lasttName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+  const [firstName, setFirstName] = useState("");
+  const [lasttName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
 
   var registerData;
-  const prepareRegister = ()=> {
+  const prepareRegister = () => {
     if (password != confirmPassword) {
-
     }
     registerData = {
-      'name': firstName + lasttName,
-      'email': email,
-      'password': password
-    }
-  }
+      name: firstName + lasttName,
+      email: email,
+      password: password,
+    };
+  };
 
-  const handleLogin = async (e: { preventDefault: () => void; }) => {
+  const handleLogin = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/register', {
-        method: 'POST',
+      const response = await fetch("/api/register", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(registerData),
       });
       if (response.ok) {
         const data = await response.json();
         // Store authentication token or session identifier in local storage
-        localStorage.setItem('token', data.token);
+        localStorage.setItem("token", data.token);
         // Redirect to dashboard or home page
-        router.push('/dashboard');
+        router.push("/dashboard");
       } else {
-        setError('Invalid username or password');
+        setError("Invalid username or password");
       }
     } catch (error) {
-      console.error('Login error:', error);
-      setError('Something went wrong');
+      console.error("Login error:", error);
+      setError("Something went wrong");
     }
   };
   return (
     <div className="w-full h-screen logginBg">
       <div className="loginWrap w-full flex justify-between">
         <div className="loginLeft w-[43.35%] py-[8.6%] px-[7.3%] pr-[4.4%]">
-          <h1 className="text-white text-[2em] font-medium tracking-[.03em]">Welcome to our page</h1>
-          <h2 className="text-[#696969] text-[1.03em] font-medium tracking-[.02em] py-[.5em]">Please enter your details</h2>
+          <h1 className="text-white text-[2em] font-medium tracking-[.03em]">
+            Welcome to our page
+          </h1>
+          <h2 className="text-[#696969] text-[1.03em] font-medium tracking-[.02em] py-[.5em]">
+            Please enter your details
+          </h2>
           <Form.Root className="w-[100%] mt-[2.8em]">
             <Flex gap="3" justify="between">
               <Form.Field className="grid mb-[10px] w=[48%]" name="email">
@@ -131,7 +134,7 @@ export default function Register() {
               </div>
               <Form.Control asChild>
                 <input
-                placeholder="Email"
+                  placeholder="Email"
                   className="box-border w-full specialInput bg-blackA2 shadow-blackA6 inline-flex h-[35px] appearance-none items-center justify-center rounded-[4px]  text-[1.1em] leading-none text-white shadow-[0_0_0_1px] outline-none hover:shadow-[0_0_0_1px_black] focus:shadow-[0_0_0_2px_black] selection:color-white selection:bg-blackA6"
                   type="email"
                   required
@@ -180,38 +183,46 @@ export default function Register() {
                 />
               </Form.Control>
             </Form.Field>
-            <div className="text-white text-[1.08em] whoAmIWrapLabelOne font-semibold	mb-[.4em] mt-[2.9em]">Number of employees</div>
+            <div className="text-white text-[1.08em] whoAmIWrapLabelOne font-semibold	mb-[.4em] mt-[2.9em]">
+              Number of employees
+            </div>
             <div className="whoAmIWrap mt-[1.2em] mb-[2.9em]">
               <div className="whoAmI h-[5.2em] mb-[1em] flex justify-start align-middle border border-[#414141] rounded-lg p-[.6em]">
                 <div className="IcnWrap border border-[#414141] rounded-lg	w-[3.35em] h-[3.35em] p-[0.8em] m-[.25em]">
                   <Image
-
-                  src="/icons/single.png"
-                  width={20}
-                  height={20}
-                  alt=""
-                  style={{width: "100%", height: "100%"}}
+                    src="/icons/single.png"
+                    width={20}
+                    height={20}
+                    alt=""
+                    style={{ width: "100%", height: "100%" }}
                   />
                 </div>
                 <div className="whoAmIWrapLabelWrap text-white pl-[.07em]">
-                  <div className="whoAmIWrapLabelOne text-[1.08em] whoAmIWrapLabelOne font-semibold	mb-[.4em]">I'm a solo creator</div>
-                  <div className="whoAmIWrapLabelTwo text-[#bbbbbb] text-[1.08em] whoAmIWrapLabelOne font-semibold	">I need to setup an account for myself.</div>
+                  <div className="whoAmIWrapLabelOne text-[1.08em] whoAmIWrapLabelOne font-semibold	mb-[.4em]">
+                    I'm a solo creator
+                  </div>
+                  <div className="whoAmIWrapLabelTwo text-[#bbbbbb] text-[1.08em] whoAmIWrapLabelOne font-semibold	">
+                    I need to setup an account for myself.
+                  </div>
                 </div>
               </div>
               <div className="whoAmI h-[5.2em] flex justify-start align-middle border border-[#414141] rounded-lg p-[.6em]">
                 <div className="IcnWrap border border-[#414141] rounded-lg		w-[3.35em] h-[3.35em] p-[0.8em] m-[.25em]">
                   <Image
-
-                  src="/icons/double.png"
-                  width={20}
-                  height={20}
-                  alt=""
-                  style={{width: "100%", height: "100%"}}
+                    src="/icons/double.png"
+                    width={20}
+                    height={20}
+                    alt=""
+                    style={{ width: "100%", height: "100%" }}
                   />
                 </div>
                 <div className="whoAmIWrapLabelWrap text-white pl-[.07em]">
-                  <div className="whoAmIWrapLabelOne text-[1.08em] whoAmIWrapLabelOne font-semibold	mb-[.4em]">I'm part of a team</div>
-                  <div className="whoAmIWrapLabelTwo text-[#bbbbbb] text-[1.08em] whoAmIWrapLabelOne font-semibold	">I need to setup an account for team.</div>
+                  <div className="whoAmIWrapLabelOne text-[1.08em] whoAmIWrapLabelOne font-semibold	mb-[.4em]">
+                    I'm part of a team
+                  </div>
+                  <div className="whoAmIWrapLabelTwo text-[#bbbbbb] text-[1.08em] whoAmIWrapLabelOne font-semibold	">
+                    I need to setup an account for team.
+                  </div>
                 </div>
               </div>
             </div>

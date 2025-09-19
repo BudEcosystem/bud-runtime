@@ -6,13 +6,16 @@ import { ButtonInput } from "../button";
 import noAccessIcn from "./../../../../public/icons/noaccess.png";
 
 interface noAccessProps {
-  textMessage?: any,
-  classNames?: string
+  textMessage?: any;
+  classNames?: string;
 }
 const NoAccess: React.FC<noAccessProps> = ({ textMessage, classNames }) => {
-
   return (
-    <Flex justify="center" align="center" className={`w-full h-[80%] ${classNames}`}>
+    <Flex
+      justify="center"
+      align="center"
+      className={`w-full h-[80%] ${classNames}`}
+    >
       <Box>
         <Flex justify="center" className="mb-[1em]">
           <Image
@@ -25,7 +28,7 @@ const NoAccess: React.FC<noAccessProps> = ({ textMessage, classNames }) => {
         <Box>
           {textMessage && (
             <Box>
-              <Text_14_400_787B83 >{textMessage}</Text_14_400_787B83>
+              <Text_14_400_787B83>{textMessage}</Text_14_400_787B83>
             </Box>
           )}
         </Box>

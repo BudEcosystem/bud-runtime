@@ -66,22 +66,22 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                 },
               ]}
             >
-            <Input
-              placeholder="Name Your Deployment"
-              style={{
-                backgroundColor: "transparent",
-                color: "#EEEEEE",
-                border: "0.5px solid #757575",
-              }}
-              size="large"
-              value={deploymentSpecifcation.deployment_name}
-              onChange={(e) => {
-                form.setFieldsValue({ deployment_name: e.target.value });
-                form.validateFields(["deployment_name"]);
-                setDeploymentSpecification({
-                  ...deploymentSpecifcation,
-                  deployment_name: e.target.value,
-                });
+              <Input
+                placeholder="Name Your Deployment"
+                style={{
+                  backgroundColor: "transparent",
+                  color: "#EEEEEE",
+                  border: "0.5px solid #757575",
+                }}
+                size="large"
+                value={deploymentSpecifcation.deployment_name}
+                onChange={(e) => {
+                  form.setFieldsValue({ deployment_name: e.target.value });
+                  form.validateFields(["deployment_name"]);
+                  setDeploymentSpecification({
+                    ...deploymentSpecifcation,
+                    deployment_name: e.target.value,
+                  });
                 }}
                 className="drawerInp py-[.65rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem]"
               />
@@ -114,28 +114,28 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
               ]}
               className={`flex items-start rounded-[6px] relative !bg-[transparent] mb-[0]`}
             >
-            <Input
-              type="number"
-              placeholder="Enter value"
-              style={{
-                backgroundColor: "transparent",
-                color: "#EEEEEE",
-                border: "0.5px solid #757575",
-              }}
-              min={1}
-              value={deploymentSpecifcation.concurrent_requests}
-              onChange={(e) => {
-                form.setFieldsValue({ concurrent_requests: e.target.value });
-                form.validateFields(["concurrent_requests"]);
-                if (
-                  e.target.value.startsWith("0") &&
-                  e.target.value.length > 1
-                ) {
-                  e.target.value = e.target.value.slice(1);
-                }
-                setDeploymentSpecification({
-                  ...deploymentSpecifcation,
-                  concurrent_requests: e.target.value,
+              <Input
+                type="number"
+                placeholder="Enter value"
+                style={{
+                  backgroundColor: "transparent",
+                  color: "#EEEEEE",
+                  border: "0.5px solid #757575",
+                }}
+                min={1}
+                value={deploymentSpecifcation.concurrent_requests}
+                onChange={(e) => {
+                  form.setFieldsValue({ concurrent_requests: e.target.value });
+                  form.validateFields(["concurrent_requests"]);
+                  if (
+                    e.target.value.startsWith("0") &&
+                    e.target.value.length > 1
+                  ) {
+                    e.target.value = e.target.value.slice(1);
+                  }
+                  setDeploymentSpecification({
+                    ...deploymentSpecifcation,
+                    concurrent_requests: e.target.value,
                   });
                 }}
                 size="large"
@@ -207,7 +207,11 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
 
                       if (value === "" || /^\d+$/.test(value)) {
                         const val = parseInt(value);
-                        if (true || value === ""  || val >= 30 && val <= 32000) {
+                        if (
+                          true ||
+                          value === "" ||
+                          (val >= 30 && val <= 32000)
+                        ) {
                           setDeploymentSpecification({
                             ...deploymentSpecifcation,
                             avg_context_length: value,
@@ -296,7 +300,11 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
 
                       if (value === "" || /^\d+$/.test(value)) {
                         const val = parseInt(value);
-                        if (true || value === ""  || val >= 10 && val <= 2000) {
+                        if (
+                          true ||
+                          value === "" ||
+                          (val >= 10 && val <= 2000)
+                        ) {
                           setDeploymentSpecification({
                             ...deploymentSpecifcation,
                             avg_sequence_length: value,
@@ -359,7 +367,11 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
 
                           if (value === "" || /^\d+$/.test(value)) {
                             const val = parseInt(value);
-                            if (true || value === ""  || val >= 5 && val <= 100) {
+                            if (
+                              true ||
+                              value === "" ||
+                              (val >= 5 && val <= 100)
+                            ) {
                               setDeploymentSpecification({
                                 ...deploymentSpecifcation,
                                 per_session_tokens_per_sec: [
@@ -378,7 +390,11 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                           if (value < 5) {
                             setDeploymentSpecification({
                               ...deploymentSpecifcation,
-                              per_session_tokens_per_sec: ["5", deploymentSpecifcation.per_session_tokens_per_sec[1]],
+                              per_session_tokens_per_sec: [
+                                "5",
+                                deploymentSpecifcation
+                                  .per_session_tokens_per_sec[1],
+                              ],
                             });
                           }
                         }}
@@ -436,7 +452,11 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
 
                           if (value === "" || /^\d+$/.test(value)) {
                             const val = parseInt(value);
-                            if (true || value === ""  || val >= 5 && val <= 100) {
+                            if (
+                              true ||
+                              value === "" ||
+                              (val >= 5 && val <= 100)
+                            ) {
                               setDeploymentSpecification({
                                 ...deploymentSpecifcation,
                                 per_session_tokens_per_sec: [
@@ -456,7 +476,8 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                             setDeploymentSpecification({
                               ...deploymentSpecifcation,
                               per_session_tokens_per_sec: [
-                                deploymentSpecifcation.per_session_tokens_per_sec[0],
+                                deploymentSpecifcation
+                                  .per_session_tokens_per_sec[0],
                                 "5",
                               ],
                             });
@@ -499,7 +520,11 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                           const value = e.target.value;
                           if (value === "" || /^\d+$/.test(value)) {
                             const val = parseInt(value);
-                            if (true || value === ""  || val >= 50 && val <= 5000) {
+                            if (
+                              true ||
+                              value === "" ||
+                              (val >= 50 && val <= 5000)
+                            ) {
                               setDeploymentSpecification({
                                 ...deploymentSpecifcation,
                                 ttft: [
@@ -573,7 +598,11 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
 
                           if (value === "" || /^\d+$/.test(value)) {
                             const val = parseInt(value);
-                            if (true || value === ""  || val >= 50 && val <= 5000) {
+                            if (
+                              true ||
+                              value === "" ||
+                              (val >= 50 && val <= 5000)
+                            ) {
                               setDeploymentSpecification({
                                 ...deploymentSpecifcation,
                                 ttft: [
@@ -591,10 +620,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                           if (value < 300) {
                             setDeploymentSpecification({
                               ...deploymentSpecifcation,
-                              ttft: [
-                                deploymentSpecifcation.ttft[0],
-                                "300",
-                              ],
+                              ttft: [deploymentSpecifcation.ttft[0], "300"],
                             });
                           }
                         }}
@@ -635,7 +661,11 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
 
                           if (value === "" || /^\d+$/.test(value)) {
                             const val = parseInt(value);
-                            if (true || value === ""  || val >= 1 && val <= 300) {
+                            if (
+                              true ||
+                              value === "" ||
+                              (val >= 1 && val <= 300)
+                            ) {
                               setDeploymentSpecification({
                                 ...deploymentSpecifcation,
                                 e2e_latency: [
@@ -653,7 +683,10 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                           if (value < 1) {
                             setDeploymentSpecification({
                               ...deploymentSpecifcation,
-                              e2e_latency: ["1", deploymentSpecifcation.e2e_latency[1]],
+                              e2e_latency: [
+                                "1",
+                                deploymentSpecifcation.e2e_latency[1],
+                              ],
                             });
                           }
                         }}
@@ -709,7 +742,11 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
 
                           if (value === "" || /^\d+$/.test(value)) {
                             const val = parseInt(value);
-                            if (true || value === ""  || val >= 1 && val <= 300) {
+                            if (
+                              true ||
+                              value === "" ||
+                              (val >= 1 && val <= 300)
+                            ) {
                               setDeploymentSpecification({
                                 ...deploymentSpecifcation,
                                 e2e_latency: [

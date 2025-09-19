@@ -88,8 +88,14 @@ pub async fn analytics_middleware(
         .get::<Arc<ClickHouseConnectionInfo>>()
         .cloned();
 
-    tracing::debug!("ClickHouse connection in analytics middleware: {}",
-        if clickhouse_opt.is_some() { "available" } else { "not available" });
+    tracing::debug!(
+        "ClickHouse connection in analytics middleware: {}",
+        if clickhouse_opt.is_some() {
+            "available"
+        } else {
+            "not available"
+        }
+    );
 
     // Process the request
     let response = next.run(request).await;
@@ -117,13 +123,21 @@ pub async fn analytics_middleware(
         }
 
         // Extract model latency from response headers if present and calculate gateway processing time
-        if let Some(model_latency_header) = response.headers().get("x-tensorzero-model-latency-ms") {
+        if let Some(model_latency_header) = response.headers().get("x-tensorzero-model-latency-ms")
+        {
             if let Ok(model_latency_str) = model_latency_header.to_str() {
                 if let Ok(model_latency_ms) = model_latency_str.parse::<u32>() {
                     // Gateway processing time = Total duration - Model latency
-                    analytics.record.gateway_processing_ms = analytics.record.total_duration_ms.saturating_sub(model_latency_ms);
-                    tracing::debug!("Calculated gateway processing time: {} ms (total: {} ms, model: {} ms)",
-                        analytics.record.gateway_processing_ms, analytics.record.total_duration_ms, model_latency_ms);
+                    analytics.record.gateway_processing_ms = analytics
+                        .record
+                        .total_duration_ms
+                        .saturating_sub(model_latency_ms);
+                    tracing::debug!(
+                        "Calculated gateway processing time: {} ms (total: {} ms, model: {} ms)",
+                        analytics.record.gateway_processing_ms,
+                        analytics.record.total_duration_ms,
+                        model_latency_ms
+                    );
                 }
             }
         }
@@ -148,7 +162,11 @@ pub async fn analytics_middleware(
 
     // Spawn task to write analytics (non-blocking)
     if let Some(clickhouse) = clickhouse_opt {
-        tracing::debug!("Spawning task to write analytics to ClickHouse for {} {}", method, uri.path());
+        tracing::debug!(
+            "Spawning task to write analytics to ClickHouse for {} {}",
+            method,
+            uri.path()
+        );
         tokio::spawn(async move {
             tracing::debug!("Writing analytics record to ClickHouse: {:?}", final_record);
             if let Err(e) = write_analytics_to_clickhouse(&clickhouse, final_record).await {
@@ -352,7 +370,6 @@ fn get_client_ip_fallback(headers: &HeaderMap) -> String {
     "unknown".to_string()
 }
 
-
 /// Extract proxy chain information
 fn extract_proxy_chain(headers: &HeaderMap) -> Option<String> {
     headers
@@ -458,7 +475,10 @@ pub async fn attach_clickhouse_middleware(
     mut request: Request,
     next: Next,
 ) -> Result<Response, Error> {
-    tracing::debug!("Attaching ClickHouse connection to request extensions: {:?}", clickhouse.database());
+    tracing::debug!(
+        "Attaching ClickHouse connection to request extensions: {:?}",
+        clickhouse.database()
+    );
     request.extensions_mut().insert(clickhouse);
     Ok(next.run(request).await)
 }

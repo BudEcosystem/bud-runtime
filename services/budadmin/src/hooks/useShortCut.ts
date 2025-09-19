@@ -4,7 +4,7 @@ export function useShortCut({ key, action }) {
   const [metaKeyPressed, setMetaKeyPressed] = useState(false);
 
   const handleKeyDown = (e) => {
-    if(e.target !== document.body){
+    if (e.target !== document.body) {
       return;
     }
     const isMetaKey = e.metaKey;

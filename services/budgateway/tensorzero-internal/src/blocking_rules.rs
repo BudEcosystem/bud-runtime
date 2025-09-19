@@ -3,27 +3,27 @@
 //! This module provides a lock-free, high-performance blocking rules system
 //! that uses Redis Pub/Sub for real-time updates and DashMap for concurrent access.
 
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use ipnet::IpNet;
 use metrics::{counter, gauge, histogram};
 use redis::AsyncCommands;
 use regex::Regex;
+use serde::Serializer;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::net::IpAddr;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use serde::Serializer;
 
+use crate::clickhouse::ClickHouseConnectionInfo;
 use crate::error::{Error, ErrorDetails};
 use crate::redis_client::RedisClient;
-use crate::clickhouse::ClickHouseConnectionInfo;
 
 /// Custom serializer for DateTime<Utc> to format compatible with ClickHouse DateTime64(3)
 fn serialize_datetime<S>(dt: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
@@ -89,10 +89,10 @@ impl GatewayBlockingEventDatabaseInsert {
             user_agent,
             request_path,
             request_method,
-            api_key_id: None, // TODO: Extract from request context if available
-            project_id: None, // TODO: Extract from request context if available
+            api_key_id: None,  // TODO: Extract from request context if available
+            project_id: None,  // TODO: Extract from request context if available
             endpoint_id: None, // TODO: Extract from request context if available
-            model_name: None, // TODO: Extract from request context if available
+            model_name: None,  // TODO: Extract from request context if available
             rule_type: format!("{:?}", rule.rule_type),
             rule_name: rule.name.clone(),
             rule_priority: rule.priority,
@@ -140,9 +140,9 @@ pub struct BlockingRule {
 #[derive(Debug, Clone)]
 pub struct CompiledRule {
     pub rule: BlockingRule,
-    pub ip_nets: Vec<IpNet>,              // Pre-parsed IP ranges
-    pub regex_patterns: Vec<Regex>,       // Pre-compiled regex
-    pub country_set: HashSet<String>,     // O(1) country lookup
+    pub ip_nets: Vec<IpNet>,          // Pre-parsed IP ranges
+    pub regex_patterns: Vec<Regex>,   // Pre-compiled regex
+    pub country_set: HashSet<String>, // O(1) country lookup
 }
 
 /// Rate limiting state for rate-based blocking
@@ -172,8 +172,8 @@ impl CircuitBreaker {
             is_open: AtomicBool::new(false),
             failure_count: AtomicU64::new(0),
             last_failure_time: AtomicU64::new(0),
-            failure_threshold: 5,  // Open after 5 consecutive failures
-            recovery_timeout: 60,  // Try again after 60 seconds
+            failure_threshold: 5, // Open after 5 consecutive failures
+            recovery_timeout: 60, // Try again after 60 seconds
         }
     }
 
@@ -191,9 +191,12 @@ impl CircuitBreaker {
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_secs(),
-                Ordering::Relaxed
+                Ordering::Relaxed,
             );
-            warn!("Circuit breaker opened after {} consecutive Redis failures", failures);
+            warn!(
+                "Circuit breaker opened after {} consecutive Redis failures",
+                failures
+            );
         }
     }
 
@@ -292,7 +295,9 @@ impl BlockingRulesManager {
         match rule.rule_type {
             BlockingRuleType::IpBlocking => {
                 // Support both "ip_addresses" and "ips" for compatibility
-                let ips = rule.config.get("ip_addresses")
+                let ips = rule
+                    .config
+                    .get("ip_addresses")
                     .or_else(|| rule.config.get("ips"))
                     .and_then(|v| v.as_array());
 
@@ -307,14 +312,14 @@ impl BlockingRulesManager {
                                     if let Ok(addr) = IpAddr::from_str(ip_str) {
                                         // Convert single IP to /32 or /128 CIDR
                                         let net = match addr {
-                                            IpAddr::V4(v4) => {
-                                                IpNet::V4(ipnet::Ipv4Net::new(v4, 32)
-                                                    .map_err(|e| format!("Invalid IPv4: {}", e))?)
-                                            }
-                                            IpAddr::V6(v6) => {
-                                                IpNet::V6(ipnet::Ipv6Net::new(v6, 128)
-                                                    .map_err(|e| format!("Invalid IPv6: {}", e))?)
-                                            }
+                                            IpAddr::V4(v4) => IpNet::V4(
+                                                ipnet::Ipv4Net::new(v4, 32)
+                                                    .map_err(|e| format!("Invalid IPv4: {}", e))?,
+                                            ),
+                                            IpAddr::V6(v6) => IpNet::V6(
+                                                ipnet::Ipv6Net::new(v6, 128)
+                                                    .map_err(|e| format!("Invalid IPv6: {}", e))?,
+                                            ),
                                         };
                                         compiled.ip_nets.push(net);
                                     } else {
@@ -340,7 +345,9 @@ impl BlockingRulesManager {
             }
             BlockingRuleType::CountryBlocking => {
                 // Support both "countries" and "country_codes" for compatibility
-                let countries = rule.config.get("countries")
+                let countries = rule
+                    .config
+                    .get("countries")
                     .or_else(|| rule.config.get("country_codes"))
                     .and_then(|v| v.as_array());
 
@@ -364,7 +371,9 @@ impl BlockingRulesManager {
                                 let regex_with_flags = format!("(?i){}", regex_str);
                                 match Regex::new(&regex_with_flags) {
                                     Ok(regex) => compiled.regex_patterns.push(regex),
-                                    Err(e) => warn!("Invalid regex pattern '{}': {}", pattern_str, e),
+                                    Err(e) => {
+                                        warn!("Invalid regex pattern '{}': {}", pattern_str, e)
+                                    }
                                 }
                             } else if pattern_str.contains('*') {
                                 // Treat as glob pattern - convert wildcards to regex
@@ -376,7 +385,9 @@ impl BlockingRulesManager {
                                 let regex_str = format!("(?i){}", regex_pattern);
                                 match Regex::new(&regex_str) {
                                     Ok(regex) => compiled.regex_patterns.push(regex),
-                                    Err(e) => warn!("Invalid glob pattern '{}': {}", pattern_str, e),
+                                    Err(e) => {
+                                        warn!("Invalid glob pattern '{}': {}", pattern_str, e)
+                                    }
                                 }
                             } else {
                                 // Treat as substring match (case-insensitive)
@@ -384,7 +395,10 @@ impl BlockingRulesManager {
                                 let regex_str = format!("(?i){}", escaped);
                                 match Regex::new(&regex_str) {
                                     Ok(regex) => compiled.regex_patterns.push(regex),
-                                    Err(e) => warn!("Failed to create regex for substring '{}': {}", pattern_str, e),
+                                    Err(e) => warn!(
+                                        "Failed to create regex for substring '{}': {}",
+                                        pattern_str, e
+                                    ),
                                 }
                             }
                         }
@@ -405,7 +419,10 @@ impl BlockingRulesManager {
 
         // Only handle global rules
         if key_suffix != "global" {
-            debug!("Ignoring non-global blocking rules key suffix: {}", key_suffix);
+            debug!(
+                "Ignoring non-global blocking rules key suffix: {}",
+                key_suffix
+            );
             return Ok(());
         }
 
@@ -417,7 +434,7 @@ impl BlockingRulesManager {
         // Check circuit breaker before attempting Redis operation
         if !self.redis_circuit_breaker.is_available() {
             debug!("Circuit breaker is open, skipping Redis rule loading");
-            return Ok(());  // Return Ok to avoid cascading failures
+            return Ok(()); // Return Ok to avoid cascading failures
         }
 
         let key = format!("blocking_rules:{}", key_suffix);
@@ -432,7 +449,7 @@ impl BlockingRulesManager {
             Err(e) => {
                 self.redis_circuit_breaker.record_failure();
                 warn!("Failed to get Redis connection for rule loading: {}", e);
-                return Ok(());  // Return Ok to avoid cascading failures
+                return Ok(()); // Return Ok to avoid cascading failures
             }
         };
 
@@ -443,8 +460,15 @@ impl BlockingRulesManager {
             })
         })?;
 
-        debug!("Redis response for key '{}': {}", key,
-               if rules_json.is_some() { "data found" } else { "no data" });
+        debug!(
+            "Redis response for key '{}': {}",
+            key,
+            if rules_json.is_some() {
+                "data found"
+            } else {
+                "no data"
+            }
+        );
 
         if let Some(json) = rules_json {
             debug!("Raw JSON from Redis: {}", json);
@@ -463,21 +487,30 @@ impl BlockingRulesManager {
                 match serde_json::from_value::<BlockingRule>(rule_json.clone()) {
                     Ok(rule) => rules.push(rule),
                     Err(e) => {
-                        warn!("Failed to parse blocking rule #{} (skipping): {} - Raw: {}", i, e, rule_json);
+                        warn!(
+                            "Failed to parse blocking rule #{} (skipping): {} - Raw: {}",
+                            i, e, rule_json
+                        );
                         parse_errors += 1;
                     }
                 }
             }
 
-            debug!("Parsed {} rules from JSON ({} parse errors skipped)", rules.len(), parse_errors);
+            debug!(
+                "Parsed {} rules from JSON ({} parse errors skipped)",
+                rules.len(),
+                parse_errors
+            );
 
             // Compile and validate rules
             let mut compiled_rules = Vec::with_capacity(rules.len());
             let mut active_count = 0;
 
             for (i, rule) in rules.into_iter().enumerate() {
-                debug!("Processing rule #{}: '{}' (type: {:?}, status: {:?})",
-                       i, rule.name, rule.rule_type, rule.status);
+                debug!(
+                    "Processing rule #{}: '{}' (type: {:?}, status: {:?})",
+                    i, rule.name, rule.rule_type, rule.status
+                );
 
                 // Only include active rules
                 if !matches!(rule.status, BlockingRuleStatus::Active) {
@@ -513,14 +546,14 @@ impl BlockingRulesManager {
             *self.global_rules.write().await = compiled_rules;
             info!(
                 "Loaded {} active global blocking rules in {:?}",
-                active_count, start.elapsed()
+                active_count,
+                start.elapsed()
             );
 
             // Update metrics
             gauge!("blocking_rules_cached").set(active_count as f64);
             *self.total_rules_count.write().await = active_count;
             *self.rules_loaded_at.write().await = Instant::now();
-
         } else {
             // No rules found - clear global rules
             *self.global_rules.write().await = Vec::new();
@@ -555,7 +588,10 @@ impl BlockingRulesManager {
         let client_addr = match IpAddr::from_str(client_ip) {
             Ok(addr) => Some(addr),
             Err(_) => {
-                warn!("Invalid client IP address: {} - IP-based rules will be skipped", client_ip);
+                warn!(
+                    "Invalid client IP address: {} - IP-based rules will be skipped",
+                    client_ip
+                );
                 counter!("blocking_rules_evaluated", "result" => "invalid_ip").increment(1);
                 None // Continue with non-IP rules
             }
@@ -594,11 +630,20 @@ impl BlockingRulesManager {
                     BlockingRuleType::IpBlocking => {
                         // Check if IP matches any configured range (pre-compiled)
                         if let Some(addr) = client_addr {
-                            let ip_matched = compiled_rule.ip_nets.iter().any(|net| net.contains(&addr));
-                            debug!("IP blocking rule '{}': {} networks, matched={}", rule.name, compiled_rule.ip_nets.len(), ip_matched);
+                            let ip_matched =
+                                compiled_rule.ip_nets.iter().any(|net| net.contains(&addr));
+                            debug!(
+                                "IP blocking rule '{}': {} networks, matched={}",
+                                rule.name,
+                                compiled_rule.ip_nets.len(),
+                                ip_matched
+                            );
                             ip_matched
                         } else {
-                            debug!("IP blocking rule '{}': skipped due to invalid IP", rule.name);
+                            debug!(
+                                "IP blocking rule '{}': skipped due to invalid IP",
+                                rule.name
+                            );
                             false
                         }
                     }
@@ -617,10 +662,17 @@ impl BlockingRulesManager {
                         // Check against pre-compiled regex patterns
                         let ua_matched = user_agent
                             .map(|ua| {
-                                for (i, pattern) in compiled_rule.regex_patterns.iter().enumerate() {
+                                for (i, pattern) in compiled_rule.regex_patterns.iter().enumerate()
+                                {
                                     let pattern_matched = pattern.is_match(ua);
-                                    debug!("User-Agent pattern #{} in rule '{}': '{}' vs '{}' = {}",
-                                           i, rule.name, pattern.as_str(), ua, pattern_matched);
+                                    debug!(
+                                        "User-Agent pattern #{} in rule '{}': '{}' vs '{}' = {}",
+                                        i,
+                                        rule.name,
+                                        pattern.as_str(),
+                                        ua,
+                                        pattern_matched
+                                    );
                                     if pattern_matched {
                                         return true;
                                     }
@@ -635,8 +687,13 @@ impl BlockingRulesManager {
 
                     BlockingRuleType::RateBasedBlocking => {
                         // Check rate limits with global scope
-                        let rate_exceeded = self.check_rate_limit("global", client_ip, &rule.config).await;
-                        debug!("Rate limiting rule '{}': rate_exceeded={}", rule.name, rate_exceeded);
+                        let rate_exceeded = self
+                            .check_rate_limit("global", client_ip, &rule.config)
+                            .await;
+                        debug!(
+                            "Rate limiting rule '{}': rate_exceeded={}",
+                            rule.name, rate_exceeded
+                        );
                         rate_exceeded
                     }
                 };
@@ -644,7 +701,9 @@ impl BlockingRulesManager {
                 if matched {
                     debug!("MATCH FOUND: Global rule '{}' matched!", rule.name);
                     // Record metrics and return blocked result
-                    return self.handle_rule_match(rule, client_ip, country_code, start, "global").await;
+                    return self
+                        .handle_rule_match(rule, client_ip, country_code, start, "global")
+                        .await;
                 } else {
                     debug!("No match for global rule '{}'", rule.name);
                 }
@@ -657,7 +716,8 @@ impl BlockingRulesManager {
         counter!("blocking_rules_evaluated",
             "result" => "allowed",
             "rules_checked" => rules_evaluated.to_string()
-        ).increment(1);
+        )
+        .increment(1);
 
         Ok(None)
     }
@@ -677,7 +737,8 @@ impl BlockingRulesManager {
             "rule_type" => format!("{:?}", rule.rule_type),
             "rule_name" => rule.name.clone(),
             "scope" => scope.to_string()
-        ).increment(1);
+        )
+        .increment(1);
 
         // Update match statistics asynchronously (fire-and-forget)
         if let Some(redis) = &self.redis_client {
@@ -698,16 +759,26 @@ impl BlockingRulesManager {
         // Try to get the custom reason from Redis, fall back to default reason
         let reason = match self.get_rule_reason(&rule.name).await {
             Some(custom_reason) => {
-                debug!("Using custom reason from Redis for rule '{}': {}", rule.name, custom_reason);
+                debug!(
+                    "Using custom reason from Redis for rule '{}': {}",
+                    rule.name, custom_reason
+                );
                 custom_reason
             }
             None => {
-                debug!("No custom reason found in Redis for rule '{}', using default", rule.name);
+                debug!(
+                    "No custom reason found in Redis for rule '{}', using default",
+                    rule.name
+                );
                 // Generate default reason string based on rule type
                 match rule.rule_type {
                     BlockingRuleType::IpBlocking => format!("IP {} is blocked", client_ip),
-                    BlockingRuleType::CountryBlocking => format!("Country {} is blocked", country_code.unwrap_or("unknown")),
-                    BlockingRuleType::UserAgentBlocking => format!("User agent matches blocked pattern"),
+                    BlockingRuleType::CountryBlocking => {
+                        format!("Country {} is blocked", country_code.unwrap_or("unknown"))
+                    }
+                    BlockingRuleType::UserAgentBlocking => {
+                        format!("User agent matches blocked pattern")
+                    }
                     BlockingRuleType::RateBasedBlocking => format!("Rate limit exceeded"),
                 }
             }
@@ -727,13 +798,15 @@ impl BlockingRulesManager {
                     &rule_clone,
                     client_ip_clone,
                     country_code_clone,
-                    None, // user_agent: TODO - need to pass from caller
+                    None,                  // user_agent: TODO - need to pass from caller
                     "unknown".to_string(), // request_path: TODO - need to pass from caller
                     "unknown".to_string(), // request_method: TODO - need to pass from caller
                     reason_clone,
                 );
 
-                if let Err(e) = write_blocking_event_to_clickhouse(&clickhouse, blocking_event).await {
+                if let Err(e) =
+                    write_blocking_event_to_clickhouse(&clickhouse, blocking_event).await
+                {
                     debug!("Failed to write blocking event to ClickHouse: {}", e);
                 } else {
                     debug!("Successfully wrote blocking event to ClickHouse");
@@ -747,7 +820,7 @@ impl BlockingRulesManager {
     /// Check rate limits with atomic operations
     async fn check_rate_limit(
         &self,
-        scope: &str,  // "global" or "model:{name}"
+        scope: &str, // "global" or "model:{name}"
         client_ip: &str,
         config: &serde_json::Value,
     ) -> bool {
@@ -761,7 +834,12 @@ impl BlockingRulesManager {
         let window_seconds = config
             .get("window_seconds")
             .and_then(|v| v.as_u64())
-            .or_else(|| config.get("window_minutes").and_then(|v| v.as_u64()).map(|minutes| minutes * 60))
+            .or_else(|| {
+                config
+                    .get("window_minutes")
+                    .and_then(|v| v.as_u64())
+                    .map(|minutes| minutes * 60)
+            })
             .unwrap_or(60);
 
         let window = Duration::from_secs(window_seconds);
@@ -770,12 +848,13 @@ impl BlockingRulesManager {
         let now = Instant::now();
 
         // Use DashMap entry API for atomic operations
-        let mut entry = self.rate_limits.entry(key.clone()).or_insert_with(|| {
-            RateLimitState {
+        let mut entry = self
+            .rate_limits
+            .entry(key.clone())
+            .or_insert_with(|| RateLimitState {
                 requests: 0,
                 window_start: now,
-            }
-        });
+            });
 
         // Check if window has expired
         if now.duration_since(entry.window_start) > window {
@@ -830,20 +909,27 @@ impl BlockingRulesManager {
         let reason_key = format!("blocking_rule_reason:{}", rule_name);
 
         match redis_client.get_connection().await {
-            Ok(mut conn) => {
-                match conn.get::<_, String>(&reason_key).await {
-                    Ok(reason) => {
-                        debug!("Retrieved rule reason from Redis: {} = {}", reason_key, reason);
-                        Some(reason)
-                    }
-                    Err(e) => {
-                        debug!("Failed to get rule reason from Redis key '{}': {}", reason_key, e);
-                        None
-                    }
+            Ok(mut conn) => match conn.get::<_, String>(&reason_key).await {
+                Ok(reason) => {
+                    debug!(
+                        "Retrieved rule reason from Redis: {} = {}",
+                        reason_key, reason
+                    );
+                    Some(reason)
                 }
-            }
+                Err(e) => {
+                    debug!(
+                        "Failed to get rule reason from Redis key '{}': {}",
+                        reason_key, e
+                    );
+                    None
+                }
+            },
             Err(e) => {
-                debug!("Failed to get Redis connection for rule reason lookup: {}", e);
+                debug!(
+                    "Failed to get Redis connection for rule reason lookup: {}",
+                    e
+                );
                 None
             }
         }
@@ -859,9 +945,11 @@ impl BlockingRulesManager {
 
 /// Update rule statistics in Redis (fire-and-forget background task)
 async fn update_rule_stats(redis: Arc<RedisClient>, rule_id: Uuid) -> Result<(), Error> {
-    let mut conn = redis.get_connection().await.map_err(|e| Error::new(ErrorDetails::InternalError {
-        message: format!("Failed to get Redis connection: {}", e),
-    }))?;
+    let mut conn = redis.get_connection().await.map_err(|e| {
+        Error::new(ErrorDetails::InternalError {
+            message: format!("Failed to get Redis connection: {}", e),
+        })
+    })?;
 
     // Update match count and last matched timestamp
     let stats_key = format!("gateway:rule_stats:{}", rule_id);
@@ -870,14 +958,24 @@ async fn update_rule_stats(redis: Arc<RedisClient>, rule_id: Uuid) -> Result<(),
     // Use Redis pipeline for atomic updates
     let _: () = redis::pipe()
         .atomic()
-        .cmd("HINCRBY").arg(&stats_key).arg("match_count").arg(1)
-        .cmd("HSET").arg(&stats_key).arg("last_matched").arg(now)
-        .cmd("EXPIRE").arg(&stats_key).arg(86400) // Expire after 24 hours
+        .cmd("HINCRBY")
+        .arg(&stats_key)
+        .arg("match_count")
+        .arg(1)
+        .cmd("HSET")
+        .arg(&stats_key)
+        .arg("last_matched")
+        .arg(now)
+        .cmd("EXPIRE")
+        .arg(&stats_key)
+        .arg(86400) // Expire after 24 hours
         .query_async(&mut conn)
         .await
-        .map_err(|e| Error::new(ErrorDetails::InternalError {
-            message: format!("Failed to update rule stats: {}", e),
-        }))?;
+        .map_err(|e| {
+            Error::new(ErrorDetails::InternalError {
+                message: format!("Failed to update rule stats: {}", e),
+            })
+        })?;
 
     Ok(())
 }
@@ -914,13 +1012,22 @@ mod tests {
         let compiled = BlockingRulesManager::compile_rule(rule).unwrap();
 
         // Test exact IP match
-        assert!(compiled.ip_nets.iter().any(|net| net.contains(&"192.168.1.100".parse::<IpAddr>().unwrap())));
+        assert!(compiled
+            .ip_nets
+            .iter()
+            .any(|net| net.contains(&"192.168.1.100".parse::<IpAddr>().unwrap())));
 
         // Test CIDR match
-        assert!(compiled.ip_nets.iter().any(|net| net.contains(&"172.20.1.1".parse::<IpAddr>().unwrap())));
+        assert!(compiled
+            .ip_nets
+            .iter()
+            .any(|net| net.contains(&"172.20.1.1".parse::<IpAddr>().unwrap())));
 
         // Test no match
-        assert!(!compiled.ip_nets.iter().any(|net| net.contains(&"8.8.8.8".parse::<IpAddr>().unwrap())));
+        assert!(!compiled
+            .ip_nets
+            .iter()
+            .any(|net| net.contains(&"8.8.8.8".parse::<IpAddr>().unwrap())));
     }
 
     #[test]
@@ -968,12 +1075,24 @@ mod tests {
         let compiled = BlockingRulesManager::compile_rule(rule).unwrap();
 
         // Test matches
-        assert!(compiled.regex_patterns.iter().any(|re| re.is_match("Mozilla/5.0 (compatible; Googlebot/2.1)")));
-        assert!(compiled.regex_patterns.iter().any(|re| re.is_match("WebCrawler/1.0")));
-        assert!(compiled.regex_patterns.iter().any(|re| re.is_match("curl/7.68.0")));
+        assert!(compiled
+            .regex_patterns
+            .iter()
+            .any(|re| re.is_match("Mozilla/5.0 (compatible; Googlebot/2.1)")));
+        assert!(compiled
+            .regex_patterns
+            .iter()
+            .any(|re| re.is_match("WebCrawler/1.0")));
+        assert!(compiled
+            .regex_patterns
+            .iter()
+            .any(|re| re.is_match("curl/7.68.0")));
 
         // Test no match
-        assert!(!compiled.regex_patterns.iter().any(|re| re.is_match("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")));
+        assert!(!compiled
+            .regex_patterns
+            .iter()
+            .any(|re| re.is_match("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")));
     }
 
     #[tokio::test]
@@ -1010,7 +1129,9 @@ mod tests {
         // Create some rate limit entries
         for i in 0..5 {
             let ip = format!("192.168.1.{}", i);
-            manager.check_rate_limit("model:test-model", &ip, &config).await;
+            manager
+                .check_rate_limit("model:test-model", &ip, &config)
+                .await;
         }
 
         // Verify we have entries
@@ -1018,6 +1139,9 @@ mod tests {
 
         // Cleanup should retain entries (they're fresh)
         manager.cleanup_rate_limits().await;
-        assert!(manager.rate_limits.len() >= 5, "Fresh entries should be retained");
+        assert!(
+            manager.rate_limits.len() >= 5,
+            "Fresh entries should be retained"
+        );
     }
 }

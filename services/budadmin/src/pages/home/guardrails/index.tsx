@@ -184,29 +184,17 @@ function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
       <div className="flex items-center justify-between mt-auto pt-[1rem] border-t border-[#1F1F1F]">
         <div className="flex items-center gap-[0.5rem] flex-wrap">
           {item.category.slice(0, 3).map((cat, idx) => (
-            <Tag
+            <Tags
+              name={cat}
+              color="#1F1F1F"
               key={idx}
-              className="text-[#B3B3B3] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
-              style={{
-                backgroundColor: "#1F1F1F",
-              }}
-            >
-              <span className="text-[0.75rem] font-[400] capitalize">
-                {cat}
-              </span>
-            </Tag>
+            />
           ))}
           {item.category.length > 3 && (
-            <Tag
-              className="text-[#757575] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
-              style={{
-                backgroundColor: "#1F1F1F",
-              }}
-            >
-              <span className="text-[0.75rem] font-[400]">
-                +{item.category.length - 3}
-              </span>
-            </Tag>
+            <Tags
+              name={`+${item.category.length - 3}`}
+              color="#1F1F1F"
+            />
           )}
         </div>
         {item.deployments !== undefined && (
@@ -872,76 +860,15 @@ export default function GuardRails() {
             >
               {/* Category Filter Tags */}
               <div className="flex items-center gap-[0.75rem] mb-[2rem] px-[1.5rem]">
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "all"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("all")}
-                >
-                  All
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "harm"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("harm")}
-                >
-                  Harm
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "jailbreak"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("jailbreak")}
-                >
-                  Jailbreak
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "toxic"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("toxic")}
-                >
-                  Toxic
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "bias"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("bias")}
-                >
-                  Bias
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "compliance"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("compliance")}
-                >
-                  Compliance
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "custom"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("custom")}
-                >
-                  Custom
-                </Tag>
+                {["all", "harm", "jailbreak", "toxic", "bias", "compliance", "custom"].map((category) => (
+                  <Tags
+                    key={category}
+                    name={category.charAt(0).toUpperCase() + category.slice(1)}
+                    color={selectedCategory === category ? "#965CDE" : "#757575"}
+                    classNames="px-[1rem] py-[0.5rem]"
+                    onTagClick={() => setSelectedCategory(category)}
+                  />
+                ))}
               </div>
 
               {/* GuardRails Grid */}
