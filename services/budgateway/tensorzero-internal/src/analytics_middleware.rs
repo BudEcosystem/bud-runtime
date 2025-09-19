@@ -58,21 +58,6 @@ pub async fn analytics_middleware(
     if let Some(geoip) = &geoip_service {
         let client_ip = record.client_ip.clone();
         geoip.enrich_analytics(&client_ip, record);
-
-        // Log the geolocation results
-        tracing::info!("========== BUDGATEWAY GEOLOCATION RESULT ==========");
-        tracing::info!("[BUDGATEWAY] IP Address: {}", client_ip);
-        tracing::info!("[BUDGATEWAY] Country: {:?}", record.country_code);
-        tracing::info!("[BUDGATEWAY] Region: {:?}", record.region);
-        tracing::info!("[BUDGATEWAY] City: {:?}", record.city);
-        tracing::info!("[BUDGATEWAY] Latitude: {:?}", record.latitude);
-        tracing::info!("[BUDGATEWAY] Longitude: {:?}", record.longitude);
-        tracing::info!("[BUDGATEWAY] ISP: {:?}", record.isp);
-        tracing::info!("[BUDGATEWAY] ASN: {:?}", record.asn);
-        tracing::info!("[BUDGATEWAY] Timezone: {:?}", record.timezone);
-        tracing::info!("====================================================");
-    } else {
-        tracing::warn!("[BUDGATEWAY] GeoIP service not available for IP lookup");
     }
 
     // Extract selected request headers
@@ -186,14 +171,12 @@ pub async fn analytics_middleware(
 fn get_client_ip_fallback(headers: &HeaderMap) -> String {
     use std::net::IpAddr;
 
-    // Enhanced logging for IP detection debugging
-    tracing::info!("========== BUDGATEWAY IP DETECTION DEBUG ==========");
 
     // First check for custom headers from BudPlayground (these won't be modified by proxies)
     // Priority 1: X-Playground-Client-IP (contains the original header chain)
     if let Some(playground_ip) = headers.get("x-playground-client-ip") {
         if let Ok(ip_str) = playground_ip.to_str() {
-            tracing::info!("[BUDGATEWAY] Found X-Playground-Client-IP header: {}", ip_str);
+            tracing::debug!("Found X-Playground-Client-IP header: {}", ip_str);
             // Split and find first public IP if it's a chain
             let ips: Vec<&str> = ip_str.split(',').map(|s| s.trim()).collect();
             for ip in &ips {
@@ -217,11 +200,10 @@ fn get_client_ip_fallback(headers: &HeaderMap) -> String {
                     };
 
                     if !is_private {
-                        tracing::info!("[BUDGATEWAY] Using public IP from X-Playground-Client-IP: {}", ip);
-                        tracing::info!("====================================================");
+                        tracing::debug!("Using public IP from X-Playground-Client-IP: {}", ip);
                         return ip.to_string();
                     } else {
-                        tracing::info!("[BUDGATEWAY] Skipping private IP in X-Playground-Client-IP: {}", ip);
+                        tracing::debug!("Skipping private IP in X-Playground-Client-IP: {}", ip);
                     }
                 }
             }
@@ -231,7 +213,7 @@ fn get_client_ip_fallback(headers: &HeaderMap) -> String {
     // Priority 2: X-Original-Client-IP (fallback if X-Playground-Client-IP not available)
     if let Some(original_client_ip) = headers.get("x-original-client-ip") {
         if let Ok(ip_str) = original_client_ip.to_str() {
-            tracing::info!("[BUDGATEWAY] Found X-Original-Client-IP header: {}", ip_str);
+            tracing::debug!("Found X-Original-Client-IP header: {}", ip_str);
             // Split and find first public IP if it's a chain
             let ips: Vec<&str> = ip_str.split(',').map(|s| s.trim()).collect();
             for ip in &ips {
@@ -255,11 +237,10 @@ fn get_client_ip_fallback(headers: &HeaderMap) -> String {
                     };
 
                     if !is_private {
-                        tracing::info!("[BUDGATEWAY] Using public IP from X-Original-Client-IP: {}", ip);
-                        tracing::info!("====================================================");
+                        tracing::debug!("Using public IP from X-Original-Client-IP: {}", ip);
                         return ip.to_string();
                     } else {
-                        tracing::info!("[BUDGATEWAY] Skipping private IP in X-Original-Client-IP: {}", ip);
+                        tracing::debug!("Skipping private IP in X-Original-Client-IP: {}", ip);
                     }
                 }
             }
@@ -295,7 +276,7 @@ fn get_client_ip_fallback(headers: &HeaderMap) -> String {
     // Check X-Forwarded-For first
     if let Some(forwarded_for) = headers.get("x-forwarded-for") {
         if let Ok(forwarded_str) = forwarded_for.to_str() {
-            tracing::info!("[BUDGATEWAY] Found X-Forwarded-For header: {}", forwarded_str);
+            tracing::debug!("Found X-Forwarded-For header: {}", forwarded_str);
 
             // X-Forwarded-For can contain multiple IPs, find the first public IP
             let ips: Vec<&str> = forwarded_str.split(',').map(|s| s.trim()).collect();
@@ -303,52 +284,48 @@ fn get_client_ip_fallback(headers: &HeaderMap) -> String {
             // Try to find the first public IP in the chain
             for ip in &ips {
                 if !is_private_ip(ip) {
-                    tracing::info!("[BUDGATEWAY] Found public IP in X-Forwarded-For: {}", ip);
-                    tracing::info!("====================================================");
+                    tracing::debug!("Found public IP in X-Forwarded-For: {}", ip);
                     return ip.to_string();
                 } else {
-                    tracing::info!("[BUDGATEWAY] Skipping private IP: {}", ip);
+                    tracing::debug!("Skipping private IP: {}", ip);
                 }
             }
 
             // If all IPs are private, use the first one as fallback
             if let Some(first_ip) = ips.first() {
-                tracing::warn!("[BUDGATEWAY] No public IP found in X-Forwarded-For, using first IP: {}", first_ip);
-                tracing::info!("====================================================");
+                tracing::debug!("No public IP found in X-Forwarded-For, using first IP: {}", first_ip);
                 return first_ip.to_string();
             }
         } else {
-            tracing::warn!("[BUDGATEWAY] X-Forwarded-For header present but invalid: {:?}", forwarded_for);
+            tracing::warn!("X-Forwarded-For header present but invalid: {:?}", forwarded_for);
         }
     } else {
-        tracing::info!("[BUDGATEWAY] X-Forwarded-For header: not present");
+        tracing::debug!("X-Forwarded-For header: not present");
     }
 
     // Check X-Real-IP
     if let Some(real_ip) = headers.get("x-real-ip") {
         if let Ok(ip_str) = real_ip.to_str() {
-            tracing::info!("[BUDGATEWAY] Found X-Real-IP header: {}", ip_str);
+            tracing::debug!("Found X-Real-IP header: {}", ip_str);
             if !is_private_ip(ip_str) {
-                tracing::info!("[BUDGATEWAY] Using public IP from X-Real-IP: {}", ip_str);
-                tracing::info!("====================================================");
+                tracing::debug!("Using public IP from X-Real-IP: {}", ip_str);
                 return ip_str.to_string();
             } else {
-                tracing::info!("[BUDGATEWAY] X-Real-IP contains private IP, skipping: {}", ip_str);
+                tracing::debug!("X-Real-IP contains private IP, skipping: {}", ip_str);
             }
         } else {
-            tracing::warn!("[BUDGATEWAY] X-Real-IP header present but invalid: {:?}", real_ip);
+            tracing::warn!("X-Real-IP header present but invalid: {:?}", real_ip);
         }
     } else {
-        tracing::info!("[BUDGATEWAY] X-Real-IP header: not present");
+        tracing::debug!("X-Real-IP header: not present");
     }
 
     // Check CF-Connecting-IP (Cloudflare)
     if let Some(cf_ip) = headers.get("cf-connecting-ip") {
         if let Ok(ip_str) = cf_ip.to_str() {
-            tracing::info!("[BUDGATEWAY] Found CF-Connecting-IP header: {}", ip_str);
+            tracing::debug!("Found CF-Connecting-IP header: {}", ip_str);
             // Cloudflare headers should always contain public IPs
-            tracing::info!("[BUDGATEWAY] Using IP from CF-Connecting-IP: {}", ip_str);
-            tracing::info!("====================================================");
+            tracing::debug!("Using IP from CF-Connecting-IP: {}", ip_str);
             return ip_str.to_string();
         }
     }
@@ -356,17 +333,15 @@ fn get_client_ip_fallback(headers: &HeaderMap) -> String {
     // Check True-Client-IP (Cloudflare Enterprise)
     if let Some(true_client_ip) = headers.get("true-client-ip") {
         if let Ok(ip_str) = true_client_ip.to_str() {
-            tracing::info!("[BUDGATEWAY] Found True-Client-IP header: {}", ip_str);
+            tracing::debug!("Found True-Client-IP header: {}", ip_str);
             // Cloudflare headers should always contain public IPs
-            tracing::info!("[BUDGATEWAY] Using IP from True-Client-IP: {}", ip_str);
-            tracing::info!("====================================================");
+            tracing::debug!("Using IP from True-Client-IP: {}", ip_str);
             return ip_str.to_string();
         }
     }
 
     // Fallback to unknown
-    tracing::info!("[BUDGATEWAY] No forwarded IP headers found, using 'unknown'");
-    tracing::info!("====================================================");
+    tracing::debug!("No forwarded IP headers found, using 'unknown'");
     "unknown".to_string()
 }
 
