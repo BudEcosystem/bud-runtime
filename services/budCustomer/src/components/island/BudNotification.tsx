@@ -40,18 +40,18 @@ export function Notification({
       onClick={() => onClick?.()}
       className="fileInput flex justify-between items-start px-[1.3rem] py-[1.25rem] rounded-[1rem] box-border width-300 transition-all duration-300 cursor-pointer height-88 island-notification island-theme-aware"
     >
-      <div className="flex justify-start items-center max-w-[65%]">
+      <div className="flex justify-start items-center max-w-[90%]">
         <IconRender icon={item?.icon || ""} size={44} imageSize={24} />
         <div className="pt-[.3rem] max-w-[94%] ml-[.75rem]">
           <div
-            className="tracking-[-.01rem] max-w-[80%] transition-all duration-300 truncate text-xs"
+            className="tracking-[-.01rem] max-w-[100%] transition-all duration-300 text-xs"
             style={{ color: "var(--island-text-muted)" }}
           >
             {item?.title}
           </div>
           <div className="flex justify-between items-center">
             <div
-              className="tracking-[-.01rem] transition-all duration-300 truncate text-sm font-semibold"
+              className="tracking-[-.01rem] transition-all duration-300 text-sm font-semibold"
               style={{ color: "var(--island-text-primary)" }}
             >
               {item?.message}
@@ -102,7 +102,7 @@ export function NotificationsWidget({
 }) {
   const { markAllNotificationsAsRead } = useNotifications();
 
-  const [isClosed, setIsClosed] = useState(true); // State to track the class
+  const [isClosed, setIsClosed] = useState(false); // State to track the class
   const toggleList = () => {
     setIsClosed(!isClosed); // Toggle between open and closed
   };
@@ -129,7 +129,7 @@ export function NotificationsWidget({
           <div className="flex justify-end items-center">
             {notifications && notifications?.length > 1 && (
               <div
-                className="w-[1.25rem] h-[1.25rem] rounded-full flex justify-center items-center mr-[.6rem] cursor-pointer island-button"
+                className="w-[1.25rem] h-[1.25rem] rounded-full flex justify-center items-center mr-[.6rem] cursor-pointer island-button hidden"
                 onClick={toggleList}
               >
                 <ChevronDown
@@ -182,7 +182,7 @@ export function NotificationsWidget({
         ) : (
           notifications?.length > 0 && (
             <div
-              className={`notificationList mt-[1.3rem] max-h-[93%] flex flex-col gap-[.7rem] ${isClosed && notifications?.length > 1 ? "closed" : "showing"} ${notifications?.length == 2 && "twoData"}  px-[1.5rem] transition-all duration-300`}
+              className={`notificationList mt-[1.3rem] max-h-[93%] overflow-auto flex flex-col gap-[.7rem] ${isClosed && notifications?.length > 1 ? "closed" : "showing"} ${notifications?.length == 2 && "twoData"}  px-[1.5rem] transition-all duration-300`}
             >
               {[...notifications]
                 ?.splice(0, isClosed ? 1 : notifications.length)

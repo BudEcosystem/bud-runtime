@@ -86,7 +86,7 @@ const AddEndpointPopup: React.FC<AddEndpointPopupProps> = ({
     },
   ];
   const defaultEvictionPolicy = evictionList.find(
-    (policy) => policy.code === "LFU"
+    (policy) => policy.code === "LFU",
   );
   const EmbeddingModel = [
     {
@@ -97,7 +97,7 @@ const AddEndpointPopup: React.FC<AddEndpointPopupProps> = ({
     },
   ];
   const defaultEmbeddingModle = EmbeddingModel.find(
-    (obj) => obj.model.name === "sentence-transformers/all-mpnet-base-v2"
+    (obj) => obj.model.name === "sentence-transformers/all-mpnet-base-v2",
   );
   const defaultMaxCache = 1000;
   const [isDeployButtonEnabled, setIsDeployButtonEnabled] = useState(false);
@@ -105,7 +105,7 @@ const AddEndpointPopup: React.FC<AddEndpointPopupProps> = ({
   const [selectedModel, setSelectedModel] = useState<any>([]);
   const [clusterData, setClusterData] = useState();
   const [selectedCluster, setSelectedCluster] = useState<any>(
-    initialValues.clusterData
+    initialValues.clusterData,
   );
   const [workerCount, setworkerCount] = useState<any>(1);
   const [formData, setFormData] = useState({
@@ -120,10 +120,10 @@ const AddEndpointPopup: React.FC<AddEndpointPopupProps> = ({
   const [isTtl, setIsTtl] = useState<any>(false);
   const [embeddingModels, setEmbeddingModels] = useState<any>([]);
   const [embeddingModel, setEmbeddingModel] = useState<any>(
-    defaultEmbeddingModle
+    defaultEmbeddingModle,
   );
   const [evictionPolicy, setEvictionPolicy] = useState<any>(
-    defaultEvictionPolicy
+    defaultEvictionPolicy,
   );
   const [sliderValue, setSliderValue] = useState([0.9]);
 
@@ -211,7 +211,7 @@ const AddEndpointPopup: React.FC<AddEndpointPopupProps> = ({
   useEffect(() => {
     if (modelData) {
       setEmbeddingModels(
-        modelData.filter((each) => each.modality == "embedding")
+        modelData.filter((each) => each.modality == "embedding"),
       );
     }
   }, [modelData]);

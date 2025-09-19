@@ -112,28 +112,34 @@ function ModelCard(item: Model, index) {
                     color: "#EEEEEE",
                   }}
                 >
-                  {item?.model_cluster_recommended?.cluster?.availability_percentage}% Available
+                  {
+                    item?.model_cluster_recommended?.cluster
+                      ?.availability_percentage
+                  }
+                  % Available
                 </div>
               </Tag>
-              {item?.model_cluster_recommended?.hardware_type?.map((resource, index) => (
-                <Tag
-                  key={index}
-                  className={`text-[#B3B3B3] border-[0] rounded-[6px] cursor-pointer hover:text-[#EEEEEE] flex justify-center items-center py-[.3rem] px-[.4rem]`}
-                style={{
-                  backgroundColor: getChromeColor("#1F1F1F"),
-                  background: "#1F1F1F",
-                }}
-              >
-                <div
-                  className={`text-[0.625rem] font-[400] leading-[100%]`}
-                  style={{
-                    color: "#EEEEEE",
-                  }}
-                >
-                  {resource.toUpperCase()}
-                </div>
-              </Tag>
-              ))}
+              {item?.model_cluster_recommended?.hardware_type?.map(
+                (resource, index) => (
+                  <Tag
+                    key={index}
+                    className={`text-[#B3B3B3] border-[0] rounded-[6px] cursor-pointer hover:text-[#EEEEEE] flex justify-center items-center py-[.3rem] px-[.4rem]`}
+                    style={{
+                      backgroundColor: getChromeColor("#1F1F1F"),
+                      background: "#1F1F1F",
+                    }}
+                  >
+                    <div
+                      className={`text-[0.625rem] font-[400] leading-[100%]`}
+                      style={{
+                        color: "#EEEEEE",
+                      }}
+                    >
+                      {resource.toUpperCase()}
+                    </div>
+                  </Tag>
+                ),
+              )}
               <Tag
                 className={`text-[#B3B3B3] border-[0] rounded-[6px] cursor-pointer hover:text-[#EEEEEE] flex justify-center items-center py-[.3rem] px-[.4rem]`}
                 style={{
@@ -147,7 +153,11 @@ function ModelCard(item: Model, index) {
                     color: "#EEEEEE",
                   }}
                 >
-                  ${Number(item?.model_cluster_recommended?.cost_per_million_tokens).toFixed(2)} / 1M Tokens
+                  $
+                  {Number(
+                    item?.model_cluster_recommended?.cost_per_million_tokens,
+                  ).toFixed(2)}{" "}
+                  / 1M Tokens
                 </div>
               </Tag>
             </div>
@@ -319,7 +329,7 @@ export default function ModelRepo() {
         hideLoader();
       }
     },
-    [currentPage, pageSize, getGlobalModels]
+    [currentPage, pageSize, getGlobalModels],
   );
 
   const handleOpenChange = (open) => {
@@ -351,7 +361,7 @@ export default function ModelRepo() {
       setTempFilter({ ...tempFilter, model_size_max: "", model_size_min: "" });
     } else {
       const filteredItems = tempFilter[key].filter(
-        (element) => element != item
+        (element) => element != item,
       );
       setTempFilter({ ...tempFilter, [key]: filteredItems });
     }
@@ -397,9 +407,9 @@ export default function ModelRepo() {
       }, 1000);
     }
   }, [currentPage, pageSize, getGlobalModels, filter, isMounted]);
-   useEffect(() => {
-      setIsMounted(true)
-    }, []);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   return (
     <DashBoardLayout>
       <div className="boardPageView" id="model-container">
@@ -430,7 +440,9 @@ export default function ModelRepo() {
                         sizePopupArrow: 0,
                       },
                     }}
-                    getPopupContainer={(trigger) => (trigger.parentNode as HTMLElement) || document.body}
+                    getPopupContainer={(trigger) =>
+                      (trigger.parentNode as HTMLElement) || document.body
+                    }
                   >
                     <Popover
                       open={filterOpen}
@@ -502,7 +514,10 @@ export default function ModelRepo() {
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#D1B854"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#D1B854"
+                                        ></Tags>
                                       );
                                     }}
                                   />
@@ -673,14 +688,19 @@ export default function ModelRepo() {
                                     maxTagCount={2}
                                     size="large"
                                     className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.15rem] font-[300]  text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                    options={modalityFilters.map((modality) => ({
-                                      label: modality.label,
-                                      value: modality.modality,
-                                    }))}
+                                    options={modalityFilters.map(
+                                      (modality) => ({
+                                        label: modality.label,
+                                        value: modality.modality,
+                                      }),
+                                    )}
                                     tagRender={(props) => {
                                       const { label } = props;
                                       return (
-                                        <Tags name={label} color="#D1B854"></Tags>
+                                        <Tags
+                                          name={label}
+                                          color="#D1B854"
+                                        ></Tags>
                                       );
                                     }}
                                     mode="multiple"
@@ -717,7 +737,7 @@ export default function ModelRepo() {
                     >
                       <label
                         className="group h-[1.7rem] text-[#EEEEEE] mx-2 flex items-center cursor-pointer text-xs font-normal leading-3 rounded-[6px] shadow-none bg-transparent"
-                        onClick={() => { }}
+                        onClick={() => {}}
                       >
                         <MixerHorizontalIcon
                           style={{ width: "0.875rem", height: "0.875rem" }}
@@ -727,18 +747,21 @@ export default function ModelRepo() {
                       </label>
                     </Popover>
                   </ConfigProvider>
-                  <div className="group flex justtify-center items-center gap-[.1rem] mr-[.5rem] cursor-pointer"
-                    onClick={() => router.push('/modelRepo/benchmarks-history')}
+                  <div
+                    className="group flex justtify-center items-center gap-[.1rem] mr-[.5rem] cursor-pointer"
+                    onClick={() => router.push("/modelRepo/benchmarks-history")}
                   >
                     <div className="relative">
-                      <Text_12_400_EEEEEE className="group-hover:text-[#FFFFFF]">Benchmark history</Text_12_400_EEEEEE>
+                      <Text_12_400_EEEEEE className="group-hover:text-[#FFFFFF]">
+                        Benchmark history
+                      </Text_12_400_EEEEEE>
                       <div className="absolute bottom-[2px] h-[1px] w-[100%] bg-[#EEEEEE] brightness-50 group-hover:brightness-100"></div>
                     </div>
                     <div>
                       <Image
                         preview={false}
                         src="/images/icons/ArrowTopRight.png"
-                        style={{ width: '0.75rem' }}
+                        style={{ width: "0.75rem" }}
                         className="transition-transform duration-200 group-hover:scale-110"
                       />
                     </div>
@@ -774,14 +797,17 @@ export default function ModelRepo() {
                   <>
                     {Object.keys(filter).filter(
                       (key) =>
-                        filter[key] !== undefined && filter[key] !== "" && key !== "table_source"
+                        filter[key] !== undefined &&
+                        filter[key] !== "" &&
+                        key !== "table_source",
                     ).length > 0 ? (
                       <NoDataFount
                         classNames="h-[60vh]"
-                        textMessage={`No models found for the ${filter.name
-                          ? `search term "${filter.name}"`
-                          : "selected filters"
-                          }`}
+                        textMessage={`No models found for the ${
+                          filter.name
+                            ? `search term "${filter.name}"`
+                            : "selected filters"
+                        }`}
                       />
                     ) : (
                       <NoDataFount

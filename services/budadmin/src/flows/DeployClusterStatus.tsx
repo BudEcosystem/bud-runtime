@@ -16,7 +16,6 @@ export default function DeployClusterStatus() {
   const [showAlert, setShowAlert] = React.useState(false);
   const [isFailed, setIsFailed] = React.useState(false);
 
-
   return (
     <BudForm
       data={{}}
@@ -34,32 +33,36 @@ export default function DeployClusterStatus() {
       }}
     >
       <BudWraperBox>
-        {showAlert && <BudDrawerLayout>
-          <BudStepAlert
-            type="warining"
-            title="You're about to cancel the finding best clusters process"
-            description="Please note that if you cancel now, you will have to start the process again."
-            cancelText="Continue Finding"
-            confirmText="Cancel Anyways"
-            confirmAction={() => {
-              // TODO: Add cancel action
-              openDrawerWithStep("deploy-model-specification");
-            }}
-            cancelAction={() => {
-              setShowAlert(false)
-            }}
-          />
-        </BudDrawerLayout>}
+        {showAlert && (
+          <BudDrawerLayout>
+            <BudStepAlert
+              type="warining"
+              title="You're about to cancel the finding best clusters process"
+              description="Please note that if you cancel now, you will have to start the process again."
+              cancelText="Continue Finding"
+              confirmText="Cancel Anyways"
+              confirmAction={() => {
+                // TODO: Add cancel action
+                openDrawerWithStep("deploy-model-specification");
+              }}
+              cancelAction={() => {
+                setShowAlert(false);
+              }}
+            />
+          </BudDrawerLayout>
+        )}
         <CommonStatus
           workflowId={currentWorkflow?.workflow_id}
           events_field_id="bud_simulator_events"
           success_payload_type="get_cluster_recommendations"
           onCompleted={() => {
-            getRecommendedClusterById(currentWorkflow?.workflow_id).then((result) => {
-              if (result) {
-                openDrawerWithStep("deploy-model-choose-cluster");
-              }
-            });
+            getRecommendedClusterById(currentWorkflow?.workflow_id).then(
+              (result) => {
+                if (result) {
+                  openDrawerWithStep("deploy-model-choose-cluster");
+                }
+              },
+            );
           }}
           onFailed={() => {
             setIsFailed(true);

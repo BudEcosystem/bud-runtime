@@ -125,7 +125,7 @@ const BenchmarkResult = () => {
     smooth: false,
   });
   const [costRequestData, setCostRequestData] = useState<any>(
-    costRequestDataSample
+    costRequestDataSample,
   );
   const [ttftVsTokenData, setTtftVsTokenData] =
     useState<any>(ttftVsTokenSample);
@@ -192,10 +192,10 @@ const BenchmarkResult = () => {
     if (!inputSizeVsTTFT) return;
     const sortedData = [...inputSizeVsTTFT].sort((a, b) => a.ttft - b.ttft);
     const categories = sortedData.map(({ prompt_len }) =>
-      Number(prompt_len).toFixed(0)
+      Number(prompt_len).toFixed(0),
     );
     const data = sortedData.map(({ ttft }) =>
-      Number(ttft * 1000).toFixed(ttft * 1000 < 1 ? 2 : 0)
+      Number(ttft * 1000).toFixed(ttft * 1000 < 1 ? 2 : 0),
     );
     setInputsizevsTTFTChart({
       categories,
@@ -220,10 +220,10 @@ const BenchmarkResult = () => {
     if (!outputSizeVsTPOT) return;
     const sortedData = [...outputSizeVsTPOT].sort((a, b) => a.tpot - b.tpot);
     const categories = sortedData.map(({ output_len }) =>
-      Number(output_len).toFixed(0)
+      Number(output_len).toFixed(0),
     );
     const data = sortedData.map(({ tpot }) =>
-      Number(tpot * 1000).toFixed(tpot * 1000 < 1 ? 2 : 0)
+      Number(tpot * 1000).toFixed(tpot * 1000 < 1 ? 2 : 0),
     );
     setOutputsizevsTTFTChart({
       categories,
@@ -244,13 +244,13 @@ const BenchmarkResult = () => {
   const prepareOutputSizeVsLatency = () => {
     if (!outputSizeVsLatency) return;
     const sortedData = [...outputSizeVsLatency].sort(
-      (a, b) => a.latency - b.latency
+      (a, b) => a.latency - b.latency,
     );
     const categories = sortedData.map(({ output_len }) =>
-      Number(output_len).toFixed(0)
+      Number(output_len).toFixed(0),
     );
     const data = sortedData.map(({ latency }) =>
-      Number(latency * 1000).toFixed(latency * 1000 < 1 ? 2 : 0)
+      Number(latency * 1000).toFixed(latency * 1000 < 1 ? 2 : 0),
     );
     setOutputsizevsLatencyChart({
       categories,
@@ -281,7 +281,7 @@ const BenchmarkResult = () => {
   useEffect(() => {
     // setTtftVsTokenData
     const chartData = benchmarkAnalysisTtftVsTokenData?.map(
-      ({ ttft, tpot }) => [Number(ttft).toFixed(2), Number(tpot).toFixed(2)]
+      ({ ttft, tpot }) => [Number(ttft).toFixed(2), Number(tpot).toFixed(2)],
     );
     setTtftVsTokenData((prevState) => ({
       ...prevState,
@@ -373,10 +373,10 @@ const BenchmarkResult = () => {
       tiles: [
         {
           value: `${millisecondsToSeconds(
-            benchmarkResult?.request_throughput
+            benchmarkResult?.request_throughput,
           )}`,
           unit: `requests/${milliToSecUinit(
-            benchmarkResult?.request_throughput
+            benchmarkResult?.request_throughput,
           )}`,
           tagName: "Request throughput",
         },
@@ -690,7 +690,7 @@ const BenchmarkResult = () => {
     return (
       // <div className=" w-[49.1%] h-[380px]  py-[1.9rem] px-[1.65rem] border border-[#1F1F1F] rounded-md">
       <div className="cardBG w-[49.1%] h-[22rem]  py-[1.9rem] px-[1.65rem] border border-[#1F1F1F] rounded-md">
-      {/* <div className="cardBG w-[49.1%] h-[25rem]  py-[1.9rem] px-[1.65rem] border border-[#1F1F1F] rounded-md"> */}
+        {/* <div className="cardBG w-[49.1%] h-[25rem]  py-[1.9rem] px-[1.65rem] border border-[#1F1F1F] rounded-md"> */}
         {/* <div className="cardBG w-[49.1%] h-[23.75rem]  py-[1.9rem] px-[1.65rem] border border-[#1F1F1F] rounded-md"> */}
         <div className="flex justify-between align-center">
           <Text_19_600_EEEEEE>{data.title}</Text_19_600_EEEEEE>
@@ -731,7 +731,9 @@ const BenchmarkResult = () => {
                 )}
               </div>
             </div>
-            <div className="h-[11.5625rem] mt-[2rem]">{data.chartContainer}</div>
+            <div className="h-[11.5625rem] mt-[2rem]">
+              {data.chartContainer}
+            </div>
           </>
         ) : (
           <NoChartData
@@ -947,7 +949,7 @@ const BenchmarkResult = () => {
                     </span>
                     <Text_11_400_808080 className="mt-[.35rem]">
                       {formatDate(
-                        modelClusterDetails?.model?.created_at || new Date()
+                        modelClusterDetails?.model?.created_at || new Date(),
                       )}
                     </Text_11_400_808080>
                   </div>
@@ -1003,7 +1005,7 @@ const BenchmarkResult = () => {
                   </span>
                   <Text_11_400_808080 className="mt-[.35rem]">
                     {formatDate(
-                      modelClusterDetails?.cluster?.created_at || new Date()
+                      modelClusterDetails?.cluster?.created_at || new Date(),
                     )}
                   </Text_11_400_808080>
                 </div>

@@ -28,11 +28,15 @@ try {
   console.error("Failed to decode private key:", error);
 }
 
-export async function decryptString(encrypedKey: string): Promise<string | null> {
+export async function decryptString(
+  encrypedKey: string,
+): Promise<string | null> {
   try {
     // Check if private key is available
     if (!decodedString) {
-      throw new Error("Private key not available - check NEXT_PUBLIC_PRIVATE_KEY environment variable");
+      throw new Error(
+        "Private key not available - check NEXT_PUBLIC_PRIVATE_KEY environment variable",
+      );
     }
 
     // Convert to base64 string
@@ -57,7 +61,7 @@ export async function decryptString(encrypedKey: string): Promise<string | null>
         mgf1: {
           md: forge.md.sha256.create(),
         },
-      }
+      },
     );
     // Convert the decrypted message to a string
     return messageDecrypted;

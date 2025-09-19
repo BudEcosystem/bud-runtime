@@ -37,8 +37,7 @@ pub async fn blocking_middleware(
         .cloned();
 
     // Extract request metadata from analytics or headers
-    let (client_ip, country_code, user_agent) = if let Some(ref analytics) = analytics
-    {
+    let (client_ip, country_code, user_agent) = if let Some(ref analytics) = analytics {
         let analytics = analytics.lock().await;
         tracing::debug!(
             "Using analytics data - IP: {}, Country: {:?}, User-Agent: {:?}",
@@ -65,31 +64,29 @@ pub async fn blocking_middleware(
             user_agent_from_header
         );
 
-        (
-            client_ip,
-            None,
-            user_agent_from_header,
-        )
+        (client_ip, None, user_agent_from_header)
     };
 
     tracing::debug!(
         "Blocking middleware - checking request: IP={}, Country={:?}, User-Agent={:?}",
-        client_ip, country_code, user_agent
+        client_ip,
+        country_code,
+        user_agent
     );
 
     // Check if request should be blocked
     match manager
-        .should_block(
-            &client_ip,
-            country_code.as_deref(),
-            user_agent.as_deref(),
-        )
+        .should_block(&client_ip, country_code.as_deref(), user_agent.as_deref())
         .await
     {
         Ok(Some((rule, reason))) => {
             tracing::warn!(
                 "Request BLOCKED - Rule: {} (type: {:?}), Reason: {}, IP: {}, User-Agent: {:?}",
-                rule.name, rule.rule_type, reason, client_ip, user_agent
+                rule.name,
+                rule.rule_type,
+                reason,
+                client_ip,
+                user_agent
             );
 
             // Update analytics if available
@@ -107,10 +104,7 @@ pub async fn blocking_middleware(
             let mut response = (
                 StatusCode::FORBIDDEN,
                 [("x-block-reason", reason.as_str())],
-                format!(
-                    r#"{{"error":"forbidden","message":"{}"}}"#,
-                    reason
-                ),
+                format!(r#"{{"error":"forbidden","message":"{}"}}"#, reason),
             )
                 .into_response();
 
@@ -126,7 +120,8 @@ pub async fn blocking_middleware(
         Ok(None) => {
             tracing::debug!(
                 "Request ALLOWED - No blocking rules matched for IP: {}, User-Agent: {:?}",
-                client_ip, user_agent
+                client_ip,
+                user_agent
             );
             Ok(next.run(request).await)
         }

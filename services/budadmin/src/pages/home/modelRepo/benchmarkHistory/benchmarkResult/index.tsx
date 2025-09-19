@@ -16,13 +16,13 @@ import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import { AppRequest } from "src/pages/api/requests";
 import DashBoardLayout from "src/pages/home/layout";
-import latencyIcon from 'public/icons/latencyIcon.png'
-import clockIcon from 'public/icons/clockIcon.png'
-import stopwatchIcon from 'public/icons/stopwatchIcon.png'
-import throughput from 'public/icons/throughput.png'
-import timeSettingIcon from 'public/icons/timeSettingIcon.png'
-import cacheIcon from 'public/icons/cacheIcon.png'
-import tokenIcon from 'public/icons/tokenIcon.png'
+import latencyIcon from "public/icons/latencyIcon.png";
+import clockIcon from "public/icons/clockIcon.png";
+import stopwatchIcon from "public/icons/stopwatchIcon.png";
+import throughput from "public/icons/throughput.png";
+import timeSettingIcon from "public/icons/timeSettingIcon.png";
+import cacheIcon from "public/icons/cacheIcon.png";
+import tokenIcon from "public/icons/tokenIcon.png";
 type Props = {};
 
 const BenchmarkHistory = (props: Props) => {

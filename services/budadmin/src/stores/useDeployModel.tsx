@@ -43,6 +43,8 @@ const modalityTypeList = [
   {
     id: "1",
     type: ["llm", "mllm"],
+    modalities: ["text_input", "text_output"],
+    endpoints: [],
     icon: "/images/drawer/brain.png",
     name: "LLM, Multi-Model LLM",
     description: "Add LLM, Multi-Model LLM",
@@ -50,33 +52,52 @@ const modalityTypeList = [
   {
     id: "2",
     type: ["embedding"],
+    modalities: ["text_input"],
+    endpoints: ["/v1/embeddings"],
     icon: "/images/drawer/embedding.png",
     name: "Embedding models",
     description: "Add Embedding models",
   },
   {
     id: "speech_to_text",
+    modalities: ["audio_input", "text_output"],
+    endpoints: ["/v1/audio/transcriptions", "/v1/audio/translations"],
     icon: "/images/drawer/speachToText.png",
     name: "Speech to text",
     description: "Add Speech to text models",
   },
   {
     id: "text_to_speech",
+    modalities: ["text_input", "audio_output"],
+    endpoints: ["/v1/audio/speech"],
     icon: "/images/drawer/textToSpeach.png",
     name: "Text to Speech",
     description: "Add Text to Speech models",
   },
   {
     id: "action_transformers",
+    modalities: [],
+    endpoints: [],
     icon: "/images/drawer/compare.png",
     name: "Action Transformers",
     description: "Add Action Transformers models",
+  },
+  {
+    id: "document",
+    type: ["mllm"],
+    modalities: ["image_input", "text_output"],
+    endpoints: ["/v1/documents"],
+    icon: "/images/drawer/document.png",
+    name: "Document",
+    description: "Add Document processing models",
   },
 ];
 
 export type ModalityType = {
   id: string;
   type?: string[];
+  modalities?: string[];
+  endpoints?: string[];
   icon: string;
   name: string;
   description: string;
@@ -234,6 +255,8 @@ export const useDeployModel = create<{
   updateCredentialsLocal: (credentials: Credentials) => Promise<any>;
   localModelDetails: any;
   setLocalModelDetails: (details: any) => void;
+  cameFromDocumentList: boolean;
+  setCameFromDocumentList: (value: boolean) => void;
   startSecurityScan: () => Promise<any>;
 
   cancelModelDeployment: (id: string, projectId?: string) => Promise<any>;
@@ -246,28 +269,34 @@ export const useDeployModel = create<{
   createWorkerFlow: (
     endpointId: string,
     additionalConcurrency: number,
-    projectId?: string
+    projectId?: string,
   ) => Promise<any>;
-  completeCreateWorkerFlow: (workflowId: string, projectId?: string) => Promise<any>;
+  completeCreateWorkerFlow: (
+    workflowId: string,
+    projectId?: string,
+  ) => Promise<any>;
   getQuantizationMethods: () => Promise<any>;
   createQuantizationWorkflow: (
     model_name: string,
     type: string,
-    hardware: string
+    hardware: string,
   ) => Promise<any>;
   updateQuantizationMethod: (method: string) => Promise<any>;
   updateQuantizationAdvanced: (
     weight: QuantizeConfig,
-    activation: QuantizeConfig
+    activation: QuantizeConfig,
   ) => Promise<any>;
   updateQuantizationCluster: (clusterId: string) => Promise<any>;
   cancelQuantizationDeployment: (id: string) => Promise<any>;
   createAddAdapterWorkflow: (
     endpointId: string,
     adapterModelId: string,
-    projectId?: string
+    projectId?: string,
   ) => Promise<any>;
-  updateAdapterDetailWorkflow: (adapterName: string, projectId?: string) => Promise<any>;
+  updateAdapterDetailWorkflow: (
+    adapterName: string,
+    projectId?: string,
+  ) => Promise<any>;
   startRequest: () => void;
   endRequest: () => void;
 }>((set, get) => ({
@@ -283,6 +312,10 @@ export const useDeployModel = create<{
   modalityType: null,
   currentWorkflow: null,
   selectedProvider: null,
+  cameFromDocumentList: false,
+  setCameFromDocumentList: (value: boolean) => {
+    set({ cameFromDocumentList: value });
+  },
   setCurrentWorkflow: (workflow: WorkflowType) => {
     set({ currentWorkflow: workflow });
   },
@@ -297,14 +330,14 @@ export const useDeployModel = create<{
   setProviderType: (id: string) => {
     set({
       providerType: get().providerTypeList.find(
-        (provider) => provider.id === id
+        (provider) => provider.id === id,
       ),
     });
   },
   setModalityType: (id) => {
     set({
       modalityType: get().modalityTypeList.find(
-        (modality) => modality.id === id
+        (modality) => modality.id === id,
       ),
     });
   },
@@ -395,6 +428,7 @@ export const useDeployModel = create<{
       status: {},
       selectedProvider: null,
       providerType: null,
+      cameFromDocumentList: false,
       cloudModelDetails: {
         name: "",
         tags: [],
@@ -406,7 +440,7 @@ export const useDeployModel = create<{
         name: "",
         icon:
           get().currentWorkflow?.workflow_steps?.provider?.type ===
-            "huggingface"
+          "huggingface"
             ? ""
             : "😍",
         tags: [],
@@ -448,7 +482,7 @@ export const useDeployModel = create<{
     get().startRequest();
     try {
       const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/workflows/${workflowId}`
+        `${tempApiBaseUrl}/workflows/${workflowId}`,
       );
       if (response) {
         const workflow: WorkflowType = response.data;
@@ -700,7 +734,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       set({ currentWorkflow: response.data });
       get().getWorkflowCloud(response.data.id);
@@ -736,7 +770,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       get().getWorkflowCloud();
       return response;
@@ -770,7 +804,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       get().getWorkflowCloud();
     } catch (error) {
@@ -802,7 +836,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       get().getWorkflowCloud();
     } catch (error) {
@@ -829,7 +863,9 @@ export const useDeployModel = create<{
         avg_context_length: deployConfig.avg_context_length,
       };
 
-      if (currentWorkflow.workflow_steps.model.provider_type !== "cloud_model") {
+      if (
+        currentWorkflow.workflow_steps.model.provider_type !== "cloud_model"
+      ) {
         deployConfigPayload = {
           ...deployConfigPayload,
           per_session_tokens_per_sec: deployConfig.per_session_tokens_per_sec,
@@ -852,7 +888,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       get().getWorkflowCloud();
       return response;
@@ -894,7 +930,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       get().getWorkflowCloud();
       return response;
@@ -927,7 +963,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       get().getWorkflowCloud();
       return response;
@@ -961,7 +997,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       get().getWorkflowCloud();
       return response;
@@ -989,7 +1025,7 @@ export const useDeployModel = create<{
           step_number: 2,
           provider_type: providerId,
           add_model_modality: modalityId,
-        }
+        },
       );
       if (!response) {
         return;
@@ -1013,7 +1049,7 @@ export const useDeployModel = create<{
           workflow_total_steps: 6,
           step_number: 2,
           provider_type: providerType?.id,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -1041,7 +1077,7 @@ export const useDeployModel = create<{
           step_number: 3,
           workflow_id: workflowId,
           provider_id: provider?.id,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -1067,7 +1103,7 @@ export const useDeployModel = create<{
           step_number: 4,
           workflow_id: workflowId,
           cloud_model_id: model?.id,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -1100,7 +1136,7 @@ export const useDeployModel = create<{
           tags: cloudModelDetails.tags,
           modality: cloudModelDetails.modality,
           uri: cloudModelDetails.uri ? cloudModelDetails.uri : undefined,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -1165,7 +1201,7 @@ export const useDeployModel = create<{
           step_number: 1,
           provider_type: providerId,
           add_model_modality: modalityId,
-        }
+        },
       );
       if (!response) {
         return;
@@ -1191,7 +1227,7 @@ export const useDeployModel = create<{
           workflow_total_steps: 5,
           step_number: 1,
           provider_type: providerType?.id,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -1228,7 +1264,7 @@ export const useDeployModel = create<{
           author: data.author,
           tags: data.tags,
           icon: data.icon || null,
-        }
+        },
       );
       get().getWorkflow();
       // successToast(response.data.message);
@@ -1255,7 +1291,7 @@ export const useDeployModel = create<{
           workflow_id: workflowId,
           trigger_workflow: true,
           proprietary_credential_id: credentials ? credentials.id : undefined,
-        }
+        },
       );
       get().getWorkflow();
       return response;
@@ -1281,7 +1317,7 @@ export const useDeployModel = create<{
           step_number: 1,
           trigger_workflow: true,
           model_id: useModels.getState().selectedModel?.id,
-        }
+        },
       );
       await get().getWorkflow(response.data.workflow_id);
       get().endRequest();
@@ -1306,7 +1342,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       return response.data;
     } catch (error) {
@@ -1321,7 +1357,7 @@ export const useDeployModel = create<{
         `${tempApiBaseUrl}/clusters/cancel-onboarding`,
         {
           workflow_id: id,
-        }
+        },
       );
       return response.data;
     } catch (error) {
@@ -1333,7 +1369,7 @@ export const useDeployModel = create<{
   deleteWorkflow: async (id: string, suppressToast?: boolean) => {
     try {
       const response: any = await AppRequest.Delete(
-        `${tempApiBaseUrl}/workflows/${id}`
+        `${tempApiBaseUrl}/workflows/${id}`,
       );
       if (!suppressToast) {
         successToast(response.data.message);
@@ -1348,7 +1384,7 @@ export const useDeployModel = create<{
   createWorkerFlow: async (
     endpointId: string,
     additionalConcurrency: number,
-    projectId?
+    projectId?,
   ) => {
     try {
       const response: any = await AppRequest.Post(
@@ -1365,7 +1401,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       return response.data;
     } catch (error) {
@@ -1388,7 +1424,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       return response.data;
     } catch (error) {
@@ -1404,7 +1440,7 @@ export const useDeployModel = create<{
   getQuantizationMethods: async () => {
     try {
       const response: any = await AppRequest.Get(
-        `${tempApiBaseUrl}/models/quantization-methods`
+        `${tempApiBaseUrl}/models/quantization-methods`,
       );
       set({ quantizationMethods: response.data.quantization_methods });
       return response.data;
@@ -1416,7 +1452,7 @@ export const useDeployModel = create<{
   createQuantizationWorkflow: async (
     model_name: string,
     type: string,
-    hardware: string
+    hardware: string,
   ) => {
     const modelId = useModels.getState().selectedModel?.id;
     if (!modelId) {
@@ -1435,7 +1471,7 @@ export const useDeployModel = create<{
           quantized_model_name: model_name,
           target_type: type,
           target_device: hardware,
-        }
+        },
       );
       get().getWorkflow(response.data.workflow_id);
       // successToast(response.data.message);
@@ -1462,7 +1498,7 @@ export const useDeployModel = create<{
           workflow_id: workflowId,
           trigger_workflow: false,
           method: method,
-        }
+        },
       );
       get().getWorkflow();
       return response;
@@ -1474,7 +1510,7 @@ export const useDeployModel = create<{
   },
   updateQuantizationAdvanced: async (
     weightConfig: QuantizeConfig,
-    activationConfig: QuantizeConfig
+    activationConfig: QuantizeConfig,
   ) => {
     const workflowId = get().currentWorkflow?.workflow_id;
     if (!workflowId) {
@@ -1492,7 +1528,7 @@ export const useDeployModel = create<{
           trigger_workflow: false,
           weight_config: weightConfig,
           activation_config: activationConfig,
-        }
+        },
       );
       get().getWorkflow();
       return response;
@@ -1518,7 +1554,7 @@ export const useDeployModel = create<{
           workflow_id: workflowId,
           trigger_workflow: true,
           cluster_id: clusterId,
-        }
+        },
       );
       get().getWorkflow();
       return response;
@@ -1537,7 +1573,7 @@ export const useDeployModel = create<{
         `${tempApiBaseUrl}/models/cancel-quantization`,
         {
           workflow_id: id,
-        }
+        },
       );
       return response.data;
     } catch (error) {
@@ -1549,7 +1585,7 @@ export const useDeployModel = create<{
   createAddAdapterWorkflow: async (
     endpointId: string,
     adapterModelId: string,
-    projectId?: string
+    projectId?: string,
   ) => {
     get().startRequest();
     try {
@@ -1567,7 +1603,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       get().getWorkflow(response.data.workflow_id);
       return response;
@@ -1578,7 +1614,10 @@ export const useDeployModel = create<{
     }
   },
 
-  updateAdapterDetailWorkflow: async (adapterName: string, projectId?: string) => {
+  updateAdapterDetailWorkflow: async (
+    adapterName: string,
+    projectId?: string,
+  ) => {
     const workflowId = get().currentWorkflow?.workflow_id;
     if (!workflowId) {
       errorToast("Please create a workflow");
@@ -1599,7 +1638,7 @@ export const useDeployModel = create<{
             "x-resource-type": "project",
             "x-entity-id": projectId,
           },
-        }
+        },
       );
       get().getWorkflow(response.data.workflow_id);
       return response;
@@ -1609,5 +1648,4 @@ export const useDeployModel = create<{
       get().endRequest();
     }
   },
-
 }));

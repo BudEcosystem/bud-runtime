@@ -12,20 +12,29 @@ import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { useRouter } from "next/router";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import HorizontalScrollFilter from "./components/filter";
-import { useEvaluations, GetEvaluationsPayload, Evaluation } from "src/hooks/useEvaluations";
+import {
+  useEvaluations,
+  GetEvaluationsPayload,
+  Evaluation,
+} from "src/hooks/useEvaluations";
 
 const EvaluationList = () => {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
-  const { getEvaluations, evaluationsList, evaluationsListTotal, getTraits, traitsList } = useEvaluations();
+  const {
+    getEvaluations,
+    evaluationsList,
+    evaluationsListTotal,
+    getTraits,
+    traitsList,
+  } = useEvaluations();
   const router = useRouter();
   const [searchValue, setSearchValue] = useState("");
 
-
   const handleFilterToggle = useCallback((filterName: string) => {
-    setSelectedFilters(prev => {
+    setSelectedFilters((prev) => {
       if (prev.includes(filterName)) {
         // Remove filter if already selected
-        return prev.filter(f => f !== filterName);
+        return prev.filter((f) => f !== filterName);
       } else {
         // Add filter if not selected
         return [...prev, filterName];
@@ -65,11 +74,12 @@ const EvaluationList = () => {
         evaluation.description.toLowerCase().includes(searchLower);
       const matchesFilter =
         selectedFilters.length === 0 ||
-        evaluation.traits?.some(trait => selectedFilters.includes(trait.name));
+        evaluation.traits?.some((trait) =>
+          selectedFilters.includes(trait.name),
+        );
       return matchesSearch && matchesFilter;
     });
   }, [searchValue, selectedFilters, evaluationsList]);
-
 
   useEffect(() => {
     const fetchEvaluations = async () => {
@@ -83,9 +93,8 @@ const EvaluationList = () => {
     fetchEvaluations();
   }, [searchValue, getEvaluations]);
 
-
   useEffect(() => {
-    getTraits()
+    getTraits();
   }, []);
 
   useEffect(() => {
@@ -114,7 +123,9 @@ const EvaluationList = () => {
             classNames="flex-1 border-[.5px] border-[#757575]"
           />
           <div className="flex items-center gap-6 text-[#757575] text-sm absolute right-[1rem]">
-            <Text_10_400_B3B3B3>{filteredEvaluations?.length || 0}/{evaluationsListTotal}</Text_10_400_B3B3B3>
+            <Text_10_400_B3B3B3>
+              {filteredEvaluations?.length || 0}/{evaluationsListTotal}
+            </Text_10_400_B3B3B3>
           </div>
         </div>
 
@@ -122,13 +133,12 @@ const EvaluationList = () => {
         <div className="mt-[2rem] mb-[.4rem] w-[90%] ">
           {traitsList.length > 0 && (
             <HorizontalScrollFilter
-              filters={traitsList.map(trait => trait.name)}
+              filters={traitsList.map((trait) => trait.name)}
               selectedFilters={selectedFilters}
               onFilterClick={handleFilterToggle}
             />
           )}
         </div>
-
       </div>
 
       {/* Evaluation Cards Grid */}
@@ -144,7 +154,6 @@ const EvaluationList = () => {
                 <Text_14_400_EEEEEE className="text-[16px]">
                   {evaluation.name}
                 </Text_14_400_EEEEEE>
-
               </div>
 
               {/* Combined Type and Trait Tags */}
@@ -156,7 +165,9 @@ const EvaluationList = () => {
                     className="flex items-center gap-[.1rem] px-[.5rem] py-[.2rem] bg-[#1F1F1F] rounded-[0.375rem]"
                   >
                     {getTypeIcon(type)}
-                    <Text_10_400_D1B854 className="capitalize">{type}</Text_10_400_D1B854>
+                    <Text_10_400_D1B854 className="capitalize">
+                      {type}
+                    </Text_10_400_D1B854>
                   </div>
                 ))}
 
@@ -166,7 +177,9 @@ const EvaluationList = () => {
                     key={trait.id || trait.name}
                     className="flex items-center gap-[.1rem] px-[.5rem] py-[.2rem] bg-[#1F1F1F] rounded-[0.375rem]"
                   >
-                    <Text_10_400_D1B854 className="capitalize">{trait.name}</Text_10_400_D1B854>
+                    <Text_10_400_D1B854 className="capitalize">
+                      {trait.name}
+                    </Text_10_400_D1B854>
                   </div>
                 ))}
               </div>

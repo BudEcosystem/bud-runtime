@@ -438,6 +438,16 @@ class XAIConfig(BaseModel):
     api_key_location: Optional[str] = None
 
 
+class BudDocConfig(BaseModel):
+    """BudDoc provider config for document processing."""
+
+    type: str = "buddoc"
+    api_base: str
+    model_name: Optional[str] = None
+    api_key: Optional[str] = None
+    api_key_location: Optional[str] = None
+
+
 ProviderConfig = Union[
     VLLMConfig,
     OpenAIConfig,
@@ -453,6 +463,7 @@ ProviderConfig = Union[
     MistralConfig,
     TogetherConfig,
     XAIConfig,
+    BudDocConfig,
 ]
 
 

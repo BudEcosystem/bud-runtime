@@ -46,6 +46,7 @@ from budapp.commons.schemas import ErrorResponse, SuccessResponse, Tag
 from budapp.core.schemas import NotificationResult
 from budapp.credential_ops.crud import ProprietaryCredentialDataManager
 from budapp.credential_ops.models import ProprietaryCredential
+from budapp.credential_ops.services import CredentialService
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint
 from budapp.endpoint_ops.schemas import ProxyModelPricing
@@ -174,6 +175,24 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             if invalid_endpoint_ids:
                 raise ClientException(
                     f"Invalid endpoint IDs: {', '.join(str(eid) for eid in invalid_endpoint_ids)}. Endpoints must belong to the specified project and not be deleted."
+                )
+
+            # Check if any endpoints already have guardrail deployments
+            existing_deployments = await GuardrailsDeploymentDataManager(
+                self.session
+            ).get_existing_deployments_for_endpoints(endpoint_ids)
+
+            if existing_deployments:
+                # Build error message with endpoint names and their existing guardrail profiles
+                conflicting_endpoints = []
+                for endpoint_id, deployment in existing_deployments.items():
+                    endpoint_name = deployment.endpoint.name if deployment.endpoint else str(endpoint_id)
+                    profile_name = deployment.profile.name if deployment.profile else "Unknown Profile"
+                    conflicting_endpoints.append(f"'{endpoint_name}' (guardrail: {profile_name})")
+
+                raise ClientException(
+                    f"The following endpoints already have guardrail deployments: {', '.join(conflicting_endpoints)}. "
+                    "Please remove or update existing deployments before adding new ones."
                 )
 
         # Validate credential
@@ -349,7 +368,9 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             missing_keys = [key for key in required_keys if key not in required_data]
             if not ("endpoint_ids" in required_data or "is_standalone" in required_data):
                 missing_keys.append("endpoint_ids/is_standalone")
-            elif required_data.get("is_standalone") and not required_data.get("credential_id"):
+            elif required_data.get("provider_type") == GuardrailProviderTypeEnum.CLOUD.value and not required_data.get(
+                "credential_id"
+            ):
                 missing_keys.append("credential_id")
             if missing_keys:
                 raise ClientException(f"Missing required data: {', '.join(missing_keys)}")
@@ -452,20 +473,44 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                 db_workflow, {"status": WorkflowStatusEnum.FAILED, "reason": err_reason}
             )
         else:
-            deployment_data = [
-                GuardrailDeploymentCreate(
-                    name=hashlib.md5(
-                        str(f"{db_profile.name} {endpoint_id}").encode(), usedforsecurity=False
-                    ).hexdigest()[:16],
-                    description=db_profile.description,
-                    status=GuardrailDeploymentStatusEnum.RUNNING,
-                    profile_id=db_profile.id,
-                    project_id=data["project_id"],
-                    endpoint_id=endpoint_id,
-                    credential_id=data.get("credential_id"),
+            # Determine deployment names based on endpoint or standalone mode
+            deployment_data = []
+
+            if data.get("is_standalone", False):
+                # For standalone deployments, use the guardrail profile name
+                deployment_data.append(
+                    GuardrailDeploymentCreate(
+                        name=db_profile.name,
+                        description=db_profile.description,
+                        status=GuardrailDeploymentStatusEnum.RUNNING,
+                        profile_id=db_profile.id,
+                        project_id=data["project_id"],
+                        endpoint_id=None,
+                        credential_id=data.get("credential_id"),
+                    )
                 )
-                for endpoint_id in data.get("endpoint_ids", [None])
-            ]
+            else:
+                # For endpoint deployments, fetch endpoint names
+                endpoint_ids = data.get("endpoint_ids", [])
+                if endpoint_ids:
+                    # Fetch endpoints to get their names
+                    endpoints = await EndpointDataManager(self.session).get_endpoints(endpoint_ids)
+                    endpoint_map = {ep.id: ep.name for ep in endpoints}
+
+                    for endpoint_id in endpoint_ids:
+                        # Use endpoint name if available, otherwise use endpoint ID as fallback
+                        deployment_name = endpoint_map.get(endpoint_id, str(endpoint_id))
+                        deployment_data.append(
+                            GuardrailDeploymentCreate(
+                                name=deployment_name,
+                                description=db_profile.description,
+                                status=GuardrailDeploymentStatusEnum.RUNNING,
+                                profile_id=db_profile.id,
+                                project_id=data["project_id"],
+                                endpoint_id=endpoint_id,
+                                credential_id=data.get("credential_id"),
+                            )
+                        )
 
             end_step_number = db_workflow_step.step_number + 1
             db_workflow_step = await self._create_or_update_next_workflow_step(workflow_id, end_step_number, {})
@@ -528,35 +573,45 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                 )
                 await BudNotifyService().send_notification(notification_request)
 
+                # Update credential proxy cache for the project
+                await CredentialService(self.session).update_proxy_cache(data["project_id"])
+
         return db_profile
 
     async def _create_guardrail_endpoint_deployment(
         self, data: list[GuardrailDeploymentCreate], current_user_id: UUID, provider_id: UUID, is_standalone: bool
     ) -> list[GuardrailDeployment]:
-        if is_standalone:
-            raise NotImplementedError("Standalone guardrail deployments are not supported at the moment")
-            # TODO: Add endpoint details and credentials to proxy cache.
-            # Refer services/budapp/budapp/model_ops/services.py#ModelService._create_endpoint_directly
-
         db_deployments = await GuardrailsDeploymentDataManager(self.session).insert_all(
             [GuardrailDeployment(**deployment.model_dump(), created_by=current_user_id) for deployment in data]
         )
 
         db_provider = await ProviderDataManager(self.session).retrieve_by_fields(Provider, {"id": provider_id})
 
+        encrypted_credential_data = None
         for db_deployment in db_deployments:
+            # For standalone deployments, endpoint_id might be None initially
+            # In that case, use the deployment ID as a temporary endpoint ID
+            endpoint_id = db_deployment.endpoint_id if db_deployment.endpoint_id else db_deployment.id
+
+            if (
+                encrypted_credential_data is None
+                and db_deployment.credential
+                and hasattr(db_deployment.credential, "other_provider_creds")
+            ):
+                encrypted_credential_data = db_deployment.credential.other_provider_creds
+
             await self.add_guardrail_deployment_to_proxy_cache(
-                endpoint_id=db_deployment.endpoint_id,
+                endpoint_id=endpoint_id,
                 profile_id=db_deployment.profile_id,
                 provider_type=db_provider.type,
                 api_base="budproxy-service.svc.cluster.local",
                 supported_endpoints=["/v1/moderations"],
-                encrypted_credential_data=None,  # The credentials will already be synced by the endpoint deployment
+                encrypted_credential_data=encrypted_credential_data,
                 include_pricing=False,
             )
 
         # Cache the profile data with all deployments, probes, and rules
-        await self.add_guardrail_profile_to_cache(db_deployments[0].profile_id)
+        # Note: Profile is already cached in add_guardrail_deployment_to_proxy_cache
 
         return db_deployments
 
@@ -570,88 +625,90 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         encrypted_credential_data: Optional[dict] = None,
         include_pricing: bool = True,
     ) -> None:
-        """Add model to proxy cache for a project with pricing information.
+        """Add guardrail configuration to proxy cache.
+
+        This method performs two operations:
+        1. Calls add_guardrail_profile_to_cache to save profile to guardrail_table:{profile_id}
+        2. Updates model_table:{endpoint_id} to include guardrail_profile reference
 
         Args:
-            endpoint_id: The endpoint ID
-            model_name: The model name
-            model_type: The model type (e.g., "openai", "aws-bedrock", etc.)
+            endpoint_id: The endpoint ID (can be None for standalone)
+            profile_id: The guardrail profile ID
+            provider_type: The provider type (e.g., "openai", "azure-content-safety")
             api_base: The base API URL
             supported_endpoints: List of supported endpoints
             encrypted_credential_data: Optional encrypted credential data from ProprietaryCredential.other_provider_creds
             include_pricing: Whether to include pricing information in the cache
         """
-        endpoint_service = EndpointService(self.session)
-
-        endpoints = []
-
-        for support_endpoint in supported_endpoints:
-            try:
-                enum_member = ModelEndpointEnum(support_endpoint)
-                # Use the enum name in lowercase (e.g., "chat", "embedding", etc.)
-                endpoints.append(enum_member.name.lower() if enum_member.name else enum_member.name)
-            except ValueError:
-                logger.debug(f"Support endpoint {support_endpoint} is not a valid ModelEndpointEnum")
-        logger.debug(f"Supported Endpoints: {endpoints}")
-
-        # Get the provider enum, default to VLLM if not found
-        provider_enum = endpoint_service.PROVIDER_MAPPING.get(provider_type.lower(), ProxyProviderEnum.BUD_SENTINEL)
-
-        if provider_enum == ProxyProviderEnum.BUD_SENTINEL:
-            provider_config = BudSentinelConfig(model_name=str(profile_id), api_base=api_base, api_key_location="none")
-            encrypted_model_api_key = None
-        else:
-            # Create the appropriate provider config using helper method
-            provider_config, encrypted_model_api_key = endpoint_service._create_provider_config(
-                provider_enum, str(profile_id), endpoint_id, api_base, encrypted_credential_data
-            )
-
-        # Get pricing information if requested
-        pricing = None
-        if include_pricing:
-            # TODO: This fetches the endpoint pricing but we need to update this to guardrail pricing
-            pricing_info = await endpoint_service.get_current_pricing(endpoint_id)
-            if pricing_info:
-                pricing = ProxyModelPricing(
-                    input_cost=float(pricing_info.input_cost),
-                    output_cost=float(pricing_info.output_cost),
-                    currency=pricing_info.currency,
-                    per_tokens=pricing_info.per_tokens,
-                )
-
-        # Create the proxy model configuration using the schema
-        model_config = ProxyGuardrailConfig(
-            routing=[provider_enum],
-            providers={provider_enum: provider_config},
-            endpoints=endpoints,
-            api_key=encrypted_model_api_key,
-            pricing=pricing,
-        )
         redis_service = RedisService()
-        await redis_service.set(
-            f"guardrail_table:{endpoint_id}",
-            json.dumps({str(endpoint_id): model_config.model_dump(exclude_none=True)}),
-        )
+
+        # Step 1: Use add_guardrail_profile_to_cache to populate guardrail_table
+        # Pass the raw encrypted credential data and provider type - the method will handle provider-specific logic
+        await self.add_guardrail_profile_to_cache(profile_id, encrypted_credential_data, provider_type)
+
+        # Step 2: Update model_table for the endpoint
+        if endpoint_id:
+            # For existing endpoints, fetch current config and add guardrail_profile
+            model_table_key = f"model_table:{endpoint_id}"
+            existing_config = await redis_service.get(model_table_key)
+
+            if existing_config:
+                # Update existing endpoint configuration
+                model_config = json.loads(existing_config)
+                if str(endpoint_id) in model_config:
+                    model_config[str(endpoint_id)]["guardrail_profile"] = str(profile_id)
+                else:
+                    # If the specific endpoint key doesn't exist, create it
+                    model_config[str(endpoint_id)] = {"guardrail_profile": str(profile_id)}
+
+                await redis_service.set(model_table_key, json.dumps(model_config))
+            else:
+                # For standalone guardrail endpoints, create a minimal entry
+                standalone_config = {
+                    str(endpoint_id): {
+                        "routing": [],
+                        "endpoints": ["moderation"],  # Default to moderation endpoint
+                        "providers": {},
+                        "guardrail_profile": str(profile_id),
+                    }
+                }
+                await redis_service.set(model_table_key, json.dumps(standalone_config))
 
     async def delete_guardrail_deployment_from_proxy_cache(self, endpoint_id: UUID) -> None:
-        """Delete model from proxy cache for a project."""
+        """Delete guardrail configuration from proxy cache.
+
+        This method removes the guardrail_profile reference from model_table:{endpoint_id}
+        """
         redis_service = RedisService()
-        await redis_service.delete_keys_by_pattern(f"guardrail_table:{endpoint_id}*")
 
-    async def add_guardrail_profile_to_cache(self, profile_id: UUID) -> None:
-        """Add guardrail profile data to cache including all deployments, probes, and rules.
+        # Remove guardrail_profile reference from model_table
+        if endpoint_id:
+            model_table_key = f"model_table:{endpoint_id}"
+            existing_config = await redis_service.get(model_table_key)
 
-        This method creates two types of cache entries:
-        1. Deployment-specific entries with endpoint overrides
-        2. Global probe and rule data linked to the profile
+            if existing_config:
+                model_config = json.loads(existing_config)
+                if str(endpoint_id) in model_config:
+                    # Remove guardrail_profile key if it exists
+                    model_config[str(endpoint_id)].pop("guardrail_profile", None)
+
+                    # Save back to Redis
+                    await redis_service.set(model_table_key, json.dumps(model_config))
+
+    async def add_guardrail_profile_to_cache(
+        self, profile_id: UUID, credential_data: Optional[dict] = None, provider_type: str = None
+    ) -> None:
+        """Add guardrail profile data to cache with the correct schema format.
+
+        This method creates the guardrail_table:{profile_id} cache entry with provider configurations.
 
         Cache structure:
-        - guardrail_deployment:{endpoint_id} -> deployment data with overrides
-        - guardrail_profile_probes:{profile_id} -> all probes with profile overrides
-        - guardrail_profile_rules:{profile_id}:{probe_id} -> rules for each probe with overrides
+        - guardrail_table:{profile_id} -> guardrail profile with providers and probe configs
 
         Args:
             profile_id: The guardrail profile ID to cache
+            credential_data: Optional raw encrypted credential data from ProprietaryCredential.other_provider_creds
+            provider_type: The actual provider type (e.g., "openai", "azure-content-safety")
         """
         redis_service = RedisService()
         # 1. Get the profile
@@ -659,82 +716,137 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             GuardrailProfile, {"id": profile_id, "status": GuardrailStatusEnum.ACTIVE}
         )
 
-        # 2. Get all deployments for this profile
-        db_deployments = await GuardrailsDeploymentDataManager(self.session).get_all_by_fields(
-            GuardrailDeployment, {"profile_id": profile_id, "status": GuardrailDeploymentStatusEnum.RUNNING}
-        )
-
-        # 3. Cache deployment data for each endpoint
-        for deployment in db_deployments:
-            if deployment.endpoint_id:
-                deployment_data = {
-                    "deployment_id": str(deployment.id),
-                    "profile_id": str(deployment.profile_id),
-                    "endpoint_id": str(deployment.endpoint_id),
-                    # Use deployment overrides if available, otherwise use profile defaults
-                    "severity_threshold": deployment.severity_threshold
-                    if deployment.severity_threshold is not None
-                    else db_profile.severity_threshold,
-                    "guard_types": deployment.guard_types
-                    if deployment.guard_types is not None
-                    else db_profile.guard_types,
-                }
-
-                await redis_service.set(
-                    f"guardrail_deployment:{deployment.endpoint_id}",
-                    json.dumps(deployment_data),
-                )
-
-        # 4. Get all enabled probes for this profile with their overrides
+        # 2. Get all enabled probes for this profile with their overrides
         profile_probes = await GuardrailsDeploymentDataManager(self.session).get_all_by_fields(
             GuardrailProfileProbe,
             {"profile_id": profile_id},
         )
 
-        # 5. Cache probe data with profile overrides
-        probes_data = []
-        for profile_probe in profile_probes:
-            probe_id = profile_probe.probe_id
-            probe_info = {
-                "probe_id": str(probe_id),
-                "uri": profile_probe.probe.uri,
-                "provider_id": str(profile_probe.probe.provider_id),
-                "provider_type": profile_probe.probe.provider_type.value,
-                # Profile-specific overrides
-                "severity_threshold": profile_probe.severity_threshold,
-                "guard_types": profile_probe.guard_types,
-                "rules": [],
+        # 3. Build providers configuration based on probes
+        providers = {}
+        if provider_type == "openai":
+            provider_config = {
+                "type": "openai",
+                "probe_config": {},
+                "api_key_location": f"dynamic::store_{profile_id}"
+                if credential_data and credential_data.get("api_key")
+                else "none",
+            }
+            # Add optional OpenAI-specific fields
+            if credential_data:
+                if api_base := credential_data.get("api_base"):
+                    provider_config["api_base"] = api_base
+                if org := credential_data.get("organization"):
+                    provider_config["organization"] = org
+            providers["openai"] = provider_config
+
+        elif provider_type in ["azure-content-safety", "azure_content_safety"]:
+            providers["azure_content_safety"] = {
+                "type": "azure_content_safety",
+                "probe_config": {},
+                "endpoint": credential_data.get("api_base", "") if credential_data else "",
+                "api_key_location": f"dynamic::store_{profile_id}"
+                if credential_data and credential_data.get("api_key")
+                else "none",
             }
 
-            # 6. Cache rules for each probe with profile overrides
-            rules_data = await GuardrailsDeploymentDataManager(self.session).get_all_by_fields(
+        elif provider_type in ["aws-comprehend", "aws_comprehend"]:
+            provider_config = {
+                "type": "aws_comprehend",
+                "probe_config": {},
+                "region": credential_data.get("aws_region_name", "us-east-1") if credential_data else "us-east-1",
+                "api_key_location": f"dynamic::store_{profile_id}"
+                if credential_data and credential_data.get("aws_access_key_id")
+                else "none",
+            }
+            # Add AWS-specific fields if available
+            if credential_data:
+                if access_key := credential_data.get("aws_access_key_id"):
+                    provider_config["aws_access_key_id"] = access_key
+                if secret_key := credential_data.get("aws_secret_access_key"):
+                    provider_config["aws_secret_access_key"] = secret_key
+                if session_token := credential_data.get("aws_session_token"):
+                    provider_config["aws_session_token"] = session_token
+            providers["aws-comprehend"] = provider_config
+
+        elif provider_type == "bud_sentinel":
+            providers["bud_sentinel"] = {
+                "type": "bud_sentinel",
+                "probe_config": {},
+                "api_key_location": "none",  # Bud sentinel doesn't require credentials
+            }
+
+        else:
+            # Default case for any other providers
+            providers[provider_type] = {
+                "type": provider_type,
+                "probe_config": {},
+                "api_key_location": f"dynamic::store_{profile_id}"
+                if credential_data and credential_data.get("api_key")
+                else "none",
+            }
+
+        for profile_probe in profile_probes:
+            probe = profile_probe.probe
+
+            # Get rules for this probe
+            profile_rules = await GuardrailsDeploymentDataManager(self.session).get_all_by_fields(
                 GuardrailProfileRule, {"profile_probe_id": profile_probe.id}
             )
 
-            for profile_rule in rules_data:
-                # Include all rules but mark disabled ones
-                probe_info["rules"].append(
-                    {
-                        "rule_id": str(profile_rule.id),
-                        "probe_id": str(probe_id),
-                        "uri": profile_rule.rule.uri,
-                        "guard_types": profile_rule.guard_types,
-                        "severity_threshold": profile_rule.severity_threshold,
-                        "status": profile_rule.status.value,
-                    }
+            # Determine which rules to include based on the logic:
+            # 1. If there are any active rules, use only active rules
+            # 2. If no rules defined, use empty list (all enabled)
+            # 3. If only disabled rules, get all rules except disabled ones
+
+            active_rules = [rule for rule in profile_rules if rule.status == GuardrailStatusEnum.ACTIVE]
+            disabled_rules = [rule for rule in profile_rules if rule.status == GuardrailStatusEnum.DISABLED]
+
+            if active_rules:
+                # Case 1: Use only active rules
+                rules = [rule.rule.uri for rule in active_rules]
+            elif not profile_rules:
+                # Case 2: No rules defined, use empty (all enabled)
+                rules = []
+            elif disabled_rules and not active_rules:
+                # Case 3: Only disabled rules, get all probe rules except disabled
+                all_probe_rules = await GuardrailsDeploymentDataManager(self.session).get_all_by_fields(
+                    GuardrailRule, {"probe_id": probe.id, "status": GuardrailStatusEnum.ACTIVE}
                 )
+                disabled_rule_ids = {rule.rule_id for rule in disabled_rules}
+                rules = [rule.uri for rule in all_probe_rules if rule.id not in disabled_rule_ids]
+            else:
+                # Default: empty
+                rules = []
 
-            probes_data.append(probe_info)
+            # Add to probe config
+            if probe.uri:
+                providers[provider_type]["probe_config"][probe.uri] = rules
 
-            # Cache rules for this probe
-            # await redis_service.set(f"guardrail_profile_rules:{profile_id}:{probe_id}", json.dumps(rules_cache))
+        # 4. Build the guardrail profile configuration
+        guardrail_profile_config = {
+            "name": db_profile.name,
+            "providers": providers,
+            "severity_threshold": db_profile.severity_threshold if db_profile.severity_threshold else 0.75,
+            "guard_types": db_profile.guard_types if db_profile.guard_types else ["input"],
+        }
 
-        # Cache all probes data
-        await redis_service.set(f"guardrail_profile:{profile_id}", json.dumps(probes_data))
+        # Add API key if provided (handle different credential types)
+        if credential_data:
+            if credential_data.get("api_key"):
+                # For providers that use standard api_key field
+                guardrail_profile_config["api_key"] = credential_data["api_key"]
+            elif credential_data.get("aws_access_key_id"):
+                # For AWS providers, store the access key as the api_key
+                guardrail_profile_config["api_key"] = credential_data["aws_access_key_id"]
 
-        logger.info(
-            f"Successfully cached guardrail profile {profile_id} with {len(db_deployments)} deployments and {len(probes_data)} probes"
+        # 5. Save to guardrail_table:{profile_id}
+        await redis_service.set(
+            f"guardrail_table:{profile_id}",
+            json.dumps({str(profile_id): guardrail_profile_config}),
         )
+
+        logger.info(f"Successfully cached guardrail profile {profile_id} with {len(providers)} providers")
 
     async def update_guardrail_profile_cache(self, profile_id: UUID) -> None:
         """Update the cache for a guardrail profile by clearing and re-caching.
@@ -760,14 +872,36 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             if deployment.endpoint_id:
                 await redis_service.delete(f"guardrail_deployment:{deployment.endpoint_id}")
 
-        # 2. Clear profile probes cache
-        await redis_service.delete(f"guardrail_profile_probes:{profile_id}")
-
-        # 3. Clear profile rules caches
-        await redis_service.delete_keys_by_pattern(f"guardrail_profile_rules:{profile_id}:*")
+        # 2. Clear guardrail table cache
+        await redis_service.delete(f"guardrail_table:{profile_id}")
 
         # Re-cache the profile data
-        await self.add_guardrail_profile_to_cache(profile_id)
+        # Get raw encrypted credential data and provider type from deployments
+        encrypted_credential_data = None
+        provider_type = None
+
+        if db_deployments:
+            # Get the first probe from the profile to determine provider
+            profile_probes = await GuardrailsDeploymentDataManager(self.session).get_all_by_fields(
+                GuardrailProfileProbe,
+                {"profile_id": profile_id},
+            )
+
+            if profile_probes and profile_probes[0].probe.provider_id:
+                # Get provider type from the probe's provider
+                db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
+                    Provider, {"id": profile_probes[0].probe.provider_id}
+                )
+                provider_type = db_provider.type
+
+            # Get credential data from deployments
+            for deployment in db_deployments:
+                if deployment.credential and hasattr(deployment.credential, "other_provider_creds"):
+                    encrypted_credential_data = deployment.credential.other_provider_creds
+                    if encrypted_credential_data:
+                        break
+
+        await self.add_guardrail_profile_to_cache(profile_id, encrypted_credential_data, provider_type)
 
     async def delete_guardrail_profile_cache(self, profile_id: UUID) -> None:
         """Delete all cache entries for a guardrail profile.
@@ -788,9 +922,8 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             if deployment.endpoint_id:
                 await redis_service.delete(f"guardrail_deployment:{deployment.endpoint_id}")
 
-        # Clear profile caches
-        await redis_service.delete(f"guardrail_profile_probes:{profile_id}")
-        await redis_service.delete_keys_by_pattern(f"guardrail_profile_rules:{profile_id}:*")
+        # Clear guardrail table cache
+        await redis_service.delete(f"guardrail_table:{profile_id}")
 
     async def _create_or_update_next_workflow_step(
         self, workflow_id: UUID, step_number: int, data: Dict[str, Any]

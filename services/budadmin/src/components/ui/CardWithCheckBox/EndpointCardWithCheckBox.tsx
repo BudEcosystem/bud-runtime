@@ -4,8 +4,6 @@ import { Text_10_400_B3B3B3, Text_14_400_EEEEEE } from "../text";
 import Tags from "src/flows/components/DrawerTags";
 import { assetBaseUrl } from "@/components/environment";
 
-
-
 type cardProps = {
   data?: any;
   ClassNames?: string;
@@ -32,7 +30,7 @@ export default function EndpointCardWithCheckBox({
         <div className="bg-[#1F1F1F] w-[2.6875rem] h-[2.6875rem] rounded-[.52rem] flex justify-center items-center grow-0 shrink-0">
           <Image
             preview={false}
-            src={(assetBaseUrl + data.model?.icon) || "/images/drawer/zephyr.png"}
+            src={assetBaseUrl + data.model?.icon || "/images/drawer/zephyr.png"}
             style={{ width: "1.67969rem", height: "1.67969rem" }}
             alt="home"
           />

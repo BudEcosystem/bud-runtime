@@ -74,10 +74,7 @@ export function ModelFlowInfoCard({
           />
         )} */}
             <IconOnlyRender
-              icon={
-                selectedModel?.icon ||
-                selectedModel?.provider?.icon
-              }
+              icon={selectedModel?.icon || selectedModel?.provider?.icon}
               imageSize={26}
               type={selectedModel?.provider_type}
             />
@@ -256,7 +253,7 @@ function DeployModelSpecificationInfo({
         icon: "/images/drawer/tag.png",
         secret: true,
         full: true,
-      })
+      }),
     ),
   ]?.filter((item) => item.value && showCredentials);
 

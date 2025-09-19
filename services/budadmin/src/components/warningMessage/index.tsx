@@ -15,7 +15,7 @@ export const openWarning = ({
   description,
   onDelete,
   onCancel,
-  deleteDisabled = false
+  deleteDisabled = false,
 }: openWarningProps) => {
   const key = `${title}-delete-notification`;
 
@@ -35,9 +35,7 @@ export const openWarning = ({
             }}
           />
           <div className="flex flex-col gap-y-[12px] pt-[5px]">
-            <Text_14_400_EEEEEE>
-              {title}
-            </Text_14_400_EEEEEE>
+            <Text_14_400_EEEEEE>{title}</Text_14_400_EEEEEE>
             <Text_12_400_757575>{newDescription}</Text_12_400_757575>
           </div>
         </div>
@@ -71,7 +69,6 @@ export const openWarning = ({
               }}
             />
           )}
-
         </Space>
       ),
     });

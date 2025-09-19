@@ -189,7 +189,7 @@ DROP TABLE IF EXISTS AudioInference;
 DROP TABLE IF EXISTS ImageInference;
 DROP TABLE IF EXISTS ModerationInference;
 ALTER TABLE ModelInference DROP COLUMN IF EXISTS endpoint_type;"#
-        .to_string()
+            .to_string()
     }
 
     async fn has_succeeded(&self) -> Result<bool, Error> {

@@ -1,5 +1,5 @@
 export interface TextFieldType {
-  type: 'text';
+  type: "text";
   name: string;
   label: string;
   placeHolder?: string;
@@ -7,7 +7,7 @@ export interface TextFieldType {
 }
 
 export interface SelectFieldType {
-  type: 'select';
+  type: "select";
   name: string;
   label: string;
   options: string[];

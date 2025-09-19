@@ -47,7 +47,8 @@ export default function ViewGuardRailDetails() {
       name: "PII Detection",
       type: "pii",
       category: ["harm", "compliance", "privacy"],
-      description: "Advanced PII detection guardrail that identifies and masks personal identifiable information including SSN, credit cards, emails, phone numbers, addresses, and other sensitive data.",
+      description:
+        "Advanced PII detection guardrail that identifies and masks personal identifiable information including SSN, credit cards, emails, phone numbers, addresses, and other sensitive data.",
       provider: "Bud Sentinel",
       deployments: 12,
       status: "active",
@@ -58,15 +59,16 @@ export default function ViewGuardRailDetails() {
       examples: [
         {
           title: "Example 1",
-          content: "Input: My credit card is 4532-1234-5678-9012\nOutput: My credit card is [REDACTED]",
-          description: "Credit card detection and masking"
+          content:
+            "Input: My credit card is 4532-1234-5678-9012\nOutput: My credit card is [REDACTED]",
+          description: "Credit card detection and masking",
         },
         {
           title: "Example 2",
           content: "Input: SSN: 123-45-6789\nOutput: SSN: [REDACTED]",
-          description: "Social security number redaction"
-        }
-      ]
+          description: "Social security number redaction",
+        },
+      ],
     };
     setGuardrail(dummyData);
   }, [drawerProps]);
@@ -81,17 +83,17 @@ export default function ViewGuardRailDetails() {
   };
 
   const getTypeIcon = (type?: string) => {
-    switch(type) {
-      case 'pii':
-        return '🔒';
-      case 'jailbreak':
-        return '🚫';
-      case 'toxicity':
-        return '⚠️';
-      case 'bias':
-        return '⚖️';
+    switch (type) {
+      case "pii":
+        return "🔒";
+      case "jailbreak":
+        return "🚫";
+      case "toxicity":
+        return "⚠️";
+      case "bias":
+        return "⚖️";
       default:
-        return '🛡️';
+        return "🛡️";
     }
   };
 
@@ -137,7 +139,8 @@ export default function ViewGuardRailDetails() {
                 <div className="flex flex-wrap gap-[0.5rem]">
                   {guardrail.modality?.map((item, idx) => (
                     <span key={idx} className="text-[#EEEEEE] text-[0.75rem]">
-                      {item}{idx < guardrail.modality!.length - 1 ? " | " : ""}
+                      {item}
+                      {idx < guardrail.modality!.length - 1 ? " | " : ""}
                     </span>
                   ))}
                 </div>
@@ -151,7 +154,8 @@ export default function ViewGuardRailDetails() {
                 <div className="flex flex-wrap gap-[0.5rem]">
                   {guardrail.scannerType?.map((item, idx) => (
                     <span key={idx} className="text-[#EEEEEE] text-[0.75rem]">
-                      {item}{idx < guardrail.scannerType!.length - 1 ? " | " : ""}
+                      {item}
+                      {idx < guardrail.scannerType!.length - 1 ? " | " : ""}
                     </span>
                   ))}
                 </div>
@@ -165,7 +169,8 @@ export default function ViewGuardRailDetails() {
                 <div className="flex flex-wrap gap-[0.5rem]">
                   {guardrail.guardType?.map((item, idx) => (
                     <span key={idx} className="text-[#EEEEEE] text-[0.75rem]">
-                      {item}{idx < guardrail.guardType!.length - 1 ? " | " : ""}
+                      {item}
+                      {idx < guardrail.guardType!.length - 1 ? " | " : ""}
                     </span>
                   ))}
                 </div>
@@ -179,7 +184,8 @@ export default function ViewGuardRailDetails() {
                 <div className="flex flex-wrap gap-[0.5rem]">
                   {guardrail.typeCategories?.map((item, idx) => (
                     <span key={idx} className="text-[#EEEEEE] text-[0.75rem]">
-                      {item}{idx < guardrail.typeCategories!.length - 1 ? " | " : ""}
+                      {item}
+                      {idx < guardrail.typeCategories!.length - 1 ? " | " : ""}
                     </span>
                   ))}
                 </div>
@@ -229,14 +235,16 @@ export default function ViewGuardRailDetails() {
                   <Text_11_400_808080>Status</Text_11_400_808080>
                   <Tag
                     className="!m-0 !mt-[0.25rem]"
-                    color={guardrail.status === 'active' ? 'green' : 'orange'}
+                    color={guardrail.status === "active" ? "green" : "orange"}
                   >
                     {guardrail.status}
                   </Tag>
                 </div>
                 <div>
                   <Text_11_400_808080>Deployments</Text_11_400_808080>
-                  <Text_12_400_B3B3B3>{guardrail.deployments} active</Text_12_400_B3B3B3>
+                  <Text_12_400_B3B3B3>
+                    {guardrail.deployments} active
+                  </Text_12_400_B3B3B3>
                 </div>
               </div>
             </div>

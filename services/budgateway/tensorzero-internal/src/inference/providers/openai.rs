@@ -53,8 +53,8 @@ use crate::inference::types::{
 };
 use crate::model::{build_creds_caching_default, Credential, CredentialLocation, ModelProvider};
 use crate::moderation::{
-    ModerationCategories, ModerationCategoryScores, ModerationInput, ModerationProvider,
-    ModerationProviderResponse, ModerationRequest, ModerationResult,
+    CategoryAppliedInputTypes, ModerationCategories, ModerationCategoryScores, ModerationInput,
+    ModerationProvider, ModerationProviderResponse, ModerationRequest, ModerationResult,
 };
 use crate::openai_batch::{
     ListBatchesParams, ListBatchesResponse, OpenAIBatchObject, OpenAIFileObject,
@@ -3221,6 +3221,8 @@ struct OpenAIModerationResult {
     flagged: bool,
     categories: ModerationCategories,
     category_scores: ModerationCategoryScores,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    category_applied_input_types: Option<CategoryAppliedInputTypes>,
 }
 
 struct OpenAIModerationResponseWithMetadata<'a> {
@@ -3320,6 +3322,9 @@ impl<'a> TryFrom<OpenAIModerationResponseWithMetadata<'a>> for ModerationProvide
                 flagged: r.flagged,
                 categories: r.categories,
                 category_scores: r.category_scores,
+                category_applied_input_types: r.category_applied_input_types,
+                hallucination_details: None,
+                ip_violation_details: None,
             })
             .collect();
 

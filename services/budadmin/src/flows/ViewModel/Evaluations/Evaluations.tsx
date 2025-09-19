@@ -1,4 +1,3 @@
-
 import { Text_14_600_EEEEEE } from "@/components/ui/text";
 import React from "react";
 import { Tag } from "antd"; // Added Checkbox import
@@ -13,8 +12,6 @@ import ComingSoon from "@/components/ui/comingSoon";
 import EvaluationResultsTable from "@/components/ui/bud/table/EvaluationResultsTable";
 import { useUser } from "src/stores/useUser";
 import { Model } from "src/hooks/useModels";
-
-
 
 const tags = [
   {
@@ -127,20 +124,13 @@ const tags = [
   },
 ];
 
-
-export default function Evaluations({
-  model
-}: {
-  model: Model
-}) {
-
+export default function Evaluations({ model }: { model: Model }) {
   const [search, setSearch] = React.useState("");
   const [showAllTags, setShowAllTags] = React.useState(false);
   const limit = 6;
   const { openDrawer } = useDrawer();
 
   return (
-
     <div className="pt-[.45rem] relative min-h-[40vh]">
       <div className="rounded-es-lg rounded-ee-lg pb-[.15rem]">
         <div className="flex items-center justify-between">
@@ -187,12 +177,9 @@ export default function Evaluations({
           </div>
         </div>
       </div>
-      {(model.provider_type != 'disk' && model.provider_type != 'url') && (
+      {model.provider_type != "disk" && model.provider_type != "url" && (
         <>
-          <Leaderboards
-            model={model}
-            leaderboardClasses="pb-[1.2rem]"
-          />
+          <Leaderboards model={model} leaderboardClasses="pb-[1.2rem]" />
           <div className="hR mt-[.1rem] mb-[1rem]"></div>
         </>
       )}

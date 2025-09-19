@@ -1,2 +1,2 @@
 // Re-export the observability page component
-export { default } from '../home/observability';
+export { default } from "../home/observability";

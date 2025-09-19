@@ -51,7 +51,7 @@ class CloudModelSyncScheduler:
         api_endpoint = f"{app_settings.bud_connect_base_url}model/get-compatible-models"
         params = {
             "limit": PAGE_LIMIT,
-            "engine": app_settings.cloud_model_seeder_engine,
+            # "engine": app_settings.cloud_model_seeder_engine,
         }
 
         try:

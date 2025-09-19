@@ -1,13 +1,19 @@
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import { Text_10_400_FFFFFF, Text_12_400_EEEEEE, Text_12_400_FFFFFF, Text_14_400_EEEEEE, Text_8_300_FFFFFF } from "@/components/ui/text";
+import {
+  Text_10_400_FFFFFF,
+  Text_12_400_EEEEEE,
+  Text_12_400_FFFFFF,
+  Text_14_400_EEEEEE,
+  Text_8_300_FFFFFF,
+} from "@/components/ui/text";
 import React, { use, useContext, useEffect, useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { ConfigProvider, Image } from "antd"; // Added Checkbox import
 import Tags from "src/flows/components/DrawerTags";
-import { Tabs } from 'antd';
-import type { TabsProps } from 'antd';
+import { Tabs } from "antd";
+import type { TabsProps } from "antd";
 import General from "./General/General";
 import CustomDropDown from "../components/CustomDropDown";
 import Evaluations from "./Evaluations/Evaluations";
@@ -23,22 +29,28 @@ import ModelTags from "../components/ModelTags";
 import { useDeployModel } from "src/stores/useDeployModel";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import IconRender from "../components/BudIconRender";
-import { useMemo } from 'react';
-
-
-
+import { useMemo } from "react";
 
 export default function ViewModel() {
-  const { isExpandedViewOpen } = useContext(BudFormContext)
-  const { currentWorkflow, setCurrentWorkflow } = useDeployModel()
-  const { openDrawerWithStep, closeDrawer, previousStep, setPreviousStep, closeExpandedStep } = useDrawer()
-  const [filteredItems, setFilteredItems] = useState<TabsProps['items']>([]);
+  const { isExpandedViewOpen } = useContext(BudFormContext);
+  const { currentWorkflow, setCurrentWorkflow } = useDeployModel();
+  const {
+    openDrawerWithStep,
+    closeDrawer,
+    previousStep,
+    setPreviousStep,
+    closeExpandedStep,
+  } = useDrawer();
+  const [filteredItems, setFilteredItems] = useState<TabsProps["items"]>([]);
   const [showConfirm, setShowConfirm] = useState(false);
   const [toAdapter, setToAdapter] = useState(false);
   const { selectedModel, deleteModel, refresh } = useModels();
-  const { hasPermission } = useUser()
+  const { hasPermission } = useUser();
   // const imageUrl = (assetBaseUrl + selectedModel?.provider?.icon) || selectedModel?.icon
-  const imageUrl = selectedModel?.source == 'local' ? assetBaseUrl + selectedModel?.icon : assetBaseUrl + selectedModel?.provider?.icon
+  const imageUrl =
+    selectedModel?.source == "local"
+      ? assetBaseUrl + selectedModel?.icon
+      : assetBaseUrl + selectedModel?.provider?.icon;
 
   const onChange = (key: string) => {
     // if (key != '1') {
@@ -46,98 +58,117 @@ export default function ViewModel() {
     // }
 
     closeExpandedStep();
-    if( key == '5') {
+    if (key == "5") {
       setToAdapter(true);
-    }
-    else {
+    } else {
       setToAdapter(false);
     }
   };
   useEffect(() => {
-    console.log('toAdapter', toAdapter);
+    console.log("toAdapter", toAdapter);
   }, [toAdapter]);
 
-  const items: TabsProps['items'] = useMemo(() => [
-    {
-      key: '1',
-      label: 'General',
-      children: <General data={selectedModel} />,
-    },
-    {
-      key: '2',
-      label: 'Evaluations',
-      children: <Evaluations
-        model={selectedModel}
-      />,
-    },
-    {
-      key: '3',
-      label: 'Performance',
-      children: <PerformanceDetailed data={selectedModel} />,
-    },
-    {
-      key: '4',
-      label: 'Advanced',
-      children: <Advanced data={selectedModel} />,
-    },
-    {
-      key: '5',
-      label: 'Adapters',
-      children: <General key={`general-tab-${toAdapter}`} data={selectedModel} goToAdapter={toAdapter} />,
-    },
-  ], [toAdapter, selectedModel]);
+  const items: TabsProps["items"] = useMemo(
+    () => [
+      {
+        key: "1",
+        label: "General",
+        children: <General data={selectedModel} />,
+      },
+      {
+        key: "2",
+        label: "Evaluations",
+        children: <Evaluations model={selectedModel} />,
+      },
+      {
+        key: "3",
+        label: "Performance",
+        children: <PerformanceDetailed data={selectedModel} />,
+      },
+      {
+        key: "4",
+        label: "Advanced",
+        children: <Advanced data={selectedModel} />,
+      },
+      {
+        key: "5",
+        label: "Adapters",
+        children: (
+          <General
+            key={`general-tab-${toAdapter}`}
+            data={selectedModel}
+            goToAdapter={toAdapter}
+          />
+        ),
+      },
+    ],
+    [toAdapter, selectedModel],
+  );
 
   useEffect(() => {
-    if (selectedModel?.provider_type === 'cloud_model') {
-      setFilteredItems(items.filter((item) => item.key !== '3' && item.key !== '4' && item.key !== '5'));
+    if (selectedModel?.provider_type === "cloud_model") {
+      setFilteredItems(
+        items.filter(
+          (item) => item.key !== "3" && item.key !== "4" && item.key !== "5",
+        ),
+      );
     } else {
       setFilteredItems(items); // Use all tabs
     }
   }, [selectedModel, toAdapter]);
 
-  const firstLineText = !selectedModel?.endpoints_count ? 'You\'re about to delete the model' : 'You\'re not allowed to delete this model'
-  const secondLineText = !selectedModel?.endpoints_count ? 'The model is not deployed on any projects. Are you sure you want to delete this model?' : 'You will have to stop the deployment of this model from every project, before you can delete this model.'
+  const firstLineText = !selectedModel?.endpoints_count
+    ? "You're about to delete the model"
+    : "You're not allowed to delete this model";
+  const secondLineText = !selectedModel?.endpoints_count
+    ? "The model is not deployed on any projects. Are you sure you want to delete this model?"
+    : "You will have to stop the deployment of this model from every project, before you can delete this model.";
   return (
     <BudForm
-      data={{
-
-      }}
-      backText={previousStep ? 'Back' : undefined}
-      onBack={previousStep ? () => {
-        if (previousStep) {
-          setCurrentWorkflow(null)
-          openDrawerWithStep(previousStep)
-          setPreviousStep(null)
-        }
-      } : undefined}
+      data={{}}
+      backText={previousStep ? "Back" : undefined}
+      onBack={
+        previousStep
+          ? () => {
+              if (previousStep) {
+                setCurrentWorkflow(null);
+                openDrawerWithStep(previousStep);
+                setPreviousStep(null);
+              }
+            }
+          : undefined
+      }
     >
       <BudWraperBox>
-        {showConfirm && <BudDrawerLayout>
-          <BudStepAlert
-            type="warining"
-            title={firstLineText}
-            description={secondLineText}
-            confirmText={!selectedModel?.endpoints_count ? 'Delete Model' : 'Okay, I understand'}
-            cancelText={!selectedModel?.endpoints_count ? 'Cancel' : null}
-            confirmAction={async () => {
-              if (!selectedModel?.endpoints_count) {
-                const result = await deleteModel(selectedModel?.id)
-                if (result) {
-                  successToast('Model deleted successfully')
-                  await refresh()
-                  closeDrawer()
-                }
-                setShowConfirm(false)
-              } else (
-                setShowConfirm(false)
-              )
-
-            }}
-            cancelAction={() => {
-              setShowConfirm(false)
-            }}
-          />
-        </BudDrawerLayout>}
+        {showConfirm && (
+          <BudDrawerLayout>
+            <BudStepAlert
+              type="warining"
+              title={firstLineText}
+              description={secondLineText}
+              confirmText={
+                !selectedModel?.endpoints_count
+                  ? "Delete Model"
+                  : "Okay, I understand"
+              }
+              cancelText={!selectedModel?.endpoints_count ? "Cancel" : null}
+              confirmAction={async () => {
+                if (!selectedModel?.endpoints_count) {
+                  const result = await deleteModel(selectedModel?.id);
+                  if (result) {
+                    successToast("Model deleted successfully");
+                    await refresh();
+                    closeDrawer();
+                  }
+                  setShowConfirm(false);
+                } else setShowConfirm(false);
+              }}
+              cancelAction={() => {
+                setShowConfirm(false);
+              }}
+            />
+          </BudDrawerLayout>
+        )}
         <BudDrawerLayout>
           <div className="flex items-start justify-between w-full p-[1.35rem]">
             <div className="flex items-start justify-start max-w-[72%]">
@@ -191,7 +222,7 @@ export default function ViewModel() {
                 </div>
               </div> */}
               <div>
-                {hasPermission(PermissionEnum.ModelManage) &&
+                {hasPermission(PermissionEnum.ModelManage) && (
                   <CustomDropDown
                     isDisabled={isExpandedViewOpen}
                     buttonContent={
@@ -200,36 +231,28 @@ export default function ViewModel() {
                           preview={false}
                           src="/images/drawer/threeDots.png"
                           alt="info"
-                          style={{ width: '0.1125rem', height: '.6rem' }}
+                          style={{ width: "0.1125rem", height: ".6rem" }}
                         />
                       </div>
                     }
-                    items={
-                      [
-                        {
-                          key: '1',
-                          label: (
-                            <Text_12_400_EEEEEE>Edit</Text_12_400_EEEEEE>
-                          ),
-                          onClick: () => openDrawerWithStep('edit-model')
-                        },
-                        {
-                          key: '2',
-                          label: (
-                            <Text_12_400_EEEEEE>Delete</Text_12_400_EEEEEE>
-                          ),
-                          onClick: () => setShowConfirm(true)
-                        },
-                      ]
-                    }
+                    items={[
+                      {
+                        key: "1",
+                        label: <Text_12_400_EEEEEE>Edit</Text_12_400_EEEEEE>,
+                        onClick: () => openDrawerWithStep("edit-model"),
+                      },
+                      {
+                        key: "2",
+                        label: <Text_12_400_EEEEEE>Delete</Text_12_400_EEEEEE>,
+                        onClick: () => setShowConfirm(true),
+                      },
+                    ]}
                   />
-                }
+                )}
               </div>
             </div>
           </div>
-          <div
-            className="relative group px-[1.4rem]"
-          >
+          <div className="relative group px-[1.4rem]">
             <ModelVerificationStatus />
           </div>
           <div className="antTabWrap px-[1.4rem]">
@@ -240,11 +263,16 @@ export default function ViewModel() {
                 },
               }}
             >
-              <Tabs  defaultActiveKey="1" items={filteredItems} onChange={onChange} className="generalTabs"/>
+              <Tabs
+                defaultActiveKey="1"
+                items={filteredItems}
+                onChange={onChange}
+                className="generalTabs"
+              />
             </ConfigProvider>
           </div>
         </BudDrawerLayout>
       </BudWraperBox>
-    </BudForm >
+    </BudForm>
   );
 }

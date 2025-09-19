@@ -9,20 +9,20 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useEvaluations } from "src/hooks/useEvaluations";
 import { successToast, errorToast } from "@/components/toast";
 
-
 export default function SelectTrait() {
   const [page, setPage] = React.useState(1);
   const [limit, setLimit] = React.useState(1000);
   const { openDrawerWithStep, drawerProps } = useDrawer();
   const [hover, setHover] = React.useState(false);
-  const { createEvaluationWorkflow, currentWorkflow, getTraits, traitsList } = useEvaluations();
+  const { createEvaluationWorkflow, currentWorkflow, getTraits, traitsList } =
+    useEvaluations();
 
   const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
 
   const handleTraitToggle = (traitId: string) => {
-    setSelectedTraits(prev => {
+    setSelectedTraits((prev) => {
       if (prev.includes(traitId)) {
-        return prev.filter(id => id !== traitId);
+        return prev.filter((id) => id !== traitId);
       } else {
         return [...prev, traitId];
       }
@@ -30,12 +30,7 @@ export default function SelectTrait() {
   };
 
   const triatCard = (data) => {
-    const {
-      id,
-      name,
-      description,
-      hideSelect = false
-    } = data;
+    const { id, name, description, hideSelect = false } = data;
     const selected = selectedTraits.includes(id);
 
     return (
@@ -43,17 +38,13 @@ export default function SelectTrait() {
         onMouseEnter={() => setHover(true)}
         onClick={() => !data.is_present_in_model && handleTraitToggle(id)}
         onMouseLeave={() => setHover(false)}
-        className={`w-full pt-[1.05rem] pb-[.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] hover:border-[#757575] flex-row flex border-box hover:bg-[#FFFFFF08] ${data.is_present_in_model ? 'opacity-30 !cursor-not-allowed' : ''}`}
+        className={`w-full pt-[1.05rem] pb-[.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] hover:border-[#757575] flex-row flex border-box hover:bg-[#FFFFFF08] ${data.is_present_in_model ? "opacity-30 !cursor-not-allowed" : ""}`}
       >
-
         <div className="flex justify-between flex-col w-full ">
           <div className="flex items-center justify-between ">
-            <div className="flex flex-grow max-w-[90%]"
-
-            >
+            <div className="flex flex-grow max-w-[90%]">
               <CustomPopover title={name}>
-                <div className="text-[#EEEEEE] mr-2 pb-[.3em] text-[0.875rem] truncate overflow-hidden whitespace-nowrap"
-                >
+                <div className="text-[#EEEEEE] mr-2 pb-[.3em] text-[0.875rem] truncate overflow-hidden whitespace-nowrap">
                   {name}
                 </div>
               </CustomPopover>
@@ -68,10 +59,16 @@ export default function SelectTrait() {
             >
               <CustomPopover
                 Placement="topRight"
-                title={data.is_present_in_model ? "Already added to model repository" : "Add to model repository"}
+                title={
+                  data.is_present_in_model
+                    ? "Already added to model repository"
+                    : "Add to model repository"
+                }
               >
                 <Checkbox
-                  checked={selected} className="AntCheckbox text-[#757575] w-[0.875rem] h-[0.875rem] text-[0.875rem] flex justify-center items-center" />
+                  checked={selected}
+                  className="AntCheckbox text-[#757575] w-[0.875rem] h-[0.875rem] text-[0.875rem] flex justify-center items-center"
+                />
               </CustomPopover>
             </div>
           </div>
@@ -80,7 +77,6 @@ export default function SelectTrait() {
               {description || "-"}
             </div>
           </CustomPopover>
-
         </div>
       </div>
     );
@@ -90,7 +86,6 @@ export default function SelectTrait() {
     // Fetch traits when component mounts
     getTraits({ page, limit });
   }, [page]);
-
 
   return (
     <BudForm
@@ -114,7 +109,8 @@ export default function SelectTrait() {
           }
 
           // Get experiment ID from workflow or drawer props
-          const experimentId = currentWorkflow.experiment_id || drawerProps?.experimentId;
+          const experimentId =
+            currentWorkflow.experiment_id || drawerProps?.experimentId;
 
           if (!experimentId) {
             errorToast("Experiment ID not found");
@@ -128,12 +124,15 @@ export default function SelectTrait() {
             workflow_total_steps: 5,
             trigger_workflow: false,
             stage_data: {
-              trait_ids: selectedTraits
-            }
+              trait_ids: selectedTraits,
+            },
           };
 
           // Call the API
-          const response = await createEvaluationWorkflow(experimentId, payload);
+          const response = await createEvaluationWorkflow(
+            experimentId,
+            payload,
+          );
 
           successToast("Traits selected successfully");
 
@@ -146,7 +145,6 @@ export default function SelectTrait() {
       }}
       nextText="Next"
     >
-
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
@@ -157,15 +155,14 @@ export default function SelectTrait() {
           />
           <div className="px-[1.4rem] pb-[.875rem] pt-[1.25rem] flex justify-between items-center">
             <div className="text-[#757575] text-[.75rem] font-[400]">
-              Traits Available <span className="text-[#EEEEEE]">{traitsList?.length || 0}</span>
+              Traits Available{" "}
+              <span className="text-[#EEEEEE]">{traitsList?.length || 0}</span>
             </div>
           </div>
 
           {traitsList && traitsList.length > 0 ? (
             traitsList.map((trait) => (
-              <div key={trait.id}>
-                {triatCard(trait)}
-              </div>
+              <div key={trait.id}>{triatCard(trait)}</div>
             ))
           ) : (
             <div className="px-[1.4rem] py-[2rem] text-center text-[#757575]">
