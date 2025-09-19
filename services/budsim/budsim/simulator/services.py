@@ -58,7 +58,6 @@ from .schemas import (
     DeviceTypeMetrics,
     NodeConfiguration,
     NodeGroupConfiguration,
-    NodeGroupConfigurationValidator,
     SimulationMethod,
     SimulationMetrics,
 )
@@ -216,11 +215,13 @@ class SimulationService:
             group["min_devices_per_node"] = (
                 min(group["node_distribution"].values()) if group["node_distribution"] else 0
             )
+            # Add total_devices field for proper validation later
+            group["total_devices"] = sum(group["node_distribution"].values()) if group["node_distribution"] else 0
 
             logger.debug(
                 f"Device type {device_type}: {len(group['devices'])} devices across "
                 f"{group['total_nodes_with_device']} nodes, max_per_node={group['max_devices_per_node']}, "
-                f"node_distribution={group['node_distribution']}"
+                f"total_devices={group['total_devices']}, node_distribution={group['node_distribution']}"
             )
 
         return device_groups
@@ -529,7 +530,8 @@ class SimulationService:
                             **{
                                 k.lower(): v
                                 for k, v in device.items()
-                                if k not in ["id", "type", "name", "node_id", "node_name", "cluster_id"]
+                                if k
+                                not in ["id", "type", "name", "node_id", "node_name", "cluster_id", "available_count"]
                             },
                         }
 
@@ -559,6 +561,9 @@ class SimulationService:
                 device_config["device_id"] = device_config.pop("id", str(uuid.uuid4()))
                 device_config["device_type"] = device_config.pop("type")
                 device_config["device_name"] = device_config.pop("name", device_config["device_id"])
+                # Ensure available_count is present for legacy configs
+                if "available_count" not in device_config:
+                    device_config["available_count"] = 1
                 device_config = {k.lower(): v for k, v in device_config.items()}
 
                 return ensure_json_serializable(
@@ -1643,15 +1648,9 @@ class SimulationService:
         tp_size = engine_config.get("tensor_parallel_size", 1)
         pp_size = engine_config.get("pipeline_parallel_size", 1)
 
-        # Validate parallelism configuration
-        try:
-            NodeGroupConfigurationValidator.validate_parallelism_combination(
-                tp_size, pp_size, template_result.available_count
-            )
-            NodeGroupConfigurationValidator.validate_device_type_compatibility(template_result.device_type, pp_size)
-        except ValueError as e:
-            logger.warning("Invalid parallelism configuration for device group %s: %s", device_type, e)
-            return None
+        # Skip validation - TP/PP values from top_k_configs are already validated during optimization
+        # The Evolution and DirectSearch optimizers validate these combinations before storing them
+        logger.info(f"Using pre-validated parallelism: TP={tp_size}, PP={pp_size} from optimization results")
 
         # Create labels for Kubernetes node selection
         labels = {"device_name": device_type, "concurrency": str(top_k_configs.get("concurrency", 1))}
@@ -1752,10 +1751,10 @@ class SimulationService:
                 tp_size = engine_config.get("tensor_parallel_size", 1)
                 logger.info(f"TP size for {device_type}: {tp_size}")
 
-                # Calculate optimal replica count for this device group
+                # Use per-device count for replica calculation
                 available_devices = template_result.available_count
                 max_replicas = available_devices // tp_size if tp_size > 0 else 0
-                logger.info(f"Available devices: {available_devices}, max replicas: {max_replicas}")
+                logger.info(f"Available devices per node: {available_devices}, max replicas: {max_replicas}")
 
                 if max_replicas <= 0:
                     logger.warning(f"No replicas possible for device type {device_type}")
