@@ -335,7 +335,6 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       if (response.data) {
         set({
           currentWorkflow: response.data,
-          workflowLoading: false,
         });
 
         // Fetch the workflow data after creation
@@ -348,6 +347,9 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
         workflowLoading: false,
         currentWorkflow: null,
       });
+    } finally {
+      // Ensure workflowLoading is always set to false
+      set({ workflowLoading: false });
     }
   },
 
@@ -375,7 +377,6 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       if (response.data) {
         set({
           currentWorkflow: response.data,
-          workflowLoading: false,
         });
 
         // Fetch the workflow data after update
@@ -387,6 +388,9 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
         workflowError: error?.message || "Failed to update workflow",
         workflowLoading: false,
       });
+    } finally {
+      // Ensure workflowLoading is always set to false
+      set({ workflowLoading: false });
     }
   },
 
@@ -407,15 +411,16 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       if (response.data) {
         set({
           currentWorkflow: response.data,
-          workflowLoading: false,
         });
       }
     } catch (error: any) {
       errorToast(error?.message || "Failed to fetch workflow");
       set({
         workflowError: error?.message || "Failed to fetch workflow",
-        workflowLoading: false,
       });
+    } finally {
+      // Ensure workflowLoading is always set to false
+      set({ workflowLoading: false });
     }
   },
 
