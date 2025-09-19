@@ -1566,53 +1566,84 @@ class ExperimentService:
         Returns:
             List[CurrentMetric]: List of current metrics derived from experiment runs.
         """
-        from budapp.eval_ops.schemas import CurrentMetric
+        try:
+            from budapp.eval_ops.schemas import CurrentMetric
 
-        # Query active runs for the experiment
-        runs = (
-            self.session.query(RunModel)
-            .filter(
-                RunModel.experiment_id == experiment_id,
-                RunModel.status != RunStatusEnum.DELETED.value,
-            )
-            .order_by(RunModel.updated_at.desc())  # Most recently updated first
-            .all()
-        )
-
-        current_metrics = []
-        for run in runs:
-            try:
-                # Get model details
-                model_detail = self.get_model_details(run.model_id)
-
-                # Get dataset information
-                dataset_version = self.session.get(ExpDatasetVersion, run.dataset_version_id)
-                dataset_name = "Unknown Dataset"
-                if dataset_version and dataset_version.dataset:
-                    dataset_name = dataset_version.dataset.name
-
-                # Get traits for this run's dataset
-                traits_with_datasets = self.get_traits_with_datasets_for_run(run.dataset_version_id)
-                trait_names = [trait.name for trait in traits_with_datasets]
-
-                # Create CurrentMetric object
-                current_metric = CurrentMetric(
-                    evaluation=f"{model_detail.name} on {dataset_name}",  # Descriptive evaluation name
-                    dataset=dataset_name,
-                    deployment_name=model_detail.deployment_name or model_detail.name,
-                    judge=None,  # Judge models not available yet
-                    traits=trait_names,
-                    last_run_at=run.updated_at or run.created_at,
-                    run_id=str(run.id),
+            # Query active runs for the experiment - use created_at for ordering to avoid NULL issues
+            runs = (
+                self.session.query(RunModel)
+                .filter(
+                    RunModel.experiment_id == experiment_id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
                 )
+                .order_by(RunModel.created_at.desc())  # Use created_at instead of updated_at
+                .all()
+            )
 
-                current_metrics.append(current_metric)
+            current_metrics = []
+            for run in runs:
+                try:
+                    # Get model details with validation
+                    model_detail = self.get_model_details(run.model_id)
+                    if not model_detail or not hasattr(model_detail, "name") or not model_detail.name:
+                        logger.warning(f"Invalid model details for run {run.id}, skipping")
+                        continue
 
-            except Exception as e:
-                logger.warning(f"Failed to process run {run.id} for current_metrics: {e}")
-                continue
+                    # Get dataset information with validation
+                    dataset_version = self.session.get(ExpDatasetVersion, run.dataset_version_id)
+                    dataset_name = "Unknown Dataset"
+                    if dataset_version and dataset_version.dataset and dataset_version.dataset.name:
+                        dataset_name = dataset_version.dataset.name
 
-        return current_metrics
+                    # Get traits for this run's dataset with validation
+                    traits_with_datasets = self.get_traits_with_datasets_for_run(run.dataset_version_id)
+                    trait_names = []
+                    if traits_with_datasets:
+                        trait_names = [
+                            trait.name
+                            for trait in traits_with_datasets
+                            if trait and hasattr(trait, "name") and trait.name
+                        ]
+
+                    # Validate required fields before creating CurrentMetric
+                    model_name = model_detail.name if model_detail.name else "Unknown Model"
+                    deployment_name = (
+                        model_detail.deployment_name
+                        if hasattr(model_detail, "deployment_name") and model_detail.deployment_name
+                        else model_name
+                    )
+                    evaluation_name = f"{model_name} on {dataset_name}"
+                    last_run_time = run.updated_at or run.created_at
+
+                    # Create CurrentMetric object with validated data
+                    current_metric = CurrentMetric(
+                        evaluation=evaluation_name,
+                        dataset=dataset_name,
+                        deployment_name=deployment_name,
+                        judge=None,  # Judge models not available yet
+                        traits=trait_names,
+                        last_run_at=last_run_time,
+                        run_id=str(run.id),
+                    )
+
+                    current_metrics.append(current_metric)
+
+                except Exception as e:
+                    logger.error(
+                        f"Failed to process run {run.id} for current_metrics: {e}",
+                        exc_info=True,
+                    )
+                    continue
+
+            logger.info(f"Generated {len(current_metrics)} current_metrics for experiment {experiment_id}")
+            return current_metrics
+
+        except Exception as e:
+            logger.error(
+                f"Failed to get current_metrics for experiment {experiment_id}: {e}",
+                exc_info=True,
+            )
+            return []  # Return empty list instead of failing
 
 
 class ExperimentWorkflowService:
