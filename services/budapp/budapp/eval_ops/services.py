@@ -16,12 +16,14 @@ from budapp.commons.constants import (
 )
 from budapp.commons.exceptions import ClientException
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
-from budapp.eval_ops.models import ExpDataset as DatasetModel
 from budapp.eval_ops.models import (
+    Evaluation,
+    EvaluationStatusEnum,
     ExpDatasetVersion,
     ExperimentStatusEnum,
     RunStatusEnum,
 )
+from budapp.eval_ops.models import ExpDataset as DatasetModel
 from budapp.eval_ops.models import Experiment as ExperimentModel
 from budapp.eval_ops.models import (
     ExpMetric as MetricModel,
@@ -765,13 +767,7 @@ class ExperimentService:
         Raises:
             HTTPException(status_code=404): If experiment not found or access denied.
         """
-        ev = self.session.get(ExperimentModel, experiment_id)
-        if not ev or ev.created_by != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Experiment not found or access denied",
-            )
-
+        # 2, Get all the the runs group by Evaluations
         runs = (
             self.session.query(RunModel)
             .filter(
@@ -2287,9 +2283,14 @@ class EvaluationWorkflowService:
                     {"current_step": request.step_number},
                 )
 
+            evaluation_id: uuid.UUID | None = None
             # If this is the final step and trigger_workflow is True, create the runs
             if request.step_number == 5 and request.trigger_workflow:
-                await self._create_runs_from_workflow(workflow.id, experiment_id, current_user_id)
+                # Create The Evaluation & Runs
+                evaluation_id = await self._create_runs_from_workflow(workflow.id, experiment_id, current_user_id)
+
+                logger.warning(f"Created Evaluation ID: {evaluation_id}")
+
                 await WorkflowDataManager(self.session).update_by_fields(
                     workflow,
                     {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
@@ -2310,14 +2311,22 @@ class EvaluationWorkflowService:
             if next_step:
                 await self._get_next_step_data(next_step, all_step_data, experiment_id)
 
+            # Get The Evaluation ID
+
             # Trigger budeval evaluation if this is the final step
             if request.step_number == 5 and request.trigger_workflow:
                 logger.info("*" * 10)
                 logger.info(f"\n\nTriggering budeval evaluation for experiment {experiment_id} \n\n")
 
+                if evaluation_id is None:
+                    raise ClientException(
+                        message="Error getting evaluation ID",
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+
                 # Trigger Eval
                 trigger_workflow_response = await self._trigger_evaluations_for_experiment_and_get_response(
-                    experiment_id, current_user_id, workflow.id
+                    experiment_id, current_user_id, workflow.id, evaluation_id
                 )
 
                 logger.warning(f"Triggered budeval evaluation for experiment {trigger_workflow_response}")
@@ -2566,7 +2575,7 @@ class EvaluationWorkflowService:
         workflow_id: uuid.UUID,
         experiment_id: uuid.UUID,
         current_user_id: uuid.UUID,
-    ) -> int:
+    ) -> uuid.UUID:
         """Create runs from workflow data.
 
         Parameters:
@@ -2581,6 +2590,10 @@ class EvaluationWorkflowService:
         all_data = await self._get_accumulated_step_data(workflow_id)
         model_id = all_data.get("step_2", {}).get("model_id")
         dataset_ids = all_data.get("step_4", {}).get("dataset_ids", [])
+
+        # Common details for evaluation
+        evaluation_name = all_data.get("step_1", {}).get("name", "Evaluation")
+        evaluation_description = all_data.get("step_1", {}).get("description")
 
         if not model_id:
             raise HTTPException(
@@ -2611,6 +2624,18 @@ class EvaluationWorkflowService:
                 detail=f"Invalid model ID format: {model_id}",
             )
 
+        # Create Evaluation
+        evaluation = Evaluation(
+            experiment_id=experiment_id,
+            name=evaluation_name,
+            description=evaluation_description,
+            workflow_id=workflow_id,
+            created_by=current_user_id,
+            status=EvaluationStatusEnum.PENDING.value,
+        )
+        self.session.add(evaluation)
+        self.session.flush()
+
         # Get next run index for this experiment
         next_run_index = (
             self.session.query(func.max(RunModel.run_index)).filter(RunModel.experiment_id == experiment_id).scalar()
@@ -2635,6 +2660,7 @@ class EvaluationWorkflowService:
             run = RunModel(
                 experiment_id=experiment_id,
                 run_index=next_run_index,
+                evaluation_id=evaluation.id,
                 model_id=model_uuid,
                 dataset_version_id=dataset_version.id,
                 status=RunStatusEnum.PENDING.value,
@@ -2649,7 +2675,7 @@ class EvaluationWorkflowService:
         # Trigger budeval evaluation for all created runs
         # await self._trigger_evaluations_for_experiment(experiment_id)
 
-        return runs_created
+        return evaluation.id
 
     async def _get_next_step_data(
         self,
@@ -2937,7 +2963,7 @@ class EvaluationWorkflowService:
                 },
                 "eval_datasets": [{"dataset_id": ds} for ds in evaluation_request["datasets"]],
                 "eval_configs": evaluation_request.get("eval_configs", []),
-                "kubeconfig": evaluation_request.get("kubeconfig", ""),  # Add required kubeconfig field
+                "kubeconfig": evaluation_request.get("kubeconfig", ""),  # Not required as we use the incluster config
                 "notification_metadata": {
                     "name": BUD_INTERNAL_WORKFLOW,
                     "subscriber_ids": str(current_user_id),
@@ -3085,6 +3111,7 @@ class EvaluationWorkflowService:
         experiment_id: uuid.UUID,
         current_user_id: uuid.UUID,
         workflow_id: uuid.UUID,
+        evaluation_id: uuid.UUID,
     ) -> dict:
         """Trigger budeval evaluation for all pending runs in experiment and return first WorkflowMetadataResponse.
 
@@ -3099,6 +3126,7 @@ class EvaluationWorkflowService:
             runs = (
                 self.session.query(RunModel)
                 .filter(
+                    RunModel.evaluation_id == evaluation_id,
                     RunModel.experiment_id == experiment_id,
                     RunModel.status == RunStatusEnum.PENDING.value,
                 )
@@ -3147,7 +3175,7 @@ class EvaluationWorkflowService:
                 "source": app_settings.name,
                 "source_topic": app_settings.source_topic,
                 "experiment_id": experiment_id,  # Include experiment ID for tracking
-                "evaluation_id": str(workflow_id),  # TODO: Update to actual evaluation ID
+                "evaluation_id": str(evaluation_id),  # TODO: Update to actual evaluation ID
             }
 
             # Update all runs status to running
@@ -3158,7 +3186,7 @@ class EvaluationWorkflowService:
             # Trigger single budeval evaluation for all runs
             try:
                 response = await self.trigger_budeval_evaluation(
-                    run_id=runs[0].id,  # Use first run's ID as representative
+                    run_id=runs[0].id,  # this is ignored
                     evaluation_request=evaluation_request,
                     workflow_id=workflow_id,
                     current_user_id=current_user_id,
