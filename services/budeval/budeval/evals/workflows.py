@@ -215,11 +215,35 @@ class EvaluationWorkflow:
             transformed_data = {"job_config": job_config}
 
             # Pass reconstructed data to the service
-            job_details = asyncio.run(
-                EvaluationOpsService.deploy_eval_job_with_transformation(
-                    payload, transformed_data, str(task_id), workflow_id
+            # Handle async operations with proper event loop management
+            try:
+                asyncio.get_running_loop()
+                # If we're in an existing loop, we need to run in a new thread
+                import concurrent.futures
+
+                def run_in_new_loop():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            EvaluationOpsService.deploy_eval_job_with_transformation(
+                                payload, transformed_data, str(task_id), workflow_id
+                            )
+                        )
+                    finally:
+                        new_loop.close()
+
+                # Run in a separate thread with its own event loop
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_new_loop)
+                    job_details = future.result()
+            except RuntimeError:
+                # No loop running, safe to use asyncio.run()
+                job_details = asyncio.run(
+                    EvaluationOpsService.deploy_eval_job_with_transformation(
+                        payload, transformed_data, str(task_id), workflow_id
+                    )
                 )
-            )
 
             response = SuccessResponse(
                 code=HTTPStatus.OK.value, message="Evaluation job deployed successfully", param=dict(job_details)
@@ -252,7 +276,15 @@ class EvaluationWorkflow:
                             status="running",
                         )
 
-                asyncio.run(_init_and_create())
+                # Check if there's already an event loop running
+                try:
+                    asyncio.get_running_loop()
+                    # If we're in an existing loop, we need to handle this differently
+                    # For Dapr workflows, we should defer this to a background task
+                    logger.warning("Event loop already running, skipping initial ClickHouse record creation")
+                except RuntimeError:
+                    # No loop running, safe to use asyncio.run()
+                    asyncio.run(_init_and_create())
             except Exception as ch_e:
                 logger.warning(f"Failed to create initial ClickHouse job record: {ch_e}")
         except Exception as e:
@@ -287,11 +319,35 @@ class EvaluationWorkflow:
         )
 
         try:
-            cluster_verified = asyncio.run(
-                EvaluationOpsService.verify_cluster_connection(
-                    verify_cluster_connection_request_json, task_id, workflow_id
+            # Handle async operations with proper event loop management
+            try:
+                asyncio.get_running_loop()
+                # If we're in an existing loop, we need to run in a new thread
+                import concurrent.futures
+
+                def run_in_new_loop():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            EvaluationOpsService.verify_cluster_connection(
+                                verify_cluster_connection_request_json, task_id, workflow_id
+                            )
+                        )
+                    finally:
+                        new_loop.close()
+
+                # Run in a separate thread with its own event loop
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_new_loop)
+                    cluster_verified = future.result()
+            except RuntimeError:
+                # No loop running, safe to use asyncio.run()
+                cluster_verified = asyncio.run(
+                    EvaluationOpsService.verify_cluster_connection(
+                        verify_cluster_connection_request_json, task_id, workflow_id
+                    )
                 )
-            )
 
             if cluster_verified:
                 return SuccessResponse(
@@ -341,7 +397,7 @@ class EvaluationWorkflow:
             from budeval.evals.results_processor import ResultsProcessor
             from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
 
-            # Run async operations in a new event loop
+            # Handle async operations with proper event loop management
             async def extract_with_storage():
                 # Create storage adapter within this event loop context
                 storage = get_storage_adapter()
@@ -360,8 +416,27 @@ class EvaluationWorkflow:
                     experiment_id=experiment_id,
                 )
 
-            # Run in a new event loop (Dapr workflows run in threads)
-            results = asyncio.run(extract_with_storage())
+            # Check if there's already an event loop running
+            try:
+                asyncio.get_running_loop()
+                # If we're in an existing loop, we need to run in a new thread
+                import concurrent.futures
+
+                def run_in_new_loop():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(extract_with_storage())
+                    finally:
+                        new_loop.close()
+
+                # Run in a separate thread with its own event loop
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_new_loop)
+                    results = future.result()
+            except RuntimeError:
+                # No loop running, safe to use asyncio.run()
+                results = asyncio.run(extract_with_storage())
 
             logger.info(f"Successfully processed results for job {job_id}")
             response = SuccessResponse(
@@ -406,7 +481,29 @@ class EvaluationWorkflow:
 
         response: SuccessResponse | ErrorResponse
         try:
-            job_status = asyncio.run(EvaluationOpsService.get_job_status(job_id, kubeconfig, namespace))
+            # Handle async operations with proper event loop management
+            try:
+                asyncio.get_running_loop()
+                # If we're in an existing loop, we need to run in a new thread
+                import concurrent.futures
+
+                def run_in_new_loop():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            EvaluationOpsService.get_job_status(job_id, kubeconfig, namespace)
+                        )
+                    finally:
+                        new_loop.close()
+
+                # Run in a separate thread with its own event loop
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_new_loop)
+                    job_status = future.result()
+            except RuntimeError:
+                # No loop running, safe to use asyncio.run()
+                job_status = asyncio.run(EvaluationOpsService.get_job_status(job_id, kubeconfig, namespace))
 
             logger.debug(f"Job status for {job_id}: {job_status}")
 
@@ -1006,7 +1103,27 @@ class EvaluationWorkflow:
                                     job_duration_seconds=duration,
                                 )
 
-                        asyncio.run(_update_final())
+                        # Handle async operations with proper event loop management
+                        try:
+                            asyncio.get_running_loop()
+                            # If we're in an existing loop, we need to run in a new thread
+                            import concurrent.futures
+
+                            def run_in_new_loop():
+                                new_loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(new_loop)
+                                try:
+                                    return new_loop.run_until_complete(_update_final())
+                                finally:
+                                    new_loop.close()
+
+                            # Run in a separate thread with its own event loop
+                            with concurrent.futures.ThreadPoolExecutor() as executor:
+                                future = executor.submit(run_in_new_loop)
+                                future.result()
+                        except RuntimeError:
+                            # No loop running, safe to use asyncio.run()
+                            asyncio.run(_update_final())
                     except Exception as ch_e:
                         logger.warning(f"Failed to update final ClickHouse job record: {ch_e}")
                     notification_req.payload.event = "monitor_eval_job_progress"
@@ -1135,7 +1252,27 @@ class EvaluationWorkflow:
                                 job_duration_seconds=duration,
                             )
 
-                    asyncio.run(_update_failed())
+                    # Handle async operations with proper event loop management
+                    try:
+                        asyncio.get_running_loop()
+                        # If we're in an existing loop, we need to run in a new thread
+                        import concurrent.futures
+
+                        def run_in_new_loop():
+                            new_loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(new_loop)
+                            try:
+                                return new_loop.run_until_complete(_update_failed())
+                            finally:
+                                new_loop.close()
+
+                        # Run in a separate thread with its own event loop
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            future = executor.submit(run_in_new_loop)
+                            future.result()
+                    except RuntimeError:
+                        # No loop running, safe to use asyncio.run()
+                        asyncio.run(_update_failed())
                 except Exception as ch_e:
                     logger.warning(f"Failed to write failure ClickHouse job record: {ch_e}")
                 return
