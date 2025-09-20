@@ -1,3 +1,8 @@
+# TODO: migrate from bitnami (oss rugpull)
+global:
+    security:
+        allowInsecureImages: true
+
 imagePullPolicy: "Always"
 
 ingress:
@@ -78,6 +83,7 @@ microservices:
 
             CLOUD_MODEL_SEEDER_ENGINE: tensorzero
             BUD_CONNECT_BASE_URL: https://budconnect.bud.studio
+            BUD_DOC_SERVICE_URL: "http://{{ $.Release.Name }}-buddoc:9081"
 
     # backend internal services
     budcluster:
@@ -164,6 +170,20 @@ microservices:
             PSQL_USER: budsim
             PSQL_PASSWORD: budsim
             PSQL_DB_NAME: budsim
+    buddoc:
+        image: budstudio/buddoc:nightly
+        daprid: buddoc
+        env:
+            LOG_LEVEL: INFO
+            PSQL_HOST: "{{ $.Release.Name }}-postgresql"
+            PSQL_PORT: "5432"
+            PSQL_USER: buddoc
+            PSQL_PASSWORD: buddoc
+            PSQL_DB_NAME: buddoc
+            VLM_API_URL: "http://{{ $.Release.Name }}-budgateway:3000/v1/chat/completions"
+            VLM_API_TIMEOUT: "300"
+            MAX_FILE_SIZE_MB: "50"
+            TEMP_UPLOAD_DIR: /tmp/buddoc_uploads
     budnotify:
         image: budstudio/budnotify:nightly
         daprid: budnotify
@@ -286,6 +306,8 @@ microservices:
             YARN_VERSION: 1.22.19
             RSA_KEY_NAME: rsa-private-key.pem
 valkey:
+    image:
+        repository: bitnamilegacy/valkey
     enabled: true
     architecture: standalone
     commonConfiguration: |-
@@ -298,6 +320,8 @@ valkey:
         password: bud
 clickhouse:
     enabled: true
+    image:
+        repository: bitnamilegacy/clickhouse
     replicaCount: 1
     shards: 1
     auth:
@@ -305,11 +329,15 @@ clickhouse:
         password: bud
     keeper:
         replicaCount: 1
+        image:
+            repository: bitnamilegacy/clickhouse-keeper
 clickhouseExtra:
     autoCreateDB:
         - budproxy
         - budeval
 postgresql:
+    image:
+        repository: bitnamilegacy/postgresql
     enabled: true
     primary:
         resources:
@@ -332,9 +360,12 @@ postgresqlExtra:
         - budmodel
         - budsim
         - budeval
+        - buddoc
         - budprompt
 
 keycloak:
+    image:
+        repository: bitnamilegacy/keycloak
     proxy: edge
     resources:
         limits:
@@ -348,6 +379,8 @@ keycloak:
         password: keycloak
         database: keycloak
 kafka:
+    image:
+        repository: bitnamilegacy/kafka
     enabled: true
     clusterId: bud
     controller:
@@ -369,6 +402,8 @@ kafka:
                 - budproxy
                 - dapr
 mongodb:
+    image:
+        repository: bitnamilegacy/mongodb
     enabled: true
     architecture: standalone
     auth:
@@ -396,6 +431,16 @@ novu:
     externalS3:
         existingSecret: "{{ $.Release.Name }}-novu-externals3"
 minio:
+    defaultInitContainers:
+        volumePermissions:
+            image:
+                repository: bitnamilegacy/os-shell
+    image:
+        repository: bitnamilegacy/minio
+    console:
+        image:
+            digest:
+            repository: bitnamilegacy/minio-object-browser
     enabled: true
     resources:
         requests:

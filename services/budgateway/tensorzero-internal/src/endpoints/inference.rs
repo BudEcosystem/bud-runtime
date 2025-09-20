@@ -227,24 +227,32 @@ pub async fn inference_handler(
         } => {
             // Extract model latency from the result (using the first model inference result) before moving result
             let model_latency_ms = match &result {
-                InferenceResult::Chat(chat_result) => {
-                    chat_result.model_inference_results.first()
-                        .and_then(|r| match &r.latency {
-                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Batch => None,
-                        })
-                        .unwrap_or(0)
-                },
-                InferenceResult::Json(json_result) => {
-                    json_result.model_inference_results.first()
-                        .and_then(|r| match &r.latency {
-                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Batch => None,
-                        })
-                        .unwrap_or(0)
-                },
+                InferenceResult::Chat(chat_result) => chat_result
+                    .model_inference_results
+                    .first()
+                    .and_then(|r| match &r.latency {
+                        crate::inference::types::Latency::NonStreaming { response_time } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Streaming { response_time, .. } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Batch => None,
+                    })
+                    .unwrap_or(0),
+                InferenceResult::Json(json_result) => json_result
+                    .model_inference_results
+                    .first()
+                    .and_then(|r| match &r.latency {
+                        crate::inference::types::Latency::NonStreaming { response_time } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Streaming { response_time, .. } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Batch => None,
+                    })
+                    .unwrap_or(0),
                 // For other result types, we don't have model_inference_results, so default to 0
                 _ => 0,
             };
@@ -272,6 +280,7 @@ pub async fn inference_handler(
                         write_info.gateway_request,
                         gateway_response,
                         write_info.model_pricing,
+                        None, // No guardrail records for standard inference endpoint
                     )
                     .await;
                 });
@@ -659,15 +668,16 @@ pub async fn inference(
                 };
 
                 // Get model pricing from the result
-                let model_pricing = if let Some(first_result) = result.model_inference_results().first() {
-                    // Look up the model config to get pricing
-                    match models.get(&first_result.model_name).await {
-                        Ok(Some(model)) => model.pricing.clone(),
-                        _ => None,
-                    }
-                } else {
-                    None
-                };
+                let model_pricing =
+                    if let Some(first_result) = result.model_inference_results().first() {
+                        // Look up the model config to get pricing
+                        match models.get(&first_result.model_name).await {
+                            Ok(Some(model)) => model.pricing.clone(),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
 
                 Some(WriteInfo {
                     resolved_input: resolved_input.clone(),
@@ -900,6 +910,7 @@ fn create_stream(
                             gateway_request,
                             gateway_response,
                             model_pricing,
+                            None, // No guardrail records for standard inference endpoint
                         ).await;
 
                 }
@@ -1024,6 +1035,7 @@ pub async fn write_inference(
     gateway_request: Option<String>,
     gateway_response: Option<String>,
     model_pricing: Option<crate::model::ModelPricing>,
+    guardrail_records: Option<Vec<crate::guardrail::GuardrailInferenceDatabaseInsert>>,
 ) {
     let mut futures: Vec<Pin<Box<dyn Future<Output = ()> + Send>>> = Vec::new();
     if config.gateway.observability.enabled.unwrap_or(true) {
@@ -1117,45 +1129,48 @@ pub async fn write_inference(
             }
             InferenceResult::TextToSpeech(result) => {
                 // Extract the text input from the input
-                let text_input = input.messages.first()
+                let text_input = input
+                    .messages
+                    .first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
-                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        ResolvedInputMessageContent::Text { value } => {
+                            value.as_str().map(|s| s.to_string())
+                        }
                         _ => None,
                     })
                     .unwrap_or_else(|| "text input".to_string());
 
-                let audio_inference = AudioInferenceDatabaseInsert::new_text_to_speech(
-                    result,
-                    text_input,
-                    metadata,
-                );
+                let audio_inference =
+                    AudioInferenceDatabaseInsert::new_text_to_speech(result, text_input, metadata);
                 let _ = clickhouse_connection_info
                     .write(&[audio_inference], "AudioInference")
                     .await;
             }
             InferenceResult::ImageGeneration(result) => {
                 // Extract the prompt from the input
-                let prompt = input.messages.first()
+                let prompt = input
+                    .messages
+                    .first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
-                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        ResolvedInputMessageContent::Text { value } => {
+                            value.as_str().map(|s| s.to_string())
+                        }
                         _ => None,
                     })
                     .unwrap_or_else(|| "image prompt".to_string());
 
-                let image_inference = ImageInferenceDatabaseInsert::new(
-                    result,
-                    prompt,
-                    metadata,
-                );
+                let image_inference = ImageInferenceDatabaseInsert::new(result, prompt, metadata);
                 let _ = clickhouse_connection_info
                     .write(&[image_inference], "ImageInference")
                     .await;
             }
             InferenceResult::Moderation(result) => {
                 // Extract the input text from the input
-                let input_text = input.messages.first()
+                let input_text = input
+                    .messages
+                    .first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
                         ResolvedInputMessageContent::Text { value } => {
@@ -1164,18 +1179,25 @@ pub async fn write_inference(
                                 serde_json::Value::String(s) => Some(s.clone()),
                                 _ => value.as_str().map(|s| s.to_string()),
                             }
-                        },
+                        }
                         _ => None,
                     })
                     .unwrap_or_else(|| "moderation input".to_string());
 
-                let moderation_inference = ModerationInferenceDatabaseInsert::new(
-                    result,
-                    input_text,
-                    metadata,
-                );
+                let moderation_inference =
+                    ModerationInferenceDatabaseInsert::new(result, input_text, metadata);
                 let _ = clickhouse_connection_info
                     .write(&[moderation_inference], "ModerationInference")
+                    .await;
+            }
+        }
+
+        // Write guardrail records if provided
+        if let Some(guardrail_records) = guardrail_records {
+            // Batch write all guardrail records at once for efficiency
+            if !guardrail_records.is_empty() {
+                let _ = clickhouse_connection_info
+                    .write(&guardrail_records, "GuardrailInference")
                     .await;
             }
         }
@@ -1268,8 +1290,8 @@ pub async fn write_inference(
                 let input_multiplier = usage.input_tokens as f64 / pricing.per_tokens as f64;
                 let output_multiplier = usage.output_tokens as f64 / pricing.per_tokens as f64;
 
-                let total_cost = (input_multiplier * pricing.input_cost) +
-                                (output_multiplier * pricing.output_cost);
+                let total_cost = (input_multiplier * pricing.input_cost)
+                    + (output_multiplier * pricing.output_cost);
                 Some(total_cost)
             } else {
                 // Fallback to default pricing if not configured
@@ -1654,6 +1676,132 @@ impl ChatCompletionInferenceParams {
 
 fn is_false(v: &bool) -> bool {
     !*v
+}
+
+/// Write a blocked inference to the database for observability
+/// This is used when a request is blocked by guardrails before reaching the model
+pub async fn write_blocked_inference(
+    clickhouse_connection_info: &ClickHouseConnectionInfo,
+    kafka_connection_info: &crate::kafka::KafkaConnectionInfo,
+    config: &Config<'_>,
+    model_name: &str,
+    model_provider: &str,
+    resolved_input: ResolvedInput,
+    inference_id: Uuid,
+    episode_id: Uuid,
+    guardrail_records: Vec<crate::guardrail::GuardrailInferenceDatabaseInsert>,
+    observability_metadata: Option<ObservabilityMetadata>,
+    model_pricing: Option<crate::model::ModelPricing>,
+    gateway_request: Option<String>,
+) {
+    use crate::inference::types::{
+        current_timestamp, ChatInferenceResult, ContentBlockOutput, Latency, RequestMessage, Text,
+    };
+    // Create blocked content
+    let blocked_content = vec![ContentBlockChatOutput::Text(Text {
+        text: "Request blocked by content policy".to_string(),
+    })];
+
+    // Create the gateway response that would be sent to the client
+    let gateway_response_json = serde_json::json!({
+        "error": {
+            "message": "Input content violates content policy",
+            "type": "invalid_request_error",
+            "code": "content_filter"
+        }
+    });
+    let gateway_response_str = gateway_response_json.to_string();
+
+    // Create blocked model inference response
+    let model_response = ModelInferenceResponseWithMetadata {
+        id: Uuid::now_v7(),
+        created: current_timestamp(),
+        output: vec![ContentBlockOutput::Text(Text {
+            text: "Request blocked by content policy".to_string(),
+        })],
+        system: resolved_input
+            .system
+            .clone()
+            .and_then(|v| v.as_str().map(|s| s.to_string())),
+        input_messages: resolved_input
+            .messages
+            .iter()
+            .map(|msg| RequestMessage {
+                role: msg.role.clone(),
+                content: vec![], // Empty content for blocked messages
+            })
+            .collect(),
+        // Since we never made it to the provider, we don't have a raw request/response
+        // Use empty objects to indicate no provider interaction occurred
+        raw_request: "{}".to_string(),
+        raw_response: "{}".to_string(),
+        usage: Usage::default(),
+        latency: Latency::NonStreaming {
+            response_time: std::time::Duration::from_millis(0),
+        },
+        model_provider_name: model_provider.to_string().into(),
+        model_name: model_name.to_string().into(),
+        cached: false,
+        finish_reason: Some(FinishReason::ContentFilter),
+        gateway_request: gateway_request.clone(),
+        gateway_response: Some(gateway_response_str.clone()),
+        guardrail_scan_summary: if !guardrail_records.is_empty() {
+            let context = crate::guardrail::GuardrailExecutionContext {
+                scan_records: guardrail_records.clone(),
+                input_scan_time_ms: guardrail_records
+                    .iter()
+                    .filter(|r| r.guard_type == 1) // Input guard type
+                    .filter_map(|r| r.scan_latency_ms)
+                    .sum::<u32>()
+                    .into(),
+                output_scan_time_ms: None,
+                response_terminated: true,
+            };
+            Some(serde_json::to_string(&context.build_summary()).unwrap_or_default())
+        } else {
+            None
+        },
+    };
+
+    // Create blocked result
+    let blocked_result = InferenceResult::Chat(ChatInferenceResult {
+        inference_id,
+        created: current_timestamp(),
+        content: blocked_content,
+        usage: Usage::default(),
+        model_inference_results: vec![model_response],
+        inference_params: InferenceParams::default(),
+        original_response: None,
+        finish_reason: Some(FinishReason::ContentFilter),
+    });
+
+    // Create metadata
+    let metadata = InferenceDatabaseInsertMetadata {
+        function_name: "openai_compatible".to_string(),
+        variant_name: model_name.to_string(),
+        episode_id,
+        tool_config: None,
+        processing_time: Some(std::time::Duration::from_millis(0)),
+        tags: HashMap::new(),
+        extra_body: UnfilteredInferenceExtraBody::default(),
+        extra_headers: UnfilteredInferenceExtraHeaders::default(),
+    };
+
+    // Write inference and guardrail records
+    write_inference(
+        clickhouse_connection_info,
+        kafka_connection_info,
+        config,
+        resolved_input,
+        blocked_result,
+        metadata,
+        observability_metadata,
+        None, // gateway_request
+        None, // gateway_response
+        model_pricing,
+        Some(guardrail_records),
+    )
+    .await;
 }
 
 #[cfg(test)]

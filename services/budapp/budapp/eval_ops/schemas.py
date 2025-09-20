@@ -86,7 +86,7 @@ class CurrentMetric(BaseModel):
     evaluation: str = Field(..., description="Evaluation name")
     dataset: str = Field(..., description="Dataset name")
     deployment_name: str = Field(..., description="Deployment name")
-    judge: JudgeInfo = Field(..., description="Judge information")
+    judge: Optional[JudgeInfo] = Field(None, description="Judge information")
     traits: List[str] = Field(..., description="List of traits")
     last_run_at: datetime = Field(..., description="Last run timestamp")
     run_id: str = Field(..., description="UUID of the latest run")
@@ -136,7 +136,12 @@ class ProgressOverview(BaseModel):
 class CreateExperimentRequest(BaseModel):
     """The request to create an experiment."""
 
-    name: str = Field(..., min_length=1, max_length=255, description="The name of the experiment.")
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="The name of the experiment.",
+    )
     description: Optional[str] = Field(None, max_length=500, description="The description of the experiment.")
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment (optional).")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
@@ -210,11 +215,13 @@ class Experiment(BaseModel):
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment.")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
     status: Optional[str] = Field(
-        None, description="Computed status based on runs (running/failed/completed/pending/no_runs)."
+        None,
+        description="Computed status based on runs (running/failed/completed/pending/no_runs).",
     )
     models: Optional[List[ModelSummary]] = Field(default_factory=list, description="Models used in the experiment.")
     traits: Optional[List[TraitSummary]] = Field(
-        default_factory=list, description="Traits associated with the experiment."
+        default_factory=list,
+        description="Traits associated with the experiment.",
     )
     created_at: Optional[datetime] = Field(None, description="Timestamp when the experiment was created")
     # New fields for experiment detail
@@ -680,7 +687,10 @@ class TraitWithDatasets(BaseModel):
 class EvaluationScore(BaseModel):
     """Evaluation score information from BudEval."""
 
-    status: str = Field(..., description="Evaluation job status (pending/running/completed/failed)")
+    status: str = Field(
+        ...,
+        description="Evaluation job status (pending/running/completed/failed)",
+    )
     overall_accuracy: Optional[float] = Field(None, description="Overall accuracy percentage (0-100)")
     datasets: Optional[List[dict]] = Field(None, description="Individual dataset scores")
 

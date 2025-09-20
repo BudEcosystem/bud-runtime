@@ -267,7 +267,7 @@ class GuardrailProfileRule(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(
         Enum(
             GuardrailStatusEnum,
-            name="guardrail_deployment_status",
+            name="guardrail_status_enum",
             values_callable=lambda x: [e.value for e in x],
         ),
         nullable=False,
@@ -315,4 +315,5 @@ class GuardrailDeployment(Base, TimestampMixin):
     endpoint: Mapped[Optional["Endpoint"]] = relationship("Endpoint")
     user: Mapped["User"] = relationship("User")
     project: Mapped["Project"] = relationship("Project")
+    credential: Mapped[Optional["ProprietaryCredential"]] = relationship("ProprietaryCredential")
     profile: Mapped["GuardrailProfile"] = relationship("GuardrailProfile", back_populates="deployments")

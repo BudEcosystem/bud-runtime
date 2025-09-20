@@ -20,12 +20,9 @@ function DeployModelSelect({
   selectedTags = [],
   children,
   hideSelect,
-  emptyComponent = (
-    <Text_12_300_EEEEEE>
-      To add new models for the provider, click the &quot;+Cloud Model&quot;
-      button
-    </Text_12_300_EEEEEE>
-  ),
+  emptyComponent = <Text_12_300_EEEEEE className="pl-5">
+    To add new models for the provider, click the &quot;+Cloud Model&quot; button
+  </Text_12_300_EEEEEE>
 }: {
   multiSelect?: boolean;
   multiSelectedModels?: Model[];

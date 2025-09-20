@@ -42,7 +42,8 @@
                 "openai-api/images",
                 "openai-api/batch",
                 "openai-api/realtime",
-                "openai-api/responses"
+                "openai-api/responses",
+                "openai-api/documents"
               ]
             },
             {

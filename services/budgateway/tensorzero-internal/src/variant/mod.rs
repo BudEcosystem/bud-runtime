@@ -1106,6 +1106,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let models = Box::leak(Box::new(ModelTable::default()));
         let mut visited_models = std::collections::HashSet::new();
@@ -1220,6 +1221,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let models = Box::leak(Box::new(ModelTable::default()));
         let mut visited_models = std::collections::HashSet::new();
@@ -1285,6 +1287,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let models = Box::leak(Box::new(ModelTable::default()));
         let mut visited_models = std::collections::HashSet::new();
@@ -1435,6 +1438,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let models = Box::leak(Box::new(ModelTable::default()));
         let mut visited_models = std::collections::HashSet::new();
@@ -1537,6 +1541,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         }));
 
         // Prepare the model inference request
@@ -1736,6 +1741,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         }));
         let models = Box::leak(Box::new(ModelTable::default()));
         let visited_models = std::collections::HashSet::new();

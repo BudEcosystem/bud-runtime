@@ -22,6 +22,7 @@ use crate::config_parser::Config;
 use crate::endpoints;
 use crate::error::{Error, ErrorDetails};
 use crate::geoip::GeoIpService;
+use crate::guardrail_table::GuardrailTable;
 use crate::kafka::KafkaConnectionInfo;
 use crate::model::ModelTable;
 use crate::rate_limit::DistributedRateLimiter;
@@ -49,6 +50,7 @@ pub struct AppStateData {
     pub geoip_service: Option<Arc<GeoIpService>>,
     pub ua_parser: Option<Arc<UserAgentParser>>,
     pub blocking_manager: Option<Arc<BlockingRulesManager>>,
+    pub guardrails: Arc<tokio::sync::RwLock<GuardrailTable>>,
 }
 pub type AppState = axum::extract::State<AppStateData>;
 
@@ -103,11 +105,12 @@ impl AppStateData {
             kafka_connection_info,
             authentication_info,
             model_credential_store: Arc::new(std::sync::RwLock::new(HashMap::new())),
-            rate_limiter: None, // Will be initialized later with Redis client
+            rate_limiter: None,  // Will be initialized later with Redis client
             usage_limiter: None, // Will be initialized later with Redis client
             geoip_service,
             ua_parser,
             blocking_manager: None, // Will be initialized later with Redis client
+            guardrails: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         })
     }
     pub async fn update_model_table(&self, mut new_models: ModelTable) {
@@ -142,6 +145,22 @@ impl AppStateData {
                 model_name
             );
         }
+    }
+
+    /// Update guardrail configuration
+    pub async fn update_guardrail(
+        &self,
+        guardrail_id: &str,
+        config: Arc<crate::guardrail_table::GuardrailConfig>,
+    ) {
+        let mut guardrails = self.guardrails.write().await;
+        guardrails.insert(Arc::from(guardrail_id), config);
+    }
+
+    /// Remove guardrail configuration
+    pub async fn remove_guardrail(&self, guardrail_id: &str) {
+        let mut guardrails = self.guardrails.write().await;
+        guardrails.remove(guardrail_id);
     }
 
     /// Create a new instance with rate limiter initialized
@@ -284,18 +303,25 @@ pub async fn setup_redis_and_rate_limiter(
         if let Some(ref url) = redis_url {
             if !url.is_empty() {
                 // Create a Redis client for blocking manager operations
-                let auth = auth_info.clone().unwrap_or_else(|| Auth::new(config.api_keys.clone()));
+                let auth = auth_info
+                    .clone()
+                    .unwrap_or_else(|| Auth::new(config.api_keys.clone()));
                 match RedisClient::new(url, app_state.clone(), auth).await {
                     Ok(redis_client) => {
                         let manager = Arc::new(BlockingRulesManager::new_with_clickhouse(
                             Some(Arc::new(redis_client)),
                             Some(Arc::new(app_state.clickhouse_connection_info.clone())),
                         ));
-                        tracing::info!("Blocking rules manager initialized with ClickHouse logging");
+                        tracing::info!(
+                            "Blocking rules manager initialized with ClickHouse logging"
+                        );
                         Some(manager)
                     }
                     Err(e) => {
-                        tracing::error!("Failed to create Redis client for blocking manager: {}", e);
+                        tracing::error!(
+                            "Failed to create Redis client for blocking manager: {}",
+                            e
+                        );
                         None
                     }
                 }
@@ -333,8 +359,14 @@ pub async fn setup_redis_and_rate_limiter(
                     })
                 })?;
 
-                tracing::info!("Redis client started successfully with auth{}",
-                    if blocking_manager.is_some() { " and blocking rules" } else { "" });
+                tracing::info!(
+                    "Redis client started successfully with auth{}",
+                    if blocking_manager.is_some() {
+                        " and blocking rules"
+                    } else {
+                        ""
+                    }
+                );
             } else {
                 tracing::warn!("TENSORZERO_REDIS_URL is empty, Redis client will not be started");
             }
@@ -385,10 +417,14 @@ pub async fn setup_redis_and_rate_limiter(
     };
 
     // Initialize usage limiter if authentication is enabled
-    let app_state = if matches!(app_state.authentication_info, AuthenticationInfo::Enabled(_)) {
+    let app_state = if matches!(
+        app_state.authentication_info,
+        AuthenticationInfo::Enabled(_)
+    ) {
         if let Ok(redis_url_var) = std::env::var("TENSORZERO_REDIS_URL") {
             if !redis_url_var.is_empty() {
-                match UsageLimiter::new(redis_url_var.clone(), UsageLimiterConfig::default()).await {
+                match UsageLimiter::new(redis_url_var.clone(), UsageLimiterConfig::default()).await
+                {
                     Ok(usage_limiter) => {
                         tracing::info!("Usage limiter initialized successfully");
                         app_state.with_usage_limiter(Arc::new(usage_limiter))

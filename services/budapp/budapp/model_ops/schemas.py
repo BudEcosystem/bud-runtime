@@ -704,6 +704,7 @@ class ModelFilter(BaseModel):
     table_source: Literal["cloud_model", "model"] = "cloud_model"
     base_model: str | None = None
     base_model_relation: BaseModelRelationEnum | None = None
+    supported_endpoints: List[ModelEndpointEnum] | None = None
 
     # @field_validator("source")
     # @classmethod
