@@ -28,6 +28,10 @@ export default {
         destination: '/auth/resetPassword',
       },
       {
+        source: '/reset-password',
+        destination: '/auth/reset-password',
+      },
+      {
         source: '/dashboard',
         destination: '/home/dashboard',
       },

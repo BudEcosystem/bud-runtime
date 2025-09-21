@@ -42,7 +42,13 @@ from budapp.user_ops.schemas import (
     ValidateResetTokenRequest,
 )
 
-from ..commons.constants import BUD_RESET_PASSWORD_WORKFLOW, EndpointStatusEnum, NotificationCategory, UserStatusEnum
+from ..commons.constants import (
+    BUD_RESET_PASSWORD_WORKFLOW,
+    EndpointStatusEnum,
+    NotificationCategory,
+    UserStatusEnum,
+    UserTypeEnum,
+)
 from ..commons.helpers import generate_valid_password, validate_password_string
 from ..credential_ops.crud import CredentialDataManager
 from ..credential_ops.models import Credential as CredentialModel
@@ -376,11 +382,6 @@ class UserService(SessionMixin):
             logger.warning(f"Password reset attempted for deleted user: {request.email}")
             return {"acknowledged": True, "status": "success", "transaction_id": secrets.token_hex(16)}
 
-        # Security: Return same success response for superusers to prevent account enumeration
-        if db_user.is_superuser:
-            logger.warning(f"Password reset attempted for superuser: {request.email}")
-            return {"acknowledged": True, "status": "success", "transaction_id": secrets.token_hex(16)}
-
         # Check max reset password attempts exceeded
         if db_user.reset_password_attempt >= 5:  # Increased limit
             raise ClientException(
@@ -428,8 +429,18 @@ class UserService(SessionMixin):
         fields = {"reset_password_attempt": db_user.reset_password_attempt + 1}
         await UserDataManager(self.session).update_by_fields(db_user, fields)
 
-        # Create reset URL
-        reset_url = f"{str(app_settings.frontend_url).rstrip('/')}/reset-password?token={reset_token}"
+        # Create reset URL based on user type
+        # Super admins and ADMIN type users use the admin frontend, CLIENT type users use the regular frontend
+        if db_user.is_superuser or db_user.user_type == UserTypeEnum.ADMIN:
+            base_url = str(app_settings.admin_frontend_url).rstrip("/")
+            logger.info(
+                f"Using admin frontend URL for user {db_user.email} (superuser: {db_user.is_superuser}, type: {db_user.user_type})"
+            )
+        else:
+            base_url = str(app_settings.frontend_url).rstrip("/")
+            logger.info(f"Using client frontend URL for user {db_user.email} (type: {db_user.user_type})")
+
+        reset_url = f"{base_url}/reset-password?token={reset_token}"
 
         # Send email notification to user
         content = {"reset_url": reset_url, "token": reset_token, "expires_in_minutes": 60, "user_name": db_user.name}
