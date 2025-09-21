@@ -172,6 +172,20 @@ function App({ Component, pageProps }: { Component: any; pageProps: any }) {
   const router = useRouter();
 
   const getUser = async () => {
+    // Check if we're on a public page before fetching user
+    const publicPaths = [
+      "/login",
+      "/auth/logIn",
+      "/reset-password",
+      "/auth/reset-password",
+      "/register",
+      "/auth/register"
+    ];
+
+    if (publicPaths.some(path => router.pathname === path)) {
+      return; // Don't fetch user on public pages
+    }
+
     showLoader();
     try {
       const userData: any = await fetchUser();
@@ -195,14 +209,28 @@ function App({ Component, pageProps }: { Component: any; pageProps: any }) {
       }
     } catch (error) {
       console.error("Error  fetching user", error);
-      return router.push("/login");
+      if (!publicPaths.some(path => router.pathname === path)) {
+        return router.push("/login");
+      }
     } finally {
       hideLoader();
     }
   };
 
   useEffect(() => {
-    if (!user?.id) {
+    // Skip authentication for public pages
+    const publicPaths = [
+      "/login",
+      "/auth/logIn",
+      "/reset-password",
+      "/auth/reset-password",
+      "/register",
+      "/auth/register"
+    ];
+
+    const isPublicPath = publicPaths.some(path => router.pathname === path);
+
+    if (!isPublicPath && !user?.id) {
       getUser();
     }
   }, [router.pathname]);
