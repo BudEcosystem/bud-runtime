@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { AppRequest } from '@/services/api/requests';
-import { message } from 'antd';
+import { create } from "zustand";
+import { AppRequest, axiosInstance } from "@/services/api/requests";
+import { message } from "antd";
 
 // Gateway metadata interfaces for components
 export interface RequestMetadata {
@@ -110,6 +110,7 @@ export interface InferenceListItem {
   model_name: string;
   model_display_name?: string;
   project_name?: string;
+  api_key_project_name?: string;
   endpoint_name?: string;
   prompt_preview: string;
   response_preview: string;
@@ -136,12 +137,13 @@ export interface InferenceDetail {
   // Project/Endpoint info
   project_id: string;
   project_name?: string;
+  api_key_project_name?: string;
   endpoint_id: string;
   endpoint_name?: string;
 
   // Content
   system_prompt?: string;
-  messages: Array<{[key: string]: any}>;
+  messages: Array<{ [key: string]: any }>;
   output: string;
 
   // Metadata
@@ -184,7 +186,7 @@ export interface InferenceDetail {
 
 export interface FeedbackItem {
   feedback_id: string;
-  feedback_type: 'boolean' | 'float' | 'comment' | 'demonstration';
+  feedback_type: "boolean" | "float" | "comment" | "demonstration";
   metric_name?: string;
   value?: boolean | number | string;
   created_at: string;
@@ -200,9 +202,16 @@ export interface InferenceFilters {
   min_tokens?: number;
   max_tokens?: number;
   max_latency_ms?: number;
-  endpoint_type?: 'chat' | 'embedding' | 'audio_transcription' | 'audio_translation' | 'text_to_speech' | 'image_generation' | 'moderation';
-  sort_by: 'timestamp' | 'tokens' | 'latency' | 'cost';
-  sort_order: 'asc' | 'desc';
+  endpoint_type?:
+    | "chat"
+    | "embedding"
+    | "audio_transcription"
+    | "audio_translation"
+    | "text_to_speech"
+    | "image_generation"
+    | "moderation";
+  sort_by: "timestamp" | "tokens" | "latency" | "cost";
+  sort_order: "asc" | "desc";
 }
 
 export interface PaginationState {
@@ -223,6 +232,7 @@ interface InferenceStore {
   isLoadingDetail: boolean;
   isLoadingFeedback: boolean;
   error: string | null;
+  abortController: AbortController | null;
 
   // Actions
   setFilters: (filters: Partial<InferenceFilters>) => void;
@@ -230,10 +240,13 @@ interface InferenceStore {
   resetFilters: () => void;
 
   // API calls
-  fetchInferences: (projectId?: string, overrideFilters?: Partial<InferenceFilters>) => Promise<void>;
+  fetchInferences: (
+    projectId?: string,
+    overrideFilters?: Partial<InferenceFilters>,
+  ) => Promise<void>;
   fetchInferenceDetail: (inferenceId: string) => Promise<void>;
   fetchInferenceFeedback: (inferenceId: string) => Promise<void>;
-  exportInferences: (format: 'csv' | 'json') => Promise<void>;
+  exportInferences: (format: "csv" | "json") => Promise<void>;
 
   // UI actions
   clearSelectedInference: () => void;
@@ -242,8 +255,8 @@ interface InferenceStore {
 // Default filters
 const defaultFilters: InferenceFilters = {
   from_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // Last 30 days
-  sort_by: 'timestamp',
-  sort_order: 'desc',
+  sort_by: "timestamp",
+  sort_order: "desc",
 };
 
 // Default pagination
@@ -265,6 +278,7 @@ export const useInferences = create<InferenceStore>((set, get) => ({
   isLoadingDetail: false,
   isLoadingFeedback: false,
   error: null,
+  abortController: null,
 
   // Filter management
   setFilters: (filters) => {
@@ -288,13 +302,26 @@ export const useInferences = create<InferenceStore>((set, get) => ({
   },
 
   // Fetch inferences list
-  fetchInferences: async (projectId?: string, overrideFilters?: Partial<InferenceFilters>) => {
-    const { filters, pagination } = get();
-    set({ isLoading: true, error: null });
+  fetchInferences: async (
+    projectId?: string,
+    overrideFilters?: Partial<InferenceFilters>,
+  ) => {
+    const { filters, pagination, abortController } = get();
+
+    // Cancel any existing request
+    if (abortController) {
+      abortController.abort();
+    }
+
+    // Create new AbortController for this request
+    const newAbortController = new AbortController();
+    set({ isLoading: true, error: null, abortController: newAbortController });
 
     try {
       // Use override filters if provided, otherwise use store filters
-      const finalFilters = overrideFilters ? { ...filters, ...overrideFilters } : filters;
+      const finalFilters = overrideFilters
+        ? { ...filters, ...overrideFilters }
+        : filters;
 
       const requestBody = {
         ...finalFilters,
@@ -303,7 +330,13 @@ export const useInferences = create<InferenceStore>((set, get) => ({
         limit: pagination.limit,
       };
 
-      const response = await AppRequest.Post('/metrics/inferences/list', requestBody);
+      const response = await axiosInstance.post(
+        "/metrics/inferences/list",
+        requestBody,
+        {
+          signal: newAbortController.signal,
+        }
+      );
 
       // Check if response is successful (could be 200 or undefined)
       if (response.data && response.data.items) {
@@ -318,14 +351,24 @@ export const useInferences = create<InferenceStore>((set, get) => ({
             has_more: data.has_more || false,
           },
           isLoading: false,
+          abortController: null,
         });
       } else {
-        throw new Error(response.data?.message || 'Failed to fetch inferences');
+        throw new Error(response.data?.message || "Failed to fetch inferences");
       }
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to fetch inferences';
+      // Don't show error if request was aborted (user changed filters)
+      if (error.name === "AbortError" || newAbortController.signal.aborted) {
+        set({ isLoading: false, abortController: null });
+        return;
+      }
+
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch inferences";
       message.error(errorMsg);
-      set({ error: errorMsg, isLoading: false });
+      set({ error: errorMsg, isLoading: false, abortController: null });
     }
   },
 
@@ -334,7 +377,9 @@ export const useInferences = create<InferenceStore>((set, get) => ({
     set({ isLoadingDetail: true, error: null });
 
     try {
-      const response = await AppRequest.Get(`/metrics/inferences/${inferenceId}`);
+      const response = await AppRequest.Get(
+        `/metrics/inferences/${inferenceId}`,
+      );
 
       if (response.data.code === 200) {
         set({
@@ -342,10 +387,15 @@ export const useInferences = create<InferenceStore>((set, get) => ({
           isLoadingDetail: false,
         });
       } else {
-        throw new Error(response.data.message || 'Failed to fetch observability details');
+        throw new Error(
+          response.data.message || "Failed to fetch observability details",
+        );
       }
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to fetch observability details';
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch observability details";
       message.error(errorMsg);
       set({ error: errorMsg, isLoadingDetail: false });
     }
@@ -356,7 +406,9 @@ export const useInferences = create<InferenceStore>((set, get) => ({
     set({ isLoadingFeedback: true, error: null });
 
     try {
-      const response = await AppRequest.Get(`/metrics/inferences/${inferenceId}/feedback`);
+      const response = await AppRequest.Get(
+        `/metrics/inferences/${inferenceId}/feedback`,
+      );
 
       if (response.data.code === 200) {
         set({
@@ -364,21 +416,26 @@ export const useInferences = create<InferenceStore>((set, get) => ({
           isLoadingFeedback: false,
         });
       } else {
-        throw new Error(response.data.message || 'Failed to fetch inference feedback');
+        throw new Error(
+          response.data.message || "Failed to fetch inference feedback",
+        );
       }
     } catch (error: any) {
-      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to fetch inference feedback';
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch inference feedback";
       message.error(errorMsg);
       set({ error: errorMsg, isLoadingFeedback: false });
     }
   },
 
   // Export inferences
-  exportInferences: async (format: 'csv' | 'json') => {
+  exportInferences: async (format: "csv" | "json") => {
     const { inferences } = get();
 
     if (!inferences || inferences.length === 0) {
-      message.warning('No data to export');
+      message.warning("No data to export");
       return;
     }
 
@@ -387,52 +444,52 @@ export const useInferences = create<InferenceStore>((set, get) => ({
       let filename: string;
       let mimeType: string;
 
-      if (format === 'csv') {
+      if (format === "csv") {
         // Convert to CSV
         const headers = [
-          'Inference ID',
-          'Timestamp',
-          'Model Name',
-          'Project',
-          'Endpoint',
-          'Input Tokens',
-          'Output Tokens',
-          'Total Tokens',
-          'Response Time (ms)',
-          'Cost',
-          'Success',
-          'Cached',
+          "Inference ID",
+          "Timestamp",
+          "Model Name",
+          "Project",
+          "Endpoint",
+          "Input Tokens",
+          "Output Tokens",
+          "Total Tokens",
+          "Response Time (ms)",
+          "Cost",
+          "Success",
+          "Cached",
         ];
 
         const rows = inferences.map((item) => [
           item.inference_id,
           item.timestamp,
           item.model_display_name || item.model_name,
-          item.project_name || '',
-          item.endpoint_name || '',
+          item.project_name || "",
+          item.endpoint_name || "",
           item.input_tokens,
           item.output_tokens,
           item.total_tokens,
           item.response_time_ms,
-          item.cost || '',
-          item.is_success ? 'Yes' : 'No',
-          item.cached ? 'Yes' : 'No',
+          item.cost || "",
+          item.is_success ? "Yes" : "No",
+          item.cached ? "Yes" : "No",
         ]);
 
-        content = [headers, ...rows].map((row) => row.join(',')).join('\n');
-        filename = `inferences_${new Date().toISOString().split('T')[0]}.csv`;
-        mimeType = 'text/csv';
+        content = [headers, ...rows].map((row) => row.join(",")).join("\n");
+        filename = `inferences_${new Date().toISOString().split("T")[0]}.csv`;
+        mimeType = "text/csv";
       } else {
         // Export as JSON
         content = JSON.stringify(inferences, null, 2);
-        filename = `inferences_${new Date().toISOString().split('T')[0]}.json`;
-        mimeType = 'application/json';
+        filename = `inferences_${new Date().toISOString().split("T")[0]}.json`;
+        mimeType = "application/json";
       }
 
       // Create blob and download
       const blob = new Blob([content], { type: mimeType });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = filename;
       document.body.appendChild(link);
@@ -440,10 +497,12 @@ export const useInferences = create<InferenceStore>((set, get) => ({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      message.success(`Exported ${inferences.length} inferences to ${format.toUpperCase()}`);
+      message.success(
+        `Exported ${inferences.length} inferences to ${format.toUpperCase()}`,
+      );
     } catch (error: any) {
-      message.error('Failed to export data');
-      console.error('Export error:', error);
+      message.error("Failed to export data");
+      console.error("Export error:", error);
     }
   },
 

@@ -186,8 +186,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.info("Storage backend initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize storage backend: {e}")
+            raise
             # Don't fail startup if storage initialization fails
-
+        # ---
         # Check volume for dataset storage exists
         # try:
         #     volume_init = VolumeInitializer()
@@ -212,6 +213,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # else:
         #     logger.info("Eval sync is disabled")
         #     eval_sync_task = None
+
+        # Initialize workflow runtime
+        logger.info("Initializing workflow runtime")
+        try:
+            # dapr_workflows.start_workflow_runtime()
+            logger.info("Workflow runtime started successfully")
+        except Exception as e:
+            logger.error(f"Failed to start workflow runtime: {e}")
+            # Don't fail startup if workflow runtime fails to start
 
         logger.info("Background initialization tasks started successfully")
         logger.info("Prepared dataset successfully.")

@@ -1,5 +1,4 @@
 import uuid
-from copy import deepcopy
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -133,67 +132,108 @@ class SimulationWorkflows:
         simulation_method = simulation_service.get_simulation_method(request)
 
         try:
+            # Step 1: Create tasks per cluster to maintain cluster separation
             parallel_tasks = []
-            devices_found = 0
+            task_count = 0
+
             for cluster in cluster_info:
-                cluster_id = cluster.get("id", "unknown")
-                nodes = cluster.get("nodes", [])
-                if cluster_id == "953b141f-7915-4187-9504-a3790e4a3c":
-                    logger.info(f"Processing target cluster {cluster_id} with {len(nodes)} nodes")
+                cluster_id = cluster.get("id")
+                logger.debug(f"Processing cluster {cluster_id}")
 
-                for node in nodes:
-                    devices = node.get("devices", [])
-                    if cluster_id == "953b141f-7915-4187-9504-a3790e4a3c":
-                        logger.info(f"  Node {node.get('id')} has {len(devices)} devices")
+                # Analyze topology for this specific cluster
+                single_cluster_list = [cluster]
+                cluster_topology = SimulationService.analyze_cluster_topology(single_cluster_list)
+                logger.info(
+                    f"Cluster {cluster_id} topology: {cluster_topology['total_nodes']} nodes, "
+                    f"{cluster_topology['total_cluster_devices']} total devices"
+                )
 
-                    for device in devices:
-                        device_type = device.get("type", "unknown")
-                        if cluster_id == "953b141f-7915-4187-9504-a3790e4a3c":
+                # Group devices by type within THIS cluster only
+                logger.debug(f"Grouping devices by type for cluster {cluster_id}")
+                device_groups = SimulationService._group_devices_by_type_across_cluster(
+                    single_cluster_list, cluster_topology
+                )
+
+                # Log device groups for this cluster
+                for device_type, group in device_groups.items():
+                    logger.debug(
+                        f"Cluster {cluster_id} - Device group {device_type}: "
+                        f"{group.get('total_nodes_with_device', 0)} nodes, "
+                        f"max {group.get('max_devices_per_node', 0)} devices/node"
+                    )
+
+                # Create tasks for each device type in THIS cluster
+                for device_type, device_group in device_groups.items():
+                    # Skip if no devices available
+                    total_available = sum(device_group.get("node_distribution", {}).values())
+                    if total_available <= 0:
+                        logger.warning(
+                            f"Cluster {cluster_id}: Skipping device type {device_type}: no available devices"
+                        )
+                        continue
+
+                    for engine_device_combo in compatible_engines:
+                        if engine_device_combo["device"].lower() == device_type.lower():
+                            task_count += 1
+
+                            # Get representative device for specs (use first device)
+                            if not device_group.get("devices"):
+                                logger.warning(
+                                    f"Cluster {cluster_id}: No devices in group for {device_type}, skipping"
+                                )
+                                continue
+
+                            representative_device = device_group["devices"][0].copy()
+
+                            # Create cluster-aware device configuration - ensure cluster_id is set correctly
+                            cluster_device_config = {
+                                **representative_device,  # Device specs first
+                                # Override with cluster-specific values (these take precedence)
+                                "device_type": device_type,
+                                # Ensure we have the device identification fields with fallbacks
+                                "device_model": representative_device.get(
+                                    "raw_name", representative_device.get("name", "")
+                                ),
+                                "device_name": representative_device.get("name", ""),
+                                "raw_name": representative_device.get(
+                                    "raw_name", representative_device.get("name", "")
+                                ),
+                                "cluster_id": cluster_id,  # Use the specific cluster ID
+                                "total_devices": total_available,
+                                "node_distribution": device_group.get("node_distribution", {}),
+                                "devices_by_node": device_group.get("devices_by_node", {}),
+                                "max_devices_per_node": device_group.get("max_devices_per_node", 0),
+                                "total_nodes_with_device": device_group.get("total_nodes_with_device", 0),
+                                "cluster_topology": cluster_topology,
+                                "available_count": total_available,  # Ensure this is set for optimizer
+                            }
+
+                            # Convert memory from MB to GB if needed
+                            if "memory" in cluster_device_config and "mem_per_GPU_in_GB" not in cluster_device_config:
+                                cluster_device_config["mem_per_GPU_in_GB"] = cluster_device_config["memory"] / 1024.0
+
                             logger.info(
-                                f"    Device: type={device_type}, model={device.get('model')}, memory={device.get('memory')}MB"
+                                f"Creating task for cluster {cluster_id}, {device_type} with engine "
+                                f"{engine_device_combo['engine_name']}: total_devices={total_available}, "
+                                f"max_tp={cluster_device_config['max_devices_per_node']}, "
+                                f"max_pp={cluster_device_config['total_nodes_with_device']}"
                             )
 
-                        for engine_device_combo in compatible_engines:
-                            if device_type == engine_device_combo["device"]:
-                                devices_found += 1
-                                # Prepare device config with proper memory conversion
-                                device_config = deepcopy(device)
-
-                                # Convert memory from MB to GB if needed
-                                if "memory" in device_config and "mem_per_GPU_in_GB" not in device_config:
-                                    device_config["mem_per_GPU_in_GB"] = device_config["memory"] / 1024.0
-
-                                # Add cluster and node info
-                                device_config.update(
+                            task = ctx.call_activity(
+                                method,
+                                input=ensure_json_serializable(
                                     {
-                                        "cluster_id": cluster_id,
-                                        "node_id": node["id"],
-                                        "node_name": node["name"],
+                                        "device_config": cluster_device_config,
+                                        **request.model_dump(mode="json"),
+                                        "engine_name": engine_device_combo["engine_name"],
+                                        "engine_image": engine_device_combo["image"],
+                                        "simulation_method": simulation_method.value,
                                     }
-                                )
+                                ),
+                            )
+                            parallel_tasks.append(task)
 
-                                if cluster_id == "953b141f-7915-4187-9504-a3790e4a3c":
-                                    logger.info(
-                                        f"    Creating task for engine={engine_device_combo['engine_name']}, device_memory_gb={device_config.get('mem_per_GPU_in_GB', 0):.2f}"
-                                    )
-
-                                task = ctx.call_activity(
-                                    method,
-                                    input=ensure_json_serializable(
-                                        {
-                                            "device_config": device_config,
-                                            **request.model_dump(mode="json"),
-                                            "engine_name": engine_device_combo["engine_name"],
-                                            "engine_image": engine_device_combo["image"],
-                                            "simulation_method": simulation_method.value,
-                                        }
-                                    ),
-                                )
-                                parallel_tasks.append(task)
-
-            logger.info(
-                f"Created {len(parallel_tasks)} tasks for {devices_found} devices across {len(cluster_info)} clusters"
-            )
+            logger.info(f"Created {len(parallel_tasks)} tasks across {len(cluster_info)} clusters")
             results = yield wf.when_all(parallel_tasks)  # type: ignore
 
             notification_req.payload.content = NotificationContent(
@@ -207,7 +247,16 @@ class SimulationWorkflows:
                 target_topic_name=request.source_topic,
                 target_name=request.source,
             )
-            return list(results)
+
+            # Flatten results since get_topk_engine_configs may return lists for cluster-wide configs
+            flattened_results = []
+            for result in results:
+                if isinstance(result, list):
+                    flattened_results.extend(result)
+                else:
+                    flattened_results.append(result)
+
+            return flattened_results
 
         except Exception as e:
             # Extract meaningful error message from exception

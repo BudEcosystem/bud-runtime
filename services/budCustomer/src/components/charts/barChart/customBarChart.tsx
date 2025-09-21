@@ -1,9 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
-import * as echarts from 'echarts';
-import { Box } from '@radix-ui/themes';
-import { getChromeColorHex } from '@/components/ui/bud/dataEntry/TagsInputData';
-import { Text_15_400_EEEEEE, Text_18_400_EEEEEE, Text_18_500_EEEEEE, Text_20_400_EEEEEE, Text_26_400_EEEEEE } from '@/components/ui/text';
-import { Image } from 'antd';
+import React, { useEffect, useRef, useState } from "react";
+import * as echarts from "echarts";
+import { Box } from "@radix-ui/themes";
+import { getChromeColorHex } from "@/components/ui/bud/dataEntry/TagsInputData";
+import {
+  Text_15_400_EEEEEE,
+  Text_18_400_EEEEEE,
+  Text_18_500_EEEEEE,
+  Text_20_400_EEEEEE,
+  Text_26_400_EEEEEE,
+} from "@/components/ui/text";
+import { Image } from "antd";
 
 interface AccuracyPopupProps {
   data: {
@@ -19,23 +25,28 @@ interface CustomLegendProps {
   legendSelection: { [key: string]: boolean };
 }
 
-const CustomLegend: React.FC<CustomLegendProps> = ({ onToggleSeries, extraChartDetails, legendSelection }) => {
+const CustomLegend: React.FC<CustomLegendProps> = ({
+  onToggleSeries,
+  extraChartDetails,
+  legendSelection,
+}) => {
   return (
     <div>
       <div className="flex flex-col justify-center items-start mt-[1.45rem] gap-[.3rem] mt-[1.5rem]">
-
-        <div className='flex items-center justify-center'>
+        <div className="flex items-center justify-center">
           <div
-            onClick={() => onToggleSeries('Input Tokens')}
-            style={{ cursor: 'pointer' }}
-            className='flex justify-start items-center gap-[.5rem] w-[8.8rem]'
+            onClick={() => onToggleSeries("Input Tokens")}
+            style={{ cursor: "pointer" }}
+            className="flex justify-start items-center gap-[.5rem] w-[8.8rem]"
           >
             <div
               style={{
-                width: '.68rem',
-                height: '.68rem',
-                backgroundColor: legendSelection['Input Tokens'] ? '#D1B854' : 'white',
-                borderRadius: '2px'
+                width: ".68rem",
+                height: ".68rem",
+                backgroundColor: legendSelection["Input Tokens"]
+                  ? "#D1B854"
+                  : "white",
+                borderRadius: "2px",
               }}
             />
             <Text_15_400_EEEEEE>Input Tokens</Text_15_400_EEEEEE>
@@ -43,38 +54,58 @@ const CustomLegend: React.FC<CustomLegendProps> = ({ onToggleSeries, extraChartD
 
           <div
             className="flex justify-between items-center gap-[.5rem]  pt-[.3rem] pb-[.3rem] px-[.6rem] rounded-md"
-            style={{
-
-            }}
+            style={{}}
           >
-            <Text_18_400_EEEEEE className='min-w-[70px]'>
-              {Number(Math.abs(extraChartDetails.token_metrics.total_input_value)).toFixed(2)}
+            <Text_18_400_EEEEEE className="min-w-[70px]">
+              {Number(
+                Math.abs(extraChartDetails.token_metrics.total_input_value),
+              ).toFixed(2)}
             </Text_18_400_EEEEEE>
-            <div className={`flex ${Number(extraChartDetails.token_metrics.input_avg) >= 0 ? 'text-[#479D5F] bg-[#122F1140]' : 'bg-[#861A1A33] text-[#EC7575]'} rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem] mt-[0.2rem]`}>
+            <div
+              className={`flex ${Number(extraChartDetails.token_metrics.input_avg) >= 0 ? "text-[#479D5F] bg-[#122F1140]" : "bg-[#861A1A33] text-[#EC7575]"} rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem] mt-[0.2rem]`}
+            >
               <span className="font-[400] text-[0.8125rem] leading-[100%]">
-                Avg. {Number(Math.abs(extraChartDetails.token_metrics.input_avg)).toFixed(2)}%
+                Avg.{" "}
+                {Number(
+                  Math.abs(extraChartDetails.token_metrics.input_avg),
+                ).toFixed(2)}
+                %
               </span>
               {Number(extraChartDetails.token_metrics.input_avg) >= 0 ? (
-                <Image preview={false} width={12} src="/images/dashboard/greenArrow.png" className="ml-[.2rem]" alt="" />
+                <Image
+                  preview={false}
+                  width={12}
+                  src="/images/dashboard/greenArrow.png"
+                  className="ml-[.2rem]"
+                  alt=""
+                />
               ) : (
-                <Image preview={false} width={12} src="/images/dashboard/redArrow.png" className="ml-[.2rem]" alt="" />
+                <Image
+                  preview={false}
+                  width={12}
+                  src="/images/dashboard/redArrow.png"
+                  className="ml-[.2rem]"
+                  alt=""
+                />
               )}
             </div>
           </div>
         </div>
 
-        <div className='flex items-center justify-center'>
+        <div className="flex items-center justify-center">
           <div
-            onClick={() => onToggleSeries('Output Tokens')}
-            style={{ cursor: 'pointer' }}
-            className='flex justify-start items-center gap-[.5rem]  w-[8.8rem]'
+            onClick={() => onToggleSeries("Output Tokens")}
+            style={{ cursor: "pointer" }}
+            className="flex justify-start items-center gap-[.5rem]  w-[8.8rem]"
           >
             <div
               style={{
-                width: '.68rem',
-                height: '.68rem',
-                backgroundColor: legendSelection['Output Tokens'] ? '#479D5F' : 'white',
-                borderRadius: '2px'
+                width: ".68rem",
+                height: ".68rem",
+                backgroundColor: legendSelection["Output Tokens"]
+                  ? "#479D5F"
+                  : "white",
+                borderRadius: "2px",
               }}
             />
             <Text_15_400_EEEEEE>Output Tokens</Text_15_400_EEEEEE>
@@ -82,26 +113,43 @@ const CustomLegend: React.FC<CustomLegendProps> = ({ onToggleSeries, extraChartD
 
           <div
             className="flex justify-between items-center gap-[.5rem] pt-[.3rem] pb-[.3rem] px-[.6rem] rounded-md"
-            style={{
-
-            }}
+            style={{}}
           >
-            <Text_18_400_EEEEEE className='min-w-[70px]'>
-              {Number(Math.abs(extraChartDetails.token_metrics.total_output_value)).toFixed(2)}
+            <Text_18_400_EEEEEE className="min-w-[70px]">
+              {Number(
+                Math.abs(extraChartDetails.token_metrics.total_output_value),
+              ).toFixed(2)}
             </Text_18_400_EEEEEE>
-            <div className={`flex ${Number(extraChartDetails.token_metrics.output_avg) >= 0 ? 'text-[#479D5F] bg-[#122F1140]' : 'bg-[#861A1A33] text-[#EC7575]'} rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem] mt-[0.2rem]`}>
+            <div
+              className={`flex ${Number(extraChartDetails.token_metrics.output_avg) >= 0 ? "text-[#479D5F] bg-[#122F1140]" : "bg-[#861A1A33] text-[#EC7575]"} rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem] mt-[0.2rem]`}
+            >
               <span className="font-[400] text-[0.8125rem] leading-[100%]">
-                Avg. {Number(Math.abs(extraChartDetails.token_metrics.output_avg)).toFixed(2)}%
+                Avg.{" "}
+                {Number(
+                  Math.abs(extraChartDetails.token_metrics.output_avg),
+                ).toFixed(2)}
+                %
               </span>
               {Number(extraChartDetails.token_metrics.output_avg) >= 0 ? (
-                <Image preview={false} width={12} src="/images/dashboard/greenArrow.png" className="ml-[.2rem]" alt="" />
+                <Image
+                  preview={false}
+                  width={12}
+                  src="/images/dashboard/greenArrow.png"
+                  className="ml-[.2rem]"
+                  alt=""
+                />
               ) : (
-                <Image preview={false} width={12} src="/images/dashboard/redArrow.png" className="ml-[.2rem]" alt="" />
+                <Image
+                  preview={false}
+                  width={12}
+                  src="/images/dashboard/redArrow.png"
+                  className="ml-[.2rem]"
+                  alt=""
+                />
               )}
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
@@ -115,13 +163,16 @@ interface TokenMetricsChartProps {
   extraChartDetails: any;
 }
 
-const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartDetails }) => {
+const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({
+  data,
+  extraChartDetails,
+}) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<any>(null);
   const [barChartData, setBarChartData] = useState<any>(data);
   const [legendSelection, setLegendSelection] = useState({
-    'Input Tokens': true,
-    'Output Tokens': true,
+    "Input Tokens": true,
+    "Output Tokens": true,
   });
 
   useEffect(() => {
@@ -131,9 +182,9 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
   }, [data]);
 
   useEffect(() => {
-    console.log('legendSelection', legendSelection)
-    console.log('legendSelection', legendSelection['Input Tokens'])
-    console.log('legendSelection', legendSelection['Output Tokens'])
+    console.log("legendSelection", legendSelection);
+    console.log("legendSelection", legendSelection["Input Tokens"]);
+    console.log("legendSelection", legendSelection["Output Tokens"]);
   }, [legendSelection]);
 
   useEffect(() => {
@@ -141,39 +192,44 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
       const containerWidth = chartRef.current.clientWidth;
       const containerHeight = chartRef.current.clientHeight;
       if (containerWidth === 0 || containerHeight === 0) {
-        console.warn("Token metrics Chart container has no width or height yet.");
+        console.warn(
+          "Token metrics Chart container has no width or height yet.",
+        );
         return;
       }
       const myChart = echarts.init(chartRef.current, null, {
-        renderer: 'canvas',
+        renderer: "canvas",
         useDirtyRect: false,
       });
       chartInstanceRef.current = myChart;
 
       const option = {
-        backgroundColor: 'transparent',
+        backgroundColor: "transparent",
         // Disable built-in legend (we're using our custom legend)
         legend: { show: false },
         grid: {
-          right: '0%',
-          left: '0%',
-          top: '16.5%',
-          bottom: '20%',
+          right: "0%",
+          left: "0%",
+          top: "16.5%",
+          bottom: "20%",
           containLabel: true,
         },
         tooltip: {
-          trigger: 'axis',
-          backgroundColor: 'rgba(44, 44, 44, .6)',
+          trigger: "axis",
+          backgroundColor: "rgba(44, 44, 44, .6)",
           borderWidth: 0,
           textStyle: {
-            color: '#ffffff',
+            color: "#ffffff",
             fontSize: 12,
           },
           padding: 0,
           extraCssText: `backdrop-filter: blur(4.2px);border-radius:4px;`,
           formatter: (params: any) => {
-            if (!legendSelection['Input Tokens'] && !legendSelection['Output Tokens']) {
-              return ''; // Hide tooltip
+            if (
+              !legendSelection["Input Tokens"] &&
+              !legendSelection["Output Tokens"]
+            ) {
+              return ""; // Hide tooltip
             }
             const seriesData = params.map(
               (item: any) =>
@@ -181,18 +237,18 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
                    <span style="display:inline-block;width:10px;height:10px;background-color:${item.color};margin-right:15px;border-radius:2px;font-size:13px;"></span>
                    <span style="margin-right: 15px;display:inline-block;min-width:50px;">${item.value[item.seriesName]}</span>
                    ${item.seriesName}
-                 </div>`
+                 </div>`,
             );
             return `<div style="text-align:left; padding: 20px;position:relative;overflow:hidden;">
                       <img style="position:absolute;bottom:0;right:0;z-index:0;" src="/images/tooltip-pattern.svg"></img>
                       <div style="font-weight:bold;margin-bottom:10px;font-size:15px;font-weight:600;padding:0 10px;">
                       <img style="display:inline-block;height:20px;width:20px;margin-right:5px;" src="/images/drawer/cloud.png"></img>
                       ${params[0].axisValue}</div>
-                      <div style="background-color: #161616;padding: 10px;border-radius:6px;position:relative;z-index:1;">${seriesData.join('')}</div>
+                      <div style="background-color: #161616;padding: 10px;border-radius:6px;position:relative;z-index:1;">${seriesData.join("")}</div>
                     </div>`;
           },
           axisPointer: {
-            type: 'none',
+            type: "none",
           },
         },
         dataset: {
@@ -200,14 +256,16 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
           source: barChartData.source,
         },
         xAxis: {
-          type: 'category',
-          axisLine: { lineStyle: { color: '#2d2d2d' } },
+          type: "category",
+          axisLine: { lineStyle: { color: "#2d2d2d" } },
           axisLabel: {
-            color: '#6A6E76',
+            color: "#6A6E76",
             fontSize: 12,
             formatter: (value: string) => {
               const maxLength = 5;
-              return value.length > maxLength ? value.slice(0, maxLength) + '...' : value;
+              return value.length > maxLength
+                ? value.slice(0, maxLength) + "..."
+                : value;
             },
           },
           axisTick: { show: false },
@@ -215,36 +273,42 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
         yAxis: {
           minInterval: 40,
           splitNumber: 6,
-          splitLine: { lineStyle: { type: 'solid', color: '#171717' } },
-          axisLine: { lineStyle: { color: '#2d2d2d' } },
+          splitLine: { lineStyle: { type: "solid", color: "#171717" } },
+          axisLine: { lineStyle: { color: "#2d2d2d" } },
           axisLabel: {
-            color: '#6A6E76',
+            color: "#6A6E76",
             fontSize: 12,
             formatter: function (value: number) {
               const abs = Math.abs(value);
               if (abs >= 1_000_000_000) {
                 const scaled = value / 1_000_000_000;
-                return (scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1)) + 'B';
+                return (
+                  (scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1)) + "B"
+                );
               }
               if (abs >= 1_000_000) {
                 const scaled = value / 1_000_000;
-                return (scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1)) + 'M';
+                return (
+                  (scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1)) + "M"
+                );
               }
               if (abs >= 1_000) {
                 const scaled = value / 1_000;
-                return (scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1)) + 'K';
+                return (
+                  (scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1)) + "K"
+                );
               }
               return value.toString();
-            }
+            },
           },
         },
         series: [
           {
-            type: 'bar',
+            type: "bar",
             barWidth: 8,
-            barGap: '0%',
+            barGap: "0%",
             itemStyle: {
-              color: '#D1B854',
+              color: "#D1B854",
               borderRadius: [5, 5, 0, 0],
             },
             emphasis: {
@@ -254,11 +318,11 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
             },
           },
           {
-            type: 'bar',
+            type: "bar",
             barWidth: 8,
-            barGap: '0%',
+            barGap: "0%",
             itemStyle: {
-              color: '#479D5F',
+              color: "#479D5F",
               borderRadius: [5, 5, 0, 0],
             },
             emphasis: {
@@ -276,9 +340,9 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
         myChart.resize();
       };
 
-      window.addEventListener('resize', handleResize);
+      window.addEventListener("resize", handleResize);
       return () => {
-        window.removeEventListener('resize', handleResize);
+        window.removeEventListener("resize", handleResize);
         myChart.dispose();
       };
     }
@@ -292,16 +356,16 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
       // [seriesName]: !legendSelection[seriesName],
     };
     setLegendSelection(newSelection);
-    if (!newSelection['Input Tokens'] && !newSelection['Output Tokens']) {
+    if (!newSelection["Input Tokens"] && !newSelection["Output Tokens"]) {
       chartInstanceRef.current.setOption({ yAxis: { show: false } });
     } else {
       chartInstanceRef.current.setOption({ yAxis: { show: true } });
     }
     if (chartInstanceRef.current) {
       const option = chartInstanceRef.current.getOption();
-      console.log('option', option)
+      console.log("option", option);
       const series = option.series.map((s: any, index: number) => {
-        const seriesName = index === 0 ? 'Input Tokens' : 'Output Tokens';
+        const seriesName = index === 0 ? "Input Tokens" : "Output Tokens";
         return {
           ...s,
           itemStyle: {
@@ -310,12 +374,12 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
           },
           emphasis: {
             itemStyle: {
-              opacity: newSelection[seriesName] ? 1 : 0
-            }
+              opacity: newSelection[seriesName] ? 1 : 0,
+            },
           },
           tooltip: {
             show: newSelection[seriesName] ? true : false,
-          }
+          },
         };
       });
       chartInstanceRef.current.setOption({ series });
@@ -329,7 +393,7 @@ const TokenMetricsChart: React.FC<TokenMetricsChartProps> = ({ data, extraChartD
         extraChartDetails={extraChartDetails}
         legendSelection={legendSelection}
       />
-      <div ref={chartRef} style={{ width: '100%', height: '100%' }} />
+      <div ref={chartRef} style={{ width: "100%", height: "100%" }} />
     </Box>
   );
 };

@@ -1,0 +1,238 @@
+{{- define "bud-runtime-container.multi-node" }}
+apiVersion: orchestration.aibrix.ai/v1alpha1
+kind: RayClusterFleet
+metadata:
+  name: {{ .Values.modelName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: aibrix
+    app.kubernetes.io/managed-by: kustomize
+    model.aibrix.ai/name: {{ .Values.modelName }}
+spec:
+  replicas: {{ .node.replicas }}
+  selector:
+    matchLabels:
+      model.aibrix.ai/name: {{ .Values.modelName }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        model.aibrix.ai/name: {{ .Values.modelName }}
+      annotations:
+        ray.io/overwrite-container-cmd: "true"
+    spec:
+      rayVersion: "2.10.0"
+      headGroupSpec:
+        rayStartParams:
+          dashboard-host: "0.0.0.0"
+        template:
+          metadata:
+            labels:
+              model.aibrix.ai/name: {{ .Values.modelName }}
+          spec:
+            nodeSelector:
+              # kubernetes.io/hostname: {{ .node.name }}
+              {{- if .node.node_selector }}
+              {{- range $key, $value := .node.node_selector }}
+              {{ $key }}: {{ $value }}
+              {{- end }}
+              {{- else }}
+              # Fallback for legacy deployments without node_selector
+              {{- if eq .node.type "cuda" }}
+              nvidia.com/gpu.present: "true"
+              {{- end }}
+              {{- end }}
+            imagePullSecrets:
+            - name: {{ $.Values.imagePullSecrets.name }}
+            {{- if eq .node.type "cuda" }}
+            runtimeClassName: nvidia
+            {{- end }}
+            containers:
+            {{- if eq .node.type "cpu" }}
+            {{- include "bud-runtime-container.cpu-container" (dict "Values" $.Values "device" .node) | nindent 12 }}
+            {{- else if eq .node.type "cuda" }}
+            {{- include "bud-runtime-container.cuda-container" (dict "Values" $.Values "device" .node) | nindent 12 }}
+            {{- else if eq .node.type "hpu" }}
+            {{- include "bud-runtime-container.hpu-container" (dict "Values" $.Values "device" .node) | nindent 12 }}
+            {{- end }}
+            - name: bud-runtime-sidecar
+              image: budstudio/runtime-sidecar:latest
+              ports:
+                - containerPort: 9090
+                  protocol: TCP
+              env: # Pass configuration via environment variables
+                - name: ENGINE_METRICS_URL
+                  value: "http://localhost:8000/metrics" # Point to the vLLM container in the same pod
+                - name: LISTEN_PORT
+                  value: "9090"
+                - name: SCRAPE_INTERVAL_SECONDS
+                  value: "0.5"
+                - name: CALCULATION_WINDOW_SECONDS
+                  value: "1"
+              livenessProbe:
+                httpGet:
+                  path: /metrics
+                  port: 9090
+                initialDelaySeconds: 120
+                periodSeconds: 30
+              readinessProbe:
+                httpGet:
+                  path: /metrics
+                  port: 9090
+                initialDelaySeconds: 60
+                periodSeconds: 10
+            - name: aibrix-runtime
+              image: aibrix/runtime:v0.2.1
+              command:
+                - aibrix_runtime
+                - --port
+                - "8080"
+              env:
+                - name: INFERENCE_ENGINE
+                  value: vllm
+                - name: INFERENCE_ENGINE_ENDPOINT
+                  value: http://localhost:8000
+              ports:
+                - containerPort: 8080
+                  protocol: TCP
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: 8080
+                initialDelaySeconds: 3
+                periodSeconds: 2
+              readinessProbe:
+                httpGet:
+                  path: /ready
+                  port: 8080
+                initialDelaySeconds: 5
+                periodSeconds: 10
+            volumes:
+            - name: shm
+              emptyDir:
+                medium: "Memory"
+                sizeLimit: "2Gi"
+            - name: model-registry
+            {{- if eq $.Values.volumeType "nfs" }}
+              nfs:
+                server: "{{ $.Values.nfs.server }}"
+                path: "{{ $.Values.nfs.path }}"
+            {{- else if eq $.Values.volumeType "local" }}
+              persistentVolumeClaim:
+                claimName: "{{ $.Values.pvcName }}"
+            {{- end }}
+      workerGroupSpecs:
+        - groupName: "{{ .Values.modelName }}-group"
+          replicas: {{ sub (.node.pp_size | int) 1 }}
+          minReplicas: {{ sub (.node.pp_size | int) 1 }}
+          rayStartParams: {}
+          template:
+            metadata:
+              labels:
+                model.aibrix.ai/name: {{ .Values.modelName }}
+            spec:
+              nodeSelector:
+                # kubernetes.io/hostname: {{ .node.name }}
+                {{- if .node.node_selector }}
+                {{- range $key, $value := .node.node_selector }}
+                {{ $key }}: {{ $value }}
+                {{- end }}
+                {{- else }}
+                # Fallback for legacy deployments without node_selector
+                {{- if eq .node.type "cuda" }}
+                nvidia.com/gpu.present: "true"
+                {{- end }}
+                {{- end }}
+              imagePullSecrets:
+              - name: {{ $.Values.imagePullSecrets.name }}
+              {{- if eq .node.type "cuda" }}
+              runtimeClassName: nvidia
+              {{- end }}
+              containers:
+                - name: ray-worker
+                  image: {{ .node.image }}
+                  volumeMounts:
+                    - name: model-registry
+                      mountPath: /data/models-registry
+                      readOnly: false
+                    - name: shm
+                      mountPath: "/dev/shm"
+                  env:
+                    - name: MY_POD_IP
+                      valueFrom:
+                        fieldRef:
+                          fieldPath: status.podIP
+                  command: [ "/bin/bash", "-c" ]
+                  args:
+                    - >
+                      ulimit -n 65536 &&
+                      eval "$KUBERAY_GEN_RAY_START_CMD --node-ip-address=$MY_POD_IP" &&
+                      tail -f /dev/null
+                  lifecycle:
+                    preStop:
+                      exec:
+                        command: [ "/bin/sh", "-c", "ray stop" ]
+                  resources:
+                    limits:
+                      cpu: "4"
+                      nvidia.com/gpu: {{ .node.tp_size }}
+                    requests:
+                      cpu: "4"
+                      nvidia.com/gpu: {{ .node.tp_size }}
+              volumes:
+              - name: shm
+                emptyDir:
+                  medium: "Memory"
+                  sizeLimit: "2Gi"
+              - name: model-registry
+              {{- if eq $.Values.volumeType "nfs" }}
+                nfs:
+                  server: "{{ $.Values.nfs.server }}"
+                  path: "{{ $.Values.nfs.path }}"
+              {{- else if eq $.Values.volumeType "local" }}
+                persistentVolumeClaim:
+                  claimName: "{{ $.Values.pvcName }}"
+              {{- end }}
+
+# ---
+# apiVersion: gateway.networking.k8s.io/v1
+# kind: HTTPRoute # Need to check why this is not auto deploy, similar to single node
+# metadata:
+#   name: "{{ .Values.modelName }}-router"
+#   namespace: aibrix-system
+# spec:
+#   parentRefs:
+#     - group: gateway.networking.k8s.io
+#       kind: Gateway
+#       name: aibrix-eg
+#       namespace: aibrix-system
+#   rules:
+#     - backendRefs:
+#         - group: ""
+#           kind: Service
+#           name: {{ .Values.modelName }}
+#           namespace: {{ .Values.namespace }}
+#           port: 8000  # or 8000 if you're not using the runtime sidecar
+#           weight: 1
+#       matches:
+#         - headers:
+#             - name: model
+#               type: Exact
+#               value: {{ .Values.modelName }}
+#           path:
+#             type: PathPrefix
+#             value: /v1/completions
+#         - headers:
+#             - name: model
+#               type: Exact
+#               value: {{ .Values.modelName }}
+#           path:
+#             type: PathPrefix
+#             value: /v1/chat/completions
+#       timeouts:
+#         request: 120s
+{{- end }}

@@ -29,7 +29,11 @@ function ProviderCardWithCheckBox({
         <div className="bg-[#1F1F1F] w-[1.75rem] h-[1.75rem] rounded-[5px] flex justify-center items-center grow-0 shrink-0">
           <Image
             preview={false}
-            src={data.iconLocal ? `${data.icon}` :  `${assetBaseUrl}${data.icon || data.logo_url}`}
+            src={
+              data.iconLocal
+                ? `${data.icon}`
+                : `${assetBaseUrl}${data.icon || data.logo_url}`
+            }
             className="!w-[1.25rem] !h-[1.25rem]"
             style={{ width: "1.25rem", height: "1.25rem" }}
             alt="home"

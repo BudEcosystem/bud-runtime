@@ -124,9 +124,34 @@ mkShell {
     }
 
     bud_sops_sync() {
-        for sec in $(find -name secrets.yaml) $(find -name values.enc.yaml); do
+        for sec in $(find -name secrets.yaml) $(find -name '*.enc.yaml'); do
                 sops updatekeys "$sec"
         done
+    }
+
+    budk8s_import() {
+
+        if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+            echo "Usage: budk8s_import <repo/image:tag> [username]"
+            return 1
+        fi
+
+        budk8s="primary.k8s.bud.studio"
+        if [ "$2" != "" ]; then
+            ssh_host="$budk8s"
+        else
+            ssh_host="$2@$budk8s"
+        fi
+
+        local_endpoint="$(mktemp)" || return 1
+        docker save "$1" > "$local_endpoint" || return 1
+
+        budk8s_endpoint="$(ssh "$ssh_host" mktemp)" || return 1
+        scp "$local_endpoint" "$ssh_host:$budk8s_endpoint" || return 1
+        ssh "$ssh_host" sudo ctr images import "$budk8s_endpoint" || return 1
+
+        rm "$local_endpoint"
+        ssh "$ssh_host" rm "$budk8s_endpoint"
     }
 
     export_sops_secret_silent() {

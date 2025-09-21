@@ -1,7 +1,7 @@
 import asyncio
 import math
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Union
 from uuid import UUID
 
@@ -35,12 +35,15 @@ from budmetrics.observability.schemas import (
     LatencyDistributionRequest,
     LatencyDistributionResponse,
     MetricsData,
+    MetricsSyncRequest,
+    MetricsSyncResponse,
     ModerationInferenceDetail,
     ObservabilityMetricsRequest,
     ObservabilityMetricsResponse,
     PerformanceMetric,
     PeriodBin,
     TimeMetric,
+    UserUsageItem,
 )
 
 
@@ -665,8 +668,15 @@ class ObservabilityMetricsService:
 
         # Support filtering by api_key_project_id (for CLIENT users)
         if hasattr(request, "filters") and request.filters and "api_key_project_id" in request.filters:
-            where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
-            params["api_key_project_id"] = str(request.filters["api_key_project_id"])
+            api_key_project_ids = request.filters["api_key_project_id"]
+            if isinstance(api_key_project_ids, list):
+                placeholders = [f"%(api_key_project_{i})s" for i in range(len(api_key_project_ids))]
+                where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                for i, val in enumerate(api_key_project_ids):
+                    params[f"api_key_project_{i}"] = str(val)
+            else:
+                where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                params["api_key_project_id"] = str(api_key_project_ids)
 
         if request.endpoint_id:
             where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
@@ -738,20 +748,20 @@ class ObservabilityMetricsService:
             mi.timestamp,
             mi.model_name,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN substring(coalesce(ci.input, mi.input_messages), 1, 100)
-                WHEN mi.endpoint_type = 'embedding' THEN substring(ei.input, 1, 100)
-                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN substring(ai.input, 1, 100)
-                WHEN mi.endpoint_type = 'image_generation' THEN substring(ii.prompt, 1, 100)
-                WHEN mi.endpoint_type = 'moderation' THEN substring(modi.input, 1, 100)
-                ELSE substring(mi.input_messages, 1, 100)
+                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(coalesce(ci.input, mi.input_messages), 1, 100))
+                WHEN mi.endpoint_type = 'embedding' THEN toValidUTF8(substring(ei.input, 1, 100))
+                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.input, 1, 100))
+                WHEN mi.endpoint_type = 'image_generation' THEN toValidUTF8(substring(ii.prompt, 1, 100))
+                WHEN mi.endpoint_type = 'moderation' THEN toValidUTF8(substring(modi.input, 1, 100))
+                ELSE toValidUTF8(substring(mi.input_messages, 1, 100))
             END as prompt_preview,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN substring(coalesce(ci.output, mi.output), 1, 100)
+                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(coalesce(ci.output, mi.output), 1, 100))
                 WHEN mi.endpoint_type = 'embedding' THEN concat('Generated ', toString(ei.input_count), ' embeddings')
-                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN substring(ai.output, 1, 100)
+                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.output, 1, 100))
                 WHEN mi.endpoint_type = 'image_generation' THEN concat('Generated ', toString(ii.image_count), ' images')
                 WHEN mi.endpoint_type = 'moderation' THEN if(modi.flagged, 'Content flagged', 'Content passed')
-                ELSE substring(mi.output, 1, 100)
+                ELSE toValidUTF8(substring(mi.output, 1, 100))
             END as response_preview,
             mi.input_tokens,
             mi.output_tokens,
@@ -860,8 +870,8 @@ class ObservabilityMetricsService:
                 mi.model_provider_name,
                 mid.model_id,
                 mi.system,
-                coalesce(ci.input, mi.input_messages) as input_messages,
-                coalesce(ci.output, mi.output) as output,
+                toValidUTF8(coalesce(ci.input, mi.input_messages)) as input_messages,
+                toValidUTF8(coalesce(ci.output, mi.output)) as output,
                 ci.function_name,
                 ci.variant_name,
                 ci.episode_id,
@@ -880,10 +890,10 @@ class ObservabilityMetricsService:
                 mi.cached,
                 mi.finish_reason,
                 mid.cost,
-                mi.raw_request,
-                mi.raw_response,
-                mi.gateway_request,
-                mi.gateway_response,
+                toValidUTF8(mi.raw_request) as raw_request,
+                toValidUTF8(mi.raw_response) as raw_response,
+                toValidUTF8(mi.gateway_request) as gateway_request,
+                toValidUTF8(mi.gateway_response) as gateway_response,
                 coalesce(mi.endpoint_type, 'chat') as endpoint_type,
                 -- Gateway Analytics fields
                 ga.client_ip,
@@ -897,7 +907,7 @@ class ObservabilityMetricsService:
                 ga.timezone,
                 ga.asn,
                 ga.isp,
-                ga.user_agent,
+                toValidUTF8(ga.user_agent) as user_agent,
                 ga.device_type,
                 ga.browser_name,
                 ga.browser_version,
@@ -906,16 +916,22 @@ class ObservabilityMetricsService:
                 ga.is_bot,
                 ga.method,
                 ga.path,
-                ga.query_params,
-                ga.request_headers,
+                ga.query_params as query_params,
+                ga.request_headers as request_headers,
                 ga.body_size,
                 ga.api_key_id,
                 ga.auth_method,
                 ga.user_id,
+                ga.project_id as ga_project_id,
+                ga.endpoint_id as ga_endpoint_id,
+                ga.request_timestamp,
+                ga.response_timestamp,
                 ga.gateway_processing_ms,
                 ga.total_duration_ms,
-                ga.routing_decision,
+                ga.model_name as ga_model_name,
+                ga.model_provider,
                 ga.model_version,
+                ga.routing_decision,
                 ga.status_code,
                 ga.response_size,
                 ga.response_headers,
@@ -942,8 +958,8 @@ class ObservabilityMetricsService:
                 mi.model_provider_name,
                 mid.model_id,
                 mi.system,
-                coalesce(ci.input, mi.input_messages) as input_messages,
-                coalesce(ci.output, mi.output) as output,
+                toValidUTF8(coalesce(ci.input, mi.input_messages)) as input_messages,
+                toValidUTF8(coalesce(ci.output, mi.output)) as output,
                 ci.function_name,
                 ci.variant_name,
                 ci.episode_id,
@@ -962,10 +978,10 @@ class ObservabilityMetricsService:
                 mi.cached,
                 mi.finish_reason,
                 mid.cost,
-                mi.raw_request,
-                mi.raw_response,
-                mi.gateway_request,
-                mi.gateway_response,
+                toValidUTF8(mi.raw_request) as raw_request,
+                toValidUTF8(mi.raw_response) as raw_response,
+                toValidUTF8(mi.gateway_request) as gateway_request,
+                toValidUTF8(mi.gateway_response) as gateway_response,
                 coalesce(mi.endpoint_type, 'chat') as endpoint_type
             FROM ModelInference mi
             INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
@@ -974,165 +990,181 @@ class ObservabilityMetricsService:
             """
 
         params = {"inference_id": inference_id}
-        results = await self.clickhouse_client.execute_query(query, params)
+        results, column_descriptions = await self.clickhouse_client.execute_query(
+            query, params, with_column_types=True
+        )
 
         if not results:
             raise ValueError("Inference not found")
 
-        row = results[0]
+        # Convert row to dictionary for named access
+        from budmetrics.observability.models import ClickHouseClient
+
+        row_dict = ClickHouseClient.row_to_dict(results[0], column_descriptions)
+
+        logger.debug(f"Available columns: {list(row_dict.keys())}")
+        logger.debug(f"Gateway table exists: {gateway_table_exists}")
 
         # Extract gateway metadata based on whether table exists and data is available
         gateway_metadata = None
         if gateway_table_exists:
-            # With GatewayAnalytics table, endpoint_type is at index 29 and gateway fields start at 30
-            endpoint_type = row[29] if len(row) > 29 else "chat"
+            endpoint_type = row_dict.get("endpoint_type", "chat")
 
-            logger.debug(f"Row length: {len(row)}, checking gateway fields from index 30")
+            logger.debug(f"Endpoint type: {endpoint_type}")
 
-            if len(row) > 30:
-                # Check if any gateway fields are present (not all None/empty)
-                gateway_fields = row[30:69] if len(row) >= 69 else row[30:]
-                has_gateway_data = any(field is not None and field != "" for field in gateway_fields)
+            # Check if any gateway fields are present (not all None/empty)
+            gateway_field_names = [
+                "client_ip",
+                "proxy_chain",
+                "protocol_version",
+                "country_code",
+                "region",
+                "city",
+                "latitude",
+                "longitude",
+                "timezone",
+                "asn",
+                "isp",
+                "user_agent",
+                "device_type",
+                "browser_name",
+                "browser_version",
+                "os_name",
+                "os_version",
+                "is_bot",
+                "method",
+                "path",
+                "query_params",
+                "request_headers",
+                "body_size",
+                "api_key_id",
+                "auth_method",
+                "user_id",
+                "ga_project_id",
+                "ga_endpoint_id",
+                "request_timestamp",
+                "response_timestamp",
+                "gateway_processing_ms",
+                "total_duration_ms",
+                "ga_model_name",
+                "model_provider",
+                "model_version",
+                "routing_decision",
+                "status_code",
+                "response_size",
+                "response_headers",
+                "error_type",
+                "error_message",
+                "is_blocked",
+                "block_reason",
+                "block_rule_id",
+                "tags",
+            ]
 
-                logger.debug(f"Gateway fields present: {has_gateway_data}")
-                logger.debug(
-                    f"Sample gateway fields: client_ip={row[30] if len(row) > 30 else None}, "
-                    f"country_code={row[33] if len(row) > 33 else None}, "
-                    f"user_agent={row[41] if len(row) > 41 else None}"
-                )
+            gateway_field_values = [row_dict.get(field) for field in gateway_field_names]
+            has_gateway_data = any(field is not None and field != "" for field in gateway_field_values)
 
-                if has_gateway_data:
-                    try:
-                        # Parse headers and tags if they exist
-                        # Note: Based on the data shift, adjusting indices
-                        request_headers = None
-                        if len(row) > 52 and row[52]:
-                            try:
-                                request_headers = dict(row[52]) if isinstance(row[52], (dict, tuple)) else None
-                            except (TypeError, ValueError):
-                                request_headers = None
+            logger.debug(f"Gateway fields present: {has_gateway_data}")
+            logger.debug(
+                f"Sample gateway fields: client_ip={row_dict.get('client_ip')}, "
+                f"country_code={row_dict.get('country_code')}, "
+                f"user_agent={row_dict.get('user_agent')}"
+            )
 
-                        response_headers = None
-                        if len(row) > 63 and row[63]:
-                            try:
-                                response_headers = dict(row[63]) if isinstance(row[63], (dict, tuple)) else None
-                            except (TypeError, ValueError):
-                                response_headers = None
-
-                        tags = None
-                        if len(row) > 69 and row[69]:
-                            try:
-                                tags = dict(row[69]) if isinstance(row[69], (dict, tuple)) else None
-                            except (TypeError, ValueError):
-                                tags = None
-
-                        # Fixed mapping based on error analysis:
-                        # The error shows that the data from the database has columns in wrong positions
-                        # Error pattern: latitude='Singapore', timezone=103.85..., asn='Asia/Singapore'
-                        # This indicates the data is shifted or reordered in the result set
-
-                        # Helper function to safely convert to float
-                        def safe_float(val):
-                            try:
-                                if val is None or val == "":
-                                    return None
-                                return float(val)
-                            except (ValueError, TypeError):
+            if has_gateway_data:
+                try:
+                    # Helper function to safely convert to float
+                    def safe_float(val):
+                        try:
+                            if val is None or val == "":
                                 return None
+                            return float(val)
+                        except (ValueError, TypeError):
+                            return None
 
-                        # Helper function to safely convert to int
-                        def safe_int(val):
-                            try:
-                                if val is None or val == "":
-                                    return None
-                                return int(val)
-                            except (ValueError, TypeError):
+                    # Helper function to safely convert to int
+                    def safe_int(val):
+                        try:
+                            if val is None or val == "":
                                 return None
+                            return int(val)
+                        except (ValueError, TypeError):
+                            return None
 
-                        # Based on error message, the actual data layout appears to be:
-                        # row[36] = 'Singapore' (should be city, so data from row[35] is duplicated?)
-                        # row[37] = longitude value (correct)
-                        # row[38] = 103.85... (should be timezone but has longitude)
-                        # row[39] = 'Asia/Singapore' (should be ASN but has timezone)
+                    # Helper function to parse dict-like fields
+                    def safe_dict(val):
+                        try:
+                            if val is None or val == "":
+                                return None
+                            if isinstance(val, dict):
+                                return val
+                            if isinstance(val, (list, tuple)):
+                                return dict(val)
+                            return None
+                        except (TypeError, ValueError):
+                            return None
 
-                        # It looks like city might be duplicated and everything after is shifted by 1
-                        # Let's handle this with proper validation
-
-                        gateway_metadata = GatewayMetadata(
-                            client_ip=row[30] if len(row) > 30 and row[30] else None,
-                            proxy_chain=row[31] if len(row) > 31 and row[31] else None,
-                            protocol_version=row[32] if len(row) > 32 and row[32] else None,
-                            country_code=row[33] if len(row) > 33 and row[33] else None,
-                            region=row[34] if len(row) > 34 and row[34] else None,
-                            city=row[35] if len(row) > 35 and row[35] else None,
-                            # Latitude should be at 36, but if it contains city name, try 37
-                            latitude=safe_float(row[37]) if len(row) > 37 else None,
-                            # Longitude should be at 37, but appears to be at 38 based on error
-                            longitude=safe_float(row[38]) if len(row) > 38 else None,
-                            # Timezone should be at 38, but appears to be at 39 based on error
-                            timezone=str(row[39])
-                            if len(row) > 39 and row[39] and not isinstance(row[39], (int, float))
-                            else None,
-                            # ASN should be at 39, but appears to be at 40
-                            asn=safe_int(row[40]) if len(row) > 40 else None,
-                            # Shift remaining fields by 1
-                            isp=row[41] if len(row) > 41 and row[41] else None,
-                            user_agent=row[42] if len(row) > 42 and row[42] else None,
-                            device_type=row[43] if len(row) > 43 and row[43] else None,
-                            browser_name=row[44] if len(row) > 44 and row[44] else None,
-                            browser_version=row[45] if len(row) > 45 and row[45] else None,
-                            os_name=row[46] if len(row) > 46 and row[46] else None,
-                            os_version=row[47] if len(row) > 47 and row[47] else None,
-                            is_bot=bool(row[48]) if len(row) > 48 and row[48] is not None else None,
-                            method=row[49] if len(row) > 49 and row[49] else None,
-                            path=row[50] if len(row) > 50 and row[50] else None,
-                            query_params=row[51] if len(row) > 51 and row[51] else None,
-                            # request_headers already parsed above at row[51], but shifted to 52
-                            request_headers=request_headers,  # This was parsed from row[51] above
-                            # body_size should be at 52, but based on error it gets headers, so likely at 53
-                            body_size=safe_int(row[53]) if len(row) > 53 else None,
-                            api_key_id=str(row[54]) if len(row) > 54 and row[54] else None,
-                            auth_method=row[55] if len(row) > 55 and row[55] else None,
-                            user_id=str(row[56]) if len(row) > 56 and row[56] else None,
-                            gateway_processing_ms=safe_int(row[57]) if len(row) > 57 else None,
-                            total_duration_ms=safe_int(row[58]) if len(row) > 58 else None,
-                            # routing_decision should be at 58 but error shows integer there, so shift to 59
-                            routing_decision=str(row[59]) if len(row) > 59 and row[59] is not None else None,
-                            model_version=row[60] if len(row) > 60 and row[60] else None,
-                            status_code=safe_int(row[61]) if len(row) > 61 else None,
-                            response_size=safe_int(row[62]) if len(row) > 62 else None,
-                            # response_headers already parsed at row[62], shifted to 63
-                            response_headers=response_headers,  # This was parsed from row[62] above
-                            # error_type at 63 gets headers based on error, so likely at 64
-                            error_type=str(row[64])
-                            if len(row) > 64 and row[64] and not isinstance(row[64], dict)
-                            else None,
-                            error_message=row[65] if len(row) > 65 and row[65] else None,
-                            is_blocked=bool(row[66]) if len(row) > 66 and row[66] is not None else None,
-                            block_reason=row[67] if len(row) > 67 and row[67] else None,
-                            block_rule_id=str(row[68]) if len(row) > 68 and row[68] else None,
-                            tags=tags,  # This was parsed from row[68] above, now shifted to 69
-                        )
-                        logger.info(f"Successfully parsed gateway metadata for inference {inference_id}")
-                    except (IndexError, TypeError) as e:
-                        logger.warning(f"Failed to parse gateway metadata for inference {inference_id}: {e}")
-                        gateway_metadata = None
-                else:
-                    logger.debug(f"No gateway data found for inference {inference_id}")
+                    # Create gateway metadata using named column access
+                    gateway_metadata = GatewayMetadata(
+                        client_ip=row_dict.get("client_ip"),
+                        proxy_chain=row_dict.get("proxy_chain"),
+                        protocol_version=row_dict.get("protocol_version"),
+                        country_code=row_dict.get("country_code"),
+                        region=row_dict.get("region"),
+                        city=row_dict.get("city"),
+                        latitude=safe_float(row_dict.get("latitude")),
+                        longitude=safe_float(row_dict.get("longitude")),
+                        timezone=row_dict.get("timezone"),
+                        asn=safe_int(row_dict.get("asn")),
+                        isp=row_dict.get("isp"),
+                        user_agent=row_dict.get("user_agent"),
+                        device_type=row_dict.get("device_type"),
+                        browser_name=row_dict.get("browser_name"),
+                        browser_version=row_dict.get("browser_version"),
+                        os_name=row_dict.get("os_name"),
+                        os_version=row_dict.get("os_version"),
+                        is_bot=row_dict.get("is_bot"),
+                        method=row_dict.get("method"),
+                        path=row_dict.get("path"),
+                        query_params=row_dict.get("query_params"),
+                        request_headers=safe_dict(row_dict.get("request_headers")),
+                        body_size=safe_int(row_dict.get("body_size")),
+                        api_key_id=row_dict.get("api_key_id"),
+                        auth_method=row_dict.get("auth_method"),
+                        user_id=row_dict.get("user_id"),
+                        gateway_processing_ms=safe_int(row_dict.get("gateway_processing_ms")),
+                        total_duration_ms=safe_int(row_dict.get("total_duration_ms")),
+                        routing_decision=row_dict.get("routing_decision"),
+                        model_version=row_dict.get("model_version"),
+                        status_code=safe_int(row_dict.get("status_code")),
+                        response_size=safe_int(row_dict.get("response_size")),
+                        response_headers=safe_dict(row_dict.get("response_headers")),
+                        error_type=row_dict.get("error_type"),
+                        error_message=row_dict.get("error_message"),
+                        is_blocked=row_dict.get("is_blocked"),
+                        block_reason=row_dict.get("block_reason"),
+                        block_rule_id=row_dict.get("block_rule_id"),
+                        tags=safe_dict(row_dict.get("tags")),
+                    )
+                    logger.info(f"Successfully parsed gateway metadata for inference {inference_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to parse gateway metadata for inference {inference_id}: {e}")
+                    gateway_metadata = None
             else:
-                logger.warning(f"Row too short for gateway data: {len(row)} columns")
+                logger.debug(f"No gateway data found for inference {inference_id}")
         else:
-            # Without GatewayAnalytics table, endpoint_type is at the last index
-            endpoint_type = row[-1] if len(row) > 0 else "chat"
+            # Without GatewayAnalytics table, get endpoint_type from the row_dict
+            endpoint_type = row_dict.get("endpoint_type", "chat")
             logger.info("GatewayAnalytics table not available, gateway_metadata will be null")
 
         # Parse messages from JSON string
         import json
 
+        input_messages = row_dict.get("input_messages")
         try:
-            if row[6]:
-                if isinstance(row[6], str):
-                    parsed_data = json.loads(row[6])
+            if input_messages:
+                if isinstance(input_messages, str):
+                    parsed_data = json.loads(input_messages)
                     # Handle the case where the JSON contains {"messages": [...]}
                     if isinstance(parsed_data, dict) and "messages" in parsed_data:
                         messages = parsed_data["messages"]
@@ -1140,8 +1172,8 @@ class ObservabilityMetricsService:
                         messages = parsed_data
                     else:
                         messages = []
-                elif isinstance(row[6], list):
-                    messages = row[6]
+                elif isinstance(input_messages, list):
+                    messages = input_messages
                 else:
                     messages = []
             else:
@@ -1149,7 +1181,11 @@ class ObservabilityMetricsService:
         except (json.JSONDecodeError, TypeError) as e:
             logger.warning(f"Failed to parse messages for inference {inference_id}: {e}")
             # Try to parse as a simple message format
-            messages = [{"role": "user", "content": row[6]}] if row[6] and isinstance(row[6], str) else []
+            messages = (
+                [{"role": "user", "content": input_messages}]
+                if input_messages and isinstance(input_messages, str)
+                else []
+            )
 
         # Skip feedback queries for now
         feedback_count = 0
@@ -1157,22 +1193,24 @@ class ObservabilityMetricsService:
 
         # Combine system prompt with messages if it exists
         combined_messages = []
-        if row[5]:  # system_prompt exists
-            combined_messages.append({"role": "system", "content": str(row[5])})
+        system_prompt = row_dict.get("system")
+        if system_prompt:  # system_prompt exists
+            combined_messages.append({"role": "system", "content": str(system_prompt)})
 
         # Add the parsed messages
         combined_messages.extend(messages)
 
         # Add the assistant's response as the last message
-        if row[7]:  # output exists
+        output = row_dict.get("output")
+        if output:  # output exists
             try:
                 # Try to parse the output as JSON if it's a JSON string
-                output_content = json.loads(row[7])
+                output_content = json.loads(output)
                 # Keep the parsed JSON content as is
                 content = output_content
             except (json.JSONDecodeError, TypeError):
                 # If it's not JSON or parsing fails, use as is
-                content = str(row[7])
+                content = str(output)
 
             combined_messages.append({"role": "assistant", "content": content})
 
@@ -1189,7 +1227,7 @@ class ObservabilityMetricsService:
                     return None
 
             # Handle potential UUID conversion for episode_id
-            episode_id = safe_uuid(row[10])
+            episode_id = safe_uuid(row_dict.get("episode_id"))
 
             # Fetch type-specific details based on endpoint_type
             embedding_details = None
@@ -1269,36 +1307,44 @@ class ObservabilityMetricsService:
 
             return EnhancedInferenceDetailResponse(
                 object="inference_detail",
-                inference_id=safe_uuid(row[0]),  # Keep as UUID
-                timestamp=row[1],
-                model_name=str(row[2]) if row[2] else "",
-                model_provider=str(row[3]) if row[3] else "unknown",
-                model_id=safe_uuid(row[4]),  # Keep as UUID
-                system_prompt=str(row[5]) if row[5] else None,  # Keep for backward compatibility
+                inference_id=safe_uuid(row_dict.get("mi.inference_id")),
+                timestamp=row_dict.get("mi.timestamp"),
+                model_name=str(row_dict.get("mi.model_name")) if row_dict.get("mi.model_name") else "",
+                model_provider=str(row_dict.get("model_provider_name"))
+                if row_dict.get("model_provider_name")
+                else "unknown",
+                model_id=safe_uuid(row_dict.get("model_id")),
+                system_prompt=str(row_dict.get("system"))
+                if row_dict.get("system")
+                else None,  # Keep for backward compatibility
                 messages=combined_messages,  # Now includes system, user, and assistant messages
-                output=str(row[7]) if row[7] else "",  # Keep for backward compatibility
-                function_name=str(row[8]) if row[8] else None,
-                variant_name=str(row[9]) if row[9] else None,
+                output=str(row_dict.get("output"))
+                if row_dict.get("output")
+                else "",  # Keep for backward compatibility
+                function_name=str(row_dict.get("function_name")) if row_dict.get("function_name") else None,
+                variant_name=str(row_dict.get("variant_name")) if row_dict.get("variant_name") else None,
                 episode_id=episode_id,
-                input_tokens=int(row[11]) if row[11] else 0,
-                output_tokens=int(row[12]) if row[12] else 0,
-                response_time_ms=int(row[13]) if row[13] else 0,
-                ttft_ms=int(row[14]) if row[14] else None,
-                processing_time_ms=int(row[15]) if row[15] else None,
-                request_ip=str(row[16]) if row[16] else None,
-                request_arrival_time=row[17],
-                request_forward_time=row[18],
-                project_id=safe_uuid(row[19]),  # Keep as UUID
-                api_key_project_id=safe_uuid(row[20]),  # API key project ID
-                endpoint_id=safe_uuid(row[21]),  # Keep as UUID
-                is_success=bool(row[22]) if row[22] is not None else True,
-                cached=bool(row[23]) if row[23] is not None else False,
-                finish_reason=str(row[24]) if row[24] else None,
-                cost=float(row[25]) if row[25] else None,
-                raw_request=str(row[26]) if row[26] else None,
-                raw_response=str(row[27]) if row[27] else None,
-                gateway_request=str(row[28]) if row[28] else None,
-                gateway_response=str(row[29]) if row[29] else None,
+                input_tokens=int(row_dict.get("input_tokens")) if row_dict.get("input_tokens") else 0,
+                output_tokens=int(row_dict.get("output_tokens")) if row_dict.get("output_tokens") else 0,
+                response_time_ms=int(row_dict.get("response_time_ms")) if row_dict.get("response_time_ms") else 0,
+                ttft_ms=int(row_dict.get("ttft_ms")) if row_dict.get("ttft_ms") else None,
+                processing_time_ms=int(row_dict.get("processing_time_ms"))
+                if row_dict.get("processing_time_ms")
+                else None,
+                request_ip=str(row_dict.get("request_ip")) if row_dict.get("request_ip") else None,
+                request_arrival_time=row_dict.get("request_arrival_time") or row_dict.get("mi.timestamp"),
+                request_forward_time=row_dict.get("request_forward_time") or row_dict.get("mi.timestamp"),
+                project_id=safe_uuid(row_dict.get("mid.project_id")),
+                api_key_project_id=safe_uuid(row_dict.get("api_key_project_id")),
+                endpoint_id=safe_uuid(row_dict.get("mid.endpoint_id")),
+                is_success=bool(row_dict.get("is_success")) if row_dict.get("is_success") is not None else True,
+                cached=bool(row_dict.get("cached")) if row_dict.get("cached") is not None else False,
+                finish_reason=str(row_dict.get("finish_reason")) if row_dict.get("finish_reason") else None,
+                cost=float(row_dict.get("cost")) if row_dict.get("cost") else None,
+                raw_request=str(row_dict.get("raw_request")) if row_dict.get("raw_request") else None,
+                raw_response=str(row_dict.get("raw_response")) if row_dict.get("raw_response") else None,
+                gateway_request=str(row_dict.get("gateway_request")) if row_dict.get("gateway_request") else None,
+                gateway_response=str(row_dict.get("gateway_response")) if row_dict.get("gateway_response") else None,
                 gateway_metadata=gateway_metadata,  # New gateway metadata
                 feedback_count=feedback_count,
                 average_rating=average_rating,
@@ -1310,7 +1356,7 @@ class ObservabilityMetricsService:
             )
         except Exception as e:
             logger.error(f"Failed to create InferenceDetailResponse: {e}")
-            logger.error(f"Row data: {row}")
+            logger.error(f"Row data columns: {list(row_dict.keys())}")
             raise ValueError(f"Failed to process inference data: {str(e)}") from e
 
     async def get_inference_feedback(self, inference_id: str) -> InferenceFeedbackResponse:
@@ -1761,6 +1807,9 @@ class ObservabilityMetricsService:
                 elif group == "user":
                     group_by_fields.append("ga.user_id")
                     select_fields.append("ga.user_id")
+                elif group == "user_project":
+                    group_by_fields.append("mid.api_key_project_id")
+                    select_fields.append("mid.api_key_project_id")
 
         # Build aggregation fields based on requested metrics
         for metric in request.metrics:
@@ -1776,6 +1825,10 @@ class ObservabilityMetricsService:
                 select_fields.append("quantile(0.99)(mi.response_time_ms) as p99_latency")
             elif metric == "total_tokens":
                 select_fields.append("SUM(mi.input_tokens + mi.output_tokens) as total_tokens")
+            elif metric == "total_input_tokens":
+                select_fields.append("SUM(mi.input_tokens) as total_input_tokens")
+            elif metric == "total_output_tokens":
+                select_fields.append("SUM(mi.output_tokens) as total_output_tokens")
             elif metric == "avg_tokens":
                 select_fields.append("AVG(mi.input_tokens + mi.output_tokens) as avg_tokens")
             elif metric == "total_cost":
@@ -1887,7 +1940,11 @@ class ObservabilityMetricsService:
                     for f in (
                         ["model_id", "model_name"]
                         if group == "model"
-                        else [f"{group}_id" if group != "user" else "user_id"]
+                        else [
+                            "api_key_project_id"
+                            if group == "user_project"
+                            else (f"{group}_id" if group != "user" else "user_id")
+                        ]
                     )
                 ]
             )
@@ -1910,6 +1967,9 @@ class ObservabilityMetricsService:
                         field_idx += 1
                     elif group_by == "user":
                         group.user_id = row[field_idx]
+                        field_idx += 1
+                    elif group_by == "user_project":
+                        group.api_key_project_id = row[field_idx]
                         field_idx += 1
 
                 # Extract metrics
@@ -1978,6 +2038,9 @@ class ObservabilityMetricsService:
                 elif group == "endpoint":
                     group_by_fields.append("mid.endpoint_id")
                     select_fields.append("mid.endpoint_id")
+                elif group == "user_project":
+                    group_by_fields.append("mid.api_key_project_id")
+                    select_fields.append("mid.api_key_project_id")
 
         # Add metric calculations
         for metric in request.metrics:
@@ -2085,6 +2148,11 @@ class ObservabilityMetricsService:
                         group_info["endpoint_id"] = endpoint_id
                         group_key_parts.append(f"endpoint:{endpoint_id}")
                         field_idx += 1
+                    elif group == "user_project":
+                        api_key_project_id = row[field_idx]
+                        group_info["api_key_project_id"] = api_key_project_id
+                        group_key_parts.append(f"api_key_project:{api_key_project_id}")
+                        field_idx += 1
 
                 group_key = "|".join(group_key_parts)
 
@@ -2111,6 +2179,7 @@ class ObservabilityMetricsService:
                 group.model_name = group_info.get("model_name")
                 group.project_id = group_info.get("project_id")
                 group.endpoint_id = group_info.get("endpoint_id")
+                group.api_key_project_id = group_info.get("api_key_project_id")
 
             groups.append(group)
 
@@ -2182,12 +2251,24 @@ class ObservabilityMetricsService:
         if request.filters:
             for filter_key, filter_value in request.filters.items():
                 if filter_key == "project_id":
-                    where_conditions.append("ga.project_id = %(project_id)s")
-                    params["project_id"] = filter_value
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
                 elif filter_key == "api_key_project_id":
                     # Support filtering by api_key_project_id for CLIENT users
-                    where_conditions.append("ga.api_key_project_id = %(api_key_project_id)s")
-                    params["api_key_project_id"] = filter_value
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
                 elif filter_key == "country_code":
                     if isinstance(filter_value, list):
                         placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
@@ -2221,7 +2302,6 @@ class ObservabilityMetricsService:
         """
 
         params["limit"] = request.limit
-
         # Execute query
         results = await self.clickhouse_client.execute_query(query, params)
 
@@ -2229,13 +2309,13 @@ class ObservabilityMetricsService:
         total_query = f"""
         SELECT COUNT(*) as total_requests
         FROM GatewayAnalytics ga
+        LEFT JOIN ModelInferenceDetails mid ON ga.inference_id = mid.inference_id
         WHERE {" AND ".join(where_conditions)}
         """
         total_result = await self.clickhouse_client.execute_query(
             total_query, {k: v for k, v in params.items() if k != "limit"}
         )
         total_requests = total_result[0][0] if total_result else 0
-
         # Process results
         locations = []
         for row in results:
@@ -2458,6 +2538,9 @@ class ObservabilityMetricsService:
             # User info would need additional joins - for now use project as proxy
             group_columns.extend(["toString(mdi.project_id) as user_id"])
 
+        if "user_project" in request.group_by:
+            group_columns.extend(["toString(mdi.api_key_project_id) as api_key_project_id"])
+
         group_by_clause = ", ".join([col.split(" as ")[1] if " as " in col else col for col in group_columns])
         select_columns = ", ".join(group_columns)
 
@@ -2524,6 +2607,11 @@ class ObservabilityMetricsService:
                 group_key.append(f"user:{group_values['user_id']}")
                 col_idx += 1
 
+            if "user_project" in request.group_by:
+                group_values["api_key_project_id"] = row[col_idx]
+                group_key.append(f"user_project:{group_values['api_key_project_id']}")
+                col_idx += 1
+
             group_key_str = "|".join(group_key)
             bucket = row[col_idx]
             request_count = row[col_idx + 1]
@@ -2581,6 +2669,13 @@ class ObservabilityMetricsService:
                 group_obj.endpoint_name = group_vals["endpoint_name"]
             if "user_id" in group_vals:
                 group_obj.user_id = group_vals["user_id"]
+            if "api_key_project_id" in group_vals:
+                try:
+                    group_obj.api_key_project_id = (
+                        UUID(group_vals["api_key_project_id"]) if group_vals["api_key_project_id"] else None
+                    )
+                except (ValueError, TypeError):
+                    group_obj.api_key_project_id = None
 
             groups.append(group_obj)
 
@@ -2663,7 +2758,7 @@ class ObservabilityMetricsService:
             return f"{value:.0f}ms", "ms"
 
         # Token metrics
-        elif metric in ["total_tokens", "avg_tokens"]:
+        elif metric in ["total_tokens", "total_input_tokens", "total_output_tokens", "avg_tokens"]:
             if value >= 1_000_000:
                 return f"{value / 1_000_000:.1f}M", "tokens"
             elif value >= 1_000:
@@ -3054,3 +3149,247 @@ class ObservabilityMetricsService:
                 },
             )
             return response
+
+    async def get_metrics_sync(
+        self,
+        request: MetricsSyncRequest,
+    ) -> MetricsSyncResponse:
+        """Get unified metrics sync data for both credentials and users.
+
+        This method provides efficient sync capabilities by combining credential usage
+        and user usage data in a single call. It supports both incremental (recent activity)
+        and full sync modes.
+
+        Args:
+            request: Request containing sync mode and parameters
+
+        Returns:
+            MetricsSyncResponse with both credential and user usage data
+        """
+        self._ensure_initialized()
+
+        query_timestamp = datetime.now()
+        credential_usage = []
+        user_usage = []
+        stats = {"active_credentials": 0, "active_users": 0, "total_users_checked": 0}
+
+        try:
+            # 1. Get credential usage data if requested
+            if request.credential_sync:
+                credential_usage = await self._get_sync_credential_data(
+                    request.sync_mode, request.activity_threshold_minutes
+                )
+                stats["active_credentials"] = len(credential_usage)
+
+            # 2. Get user usage data if requested
+            if request.user_usage_sync:
+                user_usage = await self._get_sync_user_data(
+                    request.sync_mode, request.activity_threshold_minutes, request.user_ids
+                )
+                stats["active_users"] = len(user_usage)
+                # For stats, estimate total users checked based on mode
+                if request.sync_mode == "full":
+                    stats["total_users_checked"] = await self._get_total_users_count()
+                else:
+                    stats["total_users_checked"] = len(user_usage)
+
+            response = MetricsSyncResponse(
+                sync_mode=request.sync_mode,
+                activity_threshold_minutes=request.activity_threshold_minutes,
+                query_timestamp=query_timestamp,
+                credential_usage=credential_usage,
+                user_usage=user_usage,
+                stats=stats,
+            )
+
+            logger.info(
+                f"Metrics sync completed: mode={request.sync_mode}, credentials={len(credential_usage)}, users={len(user_usage)}"
+            )
+            return response
+
+        except Exception as e:
+            logger.error(f"Error in metrics sync: {e}")
+            # Return empty response on error
+            return MetricsSyncResponse(
+                sync_mode=request.sync_mode,
+                activity_threshold_minutes=request.activity_threshold_minutes,
+                query_timestamp=query_timestamp,
+                credential_usage=[],
+                user_usage=[],
+                stats={"active_credentials": 0, "active_users": 0, "total_users_checked": 0},
+            )
+
+    async def _get_sync_credential_data(self, sync_mode: str, threshold_minutes: int) -> list[CredentialUsageItem]:
+        """Get credential usage data for sync based on mode."""
+        try:
+            # Base query for credential usage
+            query = """
+            SELECT
+                api_key_id as credential_id,
+                MAX(request_arrival_time) as last_used_at,
+                COUNT(*) as request_count
+            FROM ModelInferenceDetails
+            WHERE api_key_id IS NOT NULL
+            """
+
+            params = {}
+
+            if sync_mode == "incremental":
+                # Only credentials used within threshold
+                since_time = datetime.now() - timedelta(minutes=threshold_minutes)
+                query += " AND request_arrival_time >= %(since)s"
+                params["since"] = since_time
+
+            query += """
+            GROUP BY api_key_id
+            ORDER BY last_used_at DESC
+            """
+
+            results = await self.clickhouse_client.execute_query(query, params)
+
+            credentials = []
+            for row in results:
+                # Handle both UUID objects and strings from ClickHouse
+                cred_id = row[0]
+                if isinstance(cred_id, str):
+                    cred_id = UUID(cred_id)
+                elif not isinstance(cred_id, UUID):
+                    cred_id = UUID(str(cred_id))
+
+                credentials.append(
+                    CredentialUsageItem(
+                        credential_id=cred_id,
+                        last_used_at=row[1],
+                        request_count=row[2],
+                    )
+                )
+
+            return credentials
+
+        except Exception as e:
+            logger.error(f"Error getting sync credential data: {e}")
+            return []
+
+    async def _get_sync_user_data(
+        self, sync_mode: str, threshold_minutes: int, user_ids: Optional[list[UUID]] = None
+    ) -> list[UserUsageItem]:
+        """Get user usage data for sync based on mode."""
+        try:
+            from datetime import datetime, timezone
+
+            logger.info(f"_get_sync_user_data called: mode={sync_mode}, user_ids={len(user_ids) if user_ids else 0}")
+            # Base query for user usage - need to join with ModelInference for token data
+            query = """
+            SELECT
+                mid.user_id,
+                MAX(mid.request_arrival_time) as last_activity_at,
+                SUM(COALESCE(mi.input_tokens, 0) + COALESCE(mi.output_tokens, 0)) as total_tokens,
+                SUM(COALESCE(mid.cost, 0)) as total_cost,
+                COUNT(*) as request_count,
+                AVG(CASE WHEN mid.is_success THEN 1 ELSE 0 END) as success_rate
+            FROM ModelInferenceDetails mid
+            LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+            WHERE mid.user_id IS NOT NULL
+            """
+
+            params = {}
+
+            if sync_mode == "incremental":
+                # Only users with activity within threshold
+                since_time = datetime.now() - timedelta(minutes=threshold_minutes)
+                query += " AND mid.request_arrival_time >= %(since)s"
+                params["since"] = since_time
+            # For full sync, get ALL users with any activity (no time filter, no user filter)
+
+            query += """
+            GROUP BY mid.user_id
+            ORDER BY last_activity_at DESC
+            """
+
+            results = await self.clickhouse_client.execute_query(query, params)
+            logger.info(f"ClickHouse query returned {len(results)} rows")
+
+            users = []
+            found_user_ids = set()
+
+            for row in results:
+                # Handle both UUID objects and strings from ClickHouse
+                user_id = row[0]
+                if isinstance(user_id, str):
+                    user_id = UUID(user_id)
+                elif not isinstance(user_id, UUID):
+                    user_id = UUID(str(user_id))
+
+                found_user_ids.add(user_id)
+
+                usage_data = {
+                    "total_tokens": int(row[2]) if row[2] else 0,
+                    "total_cost": float(row[3]) if row[3] else 0.0,
+                    "request_count": int(row[4]) if row[4] else 0,
+                    "success_rate": float(row[5]) if row[5] else 0.0,
+                }
+
+                users.append(
+                    UserUsageItem(
+                        user_id=user_id,
+                        last_activity_at=row[1],
+                        usage_data=usage_data,
+                    )
+                )
+
+            # For full sync, include all users with active billing records (even if no activity)
+            if sync_mode == "full":
+                # Import the Dapr service function
+                from budmetrics.shared.dapr_service import get_users_with_active_billing
+
+                # Get users with active billing from budapp
+                billing_user_ids = await get_users_with_active_billing()
+                logger.info(
+                    f"Full sync: found {len(found_user_ids)} users with activity, {len(billing_user_ids)} users with active billing"
+                )
+
+                # Combine specific user_ids (if provided) with billing users
+                users_to_add = set(billing_user_ids)
+                if user_ids:
+                    users_to_add.update(user_ids)
+
+                no_activity_count = 0
+                for user_id in users_to_add:
+                    if user_id not in found_user_ids:
+                        # Create entry for users with no activity but who have billing records
+                        users.append(
+                            UserUsageItem(
+                                user_id=user_id,
+                                last_activity_at=datetime.now(
+                                    timezone.utc
+                                ),  # Use current time for users with no activity
+                                usage_data={
+                                    "total_tokens": 0,
+                                    "total_cost": 0.0,
+                                    "request_count": 0,
+                                    "success_rate": 0.0,
+                                },
+                            )
+                        )
+                        no_activity_count += 1
+
+                logger.info(
+                    f"Added {no_activity_count} users with no activity to sync data "
+                    f"({len(billing_user_ids)} with billing, {len(user_ids) if user_ids else 0} admin users)"
+                )
+
+            return users
+
+        except Exception as e:
+            logger.error(f"Error getting sync user data: {e}")
+            return []
+
+    async def _get_total_users_count(self) -> int:
+        """Get total count of users with activity for stats."""
+        try:
+            query = "SELECT COUNT(DISTINCT user_id) FROM ModelInferenceDetails WHERE user_id IS NOT NULL"
+            result = await self.clickhouse_client.execute_query(query, {})
+            return result[0][0] if result else 0
+        except Exception as e:
+            logger.error(f"Error getting total users count: {e}")
+            return 0

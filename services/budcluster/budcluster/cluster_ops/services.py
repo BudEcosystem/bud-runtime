@@ -1172,7 +1172,9 @@ class ClusterOpsService:
             all_cluster_info = json.loads(response.data) if response.data else []
             filtered_cluster_info = [info for info in all_cluster_info if info["id"] != cluster_id]
             filtered_cluster_info.append(data)
-            dapr_service.save_to_statestore(key=key, value=json.dumps(filtered_cluster_info))
+            dapr_service.save_to_statestore(
+                store_name=app_settings.statestore_name, key=key, value=json.dumps(filtered_cluster_info)
+            )
 
     @classmethod
     async def delete_node_info_from_statestore(cls, cluster_id: str):
@@ -1182,7 +1184,9 @@ class ClusterOpsService:
             response = dapr_service.get_state(store_name=app_settings.statestore_name, key=key)
             all_cluster_info = json.loads(response.data) if response.data else []
             filtered_cluster_info = [info for info in all_cluster_info if info["id"] != cluster_id]
-            dapr_service.save_to_statestore(key=key, value=json.dumps(filtered_cluster_info))
+            dapr_service.save_to_statestore(
+                store_name=app_settings.statestore_name, key=key, value=json.dumps(filtered_cluster_info)
+            )
 
     @classmethod
     def cancel_cluster_registration(cls, workflow_id: UUID) -> Union[SuccessResponse, ErrorResponse]:

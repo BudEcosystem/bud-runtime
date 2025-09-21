@@ -1,8 +1,12 @@
-
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import { Text_12_400_757575, Text_12_400_EEEEEE, Text_12_600_EEEEEE, Text_14_400_EEEEEE } from "@/components/ui/text";
+import {
+  Text_12_400_757575,
+  Text_12_400_EEEEEE,
+  Text_12_600_EEEEEE,
+  Text_14_400_EEEEEE,
+} from "@/components/ui/text";
 import React, { useEffect, useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useProprietaryCredentials } from "src/stores/useProprietaryCredentials";
@@ -23,115 +27,140 @@ const defaultFilter = {
   email: "",
   role: "",
   status: "",
-}
+};
 
 export default function ViewUser() {
-  const { isLoading} = useLoader();
+  const { isLoading } = useLoader();
   const { openDrawerWithStep } = useDrawer();
   const [showConfirm, setShowConfirm] = useState(false);
   const { refresh } = useProprietaryCredentials();
   const { closeDrawer } = useDrawer();
   const [disabled, setDisabled] = useState(false);
-  const {  userDetails, userPermissions, deleteUser } = useUsers();
+  const { userDetails, userPermissions, deleteUser } = useUsers();
   const { globalProjects, getGlobalProjects } = useProjects();
   const [projectList, setProjectList] = useState<any>([]);
 
   // for pagination
-  const [currentUserDetails, setCurrentUserDetails] = useState<{ id?: string; name?: string; email?: string; role?: string; status?: string }>({});
+  const [currentUserDetails, setCurrentUserDetails] = useState<{
+    id?: string;
+    name?: string;
+    email?: string;
+    role?: string;
+    status?: string;
+  }>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
   const totalItems = 100;
-  const [filter, setFilter] = useState<
-    {
-      name?: string;
-      email?: string;
-      role?: string;
-      status?: string;
-    }
-  >(defaultFilter);
+  const [filter, setFilter] = useState<{
+    name?: string;
+    email?: string;
+    role?: string;
+    status?: string;
+  }>(defaultFilter);
 
   useEffect(() => {
     setCurrentUserDetails(userDetails);
   }, [userDetails]);
 
   useEffect(() => {
-    getGlobalProjects(1, 1000)
+    getGlobalProjects(1, 1000);
   }, []);
 
-
-
   useEffect(() => {
-    let prjt = globalProjects?.map(item => {
+    let prjt = globalProjects?.map((item) => {
       // const matchingPermissions = userPermissions.project_scopes.length && userPermissions.project_scopes?.find(p => {
       //   console.log(p)
       //   p.id === item.project.id;
       // });
-      const matchingPermissions = userPermissions?.project_scopes?.find(p => p.id === item.project.id);
+      const matchingPermissions = userPermissions?.project_scopes?.find(
+        (p) => p.id === item.project.id,
+      );
 
       return {
         ...item,
-        permissions: matchingPermissions ? matchingPermissions.permissions : []
+        permissions: matchingPermissions ? matchingPermissions.permissions : [],
       };
-    })
-    setProjectList(prjt)
+    });
+    setProjectList(prjt);
   }, [userPermissions]);
 
-
   const tagsData = [
-    { name: 'user@gmail.com', color: '#D1B854' },
-    { name: 'Developer', color: '#D1B854' },
-    { name: 'Active', color: '#3EC564' }
-  ]
+    { name: "user@gmail.com", color: "#D1B854" },
+    { name: "Developer", color: "#D1B854" },
+    { name: "Active", color: "#3EC564" },
+  ];
 
-  const firstLineText = `Are you sure you want to delete this user?`
-  const secondLineText = `You are about to delete ${currentUserDetails?.['name']}`
+  const firstLineText = `Are you sure you want to delete this user?`;
+  const secondLineText = `You are about to delete ${currentUserDetails?.["name"]}`;
 
   const primaryTableData = [
     {
-      name: 'Model',
-      view: userPermissions?.global_scopes?.find(scope => scope.name === 'model:view')?.has_permission,
-      manage: userPermissions?.global_scopes?.find(scope => scope.name === 'model:manage')?.has_permission
+      name: "Model",
+      view: userPermissions?.global_scopes?.find(
+        (scope) => scope.name === "model:view",
+      )?.has_permission,
+      manage: userPermissions?.global_scopes?.find(
+        (scope) => scope.name === "model:manage",
+      )?.has_permission,
     },
     {
-      name: 'Cluster',
-      view: userPermissions?.global_scopes?.find(scope => scope.name === 'cluster:view')?.has_permission,
-      manage: userPermissions?.global_scopes?.find(scope => scope.name === 'cluster:manage')?.has_permission
+      name: "Cluster",
+      view: userPermissions?.global_scopes?.find(
+        (scope) => scope.name === "cluster:view",
+      )?.has_permission,
+      manage: userPermissions?.global_scopes?.find(
+        (scope) => scope.name === "cluster:manage",
+      )?.has_permission,
     },
     {
-      name: 'User',
-      view: userPermissions?.global_scopes?.find(scope => scope.name === 'user:view')?.has_permission,
-      manage: userPermissions?.global_scopes?.find(scope => scope.name === 'user:manage')?.has_permission,
-    },
-     {
-      name: 'Benchmarks',
-      view: userPermissions?.global_scopes?.find(scope => scope.name === 'benchmark:view')?.has_permission,
-      manage: userPermissions?.global_scopes?.find(scope => scope.name === 'benchmark:manage')?.has_permission
+      name: "User",
+      view: userPermissions?.global_scopes?.find(
+        (scope) => scope.name === "user:view",
+      )?.has_permission,
+      manage: userPermissions?.global_scopes?.find(
+        (scope) => scope.name === "user:manage",
+      )?.has_permission,
     },
     {
-      name: 'Projects',
-      view: userPermissions?.global_scopes?.find(scope => scope.name === 'project:view')?.has_permission,
-      manage: userPermissions?.global_scopes?.find(scope => scope.name === 'project:manage')?.has_permission
-    }
-  ]
+      name: "Benchmarks",
+      view: userPermissions?.global_scopes?.find(
+        (scope) => scope.name === "benchmark:view",
+      )?.has_permission,
+      manage: userPermissions?.global_scopes?.find(
+        (scope) => scope.name === "benchmark:manage",
+      )?.has_permission,
+    },
+    {
+      name: "Projects",
+      view: userPermissions?.global_scopes?.find(
+        (scope) => scope.name === "project:view",
+      )?.has_permission,
+      manage: userPermissions?.global_scopes?.find(
+        (scope) => scope.name === "project:manage",
+      )?.has_permission,
+    },
+  ];
 
   const expandData = [
-    { name: 'Project 1' },
-    { name: 'Project 2' },
-    { name: 'Project 3' }
-  ]
+    { name: "Project 1" },
+    { name: "Project 2" },
+    { name: "Project 3" },
+  ];
 
   const ExpandableTable = ({ data }: { data?: any }) => {
     const [expandedRow, setExpandedRow] = useState<boolean>(false);
-    const [checkedState, setCheckedState] = useState<{ [key: number]: boolean }>({});
+    const [checkedState, setCheckedState] = useState<{
+      [key: number]: boolean;
+    }>({});
 
     const showDetail = (index: number) => {
       setExpandedRow(!expandedRow); // Toggle the row
     };
 
     const handleCheckboxChange = (index: any) => {
-      setCheckedState(prev => ({
+      setCheckedState((prev) => ({
         ...prev,
-        [index]: !prev[index] // Toggle the checkbox state for the row
+        [index]: !prev[index], // Toggle the checkbox state for the row
       }));
     };
 
@@ -154,8 +183,9 @@ export default function ViewUser() {
               <div className="flex items-center px-[.75rem]">
                 <div className="min-h-[2.75rem] pt-[0.788rem] min-w-[60%] flex items-start">
                   <Text_12_600_EEEEEE>{item.name}</Text_12_600_EEEEEE>
-                  {item.name == 'Projects' && (
-                    <div className="ml-[.5rem]"
+                  {item.name == "Projects" && (
+                    <div
+                      className="ml-[.5rem]"
                       onClick={(event) => {
                         event.stopPropagation();
                         showDetail(index);
@@ -165,13 +195,13 @@ export default function ViewUser() {
                         src="/images/drawer/ChevronUp.png"
                         preview={false}
                         alt="info"
-                        style={{ width: '1rem', height: '1rem' }}
-                        className={`origin-center transform transition-transform duration-300 ${expandedRow ? "rotate-0" : "rotate-180"
-                          }`}
+                        style={{ width: "1rem", height: "1rem" }}
+                        className={`origin-center transform transition-transform duration-300 ${
+                          expandedRow ? "rotate-0" : "rotate-180"
+                        }`}
                       />
                     </div>
                   )}
-
                 </div>
                 <div className="min-h-[2.75rem] pt-[0.788rem] min-w-[16.5%]">
                   <Checkbox
@@ -187,11 +217,11 @@ export default function ViewUser() {
                     checked={item.manage}
                     className="AntCheckbox greayCheck text-[#757575] w-[0.875rem] h-[0.875rem] text-[0.875rem]"
                     disabled={disabled}
-                    onChange={() => handleCheckboxChange(index + 'x')}
+                    onChange={() => handleCheckboxChange(index + "x")}
                   />
                 </div>
               </div>
-              {item.name == 'Projects' && (
+              {item.name == "Projects" && (
                 <div className={`${expandedRow ? "block" : "hidden"}`}>
                   <SecondTable />
                 </div>
@@ -200,15 +230,17 @@ export default function ViewUser() {
           ))}
         </div>
       </div>
-    )
-  }
+    );
+  };
 
   const SecondTable = ({ data }: { data?: any }) => {
-    const [checkedState, setCheckedState] = useState<{ [key: number]: boolean }>({});
+    const [checkedState, setCheckedState] = useState<{
+      [key: number]: boolean;
+    }>({});
     const handleCheckboxChange = (index: any) => {
-      setCheckedState(prev => ({
+      setCheckedState((prev) => ({
         ...prev,
-        [index]: !prev[index] // Toggle the checkbox state for the row
+        [index]: !prev[index], // Toggle the checkbox state for the row
       }));
     };
     return (
@@ -234,48 +266,44 @@ export default function ViewUser() {
                     checked={item.permissions[1]?.has_permission || false}
                     className="AntCheckbox greayCheck text-[#757575] w-[0.875rem] h-[0.875rem] text-[0.875rem]"
                     disabled={disabled}
-                    onChange={() => handleCheckboxChange(index + 'x')}
+                    onChange={() => handleCheckboxChange(index + "x")}
                   />
                 </div>
               </div>
-
             </div>
           ))}
         </div>
       </div>
-    )
-  }
-
+    );
+  };
 
   return (
-    <BudForm
-      data={{
-      }}
-      drawerLoading={isLoading}
-    >
+    <BudForm data={{}} drawerLoading={isLoading}>
       <BudWraperBox classNames="mt-[2.2rem]">
-        {showConfirm && <BudDrawerLayout>
-          <BudStepAlert
-            type="warining"
-            title={firstLineText}
-            description={secondLineText}
-            confirmText='Delete User'
-            cancelText='Cancel'
-            confirmAction={async () => {
-              const result = await deleteUser(currentUserDetails?.id)
-              if (result) {
-                successToast('User deleted successfully')
-                await refresh()
-                closeDrawer()
-              }
-              setShowConfirm(false)
-              closeDrawer();
-            }}
-            cancelAction={() => {
-              setShowConfirm(false)
-            }}
-          />
-        </BudDrawerLayout>}
+        {showConfirm && (
+          <BudDrawerLayout>
+            <BudStepAlert
+              type="warining"
+              title={firstLineText}
+              description={secondLineText}
+              confirmText="Delete User"
+              cancelText="Cancel"
+              confirmAction={async () => {
+                const result = await deleteUser(currentUserDetails?.id);
+                if (result) {
+                  successToast("User deleted successfully");
+                  await refresh();
+                  closeDrawer();
+                }
+                setShowConfirm(false);
+                closeDrawer();
+              }}
+              cancelAction={() => {
+                setShowConfirm(false);
+              }}
+            />
+          </BudDrawerLayout>
+        )}
         <BudDrawerLayout>
           <div className="flex flex-col items-start justify-start w-full px-[1.4rem] py-[1.05rem] pb-[1.4rem] border-b-[.5px] border-b-[#1F1F1F]">
             <div className="w-full flex justify-between items-start ">
@@ -291,39 +319,35 @@ export default function ViewUser() {
                         preview={false}
                         src="/images/drawer/threeDots.png"
                         alt="info"
-                        style={{ width: '0.1125rem', height: '.6rem' }}
+                        style={{ width: "0.1125rem", height: ".6rem" }}
                       />
                     </div>
                   }
-                  items={
-                    [
-                      {
-                        key: '1',
-                        label: (
-                          <Text_12_400_EEEEEE>Edit</Text_12_400_EEEEEE>
-                        ),
-                        onClick: () => openDrawerWithStep('edit-user')
+                  items={[
+                    {
+                      key: "1",
+                      label: <Text_12_400_EEEEEE>Edit</Text_12_400_EEEEEE>,
+                      onClick: () => openDrawerWithStep("edit-user"),
+                    },
+                    {
+                      key: "1",
+                      label: <Text_12_400_EEEEEE>Delete</Text_12_400_EEEEEE>,
+                      onClick: () => {
+                        setShowConfirm(true);
                       },
-                      {
-                        key: '1',
-                        label: (
-                          <Text_12_400_EEEEEE>Delete</Text_12_400_EEEEEE>
-                        ),
-                        onClick: () => {
-                          setShowConfirm(true)
-                        }
+                    },
+                    {
+                      key: "3",
+                      label: (
+                        <Text_12_400_EEEEEE className="text-nowrap">
+                          Reset Password
+                        </Text_12_400_EEEEEE>
+                      ),
+                      onClick: () => {
+                        openDrawerWithStep("reset-password");
                       },
-                      {
-                        key: '3',
-                        label: (
-                          <Text_12_400_EEEEEE className="text-nowrap">Reset Password</Text_12_400_EEEEEE>
-                        ),
-                        onClick: () => {
-                          openDrawerWithStep('reset-password')
-                        }
-                      },
-                    ]
-                  }
+                    },
+                  ]}
                 />
               </div>
             </div>
@@ -331,15 +355,31 @@ export default function ViewUser() {
               {/* {tagsData.map((item, index) => (
                 <Tags key={index} name={item.name} color={item.color} classNames="py-[.3rem]" />
               ))} */}
-              <Tags name={currentUserDetails?.email} color="#D1B854" classNames="py-[.3rem]" />
-              <Tags name={capitalize(currentUserDetails?.role)} color="#D1B854" classNames="py-[.3rem]" />
-              <Tags name={capitalize(currentUserDetails?.status)} color={endpointStatusMapping[capitalize(currentUserDetails?.status)]} classNames="py-[.3rem]" />
+              <Tags
+                name={currentUserDetails?.email}
+                color="#D1B854"
+                classNames="py-[.3rem]"
+              />
+              <Tags
+                name={capitalize(currentUserDetails?.role)}
+                color="#D1B854"
+                classNames="py-[.3rem]"
+              />
+              <Tags
+                name={capitalize(currentUserDetails?.status)}
+                color={
+                  endpointStatusMapping[capitalize(currentUserDetails?.status)]
+                }
+                classNames="py-[.3rem]"
+              />
             </div>
           </div>
           <div className="px-[1.45rem]">
-            <div className='flex flex-col justify-start items-start  py-[.6rem] gap-[.25rem]'>
+            <div className="flex flex-col justify-start items-start  py-[.6rem] gap-[.25rem]">
               <Text_14_400_EEEEEE>Permissions</Text_14_400_EEEEEE>
-              <Text_12_400_757575>Selected user permissions for each module</Text_12_400_757575>
+              <Text_12_400_757575>
+                Selected user permissions for each module
+              </Text_12_400_757575>
             </div>
             <div className="pb-[1.6rem]">
               <ExpandableTable />

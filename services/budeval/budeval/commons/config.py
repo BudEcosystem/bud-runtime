@@ -53,7 +53,7 @@ class AppConfig(BaseAppConfig):
     )
     eval_sync_interval_seconds: int = Field(default=3600, alias="EVAL_SYNC_INTERVAL_SECONDS")
     eval_sync_use_bundles: bool = Field(default=False, alias="EVAL_SYNC_USE_BUNDLES")
-    eval_datasets_path: str = Field(default="bud-dev-budeval-dataset-rwx", alias="EVAL_DATASETS_PATH")
+    eval_datasets_path: str = Field(default="bud-dev-budeval-dataset", alias="EVAL_DATASETS_PATH")
 
     # ClickHouse Configuration (moved from SecretsConfig)
     clickhouse_host: str = Field(default="okb80nfy88.ap-southeast-1.aws.clickhouse.cloud", alias="CLICKHOUSE_HOST")

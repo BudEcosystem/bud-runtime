@@ -219,15 +219,28 @@ class ProjectService(SessionMixin):
             raise ClientException("Project type cannot be modified")
 
         if "name" in data:
-            duplicate_project = await ProjectDataManager(self.session).retrieve_by_fields(
-                model=ProjectModel,
-                fields={"name": data["name"], "status": ProjectStatusEnum.ACTIVE},
-                exclude_fields={"id": project_id},
-                missing_ok=True,
-                case_sensitive=False,
-            )
-            if duplicate_project:
-                raise ClientException("Project name already exists")
+            # Apply same project type logic as create method
+            if db_project.project_type == ProjectTypeEnum.CLIENT_APP.value:
+                # For CLIENT_APP projects, check only within user's associated projects
+                if await ProjectDataManager(self.session).check_duplicate_name_for_user_projects(
+                    data["name"], current_user_id, db_project.project_type, exclude_project_id=project_id
+                ):
+                    raise ClientException("Project name already exists")
+            else:
+                # For ADMIN_APP projects, check globally across all projects with same type
+                duplicate_project = await ProjectDataManager(self.session).retrieve_by_fields(
+                    model=ProjectModel,
+                    fields={
+                        "name": data["name"],
+                        "project_type": db_project.project_type,
+                        "status": ProjectStatusEnum.ACTIVE,
+                    },
+                    exclude_fields={"id": project_id},
+                    missing_ok=True,
+                    case_sensitive=False,
+                )
+                if duplicate_project:
+                    raise ClientException("Project name already exists")
 
         db_project = await ProjectDataManager(self.session).update_by_fields(db_project, data)
 
@@ -380,6 +393,13 @@ class ProjectService(SessionMixin):
             if len(user_ids) != len(db_users):
                 raise ClientException("Found non active users in request")
 
+            # Validate user type and project type compatibility
+            for db_user in db_users:
+                # CLIENT users can only be associated with CLIENT_APP projects
+                if db_user.user_type == UserTypeEnum.CLIENT and db_project.project_type == ProjectTypeEnum.ADMIN_APP:
+                    raise ClientException(f"Client user '{db_user.email}' cannot be added to admin project")
+                # ADMIN users can be associated with both types - no validation needed
+
             for db_user in db_users:
                 # Add user to project instance
                 db_project.users.append(db_user)
@@ -418,6 +438,13 @@ class ProjectService(SessionMixin):
 
         # Handle non budserve users
         if emails:
+            # Determine user type based on project type
+            # For ADMIN_APP projects, create users as ADMIN type
+            # For CLIENT_APP projects, create users as CLIENT type
+            new_user_type = (
+                UserTypeEnum.ADMIN if db_project.project_type == ProjectTypeEnum.ADMIN_APP else UserTypeEnum.CLIENT
+            )
+
             # User name, role will be static
             user_name = "Bud User"
             user_role = UserRoleEnum.DEVELOPER
@@ -429,7 +456,10 @@ class ProjectService(SessionMixin):
                 password = generate_valid_password()
 
                 # NOTE: New user created with help of auth service, it will handle different scenarios like notification, permission, etc.
-                user_data = UserCreate(name=user_name, email=new_email, password=password, role=user_role)
+                # User type is set based on the project type
+                user_data = UserCreate(
+                    name=user_name, email=new_email, password=password, role=user_role, user_type=new_user_type
+                )
                 db_user = await AuthService(self.session).register_user(user_data)
 
                 # Add user to project

@@ -36,6 +36,7 @@ export default function EditProject() {
   const { closeDrawer, openDrawerWithStep } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
   const [options, setOptions] = useState<{ name: string; color: string }[]>([]);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const fetchList = useCallback(() => {
     const data =
@@ -48,7 +49,8 @@ export default function EditProject() {
   }, [projectTags]);
 
   // Get the current project data
-  const currentProject: any = globalSelectedProject?.project || globalSelectedProject;
+  const currentProject: any =
+    globalSelectedProject?.project || globalSelectedProject;
 
   useEffect(() => {
     getProjectTags();
@@ -64,7 +66,7 @@ export default function EditProject() {
       const existingTags = currentProject.tags
         ? currentProject.tags.map((tag: any) => {
             // Handle both string and object tag formats
-            if (typeof tag === 'string') {
+            if (typeof tag === "string") {
               return { name: tag, color: "#89C0F2" };
             }
             return {
@@ -117,7 +119,7 @@ export default function EditProject() {
   const existingTags = currentProject?.tags
     ? currentProject.tags.map((tag: any) => {
         // Handle both string and object tag formats
-        if (typeof tag === 'string') {
+        if (typeof tag === "string") {
           return { name: tag, color: "#89C0F2" };
         }
         return {
@@ -138,6 +140,11 @@ export default function EditProject() {
       onNext={(values) => {
         if (!submittable) {
           form.submit();
+          return;
+        }
+
+        // Prevent multiple submissions
+        if (isUpdating) {
           return;
         }
 
@@ -176,6 +183,9 @@ export default function EditProject() {
           icon: values.icon || "😍",
         };
 
+        // Set loading state to true before API call
+        setIsUpdating(true);
+
         apiUpdateProject(currentProject.id, projectData)
           .then((result) => {
             if (result) {
@@ -189,9 +199,14 @@ export default function EditProject() {
           })
           .catch((error) => {
             console.error("Error updating project:", error);
+          })
+          .finally(() => {
+            // Reset loading state after API call completes
+            setIsUpdating(false);
           });
       }}
       nextText="Update Project"
+      drawerLoading={isUpdating}
     >
       <BudWraperBox center>
         <BudDrawerLayout>

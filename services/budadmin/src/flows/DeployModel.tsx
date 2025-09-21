@@ -17,27 +17,39 @@ export default function DeployModel() {
   const [limit, setLimit] = React.useState(1000);
   const [models, setModels] = React.useState([]);
 
-  const {
-    loading,
-    fetchModels
-  } = useModels();
+  const { loading, fetchModels } = useModels();
   const [search, setSearch] = React.useState("");
   const { selectedProjectId } = useProjects();
-  const { selectedModel, currentWorkflow, createWorkflow, updateModel, setSelectedModel, cancelModelDeployment } = useDeployModel();
-  const { openDrawerWithStep, openDrawer, setPreviousStep, currentFlow, step } = useDrawer();
+  const {
+    selectedModel,
+    currentWorkflow,
+    createWorkflow,
+    updateModel,
+    setSelectedModel,
+    cancelModelDeployment,
+  } = useDeployModel();
+  const { openDrawerWithStep, openDrawer, setPreviousStep, currentFlow, step } =
+    useDrawer();
   const router = useRouter();
   const projectId = router.query.projectId as string;
   useEffect(() => {
     fetchModels({
-      page, limit,
-      table_source: "model"
+      page,
+      limit,
+      table_source: "model",
     }).then((data) => {
       setModels(data);
     });
   }, [page]);
 
   const filteredModels = models?.filter((model) => {
-    return model.name?.toLowerCase().includes(search.toLowerCase()) || model.tags?.some((task) => task?.name?.toLowerCase().includes(search.toLowerCase())) || `${model.model_size}`.includes(search.toLowerCase());
+    return (
+      model.name?.toLowerCase().includes(search.toLowerCase()) ||
+      model.tags?.some((task) =>
+        task?.name?.toLowerCase().includes(search.toLowerCase()),
+      ) ||
+      `${model.model_size}`.includes(search.toLowerCase())
+    );
   });
 
   return (
@@ -64,7 +76,6 @@ export default function DeployModel() {
       }}
       nextText="Next"
     >
-
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
@@ -85,7 +96,7 @@ export default function DeployModel() {
                 cancelModelDeployment(currentWorkflow?.workflow_id, projectId);
                 setSelectedModel(null);
                 setPreviousStep(step.id as StepComponentsType);
-                openDrawer("add-model")
+                openDrawer("add-model");
               }}
             />
           </DeployModelSelect>

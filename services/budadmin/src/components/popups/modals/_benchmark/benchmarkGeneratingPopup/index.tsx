@@ -1,7 +1,7 @@
-import React from 'react';
-import { Dialog, Button, Flex, Box } from '@radix-ui/themes';
-import { Cross1Icon, UpdateIcon } from '@radix-ui/react-icons';
-import { Text_12_400_787B83, Text_16_600_FFFFFF } from '@/components/ui/text';
+import React from "react";
+import { Dialog, Button, Flex, Box } from "@radix-ui/themes";
+import { Cross1Icon, UpdateIcon } from "@radix-ui/react-icons";
+import { Text_12_400_787B83, Text_16_600_FFFFFF } from "@/components/ui/text";
 
 interface BenchmarkGeneratingProps {
   isOpen: boolean;

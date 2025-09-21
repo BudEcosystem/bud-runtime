@@ -67,10 +67,11 @@ SETTINGS index_granularity = 8192;
 
 -- Materialized view for model performance trends
 -- Pre-aggregates common analytical queries for instant results
+-- Note: POPULATE removed to avoid expensive rebuilds on every startup
+-- Historical data is handled by migration 004_optimize_materialized_view.sql
 CREATE MATERIALIZED VIEW IF NOT EXISTS budeval.model_performance_trends
 ENGINE = AggregatingMergeTree()
 ORDER BY (model_name, dataset_name, eval_date)
-POPULATE  -- Populate with existing data
 AS SELECT
     model_name,
     dataset_name,

@@ -44,6 +44,7 @@ from budapp.commons.constants import (
     ModelProviderTypeEnum,
     ModelSecurityScanStatusEnum,
     ModelStatusEnum,
+    ProviderCapabilityEnum,
     WorkflowStatusEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag, Task
@@ -60,6 +61,7 @@ class ProviderFilter(BaseModel):
     """Provider filter schema."""
 
     name: str | None = None
+    capabilities: ProviderCapabilityEnum | None = None
 
 
 class ProviderCreate(BaseModel):
@@ -69,6 +71,7 @@ class ProviderCreate(BaseModel):
     description: str
     type: str
     icon: str
+    capabilities: list[ProviderCapabilityEnum]
     is_active: bool = True
 
 
@@ -82,6 +85,7 @@ class Provider(BaseModel):
     description: str
     type: str
     icon: str
+    capabilities: list[ProviderCapabilityEnum]
 
 
 class ProviderResponse(PaginatedSuccessResponse):
@@ -700,6 +704,7 @@ class ModelFilter(BaseModel):
     table_source: Literal["cloud_model", "model"] = "cloud_model"
     base_model: str | None = None
     base_model_relation: BaseModelRelationEnum | None = None
+    supported_endpoints: List[ModelEndpointEnum] | None = None
 
     # @field_validator("source")
     # @classmethod
@@ -1135,6 +1140,7 @@ class ModelDeploymentRequest(BaseModel):
     endpoint_name: str
     hf_token: str | None = None
     model: str
+    model_size: Optional[int] = None
     target_ttft: Optional[int] = None
     target_e2e_latency: Optional[int] = None
     target_throughput_per_user: Optional[int] = None

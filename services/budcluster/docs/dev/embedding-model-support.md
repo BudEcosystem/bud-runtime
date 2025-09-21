@@ -83,7 +83,7 @@ if self.model_type == "embedding":
 **File**: `deploy/Dockerfile`
 - Updated llm-benchmark version from v1.0.0 to v1.1.0 (includes budlatent tool)
 
-**File**: `budcluster/charts/bud_runtime_container/templates/_cuda.tpl`
+**File**: `budcluster/charts/bud_runtime_container/templates/_cuda.yaml`
 - Increased liveness probe `failureThreshold` to 20 (better tolerance for slow model loading)
 
 **File**: `budcluster/deployment/handler.py`

@@ -19,6 +19,8 @@ import ThemeSwitcher from "@/components/ui/ThemeSwitcher";
 import { useTheme } from "@/context/themeContext";
 import { useUser } from "@/stores/useUser";
 import BudIsland from "@/components/island/BudIsland";
+import { useOverlay } from "@/context/overlayContext";
+import pkg from "@novu/notification-center/package.json";
 
 const { Text } = Typography;
 
@@ -75,6 +77,7 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const pathname = usePathname();
   const router = useRouter();
   const { effectiveTheme } = useTheme();
+  const { isVisible } = useOverlay();
   const [isHovered, setIsHovered] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -96,47 +99,47 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       iconWhite: "/icons/playIcn.png",
       shortcut: "1",
     },
-    {
-      label: "Batches",
-      route: "/batches",
-      icon: "/icons/batchesDark.png",
-      iconWhite: "/icons/batchesLight.png",
-      shortcut: "2",
-    },
+    // {
+    //   label: "Batches",
+    //   route: "/batches",
+    //   icon: "/icons/batchesDark.png",
+    //   iconWhite: "/icons/batchesLight.png",
+    //   shortcut: "2",
+    // },
     {
       label: "Logs",
       route: "/logs",
       icon: "/icons/logsDark.png",
       iconWhite: "/icons/logsLight.png",
-      shortcut: "3",
+      shortcut: "2",
     },
     {
       label: "Usage & Billing",
       route: "/usage",
       icon: "/icons/billingDark.png",
       iconWhite: "/icons/billingWhite.png",
-      shortcut: "4",
+      shortcut: "3",
     },
     {
       label: "Audit",
       route: "/audit",
       icon: "/icons/auditDark.png", // Using logs icon as fallback
       iconWhite: "/icons/auditLight.png",
-      shortcut: "5",
+      shortcut: "4",
     },
     {
       label: "API Keys",
       route: "/api-keys",
       icon: "/icons/key.png",
       iconWhite: "/icons/keyWhite.png",
-      shortcut: "6",
+      shortcut: "5",
     },
     {
       label: "Projects",
       route: "/projects",
       icon: "/icons/projectIcon.png",
       iconWhite: "/icons/projectsLight.png",
-      shortcut: "7",
+      shortcut: "6",
     },
   ];
 
@@ -146,24 +149,56 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     logout();
   };
 
-
   const getUser = async () => {
-    // showLoader();
     try {
       const userData: any = await fetchUser();
-      console.log(userData)
+      if (!userData && pathname !== "/login") {
+        return router.replace("/login");
+      }
+      if (
+        userData?.data?.result?.status === "invited" &&
+        pathname !== "/login"
+      ) {
+        console.log("User needs to complete registration");
+        return router.replace("/login");
+      }
     } catch (error) {
-      console.error("Error  fetching user", error);
-      return router.push("/login");
-    } finally {
-      // hideLoader();
+      console.error("Error fetching user", error);
+      return router.replace("/login");
     }
   };
-  useEffect(()=> {
-    if(!user?.id) {
+
+  useEffect(() => {
+    // Only fetch user if we don't have user data AND we have a token
+    // This prevents duplicate fetches since AuthGuard already handles initial auth
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("access_token")
+        : null;
+    if (!user?.id && token) {
       getUser();
     }
-  }, [user])
+  }, [pathname]); // Re-run on pathname change like budadmin
+
+  useEffect(() => {
+    console.log("Novu Notification Center version:", pkg.version);
+    console.log(
+      "process.env.NEXT_PUBLIC_BASE_URL",
+      process.env.NEXT_PUBLIC_BASE_URL,
+    );
+    console.log(
+      "process.env.NEXT_PUBLIC_NOVU_SOCKET_URL",
+      process.env.NEXT_PUBLIC_NOVU_SOCKET_URL,
+    );
+    console.log(
+      "process.env.NEXT_PUBLIC_NOVU_BASE_URL",
+      process.env.NEXT_PUBLIC_NOVU_BASE_URL,
+    );
+    console.log(
+      "process.env.NEXT_PUBLIC_NOVU_APP_ID",
+      process.env.NEXT_PUBLIC_NOVU_APP_ID,
+    );
+  }, []);
 
   return (
     <div className="flex h-screen bg-[#f2f2f2] dark:bg-bud-bg-primary">
@@ -221,41 +256,47 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
             </div>
           )} */}
 
-          {/* Notifications */}
-        {/* <BudIsland /> */}
-
-            <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors hidden">
-              <Badge
-                count={88}
-                offset={isCollapsed ? [0, -10] : [50, -10]}
-                style={{ backgroundColor: "#965CDE" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`${
-                      isCollapsed ? "w-6 h-6" : "w-8 h-8"
-                    } bg-bud-purple rounded flex items-center justify-center`}>
-                    <Icon
-                      icon="heroicons-outline:bell"
-                      className="text-white text-lg"
-                    />
-                  </div>
-                  {!isCollapsed && (<div>
+          <div className="bg-bud-bg-secondary rounded-lg p-3 mb-1 cursor-pointer hover:bg-bud-bg-tertiary transition-colors hidden">
+            <Badge
+              count={88}
+              offset={isCollapsed ? [0, -10] : [50, -10]}
+              style={{ backgroundColor: "#965CDE" }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`${
+                    isCollapsed ? "w-6 h-6" : "w-8 h-8"
+                  } bg-bud-purple rounded flex items-center justify-center`}
+                >
+                  <Icon
+                    icon="heroicons-outline:bell"
+                    className="text-white text-lg"
+                  />
+                </div>
+                {!isCollapsed && (
+                  <div>
                     <Text className="text-bud-text-disabled text-xs block">
                       88 New
                     </Text>
                     <Text className="text-bud-text-primary text-sm">
                       Notifications
                     </Text>
-                  </div>)}
-                </div>
-              </Badge>
-            </div>
+                  </div>
+                )}
+              </div>
+            </Badge>
+          </div>
         </div>
 
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {/* Navigation */}
           <nav className="flex-1 px-3 overflow-y-auto sidebar-scroll">
+            {/* Task Island as first menu item */}
+            <div className="mb-1">
+              <BudIsland />
+            </div>
+
             {tabs.map((tab) => {
               const active = isActive(tab.route);
               const hovered = isHovered === tab.route;
@@ -365,11 +406,14 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           )}
 
           {/* Page Content */}
-          <main className="flex-1 overflow-auto">
-            {children}
-          </main>
+          <main className="flex-1 overflow-auto">{children}</main>
         </div>
       </div>
+
+      {/* Overlay for notifications */}
+      <div
+        className={`dashboardOverlay absolute w-full h-full top-0 left-0 z-[1200] ${isVisible ? "block" : "hidden"}`}
+      ></div>
     </div>
   );
 };

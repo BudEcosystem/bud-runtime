@@ -7,7 +7,8 @@ const clientEnv = getClientEnvironment();
 
 export const assetBaseUrl = clientEnv.assetBaseUrl || "";
 export const tempApiBaseUrl = clientEnv.baseUrl || "http://localhost:3000";
-export const apiBaseUrl = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, '') || '';
+export const apiBaseUrl =
+  process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") || "";
 export const webSocketUrl = process.env.NEXT_PUBLIC_NOVU_SOCKET_URL;
 export const novuBackendUrl = process.env.NEXT_PUBLIC_NOVU_BASE_URL;
 export const novuSocketUrl = process.env.NEXT_PUBLIC_NOVU_SOCKET_URL;

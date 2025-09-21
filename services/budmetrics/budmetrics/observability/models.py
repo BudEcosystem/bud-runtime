@@ -265,6 +265,7 @@ class QueryBuilder:
         "model": "mid.model_id",
         "project": "mid.project_id",
         "endpoint": "mid.endpoint_id",
+        "user_project": "mid.api_key_project_id",
     }
     _MAPPING_TABLE_ALIAS = {
         "ModelInference": "mi",
@@ -992,7 +993,7 @@ class QueryBuilder:
         frequency_unit: Union[FrequencyUnit, str] = FrequencyUnit.DAY,
         frequency_interval: Optional[int] = None,
         filters: Optional[dict[Literal["model", "project", "endpoint"], Union[list[UUID], UUID]]] = None,
-        group_by: Optional[list[Literal["model", "project", "endpoint"]]] = None,
+        group_by: Optional[list[Literal["model", "project", "endpoint", "user_project"]]] = None,
         return_delta: bool = False,
         fill_time_gaps: bool = True,
         topk: Optional[int] = None,
@@ -1268,22 +1269,45 @@ class ClickHouseClient:
     async def _warmup_connections(self):
         """Pre-establish connections to reduce cold start latency."""
         for _ in range(self.config.pool_min_size):
-            async with self._pool.connection() as conn, conn.cursor() as cursor:
-                await cursor.execute("SELECT 1")
-                await cursor.fetchall()
+            try:
+                async with self._pool.connection() as conn, conn.cursor() as cursor:
+                    await cursor.execute("SELECT 1")
+                    await cursor.fetchall()
+            except Exception as e:
+                logger.warning(f"Connection warmup failed: {e}")
+                # Don't fail initialization if warmup fails
 
     async def _execute_warmup_query(self):
         """Execute a simple query for connection warmup without going through the full execute_query path."""
-        async with self._pool.connection() as conn, conn.cursor() as cursor:
-            await cursor.execute("SELECT 1")
-            await cursor.fetchall()
+        try:
+            async with self._pool.connection() as conn, conn.cursor() as cursor:
+                await cursor.execute("SELECT 1")
+                await cursor.fetchall()
+        except Exception as e:
+            logger.warning(f"Warmup query failed: {e}")
+
+    async def _cleanup_cursor_state(self, cursor):
+        """Clean up pending cursor state."""
+        try:
+            # Try to consume any remaining results
+            while True:
+                result = await cursor.fetchmany(1000)
+                if not result:
+                    break
+        except Exception as e:
+            # Ignore errors during cleanu
+            logger.warning(f"Cleanup state failed: {e}")
 
     async def close(self):
         """Close the ClickHouse connection pool."""
         if self._pool:
-            await self._pool.shutdown()
-            self._initialized = False
-            logger.info("ClickHouse connection pool closed")
+            try:
+                await self._pool.shutdown()
+            except Exception as e:
+                logger.warning(f"Error during connection pool shutdown: {e}")
+            finally:
+                self._initialized = False
+                logger.info("ClickHouse connection pool closed")
 
     @profile_async("query_execution")
     async def execute_query(
@@ -1312,16 +1336,21 @@ class ClickHouseClient:
                     self.performance_metrics.increment_counter("cache_misses")
 
         async with self._semaphore, self._pool.connection() as conn, conn.cursor() as cursor:
-            await cursor.execute(query, params or {})
-            result = await cursor.fetchall()
+            try:
+                await cursor.execute(query, params or {})
+                result = await cursor.fetchall()
 
-            if with_column_types:
-                return result, cursor.description
-            else:
-                # Cache the result if caching is enabled
-                if use_cache and self._query_cache:
-                    await self._query_cache.set(query, result, params)
-                return result
+                if with_column_types:
+                    return result, cursor.description
+                else:
+                    # Cache the result if caching is enabled
+                    if use_cache and self._query_cache:
+                        await self._query_cache.set(query, result, params)
+                    return result
+            except Exception as e:
+                # Ensure cursor is properly closed on errors
+                logger.error(f"Query execution failed: {e}. Query: {query[:100]}...")
+                raise
 
     async def execute_iter(
         self,
@@ -1334,19 +1363,43 @@ class ClickHouseClient:
             await self.initialize()
 
         async with self._semaphore, self._pool.connection() as conn, conn.cursor() as cursor:
-            await cursor.execute(query, params or {})
+            try:
+                await cursor.execute(query, params or {})
 
-            while True:
-                batch = await cursor.fetchmany(batch_size)
-                if not batch:
-                    break
-                for row in batch:
-                    yield row
+                while True:
+                    batch = await cursor.fetchmany(batch_size)
+                    if not batch:
+                        break
+                    for row in batch:
+                        yield row
+
+            except Exception as e:
+                logger.error(f"Iterator query execution failed: {e}. Query: {query[:100]}...")
+                # Try to consume any pending results to clean up cursor state
+                try:
+                    await self._cleanup_cursor_state(cursor)
+                except Exception as e:
+                    logger.warning(f"cleanup state failed: {e}")
+                raise
+            finally:
+                # Ensure all remaining results are consumed to avoid "records not fetched" errors
+                try:
+                    while await cursor.fetchone():
+                        pass  # Consume all remaining records
+                except Exception as e:
+                    # Ignore errors when consuming remaining results
+                    logger.warning(f"consume remaining failed: {e}")
 
     async def execute_many(self, queries: list[str]) -> list[list[tuple]]:
-        """Execute multiple queries concurrently."""
-        tasks = [self.execute_query(query) for query in queries]
-        return await asyncio.gather(*tasks)
+        """Execute multiple queries concurrently with proper error handling."""
+        try:
+            tasks = [self.execute_query(query) for query in queries]
+            return await asyncio.gather(*tasks)
+        except Exception as e:
+            logger.error(f"Concurrent query execution failed: {e}")
+            # Log which queries were being executed for debugging
+            logger.error(f"Failed queries: {[q[:100] + '...' if len(q) > 100 else q for q in queries]}")
+            raise
 
     async def insert_data(self, table: str, data: list[tuple], columns: Optional[list[str]] = None):
         """Insert data into a table."""
@@ -1354,10 +1407,63 @@ class ClickHouseClient:
             await self.initialize()
 
         async with self._semaphore, self._pool.connection() as conn, conn.cursor() as cursor:
-            query = f"INSERT INTO {table} ({','.join(columns)}) VALUES" if columns else f"INSERT INTO {table} VALUES"
+            try:
+                query = (
+                    f"INSERT INTO {table} ({','.join(columns)}) VALUES" if columns else f"INSERT INTO {table} VALUES"
+                )
 
-            # Execute the insert with data
-            await cursor.execute(query, data)
+                # Execute the insert with data
+                await cursor.execute(query, data)
+
+                # Consume any results to ensure cursor is clean
+                try:
+                    await cursor.fetchall()
+                except Exception as e:
+                    # Some insert queries may not return results, ignore errors
+                    logger.warning(f"consume remaining in insert failed: {e}")
+            except Exception as e:
+                logger.error(f"Insert data failed: {e}. Table: {table}")
+                raise
+
+    @staticmethod
+    def rows_to_dicts(rows: list[tuple], column_descriptions: Any) -> list[dict[str, Any]]:
+        """Convert query result rows to dictionaries using column descriptions.
+
+        Args:
+            rows: List of tuples from execute_query result
+            column_descriptions: Column descriptions from cursor.description
+
+        Returns:
+            List of dictionaries with column names as keys
+        """
+        if not rows or not column_descriptions:
+            return []
+
+        # Extract column names from descriptions
+        # cursor.description format: [(name, type_code, display_size, internal_size, precision, scale, null_ok), ...]
+        column_names = [desc[0] for desc in column_descriptions]
+
+        # Convert each row to dictionary
+        return [dict(zip(column_names, row, strict=True)) for row in rows]
+
+    @staticmethod
+    def row_to_dict(row: tuple, column_descriptions: Any) -> dict[str, Any]:
+        """Convert single query result row to dictionary using column descriptions.
+
+        Args:
+            row: Single tuple from execute_query result
+            column_descriptions: Column descriptions from cursor.description
+
+        Returns:
+            Dictionary with column names as keys
+        """
+        if not row or not column_descriptions:
+            return {}
+
+        # Extract column names from descriptions
+        column_names = [desc[0] for desc in column_descriptions]
+
+        return dict(zip(column_names, row, strict=True))
 
     async def get_pool_stats(self) -> dict[str, Any]:
         """Get connection pool statistics."""

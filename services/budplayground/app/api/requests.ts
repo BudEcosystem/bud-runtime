@@ -15,9 +15,11 @@ if (typeof window !== "undefined") {
 // Request interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    // Prioritize access_token for JWT-based sessions, fall back to token
+    const accessToken = localStorage.getItem("access_token");
+    const token = accessToken || localStorage.getItem("token");
     if (config.headers) {
-      if (token?.startsWith('budserve_')) {
+      if (token?.startsWith('bud_')) {
         config.headers['api-key'] = token;
       } else {
         config.headers.Authorization = token ? `Bearer ${token}` : "";
@@ -67,6 +69,13 @@ axiosInstance.interceptors.response.use(
   },
   (err) => {
     const status = err?.response?.status;
+    const currentToken = localStorage.getItem("token");
+
+    // Don't attempt refresh for API keys (they don't expire like JWTs)
+    if (currentToken?.startsWith('bud_')) {
+      return Promise.reject(err);
+    }
+
     if (status === 401 && !isRefreshing) {
       isRefreshing = true;
       return refreshToken()
@@ -82,6 +91,12 @@ axiosInstance.interceptors.response.use(
           return Promise.reject(error);
         });
     } else if (status === 401 && isRefreshing) {
+      const currentToken = localStorage.getItem("token");
+      // Don't queue refresh for API keys
+      if (currentToken?.startsWith('bud_')) {
+        return Promise.reject(err);
+      }
+
       return new Promise((resolve) => {
         subscribeTokenRefresh((newToken: string) => {
           err.config.headers.Authorization = `Bearer ${newToken}`;
@@ -135,7 +150,7 @@ const Post = (endPoint: string, payload?: any, params?: any, headers?: any) => {
     };
 
     // Ensure Authorization header is set correctly for JWT tokens
-    if (token && !token.startsWith('budserve_')) {
+    if (token && !token.startsWith('bud_')) {
       config["headers"]["Authorization"] = `Bearer ${token}`;
     }
   }

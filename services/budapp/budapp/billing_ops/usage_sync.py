@@ -23,8 +23,9 @@ class UsageLimitSyncTask:
         Args:
             sync_interval_seconds: How often to sync usage limits (default: 30 seconds)
 
-        Note: Redis TTL for usage limits is set to 60 seconds in BillingService.check_usage_limits()
-        to ensure data availability between sync intervals.
+        Note: This class is deprecated in favor of HybridMetricsSyncTask which combines
+        credential and user usage sync. Redis TTL uses smart dual-TTL strategy with
+        primary and fallback keys for improved reliability.
         """
         self.sync_interval = sync_interval_seconds
         self.running = False
@@ -100,6 +101,9 @@ class UsageLimitSyncTask:
                     # Check and publish usage limits
                     # This will update Redis with the latest usage status
                     await service.check_usage_limits(user.id)
+
+                    # Check and trigger alerts for this user
+                    await service.check_and_trigger_alerts(user.id)
                 except Exception as e:
                     logger.warning(f"Failed to sync usage limits for user {user.id}: {e}")
 

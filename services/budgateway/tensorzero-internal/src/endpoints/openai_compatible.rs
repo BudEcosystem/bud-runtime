@@ -9,6 +9,8 @@
 //! and then convert the response into the OpenAI-compatible format.
 
 use std::collections::HashMap;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::debug_handler;
@@ -40,6 +42,7 @@ use crate::inference::types::{
 use crate::tool::{
     DynamicToolParams, Tool, ToolCall, ToolCallChunk, ToolCallOutput, ToolChoice, ToolResult,
 };
+use crate::usage_limit::UsageLimitDecision;
 use crate::variant::JsonMode;
 
 use super::inference::{
@@ -84,6 +87,28 @@ fn merge_credentials_from_store(
         }
     }
     credentials
+}
+
+/// Helper function to create OpenAI-compatible error response for guardrail violations
+fn create_guardrail_error_response(
+    message: &str,
+    is_input_violation: bool,
+) -> (StatusCode, serde_json::Value) {
+    let (error_type, status_code) = if is_input_violation {
+        ("invalid_request_error", StatusCode::BAD_REQUEST)
+    } else {
+        ("server_error", StatusCode::INTERNAL_SERVER_ERROR)
+    };
+
+    let error_json = json!({
+        "error": {
+            "message": message,
+            "type": error_type,
+            "code": "content_filter"
+        }
+    });
+
+    (status_code, error_json)
 }
 
 /// Helper function to serialize JSON without null values
@@ -146,6 +171,7 @@ pub async fn inference_handler(
         authentication_info: _,
         model_credential_store,
         usage_limiter,
+        guardrails,
         ..
     }): AppState,
     headers: HeaderMap,
@@ -172,8 +198,32 @@ pub async fn inference_handler(
 
     let original_model_name = model_resolution.original_model_name.to_string();
 
+    // Check usage limits BEFORE processing the request
+    if let Some(usage_limiter) = &usage_limiter {
+        if let Some(user_id) = headers
+            .get("x-tensorzero-user-id")
+            .and_then(|v| v.to_str().ok())
+        {
+            let usage_decision = usage_limiter.check_usage(user_id, None, None).await;
+
+            if !usage_decision.is_allowed() {
+                return Err(Error::new(ErrorDetails::Config {
+                    message: match usage_decision {
+                        UsageLimitDecision::Deny { reason } => {
+                            format!("Usage limit exceeded: {}", reason)
+                        }
+                        _ => "Usage limit exceeded".to_string(),
+                    },
+                }));
+            }
+        }
+    }
+
     // Capture the gateway request (without null values)
     let gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
+
+    // Get model name before model_resolution is moved
+    let resolved_model_name = model_resolution.model_name.clone();
 
     // Create params with resolved model/function names
     let mut params = Params::try_from_openai_with_resolution(
@@ -227,12 +277,326 @@ pub async fn inference_handler(
     // Set the gateway request on params
     params.gateway_request = gateway_request;
 
+    // Get the guardrail profile if model has one configured
+    let (guardrail_profile_id, model_pricing) = if let Some(model_name) = &resolved_model_name {
+        let models = config.models.read().await;
+        match models.get(model_name).await {
+            Ok(Some(model)) => {
+                let profile = model.guardrail_profile.clone();
+                let pricing = model.pricing.clone();
+                drop(models);
+                (profile, pricing)
+            }
+            _ => {
+                drop(models);
+                (None, None)
+            }
+        }
+    } else {
+        (None, None)
+    };
+
+    // Create guardrail execution context to track all guardrail operations
+    let mut guardrail_context = crate::guardrail::GuardrailExecutionContext::new();
+
+    // Extract observability metadata for potential use
+    let observability_metadata = params.observability_metadata.clone();
+
+    // Execute input guardrail if configured
+    if let Some(guardrail_profile) = &guardrail_profile_id {
+        // Convert messages to moderation input
+        let mut input_texts = Vec::new();
+
+        for msg in &openai_compatible_params.messages {
+            match msg {
+                OpenAICompatibleMessage::System(sys_msg) => {
+                    if let Some(text) = sys_msg.content.as_str() {
+                        input_texts.push(text.to_string());
+                    }
+                }
+                OpenAICompatibleMessage::User(user_msg) => {
+                    match &user_msg.content {
+                        Value::String(text) => input_texts.push(text.clone()),
+                        Value::Array(arr) => {
+                            // Extract text from content parts array
+                            for item in arr {
+                                if let Some(obj) = item.as_object() {
+                                    if obj.get("type").and_then(|t| t.as_str()) == Some("text") {
+                                        if let Some(text) = obj.get("text").and_then(|t| t.as_str())
+                                        {
+                                            input_texts.push(text.to_string());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                OpenAICompatibleMessage::Assistant(asst_msg) => {
+                    if let Some(content) = &asst_msg.content {
+                        if let Some(text) = content.as_str() {
+                            input_texts.push(text.to_string());
+                        }
+                    }
+                }
+                OpenAICompatibleMessage::Tool(tool_msg) => {
+                    if let Some(content) = &tool_msg.content {
+                        if let Some(text) = content.as_str() {
+                            input_texts.push(text.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        if !input_texts.is_empty() {
+            let moderation_input = if input_texts.len() == 1 {
+                crate::moderation::ModerationInput::Single(input_texts[0].clone())
+            } else {
+                crate::moderation::ModerationInput::Batch(input_texts.clone())
+            };
+
+            // Get guardrail configuration
+            let guardrails_read = guardrails.read().await;
+            if let Some(guardrail_config) = guardrails_read.get(guardrail_profile.as_ref()) {
+                let guardrail_config = guardrail_config.clone();
+                drop(guardrails_read);
+
+                // Prepare credentials
+                let credentials = merge_credentials_from_store(&model_credential_store);
+
+                // Create inference clients for guardrail execution
+                let cache_options = crate::cache::CacheOptions {
+                    enabled: crate::cache::CacheEnabledMode::Off,
+                    max_age_s: None,
+                };
+                let clients = super::inference::InferenceClients {
+                    http_client: &http_client,
+                    credentials: &credentials,
+                    clickhouse_connection_info: &clickhouse_connection_info,
+                    cache_options: &cache_options,
+                };
+
+                // Execute input guardrail with timing
+                let input_scan_start = tokio::time::Instant::now();
+                let guardrail_result = crate::guardrail::execute_guardrail(
+                    &guardrail_config,
+                    moderation_input.clone(),
+                    crate::guardrail_table::GuardType::Input,
+                    &clients,
+                    None,
+                )
+                .await?;
+                let input_scan_duration = input_scan_start.elapsed();
+
+                // Store the input guardrail result for later (we need the inference_id from the response)
+                // For now, store with a placeholder UUID
+                let placeholder_id = uuid::Uuid::nil();
+                let scan_record = crate::guardrail::GuardrailInferenceDatabaseInsert::from_result(
+                    placeholder_id,
+                    guardrail_profile.to_string(),
+                    crate::guardrail_table::GuardType::Input,
+                    "l1".to_string(),
+                    crate::guardrail::ScanMode::Single,
+                    &guardrail_result,
+                    Some(input_scan_duration),
+                    &input_texts.join(" "),
+                    None,
+                );
+                guardrail_context.add_scan_record(scan_record);
+
+                // If input is flagged, handle the blocked request with full observability
+                if guardrail_result.flagged {
+                    guardrail_context.response_terminated = true;
+
+                    // Generate IDs for tracking the blocked request
+                    let blocked_inference_id = uuid::Uuid::now_v7();
+                    let episode_id = uuid::Uuid::now_v7();
+
+                    // Update guardrail records with the actual inference_id
+                    for record in &mut guardrail_context.scan_records {
+                        record.inference_id = blocked_inference_id;
+                    }
+
+                    // Write blocked inference with guardrail records
+                    if config.gateway.observability.enabled.unwrap_or(true) {
+                        // Get model info or use defaults if model not found
+                        let (model_name, model_provider) = if let Some(name) = &resolved_model_name
+                        {
+                            (name.clone(), "openai".to_string())
+                        } else {
+                            ("unknown".to_string(), "unknown".to_string())
+                        };
+
+                        let clickhouse = clickhouse_connection_info.clone();
+                        let kafka = kafka_connection_info.clone();
+                        let config_clone = config.clone();
+                        let records = guardrail_context.scan_records.clone();
+                        let async_writes = config.gateway.observability.async_writes;
+                        let obs_metadata = observability_metadata.clone();
+
+                        // Get the resolved input and gateway request before moving params
+                        let resolved_input = params
+                            .input
+                            .resolve(&crate::inference::types::FetchContext {
+                                client: &http_client,
+                                object_store_info: &config.object_store_info,
+                            })
+                            .await
+                            .unwrap_or_else(|_| crate::inference::types::ResolvedInput {
+                                system: None,
+                                messages: vec![],
+                            });
+                        let gateway_request = params.gateway_request.clone();
+
+                        let write_future = tokio::spawn(async move {
+                            use crate::endpoints::inference::InferenceParams;
+                            use crate::inference::types::{
+                                current_timestamp, ChatInferenceResult, ContentBlockOutput,
+                                Latency, ModelInferenceResponseWithMetadata, RequestMessage, Text,
+                            };
+
+                            // Create blocked content
+                            let blocked_content = vec![ContentBlockChatOutput::Text(Text {
+                                text: "Request blocked by content policy".to_string(),
+                            })];
+
+                            // Create the gateway response that would be sent to the client
+                            let (_, gateway_response_json) = create_guardrail_error_response(
+                                "Input content violates content policy",
+                                true,
+                            );
+                            let gateway_response_str = gateway_response_json.to_string();
+
+                            // Create blocked model inference response
+                            let model_response = ModelInferenceResponseWithMetadata {
+                                id: Uuid::now_v7(),
+                                created: current_timestamp(),
+                                output: vec![ContentBlockOutput::Text(Text {
+                                    text: "Request blocked by content policy".to_string(),
+                                })],
+                                system: resolved_input
+                                    .system
+                                    .clone()
+                                    .and_then(|v| v.as_str().map(|s| s.to_string())),
+                                input_messages: resolved_input
+                                    .messages
+                                    .iter()
+                                    .map(|msg| RequestMessage {
+                                        role: msg.role.clone(),
+                                        content: vec![], // Empty content for blocked messages
+                                    })
+                                    .collect(),
+                                // Since we never made it to the provider, we don't have a raw request/response
+                                // Use empty objects to indicate no provider interaction occurred
+                                raw_request: "{}".to_string(),
+                                raw_response: "{}".to_string(),
+                                usage: Usage::default(),
+                                latency: Latency::NonStreaming {
+                                    response_time: std::time::Duration::from_millis(0),
+                                },
+                                model_provider_name: model_provider.to_string().into(),
+                                model_name: model_name.to_string().into(),
+                                cached: false,
+                                finish_reason: Some(FinishReason::ContentFilter),
+                                gateway_request: gateway_request.clone(),
+                                gateway_response: Some(gateway_response_str.clone()),
+                                guardrail_scan_summary: if !records.is_empty() {
+                                    let context = crate::guardrail::GuardrailExecutionContext {
+                                        scan_records: records.clone(),
+                                        input_scan_time_ms: records
+                                            .iter()
+                                            .filter(|r| r.guard_type == 1) // Input guard type
+                                            .filter_map(|r| r.scan_latency_ms)
+                                            .sum::<u32>()
+                                            .into(),
+                                        output_scan_time_ms: None,
+                                        response_terminated: true,
+                                    };
+                                    Some(
+                                        serde_json::to_string(&context.build_summary())
+                                            .unwrap_or_default(),
+                                    )
+                                } else {
+                                    None
+                                },
+                            };
+
+                            // Create blocked result
+                            let blocked_result = InferenceResult::Chat(ChatInferenceResult {
+                                inference_id: blocked_inference_id,
+                                created: current_timestamp(),
+                                content: blocked_content,
+                                usage: Usage::default(),
+                                model_inference_results: vec![model_response],
+                                inference_params: InferenceParams::default(),
+                                original_response: None,
+                                finish_reason: Some(FinishReason::ContentFilter),
+                            });
+
+                            // Create metadata
+                            let metadata = super::inference::InferenceDatabaseInsertMetadata {
+                                function_name: "openai_compatible".to_string(),
+                                variant_name: model_name.to_string(),
+                                episode_id,
+                                tool_config: None,
+                                processing_time: Some(std::time::Duration::from_millis(0)),
+                                tags: HashMap::new(),
+                                extra_body: UnfilteredInferenceExtraBody::default(),
+                                extra_headers: UnfilteredInferenceExtraHeaders::default(),
+                            };
+
+                            // Write inference and guardrail records
+                            super::inference::write_inference(
+                                &clickhouse,
+                                &kafka,
+                                &config_clone,
+                                resolved_input,
+                                blocked_result,
+                                metadata,
+                                obs_metadata,
+                                gateway_request, // Pass the actual gateway_request
+                                Some(gateway_response_str), // Pass the actual gateway_response
+                                model_pricing,
+                                Some(records),
+                            )
+                            .await;
+                        });
+
+                        if !async_writes {
+                            write_future.await.map_err(|e| {
+                                Error::new(ErrorDetails::InternalError {
+                                    message: format!(
+                                        "Failed to join blocked inference write task: {e}"
+                                    ),
+                                })
+                            })?;
+                        }
+                    }
+
+                    // Return OpenAI-compatible error response
+                    let (status_code, error_response) = create_guardrail_error_response(
+                        "Input content violates content policy",
+                        true,
+                    );
+
+                    return Ok(Response::builder()
+                        .status(status_code)
+                        .header("Content-Type", "application/json")
+                        .body(Body::from(error_response.to_string()))
+                        .unwrap());
+                }
+            }
+        }
+    }
+
     let response = inference(
         config.clone(),
         &http_client,
         clickhouse_connection_info.clone(),
         kafka_connection_info.clone(),
-        model_credential_store,
+        model_credential_store.clone(),
         params,
     )
     .await?;
@@ -240,29 +604,37 @@ pub async fn inference_handler(
     match response {
         InferenceOutput::NonStreaming {
             response,
-            result,
+            mut result,
             write_info,
         } => {
             // Extract model latency from the result (using the first model inference result) before moving result
             let model_latency_ms = match &result {
-                InferenceResult::Chat(chat_result) => {
-                    chat_result.model_inference_results.first()
-                        .and_then(|r| match &r.latency {
-                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Batch => None,
-                        })
-                        .unwrap_or(0)
-                },
-                InferenceResult::Json(json_result) => {
-                    json_result.model_inference_results.first()
-                        .and_then(|r| match &r.latency {
-                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Batch => None,
-                        })
-                        .unwrap_or(0)
-                },
+                InferenceResult::Chat(chat_result) => chat_result
+                    .model_inference_results
+                    .first()
+                    .and_then(|r| match &r.latency {
+                        crate::inference::types::Latency::NonStreaming { response_time } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Streaming { response_time, .. } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Batch => None,
+                    })
+                    .unwrap_or(0),
+                InferenceResult::Json(json_result) => json_result
+                    .model_inference_results
+                    .first()
+                    .and_then(|r| match &r.latency {
+                        crate::inference::types::Latency::NonStreaming { response_time } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Streaming { response_time, .. } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Batch => None,
+                    })
+                    .unwrap_or(0),
                 // For other result types, we don't have model_inference_results, so default to 0
                 _ => 0,
             };
@@ -270,7 +642,165 @@ pub async fn inference_handler(
             let mut openai_compatible_response =
                 OpenAICompatibleResponse::from((response.clone(), original_model_name.clone()));
 
+            // Execute output guardrail if configured
+            if let Some(guardrail_profile) = &guardrail_profile_id {
+                // Check if guardrail supports output guard type
+                let guardrails_read = guardrails.read().await;
+                if let Some(guardrail_config) = guardrails_read.get(guardrail_profile.as_ref()) {
+                    if guardrail_config
+                        .guard_types
+                        .contains(&crate::guardrail_table::GuardType::Output)
+                    {
+                        let guardrail_config = guardrail_config.clone();
+                        drop(guardrails_read);
+
+                        // Extract output text from response
+                        let output_texts: Vec<String> = openai_compatible_response
+                            .choices
+                            .iter()
+                            .filter_map(|choice| {
+                                choice
+                                    .message
+                                    .content
+                                    .as_ref()
+                                    .map(|content| content.clone())
+                            })
+                            .collect();
+
+                        if !output_texts.is_empty() {
+                            let moderation_input = if output_texts.len() == 1 {
+                                crate::moderation::ModerationInput::Single(output_texts[0].clone())
+                            } else {
+                                crate::moderation::ModerationInput::Batch(output_texts.clone())
+                            };
+
+                            // Prepare credentials
+                            let credentials = merge_credentials_from_store(&model_credential_store);
+
+                            // Create inference clients for guardrail execution
+                            let cache_options = crate::cache::CacheOptions {
+                                enabled: crate::cache::CacheEnabledMode::Off,
+                                max_age_s: None,
+                            };
+                            let clients = super::inference::InferenceClients {
+                                http_client: &http_client,
+                                credentials: &credentials,
+                                clickhouse_connection_info: &clickhouse_connection_info,
+                                cache_options: &cache_options,
+                            };
+
+                            // Execute output guardrail with timing
+                            let output_scan_start = tokio::time::Instant::now();
+                            let guardrail_result = crate::guardrail::execute_guardrail(
+                                &guardrail_config,
+                                moderation_input.clone(),
+                                crate::guardrail_table::GuardType::Output,
+                                &clients,
+                                None,
+                            )
+                            .await?;
+                            let output_scan_duration = output_scan_start.elapsed();
+
+                            // Create guardrail inference record with placeholder ID (will be updated later)
+                            let placeholder_id = uuid::Uuid::nil();
+                            let scan_record =
+                                crate::guardrail::GuardrailInferenceDatabaseInsert::from_result(
+                                    placeholder_id,
+                                    guardrail_profile.to_string(),
+                                    crate::guardrail_table::GuardType::Output,
+                                    "l1".to_string(),
+                                    crate::guardrail::ScanMode::Single,
+                                    &guardrail_result,
+                                    Some(output_scan_duration),
+                                    &output_texts.join(" "),
+                                    None,
+                                );
+                            guardrail_context.add_scan_record(scan_record);
+
+                            // If output is flagged, return an error
+                            if guardrail_result.flagged {
+                                guardrail_context.response_terminated = true;
+
+                                // Extract inference_id from the response
+                                let inference_id = match &response {
+                                    InferenceResponse::Chat(chat_response) => {
+                                        chat_response.inference_id
+                                    }
+                                    InferenceResponse::Json(json_response) => {
+                                        json_response.inference_id
+                                    }
+                                };
+
+                                // Update guardrail records with the actual inference_id
+                                for record in &mut guardrail_context.scan_records {
+                                    record.inference_id = inference_id;
+                                }
+
+                                // Write the inference with guardrail records if observability is enabled
+                                if config.gateway.observability.enabled.unwrap_or(true) {
+                                    if let Some(write_info) = write_info {
+                                        let config_clone = config.clone();
+                                        let clickhouse = clickhouse_connection_info.clone();
+                                        let kafka = kafka_connection_info.clone();
+                                        let records = guardrail_context.scan_records.clone();
+                                        let async_writes =
+                                            config.gateway.observability.async_writes;
+
+                                        // Create the gateway response that would be sent to the client
+                                        let (_, gateway_response_json) =
+                                            create_guardrail_error_response(
+                                                "Output content violates content policy",
+                                                false,
+                                            );
+                                        let gateway_response_str =
+                                            gateway_response_json.to_string();
+
+                                        let write_future = tokio::spawn(async move {
+                                            write_inference(
+                                                &clickhouse,
+                                                &kafka,
+                                                &config_clone,
+                                                write_info.resolved_input,
+                                                result,
+                                                write_info.metadata,
+                                                write_info.observability_metadata,
+                                                write_info.gateway_request,
+                                                Some(gateway_response_str), // Pass the actual error response
+                                                write_info.model_pricing,
+                                                Some(records),
+                                            )
+                                            .await;
+                                        });
+
+                                        if !async_writes {
+                                            write_future.await.map_err(|e| {
+                                                Error::new(ErrorDetails::InternalError {
+                                                    message: format!("Failed to join output guardrail write task: {e}"),
+                                                })
+                                            })?;
+                                        }
+                                    }
+                                }
+
+                                // Return OpenAI-compatible error response
+                                let (status_code, error_response) = create_guardrail_error_response(
+                                    "Output content violates content policy",
+                                    false,
+                                );
+
+                                return Ok(Response::builder()
+                                    .status(status_code)
+                                    .header("Content-Type", "application/json")
+                                    .body(Body::from(error_response.to_string()))
+                                    .unwrap());
+                            }
+                        }
+                    }
+                }
+            }
+
             // Track usage consumption if usage limiter is enabled
+
             if let Some(usage_limiter) = &usage_limiter {
                 // Extract user_id from headers (set by auth middleware)
                 if let Some(user_id) = headers
@@ -285,20 +815,27 @@ pub async fn inference_handler(
                         let cost = if let Some(write_info) = &write_info {
                             if let Some(pricing) = &write_info.model_pricing {
                                 // Convert tokens to the pricing unit (e.g., if per_tokens is 1000, divide by 1000)
-                                let input_multiplier = openai_compatible_response.usage.prompt_tokens as f64 / pricing.per_tokens as f64;
-                                let output_multiplier = openai_compatible_response.usage.completion_tokens as f64 / pricing.per_tokens as f64;
+                                let input_multiplier =
+                                    openai_compatible_response.usage.prompt_tokens as f64
+                                        / pricing.per_tokens as f64;
+                                let output_multiplier =
+                                    openai_compatible_response.usage.completion_tokens as f64
+                                        / pricing.per_tokens as f64;
 
-                                (input_multiplier * pricing.input_cost) + (output_multiplier * pricing.output_cost)
+                                (input_multiplier * pricing.input_cost)
+                                    + (output_multiplier * pricing.output_cost)
                             } else {
                                 // Fallback to default pricing if not configured
                                 // Using reasonable defaults: $0.01 per 1K input tokens, $0.03 per 1K output tokens
-                                (openai_compatible_response.usage.prompt_tokens as f64 * 0.00001) +
-                                (openai_compatible_response.usage.completion_tokens as f64 * 0.00003)
+                                (openai_compatible_response.usage.prompt_tokens as f64 * 0.00001)
+                                    + (openai_compatible_response.usage.completion_tokens as f64
+                                        * 0.00003)
                             }
                         } else {
                             // No write_info, use default pricing
-                            (openai_compatible_response.usage.prompt_tokens as f64 * 0.00001) +
-                            (openai_compatible_response.usage.completion_tokens as f64 * 0.00003)
+                            (openai_compatible_response.usage.prompt_tokens as f64 * 0.00001)
+                                + (openai_compatible_response.usage.completion_tokens as f64
+                                    * 0.00003)
                         };
                         // Round to 4 decimal places for consistent precision
                         (cost * 10000.0).round() / 10000.0
@@ -307,11 +844,16 @@ pub async fn inference_handler(
                     };
 
                     // Record the consumption (fire and forget - don't block response)
+
                     let usage_limiter_clone = usage_limiter.clone();
                     let user_id_clone = user_id.to_string();
                     tokio::spawn(async move {
                         let _result = usage_limiter_clone
-                            .check_usage(&user_id_clone, Some(tokens_to_consume), Some(cost_to_consume))
+                            .check_usage(
+                                &user_id_clone,
+                                Some(tokens_to_consume),
+                                Some(cost_to_consume),
+                            )
                             .await;
                     });
                 }
@@ -354,6 +896,13 @@ pub async fn inference_handler(
             // Capture the gateway response (without null values)
             let gateway_response = serialize_without_nulls(&openai_compatible_response).ok();
 
+            // Build guardrail scan summary
+            let guardrail_summary = if !guardrail_context.scan_records.is_empty() {
+                Some(guardrail_context.build_summary())
+            } else {
+                None
+            };
+
             // Perform the database write if we have write info
             if let Some(write_info) = write_info {
                 let config = config.clone();
@@ -361,7 +910,29 @@ pub async fn inference_handler(
                 let kafka_connection_info = kafka_connection_info.clone();
                 let async_writes = config.gateway.observability.async_writes;
 
+                // Clone guardrail records for async write
+                let guardrail_records = guardrail_context.scan_records.clone();
+
                 let write_future = tokio::spawn(async move {
+                    // Update result with guardrail summary before writing
+                    if let Some(summary) = guardrail_summary {
+                        match &mut result {
+                            InferenceResult::Chat(chat_result) => {
+                                for model_result in &mut chat_result.model_inference_results {
+                                    model_result.guardrail_scan_summary =
+                                        Some(serde_json::to_string(&summary).unwrap_or_default());
+                                }
+                            }
+                            InferenceResult::Json(json_result) => {
+                                for model_result in &mut json_result.model_inference_results {
+                                    model_result.guardrail_scan_summary =
+                                        Some(serde_json::to_string(&summary).unwrap_or_default());
+                                }
+                            }
+                            _ => {} // Other types don't have model_inference_results
+                        }
+                    }
+
                     write_inference(
                         &clickhouse_connection_info,
                         &kafka_connection_info,
@@ -373,6 +944,7 @@ pub async fn inference_handler(
                         write_info.gateway_request,
                         gateway_response,
                         write_info.model_pricing,
+                        Some(guardrail_records), // Pass guardrail records for batch write
                     )
                     .await;
                 });
@@ -392,6 +964,11 @@ pub async fn inference_handler(
                 InferenceResponse::Json(json_response) => json_response.inference_id,
             };
 
+            // Update guardrail records with the correct inference_id
+            for record in &mut guardrail_context.scan_records {
+                record.inference_id = inference_id;
+            }
+
             let json_response = Json(openai_compatible_response);
             let mut http_response = json_response.into_response();
 
@@ -410,6 +987,14 @@ pub async fn inference_handler(
             Ok(http_response)
         }
         InferenceOutput::Streaming(mut stream) => {
+            // TODO: Implement output guardrails for streaming responses
+            // This would require buffering the entire response which defeats the purpose of streaming
+            // For now, streaming responses with guardrails will only check input
+
+            // Capture usage limiter and headers for usage tracking after stream completion
+            let usage_limiter_for_tracking = usage_limiter.clone();
+            let headers_for_tracking = headers.clone();
+
             // We need to peek at the first chunk to get the inference_id for analytics
             let mut inference_id_for_header = None;
             let mut first_chunk = None;
@@ -434,11 +1019,15 @@ pub async fn inference_handler(
                 }
             };
 
-            let openai_compatible_stream = prepare_serialized_openai_compatible_events(
-                Box::pin(combined_stream),
-                original_model_name,
-                stream_options,
-            );
+            // Create the stream with usage tracking
+            let openai_compatible_stream =
+                prepare_serialized_openai_compatible_events_with_usage_tracking(
+                    Box::pin(combined_stream),
+                    original_model_name.clone(),
+                    stream_options,
+                    usage_limiter_for_tracking,
+                    headers_for_tracking,
+                );
 
             let mut response = Sse::new(openai_compatible_stream)
                 .keep_alive(axum::response::sse::KeepAlive::new())
@@ -1544,100 +2133,193 @@ fn process_chat_content_chunk(
     (content_str, tool_calls, reasoning_content)
 }
 
+/// Shared stream processor for OpenAI-compatible events with optional usage tracking
+struct OpenAICompatibleStreamProcessor {
+    stream: InferenceStream,
+    model_name: String,
+    stream_options: Option<OpenAICompatibleStreamOptions>,
+    usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
+    headers: Option<HeaderMap>,
+}
+
+impl OpenAICompatibleStreamProcessor {
+    fn new(
+        stream: InferenceStream,
+        model_name: String,
+        stream_options: Option<OpenAICompatibleStreamOptions>,
+    ) -> Self {
+        Self {
+            stream,
+            model_name,
+            stream_options,
+            usage_limiter: None,
+            headers: None,
+        }
+    }
+
+    fn with_usage_tracking(
+        stream: InferenceStream,
+        model_name: String,
+        stream_options: Option<OpenAICompatibleStreamOptions>,
+        usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
+        headers: HeaderMap,
+    ) -> Self {
+        Self {
+            stream,
+            model_name,
+            stream_options,
+            usage_limiter,
+            headers: Some(headers),
+        }
+    }
+}
+
+impl Stream for OpenAICompatibleStreamProcessor {
+    type Item = Result<Event, Error>;
+
+    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // This will be implemented using async_stream::stream! macro
+        // For now, we'll use a helper method
+        unimplemented!("Use process_stream() method instead")
+    }
+}
+
+impl OpenAICompatibleStreamProcessor {
+    fn process_stream(mut self) -> impl Stream<Item = Result<Event, Error>> {
+        async_stream::stream! {
+            let mut tool_id_to_index = HashMap::new();
+            let mut is_first_chunk = true;
+            let mut total_usage = OpenAICompatibleUsage {
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                total_tokens: 0,
+            };
+            let mut inference_id = None;
+            let mut _episode_id = None;
+
+            // Process all chunks and accumulate usage
+            while let Some(chunk) = tokio_stream::StreamExt::next(&mut self.stream).await {
+                let Ok(chunk) = chunk else {
+                    continue;
+                };
+                inference_id = Some(chunk.inference_id());
+                _episode_id = Some(chunk.episode_id());
+                let chunk_usage = match &chunk {
+                    InferenceResponseChunk::Chat(c) => &c.usage,
+                    InferenceResponseChunk::Json(c) => &c.usage,
+                };
+                if let Some(chunk_usage) = chunk_usage {
+                    total_usage.prompt_tokens += chunk_usage.input_tokens;
+                    total_usage.completion_tokens += chunk_usage.output_tokens;
+                    total_usage.total_tokens += chunk_usage.input_tokens + chunk_usage.output_tokens;
+                }
+                let openai_compatible_chunks = convert_inference_response_chunk_to_openai_compatible(
+                    chunk,
+                    &mut tool_id_to_index,
+                    &self.model_name,
+                );
+                for chunk in openai_compatible_chunks {
+                    let mut chunk_json = serde_json::to_value(chunk).map_err(|e| {
+                        Error::new(ErrorDetails::Inference {
+                            message: format!("Failed to convert chunk to JSON: {e}"),
+                        })
+                    })?;
+                    if is_first_chunk {
+                        chunk_json["choices"][0]["delta"]["role"] = Value::String("assistant".to_string());
+                        is_first_chunk = false;
+                    }
+
+                    yield Ok(Event::default().json_data(chunk_json).map_err(|e| {
+                        Error::new(ErrorDetails::Inference {
+                            message: format!("Failed to convert Value to Event: {e}"),
+                        })
+                    })?);
+                }
+            }
+
+            // Handle final usage message if stream_options.include_usage is true
+            if let Some(ref options) = self.stream_options {
+                if options.include_usage {
+                    let final_usage_message = serde_json::json!({
+                        "id": format!("chatcmpl-{}", inference_id.unwrap_or(Uuid::new_v4())),
+                        "choices": [],
+                        "created": std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs(),
+                        "model": self.model_name,
+                        "system_fingerprint": serde_json::Value::Null,
+                        "object": "chat.completion.chunk",
+                        "usage": total_usage
+                    });
+
+                    yield Ok(Event::default().json_data(final_usage_message).map_err(|e| {
+                        Error::new(ErrorDetails::Inference {
+                            message: format!("Failed to convert final usage to Event: {e}"),
+                        })
+                    })?);
+                }
+            }
+
+            // Send [DONE] to signal the end of the stream
+            yield Ok(Event::default().data("[DONE]"));
+
+            // Handle usage tracking if enabled
+            if let (Some(usage_limiter), Some(headers)) = (self.usage_limiter, self.headers) {
+                if let Some(user_id) = headers.get("x-tensorzero-user-id").and_then(|v| v.to_str().ok()) {
+                    if total_usage.total_tokens > 0 {
+                        // Calculate estimated cost (using same logic as non-streaming)
+                        let tokens_to_consume = total_usage.total_tokens as i64;
+                        let cost_to_consume = if total_usage.total_tokens > 0 {
+                            // Use default pricing for streaming: $0.01 per 1K input tokens, $0.03 per 1K output tokens
+                            // Since we don't have exact input/output breakdown, use average: $0.02 per 1K tokens
+                            let cost = total_usage.total_tokens as f64 * 0.00002;
+                            (cost * 10000.0).round() / 10000.0
+                        } else {
+                            0.0
+                        };
+
+                        // Record the consumption (fire and forget - don't block response)
+                        let usage_limiter_clone = usage_limiter.clone();
+                        let user_id_clone = user_id.to_string();
+                        tokio::spawn(async move {
+                            let _result = usage_limiter_clone
+                                .check_usage(&user_id_clone, Some(tokens_to_consume), Some(cost_to_consume))
+                                .await;
+                        });
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Prepares an Event for SSE on the way out of the gateway
 /// When None is passed in, we send "[DONE]" to the client to signal the end of the stream
 fn prepare_serialized_openai_compatible_events(
-    mut stream: InferenceStream,
+    stream: InferenceStream,
     model_name: String,
     stream_options: Option<OpenAICompatibleStreamOptions>,
 ) -> impl Stream<Item = Result<Event, Error>> {
-    async_stream::stream! {
-        let mut tool_id_to_index = HashMap::new();
-        let mut is_first_chunk = true;
-        let mut total_usage = OpenAICompatibleUsage {
-            prompt_tokens: 0,
-            completion_tokens: 0,
-            total_tokens: 0,
-        };
-        let mut inference_id = None;
-        let mut episode_id = None;
-        while let Some(chunk) = tokio_stream::StreamExt::next(&mut stream).await {
-            // NOTE - in the future, we may want to end the stream early if we get an error
-            // For now, we just ignore the error and try to get more chunks
-            let Ok(chunk) = chunk else {
-                continue;
-            };
-            inference_id = Some(chunk.inference_id());
-            episode_id = Some(chunk.episode_id());
-            let chunk_usage = match &chunk {
-                InferenceResponseChunk::Chat(c) => {
-                    &c.usage
-                }
-                InferenceResponseChunk::Json(c) => {
-                    &c.usage
-                }
-            };
-            if let Some(chunk_usage) = chunk_usage {
-                total_usage.prompt_tokens += chunk_usage.input_tokens;
-                total_usage.completion_tokens += chunk_usage.output_tokens;
-                total_usage.total_tokens += chunk_usage.input_tokens + chunk_usage.output_tokens;
-            }
-            let openai_compatible_chunks = convert_inference_response_chunk_to_openai_compatible(chunk, &mut tool_id_to_index, &model_name);
-            for chunk in openai_compatible_chunks {
-                let mut chunk_json = serde_json::to_value(chunk).map_err(|e| {
-                    Error::new(ErrorDetails::Inference {
-                        message: format!("Failed to convert chunk to JSON: {e}"),
-                    })
-                })?;
-                if is_first_chunk {
-                    // OpenAI includes "assistant" role in the first chunk but not in the subsequent chunks
-                    chunk_json["choices"][0]["delta"]["role"] = Value::String("assistant".to_string());
-                    is_first_chunk = false;
-                }
+    OpenAICompatibleStreamProcessor::new(stream, model_name, stream_options).process_stream()
+}
 
-                yield Event::default().json_data(chunk_json).map_err(|e| {
-                    Error::new(ErrorDetails::Inference {
-                        message: format!("Failed to convert Value to Event: {e}"),
-                    })
-                })
-            }
-        }
-        if stream_options.map(|s| s.include_usage).unwrap_or(false) {
-            let episode_id = episode_id.ok_or_else(|| {
-                Error::new(ErrorDetails::Inference {
-                    message: "Cannot find episode_id - no chunks were produced by TensorZero".to_string(),
-                })
-            })?;
-            let inference_id = inference_id.ok_or_else(|| {
-                Error::new(ErrorDetails::Inference {
-                    message: "Cannot find inference_id - no chunks were produced by TensorZero".to_string(),
-                })
-            })?;
-            let usage_chunk = OpenAICompatibleResponseChunk {
-                id: inference_id.to_string(),
-                episode_id: episode_id.to_string(),
-                choices: vec![],
-                created: current_timestamp() as u32,
-                model: model_name.clone(),
-                system_fingerprint: "".to_string(),
-                object: "chat.completion.chunk".to_string(),
-                service_tier: "".to_string(),
-                usage: Some(OpenAICompatibleUsage {
-                    prompt_tokens: total_usage.prompt_tokens,
-                    completion_tokens: total_usage.completion_tokens,
-                    total_tokens: total_usage.total_tokens,
-                }),
-            };
-            yield Event::default().json_data(
-                usage_chunk)
-                .map_err(|e| {
-                    Error::new(ErrorDetails::Inference {
-                        message: format!("Failed to convert usage chunk to JSON: {e}"),
-                    })
-                });
-        }
-        yield Ok(Event::default().data("[DONE]"));
-    }
+/// Enhanced version of prepare_serialized_openai_compatible_events that includes usage tracking
+fn prepare_serialized_openai_compatible_events_with_usage_tracking(
+    stream: InferenceStream,
+    model_name: String,
+    stream_options: Option<OpenAICompatibleStreamOptions>,
+    usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
+    headers: HeaderMap,
+) -> impl Stream<Item = Result<Event, Error>> {
+    OpenAICompatibleStreamProcessor::with_usage_tracking(
+        stream,
+        model_name,
+        stream_options,
+        usage_limiter,
+        headers,
+    )
+    .process_stream()
 }
 
 impl From<ToolCallChunk> for OpenAICompatibleToolCall {
@@ -1851,6 +2533,7 @@ pub async fn embedding_handler(
             finish_reason: None,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
 
         let result = crate::inference::types::InferenceResult::Embedding(
@@ -1858,7 +2541,9 @@ pub async fn embedding_handler(
                 inference_id,
                 created: response.created,
                 embeddings: response.embeddings.clone(),
-                embedding_dimensions: response.embeddings.first()
+                embedding_dimensions: response
+                    .embeddings
+                    .first()
                     .map(|e| e.len() as u32)
                     .unwrap_or(0),
                 input_count: response.embeddings.len() as u32,
@@ -1910,8 +2595,8 @@ pub async fn embedding_handler(
         // Use defaults for embedding requests since they don't have function/variant context
         let episode_id = Uuid::now_v7();
         let metadata = crate::endpoints::inference::InferenceDatabaseInsertMetadata {
-            function_name: "tensorzero::embedding".to_string(),  // Default function name for embeddings
-            variant_name: original_model_name.clone(),           // Use model name as variant
+            function_name: "tensorzero::embedding".to_string(), // Default function name for embeddings
+            variant_name: original_model_name.clone(),          // Use model name as variant
             episode_id,
             tool_config: None,
             processing_time: Some(match response.latency {
@@ -1920,7 +2605,8 @@ pub async fn embedding_handler(
             }),
             tags: HashMap::new(),
             extra_body: UnfilteredInferenceExtraBody::default(),
-            extra_headers: crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
+            extra_headers:
+                crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
         };
 
         // Convert EmbeddingInput to ResolvedInput for write_inference
@@ -1928,16 +2614,17 @@ pub async fn embedding_handler(
             messages: vec![ResolvedInputMessage {
                 role: Role::User,
                 content: match &embedding_request.input {
-                    crate::embeddings::EmbeddingInput::Single(text) => vec![
-                        ResolvedInputMessageContent::Text {
+                    crate::embeddings::EmbeddingInput::Single(text) => {
+                        vec![ResolvedInputMessageContent::Text {
                             value: serde_json::Value::String(text.clone()),
-                        }
-                    ],
-                    crate::embeddings::EmbeddingInput::Batch(texts) => texts.iter().map(|text| {
-                        ResolvedInputMessageContent::Text {
+                        }]
+                    }
+                    crate::embeddings::EmbeddingInput::Batch(texts) => texts
+                        .iter()
+                        .map(|text| ResolvedInputMessageContent::Text {
                             value: serde_json::Value::String(text.clone()),
-                        }
-                    }).collect(),
+                        })
+                        .collect(),
                 },
             }],
             system: None,
@@ -1964,6 +2651,7 @@ pub async fn embedding_handler(
                 gateway_request_json,
                 gateway_response_json,
                 model_pricing,
+                None, // No guardrail records for embeddings
             )
             .await;
         });
@@ -2015,6 +2703,7 @@ pub async fn moderation_handler(
         kafka_connection_info,
         authentication_info: _,
         model_credential_store,
+        guardrails,
         ..
     }): AppState,
     headers: HeaderMap,
@@ -2070,11 +2759,22 @@ pub async fn moderation_handler(
     let gateway_request_json = serialize_without_nulls(&openai_compatible_params).ok();
 
     let moderation_request = crate::moderation::ModerationRequest {
-        input: internal_input,
+        input: internal_input.clone(),
         model: None, // Let the provider set the appropriate model name
+        provider_params: if openai_compatible_params.unknown_fields.is_empty() {
+            None
+        } else {
+            Some(serde_json::Value::Object(
+                openai_compatible_params
+                    .unknown_fields
+                    .clone()
+                    .into_iter()
+                    .collect(),
+            ))
+        },
     };
 
-    // Get the regular model table
+    // Get the model table
     let models = config.models.read().await;
 
     // Check if the model exists and has moderation capability
@@ -2109,99 +2809,194 @@ pub async fn moderation_handler(
         cache_options: &cache_options,
     };
 
-    // For now, we'll use the first provider in routing that supports moderation
-    // This is a temporary solution until we fully integrate moderation into the regular model system
-    let mut provider_errors = HashMap::new();
     let mut response = None;
 
-    for provider_name in &model_config.routing {
-        let provider = match model_config.providers.get(provider_name) {
-            Some(p) => &p.config,
-            None => {
-                tracing::warn!("Provider {} not found in model config", provider_name);
-                continue;
-            }
+    // Check if the model has a guardrail profile configured
+    if let Some(guardrail_profile) = &model_config.guardrail_profile {
+        tracing::info!(
+            "Model has guardrail profile configured: {}",
+            guardrail_profile
+        );
+
+        // Get the guardrail configuration
+        let guardrails_read = guardrails.read().await;
+        let guardrail_config = guardrails_read
+            .get(guardrail_profile.as_ref())
+            .ok_or_else(|| {
+                Error::new(ErrorDetails::Config {
+                    message: format!("Guardrail profile '{}' not found", guardrail_profile),
+                })
+            })?
+            .clone();
+        drop(guardrails_read);
+
+        // Execute the guardrail
+        let start_time = tokio::time::Instant::now();
+        let guardrail_result = crate::guardrail::execute_guardrail(
+            &guardrail_config,
+            moderation_request.input.clone(),
+            crate::guardrail_table::GuardType::Input,
+            &clients,
+            moderation_request.provider_params.clone(),
+        )
+        .await?;
+        let latency = start_time.elapsed();
+
+        // Convert guardrail result to moderation response
+        let results = vec![crate::moderation::ModerationResult {
+            flagged: guardrail_result.flagged,
+            categories: guardrail_result.merged_categories.clone(),
+            category_scores: guardrail_result.merged_scores.clone(),
+            category_applied_input_types: guardrail_result
+                .merged_category_applied_input_types
+                .clone(),
+            hallucination_details: guardrail_result.hallucination_details.clone(),
+            ip_violation_details: guardrail_result.ip_violation_details.clone(),
+        }];
+
+        let provider_response = crate::moderation::ModerationProviderResponse {
+            id: Uuid::now_v7(),
+            model: resolved_model_name.clone(),
+            results,
+            input: moderation_request.input.clone(),
+            created: crate::inference::types::current_timestamp() as u64,
+            raw_request: serde_json::to_string(&moderation_request).unwrap_or_default(),
+            raw_response: serde_json::to_value(&guardrail_result)
+                .ok()
+                .map(|v| v.to_string())
+                .unwrap_or_default(),
+            usage: crate::inference::types::Usage {
+                input_tokens: 0,
+                output_tokens: 0,
+            },
+            latency: crate::inference::types::Latency::NonStreaming {
+                response_time: latency,
+            },
         };
 
-        // Check if this provider supports moderation
-        tracing::info!("Checking provider {} for moderation support", provider_name);
-        match provider {
-            crate::model::ProviderConfig::OpenAI(openai_provider) => {
-                tracing::info!("Found OpenAI provider for moderation");
-                // For OpenAI, we need to use the provider's configured model name
-                let mut provider_request = moderation_request.clone();
-                provider_request.model = Some(openai_provider.model_name().to_string());
-                // Use the OpenAI provider's moderation capability
-                match openai_provider
-                    .moderate(&provider_request, clients.http_client, &credentials)
-                    .await
-                {
-                    Ok(provider_response) => {
-                        response = Some(crate::moderation::ModerationResponse::new(
-                            provider_response,
-                            provider_name.clone(),
-                        ));
-                        break;
-                    }
-                    Err(e) => {
-                        provider_errors.insert(provider_name.to_string(), e);
-                        continue;
+        response = Some(crate::moderation::ModerationResponse::new(
+            provider_response,
+            "guardrail".into(),
+        ));
+    }
+
+    let mut provider_errors = HashMap::new();
+
+    // Only use providers if guardrail didn't already handle the request
+    if response.is_none() {
+        // For now, we'll use the first provider in routing that supports moderation
+        // This is a temporary solution until we fully integrate moderation into the regular model system
+        for provider_name in &model_config.routing {
+            let provider = match model_config.providers.get(provider_name) {
+                Some(p) => &p.config,
+                None => {
+                    tracing::warn!("Provider {} not found in model config", provider_name);
+                    continue;
+                }
+            };
+
+            // Check if this provider supports moderation
+            tracing::info!("Checking provider {} for moderation support", provider_name);
+            match provider {
+                crate::model::ProviderConfig::OpenAI(openai_provider) => {
+                    tracing::info!("Found OpenAI provider for moderation");
+                    // For OpenAI, we need to use the provider's configured model name
+                    let mut provider_request = moderation_request.clone();
+                    provider_request.model = Some(openai_provider.model_name().to_string());
+                    // Use the OpenAI provider's moderation capability
+                    match openai_provider
+                        .moderate(&provider_request, clients.http_client, &credentials)
+                        .await
+                    {
+                        Ok(provider_response) => {
+                            response = Some(crate::moderation::ModerationResponse::new(
+                                provider_response,
+                                provider_name.clone(),
+                            ));
+                            break;
+                        }
+                        Err(e) => {
+                            provider_errors.insert(provider_name.to_string(), e);
+                            continue;
+                        }
                     }
                 }
-            }
-            crate::model::ProviderConfig::Mistral(mistral_provider) => {
-                tracing::info!("Found Mistral provider for moderation");
-                // For Mistral, we need to use the provider's configured model name
-                let mut provider_request = moderation_request.clone();
-                provider_request.model = Some(mistral_provider.model_name().to_string());
-                // Use the Mistral provider's moderation capability
-                match mistral_provider
-                    .moderate(&provider_request, clients.http_client, &credentials)
-                    .await
-                {
-                    Ok(provider_response) => {
-                        response = Some(crate::moderation::ModerationResponse::new(
-                            provider_response,
-                            provider_name.clone(),
-                        ));
-                        break;
-                    }
-                    Err(e) => {
-                        provider_errors.insert(provider_name.to_string(), e);
-                        continue;
-                    }
-                }
-            }
-            #[cfg(any(test, feature = "e2e_tests"))]
-            crate::model::ProviderConfig::Dummy(dummy_provider) => {
-                tracing::info!("Found Dummy provider for moderation");
-                // For Dummy provider, use the provider's configured model name
-                let mut provider_request = moderation_request.clone();
-                provider_request.model = Some(dummy_provider.model_name().to_string());
-                // Use the Dummy provider's moderation capability
-                match dummy_provider
-                    .moderate(&provider_request, clients.http_client, &credentials)
-                    .await
-                {
-                    Ok(provider_response) => {
-                        response = Some(crate::moderation::ModerationResponse::new(
-                            provider_response,
-                            provider_name.clone(),
-                        ));
-                        break;
-                    }
-                    Err(e) => {
-                        provider_errors.insert(provider_name.to_string(), e);
-                        continue;
+                crate::model::ProviderConfig::Mistral(mistral_provider) => {
+                    tracing::info!("Found Mistral provider for moderation");
+                    // For Mistral, we need to use the provider's configured model name
+                    let mut provider_request = moderation_request.clone();
+                    provider_request.model = Some(mistral_provider.model_name().to_string());
+                    // Use the Mistral provider's moderation capability
+                    match mistral_provider
+                        .moderate(&provider_request, clients.http_client, &credentials)
+                        .await
+                    {
+                        Ok(provider_response) => {
+                            response = Some(crate::moderation::ModerationResponse::new(
+                                provider_response,
+                                provider_name.clone(),
+                            ));
+                            break;
+                        }
+                        Err(e) => {
+                            provider_errors.insert(provider_name.to_string(), e);
+                            continue;
+                        }
                     }
                 }
-            }
-            _ => {
-                // Other providers don't support moderation yet
-                continue;
+                crate::model::ProviderConfig::AzureContentSafety(azure_cs_provider) => {
+                    tracing::info!("Found Azure Content Safety provider for moderation");
+                    // Azure Content Safety doesn't require a model name
+                    let provider_request = moderation_request.clone();
+                    // Use the Azure Content Safety provider's moderation capability
+                    match azure_cs_provider
+                        .moderate(&provider_request, clients.http_client, &credentials)
+                        .await
+                    {
+                        Ok(provider_response) => {
+                            response = Some(crate::moderation::ModerationResponse::new(
+                                provider_response,
+                                provider_name.clone(),
+                            ));
+                            break;
+                        }
+                        Err(e) => {
+                            provider_errors.insert(provider_name.to_string(), e);
+                            continue;
+                        }
+                    }
+                }
+                #[cfg(any(test, feature = "e2e_tests"))]
+                crate::model::ProviderConfig::Dummy(dummy_provider) => {
+                    tracing::info!("Found Dummy provider for moderation");
+                    // For Dummy provider, use the provider's configured model name
+                    let mut provider_request = moderation_request.clone();
+                    provider_request.model = Some(dummy_provider.model_name().to_string());
+                    // Use the Dummy provider's moderation capability
+                    match dummy_provider
+                        .moderate(&provider_request, clients.http_client, &credentials)
+                        .await
+                    {
+                        Ok(provider_response) => {
+                            response = Some(crate::moderation::ModerationResponse::new(
+                                provider_response,
+                                provider_name.clone(),
+                            ));
+                            break;
+                        }
+                        Err(e) => {
+                            provider_errors.insert(provider_name.to_string(), e);
+                            continue;
+                        }
+                    }
+                }
+                _ => {
+                    // Other providers don't support moderation yet
+                    continue;
+                }
             }
         }
-    }
+    } // End of if response.is_none()
 
     let response = response
         .ok_or_else(|| Error::new(ErrorDetails::ModelProvidersExhausted { provider_errors }))?;
@@ -2218,8 +3013,10 @@ pub async fn moderation_handler(
 
     // Write observability data if configured
     if config.gateway.observability.enabled.unwrap_or(true) {
-        use crate::inference::types::{ResolvedInput, ResolvedInputMessage, ResolvedInputMessageContent, Role};
         use crate::endpoints::inference::write_inference;
+        use crate::inference::types::{
+            ResolvedInput, ResolvedInputMessage, ResolvedInputMessageContent, Role,
+        };
 
         // Generate inference ID
         let inference_id = Uuid::now_v7();
@@ -2241,6 +3038,7 @@ pub async fn moderation_handler(
             finish_reason: Some(crate::inference::types::FinishReason::Stop),
             gateway_request: gateway_request_json.clone(),
             gateway_response: gateway_response_json.clone(),
+            guardrail_scan_summary: None,
         };
 
         // Create InferenceResult
@@ -2248,41 +3046,94 @@ pub async fn moderation_handler(
             crate::inference::types::ModerationInferenceResult {
                 inference_id,
                 created: response.created,
-                results: response.results.iter().map(|r| {
-                    // Convert ModerationCategories struct to HashMap
-                    let mut categories_map = HashMap::new();
-                    categories_map.insert("hate".to_string(), r.categories.hate);
-                    categories_map.insert("hate/threatening".to_string(), r.categories.hate_threatening);
-                    categories_map.insert("harassment".to_string(), r.categories.harassment);
-                    categories_map.insert("harassment/threatening".to_string(), r.categories.harassment_threatening);
-                    categories_map.insert("self-harm".to_string(), r.categories.self_harm);
-                    categories_map.insert("self-harm/intent".to_string(), r.categories.self_harm_intent);
-                    categories_map.insert("self-harm/instructions".to_string(), r.categories.self_harm_instructions);
-                    categories_map.insert("sexual".to_string(), r.categories.sexual);
-                    categories_map.insert("sexual/minors".to_string(), r.categories.sexual_minors);
-                    categories_map.insert("violence".to_string(), r.categories.violence);
-                    categories_map.insert("violence/graphic".to_string(), r.categories.violence_graphic);
+                results: response
+                    .results
+                    .iter()
+                    .map(|r| {
+                        // Convert ModerationCategories struct to HashMap
+                        let mut categories_map = HashMap::new();
+                        categories_map.insert("hate".to_string(), r.categories.hate);
+                        categories_map.insert(
+                            "hate/threatening".to_string(),
+                            r.categories.hate_threatening,
+                        );
+                        categories_map.insert("harassment".to_string(), r.categories.harassment);
+                        categories_map.insert(
+                            "harassment/threatening".to_string(),
+                            r.categories.harassment_threatening,
+                        );
+                        categories_map.insert("illicit".to_string(), r.categories.illicit);
+                        categories_map
+                            .insert("illicit/violent".to_string(), r.categories.illicit_violent);
+                        categories_map.insert("self-harm".to_string(), r.categories.self_harm);
+                        categories_map.insert(
+                            "self-harm/intent".to_string(),
+                            r.categories.self_harm_intent,
+                        );
+                        categories_map.insert(
+                            "self-harm/instructions".to_string(),
+                            r.categories.self_harm_instructions,
+                        );
+                        categories_map.insert("sexual".to_string(), r.categories.sexual);
+                        categories_map
+                            .insert("sexual/minors".to_string(), r.categories.sexual_minors);
+                        categories_map.insert("violence".to_string(), r.categories.violence);
+                        categories_map.insert(
+                            "violence/graphic".to_string(),
+                            r.categories.violence_graphic,
+                        );
+                        categories_map.insert("profanity".to_string(), r.categories.profanity);
+                        categories_map.insert("insult".to_string(), r.categories.insult);
+                        categories_map.insert("toxicity".to_string(), r.categories.toxicity);
+                        categories_map.insert("malicious".to_string(), r.categories.malicious);
+                        categories_map
+                            .insert("ip-violation".to_string(), r.categories.ip_violation);
 
-                    // Convert ModerationCategoryScores struct to HashMap
-                    let mut scores_map = HashMap::new();
-                    scores_map.insert("hate".to_string(), r.category_scores.hate);
-                    scores_map.insert("hate/threatening".to_string(), r.category_scores.hate_threatening);
-                    scores_map.insert("harassment".to_string(), r.category_scores.harassment);
-                    scores_map.insert("harassment/threatening".to_string(), r.category_scores.harassment_threatening);
-                    scores_map.insert("self-harm".to_string(), r.category_scores.self_harm);
-                    scores_map.insert("self-harm/intent".to_string(), r.category_scores.self_harm_intent);
-                    scores_map.insert("self-harm/instructions".to_string(), r.category_scores.self_harm_instructions);
-                    scores_map.insert("sexual".to_string(), r.category_scores.sexual);
-                    scores_map.insert("sexual/minors".to_string(), r.category_scores.sexual_minors);
-                    scores_map.insert("violence".to_string(), r.category_scores.violence);
-                    scores_map.insert("violence/graphic".to_string(), r.category_scores.violence_graphic);
+                        // Convert ModerationCategoryScores struct to HashMap
+                        let mut scores_map = HashMap::new();
+                        scores_map.insert("hate".to_string(), r.category_scores.hate);
+                        scores_map.insert(
+                            "hate/threatening".to_string(),
+                            r.category_scores.hate_threatening,
+                        );
+                        scores_map.insert("harassment".to_string(), r.category_scores.harassment);
+                        scores_map.insert(
+                            "harassment/threatening".to_string(),
+                            r.category_scores.harassment_threatening,
+                        );
+                        scores_map.insert("illicit".to_string(), r.category_scores.illicit);
+                        scores_map.insert(
+                            "illicit/violent".to_string(),
+                            r.category_scores.illicit_violent,
+                        );
+                        scores_map.insert("self-harm".to_string(), r.category_scores.self_harm);
+                        scores_map.insert(
+                            "self-harm/intent".to_string(),
+                            r.category_scores.self_harm_intent,
+                        );
+                        scores_map.insert(
+                            "self-harm/instructions".to_string(),
+                            r.category_scores.self_harm_instructions,
+                        );
+                        scores_map.insert("sexual".to_string(), r.category_scores.sexual);
+                        scores_map
+                            .insert("sexual/minors".to_string(), r.category_scores.sexual_minors);
+                        scores_map.insert("violence".to_string(), r.category_scores.violence);
+                        scores_map.insert(
+                            "violence/graphic".to_string(),
+                            r.category_scores.violence_graphic,
+                        );
+                        scores_map.insert("profanity".to_string(), r.category_scores.profanity);
+                        scores_map.insert("insult".to_string(), r.category_scores.insult);
+                        scores_map.insert("toxicity".to_string(), r.category_scores.toxicity);
 
-                    crate::inference::types::ModerationResult {
-                        flagged: r.flagged,
-                        categories: categories_map,
-                        category_scores: scores_map,
-                    }
-                }).collect(),
+                        crate::inference::types::ModerationResult {
+                            flagged: r.flagged,
+                            categories: categories_map,
+                            category_scores: scores_map,
+                        }
+                    })
+                    .collect(),
                 usage: response.usage.clone(),
                 model_inference_results: vec![model_inference],
                 inference_params: crate::endpoints::inference::InferenceParams::default(),
@@ -2331,8 +3182,8 @@ pub async fn moderation_handler(
         // Use defaults for moderation requests
         let episode_id = Uuid::now_v7();
         let metadata = crate::endpoints::inference::InferenceDatabaseInsertMetadata {
-            function_name: "tensorzero::moderation".to_string(),  // Default function name for moderation
-            variant_name: resolved_model_name.clone(),            // Use model name as variant
+            function_name: "tensorzero::moderation".to_string(), // Default function name for moderation
+            variant_name: resolved_model_name.clone(),           // Use model name as variant
             episode_id,
             tool_config: None,
             processing_time: Some(match response.latency {
@@ -2340,8 +3191,10 @@ pub async fn moderation_handler(
                 _ => std::time::Duration::from_millis(0),
             }),
             tags: HashMap::new(),
-            extra_body: crate::inference::types::extra_body::UnfilteredInferenceExtraBody::default(),
-            extra_headers: crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
+            extra_body: crate::inference::types::extra_body::UnfilteredInferenceExtraBody::default(
+            ),
+            extra_headers:
+                crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
         };
 
         // Convert input to ResolvedInput for write_inference
@@ -2380,6 +3233,7 @@ pub async fn moderation_handler(
                 gateway_request_json,
                 gateway_response_json_clone,
                 model_pricing,
+                None, // No guardrail records for moderation
             )
             .await;
         });
@@ -3542,7 +4396,12 @@ pub async fn image_generation_handler(
             created: response.created,
             output: vec![],
             model_name: Arc::from(model_name.as_str()),
-            model_provider_name: model.providers.values().next().map(|p| p.name.clone()).unwrap_or_default(),
+            model_provider_name: model
+                .providers
+                .values()
+                .next()
+                .map(|p| p.name.clone())
+                .unwrap_or_default(),
             input_messages: vec![],
             raw_request: response.raw_request.clone(),
             raw_response: response.raw_response.clone(),
@@ -3553,6 +4412,7 @@ pub async fn image_generation_handler(
             finish_reason: Some(crate::inference::types::FinishReason::Stop),
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
 
         // Create the InferenceResult
@@ -3560,14 +4420,24 @@ pub async fn image_generation_handler(
             crate::inference::types::ImageGenerationInferenceResult {
                 inference_id,
                 created: response.created,
-                images: response.data.iter().map(|d| crate::inference::types::ImageData {
-                    url: d.url.clone(),
-                    base64: d.b64_json.clone(),
-                    revised_prompt: d.revised_prompt.clone(),
-                }).collect(),
+                images: response
+                    .data
+                    .iter()
+                    .map(|d| crate::inference::types::ImageData {
+                        url: d.url.clone(),
+                        base64: d.b64_json.clone(),
+                        revised_prompt: d.revised_prompt.clone(),
+                    })
+                    .collect(),
                 image_count: response.data.len() as u8,
-                size: image_request.size.map(|s| s.as_str().to_string()).unwrap_or_else(|| "1024x1024".to_string()),
-                quality: image_request.quality.map(|q| q.as_str().to_string()).unwrap_or_else(|| "standard".to_string()),
+                size: image_request
+                    .size
+                    .map(|s| s.as_str().to_string())
+                    .unwrap_or_else(|| "1024x1024".to_string()),
+                quality: image_request
+                    .quality
+                    .map(|q| q.as_str().to_string())
+                    .unwrap_or_else(|| "standard".to_string()),
                 style: image_request.style.map(|s| s.as_str().to_string()),
                 usage: response.usage.clone(),
                 model_inference_results: vec![model_inference],
@@ -3617,8 +4487,8 @@ pub async fn image_generation_handler(
         // Use defaults for image generation requests
         let episode_id = Uuid::now_v7();
         let metadata = crate::endpoints::inference::InferenceDatabaseInsertMetadata {
-            function_name: "tensorzero::image_generation".to_string(),  // Default function name for images
-            variant_name: model_name.to_string(),           // Use model name as variant
+            function_name: "tensorzero::image_generation".to_string(), // Default function name for images
+            variant_name: model_name.to_string(),                      // Use model name as variant
             episode_id,
             tool_config: None,
             processing_time: Some(match response.latency {
@@ -3627,7 +4497,8 @@ pub async fn image_generation_handler(
             }),
             tags: HashMap::new(),
             extra_body: UnfilteredInferenceExtraBody::default(),
-            extra_headers: crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
+            extra_headers:
+                crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders::default(),
         };
 
         // Convert prompt to ResolvedInput for write_inference
@@ -3663,6 +4534,7 @@ pub async fn image_generation_handler(
                 gateway_request_json,
                 gateway_response_json,
                 model_pricing,
+                None, // No guardrail records for embeddings
             )
             .await;
         });
@@ -4409,7 +5281,7 @@ pub async fn response_create_handler(
 /// it defaults to 'gpt-4-responses'.
 ///
 /// Example:
-/// ```
+/// ```text
 /// curl -X GET http://localhost:3000/v1/responses/resp_123 \
 ///   -H "Authorization: Bearer YOUR_API_KEY" \
 ///   -H "x-model-name: your-model-name"
@@ -4494,7 +5366,7 @@ pub async fn response_retrieve_handler(
 /// it defaults to 'gpt-4-responses'.
 ///
 /// Example:
-/// ```
+/// ```text
 /// curl -X DELETE http://localhost:3000/v1/responses/resp_123 \
 ///   -H "Authorization: Bearer YOUR_API_KEY" \
 ///   -H "x-model-name: your-model-name"
@@ -4575,7 +5447,7 @@ pub async fn response_delete_handler(
 /// it defaults to 'gpt-4-responses'.
 ///
 /// Example:
-/// ```
+/// ```text
 /// curl -X POST http://localhost:3000/v1/responses/resp_123/cancel \
 ///   -H "Authorization: Bearer YOUR_API_KEY" \
 ///   -H "x-model-name: your-model-name"
@@ -4656,7 +5528,7 @@ pub async fn response_cancel_handler(
 /// it defaults to 'gpt-4-responses'.
 ///
 /// Example:
-/// ```
+/// ```text
 /// curl -X GET http://localhost:3000/v1/responses/resp_123/input_items \
 ///   -H "Authorization: Bearer YOUR_API_KEY" \
 ///   -H "x-model-name: your-model-name"
@@ -7031,4 +7903,140 @@ fn convert_openai_chunk_to_anthropic(openai_chunk: Value) -> Value {
             }
         })
     }
+}
+
+// Document processing handler
+/// Handler for document processing (POST /v1/documents)
+pub async fn document_processing_handler(
+    State(AppStateData {
+        config,
+        http_client,
+        clickhouse_connection_info,
+        kafka_connection_info: _,
+        authentication_info: _,
+        model_credential_store,
+        ..
+    }): AppState,
+    headers: HeaderMap,
+    StructuredJson(openai_compatible_params): StructuredJson<
+        crate::documents::OpenAICompatibleDocumentParams,
+    >,
+) -> Result<Response<Body>, Error> {
+    let unknown_fields: Vec<&str> = openai_compatible_params
+        .unknown_fields
+        .keys()
+        .map(|k| k.as_str())
+        .collect();
+
+    if !unknown_fields.is_empty() {
+        tracing::warn!(
+            "Ignoring unknown fields in document processing request: {:?}",
+            unknown_fields
+        );
+    }
+
+    // Resolve the model name based on authentication state
+    let model_resolution = model_resolution::resolve_model_name(
+        &openai_compatible_params.model,
+        &headers,
+        false, // not for embeddings
+    )?;
+
+    let model_id = model_resolution.model_name.ok_or_else(|| {
+        Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
+            message: "Document processing requests must specify a model, not a function"
+                .to_string(),
+        })
+    })?;
+
+    let original_model_name = model_resolution.original_model_name.to_string();
+
+    // Convert OpenAI request to internal format
+    let document_request = crate::documents::DocumentProcessingRequest {
+        id: Uuid::now_v7(),
+        model: Arc::from(openai_compatible_params.model.as_str()),
+        document: openai_compatible_params.document.clone(),
+        prompt: openai_compatible_params.prompt.clone(),
+    };
+
+    // Extract model configuration
+    use crate::model::ModelTableExt;
+    let models = config.models.read().await;
+    let model = models
+        .get_with_capability(
+            &model_id,
+            crate::endpoints::capability::EndpointCapability::Document,
+        )
+        .await?
+        .ok_or_else(|| {
+            Error::new(ErrorDetails::Config {
+                message: format!(
+                    "Model '{original_model_name}' not found or does not support document processing"
+                ),
+            })
+        })?;
+
+    // Merge credentials from the credential store
+    let mut credentials = merge_credentials_from_store(&model_credential_store);
+
+    // Extract and forward the authorization header if present
+    if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            // Strip "Bearer " prefix if present
+            let token = auth_str.strip_prefix("Bearer ").unwrap_or(auth_str);
+            // Use "authorization" as the key so dynamic credential lookup can find it
+            credentials.insert(
+                "authorization".to_string(),
+                secrecy::SecretString::from(token.to_string()),
+            );
+        }
+    }
+
+    // Create inference clients
+    let cache_options = crate::cache::CacheOptions {
+        max_age_s: None,
+        enabled: crate::cache::CacheEnabledMode::Off,
+    }; // No caching for documents yet
+    let clients = super::inference::InferenceClients {
+        http_client: &http_client,
+        credentials: &credentials,
+        clickhouse_connection_info: &clickhouse_connection_info,
+        cache_options: &cache_options,
+    };
+
+    // Call the model's document processing capability
+    let response = model
+        .process_document(&document_request, &original_model_name, &clients)
+        .await?;
+
+    // Convert to OpenAI-compatible format
+    let openai_response = crate::documents::OpenAICompatibleDocumentResponse {
+        id: format!("doc_{}", response.id),
+        object: "document".to_string(),
+        created: chrono::Utc::now().timestamp() as u64,
+        model: original_model_name.clone(),
+        document_id: response.document_id.to_string(),
+        pages: response.pages.clone(),
+        usage_info: response.usage_info.clone(),
+    };
+
+    // Convert response to JSON
+    let json_response = serde_json::to_string(&openai_response).map_err(|e| {
+        Error::new(ErrorDetails::Serialization {
+            message: format!("Failed to serialize document response: {}", e),
+        })
+    })?;
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .body(Body::from(json_response))
+        .map_err(|e| {
+            Error::new(ErrorDetails::InferenceServer {
+                message: format!("Failed to build response: {}", e),
+                provider_type: "BudDoc".to_string(),
+                raw_request: None,
+                raw_response: None,
+            })
+        })?)
 }

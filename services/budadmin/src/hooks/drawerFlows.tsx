@@ -1022,6 +1022,114 @@ const addModelLocalFlow: DrawerFlowType = {
   ],
 };
 
+const documentModelFlow: DrawerFlowType = {
+  title: "Select Document Model",
+  description: "Select a document processing model",
+  totalSteps: 4,
+  steps: [
+    {
+      id: "document-model-list",
+      component: StepComponents["document-model-list"],
+      navigation: () => ["Model", "Document Models"],
+      confirmClose: true,
+      step: 1,
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Credentials",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Model Onboarding",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Scan Completed",
+        },
+      ],
+    },
+    {
+      id: "select-or-add-credentials",
+      step: 2,
+      component: StepComponents["select-or-add-credentials"],
+      navigation: () => ["Model", "Document Models", "Credentials"],
+      confirmClose: true,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Credentials",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Model Onboarding",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Scan Completed",
+        },
+      ],
+    },
+    {
+      id: "extracting-model-status",
+      step: 3,
+      confirmClose: false,
+      navigation: () => ["Model", "Document Models", "Model Onboarding"],
+      component: StepComponents["extracting-model"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Credentials",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Model Onboarding",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Scan Completed",
+        },
+      ],
+    },
+    {
+      id: "scan-completed",
+      step: 4,
+      confirmClose: true,
+      navigation: () => ["Model", "Document Models", "Success"],
+      component: StepComponents["scan-completed"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Credentials",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Model Onboarding",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Scan Completed",
+        },
+      ],
+    },
+  ],
+};
+
 const securityScan: DrawerFlowType = {
   title: "Security Scan",
   description: "Run a security scan on the model",
@@ -4112,6 +4220,7 @@ const flows = {
   "add-model": addModel,
   "add-model-cloud-flow": addModelCloudFlow,
   "add-model-local-flow": addModelLocalFlow,
+  "document-model-flow": documentModelFlow,
   "security-scan": securityScan,
   "run-model-evaluations": runModelEvaluations,
   "edit-model": editModel,
@@ -4188,6 +4297,7 @@ export const flowMapping: {
     "add_adapter": "add-adapter",
     "delete_adapter": "delete-adapter",
     "model_benchmark": "model_benchmark",
+    "evaluate_model": "run-evaluation",
 }
 
 export const inProgressSteps = [

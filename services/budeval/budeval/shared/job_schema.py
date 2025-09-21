@@ -2,12 +2,14 @@ from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from budeval.commons.storage_config import StorageConfig
+
 
 class Job(BaseModel):
     # General info
     uuid: str
     runner_type: Literal["kubernetes", "docker"] = Field(..., description="Which runner type to use")
-    namespace: str = Field(default="budeval")
+    namespace: str = Field(default_factory=StorageConfig.get_current_namespace)
 
     # Engine config
     docker_image: str = Field(..., description="Docker image used to run the engine")

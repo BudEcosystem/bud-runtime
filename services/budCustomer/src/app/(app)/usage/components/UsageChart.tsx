@@ -8,7 +8,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  ReferenceLine,
 } from "recharts";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
@@ -95,12 +94,15 @@ const UsageChart: React.FC<UsageChartProps> = ({
 
   // Calculate days with usage and total value with proper memoization
   const daysWithUsage = useMemo(() => {
-    const count = data.filter(d => d.hasData === true).length;
+    const count = data.filter((d) => d.hasData === true).length;
     return count;
   }, [data]); // Recalculates when data changes
 
   const totalValue = useMemo(() => {
-    return data.reduce((sum, item) => sum + (item[chartConfig.dataKey] || 0), 0);
+    return data.reduce(
+      (sum, item) => sum + (item[chartConfig.dataKey] || 0),
+      0,
+    );
   }, [data, chartConfig.dataKey]); // Recalculates when data or dataKey changes
 
   // Custom bar shape with baseline
@@ -111,8 +113,9 @@ const UsageChart: React.FC<UsageChartProps> = ({
     const baselineY = y + height; // Bottom position
 
     // Check if light theme
-    const isLightTheme = document.documentElement.getAttribute('data-theme') === 'light';
-    const baselineColor = isLightTheme ? '#d1d5db' : '#4a4a4a';
+    const isLightTheme =
+      document.documentElement.getAttribute("data-theme") === "light";
+    const baselineColor = isLightTheme ? "#d1d5db" : "#4a4a4a";
 
     return (
       <g>
@@ -181,9 +184,14 @@ const UsageChart: React.FC<UsageChartProps> = ({
       <div className={styles.chartHeader}>
         <div className={styles.chartInfo}>
           <div className={styles.chartLegend}>
-            <span className={styles.legendDot} style={{ background: chartConfig.color }} />
+            <span
+              className={styles.legendDot}
+              style={{ background: chartConfig.color }}
+            />
             <span className={styles.legendText}>
-              {type === "requests" ? `${data.filter(d => d.hasData !== false).length} requests` : `${getDayFilterSelected} day${getDayFilterSelected > 1 ? 's' : ''} with usage`}
+              {type === "requests"
+                ? `${data.filter((d) => d.hasData !== false).length} requests`
+                : `${getDayFilterSelected} day${getDayFilterSelected > 1 ? "s" : ""} with usage`}
             </span>
             <span className={styles.legendValue}>
               {chartConfig.formatter(totalValue)}
@@ -195,12 +203,31 @@ const UsageChart: React.FC<UsageChartProps> = ({
       <ResponsiveContainer width="100%" height={220}>
         <BarChart
           data={data}
-          margin={{ top: 15, right: 15, left: 25, bottom: 35 }}
-          barCategoryGap={data.length > 30 ? "10%" : data.length > 14 ? "15%" : data.length > 7 ? "20%" : "25%"}
+          margin={{ top: 15, right: 15, left: 0, bottom: 10 }}
+          barCategoryGap={
+            data.length > 30
+              ? "10%"
+              : data.length > 14
+                ? "15%"
+                : data.length > 7
+                  ? "20%"
+                  : "25%"
+          }
         >
           <defs>
-            <pattern id="dotPattern" patternUnits="userSpaceOnUse" width="4" height="1">
-              <circle cx="1" cy="0.5" r="0.5" fill="var(--border-color)" opacity="0.5" />
+            <pattern
+              id="dotPattern"
+              patternUnits="userSpaceOnUse"
+              width="4"
+              height="1"
+            >
+              <circle
+                cx="1"
+                cy="0.5"
+                r="0.5"
+                fill="var(--border-color)"
+                opacity="0.5"
+              />
             </pattern>
           </defs>
           <CartesianGrid
@@ -209,21 +236,6 @@ const UsageChart: React.FC<UsageChartProps> = ({
             vertical={false}
             horizontal={false}
           />
-          {/* Top reference line with label */}
-          <ReferenceLine
-            y={maxValue}
-            stroke="#7c3aed"
-            strokeDasharray="2 2"
-            strokeWidth={1}
-            opacity={0.5}
-            label={{
-              value: chartConfig.formatter(maxValue),
-              position: "left",
-              fill: "#7c3aed",
-              fontSize: 11,
-              opacity: 0.8
-            }}
-          />
           {/* Baseline - removed as we'll use custom lines */}
           <XAxis
             dataKey="displayDate"
@@ -231,7 +243,15 @@ const UsageChart: React.FC<UsageChartProps> = ({
             axisLine={false}
             tickLine={false}
             height={40}
-            interval={data.length > 30 ? Math.floor(data.length / 10) : data.length > 14 ? 3 : data.length > 7 ? 1 : 0}
+            interval={
+              data.length > 30
+                ? Math.floor(data.length / 10)
+                : data.length > 14
+                  ? 3
+                  : data.length > 7
+                    ? 1
+                    : 0
+            }
             tickMargin={15}
           />
           <YAxis
@@ -285,8 +305,8 @@ const UsageChart: React.FC<UsageChartProps> = ({
                   entry.hasData === false
                     ? "transparent"
                     : entry[chartConfig.dataKey] > maxValue * 0.8
-                    ? chartConfig.color
-                    : `${chartConfig.color}99`
+                      ? chartConfig.color
+                      : `${chartConfig.color}99`
                 }
               />
             ))}

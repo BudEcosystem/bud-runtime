@@ -9,6 +9,9 @@
   gnused,
   gnugrep,
   findutils,
+
+  iSdebugBuild ? true,
+  neovim,
 }:
 let
   port = 3000;
@@ -64,6 +67,15 @@ dockerTools.buildLayeredImage {
     budcustomer
     novu_id_env_setter
     dockerTools.binSh # npm error enoent spawn sh ENOENT
+  ]
+  ++ lib.optional iSdebugBuild [
+    curl
+    jq
+    coreutils
+    gnused
+    gnugrep
+    findutils
+    neovim
   ];
 
   config = {

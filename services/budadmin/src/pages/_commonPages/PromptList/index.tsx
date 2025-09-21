@@ -78,7 +78,7 @@ const HarmfulnessPromptList = () => {
     clusterDetails,
     getEndpointClusterDetails,
     pageTitle,
-    setPromptPage
+    setPromptPage,
   } = useEndPoints();
   const [copyText, setCopiedText] = useState<string>("Copy");
   const { showLoader, hideLoader } = useLoader();
@@ -95,11 +95,11 @@ const HarmfulnessPromptList = () => {
   const [filterOpen, setFilterOpen] = React.useState(false);
 
   // Get last route segment
-  const lastSegment = router.asPath.split('/').filter(Boolean).pop();
+  const lastSegment = router.asPath.split("/").filter(Boolean).pop();
 
   // Find matching title
-  const matched = promptKeys.find(item => item.key === lastSegment);
-  const matchedTitle = matched ? matched.title : 'Unknown';
+  const matched = promptKeys.find((item) => item.key === lastSegment);
+  const matchedTitle = matched ? matched.title : "Unknown";
 
   const handlePageChange = (currentPage, pageSize) => {
     setCurrentPage(currentPage);
@@ -148,13 +148,16 @@ const HarmfulnessPromptList = () => {
       getClusterById(clustersId as string);
     }
     if (deploymentId) {
-      await getEndpointClusterDetails(deploymentId as string, projectId as string);
+      await getEndpointClusterDetails(
+        deploymentId as string,
+        projectId as string,
+      );
     }
     hideLoader();
-  }
+  };
 
   useEffect(() => {
-    if (projectId || clustersId && deploymentId) {
+    if (projectId || (clustersId && deploymentId)) {
       initialLoad();
     }
   }, [projectId, clustersId, deploymentId]);
@@ -196,7 +199,7 @@ const HarmfulnessPromptList = () => {
         search: !!searchValue,
         order_by: `${order}${orderBy}`,
       },
-      deploymentId as string
+      deploymentId as string,
     );
     hideLoader();
   };
@@ -206,14 +209,12 @@ const HarmfulnessPromptList = () => {
     load();
   }, [currentPage, pageSize, searchValue, filter]);
 
-
   useEffect(() => {
-    setPromptPage(matched?.key, matchedTitle)
+    setPromptPage(matched?.key, matchedTitle);
     setTimeout(() => {
       load();
     }, 500);
   }, [deploymentId]);
-
 
   const goBack = () => {
     if (showPrompt) {
@@ -377,8 +378,6 @@ const HarmfulnessPromptList = () => {
     </div>
   );
 
-
-
   const HeaderContent = () => {
     return (
       <div className="flex justify-between items-center">
@@ -393,13 +392,12 @@ const HarmfulnessPromptList = () => {
                 `${matchedTitle}`,
               ]}
               urls={[
-                `/${projectId ? 'projects' : 'clusters'}`,
-                `/${projectId?'projects':'clusters'}/${projectId || clusterDetails?.cluster?.id}`,
-                `/${projectId?'projects':'clusters'}/${projectId || clusterDetails?.cluster?.id}/deployments/${deploymentId || clusterDetails?.id}`,
+                `/${projectId ? "projects" : "clusters"}`,
+                `/${projectId ? "projects" : "clusters"}/${projectId || clusterDetails?.cluster?.id}`,
+                `/${projectId ? "projects" : "clusters"}/${projectId || clusterDetails?.cluster?.id}/deployments/${deploymentId || clusterDetails?.id}`,
                 ``,
               ]}
             />
-
           </div>
         )}
       </div>
@@ -469,7 +467,9 @@ const HarmfulnessPromptList = () => {
                   <div className="flex items-center justify-end gap-x-[.5rem]">
                     <SearchHeaderInput
                       searchValue={searchValue}
-                      setSearchValue={(value) => { setSearchValue(value) }}
+                      setSearchValue={(value) => {
+                        setSearchValue(value);
+                      }}
                     />
                     <div className=" filterPopup">
                       <ConfigProvider

@@ -1,49 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 interface FileViewerProps {
   fileUrl?: string;
 }
 
 const FileViewer: React.FC<FileViewerProps> = ({ fileUrl }) => {
-  const [fileType, setFileType] = useState('');
-  const [textContent, setTextContent] = useState('');
-  const [blobUrl, setBlobUrl] = useState('');
+  const [fileType, setFileType] = useState("");
+  const [textContent, setTextContent] = useState("");
+  const [blobUrl, setBlobUrl] = useState("");
 
   useEffect(() => {
     const fetchFileType = async () => {
       try {
         const res = await fetch(fileUrl);
-        const contentType = res.headers.get('Content-Type') || '';
-        console.log('Content-Type:', contentType);
-        if (!res.ok) throw new Error('Failed to fetch file');
+        const contentType = res.headers.get("Content-Type") || "";
+        console.log("Content-Type:", contentType);
+        if (!res.ok) throw new Error("Failed to fetch file");
 
-        const url = fileUrl || '';
+        const url = fileUrl || "";
 
         // Use URL extension fallback if contentType is useless
-        if (contentType.startsWith('image/')) {
-          setFileType('image');
+        if (contentType.startsWith("image/")) {
+          setFileType("image");
           setBlobUrl(url);
-        } else if (contentType === 'application/pdf' || url.endsWith('.pdf')) {
-          setFileType('pdf');
+        } else if (contentType === "application/pdf" || url.endsWith(".pdf")) {
+          setFileType("pdf");
           setBlobUrl(url);
-        } else if (contentType.includes('text/html') || url.endsWith('.html')) {
-          setFileType('html');
+        } else if (contentType.includes("text/html") || url.endsWith(".html")) {
+          setFileType("html");
           setBlobUrl(url);
         } else if (
-          contentType.startsWith('text/') ||
-          url.endsWith('.md') ||
-          url.endsWith('.txt') ||
-          contentType === 'application/octet-stream' // Fallback for unknown but readable files
+          contentType.startsWith("text/") ||
+          url.endsWith(".md") ||
+          url.endsWith(".txt") ||
+          contentType === "application/octet-stream" // Fallback for unknown but readable files
         ) {
-          setFileType('text');
+          setFileType("text");
           const text = await res.text(); // Try to parse it as text anyway
           setTextContent(text);
         } else {
-          setFileType('unknown');
+          setFileType("unknown");
         }
       } catch (error) {
-        console.error('File load error:', error);
-        setFileType('error');
+        console.error("File load error:", error);
+        setFileType("error");
       }
     };
 
@@ -52,15 +52,20 @@ const FileViewer: React.FC<FileViewerProps> = ({ fileUrl }) => {
     }
   }, [fileUrl]);
 
-
-  if (fileType === 'image') {
-    return <img src={blobUrl} alt="Image Preview" className="max-w-full h-auto rounded" />;
+  if (fileType === "image") {
+    return (
+      <img
+        src={blobUrl}
+        alt="Image Preview"
+        className="max-w-full h-auto rounded"
+      />
+    );
   }
 
-  if (fileType === 'pdf') {
+  if (fileType === "pdf") {
     return (
       <iframe
-        style={{ backgroundColor: 'transparent' }}
+        style={{ backgroundColor: "transparent" }}
         src={blobUrl}
         title="PDF Viewer"
         width="100%"
@@ -70,10 +75,10 @@ const FileViewer: React.FC<FileViewerProps> = ({ fileUrl }) => {
     );
   }
 
-  if (fileType === 'html') {
+  if (fileType === "html") {
     return (
       <iframe
-        style={{ backgroundColor: 'transparent' }}
+        style={{ backgroundColor: "transparent" }}
         src={blobUrl}
         // src={fileUrl}
         title="HTML Viewer"
@@ -84,7 +89,7 @@ const FileViewer: React.FC<FileViewerProps> = ({ fileUrl }) => {
     );
   }
 
-  if (fileType === 'text') {
+  if (fileType === "text") {
     return (
       <pre className="whitespace-pre-wrap p-4 bg-[#202020] rounded overflow-auto text-[#EEEEEE] text-[.625rem]">
         {textContent}
@@ -92,12 +97,17 @@ const FileViewer: React.FC<FileViewerProps> = ({ fileUrl }) => {
     );
   }
 
-  if (fileType === 'error') {
+  if (fileType === "error") {
     return <div className="text-red-500">Failed to load file</div>;
   }
 
   return (
-    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+    <a
+      href={fileUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-600 underline"
+    >
       Open file
     </a>
   );

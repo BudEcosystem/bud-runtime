@@ -1547,12 +1547,11 @@ const editProject: DrawerFlowType = {
       navigation: () => {
         const state = useProjects.getState();
         const project = state.globalSelectedProject;
-        const projectName = (project as any)?.project?.name || (project as any)?.name || "Project";
-        return [
-          "Projects",
-          projectName,
-          "Edit Project",
-        ];
+        const projectName =
+          (project as any)?.project?.name ||
+          (project as any)?.name ||
+          "Project";
+        return ["Projects", projectName, "Edit Project"];
       },
       id: "edit-project",
       confirmClose: false,
@@ -1573,12 +1572,11 @@ const editProject: DrawerFlowType = {
       navigation: () => {
         const state = useProjects.getState();
         const project = state.globalSelectedProject;
-        const projectName = (project as any)?.project?.name || (project as any)?.name || "Project";
-        return [
-          "Projects",
-          projectName,
-          "Success",
-        ];
+        const projectName =
+          (project as any)?.project?.name ||
+          (project as any)?.name ||
+          "Project";
+        return ["Projects", projectName, "Success"];
       },
       id: "project-edit-success",
       confirmClose: false,
@@ -1872,26 +1870,7 @@ const deleteCluster: DrawerFlowType = {
   ],
 };
 
-const deleteProject: DrawerFlowType = {
-  title: "Delete Project",
-  description: "Delete a project",
-  totalSteps: 1,
-  steps: [
-    {
-      navigation: () => ["Project", "Delete Project"],
-      confirmClose: false,
-      id: "delete-project",
-      step: 1,
-      component: StepComponents["delete-project"],
-      progress: [
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Delete Project",
-        },
-      ],
-    },
-  ],
-};
+// Delete project flow removed - now using notification warning approach
 
 const deletingEndpoint: DrawerFlowType = {
   title: "Deleting Deployment",
@@ -2215,6 +2194,27 @@ const clusterEvent: DrawerFlowType = {
         {
           status: FormProgressStatus.inProgress,
           title: "Event",
+        },
+      ],
+    },
+  ],
+};
+
+const createBillingAlert: DrawerFlowType = {
+  title: "Create Billing Alert",
+  description: "Set up usage threshold notifications",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Billing", "Create Alert"],
+      id: "create-billing-alert",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["create-billing-alert"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Create Alert",
         },
       ],
     },
@@ -3496,7 +3496,7 @@ const editApiKey: DrawerFlowType = {
           title: "Edit Key",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
   ],
 };
@@ -3519,7 +3519,7 @@ const flows = {
   "worker-details": workerDetails,
   "use-model": useModel,
   "delete-cluster": deleteCluster,
-  "delete-project": deleteProject,
+  // "delete-project": removed - now using notification warning approach
   "deleting-endpoint": deletingEndpoint,
   "deleting-cluster": deletingCluster,
   "add-credentials": addCredentials,
@@ -3532,6 +3532,7 @@ const flows = {
   "license-Details": licenseDetails,
   "derived-model-list": derivedModelList,
   "cluster-event": clusterEvent,
+  "create-billing-alert": createBillingAlert,
   "deleting-worker": deletingWorker,
   "view-user": viewUser,
   "edit-user": editUser,

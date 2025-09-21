@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-budgateway-config
+data:
+  tensorzero.toml: |
+    [gateway]
+    bind_address = "0.0.0.0:3000"
+    debug = false
+
+    [gateway.rate_limits]
+    enabled = true
+
+    [gateway.blocking]
+    enabled = true
+
+    [gateway.analytics]
+    enabled = true
+    geoip_db_path = "/app/geo/GeoLite2-City.mmdb"
+
+    [gateway.observability.kafka]
+    enabled = true
+    brokers = "{{ .Release.Name }}-kafka:9092"
+    topic_prefix = "tensorzero"
+    compression_type = "lz4"
+    batch_size = 1000
+    linger_ms = 10
+    security_protocol = "SASL_PLAINTEXT"
+
+    [gateway.observability.kafka.sasl]
+    mechanism = "PLAIN"
+    username = "{{ index .Values.kafka.sasl.client.users 0 }}"
+    password = "{{ index .Values.kafka.sasl.client.passwords 0 }}"
+
+    [object_storage]
+    type = "disabled"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budgateway
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budgateway
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budgateway
+      annotations:
+        date: "{{ now }}"
+    spec:
+      containers:
+        - name: budgateway
+          image: {{ .Values.microservices.budgateway.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          command: ["gateway"]
+          args:
+            - --config-file=/app/config/tensorzero.toml
+          ports:
+            - containerPort: 3000
+          env:
+            - name: TENSORZERO_REDIS_URL
+              value: "redis://default:{{ .Values.valkey.auth.password}}@{{ .Release.Name }}-valkey-primary:6379/2"
+            - name: TENSORZERO_CLICKHOUSE_URL
+              value: "http://{{ .Values.clickhouse.auth.username }}:{{ .Values.clickhouse.auth.password }}@{{ .Release.Name }}-clickhouse:8123/budproxy"
+            - name: TENSORZERO_RSA_PRIVATE_KEY_PATH
+              value: /app/keys/rsa-private-key.pem
+            - name: TENSORZERO_RSA_PRIVATE_KEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-rsa-keys
+                  key: private-key-password
+          volumeMounts:
+            - name: {{ .Release.Name }}-budgateway-config
+              mountPath: /app/config
+            - name: rsa-keys
+              mountPath: /app/keys
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4096Mi
+            requests:
+              cpu: 2000m
+              memory: 4096Mi
+      volumes:
+        - name: {{ .Release.Name }}-budgateway-config
+          configMap:
+            name: {{ .Release.Name }}-budgateway-config
+        - name: rsa-keys
+          secret:
+            secretName: {{ .Release.Name }}-rsa-keys
+            defaultMode: 0444
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budgateway
+spec:
+  selector:
+    app: {{ .Release.Name }}-budgateway
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000

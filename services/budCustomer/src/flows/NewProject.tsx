@@ -4,7 +4,8 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import ProjectNameInput from "@/components/ui/bud/dataEntry/ProjectNameInput";
+import TextInput from "@/components/ui/bud/dataEntry/TextInput";
+import { projectNameRegex } from "@/lib/utils";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 import React, { useContext, useEffect, useState, useCallback } from "react";
 import { useDrawer } from "@/hooks/useDrawer";
@@ -37,6 +38,7 @@ export default function NewProject() {
   const { openDrawerWithStep } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
   const [options, setOptions] = useState<{ name: string; color: string }[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
 
   const fetchList = useCallback(() => {
     const data =
@@ -58,7 +60,9 @@ export default function NewProject() {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         /* Fix tags dropdown visibility in light theme */
         [data-theme="light"] .ant-select-dropdown {
           background-color: #FFFFFF !important;
@@ -101,129 +105,167 @@ export default function NewProject() {
         [data-theme="light"] .ant-select-selection-item span {
           color: #000000 !important;
         }
-      ` }} />
-    <BudForm
-      data={{
-        name: "",
-        description: "",
-        tags: [],
-        icon: "😍",
-      }}
-      onNext={(values) => {
-        if (!submittable) {
-          form.submit();
-          return;
-        }
-        // Ensure tags are in the correct format (array of objects with name and color)
-        const formattedTags = values.tags
-          ? (Array.isArray(values.tags) ? values.tags : [])
-              .map((tag: any) => {
-                // If tag is already in correct format, use it
-                if (
-                  tag &&
-                  typeof tag === "object" &&
-                  "name" in tag &&
-                  "color" in tag
-                ) {
-                  return {
-                    name: tag.name,
-                    color: tag.color,
-                  };
-                }
-                // If tag is a string, convert it
-                if (typeof tag === "string") {
-                  return {
-                    name: tag,
-                    color: "#89C0F2", // Default color
-                  };
-                }
-                return null;
-              })
-              .filter(Boolean)
-          : [];
+      `,
+        }}
+      />
+      <BudForm
+        data={{
+          name: "",
+          description: "",
+          tags: [],
+          icon: "😍",
+        }}
+        onNext={(values) => {
+          // Prevent multiple submissions
+          if (isCreating) {
+            return;
+          }
 
-        const projectData: ProjectData = {
-          name: values.name,
-          description: values.description,
-          tags: formattedTags,
-          icon: values.icon || "😍",
-          project_type: "client_app",
-          benchmark: false,
-        };
+          if (!submittable) {
+            form.submit();
+            return;
+          }
 
-        apiCreateProject(projectData)
-          .then((result) => {
-            if (result) {
-              // Store project name temporarily for success screen
-              localStorage.setItem("temp_project_name", values.name);
-              // Refresh projects list
-              getGlobalProjects(1, 10);
-              // Navigate to success screen
-              openDrawerWithStep("project-success");
-            }
-          })
-          .catch((error) => {
-            console.error("Error creating project:", error);
-          });
-      }}
-      nextText="Create Project"
-    >
-      <BudWraperBox center>
-        <BudDrawerLayout>
-          <DrawerTitleCard
-            title="Create a new project"
-            description="Let's get started by filling in the details below"
-          />
-          <DrawerCard classNames="pb-0">
-            <ProjectNameInput
-              placeholder="Enter Project Name"
-              onChangeName={(name) => form.setFieldsValue({ name })}
-              onChangeIcon={(icon) => form.setFieldsValue({ icon })}
-              isEdit={true}
-              showIcon={false}
+          // Set loading state to prevent multiple clicks
+          setIsCreating(true);
+
+          // Ensure tags are in the correct format (array of objects with name and color)
+          const formattedTags = values.tags
+            ? (Array.isArray(values.tags) ? values.tags : [])
+                .map((tag: any) => {
+                  // If tag is already in correct format, use it
+                  if (
+                    tag &&
+                    typeof tag === "object" &&
+                    "name" in tag &&
+                    "color" in tag
+                  ) {
+                    return {
+                      name: tag.name,
+                      color: tag.color,
+                    };
+                  }
+                  // If tag is a string, convert it
+                  if (typeof tag === "string") {
+                    return {
+                      name: tag,
+                      color: "#89C0F2", // Default color
+                    };
+                  }
+                  return null;
+                })
+                .filter(Boolean)
+            : [];
+
+          const projectData: ProjectData = {
+            name: values.name ? values.name.trim() : "",
+            description: values.description ? values.description.trim() : "",
+            tags: formattedTags,
+            icon: values.icon || "😍",
+            project_type: "client_app",
+            benchmark: false,
+          };
+
+          // Additional validation to ensure name is not empty after trimming
+          if (!projectData.name) {
+            setIsCreating(false);
+            return;
+          }
+
+          apiCreateProject(projectData)
+            .then((result) => {
+              if (result) {
+                // Store project name temporarily for success screen
+                localStorage.setItem("temp_project_name", values.name);
+                // Refresh projects list
+                getGlobalProjects(1, 10);
+                // Navigate to success screen
+                openDrawerWithStep("project-success");
+              }
+            })
+            .catch((error) => {
+              console.error("Error creating project:", error);
+            })
+            .finally(() => {
+              // Reset loading state in case of error or if user navigates back
+              setIsCreating(false);
+            });
+        }}
+        nextText="Create Project"
+        disableNext={isCreating}
+        drawerLoading={isCreating}
+      >
+        <BudWraperBox center>
+          <BudDrawerLayout>
+            <DrawerTitleCard
+              title="Create a new project"
+              description="Let's get started by filling in the details below"
             />
-            <div className="flex justify-start items-center px-[.65rem] mb-[1.65rem]">
-              <Icon
-                icon="ph:calendar"
-                className="text-bud-text-disabled mr-2 text-[0.875rem]"
+            <DrawerCard classNames="pb-0">
+              <TextInput
+                name="name"
+                label="Project Name"
+                placeholder="Enter Project Name"
+                preventFirstSpace={true}
+                rules={[
+                  {
+                    required: true,
+                    message: "Please Enter Project Name",
+                  },
+                  {
+                    max: 30,
+                    message: "Project name should be less than 30 characters",
+                  },
+                  {
+                    pattern: projectNameRegex,
+                    message:
+                      "Project name should contain only alphanumeric characters, spaces, hyphens, and underscores",
+                  },
+                  {
+                    validator: (_, value) => {
+                      if (value && value.trim().length === 0) {
+                        return Promise.reject(
+                          new Error("Project name cannot be only spaces"),
+                        );
+                      }
+                      return Promise.resolve();
+                    },
+                  },
+                ]}
               />
-              <Text_12_400_B3B3B3>Created on&nbsp;&nbsp;</Text_12_400_B3B3B3>
-              <Text_12_400_EEEEEE>
-                {dayjs().format("DD MMM, YYYY")}
-              </Text_12_400_EEEEEE>
-            </div>
-            <TagsInput
-              label="Tags"
-              required
-              options={options}
-              info="Add keywords to help organize and find your project later."
-              name="tags"
-              placeholder="Add Tags (e.g. Data Science, Banking) "
-              rules={[
-                {
-                  required: true,
-                  message: "Please add tags to categorize the project.",
-                },
-              ]}
-            />
-            <div className="h-[1rem] w-full" />
-            <TextAreaInput
-              name="description"
-              label="Description"
-              required
-              info="This is the project's elevator pitch, use clear and concise words to summarize the project in few sentences"
-              placeholder="Provide a brief description about the project."
-              rules={[
-                {
-                  required: true,
-                  message: "Provide a brief description about the project.",
-                },
-              ]}
-            />
-          </DrawerCard>
-        </BudDrawerLayout>
-      </BudWraperBox>
-    </BudForm>
+
+              <TagsInput
+                label="Tags"
+                required
+                options={options}
+                info="Add keywords to help organize and find your project later."
+                name="tags"
+                placeholder="Add Tags (e.g. Data Science, Banking) "
+                rules={[
+                  {
+                    required: true,
+                    message: "Please add tags to categorize the project.",
+                  },
+                ]}
+              />
+              <div className="h-[1rem] w-full" />
+              <TextAreaInput
+                name="description"
+                label="Description"
+                required
+                info="This is the project's elevator pitch, use clear and concise words to summarize the project in few sentences"
+                placeholder="Provide a brief description about the project."
+                rules={[
+                  {
+                    required: true,
+                    message: "Provide a brief description about the project.",
+                  },
+                ]}
+              />
+            </DrawerCard>
+          </BudDrawerLayout>
+        </BudWraperBox>
+      </BudForm>
     </>
   );
 }

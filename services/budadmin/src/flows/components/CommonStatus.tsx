@@ -46,7 +46,7 @@ export default function CommonStatus({
     | 'performance_benchmark'
     | 'deploy_quantization'
     | 'add_adapter'
-    | 'run_evaluation',
+    | 'evaluate_model',
     events_field_id:
     'bud_simulator_events'
     | 'budserve_cluster_events'
@@ -60,7 +60,8 @@ export default function CommonStatus({
     | 'quantization_simulator_events'
     | 'quantization_deployment_events'
     | 'adapter_deployment_events'
-    | 'evaluation_workflow_events',
+    | 'evaluation_workflow_events'
+    | 'evaluation_events',
     onCompleted: () => void,
     onFailed: () => void,
 }) {
@@ -102,17 +103,19 @@ export default function CommonStatus({
         if (data?.workflow_steps[events_field_id]?.eta) {
             calculateEta(data?.workflow_steps[events_field_id]?.eta, setEta);
         }
-
+        console.log('response', response)
         setLoading(false);
     }
 
     useEffect(() => {
+        console.log(`workflowId`, workflowId)
         if (workflowId) {
             getWorkflow();
         }
     }, [workflowId]);
 
-    const handleNotification = useCallback(async (data) => {
+    const handleNotification = useCallback(async (data: any) => {
+
         try {
             if (!data) {
                 return;
@@ -123,6 +126,7 @@ export default function CommonStatus({
         } catch (error) {
             return
         }
+        console.log(`notification data`, data)
         if (data.message.payload.type === success_payload_type && data.message.payload.category === "internal") {
             setSteps(steps => {
                 const newSteps = steps.map((step) =>
@@ -151,6 +155,7 @@ export default function CommonStatus({
     }, [steps, workflowId]);
 
     useEffect(() => {
+        console.log(`socket`, socket)
         if (socket) {
             socket.on("notification_received", handleNotification);
         }

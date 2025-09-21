@@ -134,7 +134,7 @@ class SimulationResultsCRUD(CRUDMixin[SimulationResultsSchema, None, None]):
             for row in paginated_results:
                 # Extract the simulation_results object from the row
                 sim_result = _session.query(self.model).filter(self.model.id == row.id).first()
-                results.append([sim_result])  # Wrap in list to match original format
+                results.append(sim_result)  # Return individual result for node group format
 
             return results, total_count
         except SQLAlchemyError as e:

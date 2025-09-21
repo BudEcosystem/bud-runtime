@@ -302,6 +302,9 @@ impl ClientBuilder {
                                 geoip_service: None,
                                 ua_parser: None,
                                 blocking_manager: None,
+                                guardrails: std::sync::Arc::new(tokio::sync::RwLock::new(
+                                    tensorzero_internal::guardrail_table::GuardrailTable::new(),
+                                )),
                             },
                         },
                         timeout: *timeout,

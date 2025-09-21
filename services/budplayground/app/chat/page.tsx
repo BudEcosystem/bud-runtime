@@ -14,23 +14,12 @@ import { Endpoint } from "../types/deployment";
 export default function ChatPage() {
   const { activeChatList, createChat } = useChatStore();
   const { hideLoader } = useLoader();
-  const { apiKey, login } = useAuth();
+  const { apiKey, isLoading, isSessionValid } = useAuth();
   const router = useRouter();
 
   const [hasHydrated, setHasHydrated] = useState(false);
   const [isSingleChat, setIsSingleChat] = useState(false);
   const [selectedModel, setSelectedModel] = useState("");
-
-  const checkAccessKey = async (accessKey: string) => {
-    const isLoginSuccessful = await login("", accessKey);
-    if(isLoginSuccessful) {
-      console.log('Login successful');
-      // router.replace(`chat`);
-    } else {
-      // setIsInvalidApiKey(true);
-      router.replace(`login`);
-    }
-  }
 
   const createNewChat = () => {
     const newChatPayload = {
@@ -61,9 +50,8 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // Access persisted store only on client
-      const hydrated = useChatStore.persist?.hasHydrated?.() ?? false;
-      setHasHydrated(hydrated);
+      // Store is now always hydrated since we use custom persistence
+      setHasHydrated(true);
     }
   }, []);
 
@@ -78,25 +66,33 @@ export default function ChatPage() {
   }, [hasHydrated, activeChatList.length, createNewChat, hideLoader]);
 
   useEffect(() => {
-
+    // Handle URL parameters for page configuration (not authentication)
     const params = new URLSearchParams(window.location.search);
-    const accessKey = params.get('access_token');
     const isSingleChat = params.get('is_single_chat');
     const model = params.get('model');
-    const baseUrl = params.get('base_url');
-    if(accessKey) {
-      checkAccessKey(accessKey);
-    } else {
-      hideLoader();
-    }
+
     if(isSingleChat == "true") {
       setIsSingleChat(true);
     }
     if(model) {
       setSelectedModel(model);
     }
+  }, []);
 
-  }, [checkAccessKey, hideLoader]);
+  // Handle authentication state changes
+  useEffect(() => {
+    if (isLoading) {
+      return; // Wait for auth to finish loading
+    }
+
+    if (!apiKey && !isSessionValid) {
+      // No authentication, redirect to login
+      router.replace('/login');
+    } else {
+      // Authentication successful, hide loader
+      hideLoader();
+    }
+  }, [apiKey, isSessionValid, isLoading, router, hideLoader]);
 
   return (
     <div

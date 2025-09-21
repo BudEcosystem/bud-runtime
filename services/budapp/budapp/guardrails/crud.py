@@ -16,503 +16,982 @@
 
 """CRUD operations for guardrail models."""
 
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, delete, func, or_
+from sqlalchemy import and_, delete, func, or_, update
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.sql import select
 
-from budapp.commons.constants import GuardrailDeploymentStatusEnum
+from budapp.commons import logging
+from budapp.commons.constants import GuardrailDeploymentStatusEnum, GuardrailStatusEnum
+from budapp.commons.db_utils import DataManagerUtils
+from budapp.commons.exceptions import DatabaseException
 from budapp.guardrails.models import (
     GuardrailDeployment,
-    GuardrailDeploymentProbe,
-    GuardrailDeploymentRule,
     GuardrailProbe,
+    GuardrailProfile,
+    GuardrailProfileProbe,
+    GuardrailProfileRule,
     GuardrailRule,
 )
-from budapp.guardrails.schemas import (
-    GuardrailDeploymentCreate,
-    GuardrailDeploymentListRequestSchema,
-    GuardrailDeploymentProbeCreate,
-    GuardrailDeploymentUpdate,
-    GuardrailProbeCreate,
-    GuardrailProbeListRequestSchema,
-    GuardrailProbeUpdate,
-    GuardrailRuleCreate,
-    GuardrailRuleListRequestSchema,
-    GuardrailRuleUpdate,
-)
-from budapp.model_ops.models import Provider
 
 
-# Provider CRUD operations - using Provider model from model_ops
-async def get_provider(db: Session, provider_id: UUID) -> Optional[Provider]:
-    """Get a provider by ID."""
-    result = db.execute(select(Provider).where(Provider.id == provider_id))
-    return result.scalar_one_or_none()
-
-
-async def get_providers(db: Session, include_inactive: bool = False) -> List[Provider]:
-    """Get all providers."""
-    query = select(Provider).order_by(Provider.name)
-    if not include_inactive:
-        query = query.where(Provider.is_active.is_(True))
-    result = db.execute(query)
-    return result.scalars().all()
-
-
-# Rule CRUD operations
-async def create_rule(db: Session, rule_data: GuardrailRuleCreate, created_by: UUID) -> GuardrailRule:
-    """Create a new guardrail rule."""
-    rule_dict = rule_data.model_dump()
-    rule = GuardrailRule(**rule_dict)
-    db.add(rule)
-    db.commit()
-    db.refresh(rule)
-    return rule
-
-
-async def get_rule(db: Session, rule_id: UUID) -> Optional[GuardrailRule]:
-    """Get a rule by ID."""
-    result = db.execute(
-        select(GuardrailRule).options(joinedload(GuardrailRule.probe)).where(GuardrailRule.id == rule_id)
-    )
-    return result.scalar_one_or_none()
-
-
-async def get_rules_by_probe(db: Session, probe_id: UUID) -> List[GuardrailRule]:
-    """Get all rules for a probe."""
-    result = db.execute(select(GuardrailRule).where(GuardrailRule.probe_id == probe_id).order_by(GuardrailRule.name))
-    return result.scalars().all()
-
-
-async def update_rule(db: Session, rule_id: UUID, rule_data: GuardrailRuleUpdate) -> Optional[GuardrailRule]:
-    """Update a rule."""
-    rule = await get_rule(db, rule_id)
-    if not rule:
-        return None
-
-    update_dict = rule_data.model_dump(exclude_unset=True)
-    for field, value in update_dict.items():
-        setattr(rule, field, value)
-
-    db.commit()
-    db.refresh(rule)
-    return rule
-
-
-async def delete_rule(db: Session, rule_id: UUID) -> bool:
-    """Delete a rule."""
-    rule = await get_rule(db, rule_id)
-    if not rule:
-        return False
-
-    db.delete(rule)
-    db.commit()
-    return True
-
-
-async def get_rules_paginated(
-    db: Session, probe_id: UUID, filters: GuardrailRuleListRequestSchema, page: int, page_size: int
-) -> Tuple[List[GuardrailRule], int]:
-    """Get paginated rules for a probe with filtering."""
-    # Base query for rules in the probe
-    query = select(GuardrailRule).where(GuardrailRule.probe_id == probe_id)
-    count_query = select(func.count(GuardrailRule.id)).where(GuardrailRule.probe_id == probe_id)
-
-    # Apply filters
-    conditions = []
-
-    # Search filter
-    if filters.search:
-        search_term = f"%{filters.search}%"
-        conditions.append(or_(GuardrailRule.name.ilike(search_term), GuardrailRule.description.ilike(search_term)))
-
-    # Scanner type filter
-    if filters.scanner_types:
-        conditions.append(GuardrailRule.scanner_types.contains(filters.scanner_types))
-
-    # Modality type filter
-    if filters.modality_types:
-        conditions.append(GuardrailRule.modality_types.contains(filters.modality_types))
-
-    # Guard type filter
-    if filters.guard_types:
-        conditions.append(GuardrailRule.guard_types.contains(filters.guard_types))
-
-    # Enabled filter
-    if filters.is_enabled is not None:
-        conditions.append(GuardrailRule.is_enabled == filters.is_enabled)
-
-    # Custom filter
-    if filters.is_custom is not None:
-        conditions.append(GuardrailRule.is_custom == filters.is_custom)
-
-    # Apply all conditions
-    if conditions:
-        query = query.where(and_(*conditions))
-        count_query = count_query.where(and_(*conditions))
-
-    # Get total count
-    count_result = db.execute(count_query)
-    total = count_result.scalar()
-
-    # Apply pagination and ordering
-    query = query.order_by(GuardrailRule.name)
-    query = query.offset((page - 1) * page_size).limit(page_size)
-
-    # Execute query
-    result = db.execute(query)
-    rules = result.scalars().all()
-
-    return rules, total
-
-
-# Probe CRUD operations
-async def create_probe(db: Session, probe_data: GuardrailProbeCreate, created_by: UUID) -> GuardrailProbe:
-    """Create a new guardrail probe."""
-    probe_dict = probe_data.model_dump()
-    probe_dict["created_by"] = created_by
-
-    # Set is_custom to True by default if not specified
-    if probe_dict.get("is_custom") is None:
-        probe_dict["is_custom"] = True
-
-    probe = GuardrailProbe(**probe_dict)
-    db.add(probe)
-    db.commit()
-    db.refresh(probe)
-    return probe
-
-
-async def get_probe(db: Session, probe_id: UUID) -> Optional[GuardrailProbe]:
-    """Get a probe by ID with rules."""
-    result = db.execute(
-        select(GuardrailProbe)
-        .options(selectinload(GuardrailProbe.provider), selectinload(GuardrailProbe.rules))
-        .where(GuardrailProbe.id == probe_id)
-    )
-    return result.scalar_one_or_none()
-
-
-async def get_probes(
-    db: Session, filters: GuardrailProbeListRequestSchema, user_id: UUID, page: int, page_size: int
-) -> Tuple[List[GuardrailProbe], int]:
-    """Get probes with filtering and pagination."""
-    query = select(GuardrailProbe).options(selectinload(GuardrailProbe.provider), selectinload(GuardrailProbe.rules))
-    count_query = select(func.count(GuardrailProbe.id))
-
-    # Apply filters
-    conditions = []
-
-    # Provider filter
-    if filters.provider_id:
-        conditions.append(GuardrailProbe.provider_id == filters.provider_id)
-    if filters.provider_type:
-        conditions.append(GuardrailProbe.provider_type == filters.provider_type)
-
-    # Tags filter - using JSONB contains for exact tag name matching
-    if filters.tags:
-        # Create OR condition to match any of the provided tag names
-        tag_conditions = []
-        for tag_name in filters.tags:
-            tag_conditions.append(GuardrailProbe.tags.cast(JSONB).contains([{"name": tag_name}]))
-        conditions.append(or_(*tag_conditions))
-
-    # User/project/endpoint filters
-    if filters.user_id:
-        conditions.append(GuardrailProbe.user_id == filters.user_id)
-    elif filters.project_id:
-        conditions.append(GuardrailProbe.project_id == filters.project_id)
-    elif filters.endpoint_id:
-        # For endpoint filter, we need to join with deployments
-        from budapp.guardrails.models import GuardrailDeployment, GuardrailDeploymentProbe
-
-        query = query.join(GuardrailDeploymentProbe).join(GuardrailDeployment)
-        count_query = count_query.join(GuardrailDeploymentProbe).join(GuardrailDeployment)
-        conditions.append(GuardrailDeployment.endpoint_id == filters.endpoint_id)
-    else:
-        # Default: show only non-custom probes (provider type != 'custom')
-        query = query.join(Provider)
-        count_query = count_query.join(Provider)
-        # conditions.append(Provider.type != "custom")
-
-    # Search filter
-    if filters.search:
-        search_term = f"%{filters.search}%"
-        conditions.append(or_(GuardrailProbe.name.ilike(search_term), GuardrailProbe.description.ilike(search_term)))
-
-    # Apply all conditions
-    if conditions:
-        query = query.where(and_(*conditions))
-        count_query = count_query.where(and_(*conditions))
-
-    # Get total count
-    count_result = db.execute(count_query)
-    total = count_result.scalar()
-
-    # Apply pagination and ordering
-    query = query.order_by(GuardrailProbe.name)
-    query = query.offset((page - 1) * page_size).limit(page_size)
-
-    # Execute query
-    result = db.execute(query)
-    probes = result.scalars().all()
-
-    return probes, total
-
-
-async def get_probes_by_provider(db: Session, provider_id: UUID) -> List[GuardrailProbe]:
-    """Get all probes for a specific provider."""
-    result = db.execute(
-        select(GuardrailProbe)
-        .where(GuardrailProbe.provider_id == provider_id)
-        .options(
-            selectinload(GuardrailProbe.provider),
-            selectinload(GuardrailProbe.rules),
-        )
-    )
-    return result.scalars().all()
-
-
-async def update_probe(
-    db: Session, probe_id: UUID, probe_data: GuardrailProbeUpdate, user_id: UUID
-) -> Optional[GuardrailProbe]:
-    """Update a probe (only if user owns it)."""
-    probe = await get_probe(db, probe_id)
-    if not probe:
-        return None
-
-    # Check ownership (non-custom probes can't be updated, user must own custom probes)
-    if not probe.is_custom or (probe.is_custom and probe.user_id != user_id):
-        return None
-
-    for field, value in probe_data.model_dump(exclude_unset=True).items():
-        setattr(probe, field, value)
-
-    db.commit()
-    db.refresh(probe)
-    return probe
-
-
-async def delete_probe(db: Session, probe_id: UUID, user_id: UUID) -> bool:
-    """Delete a probe (only if user owns it)."""
-    probe = await get_probe(db, probe_id)
-    if not probe:
-        return False
-
-    # Check ownership
-    if not probe.is_custom or (probe.is_custom and probe.user_id != user_id):
-        return False
-
-    db.delete(probe)
-    db.commit()
-    return True
-
-
-# Deployment CRUD operations
-async def create_deployment(
-    db: Session,
-    deployment_data: GuardrailDeploymentCreate,
-    user_id: UUID,
-    probes: Optional[List[GuardrailDeploymentProbeCreate]] = None,
-) -> GuardrailDeployment:
-    """Create a new guardrail deployment with probes."""
-    # Create deployment
-    deployment_dict = deployment_data.model_dump(exclude={"probe_selections", "provider_ids"})
-    deployment_dict["user_id"] = user_id
-    deployment = GuardrailDeployment(**deployment_dict)
-    db.add(deployment)
-    db.flush()  # Flush to get the ID
-
-    # Create probe associations
-    if probes:
-        for probe_data in probes:
-            deployment_probe = await _create_deployment_probe(db, deployment.id, probe_data)
-            deployment.probe_associations.append(deployment_probe)
-
-    db.commit()
-    db.refresh(deployment)
-    return deployment
-
-
-async def _create_deployment_probe(
-    db: Session, deployment_id: UUID, probe_data: GuardrailDeploymentProbeCreate
-) -> GuardrailDeploymentProbe:
-    """Create a deployment-probe association with rule configs."""
-    # Create deployment-probe association
-    deployment_probe_dict = probe_data.model_dump(exclude={"rules"})
-    deployment_probe_dict["deployment_id"] = deployment_id
-    deployment_probe = GuardrailDeploymentProbe(**deployment_probe_dict)
-    db.add(deployment_probe)
-    db.flush()  # Flush to get the ID
-
-    # Create rule configurations if provided
-    if probe_data.rules:
-        for rule_config_data in probe_data.rules:
-            rule_config_dict = rule_config_data.model_dump()
-            rule_config_dict["deployment_probe_id"] = deployment_probe.id
-            rule_config = GuardrailDeploymentRule(**rule_config_dict)
-            db.add(rule_config)
-
-    return deployment_probe
-
-
-async def get_deployment(db: Session, deployment_id: UUID) -> Optional[GuardrailDeployment]:
-    """Get a deployment by ID with all related data."""
-    result = db.execute(
-        select(GuardrailDeployment)
-        .options(
-            selectinload(GuardrailDeployment.probe_associations).selectinload(GuardrailDeploymentProbe.probe),
-            selectinload(GuardrailDeployment.probe_associations)
-            .selectinload(GuardrailDeploymentProbe.rule)
-            .selectinload(GuardrailDeploymentRule.rule),
-        )
-        .where(
-            and_(
-                GuardrailDeployment.id == deployment_id,
-                GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED,
+logger = logging.get_logger(__name__)
+
+
+class GuardrailsProbeRulesDataManager(DataManagerUtils):
+    """Data manager for guardrail probes and rules."""
+
+    async def list_probe_tags(
+        self,
+        search_value: str = "",
+        offset: int = 0,
+        limit: int = 10,
+    ) -> Tuple[List[GuardrailProbe], int]:
+        """Search tags by name with pagination, or fetch all tags if no search value is provided."""
+        # Ensure only valid JSON arrays are processed
+        tags_subquery = (
+            select(func.jsonb_array_elements(GuardrailProbe.tags).label("tag"))
+            .where(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+            .where(GuardrailProbe.tags.is_not(None))  # Exclude null tags
+            .where(func.jsonb_typeof(GuardrailProbe.tags) == "array")  # Ensure tags is a JSON array
+        ).subquery()
+
+        # Extract name and color as jsonb
+        distinct_tags_query = (
+            select(
+                func.jsonb_extract_path_text(tags_subquery.c.tag, "name").label("name"),
+                func.jsonb_extract_path_text(tags_subquery.c.tag, "color").label("color"),
             )
-        )
-    )
-    return result.scalar_one_or_none()
+            .where(func.jsonb_typeof(tags_subquery.c.tag) == "object")  # Ensure valid JSONB objects
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "name").is_not(None))  # Valid names
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "color").is_not(None))  # Valid colors
+        ).subquery()
 
-
-async def get_deployments(
-    db: Session, filters: GuardrailDeploymentListRequestSchema, user_id: UUID, page: int, page_size: int
-) -> Tuple[List[GuardrailDeployment], int]:
-    """Get deployments with filtering and pagination."""
-    query = select(GuardrailDeployment)
-    count_query = select(func.count(GuardrailDeployment.id))
-
-    # Apply filters
-    conditions = [
-        GuardrailDeployment.user_id == user_id,  # User can only see their deployments
-        GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED,  # Exclude deleted deployments
-    ]
-
-    if filters.project_id:
-        conditions.append(GuardrailDeployment.project_id == filters.project_id)
-
-    if filters.endpoint_id:
-        conditions.append(GuardrailDeployment.endpoint_id == filters.endpoint_id)
-
-    if filters.deployment_type:
-        conditions.append(GuardrailDeployment.deployment_type == filters.deployment_type)
-
-    if filters.status:
-        conditions.append(GuardrailDeployment.status == filters.status)
-
-    if filters.search:
-        search_term = f"%{filters.search}%"
-        conditions.append(
-            or_(GuardrailDeployment.name.ilike(search_term), GuardrailDeployment.description.ilike(search_term))
-        )
-
-    # Apply conditions
-    query = query.where(and_(*conditions))
-    count_query = count_query.where(and_(*conditions))
-
-    # Get total count
-    count_result = db.execute(count_query)
-    total = count_result.scalar()
-
-    # Apply pagination and ordering
-    query = query.order_by(GuardrailDeployment.created_at.desc())
-    query = query.offset((page - 1) * page_size).limit(page_size)
-
-    # Load probe associations for counting
-    query = query.options(selectinload(GuardrailDeployment.probe_associations))
-
-    # Execute query
-    result = db.execute(query)
-    deployments = result.scalars().all()
-
-    return deployments, total
-
-
-async def update_deployment(
-    db: Session, deployment_id: UUID, deployment_data: GuardrailDeploymentUpdate, user_id: UUID
-) -> Optional[GuardrailDeployment]:
-    """Update a deployment."""
-    deployment = await get_deployment(db, deployment_id)
-    if not deployment or deployment.user_id != user_id:
-        return None
-
-    update_dict = deployment_data.model_dump(exclude_unset=True, exclude={"probes"})
-
-    # Update basic fields
-    for field, value in update_dict.items():
-        setattr(deployment, field, value)
-
-    # Update probe associations if provided
-    if deployment_data.probes is not None:
-        # Delete existing associations
-        for existing_probe in deployment.probe_associations:
-            db.delete(existing_probe)
-
-        # Create new associations
-        deployment.probe_associations = []
-        for probe_data in deployment_data.probes:
-            deployment_probe = await _create_deployment_probe(db, deployment.id, probe_data)
-            deployment.probe_associations.append(deployment_probe)
-
-    db.commit()
-    db.refresh(deployment)
-    return deployment
-
-
-async def delete_deployment(db: Session, deployment_id: UUID, user_id: UUID) -> bool:
-    """Delete a deployment (soft delete by updating status)."""
-    deployment = await get_deployment(db, deployment_id)
-    if not deployment or deployment.user_id != user_id:
-        return False
-
-    # Soft delete: update status to DELETED instead of removing the row
-    deployment.status = GuardrailDeploymentStatusEnum.DELETED
-    db.commit()
-    return True
-
-
-async def get_deployments_by_endpoint(db: Session, endpoint_id: UUID, user_id: UUID) -> List[GuardrailDeployment]:
-    """Get all deployments for a specific endpoint."""
-    result = db.execute(
-        select(GuardrailDeployment)
-        .where(
-            and_(
-                GuardrailDeployment.endpoint_id == endpoint_id,
-                GuardrailDeployment.user_id == user_id,
-                GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED,
+        # Apply DISTINCT to get unique tags by name, selecting the first color
+        distinct_on_name_query = (
+            select(
+                distinct_tags_query.c.name,
+                distinct_tags_query.c.color,
             )
+            .distinct(distinct_tags_query.c.name)
+            .order_by(distinct_tags_query.c.name, distinct_tags_query.c.color)  # Ensure deterministic order
         )
-        .options(
-            selectinload(GuardrailDeployment.probe_associations).selectinload(GuardrailDeploymentProbe.probe),
-            selectinload(GuardrailDeployment.probe_associations)
-            .selectinload(GuardrailDeploymentProbe.rule)
-            .selectinload(GuardrailDeploymentRule.rule),
+
+        # Apply search filter if provided
+        if search_value:
+            distinct_on_name_query = distinct_on_name_query.where(distinct_tags_query.c.name.ilike(f"{search_value}%"))
+
+        # Add pagination
+        distinct_tags_with_pagination = distinct_on_name_query.offset(offset).limit(limit)
+
+        # Execute the paginated query
+        tags_result = self.session.execute(distinct_tags_with_pagination)
+
+        # Count total distinct tag names
+        distinct_count_query = (
+            select(func.count(func.distinct(distinct_tags_query.c.name)))
+            .where(func.jsonb_typeof(tags_subquery.c.tag) == "object")  # Ensure valid JSONB objects
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "name").is_not(None))  # Valid names
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "color").is_not(None))  # Valid colors
         )
-    )
-    return result.scalars().all()
 
-
-async def get_deployments_by_project(db: Session, project_id: UUID, user_id: UUID) -> List[GuardrailDeployment]:
-    """Get all deployments for a specific project."""
-    result = db.execute(
-        select(GuardrailDeployment)
-        .where(
-            and_(
-                GuardrailDeployment.project_id == project_id,
-                GuardrailDeployment.user_id == user_id,
-                GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED,
+        # Apply search filter to the count query
+        if search_value:
+            distinct_count_query = distinct_count_query.where(
+                func.jsonb_extract_path_text(tags_subquery.c.tag, "name").ilike(f"{search_value}%")
             )
+
+        # Execute the count query
+        distinct_count_result = self.session.execute(distinct_count_query)
+        total_count = distinct_count_result.scalar()
+
+        return tags_result, total_count
+
+    async def get_all_probes(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[GuardrailProbe], int]:
+        """List all probes in the database."""
+        # Tags are not filterable
+        # Also remove from filters dict
+        explicit_conditions = []
+        json_filters = {"tags": filters.pop("tags", [])}
+
+        # Validate the remaining filters
+        await self.validate_fields(GuardrailProbe, filters)
+
+        if json_filters["tags"]:
+            # Either TagA or TagB exist in tag field
+            tag_conditions = or_(
+                *[GuardrailProbe.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+            )
+            explicit_conditions.append(tag_conditions)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(GuardrailProbe, filters)
+            stmt = (
+                select(
+                    GuardrailProbe,
+                    func.count(GuardrailRule.id)
+                    .filter(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+                    .label("rules_count"),
+                )
+                .select_from(GuardrailProbe)
+                .filter(or_(*search_conditions, *explicit_conditions))
+                .filter(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+                .outerjoin(GuardrailRule, GuardrailRule.probe_id == GuardrailProbe.id)
+                .group_by(GuardrailProbe.id)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(GuardrailProbe)
+                .filter(or_(*search_conditions, *explicit_conditions))
+                .filter(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+            )
+        else:
+            stmt = (
+                select(
+                    GuardrailProbe,
+                    func.count(GuardrailRule.id)
+                    .filter(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+                    .label("rules_count"),
+                )
+                .select_from(GuardrailProbe)
+                .filter_by(**filters)
+                .where(and_(*explicit_conditions))
+                .filter(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+                .outerjoin(GuardrailRule, GuardrailRule.probe_id == GuardrailProbe.id)
+                .group_by(GuardrailProbe.id)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(GuardrailProbe)
+                .filter_by(**filters)
+                .where(and_(*explicit_conditions))
+                .filter(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+            )
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(GuardrailProbe, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.execute_all(stmt)
+
+        return result, count
+
+    async def get_all_probe_rules(
+        self,
+        probe_id: UUID,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[GuardrailRule], int]:
+        """List all rules for a specific probe."""
+        # Add probe_id to filters
+        filters["probe_id"] = probe_id
+
+        # Validate the remaining filters
+        await self.validate_fields(GuardrailRule, filters)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(GuardrailRule, filters)
+            stmt = (
+                select(GuardrailRule)
+                .filter(or_(*search_conditions))
+                .filter(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(GuardrailRule)
+                .filter(or_(*search_conditions))
+                .filter(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+            )
+        else:
+            stmt = (
+                select(GuardrailRule).filter_by(**filters).filter(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(GuardrailRule)
+                .filter_by(**filters)
+                .filter(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+            )
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(GuardrailRule, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.execute_all(stmt)
+
+        return result, count
+
+    async def soft_delete_deprecated_probes(self, ids: List[str]) -> None:
+        """Soft delete deprecated probes and their associated rules.
+
+        Args:
+            ids (List[str]): List of probe ids to soft delete.
+
+        Returns:
+            None
+        """
+        try:
+            # First, soft delete all rules associated with these probes
+            rules_stmt = (
+                update(GuardrailRule).where(GuardrailRule.probe_id.in_(ids)).values(status=GuardrailStatusEnum.DELETED)
+            )
+            self.session.execute(rules_stmt)
+
+            # Then, soft delete the probes themselves
+            probes_stmt = (
+                update(GuardrailProbe).where(GuardrailProbe.id.in_(ids)).values(status=GuardrailStatusEnum.DELETED)
+            )
+            self.session.execute(probes_stmt)
+
+            self.session.commit()
+            logger.info(f"Successfully soft deleted {len(ids)} probes and their associated rules")
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            logger.exception(f"Failed to soft delete deprecated probes: {e}")
+            raise DatabaseException("Unable to soft delete deprecated probes") from e
+
+    async def soft_delete_deprecated_rules(self, ids: List[str]) -> None:
+        """Soft delete deprecated rules.
+
+        Args:
+            ids (List[str]): List of rule ids to soft delete.
+
+        Returns:
+            None
+        """
+        try:
+            stmt = update(GuardrailRule).where(GuardrailRule.id.in_(ids)).values(status=GuardrailStatusEnum.DELETED)
+            self.session.execute(stmt)
+            self.session.commit()
+            logger.info(f"Successfully soft deleted {len(ids)} rules")
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            logger.exception(f"Failed to soft delete deprecated rules: {e}")
+            raise DatabaseException("Unable to soft delete deprecated rules") from e
+
+    async def get_missing_probes_and_rules(
+        self,
+        probe_ids: List[UUID],
+        provider_id: UUID,
+        rule_selections: Optional[Dict[UUID, List[UUID]]] = None,
+    ) -> Tuple[List[UUID], List[UUID]]:
+        """Validate that all probe and rule IDs exist with the given filters.
+
+        This method efficiently validates multiple probe and rule IDs in a single query
+        to ensure they all exist with the specified provider and status.
+
+        Args:
+            probe_ids: List of probe IDs to validate
+            provider_id: Provider ID that probes must belong to
+            rule_selections: Optional dict mapping probe_id to list of rule_ids
+
+        Returns:
+            Tuple of (invalid_probe_ids, invalid_rule_ids)
+        """
+        invalid_probe_ids = []
+        invalid_rule_ids = []
+
+        # Validate probes if provided
+        if probe_ids:
+            # Query to find all valid probe IDs
+            valid_probes_stmt = (
+                select(GuardrailProbe.id)
+                .where(GuardrailProbe.id.in_(probe_ids))
+                .where(GuardrailProbe.provider_id == provider_id)
+                .where(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+            )
+            valid_probe_ids = set(self.session.scalars(valid_probes_stmt).all())
+
+            # Find invalid probe IDs
+            invalid_probe_ids = [pid for pid in probe_ids if pid not in valid_probe_ids]
+
+            if invalid_probe_ids:
+                logger.warning(f"Invalid probe IDs found: {invalid_probe_ids}")
+
+        # Validate rules if provided
+        if rule_selections:
+            all_rule_ids = []
+            probe_rule_mapping = []
+
+            for probe_id, rule_ids in rule_selections.items():
+                for rule_id in rule_ids:
+                    all_rule_ids.append(rule_id)
+                    probe_rule_mapping.append((probe_id, rule_id))
+
+            if all_rule_ids:
+                # Query to find all valid rule IDs with their probe associations
+                valid_rules_stmt = (
+                    select(GuardrailRule.id, GuardrailRule.probe_id)
+                    .where(GuardrailRule.id.in_(all_rule_ids))
+                    .where(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+                )
+                valid_rules = self.session.execute(valid_rules_stmt).all()
+
+                # Create a set of valid (probe_id, rule_id) tuples
+                valid_probe_rule_pairs = {(rule.probe_id, rule.id) for rule in valid_rules}
+
+                # Find invalid rule IDs (either don't exist or don't belong to the correct probe)
+                for probe_id, rule_id in probe_rule_mapping:
+                    if (probe_id, rule_id) not in valid_probe_rule_pairs:
+                        invalid_rule_ids.append(rule_id)
+
+                if invalid_rule_ids:
+                    logger.warning(f"Invalid rule IDs found: {invalid_rule_ids}")
+
+        return invalid_probe_ids, invalid_rule_ids
+
+
+class GuardrailsDeploymentDataManager(DataManagerUtils):
+    """Data manager for guardrail deployments including probes and rules overrides."""
+
+    async def list_profile_tags(
+        self,
+        search_value: str = "",
+        offset: int = 0,
+        limit: int = 10,
+    ) -> Tuple[List[GuardrailProfile], int]:
+        """Search tags by name with pagination for profiles, or fetch all tags if no search value is provided."""
+        # Ensure only valid JSON arrays are processed
+        tags_subquery = (
+            select(func.jsonb_array_elements(GuardrailProfile.tags).label("tag"))
+            .where(GuardrailProfile.status == GuardrailStatusEnum.ACTIVE)
+            .where(GuardrailProfile.tags.is_not(None))  # Exclude null tags
+            .where(func.jsonb_typeof(GuardrailProfile.tags) == "array")  # Ensure tags is a JSON array
+        ).subquery()
+
+        # Extract name and color as jsonb
+        distinct_tags_query = (
+            select(
+                func.jsonb_extract_path_text(tags_subquery.c.tag, "name").label("name"),
+                func.jsonb_extract_path_text(tags_subquery.c.tag, "color").label("color"),
+            )
+            .where(func.jsonb_typeof(tags_subquery.c.tag) == "object")  # Ensure valid JSONB objects
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "name").is_not(None))  # Valid names
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "color").is_not(None))  # Valid colors
+        ).subquery()
+
+        # Apply DISTINCT to get unique tags by name, selecting the first color
+        distinct_on_name_query = (
+            select(
+                distinct_tags_query.c.name,
+                distinct_tags_query.c.color,
+            )
+            .distinct(distinct_tags_query.c.name)
+            .order_by(distinct_tags_query.c.name, distinct_tags_query.c.color)  # Ensure deterministic order
         )
-        .options(
-            selectinload(GuardrailDeployment.probe_associations).selectinload(GuardrailDeploymentProbe.probe),
-            selectinload(GuardrailDeployment.probe_associations)
-            .selectinload(GuardrailDeploymentProbe.rule)
-            .selectinload(GuardrailDeploymentRule.rule),
+
+        # Apply search filter if provided
+        if search_value:
+            distinct_on_name_query = distinct_on_name_query.where(distinct_tags_query.c.name.ilike(f"{search_value}%"))
+
+        # Add pagination
+        distinct_tags_with_pagination = distinct_on_name_query.offset(offset).limit(limit)
+
+        # Execute the paginated query
+        tags_result = self.session.execute(distinct_tags_with_pagination)
+
+        # Count total distinct tag names
+        distinct_count_query = (
+            select(func.count(func.distinct(distinct_tags_query.c.name)))
+            .where(func.jsonb_typeof(tags_subquery.c.tag) == "object")  # Ensure valid JSONB objects
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "name").is_not(None))  # Valid names
+            .where(func.jsonb_extract_path_text(tags_subquery.c.tag, "color").is_not(None))  # Valid colors
         )
-    )
-    return result.scalars().all()
+
+        # Apply search filter to the count query
+        if search_value:
+            distinct_count_query = distinct_count_query.where(
+                func.jsonb_extract_path_text(tags_subquery.c.tag, "name").ilike(f"{search_value}%")
+            )
+
+        # Execute the count query
+        distinct_count_result = self.session.execute(distinct_count_query)
+        total_count = distinct_count_result.scalar()
+
+        return tags_result, total_count
+
+    async def add_profile_with_selections(
+        self,
+        name: str,
+        current_user_id: UUID,
+        probe_selections: List[Dict[str, Any]],
+        description: Optional[str] = None,
+        tags: Optional[List[Dict[str, str]]] = None,
+        severity_threshold: Optional[float] = None,
+        guard_types: Optional[List[str]] = None,
+        status: GuardrailStatusEnum = GuardrailStatusEnum.ACTIVE,
+        project_id: Optional[UUID] = None,
+    ) -> GuardrailProfile:
+        """Create guardrail profile with probe and rule selections atomically.
+
+        This method creates:
+        1. GuardrailProfile
+        2. GuardrailProfileProbe records for each selected probe
+        3. GuardrailProfileRule records for each rule with specific overrides
+
+        All operations are performed within a single database transaction.
+        If any operation fails, all changes are rolled back.
+
+        Args:
+            name: Profile name
+            current_user_id: ID of the user creating the profile
+            probe_selections: List of probe configurations with optional rule overrides
+            description: Profile description
+            tags: List of tags with 'name' and 'color' keys
+            severity_threshold: Default severity threshold for the profile
+            guard_types: List of guard types
+            status: Profile status (default: ACTIVE)
+
+        Returns:
+            The created GuardrailProfile instance
+
+        Raises:
+            DatabaseException: If any database operation fails
+        """
+        savepoint = None
+
+        try:
+            # Start a new transaction savepoint
+            savepoint = self.session.begin_nested()
+
+            # Create the profile
+            db_profile = GuardrailProfile(
+                name=name,
+                created_by=current_user_id,
+                status=status,
+                description=description or "",
+                tags=tags,
+                severity_threshold=severity_threshold,
+                guard_types=guard_types,
+                project_id=project_id,
+            )
+            self.session.add(db_profile)
+
+            # Flush to get the profile ID without committing
+            self.session.flush()
+
+            # Process probe selections
+            for probe_selection in probe_selections:
+                probe_id = probe_selection["id"]
+
+                # Create GuardrailProfileProbe
+                db_profile_probe = GuardrailProfileProbe(
+                    profile_id=db_profile.id,
+                    probe_id=probe_id,
+                    severity_threshold=probe_selection.get("severity_threshold"),
+                    guard_types=probe_selection.get("guard_types"),
+                    created_by=current_user_id,
+                )
+                self.session.add(db_profile_probe)
+
+                # Flush to get the profile_probe ID
+                self.session.flush()
+
+                # Process rule selections if present
+                for rule_selection in probe_selection.get("rules", []):
+                    # Only create GuardrailProfileRule if the rule has specific overrides
+                    # or if it's explicitly disabled (status != ACTIVE)
+                    if (
+                        rule_selection.get("status") == GuardrailStatusEnum.DISABLED
+                        or rule_selection.get("severity_threshold") is not None
+                        or rule_selection.get("guard_types") is not None
+                    ):
+                        db_profile_rule = GuardrailProfileRule(
+                            profile_probe_id=db_profile_probe.id,
+                            rule_id=rule_selection["id"],
+                            status=rule_selection.get("status", GuardrailStatusEnum.ACTIVE),
+                            severity_threshold=rule_selection.get("severity_threshold"),
+                            guard_types=rule_selection.get("guard_types"),
+                            created_by=current_user_id,
+                        )
+                        self.session.add(db_profile_rule)
+
+            # Commit the savepoint
+            savepoint.commit()
+
+            # Refresh the profile to get all relationships
+            self.session.refresh(db_profile)
+
+            return db_profile
+
+        except SQLAlchemyError as e:
+            # Rollback the savepoint on any database error
+            if savepoint and savepoint.is_active:
+                savepoint.rollback()
+            logger.exception(f"Failed to create guardrail profile with selections: {e}")
+            raise DatabaseException("Unable to create guardrail profile") from e
+        except Exception as e:
+            # Rollback on any other error
+            if savepoint and savepoint.is_active:
+                savepoint.rollback()
+            logger.exception(f"Unexpected error creating guardrail profile: {e}")
+            raise
+
+    async def get_all_profiles(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[GuardrailProfile], int]:
+        """List all profiles in the database.
+
+        Args:
+            offset: Number of records to skip
+            limit: Maximum number of records to return
+            filters: Dictionary of filters to apply
+            order_by: List of fields to order by
+            search: Whether to use search filters
+
+        Returns:
+            Tuple of list of profiles and total count
+        """
+        # Validate the filters
+        await self.validate_fields(GuardrailProfile, filters)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(GuardrailProfile, filters)
+            stmt = select(GuardrailProfile).filter(or_(*search_conditions))
+            count_stmt = select(func.count()).select_from(GuardrailProfile).filter(or_(*search_conditions))
+        else:
+            stmt = select(GuardrailProfile).filter_by(**filters)
+            count_stmt = select(func.count()).select_from(GuardrailProfile).filter_by(**filters)
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(GuardrailProfile, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+
+        result = self.execute_all(stmt)
+
+        return result, count
+
+    async def soft_delete_profile(self, profile_id: UUID) -> None:
+        """Soft delete a guardrail profile.
+
+        Args:
+            profile_id (UUID): The profile id to soft delete.
+
+        Returns:
+            None
+        """
+        # Check for active deployments using this profile
+        active_deployment_stmt = (
+            select(func.count(GuardrailDeployment.id))
+            .where(GuardrailDeployment.profile_id == profile_id)
+            .where(GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED)
+        )
+        active_deployment_count = self.session.execute(active_deployment_stmt).scalar()
+
+        if active_deployment_count > 0:
+            logger.error(f"Cannot delete profile {profile_id}: {active_deployment_count} active deployment(s) found")
+            raise ValueError(
+                f"Cannot delete guardrail profile because it has {active_deployment_count} active deployment(s). Please delete or update the deployments first."
+            )
+
+        try:
+            # Soft delete the profile (keep associations for audit trail)
+            stmt = (
+                update(GuardrailProfile)
+                .where(GuardrailProfile.id == profile_id)
+                .values(status=GuardrailStatusEnum.DELETED)
+            )
+            self.session.execute(stmt)
+            self.session.commit()
+            logger.info(f"Successfully soft deleted profile {profile_id}")
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            logger.exception(f"Failed to soft delete profile {profile_id}: {e}")
+            raise DatabaseException("Unable to soft delete guardrail profile") from e
+
+    async def soft_delete_deployment(self, deployment_id: UUID) -> None:
+        """Soft delete a guardrail deployment.
+
+        Args:
+            deployment_id (UUID): The deployment id to soft delete.
+
+        Returns:
+            None
+        """
+        try:
+            # Soft delete the deployment
+            stmt = (
+                update(GuardrailDeployment)
+                .where(GuardrailDeployment.id == deployment_id)
+                .values(status=GuardrailDeploymentStatusEnum.DELETED)
+            )
+            self.session.execute(stmt)
+            self.session.commit()
+            logger.info(f"Successfully soft deleted deployment {deployment_id}")
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            logger.exception(f"Failed to soft delete deployment {deployment_id}: {e}")
+            raise DatabaseException("Unable to soft delete guardrail deployment") from e
+
+    async def get_profile_probes(
+        self,
+        profile_id: UUID,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[Tuple[GuardrailProfileProbe, GuardrailProbe]], int]:
+        """Get probes enabled in a profile with pagination and filtering.
+
+        This method performs an efficient join between GuardrailProfileProbe and GuardrailProbe
+        to get all probes that are enabled in a specific profile, with support for filtering,
+        searching, and pagination.
+
+        Args:
+            profile_id: The profile ID to get probes for
+            offset: Number of records to skip
+            limit: Maximum number of records to return
+            filters: Dictionary of filters to apply on GuardrailProbe fields
+            order_by: List of fields to order by
+            search: Whether to use search filters
+
+        Returns:
+            Tuple of list of (GuardrailProfileProbe, GuardrailProbe) and total count
+        """
+        # Tags are not filterable
+        # Also remove from filters dict
+        explicit_conditions = []
+        json_filters = {"tags": filters.pop("tags", [])}
+
+        # Validate filters for GuardrailProbe model
+        await self.validate_fields(GuardrailProbe, filters)
+
+        if json_filters["tags"]:
+            # Either TagA or TagB exist in tag field
+            tag_conditions = or_(
+                *[GuardrailProbe.tags.cast(JSONB).contains([{"name": tag_name}]) for tag_name in json_filters["tags"]]
+            )
+            explicit_conditions.append(tag_conditions)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(GuardrailProbe, filters)
+            stmt = (
+                select(GuardrailProfileProbe, GuardrailProbe)
+                .select_from(GuardrailProfileProbe)
+                .join(GuardrailProbe, GuardrailProfileProbe.probe_id == GuardrailProbe.id)
+                .where(GuardrailProfileProbe.profile_id == profile_id)
+                .filter(or_(*search_conditions, *explicit_conditions))
+                .filter(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(GuardrailProfileProbe)
+                .join(GuardrailProbe, GuardrailProfileProbe.probe_id == GuardrailProbe.id)
+                .where(GuardrailProfileProbe.profile_id == profile_id)
+                .filter(or_(*search_conditions, *explicit_conditions))
+                .filter(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+            )
+        else:
+            stmt = (
+                select(GuardrailProfileProbe, GuardrailProbe)
+                .select_from(GuardrailProfileProbe)
+                .join(GuardrailProbe, GuardrailProfileProbe.probe_id == GuardrailProbe.id)
+                .where(GuardrailProfileProbe.profile_id == profile_id)
+                .where(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+            )
+            # Apply filters using filter_by for exact matches
+            if filters:
+                stmt = stmt.where(
+                    GuardrailProbe.id.in_(
+                        select(GuardrailProbe.id)
+                        .filter_by(**filters)
+                        .where(and_(*explicit_conditions) if explicit_conditions else True)
+                    )
+                )
+            elif explicit_conditions:
+                stmt = stmt.where(and_(*explicit_conditions))
+
+            count_stmt = (
+                select(func.count())
+                .select_from(GuardrailProfileProbe)
+                .join(GuardrailProbe, GuardrailProfileProbe.probe_id == GuardrailProbe.id)
+                .where(GuardrailProfileProbe.profile_id == profile_id)
+                .where(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+            )
+            # Apply same filter logic to count
+            if filters:
+                count_stmt = count_stmt.where(
+                    GuardrailProbe.id.in_(
+                        select(GuardrailProbe.id)
+                        .filter_by(**filters)
+                        .where(and_(*explicit_conditions) if explicit_conditions else True)
+                    )
+                )
+            elif explicit_conditions:
+                count_stmt = count_stmt.where(and_(*explicit_conditions))
+
+        # Get total count
+        count = self.execute_scalar(count_stmt) or 0
+
+        # Apply ordering
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(GuardrailProbe, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+        else:
+            # Default ordering by probe name
+            stmt = stmt.order_by(GuardrailProbe.name)
+
+        # Apply pagination
+        stmt = stmt.offset(offset).limit(limit)
+
+        # Execute query
+        results = self.session.execute(stmt).all()
+
+        return results, count
+
+    async def get_profile_probe_rules(
+        self,
+        profile_id: UUID,
+        probe_id: UUID,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[Tuple[GuardrailRule, Optional[GuardrailProfileRule]]], int]:
+        """Get rules for a specific probe in a profile with status overrides.
+
+        This method efficiently retrieves all active rules for a probe and joins them
+        with any profile-specific rule overrides (disabled rules or custom settings).
+
+        Args:
+            profile_id: The profile ID
+            probe_id: The probe ID
+            offset: Number of records to skip
+            limit: Maximum number of records to return
+            filters: Dictionary of filters to apply on GuardrailRule fields
+            order_by: List of fields to order by
+            search: Whether to use search filters
+
+        Returns:
+            Tuple of list of (GuardrailRule, Optional[GuardrailProfileRule]) and total count
+        """
+        # First verify the probe is enabled in the profile
+        profile_probe_stmt = (
+            select(GuardrailProfileProbe)
+            .where(GuardrailProfileProbe.profile_id == profile_id)
+            .where(GuardrailProfileProbe.probe_id == probe_id)
+        )
+        profile_probe = self.scalar_one_or_none(profile_probe_stmt)
+
+        if not profile_probe:
+            # Probe not enabled in this profile
+            return [], 0
+
+        # Validate filters for GuardrailRule model (excluding probe_id which is handled separately)
+        await self.validate_fields(GuardrailRule, filters)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(GuardrailRule, filters)
+            stmt = (
+                select(GuardrailRule, GuardrailProfileRule)
+                .select_from(GuardrailRule)
+                .outerjoin(
+                    GuardrailProfileRule,
+                    and_(
+                        GuardrailProfileRule.rule_id == GuardrailRule.id,
+                        GuardrailProfileRule.profile_probe_id == profile_probe.id,
+                    ),
+                )
+                .filter(or_(*search_conditions))
+                .filter(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(GuardrailRule)
+                .filter(or_(*search_conditions))
+                .filter(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+            )
+        else:
+            stmt = (
+                select(GuardrailRule, GuardrailProfileRule)
+                .select_from(GuardrailRule)
+                .outerjoin(
+                    GuardrailProfileRule,
+                    and_(
+                        GuardrailProfileRule.rule_id == GuardrailRule.id,
+                        GuardrailProfileRule.profile_probe_id == profile_probe.id,
+                    ),
+                )
+                .filter(GuardrailRule.probe_id == probe_id)
+                .filter(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(GuardrailRule)
+                .filter(GuardrailRule.probe_id == probe_id)
+                .filter(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+            )
+
+            # Apply additional filters if any
+            if filters:
+                stmt = stmt.filter_by(**filters)
+                count_stmt = count_stmt.filter_by(**filters)
+
+        # Get total count
+        count = self.execute_scalar(count_stmt) or 0
+
+        # Apply ordering
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(GuardrailRule, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+        else:
+            # Default ordering by rule name
+            stmt = stmt.order_by(GuardrailRule.name)
+
+        # Apply pagination
+        stmt = stmt.offset(offset).limit(limit)
+
+        # Execute query
+        results = self.session.execute(stmt).all()
+
+        return results, count
+
+    async def get_all_deployments(
+        self,
+        offset: int,
+        limit: int,
+        filters: Dict = {},
+        order_by: List = [],
+        search: bool = False,
+    ) -> Tuple[List[GuardrailDeployment], int]:
+        """List all deployments in the database with pagination.
+
+        Args:
+            offset: Number of records to skip
+            limit: Maximum number of records to return
+            filters: Dictionary of filters to apply
+            order_by: List of fields to order by
+            search: Whether to use search filters
+
+        Returns:
+            Tuple of list of deployments and total count
+        """
+        # Validate the filters
+        await self.validate_fields(GuardrailDeployment, filters)
+
+        # Generate statements according to search or filters
+        if search:
+            search_conditions = await self.generate_search_stmt(GuardrailDeployment, filters)
+            stmt = (
+                select(GuardrailDeployment)
+                .filter(or_(*search_conditions))
+                .filter(GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(GuardrailDeployment)
+                .filter(or_(*search_conditions))
+                .filter(GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED)
+            )
+        else:
+            stmt = (
+                select(GuardrailDeployment)
+                .filter_by(**filters)
+                .filter(GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED)
+            )
+            count_stmt = (
+                select(func.count())
+                .select_from(GuardrailDeployment)
+                .filter_by(**filters)
+                .filter(GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED)
+            )
+
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
+
+        # Apply sorting
+        if order_by:
+            sort_conditions = await self.generate_sorting_stmt(GuardrailDeployment, order_by)
+            stmt = stmt.order_by(*sort_conditions)
+        else:
+            # Default ordering by created_at desc
+            stmt = stmt.order_by(GuardrailDeployment.created_at.desc())
+
+        result = self.execute_all(stmt)
+
+        return result, count
+
+    async def get_existing_deployments_for_endpoints(
+        self, endpoint_ids: List[UUID]
+    ) -> Dict[UUID, GuardrailDeployment]:
+        """Get existing guardrail deployments for given endpoint IDs.
+
+        Returns a dictionary mapping endpoint_id to deployment for endpoints that have
+        non-deleted guardrail deployments. The deployment objects include the related
+        endpoint and profile data via eager loading.
+
+        Args:
+            endpoint_ids: List of endpoint IDs to check
+
+        Returns:
+            Dict mapping endpoint_id to GuardrailDeployment for endpoints with existing deployments
+        """
+        if not endpoint_ids:
+            return {}
+
+        stmt = (
+            select(GuardrailDeployment)
+            .where(GuardrailDeployment.endpoint_id.in_(endpoint_ids))
+            .where(GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED)
+            .options(joinedload(GuardrailDeployment.profile), joinedload(GuardrailDeployment.endpoint))
+        )
+
+        result = self.execute_all(stmt)
+
+        # Convert to dictionary keyed by endpoint_id
+        existing_deployments = {}
+        for deployment in result:
+            if deployment[0].endpoint_id:
+                existing_deployments[deployment[0].endpoint_id] = deployment[0]
+
+        return existing_deployments

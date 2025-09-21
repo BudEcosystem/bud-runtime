@@ -1,50 +1,21 @@
 {
-    "openai": {
-        "name": "OpenAI",
-        "type": "openai",
-        "description": "Offers advanced models for language, image generation, and audio conversion.",
-        "icon": "icons/providers/openai.png",
+    "anthropic": {
+        "name": "Anthropic",
+        "type": "anthropic",
+        "description": "Anthropic is an AI safety and research company that's working to build reliable, interpretable, and steerable AI systems.",
+        "icon": "icons/providers/anthropic.png",
         "credentials": [
             {
+                "type": "password",
                 "field": "api_key",
                 "label": "API Key",
-                "type": "password",
-                "description": "Your OpenAI API key",
+                "order": 1,
                 "required": true,
-                "order": 1
-            },
-            {
-                "field": "api_base",
-                "label": "API Base URL",
-                "type": "url",
-                "description": "Custom base URL for API requests (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "organization",
-                "label": "Organization ID",
-                "type": "text",
-                "description": "Your OpenAI organization ID (optional)",
-                "required": false,
-                "order": 3
+                "description": "Your Anthropic API key"
             }
-        ]
-    },
-    "text-completion-openai": {
-        "name": "OpenAI (Text Completion)",
-        "type": "text-completion-openai",
-        "description": "Includes GPT-3.5 Turbo models optimized for text completion tasks.",
-        "icon": "icons/providers/openai.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your OpenAI API key for text completion",
-                "required": true,
-                "order": 1
-            }
+        ],
+        "capabilities": [
+            "model"
         ]
     },
     "azure": {
@@ -54,569 +25,76 @@
         "icon": "icons/providers/azure_ai_studio.png",
         "credentials": [
             {
+                "type": "url",
                 "field": "api_base",
                 "label": "API Base URL",
-                "type": "url",
-                "description": "The base URL for Azure API",
+                "order": 1,
                 "required": true,
-                "order": 1
+                "description": "The base URL for Azure API"
             },
             {
+                "type": "text",
                 "field": "api_version",
                 "label": "API Version",
-                "type": "text",
-                "description": "Azure API version",
+                "order": 2,
                 "required": true,
-                "order": 2
+                "description": "Azure API version"
             },
             {
+                "type": "password",
                 "field": "api_key",
                 "label": "API Key",
-                "type": "password",
-                "description": "Your Azure API key",
+                "order": 3,
                 "required": true,
-                "order": 3
+                "description": "Your Azure API key"
             },
             {
+                "type": "password",
                 "field": "azure_ad_token",
                 "label": "Azure AD Token",
-                "type": "password",
-                "description": "Azure Active Directory token",
+                "order": 4,
                 "required": false,
-                "order": 4
+                "description": "Azure Active Directory token"
             },
             {
+                "type": "text",
                 "field": "tenant_id",
                 "label": "Tenant ID",
-                "type": "text",
-                "description": "Your Azure tenant ID",
-                "required": false,
                 "order": 5,
+                "required": false,
+                "description": "Your Azure tenant ID",
                 "dependencies": [
                     "client_id",
                     "client_secret"
                 ]
             },
             {
+                "type": "text",
                 "field": "client_id",
                 "label": "Client ID",
-                "type": "text",
-                "description": "Your Azure client ID",
-                "required": false,
                 "order": 6,
+                "required": false,
+                "description": "Your Azure client ID",
                 "dependencies": [
                     "tenant_id",
                     "client_secret"
                 ]
             },
             {
+                "type": "password",
                 "field": "client_secret",
                 "label": "Client Secret",
-                "type": "password",
-                "description": "Your Azure client secret",
-                "required": false,
                 "order": 7,
+                "required": false,
+                "description": "Your Azure client secret",
                 "dependencies": [
                     "tenant_id",
                     "client_id"
                 ]
             }
-        ]
-    },
-    "azure_ai": {
-        "name": "Azure AI Studio",
-        "type": "azure_ai",
-        "description": "Incorporates Cohere Command, Mistral Large, and AI21 Jamba Instruct models.",
-        "icon": "icons/providers/azure_ai_studio.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Azure AI API key",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "api_base",
-                "label": "API Base URL",
-                "type": "url",
-                "description": "The base URL for Azure AI API",
-                "required": true,
-                "order": 2
-            }
-        ]
-    },
-    "vertex_ai-ai21_models": {
-        "name": "Vertex AI AI21",
-        "type": "vertex_ai-ai21_models",
-        "description": "Supports text generation and completion, ideal for summarization, content creation, and conversational agents.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "vertex_ai-anthropic_models": {
-        "name": "Vertex AI Anthropic",
-        "type": "vertex_ai-anthropic_models",
-        "description": "Can be implemented for ethical and aligned conversational AI applications.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "vertex_ai-chat-models": {
-        "name": "Vertex AI Chat",
-        "type": "vertex_ai-chat-models",
-        "description": "Can be implemented for real-time conversational interfaces and customer support.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "vertex_ai-code-chat-models": {
-        "name": "Vertex AI Code Chat",
-        "type": "vertex_ai-code-chat-models",
-        "description": "Can be implemented for interactive coding assistance and debugging workflows.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "vertex_ai-code-text-models": {
-        "name": "Vertex AI Code Text",
-        "type": "vertex_ai-code-text-models",
-        "description": "Suitable for generating and completing code snippets for development tasks.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "vertex_ai-embedding-models": {
-        "name": "Vertex AI Embedding",
-        "type": "vertex_ai-embedding-models",
-        "description": "Enhances search, classification, and clustering in data-rich applications.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "vertex_ai-image-models": {
-        "name": "Vertex AI Image",
-        "type": "vertex_ai-image-models",
-        "description": "Enables image generation for design, marketing, and creative projects.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "vertex_ai-language-models": {
-        "name": "Vertex AI Language",
-        "type": "vertex_ai-language-models",
-        "description": "Suitable for natural language understanding and multilingual processing tasks.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "vertex_ai-llama_models": {
-        "name": "Vertex AI Llama",
-        "type": "vertex_ai-llama_models",
-        "description": "Ideal for advanced language modeling and conversational AI use cases.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "vertex_ai-mistral_models": {
-        "name": "Vertex AI Mistral",
-        "type": "vertex_ai-mistral_models",
-        "description": "Useful for text generation and instruction tasks in edge and lightweight environments.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "vertex_ai-text-models": {
-        "name": "Vertex AI Text",
-        "type": "vertex_ai-text-models",
-        "description": "Designed for text generation and language understanding in chatbots and content automation.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "vertex_ai-vision-models": {
-        "name": "Vertex AI Vision",
-        "type": "vertex_ai-vision-models",
-        "description": "Can be implemented for visual analysis, object detection, and image recognition.",
-        "icon": "icons/providers/vertexai.png",
-        "credentials": [
-            {
-                "field": "vertex_credentials",
-                "label": "Vertex AI Credentials",
-                "type": "textarea",
-                "description": "Your Vertex AI credentials (JSON format)",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "vertex_project",
-                "label": "Vertex Project",
-                "type": "text",
-                "description": "Your Vertex AI project ID (optional)",
-                "required": false,
-                "order": 2
-            },
-            {
-                "field": "vertex_location",
-                "label": "Vertex Location",
-                "type": "text",
-                "description": "The location for Vertex AI resources",
-                "required": true,
-                "order": 3
-            }
-        ]
-    },
-    "gemini": {
-        "name": "Gemini - Google AI Studio",
-        "type": "gemini",
-        "description": "Access Google\u2019s Gemini Pro, 1.5 Pro, and Pro Vision models for multimodal AI.",
-        "icon": "icons/providers/gemini_google_ai_studio.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Gemini API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "sagemaker": {
-        "name": "AWS Sagemaker",
-        "type": "sagemaker",
-        "description": "Supports Jumpstart Huggingface embedding models and Meta\u2019s Llama series.",
-        "icon": "icons/providers/aws_sagemaker.png",
-        "credentials": [
-            {
-                "field": "aws_access_key_id",
-                "label": "AWS Access Key ID",
-                "type": "text",
-                "description": "Your AWS Access Key ID",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "aws_secret_access_key",
-                "label": "AWS Secret Access Key",
-                "type": "password",
-                "description": "Your AWS Secret Access Key",
-                "required": true,
-                "order": 2
-            },
-            {
-                "field": "aws_session_token",
-                "label": "AWS Session Token",
-                "type": "password",
-                "description": "Your AWS Session Token (optional)",
-                "required": false,
-                "order": 3
-            },
-            {
-                "field": "aws_region_name",
-                "label": "AWS Region Name",
-                "type": "text",
-                "description": "The AWS region name",
-                "required": true,
-                "order": 4
-            },
-            {
-                "field": "aws_session_name",
-                "label": "AWS Session Name",
-                "type": "text",
-                "description": "Your AWS Session Name (optional)",
-                "required": false,
-                "order": 5
-            },
-            {
-                "field": "aws_profile_name",
-                "label": "AWS Profile Name",
-                "type": "text",
-                "description": "Your AWS Profile Name (optional)",
-                "required": false,
-                "order": 6
-            },
-            {
-                "field": "aws_role_name",
-                "label": "AWS Role Name",
-                "type": "text",
-                "description": "Your AWS Role Name (optional)",
-                "required": false,
-                "order": 7
-            },
-            {
-                "field": "aws_web_identity_token",
-                "label": "AWS Web Identity Token",
-                "type": "password",
-                "description": "Your AWS Web Identity Token (optional)",
-                "required": false,
-                "order": 8
-            }
+        ],
+        "capabilities": [
+            "model"
         ]
     },
     "bedrock": {
@@ -626,301 +104,72 @@
         "icon": "icons/providers/aws_bedrock.png",
         "credentials": [
             {
+                "type": "text",
                 "field": "aws_access_key_id",
                 "label": "AWS Access Key ID",
-                "type": "text",
-                "description": "Your AWS Access Key ID",
+                "order": 1,
                 "required": true,
-                "order": 1
+                "description": "Your AWS Access Key ID"
             },
             {
+                "type": "password",
                 "field": "aws_secret_access_key",
                 "label": "AWS Secret Access Key",
-                "type": "password",
-                "description": "Your AWS Secret Access Key",
+                "order": 2,
                 "required": true,
-                "order": 2
+                "description": "Your AWS Secret Access Key"
             },
             {
+                "type": "password",
                 "field": "aws_session_token",
                 "label": "AWS Session Token",
-                "type": "password",
-                "description": "Your AWS Session Token (optional)",
+                "order": 3,
                 "required": false,
-                "order": 3
+                "description": "Your AWS Session Token (optional)"
             },
             {
+                "type": "text",
                 "field": "aws_region_name",
                 "label": "AWS Region Name",
-                "type": "text",
-                "description": "The AWS region name",
+                "order": 4,
                 "required": true,
-                "order": 4
+                "description": "The AWS region name"
             },
             {
+                "type": "text",
                 "field": "aws_session_name",
                 "label": "AWS Session Name",
-                "type": "text",
-                "description": "Your AWS Session Name (optional)",
+                "order": 5,
                 "required": false,
-                "order": 5
+                "description": "Your AWS Session Name (optional)"
             },
             {
+                "type": "text",
                 "field": "aws_profile_name",
                 "label": "AWS Profile Name",
-                "type": "text",
-                "description": "Your AWS Profile Name (optional)",
+                "order": 6,
                 "required": false,
-                "order": 6
+                "description": "Your AWS Profile Name (optional)"
             },
             {
+                "type": "text",
                 "field": "aws_role_name",
                 "label": "AWS Role Name",
-                "type": "text",
-                "description": "Your AWS Role Name (optional)",
+                "order": 7,
                 "required": false,
-                "order": 7
+                "description": "Your AWS Role Name (optional)"
             },
             {
+                "type": "password",
                 "field": "aws_web_identity_token",
                 "label": "AWS Web Identity Token",
-                "type": "password",
-                "description": "Your AWS Web Identity Token (optional)",
+                "order": 8,
                 "required": false,
-                "order": 8
+                "description": "Your AWS Web Identity Token (optional)"
             }
-        ]
-    },
-    "mistral": {
-        "name": "Mistral AI API",
-        "type": "mistral",
-        "description": "Provides embedding, coding, edge, math, image, and multimodal reasoning models.",
-        "icon": "icons/providers/mistral_ai_api.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Mistral API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "codestral": {
-        "name": "Codestral API",
-        "type": "codestral",
-        "description": "Features a robust code completion model for plugins or direct queries.",
-        "icon": "icons/providers/mistral_ai_api.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Codestral API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "text-completion-codestral": {
-        "name": "Codestral API (Text Completion)",
-        "type": "text-completion-codestral",
-        "description": "Access Codestral's latest and 2405 text completion models.",
-        "icon": "icons/providers/mistral_ai_api.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Text Completion Codestral API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "cohere": {
-        "name": "Cohere",
-        "type": "cohere",
-        "description": "Offers the Command family for text generation, Rerank for search optimization, and Embed for search, classification, and clustering.",
-        "icon": "icons/providers/cohere.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Cohere API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "cohere_chat": {
-        "name": "Cohere (Chat)",
-        "type": "cohere_chat",
-        "description": "Designed for conversational agents in customer support, chatbots, and virtual assistants.",
-        "icon": "icons/providers/cohere.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Cohere Chat API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "anyscale": {
-        "name": "Anyscale",
-        "type": "anyscale",
-        "description": "Offers Llama Chat, Code Instruct, and Mistral Instruct models for versatile applications.",
-        "icon": "icons/providers/anyscale.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Anyscale API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "huggingface": {
-        "name": "Huggingface",
-        "type": "huggingface",
-        "description": "Provides Meta-Llama, Falcon, MPT, CodeLlama, WizardCoder, and Phind models, along with custom models.",
-        "icon": "icons/providers/huggingface.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Hugging Face API key",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "api_base",
-                "label": "API Base URL",
-                "type": "url",
-                "description": "Custom base URL for API requests (optional)",
-                "required": false,
-                "order": 2
-            }
-        ]
-    },
-    "perplexity": {
-        "name": "Perplexity AI (pplx-api)",
-        "type": "perplexity",
-        "description": "Includes Llama 3.1 Sonar, OpenHermes Mistral, and PPLX Chat completion models.",
-        "icon": "icons/providers/perplexity_ai.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Perplexity API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "groq": {
-        "name": "Groq",
-        "type": "groq",
-        "description": "Features Llama, Mixtral, Gemma, and Whisper Speech-to-Text models.",
-        "icon": "icons/providers/groq.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Groq API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "together_ai": {
-        "name": "Together AI",
-        "type": "together_ai",
-        "description": "Offers Llama, Falcon, Alpaca, and other Chat and Code LLMs, along with language/instruction models.",
-        "icon": "icons/providers/together_ai.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Together AI API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "databricks": {
-        "name": "Databricks",
-        "type": "databricks",
-        "description": "Supports text summarization, code generation, image generation, virtual assistants, synthetic data generation, and content creation.",
-        "icon": "icons/providers/databricks.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Databricks API key",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "api_base",
-                "label": "API Base URL",
-                "type": "url",
-                "description": "Custom base URL for API requests",
-                "required": true,
-                "order": 2
-            }
-        ]
-    },
-    "cerebras": {
-        "name": "Cerebras",
-        "type": "cerebras",
-        "description": "Delivers chat completion models for conversational AI tasks.",
-        "icon": "icons/providers/cerebras.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Cerebras API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "friendliai": {
-        "name": "FriendliAI",
-        "type": "friendliai",
-        "description": "Features vision, instruct, chat, and coding models aggregated from multiple providers.",
-        "icon": "icons/providers/friendliai.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Friendliai API key",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "api_base",
-                "label": "API Base URL",
-                "type": "url",
-                "description": "Custom base URL for API requests",
-                "required": false,
-                "order": 2
-            }
+        ],
+        "capabilities": [
+            "model"
         ]
     },
     "deepseek": {
@@ -930,365 +179,392 @@
         "icon": "icons/providers/deepseek.png",
         "credentials": [
             {
+                "type": "password",
                 "field": "api_key",
                 "label": "API Key",
-                "type": "password",
-                "description": "Your Deepseek API key",
+                "order": 1,
                 "required": true,
-                "order": 1
+                "description": "Your Deepseek API key"
             }
+        ],
+        "capabilities": [
+            "model"
         ]
     },
-    "fireworks_ai": {
-        "name": "Fireworks AI",
-        "type": "fireworks_ai",
-        "description": "Provides a model library for serverless applications, with over 140 LLMs, stable diffusion and Flux image models, and Whisper series speech models.",
+    "fireworks_ai-embedding-models": {
+        "name": "Fireworks",
+        "type": "fireworks_ai-embedding-models",
+        "description": "The fastest and most efficient inference engine to build production-ready, compound AI systems.",
         "icon": "icons/providers/fireworks_ai.png",
         "credentials": [
             {
+                "type": "password",
                 "field": "api_key",
                 "label": "API Key",
-                "type": "password",
-                "description": "Your Fireworks AI API key",
+                "order": 1,
                 "required": true,
-                "order": 1
+                "description": "Your Fireworks AI API key"
             }
+        ],
+        "capabilities": [
+            "model"
         ]
     },
-    "cloudflare": {
-        "name": "Cloudflare Workers AI",
-        "type": "cloudflare",
-        "description": "Workers AI: Features Meta\u2019s Llama, Mistral Instruct, and CodeLlama models.",
-        "icon": "icons/providers/cloudflare_workers_ai.png",
+    "gemini": {
+        "name": "Gemini - Google AI Studio",
+        "type": "gemini",
+        "description": "Access Google's Gemini Pro, 1.5 Pro, and Pro Vision models for multimodal AI.",
+        "icon": "icons/providers/gemini_google_ai_studio.png",
         "credentials": [
             {
+                "type": "password",
                 "field": "api_key",
                 "label": "API Key",
-                "type": "password",
-                "description": "Your Cloudflare Workers AI API key",
+                "order": 1,
                 "required": true,
-                "order": 1
+                "description": "Your Gemini API key"
+            }
+        ],
+        "capabilities": [
+            "model"
+        ]
+    },
+    "huggingface": {
+        "name": "Huggingface",
+        "type": "huggingface",
+        "description": "Provides Meta-Llama, Falcon, MPT, CodeLlama, WizardCoder, and Phind models, along with custom models.",
+        "icon": "icons/providers/huggingface.png",
+        "credentials": [
+            {
+                "type": "password",
+                "field": "api_key",
+                "label": "API Key",
+                "order": 1,
+                "required": true,
+                "description": "Your Hugging Face API key"
             },
             {
-                "field": "account_id",
-                "label": "Account ID",
-                "type": "text",
-                "description": "Your Cloudflare Workers AI Account ID",
-                "required": true,
-                "order": 2
-            }
-        ]
-    },
-    "deepinfra": {
-        "name": "DeepInfra",
-        "type": "deepinfra",
-        "description": "Includes Meta\u2019s Llama, Mistral Instruct, and CodeLlama models.",
-        "icon": "icons/providers/deepinfra.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your DeepInfra API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "ai21": {
-        "name": "AI21",
-        "type": "ai21",
-        "description": "Showcases Jamba-1.5 (Mini and Large) and J2 series (Light, Mid, Ultra) models.",
-        "icon": "icons/providers/ai21.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your AI21 API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "nlp_cloud": {
-        "name": "NLP Cloud",
-        "type": "nlp_cloud",
-        "description": "Supports models for text, image, audio, and video generation.",
-        "icon": "icons/providers/nlp_cloud.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your NLP Cloud API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "replicate": {
-        "name": "Replicate",
-        "type": "replicate",
-        "description": "Hosts Llama Chat (70B & 13B), Vicuna, and Flan-T5 models.",
-        "icon": "icons/providers/replicate.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Replicate API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "voyage": {
-        "name": "Voyage AI",
-        "type": "voyage",
-        "description": "Includes text embedding models for coding, finance, law, multilingual, and multimodal tasks.",
-        "icon": "icons/providers/voyage_ai.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Voyage AI API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "aleph_alpha": {
-        "name": "Aleph Alpha",
-        "type": "aleph_alpha",
-        "description": "Features the Luminous model series for advanced AI applications.",
-        "icon": "icons/providers/aleph_alpha.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Aleph Alpha API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "openrouter": {
-        "name": "OpenRouter",
-        "type": "openrouter",
-        "description": "Aggregates text, chat, and vision models from OpenAI, Anthropic, Google PaLM, and Meta\u2019s Llama.",
-        "icon": "icons/providers/openrouter.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your OpenRouter API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "watsonx": {
-        "name": "IBM watsonx.ai",
-        "type": "watsonx",
-        "description": "Diverse range of foundation models across domains like cybersecurity, translation, Q&A, and image processing with strong governance and customization options.",
-        "icon": "icons/providers/ibm_watsonx.ai.png",
-        "credentials": [
-            {
+                "type": "url",
                 "field": "api_base",
                 "label": "API Base URL",
-                "type": "url",
-                "description": "The base URL for watsonx API",
-                "required": true,
-                "order": 1
-            },
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your IBM watsonx AI API key",
-                "required": true,
-                "order": 2
-            },
-            {
-                "field": "project_id",
-                "label": "Project ID",
-                "type": "text",
-                "description": "Your IBM watsonx AI Project ID",
+                "order": 2,
                 "required": false,
-                "order": 3
-            },
-            {
-                "field": "space_id",
-                "label": "Space ID",
-                "type": "text",
-                "description": "Your IBM watsonx AI Space ID",
-                "required": false,
-                "order": 4
+                "description": "Custom base URL for API requests (optional)"
             }
+        ],
+        "capabilities": [
+            "model"
         ]
     },
-    "predibase": {
-        "name": "Predibase",
-        "type": "predibase",
-        "description": "Supports models from the Llama, Qwen, Mistral, and Gemma series for a variety of AI-driven tasks, including text generation and language understanding.",
-        "icon": "icons/providers/predibase.png",
+    "mistral": {
+        "name": "Mistral AI API",
+        "type": "mistral",
+        "description": "Provides embedding, coding, edge, math, image, and multimodal reasoning models.",
+        "icon": "icons/providers/mistral_ai_api.png",
         "credentials": [
             {
-                "field": "api_base",
-                "label": "API Base URL",
-                "type": "url",
-                "description": "The base URL for Predibase API",
-                "required": false,
-                "order": 1
-            },
-            {
+                "type": "password",
                 "field": "api_key",
                 "label": "API Key",
-                "type": "password",
-                "description": "Your Predibase API key",
+                "order": 1,
                 "required": true,
-                "order": 2
+                "description": "Your Mistral API key"
+            }
+        ],
+        "capabilities": [
+            "model"
+        ]
+    },
+    "openai": {
+        "name": "OpenAI",
+        "type": "openai",
+        "description": "Offers advanced models for language, image generation, and audio conversion.",
+        "icon": "icons/providers/openai.png",
+        "credentials": [
+            {
+                "type": "password",
+                "field": "api_key",
+                "label": "API Key",
+                "order": 1,
+                "required": true,
+                "description": "Your OpenAI API key"
+            }
+        ],
+        "capabilities": [
+            "model",
+            "moderation"
+        ]
+    },
+    "together_ai": {
+        "name": "Together AI",
+        "type": "together_ai",
+        "description": "Offers Llama, Falcon, Alpaca, and other Chat and Code LLMs, along with language/instruction models.",
+        "icon": "icons/providers/together_ai.png",
+        "credentials": [
+            {
+                "type": "password",
+                "field": "api_key",
+                "label": "API Key",
+                "order": 1,
+                "required": true,
+                "description": "Your Together AI API key"
+            }
+        ],
+        "capabilities": [
+            "model"
+        ]
+    },
+    "vertex_ai-anthropic_models": {
+        "name": "Vertex AI Anthropic",
+        "type": "vertex_ai-anthropic_models",
+        "description": "Can be implemented for ethical and aligned conversational AI applications.",
+        "icon": "icons/providers/vertexai.png",
+        "credentials": [
+            {
+                "type": "textarea",
+                "field": "vertex_credentials",
+                "label": "Vertex AI Credentials",
+                "order": 1,
+                "required": true,
+                "description": "Your Vertex AI credentials (JSON format)"
             },
             {
-                "field": "predibase_tenant_id",
+                "type": "text",
+                "field": "vertex_project",
+                "label": "Vertex Project",
+                "order": 2,
+                "required": false,
+                "description": "Your Vertex AI project ID (optional)"
+            },
+            {
+                "type": "text",
+                "field": "vertex_location",
+                "label": "Vertex Location",
+                "order": 3,
+                "required": true,
+                "description": "The location for Vertex AI resources"
+            }
+        ],
+        "capabilities": [
+            "model"
+        ]
+    },
+    "vertex_ai-gemini-models": {
+        "name": "Vertex AI Gemini",
+        "type": "vertex_ai-gemini-models",
+        "description": "Gemini is a family of large language models developed by Google. It is a general-purpose model that can be used for a variety of tasks, including natural language understanding and generation, translation, and more.",
+        "icon": "icons/providers/vertexai.png",
+        "credentials": [
+            {
+                "type": "textarea",
+                "field": "vertex_credentials",
+                "label": "Vertex AI Credentials",
+                "order": 1,
+                "required": true,
+                "description": "Your Vertex AI credentials (JSON format)"
+            },
+            {
+                "type": "text",
+                "field": "vertex_project",
+                "label": "Vertex Project",
+                "order": 2,
+                "required": false,
+                "description": "Your Vertex AI project ID (optional)"
+            },
+            {
+                "type": "text",
+                "field": "vertex_location",
+                "label": "Vertex Location",
+                "order": 3,
+                "required": true,
+                "description": "The location for Vertex AI resources"
+            }
+        ],
+        "capabilities": [
+            "model"
+        ]
+    },
+    "xai": {
+        "name": "xAI",
+        "type": "xai",
+        "description": "xAI's inference provider allows access to their large language models, like Grok, for generating text and other AI outputs.",
+        "icon": "icons/providers/x_ai.png",
+        "credentials": [
+            {
+                "type": "password",
+                "field": "api_key",
+                "label": "API Key",
+                "order": 1,
+                "required": true,
+                "description": "Your xAI API key"
+            }
+        ],
+        "capabilities": [
+            "model"
+        ]
+    },
+    "aws_comprehend": {
+        "name": "AWS Comprehend",
+        "type": "aws_comprehend",
+        "description": "Amazon Comprehend uses natural language processing (NLP) to extract insights about the content of documents. It develops insights by recognizing the entities, key phrases, language, sentiments, and other common elements in a document.",
+        "icon": "icons/providers/aws_sagemaker.png",
+        "credentials": [
+            {
+                "type": "text",
+                "field": "aws_access_key_id",
+                "label": "AWS Access Key ID",
+                "order": 1,
+                "required": true,
+                "description": "Your AWS Access Key ID"
+            },
+            {
+                "type": "password",
+                "field": "aws_secret_access_key",
+                "label": "AWS Secret Access Key",
+                "order": 2,
+                "required": true,
+                "description": "Your AWS Secret Access Key"
+            },
+            {
+                "type": "password",
+                "field": "aws_session_token",
+                "label": "AWS Session Token",
+                "order": 3,
+                "required": false,
+                "description": "Your AWS Session Token (optional)"
+            },
+            {
+                "type": "text",
+                "field": "aws_region_name",
+                "label": "AWS Region Name",
+                "order": 4,
+                "required": true,
+                "description": "The AWS region name"
+            },
+            {
+                "type": "text",
+                "field": "aws_session_name",
+                "label": "AWS Session Name",
+                "order": 5,
+                "required": false,
+                "description": "Your AWS Session Name (optional)"
+            },
+            {
+                "type": "text",
+                "field": "aws_profile_name",
+                "label": "AWS Profile Name",
+                "order": 6,
+                "required": false,
+                "description": "Your AWS Profile Name (optional)"
+            },
+            {
+                "type": "text",
+                "field": "aws_role_name",
+                "label": "AWS Role Name",
+                "order": 7,
+                "required": false,
+                "description": "Your AWS Role Name (optional)"
+            },
+            {
+                "type": "password",
+                "field": "aws_web_identity_token",
+                "label": "AWS Web Identity Token",
+                "order": 8,
+                "required": false,
+                "description": "Your AWS Web Identity Token (optional)"
+            }
+        ],
+        "capabilities": [
+            "moderation"
+        ]
+    },
+    "azure_content_safety": {
+        "name": "Azure Content Safety",
+        "type": "azure_content_safety",
+        "description": "Azure AI Content Safety is an AI service that detects harmful user-generated and AI-generated content in applications and services.",
+        "icon": "icons/providers/azure_ai_studio.png",
+        "credentials": [
+            {
+                "type": "url",
+                "field": "api_base",
+                "label": "API Base URL",
+                "order": 1,
+                "required": true,
+                "description": "The base URL for Azure API"
+            },
+            {
+                "type": "password",
+                "field": "api_key",
+                "label": "API Key",
+                "order": 2,
+                "required": true,
+                "description": "Your Azure API key"
+            },
+            {
+                "type": "text",
+                "field": "api_version",
+                "label": "API Version",
+                "order": 3,
+                "required": false,
+                "description": "Azure API version"
+            },
+            {
+                "type": "password",
+                "field": "azure_ad_token",
+                "label": "Azure AD Token",
+                "order": 4,
+                "required": false,
+                "description": "Azure Active Directory token"
+            },
+            {
+                "type": "text",
+                "field": "tenant_id",
                 "label": "Tenant ID",
-                "type": "text",
-                "description": "Your Predibase Tenant ID",
+                "order": 5,
                 "required": false,
-                "order": 3
+                "description": "Your Azure tenant ID",
+                "dependencies": [
+                    "client_id",
+                    "client_secret"
+                ]
             },
             {
-                "field": "adapter_id",
-                "label": "Adapter ID",
                 "type": "text",
-                "description": "Your Predibase Adapter ID",
+                "field": "client_id",
+                "label": "Client ID",
+                "order": 6,
                 "required": false,
-                "order": 4
+                "description": "Your Azure client ID",
+                "dependencies": [
+                    "tenant_id",
+                    "client_secret"
+                ]
             },
             {
-                "field": "adapter_source",
-                "label": "Adapter Source",
-                "type": "text",
-                "description": "Your Predibase Adapter Source",
+                "type": "password",
+                "field": "client_secret",
+                "label": "Client Secret",
+                "order": 7,
                 "required": false,
-                "order": 5
+                "description": "Your Azure client secret",
+                "dependencies": [
+                    "tenant_id",
+                    "client_id"
+                ]
             }
-        ]
-    },
-    "volcengine": {
-        "name": "Volcano Engine",
-        "type": "volcengine",
-        "description": "Includes Bytedance Doubao model series for AI applications.",
-        "icon": "icons/providers/volcano_engine.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Volcano Engine API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "clarifai": {
-        "name": "Clarifai",
-        "type": "clarifai",
-        "description": "Integrates Llama, Mistral, Jurassic, WizardCoder, Anthropic, OpenAI, GCP, Cohere, Databricks, Microsoft, and Salesforce models.",
-        "icon": "icons/providers/clarifai.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Clarifai API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "baseten": {
-        "name": "Baseten",
-        "type": "baseten",
-        "description": "Features Falcon, Wizard, and MPT models.",
-        "icon": "icons/providers/baseten.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Baseten API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "sambanova": {
-        "name": "Sambanova",
-        "type": "sambanova",
-        "description": "Offers high-performance for Llama 3 series that excels in real-time inference for dynamic AI workloads.",
-        "icon": "icons/providers/sambanova.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Sambanova API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "github": {
-        "name": "Github",
-        "type": "github",
-        "description": "All GitHub model are available for deployment.",
-        "icon": "icons/providers/github.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Github API key",
-                "required": true,
-                "order": 1
-            }
-        ]
-    },
-    "petals": {
-        "name": "Petals",
-        "type": "petals",
-        "description": "Enables text generation with distributed Llama 3.1, Mixtral, Falcon, and BLOOM models, along with fine-tuning capabilities.",
-        "icon": "icons/providers/petals.png",
-        "credentials": [
-            {}
-        ]
-    },
-    "anthropic": {
-        "name": "Anthropic",
-        "type": "anthropic",
-        "description": "Anthropic is an AI safety and research company that's working to build reliable, interpretable, and steerable AI systems.",
-        "icon": "icons/providers/anthropic.png",
-        "credentials": [
-            {
-                "field": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "description": "Your Anthropic API key",
-                "required": true,
-                "order": 1
-            }
+        ],
+        "capabilities": [
+            "moderation"
         ]
     },
     "bud_sentinel": {
         "name": "Bud Sentinel",
         "type": "bud_sentinel",
         "description": "A multi-tiered Guardrail framework for LLM safety and compliance, from the Bud Team",
-        "icon": "icons/providers/openai.png",
-        "credentials": []
+        "icon": "icons/providers/bud.png",
+        "credentials": [],
+        "capabilities": [
+            "moderation"
+        ]
     }
 }

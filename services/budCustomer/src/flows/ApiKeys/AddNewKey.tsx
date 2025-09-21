@@ -11,7 +11,13 @@ import { errorToast } from "@/components/toast";
 import TextInput from "@/components/ui/bud/dataEntry/TextInput";
 import CustomSelect from "@/components/ui/bud/dataEntry/CustomSelect";
 
-function AddKeyForm({ setApiKeyData, apiKeyData }: { setApiKeyData: (data: any) => void; apiKeyData: any }) {
+function AddKeyForm({
+  setApiKeyData,
+  apiKeyData,
+}: {
+  setApiKeyData: (data: any) => void;
+  apiKeyData: any;
+}) {
   const { form } = useContext(BudFormContext);
   const [projectData, setProjectData] = useState<any>([]);
   const { projects, getProjects } = useProjects();
@@ -36,7 +42,17 @@ function AddKeyForm({ setApiKeyData, apiKeyData }: { setApiKeyData: (data: any) 
         label="Credential Name"
         placeholder="Enter name"
         infoText="This is the name"
-        rules={[{ required: true, message: "Please input name!" }]}
+        rules={[
+          { required: true, message: "Please input name!" },
+          {
+            validator: (_, value) => {
+              if (value && value.trim().length === 0) {
+                return Promise.reject(new Error("Name cannot be only spaces"));
+              }
+              return Promise.resolve();
+            },
+          },
+        ]}
         ClassNames="mt-[.1rem] mb-[0rem]"
         InputClasses="py-[.5rem]"
         formItemClassnames="mb-[0]"
@@ -45,7 +61,7 @@ function AddKeyForm({ setApiKeyData, apiKeyData }: { setApiKeyData: (data: any) 
           form.validateFields(["name"]);
           setApiKeyData((prev: any) => ({
             ...prev,
-            name: value,
+            name: value ? value.trim() : "",
           }));
         }}
       />
@@ -97,48 +113,101 @@ export default function AddNewKey() {
     project_id: "",
     expiry: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (values: any) => {
+    // Prevent double submission
+    if (isSubmitting) {
+      console.log("Submission already in progress, ignoring click");
+      return;
+    }
+
+    // Validate required fields before proceeding
+    const payload = {
+      name: (apiKeyData.name || values.name || "").trim(),
+      project_id: apiKeyData.project_id || values.project,
+      expiry: apiKeyData.expiry || values.SetExpiry,
+      credential_type: "client_app",
+    };
+
+    if (!payload.name || !payload.project_id || !payload.expiry) {
+      errorToast("Please fill in all required fields");
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      const payload = {
-        name: apiKeyData.name || values.name,
-        project_id: apiKeyData.project_id || values.project,
-        expiry: apiKeyData.expiry || values.SetExpiry,
-        credential_type: "client_app",
-      };
 
       const response = await AppRequest.Post("/credentials/", payload);
 
-      if (response?.data) {
+      console.log("API Response:", response);
+      console.log("Response status:", response?.status);
+      console.log("Response data:", response?.data);
+
+      // Check for successful response (2xx status codes)
+      if (response && response.status >= 200 && response.status < 300) {
         // Store the API key for display in success screen
-        localStorage.setItem(
-          "temp_api_key",
-          response.data.key || response.data.api_key || "",
-        );
-        openDrawerWithStep("api-key-success");
+        // Handle different possible response structures
+        const apiKey =
+          response.data?.key ||
+          response.data?.api_key ||
+          response.data?.credential?.key ||
+          response.data?.credential?.api_key ||
+          "";
+
+        if (apiKey) {
+          localStorage.setItem("temp_api_key", apiKey);
+          openDrawerWithStep("api-key-success");
+        } else {
+          // Success response but no API key in response
+          console.warn(
+            "API key created but key not found in response:",
+            response.data,
+          );
+          // Still navigate to success screen as the creation was successful
+          localStorage.setItem("temp_api_key", "");
+          openDrawerWithStep("api-key-success");
+        }
       } else {
-        errorToast("Failed to create API key");
+        // If response exists but not a success status
+        errorToast("Failed to create API key. Please try again.");
       }
     } catch (error: any) {
       console.error("Error during form submission:", error);
-      errorToast(
-        error?.response?.data?.detail || error?.response?.data?.message || "Failed to create API key",
-      );
+
+      // Check specifically for 500 errors
+      if (error?.response?.status === 500) {
+        errorToast("Server error occurred. Please try again later.");
+      } else {
+        errorToast(
+          error?.response?.data?.detail ||
+            error?.response?.data?.message ||
+            "Failed to create API key. Please try again.",
+        );
+      }
+      // Ensure we don't navigate to success screen on error
+      return;
     } finally {
-      // Handle loading state if needed
+      setIsSubmitting(false);
     }
   };
 
   return (
     <BudForm
       data={{}}
-      disableNext={!apiKeyData.name || !apiKeyData.project_id || !apiKeyData.expiry}
+      disableNext={
+        !apiKeyData.name ||
+        !apiKeyData.project_id ||
+        !apiKeyData.expiry ||
+        isSubmitting
+      }
       onNext={handleSubmit}
-      nextText="Create"
+      nextText={isSubmitting ? "Creating..." : "Create"}
       backText="Cancel"
       onBack={() => {
         closeDrawer();
       }}
+      drawerLoading={isSubmitting}
     >
       <BudWraperBox>
         <BudDrawerLayout>

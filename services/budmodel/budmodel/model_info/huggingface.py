@@ -899,7 +899,7 @@ class HuggingfaceUtils:
             # Parse the HTML content
             tree = lxml_html.fromstring(response.content)
             # Try to get the image using the XPath
-            xpath_selector = "/html/body/div/main/header/div/div[1]/div[1]/img"
+            xpath_selector = "/html/body/div/main/header/div/div[1]/div[1]/a/img"
             img_elements = tree.xpath(xpath_selector)
             # If XPath didn't work, try the CSS selector
             if not img_elements:

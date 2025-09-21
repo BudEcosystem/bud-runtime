@@ -60,11 +60,13 @@ function CustomDatepicker(props: BudInputProps) {
               getPopupContainer={() => document.body}
               format={"MM/DD/YYYY"}
               value={props.value ? dayjs(props.value, "MM/DD/YYYY") : null}
-              onChange={((date, dateString) => {
-                if (typeof dateString === "string") {
-                  props.onChange?.(dateString);
-                }
-              }) as DatePickerProps['onChange']}
+              onChange={
+                ((date, dateString) => {
+                  if (typeof dateString === "string") {
+                    props.onChange?.(dateString);
+                  }
+                }) as DatePickerProps["onChange"]
+              }
               className={`w-[100%] bg-[transparent] !border py-[.6rem] !border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] ${props.InputClasses}`}
             />
           </ConfigProvider>
@@ -73,6 +75,5 @@ function CustomDatepicker(props: BudInputProps) {
     </Form.Item>
   );
 }
-
 
 export default CustomDatepicker;

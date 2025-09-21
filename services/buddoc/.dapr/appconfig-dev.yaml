@@ -1,0 +1,17 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: appconfig
+  namespace: development
+spec:
+  tracing:
+    samplingRate: "1"
+    stdout: true
+  features:
+    - name: SchedulerReminders
+      enabled: true
+  secrets:
+    scopes:
+      - storeName: secretstore-local
+        defaultAccess: allow
+        deniedSecrets: [ ]

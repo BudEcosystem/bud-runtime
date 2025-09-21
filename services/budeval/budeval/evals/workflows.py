@@ -17,6 +17,7 @@ from budmicroframe.commons.schemas import (
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 from budeval.commons.logging import logging
+from budeval.commons.storage_config import StorageConfig
 from budeval.commons.utils import update_workflow_data_in_statestore
 from budeval.core.schemas import (
     DatasetCategory,
@@ -32,23 +33,176 @@ from budeval.evals.services import EvaluationOpsService
 
 logger = logging.getLogger(__name__)
 
-
-# Worflow
 dapr_workflows = DaprWorkflow()
 
-# Retry Policy
-retry_policy = wf.RetryPolicy(
-    first_retry_interval=timedelta(seconds=1),
-    max_number_of_attempts=1,
-    backoff_coefficient=1,
-    max_retry_interval=timedelta(seconds=10),
-    retry_timeout=timedelta(seconds=100),
-)
 
-
-# EvaluationWorkflow
 class EvaluationWorkflow:
-    # Activities
+    @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
+    @staticmethod
+    def monitor_eval_job_progress(
+        ctx: wf.WorkflowActivityContext,
+        monitor_request: str,
+    ) -> dict:
+        """Monitor the evaluation job progress.
+
+        Args:
+            ctx (WorkflowActivityContext): The context of the Dapr workflow, providing
+                access to workflow instance information.
+            monitor_request (str): A JSON string containing the monitoring request parameters
+                including job_id, kubeconfig, and namespace.
+        """
+        logger = logging.getLogger("::EVAL:: Monitor Job Progress")
+        logger.debug(f"Monitoring job progress for {monitor_request}")
+
+        response = SuccessResponse(
+            code=HTTPStatus.OK.value,
+            message="Job status retrieved successfully",
+            param={},
+        )
+
+        monitor_request_json = json.loads(monitor_request)
+        job_id = monitor_request_json["job_id"]
+        kubeconfig = monitor_request_json["kubeconfig"]
+        # Resolve namespace with fallback to current cluster namespace
+        namespace = monitor_request_json.get("namespace") or StorageConfig.get_current_namespace()
+
+        response: SuccessResponse | ErrorResponse
+        try:
+            # Handle async operations with proper event loop management
+            try:
+                asyncio.get_running_loop()
+                # If we're in an existing loop, we need to run in a new thread
+                import concurrent.futures
+
+                def run_in_new_loop():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            EvaluationOpsService.get_job_status(job_id, kubeconfig, namespace)
+                        )
+                    finally:
+                        new_loop.close()
+
+                # Run in a separate thread with its own event loop
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_new_loop)
+                    job_status = future.result()
+            except RuntimeError:
+                # No loop running, safe to use asyncio.run()
+                job_status = asyncio.run(EvaluationOpsService.get_job_status(job_id, kubeconfig, namespace))
+
+            logger.debug(f"Job status for {job_id}: {job_status}")
+
+            response = SuccessResponse(
+                code=HTTPStatus.OK.value,
+                message="Job status retrieved successfully",
+                param=job_status,
+            )
+        except Exception as e:
+            logger.error(f"Error monitoring job progress: {e}", exc_info=True)
+            response = ErrorResponse(
+                message="Error monitoring job progress",
+                code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
+            )
+        return response.model_dump(mode="json")
+
+    @dapr_workflows.register_workflow  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
+    @staticmethod
+    def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
+        """Child workflow dedicated to monitoring a job until completion."""
+        logger = logging.getLogger("::EVAL:: MonitorJobWorkflow")
+
+        # Load From State
+        # Parse monitoring request
+        try:
+            request_data = json.loads(monitor_request)
+            job_id = request_data["job_id"]
+            kubeconfig = request_data["kubeconfig"]
+            _parent_workflow_id = request_data["parent_workflow_id"]
+            namespace = request_data.get("namespace") or StorageConfig.get_current_namespace()
+            max_attempts = request_data.get("max_attempts", 360)
+            poll_interval = request_data.get("poll_interval", 5)
+        except Exception as e:
+            logger.error(f"Error parsing monitor request: {e}", exc_info=True)
+            return {"status": "error", "message": str(e)}
+
+        for attempt in range(1, max_attempts + 1):
+            # Check job status
+            monitor_activity_request = {
+                "job_id": job_id,
+                "kubeconfig": kubeconfig,
+                "namespace": namespace,
+            }
+
+            monitor_result = yield ctx.call_activity(
+                EvaluationWorkflow.monitor_eval_job_progress,
+                input=json.dumps(monitor_activity_request),
+            )
+
+            # Check if monitoring activity failed
+            if monitor_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
+                logger.warning(f"Monitoring attempt {attempt} failed: {monitor_result.get('message')}")
+                # Wait before retry
+                yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
+                continue
+
+            # Extract job status
+            job_status_data = monitor_result.get("param", {})
+            job_status = job_status_data.get("status", "unknown")
+            job_details = job_status_data.get("details", {})
+
+            # Determine if job is complete
+            job_completed = False
+            final_status = None
+
+            if job_status in ["completed", "succeeded", "failed", "error"]:
+                job_completed = True
+                final_status = job_status
+            elif job_details:
+                # Check if job was not found (terminal state)
+                job_phase = job_details.get("phase", "")
+                if job_phase == "NotFound":
+                    job_completed = True
+                    final_status = "failed"
+                    logger.warning(f"Job {job_id} not found in cluster - marking as failed")
+                else:
+                    # Check Kubernetes job details
+                    try:
+                        succeeded = int(job_details.get("succeeded", 0))
+                        failed = int(job_details.get("failed", 0))
+
+                        if succeeded > 0:
+                            job_completed = True
+                            final_status = "succeeded"
+                        elif failed > 0:
+                            job_completed = True
+                            final_status = "failed"
+                    except (ValueError, TypeError):
+                        pass
+
+            # If job completed, return result
+            if job_completed:
+                logger.info(f"Job {job_id} completed with status: {final_status}")
+                return {
+                    "status": "completed",
+                    "job_status": final_status,
+                    "job_id": job_id,
+                    "attempts": attempt,
+                    "job_details": job_status_data,
+                }
+
+            # Wait before next check
+            yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
+
+        # Timeout reached
+        logger.warning(f"Job {job_id} monitoring timed out after {max_attempts} attempts")
+        return {
+            "status": "timeout",
+            "job_id": job_id,
+            "message": f"Monitoring timed out after {max_attempts} attempts",
+        }
+
     @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
     @staticmethod
     def create_engine_config(
@@ -103,7 +257,6 @@ class EvaluationWorkflow:
                 num_workers=1,
                 timeout_minutes=30,
                 kubeconfig=evaluate_model_request_json.kubeconfig,
-                namespace="budeval",
                 debug=True,
             )
 
@@ -114,9 +267,11 @@ class EvaluationWorkflow:
             transformed = transformer.transform_request(generic_request)
 
             # Create ConfigMap with transformed configuration
+            from budeval.commons.storage_config import StorageConfig
+
             from .configmap_manager import ConfigMapManager
 
-            configmap_manager = ConfigMapManager(namespace="budeval")
+            configmap_manager = ConfigMapManager(namespace=StorageConfig.get_current_namespace())
 
             configmap_result = configmap_manager.create_generic_config_map(
                 eval_request_id=str(generic_request.eval_request_id),
@@ -144,10 +299,15 @@ class EvaluationWorkflow:
         except Exception as e:
             logger.error(f"Error creating engine config: {e}", exc_info=True)
             response = ErrorResponse(
-                message="Error creating engine configuration", code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                message="Error creating engine configuration",
+                code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
             )
             # Manually construct error response to ensure code field is included
-            return {"object": "error", "code": HTTPStatus.INTERNAL_SERVER_ERROR.value, "message": response.message}
+            return {
+                "object": "error",
+                "code": HTTPStatus.INTERNAL_SERVER_ERROR.value,
+                "message": response.message,
+            }
 
     @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
     @staticmethod
@@ -213,19 +373,51 @@ class EvaluationWorkflow:
             transformed_data = {"job_config": job_config}
 
             # Pass reconstructed data to the service
-            job_details = asyncio.run(
-                EvaluationOpsService.deploy_eval_job_with_transformation(
-                    payload, transformed_data, str(task_id), workflow_id
+            # Handle async operations with proper event loop management
+            try:
+                asyncio.get_running_loop()
+                # If we're in an existing loop, we need to run in a new thread
+                import concurrent.futures
+
+                def run_in_new_loop():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            EvaluationOpsService.deploy_eval_job_with_transformation(
+                                payload,
+                                transformed_data,
+                                str(task_id),
+                                workflow_id,
+                            )
+                        )
+                    finally:
+                        new_loop.close()
+
+                # Run in a separate thread with its own event loop
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_new_loop)
+                    job_details = future.result()
+            except RuntimeError:
+                # No loop running, safe to use asyncio.run()
+                job_details = asyncio.run(
+                    EvaluationOpsService.deploy_eval_job_with_transformation(
+                        payload, transformed_data, str(task_id), workflow_id
+                    )
                 )
-            )
 
             response = SuccessResponse(
-                code=HTTPStatus.OK.value, message="Evaluation job deployed successfully", param=dict(job_details)
+                code=HTTPStatus.OK.value,
+                message="Evaluation job deployed successfully",
+                param=dict(job_details),
             )
 
             # Create initial job record in ClickHouse with status=running
             try:
-                from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
+                from budeval.evals.storage.factory import (
+                    get_storage_adapter,
+                    initialize_storage,
+                )
 
                 storage = get_storage_adapter()
 
@@ -250,13 +442,22 @@ class EvaluationWorkflow:
                             status="running",
                         )
 
-                asyncio.run(_init_and_create())
+                # Check if there's already an event loop running
+                try:
+                    asyncio.get_running_loop()
+                    # If we're in an existing loop, we need to handle this differently
+                    # For Dapr workflows, we should defer this to a background task
+                    logger.warning("Event loop already running, skipping initial ClickHouse record creation")
+                except RuntimeError:
+                    # No loop running, safe to use asyncio.run()
+                    asyncio.run(_init_and_create())
             except Exception as ch_e:
                 logger.warning(f"Failed to create initial ClickHouse job record: {ch_e}")
         except Exception as e:
             logger.error(f"Error deploying evaluation job: {e}", exc_info=True)
             response = ErrorResponse(
-                message="Error deploying evaluation job", code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                message="Error deploying evaluation job",
+                code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
             )
         return response.model_dump(mode="json")
 
@@ -285,11 +486,39 @@ class EvaluationWorkflow:
         )
 
         try:
-            cluster_verified = asyncio.run(
-                EvaluationOpsService.verify_cluster_connection(
-                    verify_cluster_connection_request_json, task_id, workflow_id
+            # Handle async operations with proper event loop management
+            try:
+                asyncio.get_running_loop()
+                # If we're in an existing loop, we need to run in a new thread
+                import concurrent.futures
+
+                def run_in_new_loop():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            EvaluationOpsService.verify_cluster_connection(
+                                verify_cluster_connection_request_json,
+                                task_id,
+                                workflow_id,
+                            )
+                        )
+                    finally:
+                        new_loop.close()
+
+                # Run in a separate thread with its own event loop
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_new_loop)
+                    cluster_verified = future.result()
+            except RuntimeError:
+                # No loop running, safe to use asyncio.run()
+                cluster_verified = asyncio.run(
+                    EvaluationOpsService.verify_cluster_connection(
+                        verify_cluster_connection_request_json,
+                        task_id,
+                        workflow_id,
+                    )
                 )
-            )
 
             if cluster_verified:
                 return SuccessResponse(
@@ -299,7 +528,8 @@ class EvaluationWorkflow:
                 ).model_dump(mode="json")
             else:
                 return ErrorResponse(
-                    code=HTTPStatus.BAD_REQUEST.value, message="Cluster connection verification failed"
+                    code=HTTPStatus.BAD_REQUEST.value,
+                    message="Cluster connection verification failed",
                 ).model_dump(mode="json")
         except Exception as e:
             error_msg = (
@@ -307,116 +537,11 @@ class EvaluationWorkflow:
             )
             logger.error(error_msg)
             return ErrorResponse(
-                message="Cluster connection verification failed", code=HTTPStatus.BAD_REQUEST.value
+                message="Cluster connection verification failed",
+                code=HTTPStatus.BAD_REQUEST.value,
             ).model_dump(mode="json")  # type: ignore # noqa
 
-    @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
-    @staticmethod
-    def extract_and_process_results(
-        ctx: wf.WorkflowActivityContext,
-        extract_request: str,
-    ) -> dict:
-        """Extract and process evaluation results from PVC.
-
-        Args:
-            ctx (WorkflowActivityContext): The context of the Dapr workflow
-            extract_request (str): A JSON string containing the extraction request parameters
-                including job_id, model_name, namespace, and kubeconfig.
-        """
-        logger = logging.getLogger("::EVAL:: Extract Results")
-        logger.debug(f"Extracting results for {extract_request}")
-
-        extract_request_json = json.loads(extract_request)
-        job_id = extract_request_json["job_id"]
-        model_name = extract_request_json["model_name"]
-        namespace = extract_request_json.get("namespace", "budeval")
-        kubeconfig = extract_request_json.get("kubeconfig")
-        experiment_id = extract_request_json.get("experiment_id")
-
-        response: SuccessResponse | ErrorResponse
-        try:
-            from budeval.evals.results_processor import ResultsProcessor
-            from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
-
-            # Initialize processor with configured storage backend
-            storage = get_storage_adapter()
-            processor = ResultsProcessor(storage)
-
-            # Initialize storage and extract results in the same event loop
-            async def extract_with_storage():
-                # Initialize storage if needed (e.g., ClickHouse connection pool)
-                if hasattr(storage, "initialize"):
-                    await initialize_storage(storage)
-
-                # Extract and process results
-                return await processor.extract_and_process(
-                    job_id=job_id,
-                    model_name=model_name,
-                    namespace=namespace,
-                    kubeconfig=kubeconfig,
-                    experiment_id=experiment_id,
-                )
-
-            # Run both operations in the same event loop
-            results = asyncio.run(extract_with_storage())
-
-            logger.info(f"Successfully processed results for job {job_id}")
-            response = SuccessResponse(
-                code=HTTPStatus.OK.value,
-                message="Results extracted and processed successfully",
-                param={
-                    "job_id": job_id,
-                    "datasets_processed": len(results.datasets),
-                    "overall_accuracy": results.summary.overall_accuracy,
-                    "storage_path": results.extraction_path,
-                },
-            )
-        except Exception as e:
-            logger.error(f"Error extracting results: {e}", exc_info=True)
-            response = ErrorResponse(
-                message=f"Error extracting results: {str(e)}", code=HTTPStatus.INTERNAL_SERVER_ERROR.value
-            )
-        return response.model_dump(mode="json")
-
-    @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
-    @staticmethod
-    def monitor_eval_job_progress(
-        ctx: wf.WorkflowActivityContext,
-        monitor_request: str,
-    ) -> dict:
-        """Monitor the evaluation job progress.
-
-        Args:
-            ctx (WorkflowActivityContext): The context of the Dapr workflow, providing
-                access to workflow instance information.
-            monitor_request (str): A JSON string containing the monitoring request parameters
-                including job_id, kubeconfig, and namespace.
-        """
-        logger = logging.getLogger("::EVAL:: Monitor Job Progress")
-        logger.debug(f"Monitoring job progress for {monitor_request}")
-
-        monitor_request_json = json.loads(monitor_request)
-        job_id = monitor_request_json["job_id"]
-        kubeconfig = monitor_request_json["kubeconfig"]
-        namespace = monitor_request_json.get("namespace", "budeval")
-
-        response: SuccessResponse | ErrorResponse
-        try:
-            job_status = asyncio.run(EvaluationOpsService.get_job_status(job_id, kubeconfig, namespace))
-
-            logger.debug(f"Job status for {job_id}: {job_status}")
-
-            response = SuccessResponse(
-                code=HTTPStatus.OK.value, message="Job status retrieved successfully", param=job_status
-            )
-        except Exception as e:
-            logger.error(f"Error monitoring job progress: {e}", exc_info=True)
-            response = ErrorResponse(
-                message="Error monitoring job progress", code=HTTPStatus.INTERNAL_SERVER_ERROR.value
-            )
-        return response.model_dump(mode="json")
-
-    @dapr_workflows.register_workflow  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
+    @dapr_workflows.register_workflow  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
     @staticmethod
     def evaluate_model(ctx: wf.DaprWorkflowContext, evaluate_model_request: str):
         """Execute the workflow to evaluate a model.
@@ -434,29 +559,12 @@ class EvaluationWorkflow:
 
         instance_id = str(ctx.instance_id)
 
-        # Parse request to check if this is monitoring phase
-        request_dict = json.loads(evaluate_model_request)
-        phase = request_dict.get("phase", "deployment")
-
-        logger.debug(f"Workflow phase: {phase}")
-
-        if phase == "monitoring":
-            # Handle monitoring phase with proper Dapr pattern
-            logger.info("Transitioning to monitoring phase")
-            yield from EvaluationWorkflow._handle_monitoring_phase(ctx, evaluate_model_request)
-            return
-
-        # Continue with deployment phase
-        logger.info(f"Evaluating model for instance_id: {instance_id}")
-
-        # Parse the request
         try:
             evaluate_model_request_json = StartEvaluationRequest.model_validate_json(evaluate_model_request)
         except Exception as e:
             logger.error(f"Error parsing cluster create request: {e}", exc_info=True)
             return
 
-        # Set workflow data
         update_workflow_data_in_statestore(
             instance_id,
             evaluate_model_request_json.model_dump(mode="json"),
@@ -468,17 +576,19 @@ class EvaluationWorkflow:
 
         # Notification Request
         notification_request = NotificationRequest.from_cloud_event(
-            cloud_event=evaluate_model_request_json, name=workflow_name, workflow_id=instance_id
-        )
-        notification_req = notification_request.model_copy(deep=True)
-        notification_req.payload.event = "evaluation_status"
-        notification_req.payload.content = NotificationContent(
-            title="Model evaluation process is initiated",
-            message=f"Model evaluation process is initiated for {evaluate_model_request_json.eval_model_info.model_name}",
-            status=WorkflowStatus.STARTED,
+            cloud_event=evaluate_model_request_json,
+            name=workflow_name,
+            workflow_id=instance_id,
         )
 
-        # Publish initial notification
+        # Starting The Notification
+        notification_req = notification_request.model_copy(deep=True)
+        notification_req.payload.event = "verify_cluster_connection"
+        notification_req.payload.content = NotificationContent(
+            title="Starting Cluster Connectivity Check",
+            message="Starting Cluster Connectivity Check",
+            status=WorkflowStatus.STARTED,
+        )
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
             notification=notification_req,
@@ -491,7 +601,7 @@ class EvaluationWorkflow:
         eta_minutes = 30
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{eta_minutes} minutes",
+            message=f"{eta_minutes}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -501,7 +611,6 @@ class EvaluationWorkflow:
             target_name=evaluate_model_request_json.source,
         )
 
-        # End Of Notifications
         logger.info("Starting Cluster Connection Verification")
         verify_cluster_connection_result = yield ctx.call_activity(
             EvaluationWorkflow.verify_cluster_connection,
@@ -518,6 +627,7 @@ class EvaluationWorkflow:
                 title="Cluster verification failed",
                 message=verify_cluster_connection_result["message"],
                 status=WorkflowStatus.FAILED,
+                primary_action="retry",
             )
             dapr_workflows.publish_notification(
                 workflow_id=instance_id,
@@ -545,7 +655,7 @@ class EvaluationWorkflow:
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{25} minutes",
+            message=f"{25}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -557,6 +667,21 @@ class EvaluationWorkflow:
 
         # Create Engine Configuration
         logger.info(f"Creating {evaluate_model_request_json.engine.value} configuration")
+
+        # Notification For Engine Configuration Creation
+        notification_req.payload.event = "preparing_eval_engine"
+        notification_req.payload.content = NotificationContent(
+            title="Engine Configuration Creation",
+            message="Engine Configuration Creation Started",
+            status=WorkflowStatus.RUNNING,
+        )
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
+
         create_config_result = yield ctx.call_activity(
             EvaluationWorkflow.create_engine_config,
             input=evaluate_model_request_json.model_dump_json(),
@@ -575,11 +700,12 @@ class EvaluationWorkflow:
         if not (200 <= result_code < 300):
             logger.error(f"Engine Configuration Creation Failed: {create_config_result.get('message')}")
             # notify that config creation failed
-            notification_req.payload.event = "create_engine_config"
+            notification_req.payload.event = "preparing_eval_engine"
             notification_req.payload.content = NotificationContent(
                 title="Configuration creation failed",
                 message=create_config_result["message"],
                 status=WorkflowStatus.FAILED,
+                primary_action="retry",
             )
             dapr_workflows.publish_notification(
                 workflow_id=instance_id,
@@ -587,16 +713,31 @@ class EvaluationWorkflow:
                 target_topic_name=evaluate_model_request_json.source_topic,
                 target_name=evaluate_model_request_json.source,
             )
+
             return
 
         # notify that config creation is successful
-        notification_req.payload.event = "create_engine_config"
+        notification_req.payload.event = "preparing_eval_engine"
         configmap_name = create_config_result.get("param", {}).get("configmap_name", "configuration")
         engine_name = evaluate_model_request_json.engine.value
         notification_req.payload.content = NotificationContent(
             title="Configuration created successfully",
             message=f"{engine_name} configuration '{configmap_name}' created for model",
             status=WorkflowStatus.COMPLETED,
+        )
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
+
+        # notify activity ETA
+        notification_req.payload.event = "eta"
+        notification_req.payload.content = NotificationContent(
+            title="Estimated time to completion",
+            message=f"{22}",
+            status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
@@ -639,6 +780,20 @@ class EvaluationWorkflow:
         # Print the deploy request
         logger.debug(f"Deploy Request: {deploy_request}")
 
+        # Notification For  Deploy Job
+        notification_req.payload.event = "deploy_eval_job"
+        notification_req.payload.content = NotificationContent(
+            title="Deploying Evaluation Job",
+            message="Deploying Evaluation Job",
+            status=WorkflowStatus.RUNNING,
+        )
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
+
         deploy_eval_job_result = yield ctx.call_activity(
             EvaluationWorkflow.deploy_eval_job,
             input=json.dumps(deploy_request),
@@ -654,6 +809,7 @@ class EvaluationWorkflow:
                 title="Deploy evaluation job failed",
                 message=deploy_eval_job_result["message"],
                 status=WorkflowStatus.FAILED,
+                primary_action="retry",
             )
             dapr_workflows.publish_notification(
                 workflow_id=instance_id,
@@ -677,36 +833,53 @@ class EvaluationWorkflow:
             target_name=evaluate_model_request_json.source,
         )
 
+        # notify activity ETA
+        notification_req.payload.event = "eta"
+        notification_req.payload.content = NotificationContent(
+            title="Estimated time to completion",
+            message=f"{21}",
+            status=WorkflowStatus.RUNNING,
+        )
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
+
         # Monitor Evaluation Job Progress
         logger.info("Starting job monitoring")
 
-        # Extract job details from deployment result
+        # Update Information To State Store
+
+        # # Extract job details from deployment result
         job_details = deploy_eval_job_result.get("param", {})
         job_id = job_details.get("job_id")
 
-        if not job_id:
-            logger.error("No job_id found in deployment result")
-            notification_req.payload.event = "monitor_eval_job_progress"
-            notification_req.payload.content = NotificationContent(
-                title="Job monitoring failed",
-                message="No job ID found to monitor",
-                status=WorkflowStatus.FAILED,
-            )
-            dapr_workflows.publish_notification(
-                workflow_id=instance_id,
-                notification=notification_req,
-                target_topic_name=evaluate_model_request_json.source_topic,
-                target_name=evaluate_model_request_json.source,
-            )
-            return
+        # Update the job id to state store
+        update_workflow_data_in_statestore(instance_id, {"job_id": job_id})
 
-        # Prepare monitoring request with initial monitoring data
-        monitor_request = {
+        # Notification For Job Monitoring
+        notification_req.payload.event = "monitor_eval_job_progress"
+        notification_req.payload.content = NotificationContent(
+            title="Waiting for evaluation to complete",
+            message=f"Waiting for evaluation to complete - {job_id}",
+            status=WorkflowStatus.RUNNING,
+        )
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
+
+        # Start Monitoring Child Workflow
+        monitor_workflow_request = {
             "job_id": job_id,
             "kubeconfig": evaluate_model_request_json.kubeconfig,
-            "namespace": "budeval",
-            "monitoring_attempt": 0,
+            "namespace": StorageConfig.get_current_namespace(),
             "max_attempts": 360,  # 30 minutes with 5-second intervals
+            "poll_interval": 5,
             "notification_data": {
                 "instance_id": instance_id,
                 "source_topic": evaluate_model_request_json.source_topic,
@@ -715,336 +888,48 @@ class EvaluationWorkflow:
             },
         }
 
-        logger.debug(f"Prepared monitor request: {monitor_request}")
-
-        # Start monitoring using proper Dapr pattern
-        # Add monitoring state to the request and continue as new
-        monitoring_data = {
-            **evaluate_model_request_json.model_dump(mode="json"),
-            "job_id": job_id,
-            "monitoring_attempt": monitor_request.get("monitoring_attempt", 0),
-            "max_attempts": monitor_request.get("max_attempts", 360),
-            "phase": "monitoring",
-            # Carry initial start time for accurate duration on completion
-            "job_start_time": ctx.current_utc_datetime.isoformat(),
-        }
-
-        logger.info(f"Continuing workflow as monitoring phase for job_id: {job_id}")
-        logger.debug(f"Monitoring data: {json.dumps(monitoring_data, indent=2)}")
-
-        ctx.continue_as_new(json.dumps(monitoring_data))
-        return
-
-    @staticmethod
-    def _handle_monitoring_phase(ctx: wf.DaprWorkflowContext, request_str: str):
-        """Handle the monitoring phase using proper Dapr continue_as_new pattern."""
-        logger = logging.getLogger("::EVAL:: Monitoring Phase")
-
-        logger.debug(f"Monitoring phase handler called with request: {request_str[:200]}...")
-
-        # Parse the monitoring request
-        try:
-            request_data = json.loads(request_str)
-            job_id = request_data["job_id"]
-            monitoring_attempt = request_data.get("monitoring_attempt", 0) + 1
-            max_attempts = request_data.get("max_attempts", 360)
-            instance_id = str(ctx.instance_id)
-
-            logger.debug(
-                f"Parsed monitoring data - job_id: {job_id}, attempt: {monitoring_attempt}, max_attempts: {max_attempts}"
-            )
-
-            # Reconstruct EvaluateModelRequest without monitoring fields
-            eval_request_data = {
-                k: v
-                for k, v in request_data.items()
-                if k not in ["job_id", "monitoring_attempt", "max_attempts", "phase", "job_start_time"]
-            }
-            evaluate_model_request_json = StartEvaluationRequest(**eval_request_data)
-            job_start_time_str = request_data.get("job_start_time")
-
-            logger.info(f"Monitoring job {job_id}, attempt {monitoring_attempt}/{max_attempts}")
-        except Exception as e:
-            logger.error(f"Error parsing monitoring request: {e}", exc_info=True)
-            return
-
-        # Check if we've exceeded max attempts
-        if monitoring_attempt > max_attempts:
-            logger.warning(f"Job {job_id} monitoring timed out after {max_attempts} attempts")
-            notification_req = NotificationRequest.from_cloud_event(
-                cloud_event=evaluate_model_request_json, name="evaluate_model", workflow_id=instance_id
-            )
-            notification_req.payload.event = "monitor_eval_job_progress"
-            notification_req.payload.content = NotificationContent(
-                title="Job monitoring timeout",
-                message=f"Job {job_id} monitoring timed out after {max_attempts} attempts (30 minutes)",
-                status=WorkflowStatus.FAILED,
-            )
-            dapr_workflows.publish_notification(
-                workflow_id=instance_id,
-                notification=notification_req,
-                target_topic_name=evaluate_model_request_json.source_topic,
-                target_name=evaluate_model_request_json.source,
-            )
-            return  # End workflow on timeout
-
-        # Check job status
-        basic_monitor_request = {
-            "job_id": job_id,
-            "kubeconfig": evaluate_model_request_json.kubeconfig,
-            "namespace": "budeval",
-        }
-
-        monitor_result = yield ctx.call_activity(
-            EvaluationWorkflow.monitor_eval_job_progress,
-            input=json.dumps(basic_monitor_request),
+        _monitoring_result = yield ctx.call_child_workflow(
+            workflow=EvaluationWorkflow.monitor_job_workflow,
+            input=json.dumps(monitor_workflow_request),
+            instance_id=f"{instance_id}_monitor_{job_id}",
         )
 
-        # Handle monitoring activity failure
-        if monitor_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
-            logger.warning(f"Monitoring attempt {monitoring_attempt} failed: {monitor_result.get('message')}")
+        notification_req.payload.event = "monitor_eval_job_progress"
+        notification_req.payload.content = NotificationContent(
+            title="Evaluation Completed",
+            message=f"Evaluation completed - {job_id}",
+            status=WorkflowStatus.COMPLETED,
+        )
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
 
-            # Wait and continue monitoring
-            yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=5))
+        ### Final Result
+        notification_req.payload.event = "results"
+        notification_req.payload.content = NotificationContent(
+            title="Fetching cluster nodes info successful",
+            message="Cluster nodes info fetched successfully",
+            status=WorkflowStatus.COMPLETED,
+            result={},
+        )
 
-            request_data["monitoring_attempt"] = monitoring_attempt
-            ctx.continue_as_new(json.dumps(request_data))
-            return
+        notification_req.payload.event = "evaluate_model_status"
+        notification_req.payload.content = NotificationContent(
+            title="Model Evaluation Completed",
+            message="Model Evaluation Completed",
+            status=WorkflowStatus.COMPLETED,
+        )
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
 
-        job_status_data = monitor_result.get("param", {})
-        job_status = job_status_data.get("status", "unknown")
-        job_details_info = job_status_data.get("details", {})
-
-        # Check if job is completed
-        job_completed = False
-        final_job_status = None
-
-        if job_status in ["completed", "succeeded", "failed", "error"]:
-            job_completed = True
-            final_job_status = job_status_data
-            logger.info(f"Job {job_id} completed with status: {job_status}")
-        elif job_details_info:
-            try:
-                succeeded = int(job_details_info.get("succeeded", 0))
-                failed = int(job_details_info.get("failed", 0))
-            except (ValueError, TypeError):
-                succeeded = 0
-                failed = 0
-
-            if succeeded > 0:
-                job_completed = True
-                final_job_status = job_status_data
-                final_job_status["status"] = "succeeded"
-                logger.info(f"Job {job_id} succeeded")
-            elif failed > 0:
-                job_completed = True
-                final_job_status = job_status_data
-                final_job_status["status"] = "failed"
-                logger.info(f"Job {job_id} failed")
-
-        # If job completed, handle results
-        if job_completed and final_job_status:
-            final_status = final_job_status.get("status", "unknown")
-
-            notification_req = NotificationRequest.from_cloud_event(
-                cloud_event=evaluate_model_request_json, name="evaluate_model", workflow_id=instance_id
-            )
-
-            if final_status in ["succeeded", "completed"]:
-                # Job succeeded - extract and process results
-                logger.info(f"Job {job_id} succeeded, extracting results")
-
-                extract_request = {
-                    "job_id": job_id,
-                    "model_name": evaluate_model_request_json.eval_model_info.model_name,
-                    "namespace": "budeval",
-                    "kubeconfig": evaluate_model_request_json.kubeconfig,
-                    "experiment_id": str(evaluate_model_request_json.experiment_id)
-                    if evaluate_model_request_json.experiment_id
-                    else None,
-                }
-
-                extract_result = yield ctx.call_activity(
-                    EvaluationWorkflow.extract_and_process_results,
-                    input=json.dumps(extract_request),
-                )
-
-                if extract_result.get("code", HTTPStatus.OK.value) == HTTPStatus.OK.value:
-                    results_info = extract_result.get("param", {})
-                    # Update final status and duration in ClickHouse
-                    try:
-                        from datetime import datetime
-
-                        from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
-
-                        storage = get_storage_adapter()
-
-                        async def _update_final():
-                            await initialize_storage(storage)
-                            engine = evaluate_model_request_json.engine.value
-                            model_name = evaluate_model_request_json.eval_model_info.model_name
-                            experiment_id = (
-                                str(evaluate_model_request_json.experiment_id)
-                                if evaluate_model_request_json.experiment_id
-                                else None
-                            )
-                            # Prefer Kubernetes timestamps if available
-                            start_time = None
-                            end_time = None
-                            try:
-                                k8s_start = final_job_status.get("start_time") or final_job_status.get("startTime")
-                                if k8s_start:
-                                    start_time = datetime.fromisoformat(str(k8s_start).replace("Z", "+00:00"))
-                            except Exception:
-                                start_time = None
-                            try:
-                                k8s_end = final_job_status.get("completion_time") or final_job_status.get(
-                                    "completionTime"
-                                )
-                                if k8s_end:
-                                    end_time = datetime.fromisoformat(str(k8s_end).replace("Z", "+00:00"))
-                            except Exception:
-                                end_time = None
-                            if start_time is None and job_start_time_str:
-                                try:
-                                    start_time = datetime.fromisoformat(job_start_time_str)
-                                except Exception:
-                                    start_time = None
-                            if end_time is None:
-                                end_time = datetime.utcnow()
-                            duration = (end_time - start_time).total_seconds() if start_time else None
-                            if hasattr(storage, "update_job_status"):
-                                await storage.update_job_status(
-                                    job_id=job_id,
-                                    experiment_id=experiment_id,
-                                    model_name=model_name,
-                                    engine=engine,
-                                    status="succeeded",
-                                    job_start_time=start_time,
-                                    job_end_time=end_time,
-                                    job_duration_seconds=duration,
-                                )
-
-                        asyncio.run(_update_final())
-                    except Exception as ch_e:
-                        logger.warning(f"Failed to update final ClickHouse job record: {ch_e}")
-                    notification_req.payload.event = "monitor_eval_job_progress"
-                    notification_req.payload.content = NotificationContent(
-                        title="Job completed successfully",
-                        message=f"Job {job_id} completed successfully. Results processed: {results_info.get('datasets_processed', 0)} datasets, {results_info.get('overall_accuracy', 0):.2f}% accuracy",
-                        status=WorkflowStatus.COMPLETED,
-                        result=results_info,
-                    )
-                else:
-                    notification_req.payload.event = "monitor_eval_job_progress"
-                    notification_req.payload.content = NotificationContent(
-                        title="Job completed - Results extraction failed",
-                        message=f"Job {job_id} completed successfully but results extraction failed: {extract_result.get('message')}",
-                        status=WorkflowStatus.COMPLETED,
-                    )
-                dapr_workflows.publish_notification(
-                    workflow_id=instance_id,
-                    notification=notification_req,
-                    target_topic_name=evaluate_model_request_json.source_topic,
-                    target_name=evaluate_model_request_json.source,
-                )
-                return
-            else:
-                # Job failed
-                notification_req.payload.event = "monitor_eval_job_progress"
-                notification_req.payload.content = NotificationContent(
-                    title="Job failed",
-                    message=f"Job {job_id} failed with status: {final_status}",
-                    status=WorkflowStatus.FAILED,
-                )
-                dapr_workflows.publish_notification(
-                    workflow_id=instance_id,
-                    notification=notification_req,
-                    target_topic_name=evaluate_model_request_json.source_topic,
-                    target_name=evaluate_model_request_json.source,
-                )
-                # Update failure in ClickHouse
-                try:
-                    from datetime import datetime
-
-                    from budeval.evals.storage.factory import get_storage_adapter, initialize_storage
-
-                    storage = get_storage_adapter()
-
-                    async def _update_failed():
-                        await initialize_storage(storage)
-                        engine = evaluate_model_request_json.engine.value
-                        model_name = evaluate_model_request_json.eval_model_info.model_name
-                        experiment_id = (
-                            str(evaluate_model_request_json.experiment_id)
-                            if evaluate_model_request_json.experiment_id
-                            else None
-                        )
-                        # Prefer Kubernetes timestamps if available
-                        start_time = None
-                        end_time = None
-                        try:
-                            k8s_start = final_job_status.get("start_time") or final_job_status.get("startTime")
-                            if k8s_start:
-                                start_time = datetime.fromisoformat(str(k8s_start).replace("Z", "+00:00"))
-                        except Exception:
-                            start_time = None
-                        try:
-                            k8s_end = final_job_status.get("completion_time") or final_job_status.get("completionTime")
-                            if k8s_end:
-                                end_time = datetime.fromisoformat(str(k8s_end).replace("Z", "+00:00"))
-                        except Exception:
-                            end_time = None
-                        if start_time is None and job_start_time_str:
-                            try:
-                                start_time = datetime.fromisoformat(job_start_time_str)
-                            except Exception:
-                                start_time = None
-                        if end_time is None:
-                            end_time = datetime.utcnow()
-                        duration = (end_time - start_time).total_seconds() if start_time else None
-                        if hasattr(storage, "update_job_status"):
-                            await storage.update_job_status(
-                                job_id=job_id,
-                                experiment_id=experiment_id,
-                                model_name=model_name,
-                                engine=engine,
-                                status="failed",
-                                job_start_time=start_time,
-                                job_end_time=end_time,
-                                job_duration_seconds=duration,
-                            )
-
-                    asyncio.run(_update_failed())
-                except Exception as ch_e:
-                    logger.warning(f"Failed to write failure ClickHouse job record: {ch_e}")
-                return
-
-        # Job still running - send progress notification if needed
-        if monitoring_attempt % 10 == 0:  # Every 50 seconds
-            notification_req = NotificationRequest.from_cloud_event(
-                cloud_event=evaluate_model_request_json, name="evaluate_model", workflow_id=instance_id
-            )
-            notification_req.payload.event = "monitor_eval_job_progress"
-            notification_req.payload.content = NotificationContent(
-                title="Job monitoring in progress",
-                message=f"Job {job_id} is still running. Status: {job_status}. Attempt: {monitoring_attempt}/{max_attempts}",
-                status=WorkflowStatus.RUNNING,
-            )
-            dapr_workflows.publish_notification(
-                workflow_id=instance_id,
-                notification=notification_req,
-                target_topic_name=evaluate_model_request_json.source_topic,
-                target_name=evaluate_model_request_json.source,
-            )
-
-        # Job still running - set timer and continue monitoring
-        yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=5))
-
-        # Continue as new with updated attempt count
-        request_data["monitoring_attempt"] = monitoring_attempt
-        ctx.continue_as_new(json.dumps(request_data))
-        return  # Required return after continue_as_new
+        return
 
     async def __call__(
         self, request: StartEvaluationRequest, workflow_id: str | None = None
@@ -1092,10 +977,12 @@ class EvaluationWorkflow:
                 target_name=request.source,
             )
             return response or ErrorResponse(
-                message="Failed to schedule workflow", code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                message="Failed to schedule workflow",
+                code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
             )
         except Exception as e:
             logger.error(f"Error scheduling workflow: {e}", exc_info=True)
             return ErrorResponse(
-                message=f"Error scheduling workflow: {e}", code=HTTPStatus.INTERNAL_SERVER_ERROR.value
+                message=f"Error scheduling workflow: {e}",
+                code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
             )

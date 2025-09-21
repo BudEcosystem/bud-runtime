@@ -4,8 +4,8 @@ ingress:
 
 # when we make a first release the tags should be changed to :staging
 microservices:
-    budproxy:
-        image: budstudio/budproxy:nightly
+    budgateway:
+        image: budstudio/budgateway:nightly
     askbud:
         image: budstudio/askbud:nightly
     budapp:
@@ -26,3 +26,5 @@ microservices:
         image: budstudio/budcustomer:nightly
     budnotify:
         image: budstudio/budnotify:nightly
+    budprompt:
+        image: budstudio/budprompt:nightly

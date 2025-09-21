@@ -10,13 +10,7 @@ interface AuthGuardProps {
 }
 
 // List of public routes that don't require authentication
-const publicRoutes = [
-  "/auth/login",
-  "/auth/register",
-  "/auth/reset-password",
-  "/login", // Rewritten route
-  "/register", // Rewritten route
-];
+const publicRoutes = ["/login", "/register", "/auth/resetPassword", "/auth/reset-password"];
 
 export default function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
@@ -41,15 +35,9 @@ export default function AuthGuard({ children }: AuthGuardProps) {
       // If on public route, allow access immediately
       if (isPublicRoute) {
         // If already authenticated and on login/register, redirect to models
-        if (
-          token &&
-          (pathname === "/auth/login" ||
-            pathname === "/auth/register" ||
-            pathname === "/login" ||
-            pathname === "/register")
-        ) {
+        if (token && (pathname === "/login" || pathname === "/register")) {
           console.log("Already authenticated, redirecting to models");
-          router.push("/models");
+          router.replace("/models");
         }
         setIsInitialized(true);
         return;
@@ -58,19 +46,27 @@ export default function AuthGuard({ children }: AuthGuardProps) {
       // If not on public route and no token, redirect to login
       if (!token) {
         console.log("No token found, redirecting to login");
-        router.push("/login");
+        router.replace("/login");
         setIsInitialized(true);
         return;
       }
 
-      // If token exists but no user data, try to fetch user
-      if (token && !user && !loadingUser) {
+      // Always fetch user data on route change if token exists (like budadmin)
+      if (token && !user?.id) {
         showLoader();
         try {
-          await getUser();
+          const userData = await getUser();
+          // Check if user needs to complete registration
+          if (userData?.data?.result?.status === "invited") {
+            console.log("User needs to complete registration");
+            router.replace("/login");
+            return;
+          }
         } catch (error) {
           console.error("Failed to get user data:", error);
-          // Still allow access if token exists
+          // Redirect to login if user fetch fails
+          router.replace("/login");
+          return;
         } finally {
           hideLoader();
         }
@@ -80,7 +76,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     };
 
     checkAuth();
-  }, [pathname, router, user, getUser, showLoader, hideLoader, loadingUser]);
+  }, [pathname]); // Simplified dependency array - only re-run on pathname change
 
   // Show loading while initializing
   if (!isInitialized) {

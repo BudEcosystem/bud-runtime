@@ -1,4 +1,3 @@
-
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 
@@ -11,9 +10,9 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
 
 export default function DeployModelTemplate() {
-  const { selectedTemplate, currentWorkflow, updateTemplate } = useDeployModel();
+  const { selectedTemplate, currentWorkflow, updateTemplate } =
+    useDeployModel();
   const { openDrawer, openDrawerWithStep } = useDrawer();
-
 
   return (
     <BudForm
@@ -33,7 +32,6 @@ export default function DeployModelTemplate() {
       backText="Back"
       nextText="Next"
     >
-
       <BudWraperBox>
         <BudDrawerLayout>
           <DeployModelSpecificationInfo showTemplate={false} />

@@ -1,11 +1,15 @@
-import React, { useEffect } from 'react';
-import { Image } from 'antd';
-import { useDrawer } from '@/hooks/useDrawer';
-import { useBlockingRules } from '@/stores/useBlockingRules';
+import React, { useEffect } from "react";
+import { Image } from "antd";
+import { useDrawer } from "@/hooks/useDrawer";
+import { useBlockingRules } from "@/stores/useBlockingRules";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import { Text_12_300_EEEEEE, Text_12_400_B3B3B3, Text_24_600_EEEEEE } from '@/components/ui/text';
+import {
+  Text_12_300_EEEEEE,
+  Text_12_400_B3B3B3,
+  Text_24_600_EEEEEE,
+} from "@/components/ui/text";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 
 interface BlockingRuleSuccessProps {
@@ -13,7 +17,10 @@ interface BlockingRuleSuccessProps {
   ruleType?: string;
 }
 
-const BlockingRuleSuccess: React.FC<BlockingRuleSuccessProps> = ({ ruleName, ruleType }) => {
+const BlockingRuleSuccess: React.FC<BlockingRuleSuccessProps> = ({
+  ruleName,
+  ruleType,
+}) => {
   const { closeDrawer, drawerProps } = useDrawer();
   const { fetchRules } = useBlockingRules();
 
@@ -23,9 +30,7 @@ const BlockingRuleSuccess: React.FC<BlockingRuleSuccessProps> = ({ ruleName, rul
   }, []);
 
   return (
-    <BudForm
-      data={{}}
-    >
+    <BudForm data={{}}>
       <BudWraperBox center={true}>
         <BudDrawerLayout>
           <div className="flex flex-col justify-start items-center p-[2.5rem]">
@@ -43,7 +48,8 @@ const BlockingRuleSuccess: React.FC<BlockingRuleSuccessProps> = ({ ruleName, rul
                 Blocking Rule Created Successfully!
               </Text_24_600_EEEEEE>
               <Text_12_400_B3B3B3 className="text-center">
-                Your rule "{drawerProps?.ruleName || ruleName}" is now active and protecting your gateway.
+                Your rule "{drawerProps?.ruleName || ruleName}" is now active
+                and protecting your gateway.
               </Text_12_400_B3B3B3>
             </div>
             <PrimaryButton

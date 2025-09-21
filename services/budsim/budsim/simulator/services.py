@@ -19,6 +19,7 @@
 
 import math
 import uuid
+import warnings
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 from dataclasses import asdict
@@ -56,6 +57,7 @@ from .schemas import (
     DeviceConfiguration,
     DeviceTypeMetrics,
     NodeConfiguration,
+    NodeGroupConfiguration,
     SimulationMethod,
     SimulationMetrics,
 )
@@ -213,11 +215,13 @@ class SimulationService:
             group["min_devices_per_node"] = (
                 min(group["node_distribution"].values()) if group["node_distribution"] else 0
             )
+            # Add total_devices field for proper validation later
+            group["total_devices"] = sum(group["node_distribution"].values()) if group["node_distribution"] else 0
 
             logger.debug(
                 f"Device type {device_type}: {len(group['devices'])} devices across "
                 f"{group['total_nodes_with_device']} nodes, max_per_node={group['max_devices_per_node']}, "
-                f"node_distribution={group['node_distribution']}"
+                f"total_devices={group['total_devices']}, node_distribution={group['node_distribution']}"
             )
 
         return device_groups
@@ -526,7 +530,8 @@ class SimulationService:
                             **{
                                 k.lower(): v
                                 for k, v in device.items()
-                                if k not in ["id", "type", "name", "node_id", "node_name", "cluster_id"]
+                                if k
+                                not in ["id", "type", "name", "node_id", "node_name", "cluster_id", "available_count"]
                             },
                         }
 
@@ -556,6 +561,9 @@ class SimulationService:
                 device_config["device_id"] = device_config.pop("id", str(uuid.uuid4()))
                 device_config["device_type"] = device_config.pop("type")
                 device_config["device_name"] = device_config.pop("name", device_config["device_id"])
+                # Ensure available_count is present for legacy configs
+                if "available_count" not in device_config:
+                    device_config["available_count"] = 1
                 device_config = {k.lower(): v for k, v in device_config.items()}
 
                 return ensure_json_serializable(
@@ -1522,22 +1530,23 @@ class SimulationService:
                     cost_per_million_tokens=0,
                 ),
             )
-            deployment_config = self.optimal_search_deployment_config(result, concurrency)
+            deployment_config = self.optimal_search_node_group_config([result], concurrency)
             if deployment_config is not None:
                 device_types = {}
-                for node in deployment_config.nodes:
-                    for device in node.devices:
-                        if device.type not in device_types:
-                            device_types[device.type] = DeviceTypeMetrics(
-                                device_type=device.type,
-                                num_replicas=device.replica,
-                                concurrency=device.concurrency,
-                                cost_per_million_tokens=device.cost_per_million_tokens,
-                            )
-                        else:
-                            device_types[device.type].num_replicas += device.replica
-                            device_types[device.type].concurrency += device.concurrency
-                            device_types[device.type].cost_per_million_tokens += device.cost_per_million_tokens
+                # Process node groups instead of nodes.devices
+                for node_group in deployment_config.node_groups:
+                    if node_group.type not in device_types:
+                        device_types[node_group.type] = DeviceTypeMetrics(
+                            device_type=node_group.type,
+                            num_replicas=node_group.replicas,
+                            # Concurrency is calculated from the node group's base concurrency per replica
+                            concurrency=node_group.replicas,  # For node groups, this represents total capacity
+                            cost_per_million_tokens=node_group.cost_per_million_tokens,
+                        )
+                    else:
+                        device_types[node_group.type].num_replicas += node_group.replicas
+                        device_types[node_group.type].concurrency += node_group.replicas
+                        device_types[node_group.type].cost_per_million_tokens += node_group.cost_per_million_tokens
 
                 recommendation.cluster_id = deployment_config.id
                 recommendation.metrics.device_types = list(device_types.values())
@@ -1563,6 +1572,229 @@ class SimulationService:
             page=page,
             limit=limit,
         )
+
+    @staticmethod
+    def _should_use_node_groups(simulation_results: List[SimulationResultsSchema]) -> bool:
+        """Determine if node groups should be used instead of legacy node structure.
+
+        NOTE: Always returns True now - we always use the new node group format
+        for consistency and to support the new device mapping functionality.
+        The legacy nodes[].devices[] format is deprecated.
+        """
+        return True  # Always use new node group format
+
+    @staticmethod
+    def _group_devices_by_type(simulation_results: List[SimulationResultsSchema]) -> Dict[str, List]:
+        """Group simulation results by device type for node group creation."""
+        device_groups = {}
+        for result in simulation_results:
+            device_key = result.device_name or result.device_type
+            if device_key not in device_groups:
+                device_groups[device_key] = []
+            device_groups[device_key].append(result)
+        return device_groups
+
+    @staticmethod
+    def _create_node_group_config(
+        device_group_results: List[SimulationResultsSchema],
+        device_type: str,
+        replica_count: int,
+        target_concurrency: int,
+    ) -> Optional[NodeGroupConfiguration]:
+        """Create a node group configuration from grouped device results."""
+        logger.info(f"Creating node group config for device_type={device_type}, replica_count={replica_count}")
+
+        if not device_group_results:
+            logger.warning(f"No device group results for {device_type}")
+            return None
+
+        # Use the first result as the template for the group
+        template_result = device_group_results[0]
+        logger.info(f"Template result type: {type(template_result)}")
+
+        # Check top_k_configs structure
+        top_k_configs = getattr(template_result, "top_k_configs", None)
+        if top_k_configs is None:
+            logger.error(f"top_k_configs is None for device_type {device_type}")
+            return None
+
+        if not isinstance(top_k_configs, dict):
+            logger.error(f"top_k_configs is not a dict for device_type {device_type}, got {type(top_k_configs)}")
+            return None
+
+        logger.info(f"top_k_configs structure: {top_k_configs}")
+        engine_config = top_k_configs.get("config", {})
+
+        if not isinstance(engine_config, dict):
+            logger.error(f"engine_config is not a dict, got {type(engine_config)}")
+            return None
+
+        engine_config["model"] = template_result.model_name
+        logger.info(f"Engine config: {engine_config}")
+
+        try:
+            # Get args and envs for the engine configuration
+            from ..engine_ops import get_engine_args_and_envs, get_minimal_engine_args_and_envs
+
+            if _is_heuristic_config(engine_config):
+                args_and_envs = get_minimal_engine_args_and_envs(template_result.engine, engine_config)
+            else:
+                args_and_envs = get_engine_args_and_envs(template_result.engine, engine_config)
+        except Exception:
+            logger.exception("Failed to get engine args and envs for %s", engine_config)
+            return None
+
+        # Calculate parallelism parameters
+        tp_size = engine_config.get("tensor_parallel_size", 1)
+        pp_size = engine_config.get("pipeline_parallel_size", 1)
+
+        # Skip validation - TP/PP values from top_k_configs are already validated during optimization
+        # The Evolution and DirectSearch optimizers validate these combinations before storing them
+        logger.info(f"Using pre-validated parallelism: TP={tp_size}, PP={pp_size} from optimization results")
+
+        # Create labels for Kubernetes node selection
+        labels = {"device_name": device_type, "concurrency": str(top_k_configs.get("concurrency", 1))}
+
+        # Add device identification based on device type
+        device_name = template_result.device_name
+        device_model = getattr(template_result, "device_model", None)
+        raw_name = getattr(template_result, "raw_name", None)
+
+        return NodeGroupConfiguration(
+            config_id=str(template_result.id),
+            name=device_type,
+            labels=labels,
+            type=template_result.device_type,
+            tp_size=tp_size,
+            pp_size=pp_size,
+            envs=args_and_envs.get("envs", {}),
+            args=args_and_envs.get("args", {}),
+            replicas=replica_count,
+            image=template_result.engine_image,
+            memory=top_k_configs.get("kv_cache_memory", 0),
+            ttft=float(top_k_configs.get("ttft", 0)),
+            throughput_per_user=float(top_k_configs.get("throughput_per_user", 0)),
+            e2e_latency=float(top_k_configs.get("e2e_latency", 0)),
+            error_rate=float(top_k_configs.get("error_rate", 0)),
+            cost_per_million_tokens=float(top_k_configs.get("cost_per_million_tokens", 0)) * replica_count,
+            device_name=device_name,
+            device_model=device_model,
+            raw_name=raw_name,
+        )
+
+    @staticmethod
+    def optimal_search_node_group_config(
+        simulation_results: List[SimulationResultsSchema], target_concurrency: int = None
+    ) -> DeploymentConfigurationResponse:
+        """Perform optimal search for deployment configuration using node groups."""
+        try:
+            logger.info(f"Starting optimal_search_node_group_config with {len(simulation_results)} results")
+
+            target_concurrency = target_concurrency or simulation_results[0].target_concurrency
+            logger.info(f"Target concurrency: {target_concurrency}")
+
+            # Group devices by type for node group creation
+            device_groups = SimulationService._group_devices_by_type(simulation_results)
+            logger.info(f"Device groups created: {list(device_groups.keys())}")
+
+            config = DeploymentConfigurationResponse(
+                id=simulation_results[0].cluster_id,
+                nodes=None,  # Using new node groups structure
+                node_groups=[],
+                replica=0,
+                concurrency=0,
+                ttft=0,
+                throughput_per_user=0,
+                e2e_latency=0,
+                error_rate=0,
+                cost_per_million_tokens=0,
+            )
+        except Exception as e:
+            logger.error(f"Error in optimal_search_node_group_config initialization: {str(e)}", exc_info=True)
+            return None
+
+        try:
+            total_cost = 0
+            total_concurrency = 0
+
+            for device_type, group_results in device_groups.items():
+                logger.info(f"Processing device type: {device_type} with {len(group_results)} results")
+
+                if not group_results:
+                    logger.warning(f"No results for device type {device_type}, skipping")
+                    continue
+
+                template_result = group_results[0]
+                logger.info(f"Template result type: {type(template_result)}")
+
+                # Check top_k_configs structure
+                top_k_configs = getattr(template_result, "top_k_configs", None)
+                if top_k_configs is None:
+                    logger.error(f"top_k_configs is None for device type {device_type}")
+                    continue
+
+                logger.info(f"top_k_configs for {device_type}: {top_k_configs}")
+
+                if not isinstance(top_k_configs, dict):
+                    logger.error(
+                        f"top_k_configs is not a dict for device type {device_type}, got {type(top_k_configs)}"
+                    )
+                    continue
+
+                engine_config = top_k_configs.get("config", {})
+                if not isinstance(engine_config, dict):
+                    logger.error(
+                        f"engine_config is not a dict for device type {device_type}, got {type(engine_config)}"
+                    )
+                    continue
+
+                tp_size = engine_config.get("tensor_parallel_size", 1)
+                logger.info(f"TP size for {device_type}: {tp_size}")
+
+                # Use per-device count for replica calculation
+                available_devices = template_result.available_count
+                max_replicas = available_devices // tp_size if tp_size > 0 else 0
+                logger.info(f"Available devices per node: {available_devices}, max replicas: {max_replicas}")
+
+                if max_replicas <= 0:
+                    logger.warning(f"No replicas possible for device type {device_type}")
+                    continue
+
+                target_concurrency_per_result = top_k_configs.get("concurrency", 1)
+                needed_replicas = math.ceil(target_concurrency / target_concurrency_per_result)
+                replica_count = min(max_replicas, needed_replicas)
+                logger.info(f"Replica count for {device_type}: {replica_count}")
+
+                # Create node group configuration
+                node_group = SimulationService._create_node_group_config(
+                    group_results, device_type, replica_count, target_concurrency
+                )
+
+                if node_group:
+                    logger.info(f"Successfully created node group for {device_type}")
+                    config.node_groups.append(node_group)
+                    total_cost += node_group.cost_per_million_tokens
+                    total_concurrency += top_k_configs.get("concurrency", 0) * replica_count
+                    config.replica += replica_count
+                    config.ttft += node_group.ttft
+                    config.throughput_per_user += node_group.throughput_per_user
+                    config.e2e_latency = max(config.e2e_latency, node_group.e2e_latency)
+                    config.error_rate = max(config.error_rate, node_group.error_rate)
+                else:
+                    logger.error(f"Failed to create node group for {device_type}")
+        except Exception as e:
+            logger.error(f"Error processing device groups: {str(e)}", exc_info=True)
+            return None
+
+        config.concurrency = total_concurrency
+        config.cost_per_million_tokens = total_cost
+
+        if not config.node_groups:
+            logger.error("No node groups created, returning None")
+            return None
+
+        logger.info(f"Successfully created config with {len(config.node_groups)} node groups")
+        return config
 
     @staticmethod
     def greedy_search_deployment_config(
@@ -1668,7 +1900,18 @@ class SimulationService:
     def optimal_search_deployment_config(
         simulation_results: List[SimulationResultsSchema], target_concurrency: int = None
     ) -> DeploymentConfigurationResponse:
-        """Perform optimal search for deployment configuration."""
+        """Create deployment configuration using legacy structure.
+
+        DEPRECATED: Use optimal_search_node_group_config instead.
+        Legacy function that creates deployment configuration using the old
+        nodes[].devices[] structure. This is deprecated in favor of the new
+        node group structure that uses device groups (A100, V100, etc.).
+        """
+        warnings.warn(
+            "optimal_search_deployment_config is deprecated. Use optimal_search_node_group_config instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         target_concurrency = target_concurrency or simulation_results[0].target_concurrency
 
         device_args_and_envs = {}
@@ -1861,7 +2104,9 @@ class SimulationService:
 
         for page in range(1, total_count + 1):
             for result in results:
-                config = self.optimal_search_deployment_config(result, request.concurrency)
+                # Always use the new node group structure
+                # Legacy optimal_search_deployment_config is deprecated
+                config = self.optimal_search_node_group_config([result], request.concurrency)
 
             if config is not None:
                 break

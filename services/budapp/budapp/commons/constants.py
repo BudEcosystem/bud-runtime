@@ -273,6 +273,9 @@ ModelSourceEnum = create_dynamic_enum(
         "bedrock",
         "text-completion-codestral",
         "huggingface",
+        "bud_sentinel",
+        "azure_content_safety",
+        "aws_comprehend",
     ],
 )
 
@@ -589,7 +592,10 @@ class WorkflowTypeEnum(StrEnum):
     ADD_ADAPTER = auto()
     DELETE_ADAPTER = auto()
     EVALUATION_CREATION = auto()
+    EVALUATE_MODEL = auto()
     GUARDRAIL_DEPLOYMENT = auto()
+    PROMPT_CREATION = auto()
+    PROMPT_SCHEMA_CREATION = auto()
 
 
 class NotificationType(Enum):
@@ -643,6 +649,7 @@ class PayloadType(str, Enum):
     ADD_ADAPTER = "add_adapter"
     DELETE_ADAPTER = "delete_adapter"
     EVALUATE_MODEL = "evaluate_model"
+    PERFORM_PROMPT_SCHEMA = "perform_prompt_schema"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -670,6 +677,8 @@ class BudServeWorkflowStepEventName(str, Enum):
     ADAPTER_DEPLOYMENT_EVENTS = "adapter_deployment_events"
     ADAPTER_DELETE_EVENTS = "adapter_delete_events"
     EVALUATION_EVENTS = "evaluation_events"
+    GUARDRAIL_DEPLOYMENT_EVENTS = "guardrail_deployment_events"
+    PROMPT_SCHEMA_EVENTS = "prompt_schema_events"
 
 
 # Mapping between payload types and workflow step event names.
@@ -789,6 +798,10 @@ class ProxyProviderEnum(StrEnum):
     MISTRAL = "mistral"
     TOGETHER = "together"
     XAI = "xai"
+    BUD_SENTINEL = "bud-sentinel"
+    BUDDOC = "buddoc"
+    AZURE_CONTENT_SAFETY = "azure-content-safety"
+    AWS_COMPREHEND = "aws-comprehend"
 
 
 # class ModelTemplateTypeEnum(StrEnum):
@@ -866,6 +879,56 @@ class ModelStatusEnum(StrEnum):
 
     ACTIVE = auto()
     DELETED = auto()
+
+
+class PromptTypeEnum(StrEnum):
+    """Enumeration of prompt types.
+
+    Attributes:
+        SIMPLE_PROMPT: Represents a simple prompt type.
+    """
+
+    SIMPLE_PROMPT = auto()
+
+
+class PromptStatusEnum(StrEnum):
+    """Enumeration of prompt statuses.
+
+    Attributes:
+        ACTIVE: Represents an active prompt.
+        DELETED: Represents a deleted prompt.
+    """
+
+    ACTIVE = auto()
+    DELETED = auto()
+
+
+class PromptVersionStatusEnum(StrEnum):
+    """Enumeration of prompt version statuses.
+
+    Attributes:
+        ACTIVE: Represents an active prompt version.
+        DELETED: Represents a deleted prompt version.
+    """
+
+    ACTIVE = auto()
+    DELETED = auto()
+
+
+class RateLimitTypeEnum(StrEnum):
+    """Enumeration of rate limit types.
+
+    Attributes:
+        ENABLED: Rate limiting is enabled with default settings.
+        DISABLED: Rate limiting is disabled.
+        AUTO: Automatic rate limiting based on system load.
+        CUSTOM: Custom rate limiting with user-defined value.
+    """
+
+    ENABLED = auto()
+    DISABLED = auto()
+    AUTO = auto()
+    CUSTOM = auto()
 
 
 class CloudModelStatusEnum(StrEnum):
@@ -2883,6 +2946,8 @@ class NotificationTypeEnum(StrEnum):
     ADAPTER_DEPLOYMENT_SUCCESS = auto()
     ADAPTER_DELETION_SUCCESS = auto()
     PROJECT_INVITATION_SUCCESS = auto()
+    EVALUATION_SUCCESS = auto()
+    GUARDRAIL_DEPLOYMENT_SUCCESS = auto()
 
 
 BENCHMARK_FIELDS_TYPE_MAPPER = {
@@ -2982,23 +3047,36 @@ class ModelEndpointEnum(Enum):
         CHAT (str): Chat completion endpoint for conversational AI.
         COMPLETION (str): Text completion endpoint for non-conversational AI.
         IMAGE_GENERATION (str): Image creation endpoint.
+        IMAGE_EDIT (str): Image editing endpoint for modifying existing images.
+        IMAGE_VARIATION (str): Image variation endpoint for creating variations of existing images.
         AUDIO_TRANSCRIPTION (str): Speech-to-text conversion endpoint.
-        AUDIO_SPEECH (str): Text-to-speech synthesis endpoint.
+        AUDIO_TRANSLATION (str): Audio translation to English text endpoint.
+        TEXT_TO_SPEECH (str): Text-to-speech synthesis endpoint.
+        REALTIME_SESSION (str): Real-time bidirectional conversation endpoint.
+        REALTIME_TRANSCRIPTION (str): Real-time audio transcription session endpoint.
         EMBEDDING (str): Vector embedding generation endpoint.
         BATCH (str): Batch processing endpoint for multiple requests.
-        RESPONSE (str): Response retrieval endpoint for asynchronous operations.
+        RESPONSES (str): Response retrieval endpoint for asynchronous operations.
+        RERANK (str): Reranking endpoint for relevance scoring.
+        MODERATION (str): Content moderation endpoint.
     """
 
     CHAT = "/v1/chat/completions"
     COMPLETION = "/v1/completions"
-    IMAGE_GENERATION = "/v1/images/generations"
-    AUDIO_TRANSCRIPTION = "/v1/audio/transcriptions"
-    AUDIO_SPEECH = "/v1/audio/speech"
     EMBEDDING = "/v1/embeddings"
-    BATCH = "/v1/batch"
     RESPONSES = "/v1/responses"
+    AUDIO_TRANSCRIPTION = "/v1/audio/transcriptions"
+    AUDIO_TRANSLATION = "/v1/audio/translations"
+    TEXT_TO_SPEECH = "/v1/audio/speech"
+    DOCUMENT = "/v1/documents"  # Document processing endpoint for MLLM models
+    BATCH = "/v1/batch"
+    IMAGE_GENERATION = "/v1/images/generations"
+    IMAGE_EDIT = "/v1/images/edits"
+    IMAGE_VARIATION = "/v1/images/variations"
     RERANK = "/v1/rerank"  # https://docs.litellm.ai/docs/rerank
     MODERATION = "/v1/moderations"  # https://docs.litellm.ai/docs/moderation
+    # REALTIME_SESSION = "/v1/realtime/sessions"
+    # REALTIME_TRANSCRIPTION = "/v1/realtime/transcription_sessions"
 
     @classmethod
     def serialize_endpoints(cls, selected_endpoints: List["ModelEndpointEnum"]) -> Dict[str, Any]:
@@ -3018,13 +3096,19 @@ class ModelEndpointEnum(Enum):
             cls.CHAT: "Chat Completions",
             cls.COMPLETION: "Completions",
             cls.IMAGE_GENERATION: "Image Generation",
+            cls.IMAGE_EDIT: "Image Editing",
+            cls.IMAGE_VARIATION: "Image Variations",
             cls.AUDIO_TRANSCRIPTION: "Transcription",
-            cls.AUDIO_SPEECH: "Speech generation",
+            cls.AUDIO_TRANSLATION: "Audio Translation",
+            cls.TEXT_TO_SPEECH: "Speech generation",
+            # cls.REALTIME_SESSION: "Real-time Session",
+            # cls.REALTIME_TRANSCRIPTION: "Real-time Transcription",
             cls.EMBEDDING: "Embeddings",
             cls.BATCH: "Batch",
             cls.RESPONSES: "Responses",
             cls.RERANK: "Reranking",
             cls.MODERATION: "Moderation",
+            cls.DOCUMENT: "Document",
         }
 
         # Create result dictionary
@@ -3068,11 +3152,18 @@ class ExperimentWorkflowStepEnum(StrEnum):
     FINALIZE = "finalize"
 
 
-class GuardrailDeploymentTypeEnum(StrEnum):
-    """Guardrail deployment type enumeration."""
+class GuardrailProviderTypeEnum(Enum):
+    """Enumeration of guardrail provider types.
 
-    ENDPOINT_MAPPED = "endpoint_mapped"
-    STANDALONE = "standalone"
+    This enum represents different types of guardrail providers or sources.
+
+    Attributes:
+        CLOUD (str): Represents cloud-based guardrail providers.
+        BUD (str): Represents guardrails from the Bud platform.
+    """
+
+    CLOUD = "cloud"
+    BUD = "bud"
 
 
 class GuardrailDeploymentStatusEnum(StrEnum):
@@ -3087,18 +3178,37 @@ class GuardrailDeploymentStatusEnum(StrEnum):
     PENDING = auto()
 
 
-class GuardrailProviderTypeEnum(Enum):
-    """Enumeration of guardrail provider types.
-
-    This enum represents different types of guardrail providers or sources.
+class GuardrailStatusEnum(StrEnum):
+    """Enumeration of entity statuses in the system.
 
     Attributes:
-        CLOUD_PROVIDER (str): Represents cloud-based guardrail providers.
-        BUD_SENTINEL (str): Represents guardrails from the Bud Sentinel.
+        ACTIVE: Represents an active entity.
+        DELETED: Represents an deleted entity.
     """
 
-    CLOUD_PROVIDER = "cloud_provider"
-    BUD_SENTINEL = "bud_sentinel"
+    ACTIVE = auto()
+    DISABLED = auto()
+    DELETED = auto()
+
+
+class ProviderCapabilityEnum(Enum):
+    """Enumeration for identifying provider capabilities.
+
+    This enum categorizes providers like OpenAI, Azure, and AWS Bedrock based on
+    the specific services they offer, allowing for clear differentiation between
+    their core functionalities.
+
+    Attributes:
+        MODEL: Represents providers that support model hubs or offer direct access
+               to model inference endpoints.
+        MODERATION: Represents providers that offer content moderation, safety, or
+                    guardrail endpoints.
+        LOCAL: Represents providers that expose local or user-managed runtimes.
+    """
+
+    MODEL = "model"
+    MODERATION = "moderation"
+    LOCAL = "local"
 
 
 class AuditActionEnum(StrEnum):

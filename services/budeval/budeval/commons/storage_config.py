@@ -4,6 +4,10 @@ import os
 from typing import Any, Dict
 
 from budeval.commons.config import app_settings
+from budeval.commons.logging import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class StorageConfig:
@@ -31,16 +35,22 @@ class StorageConfig:
         namespace = os.environ.get("NAMESPACE")
         if namespace:
             namespace = namespace.lower()  # Kubernetes namespaces must be lowercase
+            logger.debug(f"Namespace from environment variable: {namespace}")
             return namespace
 
         # Try reading from serviceaccount if running in cluster
         namespace_file = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
         if os.path.exists(namespace_file):
-            with open(namespace_file, "r") as f:
-                namespace = f.read().strip().lower()  # Ensure lowercase
-                return namespace
+            try:
+                with open(namespace_file, "r") as f:
+                    namespace = f.read().strip().lower()  # Ensure lowercase
+                    logger.debug(f"Namespace from serviceaccount file: {namespace}")
+                    return namespace
+            except (IOError, OSError) as e:
+                logger.warning(f"Failed to read namespace from serviceaccount file: {e}")
 
         # Default fallback
+        logger.debug("Using default namespace: default")
         return "default"
 
     @staticmethod

@@ -19,13 +19,12 @@ export const calculateEta = (eta: string | number, setEta?: any) => {
   }
 };
 
-
 export const calculateEtaInDays = (eta: string | number) => {
   if (eta) {
     let time = "Calculating...";
     try {
-      const days = Math.floor(((Number(eta) / 60) / 60) / 24);
-      time = `${days > 0 ?  days > 1 ? `${days} days` : `${days} day` : `${days} day`}`;
+      const days = Math.floor(Number(eta) / 60 / 60 / 24);
+      time = `${days > 0 ? (days > 1 ? `${days} days` : `${days} day`) : `${days} day`}`;
     } catch (error) {
       time = "Calculating...";
     }
@@ -35,9 +34,11 @@ export const calculateEtaInDays = (eta: string | number) => {
 
     return time;
   }
-}
+};
 
-export const calculateEtaInHoursAndMinutesExcludeDays = (eta: string | number) => {
+export const calculateEtaInHoursAndMinutesExcludeDays = (
+  eta: string | number,
+) => {
   if (eta) {
     let time = "Calculating...";
     try {
@@ -54,4 +55,4 @@ export const calculateEtaInHoursAndMinutesExcludeDays = (eta: string | number) =
 
     return time;
   }
-}
+};

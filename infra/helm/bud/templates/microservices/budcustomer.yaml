@@ -23,6 +23,19 @@ spec:
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         ports:
         - containerPort: 3000
+
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 3000
+          initialDelaySeconds: 16
+          periodSeconds: 8
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 3000
+          initialDelaySeconds: 8
+          periodSeconds: 4
         env:
           - name: ENTRYPOINT_BUDNOTIFY_SERVICE
             value: "{{ .Release.Name }}-budnotify:3000"

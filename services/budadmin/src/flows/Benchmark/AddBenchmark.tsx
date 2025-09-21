@@ -21,7 +21,7 @@ export default function AddBenchmark() {
   const { createBenchmark, setEvalWith, evalWith, stepOneData } =
     usePerfomanceBenchmark();
   const [concurrentRequests, setConcurrentRequests] = useState(
-    stepOneData?.concurrent_requests || ""
+    stepOneData?.concurrent_requests || "",
   );
   const { openDrawerWithStep, openDrawer, step, drawerProps } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
@@ -49,7 +49,7 @@ export default function AddBenchmark() {
   }, [stepOneData?.eval_with]);
 
   useEffect(() => {
-    console.log('drawerProps', drawerProps?.source);
+    console.log("drawerProps", drawerProps?.source);
   }, [drawerProps]);
 
   return (
@@ -62,10 +62,10 @@ export default function AddBenchmark() {
         eval_with: stepOneData?.eval_with || "",
       }}
       disableNext={!submittable || !evalWith?.length}
-      showBack={drawerProps?.source == 'modelDetails' ? true : false}
+      showBack={drawerProps?.source == "modelDetails" ? true : false}
       onBack={() => {
-        if (drawerProps?.source == 'modelDetails') {
-          openDrawer('view-model');
+        if (drawerProps?.source == "modelDetails") {
+          openDrawer("view-model");
         }
       }}
       onNext={async (values) => {
@@ -105,6 +105,7 @@ export default function AddBenchmark() {
               formItemClassnames="pb-[.6rem] mb-[1rem]"
               infoText="Enter the benchmark name"
               InputClasses="py-[.5rem]"
+              replaceSpacesWithHyphens={true}
             />
             <TagsInput
               label="Tags"

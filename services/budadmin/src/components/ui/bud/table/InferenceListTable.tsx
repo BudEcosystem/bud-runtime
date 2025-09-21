@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Button, Table, Tooltip, message } from 'antd';
 import { EyeOutlined, DownloadOutlined, CopyOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { format } from 'date-fns';
 import { useRouter } from 'next/router';
 import { useInferences, InferenceListItem } from '@/stores/useInferences';
 import InferenceFilters from '@/components/inferences/InferenceFilters';
@@ -12,11 +11,9 @@ import NoDataFount from '../../noDataFount';
 import { PrimaryButton, SecondaryButton } from '../form/Buttons';
 import ProjectTags from 'src/flows/components/ProjectTags';
 import { SortIcon } from './SortIcon';
-import { formatDate, formatTimestamp } from 'src/utils/formatDate';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { ClientTimestamp } from '../../ClientTimestamp';
 
-const { Text } = Typography;
 
 interface InferenceListTableProps {
   projectId?: string;
@@ -31,13 +28,10 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
 
   const {
     inferences,
-    pagination,
     isLoading,
     fetchInferences,
-    setPagination,
     exportInferences,
     setFilters,
-    filters,
   } = useInferences();
 
   useLoaderOnLoding(isLoading);
@@ -111,6 +105,9 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
       dataIndex: 'response_time_ms',
       key: 'response_time_ms',
       width: 120,
+      onHeaderCell: () => ({
+        style: { whiteSpace: 'nowrap' },
+      }),
       render: (response_time_ms: number) => (
         <Text_12_400_EEEEEE>
           {response_time_ms ? `${response_time_ms.toLocaleString()} ms` : '-'}
@@ -161,7 +158,7 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
   ];
 
   // Handle table change (pagination, sorting)
-  const handleTableChange = (newPagination: any, _filters: any, sorter: any) => {
+  const handleTableChange = (_newPagination: any, _filters: any, sorter: any) => {
     // Handle sorting
     if (sorter.field) {
       const sortMap: Record<string, string> = {
@@ -180,19 +177,6 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
     }
   };
 
-  // Export menu items
-  const exportMenu = [
-    {
-      key: 'csv',
-      label: 'Export as CSV',
-      onClick: () => exportInferences('csv'),
-    },
-    {
-      key: 'json',
-      label: 'Export as JSON',
-      onClick: () => exportInferences('json'),
-    },
-  ];
 
   return (
     <div className="pb-[60px] pt-[.4rem]">

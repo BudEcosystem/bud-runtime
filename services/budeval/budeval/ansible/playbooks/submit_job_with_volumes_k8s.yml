@@ -40,7 +40,7 @@
             msg: |
                 Job {{ job_name }} has been deployed successfully.
                 Status: {{ job_status.resources[0].status | default('Unknown') }}
-                Datasets: bud-dev-budeval-dataset-rwx mounted at /workspace/data (read-only)
-                Output: bud-dev-budeval-dataset-rwx/results/{{ job_name }} mounted at /workspace/outputs
+                Datasets: bud-dev-budeval-dataset mounted at /workspace/data (read-only)
+                Output: bud-dev-budeval-dataset/results/{{ job_name }} mounted at /workspace/outputs
                 Cache: emptyDir mounted at /workspace/cache
                 Configs: ConfigMap mounted at /workspace/configs (read-only)

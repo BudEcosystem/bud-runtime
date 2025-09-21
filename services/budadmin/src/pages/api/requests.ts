@@ -1,11 +1,51 @@
 import axios from "axios";
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 import { errorToast } from "./../../components/toast";
-import router from "next/router";
+
+const serializeParams = (params?: Record<string, any>) => {
+  if (!params) {
+    return "";
+  }
+
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item !== undefined && item !== null) {
+          searchParams.append(key, String(item));
+        }
+      });
+      return;
+    }
+
+    if (typeof value === "object") {
+      // Allow nested objects by flattening their entries
+      Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+        if (nestedValue !== undefined && nestedValue !== null) {
+          searchParams.append(`${key}.${nestedKey}`, String(nestedValue));
+        }
+      });
+      return;
+    }
+
+    searchParams.append(key, String(value));
+  });
+
+  return searchParams.toString();
+};
 
 export const axiosInstance = axios.create({
   baseURL: baseUrl,
 });
+
+axiosInstance.defaults.paramsSerializer = {
+  serialize: serializeParams,
+};
 
 let Token = null;
 let isRefreshing = false;
@@ -53,7 +93,10 @@ axiosInstance.interceptors.request.use(
 
     if (!Token && !isPublicEndpoint) {
       // Prevent redirect loop
-      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/login"
+      ) {
         if (!isRedirecting) {
           isRedirecting = true;
           localStorage.clear();
@@ -63,7 +106,6 @@ axiosInstance.interceptors.request.use(
       return Promise.reject(new Error("No access token found"));
     }
 
-
     if (Token && config.headers) {
       config.headers.Authorization = `Bearer ${Token}`;
     }
@@ -72,9 +114,8 @@ axiosInstance.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
-
 
 // Response interceptor
 axiosInstance.interceptors.response.use(
@@ -98,7 +139,6 @@ axiosInstance.interceptors.response.use(
               Authorization: `Bearer ${newToken}`,
             },
           });
-
         })
         .catch((err) => {
           console.log("Token refresh failed", err);
@@ -109,12 +149,11 @@ axiosInstance.interceptors.response.use(
             return Promise.reject(err);
           }
           // If redirect already in progress, halt further processing
-          return new Promise(() => { }); // Keeps the Promise pending
+          return new Promise(() => {}); // Keeps the Promise pending
         });
     } else if (status === 401 && isRefreshing) {
-
       return new Promise((resolve) => {
-        if (err.config?.url == 'auth/refresh-token') {
+        if (err.config?.url == "auth/refresh-token") {
           if (!isRedirecting) {
             isRedirecting = true;
             localStorage.clear();
@@ -129,11 +168,11 @@ axiosInstance.interceptors.response.use(
       });
     }
     return handleErrorResponse(err);
-  }
+  },
 );
 
 const handleErrorResponse = (err) => {
-  console.log('err.config?.url', err.config?.url);
+  console.log("err.config?.url", err.config?.url);
   if (
     err.response &&
     err.response.status === 401 &&
@@ -155,8 +194,8 @@ const handleErrorResponse = (err) => {
     }
   }
   if (err.response && err.response.status === 403) {
-    console.log('403', err)
-    if (err.config.url.includes('auth/refresh-token')) {
+    console.log("403", err);
+    if (err.config.url.includes("auth/refresh-token")) {
       localStorage.clear();
     } else {
       errorToast(err.response?.data?.message || err.response?.data?.detail);
@@ -169,12 +208,16 @@ const handleErrorResponse = (err) => {
     return Promise.reject(err);
   } else if (err.response && err.response.status === 422) {
     return Promise.reject(err);
-  } else if (err.response && err.response.status == 400 && err.response.request.responseURL.includes('/login')) {
+  } else if (
+    err.response &&
+    err.response.status == 400 &&
+    err.response.request.responseURL.includes("/login")
+  ) {
     return Promise.reject(err.response.data);
   } else {
-    console.log(err)
+    console.log(err);
     if (err && localStorage.getItem("access_token")) {
-      console.log(err.response?.data?.message)
+      console.log(err.response?.data?.message);
       errorToast(err.response?.data?.message);
     }
     return false;
@@ -215,13 +258,12 @@ const refreshToken = async () => {
   }
 };
 
-
 const Get = (
   endPoint,
   payload?: {
     params?: any;
     headers?: any;
-  }
+  },
 ) => {
   return axiosInstance.get(endPoint, payload);
 };
@@ -232,7 +274,7 @@ const Post = (
   config?: {
     params?: any;
     headers?: any;
-  }
+  },
 ) => {
   const finalConfig: any = {
     ...config,
@@ -249,7 +291,6 @@ const Post = (
   return axiosInstance.post(endPoint, payload, finalConfig);
 };
 
-
 const Delete = (endPoint, payload?, config?) => {
   return axiosInstance.delete(endPoint, config);
 };
@@ -264,7 +305,7 @@ const Put = (
   config?: {
     params?: any;
     headers?: any;
-  }
+  },
 ) => {
   const finalConfig: any = {
     ...config,

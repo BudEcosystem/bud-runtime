@@ -70,6 +70,9 @@ class InferenceListRequest(BaseModel):
         ]
     ] = None
 
+    # Additional filters for complex queries (e.g., {"api_key_project_id": ["uuid1", "uuid2"]})
+    filters: Optional[Dict[str, Any]] = None
+
     # Sorting
     sort_by: Literal["timestamp", "tokens", "latency", "cost"] = "timestamp"
     sort_order: Literal["asc", "desc"] = "desc"
@@ -552,7 +555,7 @@ class AggregatedMetricsRequest(BaseModel):
 
     from_date: datetime = Field(..., description="Start date for the analysis")
     to_date: Optional[datetime] = Field(None, description="End date for the analysis")
-    group_by: Optional[List[Literal["model", "project", "endpoint", "user"]]] = Field(
+    group_by: Optional[List[Literal["model", "project", "endpoint", "user", "user_project"]]] = Field(
         None, description="Dimensions to group by"
     )
     filters: Optional[Dict[str, Any]] = Field(None, description="Filters to apply")
@@ -564,6 +567,8 @@ class AggregatedMetricsRequest(BaseModel):
             "p95_latency",
             "p99_latency",
             "total_tokens",
+            "total_input_tokens",
+            "total_output_tokens",
             "avg_tokens",
             "total_cost",
             "avg_cost",
@@ -608,6 +613,8 @@ class AggregatedMetricsGroup(BaseModel):
     endpoint_id: Optional[UUID] = Field(None, description="Endpoint ID")
     endpoint_name: Optional[str] = Field(None, description="Endpoint name")
     user_id: Optional[str] = Field(None, description="User ID")
+    api_key_project_id: Optional[UUID] = Field(None, description="API key's project ID (for user_project grouping)")
+    api_key_project_name: Optional[str] = Field(None, description="API key's project name")
 
     # Aggregated metrics
     metrics: Dict[str, AggregatedMetricValue] = Field(..., description="Calculated metrics")
@@ -647,7 +654,7 @@ class TimeSeriesRequest(BaseModel):
         ]
     ] = Field(..., description="Metrics to include in time series")
     filters: Optional[Dict[str, Any]] = Field(None, description="Filters to apply")
-    group_by: Optional[List[Literal["model", "project", "endpoint"]]] = Field(
+    group_by: Optional[List[Literal["model", "project", "endpoint", "user_project"]]] = Field(
         None, description="Dimensions to group by"
     )
     fill_gaps: bool = Field(default=True, description="Fill gaps in time series data")
@@ -681,6 +688,8 @@ class TimeSeriesGroup(BaseModel):
     project_name: Optional[str] = Field(None, description="Project name")
     endpoint_id: Optional[UUID] = Field(None, description="Endpoint ID")
     endpoint_name: Optional[str] = Field(None, description="Endpoint name")
+    api_key_project_id: Optional[UUID] = Field(None, description="API key's project ID (for user_project grouping)")
+    api_key_project_name: Optional[str] = Field(None, description="API key's project name")
 
     # Time series data
     data_points: List[TimeSeriesPoint] = Field(..., description="Time series data points")
@@ -760,7 +769,7 @@ class LatencyDistributionRequest(BaseModel):
     from_date: datetime = Field(..., description="Start date for the analysis")
     to_date: Optional[datetime] = Field(None, description="End date for the analysis")
     filters: Optional[Dict[str, Any]] = Field(None, description="Additional filters to apply")
-    group_by: Optional[list[Literal["model", "project", "endpoint", "user"]]] = Field(
+    group_by: Optional[list[Literal["model", "project", "endpoint", "user", "user_project"]]] = Field(
         None, description="Dimensions to group the results by"
     )
     buckets: Optional[List[Dict[str, Union[int, str]]]] = Field(
@@ -812,6 +821,8 @@ class LatencyDistributionGroup(BaseModel):
     endpoint_id: Optional[UUID] = Field(None, description="Endpoint ID")
     endpoint_name: Optional[str] = Field(None, description="Endpoint name")
     user_id: Optional[str] = Field(None, description="User ID")
+    api_key_project_id: Optional[UUID] = Field(None, description="API key's project ID (for user_project grouping)")
+    api_key_project_name: Optional[str] = Field(None, description="API key's project name")
 
     # Distribution data
     buckets: List[LatencyDistributionBucket] = Field(..., description="Distribution buckets")
