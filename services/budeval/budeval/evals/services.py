@@ -260,15 +260,25 @@ class EvaluationOpsService:
             # Initialize Ansible orchestrator
             ansible_orchestrator = AnsibleOrchestrator()
 
-            # Get job status using Ansible
-            status = ansible_orchestrator.get_job_status(job_id, kubeconfig, namespace)
+            # Get job status using Ansible (simple method)
+            result = ansible_orchestrator.get_job_status_simple(job_id, namespace, kubeconfig)
 
-            return {
-                "job_id": job_id,
-                "status": status.get("status", "unknown"),
-                "namespace": namespace,
-                "details": status,
-            }
+            # Handle the new simple method response format
+            if result.get("success"):
+                job_status = result.get("job_status", {})
+                return {
+                    "job_id": job_id,
+                    "status": job_status.get("status", "unknown"),
+                    "namespace": namespace,
+                    "details": job_status,
+                }
+            else:
+                return {
+                    "job_id": job_id,
+                    "status": "error",
+                    "namespace": namespace,
+                    "error": result.get("error", "Unknown error"),
+                }
 
         except Exception as e:
             logger.error(f"Failed to get job status for {job_id}: {e}", exc_info=True)
