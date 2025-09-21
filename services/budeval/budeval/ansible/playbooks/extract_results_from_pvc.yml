@@ -2,179 +2,225 @@
 - name: Extract Evaluation Results from PVC
   hosts: localhost
   connection: local
-  gather_facts: no
+  gather_facts: false
   collections:
-    - community.kubernetes
+      - kubernetes.core
 
   vars:
-    extractor_image: "busybox:1.35"
-    wait_timeout: 180
-    kubectl_retries: 5
+      extractor_image: "busybox:1.35"
+      wait_timeout: 180
+      kubectl_retries: 5
 
   tasks:
-    - name: Verify shared PVC exists before extraction
-      community.kubernetes.k8s_info:
-        api_version: v1
-        kind: PersistentVolumeClaim
-        name: "{{ pvc_name }}"
-        namespace: "{{ namespace }}"
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-      register: pvc_info
-      failed_when: pvc_info.resources | length == 0
+      - name: Verify shared PVC exists before extraction
+        kubernetes.core.k8s_info:
+            api_version: v1
+            kind: PersistentVolumeClaim
+            name: "{{ pvc_name }}"
+            namespace: "{{ namespace }}"
+            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        register: pvc_info
+        failed_when: pvc_info.resources | length == 0
 
-    - name: Display PVC status
-      debug:
-        msg: "Shared PVC {{ pvc_name }} found with status: {{ pvc_info.resources[0].status.phase }}. Will extract from subPath: {{ results_subpath }}"
+      - name: Display PVC status
+        debug:
+            msg: "Shared PVC {{ pvc_name }} found with status: {{ pvc_info.resources[0].status.phase }}. Will extract from subPath: {{ results_subpath }}"
 
-    - name: Ensure local extraction directory exists
-      file:
-        path: "{{ local_extract_path }}"
-        state: directory
-        mode: '0755'
+      - name: Ensure local extraction directory exists
+        file:
+            path: "{{ local_extract_path }}"
+            state: directory
+            mode: "0755"
 
-    - name: Create extraction pod
-      community.kubernetes.k8s:
-        state: present
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-        definition:
-          apiVersion: v1
-          kind: Pod
-          metadata:
+      - name: Create extraction pod
+        kubernetes.core.k8s:
+            state: present
+            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+            definition:
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                    name: "{{ job_id }}-extract"
+                    namespace: "{{ namespace }}"
+                    labels:
+                        app: eval-result-extractor
+                        job-id: "{{ job_id }}"
+                spec:
+                    restartPolicy: Never
+                    containers:
+                        - name: extractor
+                          image: "{{ extractor_image }}"
+                          command: ["sleep", "{{ wait_timeout | string }}"]
+                          volumeMounts:
+                              - name: output
+                                mountPath: /workspace/outputs
+                                subPath: "{{ results_subpath }}"
+                                readOnly: true
+                          resources:
+                              requests:
+                                  memory: "64Mi"
+                                  cpu: "50m"
+                              limits:
+                                  memory: "128Mi"
+                                  cpu: "100m"
+                    volumes:
+                        - name: output
+                          persistentVolumeClaim:
+                              claimName: "{{ pvc_name }}"
+
+      - name: Wait for extraction pod to be ready
+        kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Pod
             name: "{{ job_id }}-extract"
             namespace: "{{ namespace }}"
-            labels:
-              app: eval-result-extractor
-              job-id: "{{ job_id }}"
-          spec:
-            restartPolicy: Never
-            containers:
-            - name: extractor
-              image: "{{ extractor_image }}"
-              command: ["sleep", "{{ wait_timeout | string }}"]
-              volumeMounts:
-              - name: output
-                mountPath: /workspace/outputs
-                subPath: "{{ results_subpath }}"
-                readOnly: true
-              resources:
-                requests:
-                  memory: "64Mi"
-                  cpu: "50m"
-                limits:
-                  memory: "128Mi"
-                  cpu: "100m"
-            volumes:
-            - name: output
-              persistentVolumeClaim:
-                claimName: "{{ pvc_name }}"
+            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        register: pod_info
+        until: >
+            pod_info.resources | length > 0 and
+            pod_info.resources[0].status is defined and
+            pod_info.resources[0].status.phase == "Running"
+        retries: 20
+        delay: 3
+        failed_when: >
+            pod_info.resources | length == 0 or
+            (pod_info.resources[0].status is defined and
+             pod_info.resources[0].status.phase == "Failed")
 
-    - name: Wait for extraction pod to be ready
-      community.kubernetes.k8s_info:
-        api_version: v1
-        kind: Pod
-        name: "{{ job_id }}-extract"
-        namespace: "{{ namespace }}"
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
-      register: pod_info
-      until: >
-        pod_info.resources | length > 0 and
-        pod_info.resources[0].status is defined and
-        pod_info.resources[0].status.phase == "Running"
-      retries: 20
-      delay: 3
-      failed_when: >
-        pod_info.resources | length == 0 or
-        (pod_info.resources[0].status is defined and
-         pod_info.resources[0].status.phase == "Failed")
+      - name: Check if output directory exists in pod
+        kubernetes.core.k8s_exec:
+            namespace: "{{ namespace }}"
+            pod: "{{ job_id }}-extract"
+            container: extractor
+            command: ls -la /workspace/outputs
+            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        register: output_check
+        failed_when: output_check.rc != 0
 
-    - name: Check if output directory exists in pod
-      shell: |
-        kubectl exec {{ job_id }}-extract -n {{ namespace }} \
-        {% if kubeconfig_path is defined %}--kubeconfig {{ kubeconfig_path }}{% endif %} \
-        -- ls -la /workspace/outputs
-      register: output_check
-      failed_when: output_check.rc != 0
+      - name: Find timestamp directory (OpenCompass format YYYYMMDD_HHMMSS)
+        kubernetes.core.k8s_exec:
+            namespace: "{{ namespace }}"
+            pod: "{{ job_id }}-extract"
+            container: extractor
+            command: find /workspace/outputs -maxdepth 1 -type d -name "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9]"
+            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        register: timestamp_dir_check
+        failed_when: false
 
-    - name: Find timestamp directory (OpenCompass format YYYYMMDD_HHMMSS)
-      shell: |
-        kubectl exec {{ job_id }}-extract -n {{ namespace }} \
-        {% if kubeconfig_path is defined %}--kubeconfig {{ kubeconfig_path }}{% endif %} \
-        -- find /workspace/outputs -maxdepth 1 -type d -name "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9]" | head -1
-      register: timestamp_dir_check
-      failed_when: false
+      - name: Set timestamp directory variable
+        set_fact:
+            timestamp_dir: "{{ timestamp_dir_check.stdout.split('\n')[0].split('/')[-1] if timestamp_dir_check.stdout else '' }}"
 
-    - name: Set timestamp directory variable
-      set_fact:
-        timestamp_dir: "{{ timestamp_dir_check.stdout.split('/')[-1] if timestamp_dir_check.stdout else '' }}"
+      - name: Display output directory contents and timestamp
+        debug:
+            msg:
+                - "Output directory contents: {{ output_check.stdout_lines }}"
+                - "Found timestamp directory: {{ timestamp_dir if timestamp_dir else 'None found' }}"
 
-    - name: Display output directory contents and timestamp
-      debug:
-        msg:
-          - "Output directory contents: {{ output_check.stdout_lines }}"
-          - "Found timestamp directory: {{ timestamp_dir if timestamp_dir else 'None found' }}"
+      - name: Fail if no timestamp directory found
+        fail:
+            msg: "No timestamp directory found in /workspace/outputs. Expected format: YYYYMMDD_HHMMSS"
+        when: timestamp_dir == ""
 
-    - name: Fail if no timestamp directory found
-      fail:
-        msg: "No timestamp directory found in /workspace/outputs. Expected format: YYYYMMDD_HHMMSS"
-      when: timestamp_dir == ""
+      - name: Create job-specific extraction directory
+        file:
+            path: "{{ local_extract_path }}/{{ job_id }}"
+            state: directory
+            mode: "0755"
 
-    - name: Create job-specific extraction directory
-      file:
-        path: "{{ local_extract_path }}/{{ job_id }}"
-        state: directory
-        mode: '0755'
+      - name: Create tar archive of results in pod
+        kubernetes.core.k8s_exec:
+            namespace: "{{ namespace }}"
+            pod: "{{ job_id }}-extract"
+            container: extractor
+            command: tar -czf /tmp/results.tar.gz -C /workspace/outputs/{{ timestamp_dir }} .
+            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        register: tar_result
+        failed_when: tar_result.rc != 0
 
-    - name: Copy results from pod to local filesystem (timestamp directory)
-      shell: |
-        kubectl cp {{ namespace }}/{{ job_id }}-extract:/workspace/outputs/{{ timestamp_dir }} \
-        "{{ local_extract_path }}/{{ job_id }}/outputs" \
-        {% if kubeconfig_path is defined %}--kubeconfig {{ kubeconfig_path }}{% endif %} \
-        --retries={{ kubectl_retries }}
-      register: copy_result
-      failed_when: copy_result.rc != 0
+      - name: Get base64 encoded tar archive from pod
+        kubernetes.core.k8s_exec:
+            namespace: "{{ namespace }}"
+            pod: "{{ job_id }}-extract"
+            container: extractor
+            command: base64 -w 0 /tmp/results.tar.gz
+            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        register: tar_base64
+        failed_when: tar_base64.rc != 0
 
-    - name: Verify copied files
-      find:
-        paths: "{{ local_extract_path }}/{{ job_id }}/outputs"
-        recurse: yes
-        file_type: file
-      register: copied_files
+      - name: Write tar archive to local filesystem
+        copy:
+            content: "{{ tar_base64.stdout | b64decode }}"
+            dest: "{{ local_extract_path }}/{{ job_id }}/results.tar.gz"
+            mode: "0644"
 
-    - name: Display extraction summary
-      debug:
-        msg: |
-          Extraction completed successfully:
-          - Job ID: {{ job_id }}
-          - Local path: {{ local_extract_path }}/{{ job_id }}/outputs
-          - Files extracted: {{ copied_files.files | length }}
-          - Total size: {{ copied_files.files | map(attribute='size') | sum | filesizeformat }}
+      - name: Extract tar archive to outputs directory
+        unarchive:
+            src: "{{ local_extract_path }}/{{ job_id }}/results.tar.gz"
+            dest: "{{ local_extract_path }}/{{ job_id }}"
+            remote_src: false
+            creates: "{{ local_extract_path }}/{{ job_id }}/outputs"
 
-    - name: Delete extraction pod
-      community.kubernetes.k8s:
-        state: absent
-        api_version: v1
-        kind: Pod
-        name: "{{ job_id }}-extract"
-        namespace: "{{ namespace }}"
-        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      - name: Create outputs directory and move extracted files
+        shell: |
+            cd "{{ local_extract_path }}/{{ job_id }}"
+            if [ ! -d outputs ]; then
+              mkdir -p outputs
+              # Move all files except the tar to outputs directory
+              find . -maxdepth 1 -type f ! -name "results.tar.gz" -exec mv {} outputs/ \;
+              # Move all directories except outputs to outputs directory
+              find . -maxdepth 1 -type d ! -name "." ! -name "outputs" -exec mv {} outputs/ \;
+            fi
+        args:
+            creates: "{{ local_extract_path }}/{{ job_id }}/outputs"
 
-    - name: Set extraction results facts
-      set_fact:
-        extraction_result:
-          job_id: "{{ job_id }}"
-          status: "success"
-          local_path: "{{ local_extract_path }}/{{ job_id }}/outputs"
-          files_extracted: "{{ copied_files.files | length }}"
-          total_size_bytes: "{{ copied_files.files | map(attribute='size') | sum }}"
-          timestamp_dir: "{{ timestamp_dir }}"
-          extracted_at: "{{ ansible_date_time.iso8601 | default(ansible_date_time) | default('unknown') }}"
+      - name: Clean up tar archive
+        file:
+            path: "{{ local_extract_path }}/{{ job_id }}/results.tar.gz"
+            state: absent
 
-    - name: Output extraction result as JSON
-      debug:
-        msg: "{{ extraction_result | to_json }}"
+      - name: Verify copied files
+        find:
+            paths: "{{ local_extract_path }}/{{ job_id }}/outputs"
+            recurse: true
+            file_type: file
+        register: copied_files
 
-    - name: Write JSON to file if requested
-      copy:
-        content: "{{ extraction_result | to_nice_json }}"
-        dest: "{{ output_file }}"
-      when: output_file is defined
+      - name: Display extraction summary
+        debug:
+            msg: |
+                Extraction completed successfully:
+                - Job ID: {{ job_id }}
+                - Local path: {{ local_extract_path }}/{{ job_id }}/outputs
+                - Files extracted: {{ copied_files.files | length }}
+                - Total size: {{ copied_files.files | map(attribute='size') | sum | filesizeformat }}
+
+      - name: Delete extraction pod
+        kubernetes.core.k8s:
+            state: absent
+            api_version: v1
+            kind: Pod
+            name: "{{ job_id }}-extract"
+            namespace: "{{ namespace }}"
+            kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+
+      - name: Set extraction results facts
+        set_fact:
+            extraction_result:
+                job_id: "{{ job_id }}"
+                status: "success"
+                local_path: "{{ local_extract_path }}/{{ job_id }}/outputs"
+                files_extracted: "{{ copied_files.files | length }}"
+                total_size_bytes: "{{ copied_files.files | map(attribute='size') | sum }}"
+                timestamp_dir: "{{ timestamp_dir }}"
+                extracted_at: "{{ ansible_date_time.iso8601 | default(ansible_date_time) | default('unknown') }}"
+
+      - name: Output extraction result as JSON
+        debug:
+            msg: "{{ extraction_result | to_json }}"
+
+      - name: Write JSON to file if requested
+        copy:
+            content: "{{ extraction_result | to_nice_json }}"
+            dest: "{{ output_file }}"
+        when: output_file is defined
