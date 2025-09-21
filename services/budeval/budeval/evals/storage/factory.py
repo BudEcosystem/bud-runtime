@@ -8,6 +8,7 @@ different from the one that created the pool.
 """
 
 import threading
+import weakref
 from typing import TYPE_CHECKING, Optional
 
 from budeval.commons.config import app_settings
@@ -26,6 +27,19 @@ logger = logging.getLogger(__name__)
 # Maintain per-thread ClickHouse storage instances to keep each connection pool
 # bound to the event loop that initializes and uses it within that thread.
 _clickhouse_storage_by_thread: dict[int, "ClickHouseStorage"] = {}
+_storage_cleanup_registry: dict[int, weakref.ref] = {}
+
+
+def _cleanup_dead_storage_references() -> None:
+    """Clean up dead storage references from the registry."""
+    dead_threads = []
+    for thread_id, weak_ref in _storage_cleanup_registry.items():
+        if weak_ref() is None:  # Reference is dead
+            dead_threads.append(thread_id)
+
+    for thread_id in dead_threads:
+        _clickhouse_storage_by_thread.pop(thread_id, None)
+        _storage_cleanup_registry.pop(thread_id, None)
 
 
 def get_storage_adapter(backend: Optional[str] = None) -> StorageAdapter:
@@ -55,12 +69,29 @@ def get_storage_adapter(backend: Optional[str] = None) -> StorageAdapter:
     elif storage_backend == "clickhouse":
         # Per-thread instance to avoid cross-event-loop future issues
         thread_id = threading.get_ident()
+
+        # Clean up any dead references first
+        _cleanup_dead_storage_references()
+
         if thread_id not in _clickhouse_storage_by_thread:
             try:
                 from .clickhouse import ClickHouseStorage
 
-                _clickhouse_storage_by_thread[thread_id] = ClickHouseStorage()
-                logger.info("ClickHouse storage adapter created for thread %s", thread_id)
+                storage_instance = ClickHouseStorage()
+                _clickhouse_storage_by_thread[thread_id] = storage_instance
+                logger.info(
+                    "ClickHouse storage adapter created for thread %s",
+                    thread_id,
+                )
+
+                # Set up cleanup callback for when storage is garbage collected
+                def cleanup_callback(ref):
+                    logger.debug(f"Cleaning up ClickHouse storage for thread {thread_id}")
+                    _clickhouse_storage_by_thread.pop(thread_id, None)
+                    _storage_cleanup_registry.pop(thread_id, None)
+
+                _storage_cleanup_registry[thread_id] = weakref.ref(storage_instance, cleanup_callback)
+
             except ImportError as e:
                 logger.error(f"ClickHouse dependencies not available: {e}")
                 raise ImportError(
@@ -107,11 +138,19 @@ def get_storage_info() -> dict:
     """
     backend = app_settings.storage_backend
 
-    info = {"backend": backend, "available_backends": ["filesystem", "clickhouse"]}
+    info = {
+        "backend": backend,
+        "available_backends": ["filesystem", "clickhouse"],
+    }
 
     if backend == "filesystem":
         storage = FilesystemStorage()
-        info.update({"base_path": str(storage.base_path), "description": "Local filesystem storage with JSON files"})
+        info.update(
+            {
+                "base_path": str(storage.base_path),
+                "description": "Local filesystem storage with JSON files",
+            }
+        )
 
     elif backend == "clickhouse":
         info.update(
@@ -138,7 +177,11 @@ async def health_check_storage(storage: StorageAdapter) -> dict:
     Returns:
         Dictionary with health check results
     """
-    result = {"backend": storage.__class__.__name__, "healthy": False, "error": None}
+    result = {
+        "backend": storage.__class__.__name__,
+        "healthy": False,
+        "error": None,
+    }
 
     try:
         if hasattr(storage, "health_check"):
