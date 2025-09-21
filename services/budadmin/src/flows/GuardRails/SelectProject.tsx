@@ -47,13 +47,40 @@ export default function SelectProject() {
     }
 
     try {
-      // Update workflow with selected project
-      await updateWorkflow({
+      // Build the complete payload
+      const payload: any = {
         step_number: 4, // Project selection is step 4
-        workflow_total_steps: 5, // Not counting the first step
         project_id: selectedProject,
         trigger_workflow: false,
-      });
+      };
+
+      // Include workflow_id if available
+      const { currentWorkflow, selectedProvider } = useGuardrails.getState();
+
+      if (currentWorkflow?.workflow_id) {
+        payload.workflow_id = currentWorkflow.workflow_id;
+      }
+
+      // Include provider data from previous steps
+      if (selectedProvider?.provider_type) {
+        payload.provider_type = selectedProvider.provider_type;
+      }
+      if (selectedProvider?.id) {
+        payload.provider_id = selectedProvider.id;
+      }
+
+      // Include probe selections from previous steps
+      if (currentWorkflow?.probe_selections) {
+        payload.probe_selections = currentWorkflow.probe_selections;
+      }
+
+      // Include is_standalone from deployment type step
+      if (currentWorkflow?.is_standalone !== undefined) {
+        payload.is_standalone = currentWorkflow.is_standalone;
+      }
+
+      // Update workflow with complete data
+      await updateWorkflow(payload);
 
       // Save selected project to guardrails store
       setSelectedProjectInStore(selectedProjectData);

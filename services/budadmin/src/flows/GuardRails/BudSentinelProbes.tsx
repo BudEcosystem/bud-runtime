@@ -34,6 +34,7 @@ export default function BudSentinelProbes() {
     totalProbes,
     fetchProbeById,
     setSelectedProbe: setSelectedProbeInStore,
+    setSelectedProbes: setSelectedProbesInStore,
     updateWorkflow,
     workflowLoading,
     selectedProvider,
@@ -93,6 +94,8 @@ export default function BudSentinelProbes() {
     if (selectedProbeObjects.length > 0) {
       // Save the first selected probe to the store (for backward compatibility)
       setSelectedProbeInStore(selectedProbeObjects[0]);
+      // Save all selected probes for the PIIDetectionConfig
+      setSelectedProbesInStore(selectedProbeObjects);
 
       try {
         // Build the payload with data from previous step
