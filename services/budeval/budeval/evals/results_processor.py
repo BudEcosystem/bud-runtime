@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from budeval.commons.logging import logging
-from budeval.registry.orchestrator.ansible_orchestrator import AnsibleOrchestrator
+from budeval.registry.orchestrator.ansible_orchestrator import (
+    AnsibleOrchestrator,
+)
 
 from .result_schemas import (
     DatasetResult,
@@ -28,7 +30,9 @@ class ResultsProcessor:
     """Process evaluation results from PVC and store using storage adapter."""
 
     def __init__(
-        self, storage_adapter: Optional[StorageAdapter] = None, extraction_base_path: str = "/tmp/eval_extractions"
+        self,
+        storage_adapter: Optional[StorageAdapter] = None,
+        extraction_base_path: str = "/tmp/eval_extractions",
     ):
         """Initialize results processor.
 
@@ -44,7 +48,12 @@ class ResultsProcessor:
             f"Initialized results processor with {self.storage.__class__.__name__} storage and extraction path: {self.extraction_base_path}"
         )
 
-    def extract_from_pvc(self, job_id: str, namespace: str = "budeval", kubeconfig: Optional[str] = None) -> str:
+    def extract_from_pvc(
+        self,
+        job_id: str,
+        namespace: str = "budeval",
+        kubeconfig: Optional[str] = None,
+    ) -> str:
         """Extract results from shared PVC using Ansible playbook.
 
         Args:
@@ -91,7 +100,10 @@ class ResultsProcessor:
             temp_id = str(uuid.uuid4())
 
             result = self.orchestrator._run_ansible_playbook_with_output(
-                playbook="extract_results_from_pvc.yml", uuid=temp_id, files={}, extravars=ansible_vars
+                playbook="extract_results_from_pvc.yml",
+                uuid=temp_id,
+                files={},
+                extravars=ansible_vars,
             )
 
             # Check if playbook succeeded - ansible_runner result has .rc attribute
@@ -276,7 +288,11 @@ class ResultsProcessor:
             return {}
 
     async def process_opencompass_results(
-        self, extracted_path: str, job_id: str, model_name: str, experiment_id: Optional[str] = None
+        self,
+        extracted_path: str,
+        job_id: str,
+        model_name: str,
+        experiment_id: Optional[str] = None,
     ) -> ProcessedEvaluationResults:
         """Process OpenCompass results from extracted path.
 
@@ -407,29 +423,53 @@ class ResultsProcessor:
             ProcessedEvaluationResults object
         """
         try:
+            # Ensure storage is properly initialized in this event loop/thread
+            from .storage.factory import initialize_storage
+
+            await initialize_storage(self.storage)
+            logger.debug(f"Storage initialized for processing job {job_id}")
+
             # Extract from PVC
             extracted_path = self.extract_from_pvc(job_id, namespace, kubeconfig)
 
             # Process results
             results = await self.process_opencompass_results(extracted_path, job_id, model_name, experiment_id)
 
-            # Store results
-            await self.storage.save_results(job_id, results.model_dump())
+            # Store results with error handling
+            try:
+                save_success = await self.storage.save_results(job_id, results.model_dump())
+                if not save_success:
+                    raise Exception("Storage save operation returned False")
+                logger.info(f"Successfully saved results for job {job_id} to storage")
+            except Exception as storage_error:
+                logger.error(
+                    f"Failed to save results to storage: {storage_error}",
+                    exc_info=True,
+                )
+                # Continue - don't fail entire operation due to storage issues
 
             logger.info(f"Successfully extracted and processed results for job {job_id}")
             return results
 
         except Exception as e:
-            logger.error(f"Failed to extract and process results for job {job_id}: {e}")
-
-            # Save error information
-            error = ResultsProcessingError(
-                job_id=job_id,
-                error_type=type(e).__name__,
-                error_message=str(e),
-                occurred_at=datetime.utcnow(),
-                extraction_path=str(self.extraction_base_path / job_id),
+            logger.error(
+                f"Failed to extract and process results for job {job_id}: {e}",
+                exc_info=True,
             )
 
-            await self.storage.save_results(f"{job_id}_error", error.model_dump())
+            # Save error information - but don't fail if this fails too
+            try:
+                error = ResultsProcessingError(
+                    job_id=job_id,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    occurred_at=datetime.utcnow(),
+                    extraction_path=str(self.extraction_base_path / job_id),
+                )
+
+                await self.storage.save_results(f"{job_id}_error", error.model_dump())
+                logger.debug(f"Saved error information for job {job_id}")
+            except Exception as error_save_error:
+                logger.warning(f"Failed to save error information: {error_save_error}")
+
             raise

@@ -78,6 +78,17 @@ class EvaluationWorkflow:
                     new_loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(new_loop)
                     try:
+                        # Clear any thread-local storage to force new instances
+                        import threading
+
+                        from budeval.evals.storage.factory import (
+                            _clickhouse_storage_by_thread,
+                        )
+
+                        thread_id = threading.get_ident()
+                        if thread_id in _clickhouse_storage_by_thread:
+                            del _clickhouse_storage_by_thread[thread_id]
+
                         return new_loop.run_until_complete(
                             EvaluationOpsService.get_job_status(job_id, kubeconfig, namespace)
                         )
@@ -168,6 +179,18 @@ class EvaluationWorkflow:
                     new_loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(new_loop)
                     try:
+                        # Clear any thread-local storage to force new instances
+                        import threading
+
+                        from budeval.evals.storage.factory import (
+                            _clickhouse_storage_by_thread,
+                        )
+
+                        thread_id = threading.get_ident()
+                        if thread_id in _clickhouse_storage_by_thread:
+                            logger.debug(f"Clearing existing ClickHouse storage for thread {thread_id}")
+                            del _clickhouse_storage_by_thread[thread_id]
+
                         # Create processor and extract results
                         processor = ResultsProcessor()
                         return new_loop.run_until_complete(
@@ -561,6 +584,18 @@ class EvaluationWorkflow:
                     new_loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(new_loop)
                     try:
+                        # Clear any thread-local storage to force new instances
+                        import threading
+
+                        from budeval.evals.storage.factory import (
+                            _clickhouse_storage_by_thread,
+                        )
+
+                        thread_id = threading.get_ident()
+                        if thread_id in _clickhouse_storage_by_thread:
+                            logger.debug(f"Clearing existing ClickHouse storage for thread {thread_id}")
+                            del _clickhouse_storage_by_thread[thread_id]
+
                         return new_loop.run_until_complete(
                             EvaluationOpsService.deploy_eval_job_with_transformation(
                                 payload,
@@ -674,6 +709,18 @@ class EvaluationWorkflow:
                     new_loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(new_loop)
                     try:
+                        # Clear any thread-local storage to force new instances
+                        import threading
+
+                        from budeval.evals.storage.factory import (
+                            _clickhouse_storage_by_thread,
+                        )
+
+                        thread_id = threading.get_ident()
+                        if thread_id in _clickhouse_storage_by_thread:
+                            logger.debug(f"Clearing existing ClickHouse storage for thread {thread_id}")
+                            del _clickhouse_storage_by_thread[thread_id]
+
                         return new_loop.run_until_complete(
                             EvaluationOpsService.verify_cluster_connection(
                                 verify_cluster_connection_request_json,
