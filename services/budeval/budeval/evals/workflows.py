@@ -1,6 +1,7 @@
 import asyncio
 import json
 import uuid
+from datetime import timedelta
 from http import HTTPStatus
 
 import dapr.ext.workflow as wf
@@ -16,6 +17,7 @@ from budmicroframe.commons.schemas import (
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 from budeval.commons.logging import logging
+from budeval.commons.storage_config import StorageConfig
 from budeval.commons.utils import update_workflow_data_in_statestore
 from budeval.core.schemas import (
     DatasetCategory,
@@ -35,6 +37,172 @@ dapr_workflows = DaprWorkflow()
 
 
 class EvaluationWorkflow:
+    @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
+    @staticmethod
+    def monitor_eval_job_progress(
+        ctx: wf.WorkflowActivityContext,
+        monitor_request: str,
+    ) -> dict:
+        """Monitor the evaluation job progress.
+
+        Args:
+            ctx (WorkflowActivityContext): The context of the Dapr workflow, providing
+                access to workflow instance information.
+            monitor_request (str): A JSON string containing the monitoring request parameters
+                including job_id, kubeconfig, and namespace.
+        """
+        logger = logging.getLogger("::EVAL:: Monitor Job Progress")
+        logger.debug(f"Monitoring job progress for {monitor_request}")
+
+        response = SuccessResponse(
+            code=HTTPStatus.OK.value,
+            message="Job status retrieved successfully",
+            param={},
+        )
+
+        monitor_request_json = json.loads(monitor_request)
+        job_id = monitor_request_json["job_id"]
+        kubeconfig = monitor_request_json["kubeconfig"]
+        # Resolve namespace with fallback to current cluster namespace
+        namespace = monitor_request_json.get("namespace") or StorageConfig.get_current_namespace()
+
+        response: SuccessResponse | ErrorResponse
+        try:
+            # Handle async operations with proper event loop management
+            try:
+                asyncio.get_running_loop()
+                # If we're in an existing loop, we need to run in a new thread
+                import concurrent.futures
+
+                def run_in_new_loop():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            EvaluationOpsService.get_job_status(job_id, kubeconfig, namespace)
+                        )
+                    finally:
+                        new_loop.close()
+
+                # Run in a separate thread with its own event loop
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_new_loop)
+                    job_status = future.result()
+            except RuntimeError:
+                # No loop running, safe to use asyncio.run()
+                job_status = asyncio.run(EvaluationOpsService.get_job_status(job_id, kubeconfig, namespace))
+
+            logger.debug(f"Job status for {job_id}: {job_status}")
+
+            response = SuccessResponse(
+                code=HTTPStatus.OK.value,
+                message="Job status retrieved successfully",
+                param=job_status,
+            )
+        except Exception as e:
+            logger.error(f"Error monitoring job progress: {e}", exc_info=True)
+            response = ErrorResponse(
+                message="Error monitoring job progress",
+                code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
+            )
+        return response.model_dump(mode="json")
+
+    @dapr_workflows.register_workflow  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
+    @staticmethod
+    def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
+        """Child workflow dedicated to monitoring a job until completion."""
+        logger = logging.getLogger("::EVAL:: MonitorJobWorkflow")
+
+        # Load From State
+        # Parse monitoring request
+        try:
+            request_data = json.loads(monitor_request)
+            job_id = request_data["job_id"]
+            kubeconfig = request_data["kubeconfig"]
+            _parent_workflow_id = request_data["parent_workflow_id"]
+            namespace = request_data.get("namespace") or StorageConfig.get_current_namespace()
+            max_attempts = request_data.get("max_attempts", 360)
+            poll_interval = request_data.get("poll_interval", 5)
+        except Exception as e:
+            logger.error(f"Error parsing monitor request: {e}", exc_info=True)
+            return {"status": "error", "message": str(e)}
+
+        for attempt in range(1, max_attempts + 1):
+            # Check job status
+            monitor_activity_request = {
+                "job_id": job_id,
+                "kubeconfig": kubeconfig,
+                "namespace": namespace,
+            }
+
+            monitor_result = yield ctx.call_activity(
+                EvaluationWorkflow.monitor_eval_job_progress,
+                input=json.dumps(monitor_activity_request),
+            )
+
+            # Check if monitoring activity failed
+            if monitor_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
+                logger.warning(f"Monitoring attempt {attempt} failed: {monitor_result.get('message')}")
+                # Wait before retry
+                yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
+                continue
+
+            # Extract job status
+            job_status_data = monitor_result.get("param", {})
+            job_status = job_status_data.get("status", "unknown")
+            job_details = job_status_data.get("details", {})
+
+            # Determine if job is complete
+            job_completed = False
+            final_status = None
+
+            if job_status in ["completed", "succeeded", "failed", "error"]:
+                job_completed = True
+                final_status = job_status
+            elif job_details:
+                # Check if job was not found (terminal state)
+                job_phase = job_details.get("phase", "")
+                if job_phase == "NotFound":
+                    job_completed = True
+                    final_status = "failed"
+                    logger.warning(f"Job {job_id} not found in cluster - marking as failed")
+                else:
+                    # Check Kubernetes job details
+                    try:
+                        succeeded = int(job_details.get("succeeded", 0))
+                        failed = int(job_details.get("failed", 0))
+
+                        if succeeded > 0:
+                            job_completed = True
+                            final_status = "succeeded"
+                        elif failed > 0:
+                            job_completed = True
+                            final_status = "failed"
+                    except (ValueError, TypeError):
+                        pass
+
+            # If job completed, return result
+            if job_completed:
+                logger.info(f"Job {job_id} completed with status: {final_status}")
+                return {
+                    "status": "completed",
+                    "job_status": final_status,
+                    "job_id": job_id,
+                    "attempts": attempt,
+                    "job_details": job_status_data,
+                }
+
+            # Wait before next check
+            yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
+
+        # Timeout reached
+        logger.warning(f"Job {job_id} monitoring timed out after {max_attempts} attempts")
+        return {
+            "status": "timeout",
+            "job_id": job_id,
+            "message": f"Monitoring timed out after {max_attempts} attempts",
+        }
+
     @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
     @staticmethod
     def create_engine_config(
@@ -703,6 +871,27 @@ class EvaluationWorkflow:
             notification=notification_req,
             target_topic_name=evaluate_model_request_json.source_topic,
             target_name=evaluate_model_request_json.source,
+        )
+
+        # Start Monitoring Child Workflow
+        monitor_workflow_request = {
+            "job_id": job_id,
+            "kubeconfig": evaluate_model_request_json.kubeconfig,
+            "namespace": StorageConfig.get_current_namespace(),
+            "max_attempts": 360,  # 30 minutes with 5-second intervals
+            "poll_interval": 5,
+            "notification_data": {
+                "instance_id": instance_id,
+                "source_topic": evaluate_model_request_json.source_topic,
+                "source": evaluate_model_request_json.source,
+                "model_name": evaluate_model_request_json.eval_model_info.model_name,
+            },
+        }
+
+        _monitoring_result = yield ctx.call_child_workflow(
+            workflow=EvaluationWorkflow.monitor_job_workflow,
+            input=json.dumps(monitor_workflow_request),
+            instance_id=f"{instance_id}_monitor_{job_id}",
         )
 
         notification_req.payload.event = "monitor_eval_job_progress"
