@@ -214,6 +214,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         #     logger.info("Eval sync is disabled")
         #     eval_sync_task = None
 
+        # Initialize workflow runtime
+        logger.info("Initializing workflow runtime")
+        try:
+            # dapr_workflows.start_workflow_runtime()
+            logger.info("Workflow runtime started successfully")
+        except Exception as e:
+            logger.error(f"Failed to start workflow runtime: {e}")
+            # Don't fail startup if workflow runtime fails to start
+
         logger.info("Background initialization tasks started successfully")
         logger.info("Prepared dataset successfully.")
     except SeederException as e:

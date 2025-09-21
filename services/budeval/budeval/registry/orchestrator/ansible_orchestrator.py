@@ -421,6 +421,9 @@ class AnsibleOrchestrator:
 
             # Parse the Ansible output to extract job status
             job_status = self._parse_job_status_from_ansible_output(result, uuid)
+
+            logger.warning(f"XXX EVAL XXX : Job {uuid} status: {job_status}")
+
             return job_status
 
         except Exception as e:
@@ -638,6 +641,8 @@ class AnsibleOrchestrator:
                             ansible_facts = res.get("ansible_facts", {})
                             job_status = ansible_facts.get("job_status", {})
 
+                            logger.info(f"XXX EVAL XXX Job status: {job_status}")
+
                             if job_status:
                                 status_info.update(job_status)
 
@@ -653,7 +658,13 @@ class AnsibleOrchestrator:
                                     succeeded = 0
                                     failed = 0
 
-                                if succeeded > 0:
+                                # Check phase first for NotFound status
+                                phase = job_status.get("phase", "")
+                                if phase == "NotFound":
+                                    status_info["status"] = "failed"
+                                    status_info["phase"] = "NotFound"
+                                    status_info["message"] = "Job not found in cluster"
+                                elif succeeded > 0:
                                     status_info["status"] = "succeeded"
                                 elif failed > 0:
                                     status_info["status"] = "failed"

@@ -1,6 +1,9 @@
 from typing import Optional, Union
 
-from budmicroframe.commons.schemas import ErrorResponse, WorkflowMetadataResponse
+from budmicroframe.commons.schemas import (
+    ErrorResponse,
+    WorkflowMetadataResponse,
+)
 
 from budeval.commons.logging import logging
 from budeval.evals.kubernetes import KubernetesClusterHandler
@@ -18,7 +21,10 @@ class EvaluationOpsService:
 
     @classmethod
     async def verify_cluster_connection(
-        cls, verify_cluster_connection_request: StartEvaluationRequest, task_id: str, workflow_id: str
+        cls,
+        verify_cluster_connection_request: StartEvaluationRequest,
+        task_id: str,
+        workflow_id: str,
     ):
         """Verify cluster connection."""
         logger.info(f"Verifying cluster connection for workflow_id: {workflow_id} and task_id: {task_id}")
@@ -29,13 +35,18 @@ class EvaluationOpsService:
 
     @classmethod
     async def deploy_eval_job(
-        cls, evaluate_model_request: DeployEvalJobRequest, task_id: str, workflow_id: str
+        cls,
+        evaluate_model_request: DeployEvalJobRequest,
+        task_id: str,
+        workflow_id: str,
     ) -> dict:
         """Deploy evaluation job with persistent volumes."""
         logger.info(f"Deploying evaluation job for workflow_id: {workflow_id} and task_id: {task_id}")
 
         try:
-            from budeval.registry.orchestrator.ansible_orchestrator import AnsibleOrchestrator
+            from budeval.registry.orchestrator.ansible_orchestrator import (
+                AnsibleOrchestrator,
+            )
 
             # Initialize Ansible orchestrator
             ansible_orchestrator = AnsibleOrchestrator()
@@ -106,7 +117,11 @@ class EvaluationOpsService:
 
     @classmethod
     async def deploy_eval_job_with_transformation(
-        cls, evaluate_model_request: DeployEvalJobRequest, transformed_data: dict, task_id: str, workflow_id: str
+        cls,
+        evaluate_model_request: DeployEvalJobRequest,
+        transformed_data: dict,
+        task_id: str,
+        workflow_id: str,
     ) -> dict:
         """Deploy evaluation job using transformed configuration data."""
         logger.info(
@@ -114,7 +129,9 @@ class EvaluationOpsService:
         )
 
         try:
-            from budeval.registry.orchestrator.ansible_orchestrator import AnsibleOrchestrator
+            from budeval.registry.orchestrator.ansible_orchestrator import (
+                AnsibleOrchestrator,
+            )
 
             # Initialize Ansible orchestrator
             ansible_orchestrator = AnsibleOrchestrator()
@@ -142,7 +159,9 @@ class EvaluationOpsService:
                         GenericModelConfig,
                         ModelType,
                     )
-                    from budeval.core.transformers.opencompass_transformer import OpenCompassTransformer
+                    from budeval.core.transformers.opencompass_transformer import (
+                        OpenCompassTransformer,
+                    )
 
                     # Create a generic request from the original request
                     datasets = [
@@ -211,11 +230,19 @@ class EvaluationOpsService:
             }
 
         except Exception as e:
-            logger.error(f"Failed to deploy evaluation job with transformation: {e}", exc_info=True)
+            logger.error(
+                f"Failed to deploy evaluation job with transformation: {e}",
+                exc_info=True,
+            )
             raise e
 
     @classmethod
-    async def get_job_status(cls, job_id: str, kubeconfig: Optional[str], namespace: Optional[str] = None) -> dict:
+    async def get_job_status(
+        cls,
+        job_id: str,
+        kubeconfig: Optional[str],
+        namespace: Optional[str] = None,
+    ) -> dict:
         """Get the status of a deployed evaluation job."""
         logger.info(f"Getting status for job: {job_id}")
 
@@ -226,7 +253,9 @@ class EvaluationOpsService:
             namespace = StorageConfig.get_current_namespace()
 
         try:
-            from budeval.registry.orchestrator.ansible_orchestrator import AnsibleOrchestrator
+            from budeval.registry.orchestrator.ansible_orchestrator import (
+                AnsibleOrchestrator,
+            )
 
             # Initialize Ansible orchestrator
             ansible_orchestrator = AnsibleOrchestrator()
@@ -246,7 +275,12 @@ class EvaluationOpsService:
             return {"job_id": job_id, "status": "error", "error": str(e)}
 
     @classmethod
-    async def cleanup_job(cls, job_id: str, kubeconfig: Optional[str], namespace: Optional[str] = None) -> dict:
+    async def cleanup_job(
+        cls,
+        job_id: str,
+        kubeconfig: Optional[str],
+        namespace: Optional[str] = None,
+    ) -> dict:
         """Clean up a deployed evaluation job and its resources."""
         logger.info(f"Cleaning up job: {job_id}")
 
@@ -257,7 +291,9 @@ class EvaluationOpsService:
             namespace = StorageConfig.get_current_namespace()
 
         try:
-            from budeval.registry.orchestrator.ansible_orchestrator import AnsibleOrchestrator
+            from budeval.registry.orchestrator.ansible_orchestrator import (
+                AnsibleOrchestrator,
+            )
 
             # Initialize Ansible orchestrator
             ansible_orchestrator = AnsibleOrchestrator()
@@ -265,11 +301,19 @@ class EvaluationOpsService:
             # Clean up job resources
             ansible_orchestrator.cleanup_job_resources(job_id, kubeconfig, namespace)
 
-            return {"job_id": job_id, "status": "cleaned_up", "namespace": namespace}
+            return {
+                "job_id": job_id,
+                "status": "cleaned_up",
+                "namespace": namespace,
+            }
 
         except Exception as e:
             logger.error(f"Failed to cleanup job {job_id}: {e}", exc_info=True)
-            return {"job_id": job_id, "status": "cleanup_failed", "error": str(e)}
+            return {
+                "job_id": job_id,
+                "status": "cleanup_failed",
+                "error": str(e),
+            }
 
 
 class EvaluationService:
