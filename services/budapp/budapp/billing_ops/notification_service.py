@@ -186,20 +186,7 @@ class BillingNotificationService:
         message = f"""Your {usage_type} usage has reached {current_usage_percent:.1f}% of your {period_desc} quota.
 
 Current Usage: {value_str} {unit}
-{period_desc.capitalize()} Quota: {quota_str} {unit}
-Billing Plan: {plan_name}
-
-You have reached the {threshold_percent}% threshold you configured for {usage_type} usage alerts."""
-
-        # Add period dates if available
-        if billing_period_start and billing_period_end:
-            message += f"\nBilling Period: {billing_period_start.strftime('%Y-%m-%d')} to {billing_period_end.strftime('%Y-%m-%d')}"
-
-        # Add recommendations based on threshold
-        if threshold_percent >= 90:
-            message += f"\n\n⚠️ Warning: You are approaching your {period_desc} {usage_type} limit. Consider upgrading your plan to avoid service interruptions."
-        elif threshold_percent >= 75:
-            message += f"\n\nℹ️ Tip: Monitor your {usage_type} usage closely to stay within your {period_desc} quota."
+{period_desc.capitalize()} Quota: {quota_str} {unit}."""
 
         return message
 
