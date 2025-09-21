@@ -95,9 +95,28 @@
       register: output_check
       failed_when: output_check.rc != 0
 
-    - name: Display output directory contents
+    - name: Find timestamp directory (OpenCompass format YYYYMMDD_HHMMSS)
+      shell: |
+        kubectl exec {{ job_id }}-extract -n {{ namespace }} \
+        {% if kubeconfig_path is defined %}--kubeconfig {{ kubeconfig_path }}{% endif %} \
+        -- find /workspace/outputs -maxdepth 1 -type d -name "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9]" | head -1
+      register: timestamp_dir_check
+      failed_when: false
+
+    - name: Set timestamp directory variable
+      set_fact:
+        timestamp_dir: "{{ timestamp_dir_check.stdout.split('/')[-1] if timestamp_dir_check.stdout else '' }}"
+
+    - name: Display output directory contents and timestamp
       debug:
-        msg: "Output directory contents: {{ output_check.stdout_lines }}"
+        msg:
+          - "Output directory contents: {{ output_check.stdout_lines }}"
+          - "Found timestamp directory: {{ timestamp_dir if timestamp_dir else 'None found' }}"
+
+    - name: Fail if no timestamp directory found
+      fail:
+        msg: "No timestamp directory found in /workspace/outputs. Expected format: YYYYMMDD_HHMMSS"
+      when: timestamp_dir == ""
 
     - name: Create job-specific extraction directory
       file:
@@ -105,9 +124,9 @@
         state: directory
         mode: '0755'
 
-    - name: Copy results from pod to local filesystem
+    - name: Copy results from pod to local filesystem (timestamp directory)
       shell: |
-        kubectl cp {{ namespace }}/{{ job_id }}-extract:/workspace/outputs \
+        kubectl cp {{ namespace }}/{{ job_id }}-extract:/workspace/outputs/{{ timestamp_dir }} \
         "{{ local_extract_path }}/{{ job_id }}/outputs" \
         {% if kubeconfig_path is defined %}--kubeconfig {{ kubeconfig_path }}{% endif %} \
         --retries={{ kubectl_retries }}
@@ -147,4 +166,15 @@
           local_path: "{{ local_extract_path }}/{{ job_id }}/outputs"
           files_extracted: "{{ copied_files.files | length }}"
           total_size_bytes: "{{ copied_files.files | map(attribute='size') | sum }}"
+          timestamp_dir: "{{ timestamp_dir }}"
           extracted_at: "{{ ansible_date_time.iso8601 | default(ansible_date_time) | default('unknown') }}"
+
+    - name: Output extraction result as JSON
+      debug:
+        msg: "{{ extraction_result | to_json }}"
+
+    - name: Write JSON to file if requested
+      copy:
+        content: "{{ extraction_result | to_nice_json }}"
+        dest: "{{ output_file }}"
+      when: output_file is defined

@@ -103,11 +103,12 @@ class ResultsProcessor:
                     error_msg += f", stderr: {result.stderr.read()}"
                 raise Exception(error_msg)
 
-            extracted_path = f"{local_extract_path}/{job_id}/outputs"
+            extracted_path = f"{local_extract_path}/{job_id}"
 
-            # Verify extraction was successful
-            if not os.path.exists(extracted_path):
-                raise Exception(f"Extraction failed: path {extracted_path} does not exist")
+            # Verify extraction was successful - check for outputs directory
+            outputs_path = f"{extracted_path}/outputs"
+            if not os.path.exists(outputs_path):
+                raise Exception(f"Extraction failed: path {outputs_path} does not exist")
 
             logger.info(f"Successfully extracted results to {extracted_path}")
             return extracted_path
@@ -123,23 +124,29 @@ class ResultsProcessor:
                     kubeconfig_path.unlink()
 
     def _find_timestamp_directory(self, extracted_path: str) -> Optional[str]:
-        """Find the timestamp directory in extracted results.
+        """Find the timestamp directory in extracted results or detect direct outputs structure.
 
         Args:
             extracted_path: Path where results were extracted
 
         Returns:
-            Name of the timestamp directory or None if not found
+            Name of the timestamp directory or "outputs" for direct structure, None if neither found
         """
         try:
             extracted_dir = Path(extracted_path)
             if not extracted_dir.exists():
                 return None
 
-            # Look for directories that match timestamp pattern (YYYYMMDD_HHMMSS)
+            # First, look for directories that match timestamp pattern (YYYYMMDD_HHMMSS) - backward compatibility
             for item in extracted_dir.iterdir():
                 if item.is_dir() and len(item.name) == 15 and "_" in item.name:
                     return item.name
+
+            # If no timestamp directory found, check for direct outputs structure
+            outputs_dir = extracted_dir / "outputs"
+            if outputs_dir.exists() and outputs_dir.is_dir():
+                logger.info(f"Found direct outputs structure in {extracted_path}")
+                return "outputs"
 
             return None
 
@@ -284,12 +291,19 @@ class ResultsProcessor:
         """
         logger.info(f"Processing OpenCompass results for job {job_id}")
 
-        # Find timestamp directory
+        # Find timestamp directory or direct outputs structure
         timestamp_dir = self._find_timestamp_directory(extracted_path)
         if not timestamp_dir:
-            raise Exception(f"No timestamp directory found in {extracted_path}")
+            raise Exception(f"No timestamp directory or outputs structure found in {extracted_path}")
 
-        results_path = Path(extracted_path) / timestamp_dir
+        # Handle both directory formats
+        if timestamp_dir == "outputs":
+            # Direct outputs structure: /extracted_path/outputs/
+            results_path = Path(extracted_path) / timestamp_dir
+        else:
+            # Legacy timestamp structure: /extracted_path/timestamp_dir/
+            # The outputs subdirectory will be found during structure parsing
+            results_path = Path(extracted_path) / timestamp_dir
 
         # Parse directory structure
         structure = self._parse_opencompass_structure(results_path)

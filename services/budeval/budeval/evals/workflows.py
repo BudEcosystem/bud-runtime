@@ -107,6 +107,126 @@ class EvaluationWorkflow:
             )
         return response.model_dump(mode="json")
 
+    @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
+    @staticmethod
+    def monitor_eval_job_simple(
+        ctx: wf.WorkflowActivityContext,
+        monitor_request: str,
+    ) -> dict:
+        """Monitor a job until completion."""
+        logger = logging.getLogger("::EVAL:: Simple Monitor")
+
+        try:
+            request = json.loads(monitor_request)
+            job_id = request["job_id"]
+            kubeconfig = request.get("kubeconfig")
+            namespace = request.get("namespace", "budeval")
+
+            from budeval.registry.orchestrator.ansible_orchestrator import (
+                AnsibleOrchestrator,
+            )
+
+            orchestrator = AnsibleOrchestrator()
+
+            # Get simple status
+            result = orchestrator.get_job_status_simple(job_id, namespace, kubeconfig)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in simple monitoring: {e}", exc_info=True)
+            return {"success": False, "job_status": None, "error": str(e)}
+
+    @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
+    @staticmethod
+    def extract_results_simple(
+        ctx: wf.WorkflowActivityContext,
+        extraction_request: str,
+    ) -> dict:
+        """Extract and process evaluation results using ResultsProcessor."""
+        logger = logging.getLogger("::EVAL:: Extract Results")
+
+        try:
+            request = json.loads(extraction_request)
+            job_id = request["job_id"]
+            model_name = request["model_name"]
+            kubeconfig = request.get("kubeconfig")
+            namespace = request.get("namespace", "budeval")
+            experiment_id = request.get("experiment_id")
+
+            from budeval.evals.results_processor import ResultsProcessor
+
+            logger.info(f"Starting extraction for job {job_id}")
+
+            # Handle async operations with proper event loop management
+            try:
+                asyncio.get_running_loop()
+                # If we're in an existing loop, we need to run in a new thread
+                import concurrent.futures
+
+                def run_in_new_loop():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        # Create processor and extract results
+                        processor = ResultsProcessor()
+                        return new_loop.run_until_complete(
+                            processor.extract_and_process(
+                                job_id=job_id,
+                                model_name=model_name,
+                                namespace=namespace,
+                                kubeconfig=kubeconfig,
+                                experiment_id=experiment_id,
+                            )
+                        )
+                    finally:
+                        new_loop.close()
+
+                # Run in a separate thread with its own event loop
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_new_loop)
+                    results = future.result()
+            except RuntimeError:
+                # No loop running, safe to use asyncio.run()
+                processor = ResultsProcessor()
+                results = asyncio.run(
+                    processor.extract_and_process(
+                        job_id=job_id,
+                        model_name=model_name,
+                        namespace=namespace,
+                        kubeconfig=kubeconfig,
+                        experiment_id=experiment_id,
+                    )
+                )
+
+            logger.info(f"Successfully extracted and processed results for job {job_id}")
+
+            # Return structured response
+            return {
+                "success": True,
+                "job_id": job_id,
+                "extracted_path": results.extraction_path,
+                "files_count": len(results.datasets),
+                "overall_accuracy": results.summary.overall_accuracy,
+                "total_datasets": results.summary.total_datasets,
+                "total_examples": results.summary.total_examples,
+                "total_correct": results.summary.total_correct,
+                "dataset_accuracies": results.summary.dataset_accuracies,
+                "message": f"Extraction completed successfully. {results.summary.total_datasets} datasets processed with {results.summary.overall_accuracy:.2f}% overall accuracy",
+                "results": results.model_dump(),
+            }
+
+        except Exception as e:
+            logger.error(f"Error in extraction and processing: {e}", exc_info=True)
+            return {
+                "success": False,
+                "job_id": request.get("job_id", "unknown"),
+                "extracted_path": "",
+                "files_count": 0,
+                "message": f"Extraction failed: {str(e)}",
+                "error": str(e),
+            }
+
     @dapr_workflows.register_workflow  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
     @staticmethod
     def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
@@ -118,9 +238,9 @@ class EvaluationWorkflow:
         try:
             request_data = json.loads(monitor_request)
             job_id = request_data["job_id"]
-            kubeconfig = request_data["kubeconfig"]
+            # kubeconfig = request_data["kubeconfig"]  # Not used in this function
             _parent_workflow_id = request_data["parent_workflow_id"]
-            namespace = request_data.get("namespace") or StorageConfig.get_current_namespace()
+            # namespace = request_data.get("namespace") or StorageConfig.get_current_namespace()  # Not used in this function
             max_attempts = request_data.get("max_attempts", 360)
             poll_interval = request_data.get("poll_interval", 5)
         except Exception as e:
@@ -128,80 +248,138 @@ class EvaluationWorkflow:
             return {"status": "error", "message": str(e)}
 
         for attempt in range(1, max_attempts + 1):
-            # Check job status
-            monitor_activity_request = {
-                "job_id": job_id,
-                "kubeconfig": kubeconfig,
-                "namespace": namespace,
-            }
-
+            # Monitor job
             monitor_result = yield ctx.call_activity(
-                EvaluationWorkflow.monitor_eval_job_progress,
-                input=json.dumps(monitor_activity_request),
+                EvaluationWorkflow.monitor_eval_job_simple,
+                input=json.dumps(request_data),
             )
 
-            # Check if monitoring activity failed
-            if monitor_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
-                logger.warning(f"Monitoring attempt {attempt} failed: {monitor_result.get('message')}")
-                # Wait before retry
+            if not monitor_result.get("success"):
+                logger.warning(f"Monitoring attempt {attempt} failed")
                 yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
                 continue
 
-            # Extract job status
-            job_status_data = monitor_result.get("param", {})
-            job_status = job_status_data.get("status", "unknown")
-            job_details = job_status_data.get("details", {})
+            job_status = monitor_result.get("job_status", {})
+            status = job_status.get("status", "unknown")
 
-            # Determine if job is complete
-            job_completed = False
-            final_status = None
+            # Check if complete
+            if status in ["succeeded", "failed", "not_found"]:
+                logger.info(f"Job {job_id} completed with status: {status}")
 
-            if job_status in ["completed", "succeeded", "failed", "error"]:
-                job_completed = True
-                final_status = job_status
-            elif job_details:
-                # Check if job was not found (terminal state)
-                job_phase = job_details.get("phase", "")
-                if job_phase == "NotFound":
-                    job_completed = True
-                    final_status = "failed"
-                    logger.warning(f"Job {job_id} not found in cluster - marking as failed")
-                else:
-                    # Check Kubernetes job details
-                    try:
-                        succeeded = int(job_details.get("succeeded", 0))
-                        failed = int(job_details.get("failed", 0))
+                # Extract results if succeeded
+                extraction_result = None
+                if status == "succeeded":
+                    # Get model name from notification data or use default
+                    notification_data = request_data.get("notification_data", {})
+                    model_name = notification_data.get("model_name", "unknown-model")
 
-                        if succeeded > 0:
-                            job_completed = True
-                            final_status = "succeeded"
-                        elif failed > 0:
-                            job_completed = True
-                            final_status = "failed"
-                    except (ValueError, TypeError):
-                        pass
+                    extraction_request = {
+                        "job_id": job_id,
+                        "model_name": model_name,
+                        "kubeconfig": request_data.get("kubeconfig"),
+                        "namespace": request_data.get("namespace", "budeval"),
+                        "experiment_id": notification_data.get("experiment_id"),
+                    }
 
-            # If job completed, return result
-            if job_completed:
-                logger.info(f"Job {job_id} completed with status: {final_status}")
+                    extraction_result = yield ctx.call_activity(
+                        EvaluationWorkflow.extract_results_simple,
+                        input=json.dumps(extraction_request),
+                    )
+
                 return {
                     "status": "completed",
-                    "job_status": final_status,
+                    "job_status": status,
                     "job_id": job_id,
                     "attempts": attempt,
-                    "job_details": job_status_data,
+                    "job_details": job_status,
+                    "extraction_result": extraction_result,
                 }
 
             # Wait before next check
             yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
 
-        # Timeout reached
-        logger.warning(f"Job {job_id} monitoring timed out after {max_attempts} attempts")
+        # Timeout
         return {
             "status": "timeout",
             "job_id": job_id,
-            "message": f"Monitoring timed out after {max_attempts} attempts",
+            "message": f"Timed out after {max_attempts} attempts",
         }
+
+        # for attempt in range(1, max_attempts + 1):
+        #     # Check job status
+        #     monitor_activity_request = {
+        #         "job_id": job_id,
+        #         "kubeconfig": kubeconfig,
+        #         "namespace": namespace,
+        #     }
+
+        #     monitor_result = yield ctx.call_activity(
+        #         EvaluationWorkflow.monitor_eval_job_progress,
+        #         input=json.dumps(monitor_activity_request),
+        #     )
+
+        #     # Check if monitoring activity failed
+        #     if monitor_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
+        #         logger.warning(f"Monitoring attempt {attempt} failed: {monitor_result.get('message')}")
+        #         # Wait before retry
+        #         yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
+        #         continue
+
+        #     # Extract job status
+        #     job_status_data = monitor_result.get("param", {})
+        #     job_status = job_status_data.get("status", "unknown")
+        #     job_details = job_status_data.get("details", {})
+
+        #     # Determine if job is complete
+        #     job_completed = False
+        #     final_status = None
+
+        #     if job_status in ["completed", "succeeded", "failed", "error"]:
+        #         job_completed = True
+        #         final_status = job_status
+        #     elif job_details:
+        #         # Check if job was not found (terminal state)
+        #         job_phase = job_details.get("phase", "")
+        #         if job_phase == "NotFound":
+        #             job_completed = True
+        #             final_status = "failed"
+        #             logger.warning(f"Job {job_id} not found in cluster - marking as failed")
+        #         else:
+        #             # Check Kubernetes job details
+        #             try:
+        #                 succeeded = int(job_details.get("succeeded", 0))
+        #                 failed = int(job_details.get("failed", 0))
+
+        #                 if succeeded > 0:
+        #                     job_completed = True
+        #                     final_status = "succeeded"
+        #                 elif failed > 0:
+        #                     job_completed = True
+        #                     final_status = "failed"
+        #             except (ValueError, TypeError):
+        #                 pass
+
+        #     # If job completed, return result
+        #     if job_completed:
+        #         logger.info(f"Job {job_id} completed with status: {final_status}")
+        #         return {
+        #             "status": "completed",
+        #             "job_status": final_status,
+        #             "job_id": job_id,
+        #             "attempts": attempt,
+        #             "job_details": job_status_data,
+        #         }
+
+        #     # Wait before next check
+        #     yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
+
+        # # Timeout reached
+        # logger.warning(f"Job {job_id} monitoring timed out after {max_attempts} attempts")
+        # return {
+        #     "status": "timeout",
+        #     "job_id": job_id,
+        #     "message": f"Monitoring timed out after {max_attempts} attempts",
+        # }
 
     @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
     @staticmethod
@@ -876,6 +1054,7 @@ class EvaluationWorkflow:
         # Start Monitoring Child Workflow
         monitor_workflow_request = {
             "job_id": job_id,
+            "parent_workflow_id": instance_id,
             "kubeconfig": evaluate_model_request_json.kubeconfig,
             "namespace": StorageConfig.get_current_namespace(),
             "max_attempts": 360,  # 30 minutes with 5-second intervals

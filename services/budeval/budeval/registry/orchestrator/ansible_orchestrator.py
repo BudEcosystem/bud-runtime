@@ -887,6 +887,121 @@ spec:
   backoffLimit: 1
 """
 
+    def run_playbook_json(
+        self,
+        playbook: str,
+        uuid: str,
+        extravars: Dict[str, Any],
+        kubeconfig: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Run an Ansible playbook and return JSON output.
+
+        Args:
+            playbook: Name of the playbook to run
+            uuid: Unique identifier for this run
+            extravars: Extra variables to pass to the playbook
+            kubeconfig: Optional kubeconfig content
+
+        Returns:
+            Dictionary with the JSON output from the playbook
+        """
+        import json
+        import tempfile
+
+        # Add output file for JSON result
+        fd, output_file_name = tempfile.mkstemp(
+            suffix=".json",
+            prefix=f"ansible_output_{uuid}_",
+        )
+        os.close(fd)  # Close the file descriptor
+
+        extravars["output_file"] = output_file_name
+
+        # Handle kubeconfig
+        files = {}
+        if kubeconfig:
+            kube_files, kube_extravars = self._parse_kubeconfig(kubeconfig, uuid)
+            files.update(kube_files)
+            extravars.update(kube_extravars)
+
+        try:
+            # Run the playbook
+            self._run_ansible_playbook(playbook, uuid, files, extravars)
+
+            # Read the JSON output
+            with open(output_file_name, "r") as f:
+                result = json.load(f)
+
+            return result
+
+        finally:
+            # Clean up temp file
+            if os.path.exists(output_file_name):
+                os.unlink(output_file_name)
+
+    def get_job_status_simple(
+        self,
+        job_id: str,
+        namespace: str = "budeval",
+        kubeconfig: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get job status with simple output."""
+        extravars = {
+            "job_name": job_id,
+            "namespace": namespace,
+        }
+
+        try:
+            result = self.run_playbook_json("get_job_status_simple.yml", job_id, extravars, kubeconfig)
+            return result
+        except Exception as e:
+            logger.error(f"Failed to get job status for {job_id}: {e}")
+            return {"success": False, "job_status": None, "error": str(e)}
+
+    def extract_results_simple(
+        self,
+        job_id: str,
+        namespace: str = "budeval",
+        kubeconfig: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Extract results with simple output."""
+        from budeval.commons.storage_config import StorageConfig
+
+        pvc_name = StorageConfig.get_eval_datasets_pvc_name()
+        local_extract_path = "/tmp/eval_extractions"
+
+        extravars = {
+            "job_id": job_id,
+            "namespace": namespace,
+            "pvc_name": pvc_name,
+            "local_extract_path": local_extract_path,
+        }
+
+        try:
+            # Check if extraction playbook exists, if not return simple success
+            playbook_path = self._playbook_dir / "extract_results_simple.yml"
+            if not playbook_path.exists():
+                logger.warning(f"Extraction playbook not found at {playbook_path}, returning placeholder result")
+                return {
+                    "success": True,
+                    "job_id": job_id,
+                    "extracted_path": f"{local_extract_path}/{job_id}/results",
+                    "files_count": 0,
+                    "message": "Extraction playbook not implemented yet",
+                }
+
+            result = self.run_playbook_json("extract_results_simple.yml", job_id, extravars, kubeconfig)
+            return result
+        except Exception as e:
+            logger.error(f"Failed to extract results for {job_id}: {e}")
+            return {
+                "success": False,
+                "job_id": job_id,
+                "extracted_path": None,
+                "files_count": 0,
+                "error": str(e),
+            }
+
     def _render_generic_job_yaml(self, uuid: str, job_config: Dict[str, Any], namespace: str) -> str:
         """Render a generic job YAML from transformer configuration.
 
