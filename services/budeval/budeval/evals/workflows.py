@@ -876,6 +876,7 @@ class EvaluationWorkflow:
         # Start Monitoring Child Workflow
         monitor_workflow_request = {
             "job_id": job_id,
+            "parent_workflow_id": instance_id,
             "kubeconfig": evaluate_model_request_json.kubeconfig,
             "namespace": StorageConfig.get_current_namespace(),
             "max_attempts": 360,  # 30 minutes with 5-second intervals
