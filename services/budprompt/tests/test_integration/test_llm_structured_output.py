@@ -14,13 +14,13 @@ from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
 
-from .dynamic_model_creation import json_schema_to_pydantic_model
+from test_unit_tests.test_structured_output.dynamic_model_creation import json_schema_to_pydantic_model
 
 # Import test models from our test suite
-from .test_supported_types import ComprehensiveTypesModel
-from .test_string_properties import StringPropertiesModel
-from .test_number_properties import NumberPropertiesModel
-from .test_array_properties import ArrayPropertiesModel
+from test_unit_tests.test_structured_output.test_supported_types import ComprehensiveTypesModel
+from test_unit_tests.test_structured_output.test_string_properties import StringPropertiesModel
+from test_unit_tests.test_structured_output.test_number_properties import NumberPropertiesModel
+from test_unit_tests.test_structured_output.test_array_properties import ArrayPropertiesModel
 
 
 # ============================================================================
