@@ -169,58 +169,18 @@ class EvaluationWorkflow:
 
             logger.info(f"Starting extraction for job {job_id}")
 
-            # Handle async operations with proper event loop management
-            try:
-                asyncio.get_running_loop()
-                # If we're in an existing loop, we need to run in a new thread
-                import concurrent.futures
-
-                def run_in_new_loop():
-                    new_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(new_loop)
-                    try:
-                        # Clear any thread-local storage to force new instances
-                        import threading
-
-                        from budeval.evals.storage.factory import (
-                            _clickhouse_storage_by_thread,
-                        )
-
-                        thread_id = threading.get_ident()
-                        if thread_id in _clickhouse_storage_by_thread:
-                            logger.debug(f"Clearing existing ClickHouse storage for thread {thread_id}")
-                            del _clickhouse_storage_by_thread[thread_id]
-
-                        # Create processor and extract results
-                        processor = ResultsProcessor()
-                        return new_loop.run_until_complete(
-                            processor.extract_and_process(
-                                job_id=job_id,
-                                model_name=model_name,
-                                namespace=namespace,
-                                kubeconfig=kubeconfig,
-                                experiment_id=experiment_id,
-                            )
-                        )
-                    finally:
-                        new_loop.close()
-
-                # Run in a separate thread with its own event loop
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(run_in_new_loop)
-                    results = future.result()
-            except RuntimeError:
-                # No loop running, safe to use asyncio.run()
-                processor = ResultsProcessor()
-                results = asyncio.run(
-                    processor.extract_and_process(
-                        job_id=job_id,
-                        model_name=model_name,
-                        namespace=namespace,
-                        kubeconfig=kubeconfig,
-                        experiment_id=experiment_id,
-                    )
+            # Simple async execution - no complex threading needed
+            # The synchronous ClickHouse adapter handles event loop issues
+            processor = ResultsProcessor()
+            results = asyncio.run(
+                processor.extract_and_process(
+                    job_id=job_id,
+                    model_name=model_name,
+                    namespace=namespace,
+                    kubeconfig=kubeconfig,
+                    experiment_id=experiment_id,
                 )
+            )
 
             logger.info(f"Successfully extracted and processed results for job {job_id}")
 
