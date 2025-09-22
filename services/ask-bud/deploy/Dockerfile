@@ -1,4 +1,4 @@
-FROM python:3.11.0
+FROM python:3.11.11
 
 # Install kubectl
 RUN curl -LO "https://dl.k8s.io/release/stable.txt" && \
