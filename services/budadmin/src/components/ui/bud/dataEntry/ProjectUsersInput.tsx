@@ -24,12 +24,13 @@ interface SelectProps {
   classNames?: string;
   rules: FormRule[];
   onChangeScope?: (selectedScope: string) => void;
+  userType?: string;
 }
 
 export default function ProjectUsersInput(props: SelectProps) {
   // Usage of DebounceSelect
   const { users, getUsers } = useUsers();
-  const { name: fieldName } = props;
+  const { name: fieldName, userType } = props;
   const { form } = useContext(BudFormContext);
   const [options, setOptions] = useState([]);
   const [scopes, setScopes] = useState("endpoint:view");
@@ -70,6 +71,7 @@ export default function ProjectUsersInput(props: SelectProps) {
       page: 1,
       limit: 10000,
       search: false,
+      user_type: userType || ''
     });
   }, []);
 

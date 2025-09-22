@@ -117,12 +117,13 @@ export default function ObservabilityPage() {
   }, []); // Run only on mount
 
   // Handle search with debounce
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchInferences(); // Fetch all with current filters
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchValue, fetchInferences]);
+  // useEffect(() => {
+  //   const timer = setTimeout(() => {
+  //     console.log("fetchInferences")
+  //     fetchInferences(); // Fetch all with current filters
+  //   }, 500);
+  //   return () => clearTimeout(timer);
+  // }, [searchValue, fetchInferences]);
 
   // Copy inference ID to clipboard
   const copyToClipboard = (text: string) => {
