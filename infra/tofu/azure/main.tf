@@ -7,7 +7,7 @@ locals {
 
 resource "azurerm_resource_group" "common" {
   name     = var.prefix
-  location = "West US"
+  location = var.region
 }
 
 resource "azurerm_virtual_network" "common" {

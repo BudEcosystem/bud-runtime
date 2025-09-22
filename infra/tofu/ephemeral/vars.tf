@@ -1,5 +1,5 @@
 variable "environment" {
-  default = "dev"
+  default = "stove8s"
 }
 
 variable "zone" {
