@@ -177,7 +177,7 @@ class DataModelGenerator:
 
             try:
                 # Execute the generated code in module context
-                exec(generated_code, module.__dict__)
+                exec(generated_code, module.__dict__)  # nosec B102 - Dynamic Pydantic model generation from JSON schema is required
 
                 # Get the model class by name
                 if not hasattr(module, model_name):

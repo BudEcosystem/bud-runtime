@@ -34,7 +34,7 @@ class TemplateRenderer:
         """Initialize the template renderer with a sandboxed Jinja2 environment."""
         # Create a sandboxed environment for security
         self.env = Environment(
-            autoescape=False,  # We don't need HTML escaping for prompts
+            autoescape=False,  # nosec B701 - HTML escaping not needed for LLM prompts (non-web context)
             trim_blocks=True,  # Remove newline after blocks
             lstrip_blocks=True,  # Remove leading spaces from blocks
         )
