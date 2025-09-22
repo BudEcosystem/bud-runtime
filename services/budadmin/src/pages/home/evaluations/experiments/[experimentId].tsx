@@ -155,11 +155,6 @@ const ExperimentDetailsPage = () => {
     console.log("Experiment Details:", experimentDetails);
   }, [experimentDetails]);
 
-  const handleNewEvaluation = () => {
-    // Navigate to new evaluation flow
-    router.push("/home/evaluations?tab=experiments&action=new");
-  };
-
   if (loading) {
     return (
       <DashBoardLayout>
@@ -250,7 +245,7 @@ const ExperimentDetailsPage = () => {
                 (showAllTags
                   ? experimentDetails.tags
                   : experimentDetails.tags.slice(0, 5)
-                ).map((tag, index) => (
+                ).map((tag: string, index: number) => (
                   <Tags
                     key={index}
                     name={tag}
