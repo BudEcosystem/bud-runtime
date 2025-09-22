@@ -21,7 +21,7 @@ export default function SelectModelForNewEvaluation() {
   const { openDrawerWithStep, drawerProps } = useDrawer();
   const { setSelectedModel, selectedModel, stepFive } =
     usePerfomanceBenchmark();
-  const { createEvaluationWorkflow, currentWorkflow } = useEvaluations();
+  const { createWorkflow, currentWorkflow } = useEvaluations();
 
   useEffect(() => {
     fetchModels({
@@ -63,7 +63,7 @@ export default function SelectModelForNewEvaluation() {
             errorToast("Workflow not found. Please start over.");
             return;
           }
-
+          console.log("currentWorkflow:", currentWorkflow);
           // Get experiment ID from workflow or drawer props
           const experimentId =
             currentWorkflow.experiment_id || drawerProps?.experimentId;
@@ -83,7 +83,7 @@ export default function SelectModelForNewEvaluation() {
           };
 
           // Call the API
-          const response = await createEvaluationWorkflow(
+          const response = await createWorkflow(
             experimentId,
             payload,
           );

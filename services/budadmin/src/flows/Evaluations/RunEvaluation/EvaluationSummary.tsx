@@ -17,7 +17,7 @@ import { Model, useModels } from "src/hooks/useModels";
 
 
 export default function EvaluationSummary() {
-  const { getWorkflowData, workflowData, currentWorkflow, createEvaluationWorkflow } = useEvaluations();
+  const { getWorkflowData, workflowData, currentWorkflow, createWorkflow } = useEvaluations();
   const { getModel, selectedModel: selectedModelFromStore } = useModels();
   const [isLoadingData, setIsLoadingData] = React.useState(true);
   const [evaluations, setEvaluations] = React.useState<Evaluation[]>([]);
@@ -390,7 +390,7 @@ export default function EvaluationSummary() {
           console.log("Triggering evaluation workflow with payload:", payload);
 
           // Call the API to trigger the evaluation
-          const response = await createEvaluationWorkflow(experimentId, payload);
+          const response = await createWorkflow(experimentId, payload);
 
           console.log("Evaluation workflow triggered successfully:", response);
 

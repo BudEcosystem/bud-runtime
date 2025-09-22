@@ -22,7 +22,7 @@ export default function SelectEvaluation() {
     expandedStep,
   } = useDrawer();
   const {
-    createEvaluationWorkflow,
+    createWorkflow,
     currentWorkflow,
     getEvaluations,
     evaluationsList,
@@ -123,7 +123,7 @@ export default function SelectEvaluation() {
           };
 
           // Call the API
-          const response = await createEvaluationWorkflow(
+          const response = await createWorkflow(
             experimentId,
             payload,
           );

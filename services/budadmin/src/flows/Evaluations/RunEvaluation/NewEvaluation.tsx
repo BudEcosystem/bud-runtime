@@ -33,7 +33,7 @@ export default function NewEvaluation() {
   } = useDeployModel();
   const { values, form } = useContext(BudFormContext);
   const router = useRouter();
-  const { createEvaluationWorkflow } = useEvaluations();
+  const { createWorkflow } = useEvaluations();
 
   // Get experiment ID from drawer props
   const experimentId = drawerProps?.experimentId as string;
@@ -62,7 +62,7 @@ export default function NewEvaluation() {
           };
 
           // Call the API
-          const response = await createEvaluationWorkflow(
+          const response = await createWorkflow(
             experimentId,
             payload,
           );
