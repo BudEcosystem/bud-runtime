@@ -106,8 +106,10 @@ interface GuardrailsState {
 
   // Single probe
   selectedProbe: Probe | null;
+  selectedProbes: Probe[]; // Multiple selected probes
   fetchProbeById: (id: string) => Promise<void>;
   setSelectedProbe: (probe: Probe | null) => void;
+  setSelectedProbes: (probes: Probe[]) => void;
   clearSelectedProbe: () => void;
 
   // Selected project for guardrail deployment
@@ -125,7 +127,7 @@ interface GuardrailsState {
 
   // Workflow actions
   createWorkflow: (providerId: string) => Promise<void>;
-  updateWorkflow: (data: Partial<GuardrailsWorkflow>) => Promise<void>;
+  updateWorkflow: (data: Partial<GuardrailsWorkflow>) => Promise<boolean>;
   getWorkflow: (workflowId?: string) => Promise<void>;
   clearWorkflow: () => void;
 
@@ -162,6 +164,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   selectedProviderType: null,
 
   selectedProbe: null,
+  selectedProbes: [], // Initialize empty array for multiple probes
   selectedProject: null,
   selectedDeployment: null,
 
@@ -243,7 +246,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
     set({ probesLoading: true, probesError: null });
 
     try {
-      const response = await AppRequest.Get(`/guardrails/probes/${id}`);
+      const response = await AppRequest.Get(`/guardrails/probe/${id}`);
 
       if (response.data) {
         set({
@@ -297,9 +300,14 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
     set({ selectedProbe: probe });
   },
 
+  // Set multiple selected probes
+  setSelectedProbes: (probes: Probe[]) => {
+    set({ selectedProbes: probes });
+  },
+
   // Clear selected probe
   clearSelectedProbe: () => {
-    set({ selectedProbe: null });
+    set({ selectedProbe: null, selectedProbes: [] });
   },
 
   // Set selected project
@@ -353,12 +361,13 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
     }
   },
 
-  // Update workflow
-  updateWorkflow: async (data: Partial<GuardrailsWorkflow>) => {
+  // Update workflow - returns true on success, false on failure
+  updateWorkflow: async (data: Partial<GuardrailsWorkflow>): Promise<boolean> => {
     const currentWorkflow = get().currentWorkflow;
     if (!currentWorkflow?.workflow_id) {
+      console.error("updateWorkflow: No active workflow found");
       errorToast("No active workflow found");
-      return;
+      return false;
     }
 
     set({ workflowLoading: true, workflowError: null });
@@ -369,25 +378,56 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
         ...data,
       };
 
+      console.log("updateWorkflow: Sending request to /guardrails/deploy-workflow");
       const response = await AppRequest.Post(
         "/guardrails/deploy-workflow",
         payload,
       );
 
-      if (response.data) {
+      console.log("updateWorkflow: Response received:", {
+        status: response?.status,
+        hasData: !!response?.data,
+        dataKeys: response?.data ? Object.keys(response.data) : []
+      });
+
+      // Check for successful response (status 200-299)
+      if (response && response.status >= 200 && response.status < 300 && response.data) {
         set({
           currentWorkflow: response.data,
         });
 
         // Fetch the workflow data after update
         await get().getWorkflow(currentWorkflow.workflow_id);
+
+        console.log("updateWorkflow: ✅ Success with status:", response.status);
+        // Return true to indicate success
+        return true;
       }
+
+      // If we get here, something went wrong
+      const errorMsg = response?.data?.detail || response?.data?.message || "No response data from workflow update";
+      console.error("updateWorkflow: ❌ Failed:", errorMsg, "Status:", response?.status);
+      errorToast(errorMsg);
+      set({ workflowLoading: false });
+      return false;
     } catch (error: any) {
-      errorToast(error?.message || "Failed to update workflow");
+      console.error("updateWorkflow: Caught error:", error);
+
+      const errorMessage = error?.response?.data?.detail ||
+                          error?.response?.data?.message ||
+                          error?.message ||
+                          "Failed to update workflow";
+
+      console.error("updateWorkflow: ❌ Error message:", errorMessage);
+      errorToast(errorMessage);
+
       set({
-        workflowError: error?.message || "Failed to update workflow",
+        workflowError: errorMessage,
         workflowLoading: false,
       });
+
+      // Always return false on error
+      return false;
     } finally {
       // Ensure workflowLoading is always set to false
       set({ workflowLoading: false });
@@ -455,7 +495,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       }
 
       const response = await AppRequest.Get(
-        `/guardrails/probes/${probeId}/rules`,
+        `/guardrails/probe/${probeId}/rules`,
         {
           params: queryParams,
         },
