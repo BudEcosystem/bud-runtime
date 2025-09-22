@@ -40,7 +40,7 @@ const LoginForm = ({ onSubmit, isLoading = false }: LoginPageModalProps) => {
   useEffect(()=> {
     setAuthError("")
   }, [activePage])
-  
+
   useEffect(() => {
     // Check if form is submittable
     const isEmailValid = email.length >= 3 && emailRegex.test(email);
