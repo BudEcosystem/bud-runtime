@@ -10,7 +10,7 @@ import { Text_14_400_EEEEEE, Text_16_600_FFFFFF } from "@/components/ui/text";
 export default function DeployingProbe() {
   const { openDrawerWithStep } = useDrawer();
   const [progress, setProgress] = useState(0);
-  const [remainingTime, setRemainingTime] = useState(30); // 30 secs
+  const [remainingTime, setRemainingTime] = useState(5); // 30 secs
   const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
