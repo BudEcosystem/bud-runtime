@@ -169,21 +169,173 @@ pub async fn analytics_middleware(
 
 /// Extract client IP from headers only (when ConnectInfo is not available)
 fn get_client_ip_fallback(headers: &HeaderMap) -> String {
+    use std::net::IpAddr;
+
+
+    // First check for custom headers from BudPlayground (these won't be modified by proxies)
+    // Priority 1: X-Playground-Client-IP (contains the original header chain)
+    if let Some(playground_ip) = headers.get("x-playground-client-ip") {
+        if let Ok(ip_str) = playground_ip.to_str() {
+            tracing::debug!("Found X-Playground-Client-IP header: {}", ip_str);
+            // Split and find first public IP if it's a chain
+            let ips: Vec<&str> = ip_str.split(',').map(|s| s.trim()).collect();
+            for ip in &ips {
+                if let Ok(parsed_ip) = ip.parse::<IpAddr>() {
+                    // Check if it's a public IP
+                    let is_private = match parsed_ip {
+                        IpAddr::V4(ipv4) => {
+                            ipv4.is_private() ||
+                            ipv4.is_loopback() ||
+                            ipv4.is_link_local() ||
+                            ipv4.is_unspecified() ||
+                            ipv4.octets()[0] == 10 ||
+                            (ipv4.octets()[0] == 172 && ipv4.octets()[1] >= 16 && ipv4.octets()[1] <= 31) ||
+                            (ipv4.octets()[0] == 192 && ipv4.octets()[1] == 168)
+                        },
+                        IpAddr::V6(ipv6) => {
+                            ipv6.is_loopback() ||
+                            ipv6.is_unspecified() ||
+                            (ipv6.segments()[0] & 0xfe00) == 0xfc00
+                        }
+                    };
+
+                    if !is_private {
+                        tracing::debug!("Using public IP from X-Playground-Client-IP: {}", ip);
+                        return ip.to_string();
+                    } else {
+                        tracing::debug!("Skipping private IP in X-Playground-Client-IP: {}", ip);
+                    }
+                }
+            }
+        }
+    }
+
+    // Priority 2: X-Original-Client-IP (fallback if X-Playground-Client-IP not available)
+    if let Some(original_client_ip) = headers.get("x-original-client-ip") {
+        if let Ok(ip_str) = original_client_ip.to_str() {
+            tracing::debug!("Found X-Original-Client-IP header: {}", ip_str);
+            // Split and find first public IP if it's a chain
+            let ips: Vec<&str> = ip_str.split(',').map(|s| s.trim()).collect();
+            for ip in &ips {
+                if let Ok(parsed_ip) = ip.parse::<IpAddr>() {
+                    // Check if it's a public IP
+                    let is_private = match parsed_ip {
+                        IpAddr::V4(ipv4) => {
+                            ipv4.is_private() ||
+                            ipv4.is_loopback() ||
+                            ipv4.is_link_local() ||
+                            ipv4.is_unspecified() ||
+                            ipv4.octets()[0] == 10 ||
+                            (ipv4.octets()[0] == 172 && ipv4.octets()[1] >= 16 && ipv4.octets()[1] <= 31) ||
+                            (ipv4.octets()[0] == 192 && ipv4.octets()[1] == 168)
+                        },
+                        IpAddr::V6(ipv6) => {
+                            ipv6.is_loopback() ||
+                            ipv6.is_unspecified() ||
+                            (ipv6.segments()[0] & 0xfe00) == 0xfc00
+                        }
+                    };
+
+                    if !is_private {
+                        tracing::debug!("Using public IP from X-Original-Client-IP: {}", ip);
+                        return ip.to_string();
+                    } else {
+                        tracing::debug!("Skipping private IP in X-Original-Client-IP: {}", ip);
+                    }
+                }
+            }
+        }
+    }
+
+    // Helper function to check if an IP is private/local
+    let is_private_ip = |ip_str: &str| -> bool {
+        if let Ok(ip) = ip_str.parse::<IpAddr>() {
+            match ip {
+                IpAddr::V4(ipv4) => {
+                    ipv4.is_private() ||
+                    ipv4.is_loopback() ||
+                    ipv4.is_link_local() ||
+                    ipv4.is_unspecified() ||
+                    // Check for Docker/Kubernetes internal IPs
+                    ipv4.octets()[0] == 10 ||  // 10.0.0.0/8
+                    (ipv4.octets()[0] == 172 && ipv4.octets()[1] >= 16 && ipv4.octets()[1] <= 31) || // 172.16.0.0/12
+                    (ipv4.octets()[0] == 192 && ipv4.octets()[1] == 168) // 192.168.0.0/16
+                },
+                IpAddr::V6(ipv6) => {
+                    ipv6.is_loopback() ||
+                    ipv6.is_unspecified() ||
+                    // fc00::/7 - Unique local addresses
+                    (ipv6.segments()[0] & 0xfe00) == 0xfc00
+                }
+            }
+        } else {
+            false
+        }
+    };
+
     // Check X-Forwarded-For first
     if let Some(forwarded_for) = headers.get("x-forwarded-for") {
         if let Ok(forwarded_str) = forwarded_for.to_str() {
             tracing::debug!("Found X-Forwarded-For header: {}", forwarded_str);
-            // X-Forwarded-For can contain multiple IPs, take the first one
-            if let Some(first_ip) = forwarded_str.split(',').next() {
-                return first_ip.trim().to_string();
+
+            // X-Forwarded-For can contain multiple IPs, find the first public IP
+            let ips: Vec<&str> = forwarded_str.split(',').map(|s| s.trim()).collect();
+
+            // Try to find the first public IP in the chain
+            for ip in &ips {
+                if !is_private_ip(ip) {
+                    tracing::debug!("Found public IP in X-Forwarded-For: {}", ip);
+                    return ip.to_string();
+                } else {
+                    tracing::debug!("Skipping private IP: {}", ip);
+                }
             }
+
+            // If all IPs are private, use the first one as fallback
+            if let Some(first_ip) = ips.first() {
+                tracing::debug!("No public IP found in X-Forwarded-For, using first IP: {}", first_ip);
+                return first_ip.to_string();
+            }
+        } else {
+            tracing::warn!("X-Forwarded-For header present but invalid: {:?}", forwarded_for);
         }
+    } else {
+        tracing::debug!("X-Forwarded-For header: not present");
     }
 
     // Check X-Real-IP
     if let Some(real_ip) = headers.get("x-real-ip") {
         if let Ok(ip_str) = real_ip.to_str() {
             tracing::debug!("Found X-Real-IP header: {}", ip_str);
+            if !is_private_ip(ip_str) {
+                tracing::debug!("Using public IP from X-Real-IP: {}", ip_str);
+                return ip_str.to_string();
+            } else {
+                tracing::debug!("X-Real-IP contains private IP, skipping: {}", ip_str);
+            }
+        } else {
+            tracing::warn!("X-Real-IP header present but invalid: {:?}", real_ip);
+        }
+    } else {
+        tracing::debug!("X-Real-IP header: not present");
+    }
+
+    // Check CF-Connecting-IP (Cloudflare)
+    if let Some(cf_ip) = headers.get("cf-connecting-ip") {
+        if let Ok(ip_str) = cf_ip.to_str() {
+            tracing::debug!("Found CF-Connecting-IP header: {}", ip_str);
+            // Cloudflare headers should always contain public IPs
+            tracing::debug!("Using IP from CF-Connecting-IP: {}", ip_str);
+            return ip_str.to_string();
+        }
+    }
+
+    // Check True-Client-IP (Cloudflare Enterprise)
+    if let Some(true_client_ip) = headers.get("true-client-ip") {
+        if let Ok(ip_str) = true_client_ip.to_str() {
+            tracing::debug!("Found True-Client-IP header: {}", ip_str);
+            // Cloudflare headers should always contain public IPs
+            tracing::debug!("Using IP from True-Client-IP: {}", ip_str);
             return ip_str.to_string();
         }
     }

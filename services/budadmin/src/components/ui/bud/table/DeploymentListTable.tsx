@@ -240,7 +240,7 @@ function DeploymentListTable() {
                                             permission={hasPermission(PermissionEnum.ModelManage)}
                                             onClick={async (event) => {
                                                 event.stopPropagation();
-                                                await getEndpointClusterDetails(record.id, projectId as string);
+                                                // await getEndpointClusterDetails(record.id, projectId as string);
                                                 openDrawer('publish', { endpoint: record });
                                             }}
                                         >

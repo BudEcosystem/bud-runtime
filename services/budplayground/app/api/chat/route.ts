@@ -38,27 +38,11 @@ export async function POST(req: Request) {
     clientIp = xRealIp;
   }
 
-  // Enhanced logging for debugging IP forwarding
-  console.log('========== BUDPLAYGROUND IP FORWARDING DEBUG ==========');
-  console.log(`[BUDPLAYGROUND] Incoming request headers:`);
-  console.log(req.headers);
-  console.log(`  - X-Forwarded-For: ${xForwardedFor || 'not present'}`);
-  console.log(`  - X-Real-IP: ${xRealIp || 'not present'}`);
-  console.log(`  - CF-Connecting-IP: ${cfConnectingIp || 'not present'}`);
-  console.log(`  - True-Client-IP: ${trueClientIp || 'not present'}`);
-  console.log(`[BUDPLAYGROUND] Forwarding strategy: Pass entire chain to budgateway`);
-  console.log(`[BUDPLAYGROUND] Will forward to budgateway with:`);
-  console.log(`  - X-Forwarded-For: ${clientIp}`);
-  console.log(`  - X-Real-IP: ${xRealIp || clientIp}`);
-  console.log('[BUDPLAYGROUND] Note: BudGateway will extract the first public IP from the chain');
-  console.log('========================================================');
-
   // Accept either JWT (Bearer token) or API key
   if (!authorization && !apiKey) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  console.log(metadata.base_url || copyCodeApiBaseUrl)
   const proxyOpenAI = createOpenAI({
     // custom settings, e.g.
     baseURL: metadata.base_url || copyCodeApiBaseUrl,
@@ -77,7 +61,10 @@ export async function POST(req: Request) {
           // Pass the entire chain for X-Forwarded-For so budgateway can find the public IP
           'X-Forwarded-For': clientIp,
           // For X-Real-IP, prefer the original value if present, otherwise use clientIp
-          'X-Real-IP': xRealIp || clientIp
+          'X-Real-IP': xRealIp || clientIp,
+          // Add custom headers that won't be modified by intermediate proxies
+          'X-Original-Client-IP': clientIp,
+          'X-Playground-Client-IP': xForwardedFor || xRealIp || cfConnectingIp || trueClientIp || 'unknown'
         },
         body: JSON.stringify({
           id,
@@ -101,15 +88,6 @@ export async function POST(req: Request) {
           }
         })
       }
-      // Enhanced logging to show exactly what's being sent to budgateway
-      console.log('========== BUDPLAYGROUND -> BUDGATEWAY REQUEST ==========');
-      console.log(`[BUDPLAYGROUND] Sending to URL: ${input}`);
-      console.log(`[BUDPLAYGROUND] Headers being sent:`);
-      console.log(`  - X-Forwarded-For: ${request.headers['X-Forwarded-For']}`);
-      console.log(`  - X-Real-IP: ${request.headers['X-Real-IP']}`);
-      console.log(`  - project-id: ${request.headers['project-id']}`);
-      console.log('==========================================================');
-
       return fetch(input, request);
     }
   });

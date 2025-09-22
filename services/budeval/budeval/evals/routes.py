@@ -369,3 +369,186 @@ async def get_evaluation_scores(evaluation_id: str):
     except Exception as e:
         logger.error(f"Failed to get evaluation scores for {evaluation_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to retrieve evaluation scores: {str(e)}") from e
+
+
+@evals_routes.get("/internal/workflows/instances")
+async def list_workflow_instances():
+    """List all workflow instances.
+
+    Returns:
+        list: List of workflow instances with their status and metadata
+    """
+    try:
+        # Import the workflow client directly from dapr
+        from dapr.ext.workflow import DaprWorkflowClient
+
+        # Create a new workflow client instance
+        workflow_client = DaprWorkflowClient()
+
+        # List all workflow instances
+        instances = workflow_client.list_instances()
+
+        # Convert to dict format for JSON serialization
+        return [
+            {
+                "instance_id": instance.instance_id,
+                "workflow_name": instance.workflow_name,
+                "runtime_status": instance.runtime_status.name
+                if hasattr(instance.runtime_status, "name")
+                else str(instance.runtime_status),
+                "created_at": instance.created_at.isoformat() if instance.created_at else None,
+                "last_updated": instance.last_updated.isoformat() if instance.last_updated else None,
+                "serialized_input": instance.serialized_input[:200] + "..."
+                if instance.serialized_input and len(instance.serialized_input) > 200
+                else instance.serialized_input,
+                "serialized_output": instance.serialized_output[:200] + "..."
+                if instance.serialized_output and len(instance.serialized_output) > 200
+                else instance.serialized_output,
+                "serialized_custom_status": instance.serialized_custom_status,
+            }
+            for instance in instances
+        ]
+
+    except Exception as e:
+        logger.error(f"Failed to list workflow instances: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to list workflow instances: {str(e)}") from e
+
+
+@evals_routes.post("/internal/workflows/{instance_id}/terminate")
+async def terminate_workflow(instance_id: str):
+    """Terminate a specific workflow instance.
+
+    Args:
+        instance_id (str): The workflow instance ID to terminate
+
+    Returns:
+        dict: Termination status
+    """
+    try:
+        from dapr.ext.workflow import DaprWorkflowClient
+
+        workflow_client = DaprWorkflowClient()
+
+        # Terminate the workflow
+        workflow_client.terminate_workflow(instance_id, output=None)
+
+        return {"status": "success", "message": f"Workflow {instance_id} terminated successfully"}
+
+    except Exception as e:
+        logger.error(f"Failed to terminate workflow {instance_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to terminate workflow: {str(e)}") from e
+
+
+@evals_routes.post("/internal/workflows/{instance_id}/purge")
+async def purge_workflow(instance_id: str):
+    """Purge a specific workflow instance (removes it from history).
+
+    Args:
+        instance_id (str): The workflow instance ID to purge
+
+    Returns:
+        dict: Purge status
+    """
+    try:
+        from dapr.ext.workflow import DaprWorkflowClient
+
+        workflow_client = DaprWorkflowClient()
+
+        # Purge the workflow
+        workflow_client.purge_workflow(instance_id)
+
+        return {"status": "success", "message": f"Workflow {instance_id} purged successfully"}
+
+    except Exception as e:
+        logger.error(f"Failed to purge workflow {instance_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to purge workflow: {str(e)}") from e
+
+
+@evals_routes.post("/internal/workflows/terminate-all")
+async def terminate_all_workflows():
+    """Terminate all running workflow instances.
+
+    Returns:
+        dict: Termination status with count of terminated workflows
+    """
+    try:
+        from dapr.ext.workflow import DaprWorkflowClient
+
+        workflow_client = DaprWorkflowClient()
+
+        # List all instances
+        instances = workflow_client.list_instances()
+
+        terminated_count = 0
+        errors = []
+
+        for instance in instances:
+            try:
+                # Only terminate running workflows
+                if hasattr(instance, "runtime_status") and str(instance.runtime_status).lower() in [
+                    "running",
+                    "pending",
+                    "suspended",
+                ]:
+                    workflow_client.terminate_workflow(instance.instance_id, output="Terminated by admin")
+                    terminated_count += 1
+                    logger.info(f"Terminated workflow: {instance.instance_id}")
+            except Exception as e:
+                error_msg = f"Failed to terminate {instance.instance_id}: {str(e)}"
+                errors.append(error_msg)
+                logger.error(error_msg)
+
+        result = {
+            "status": "success",
+            "terminated_count": terminated_count,
+            "message": f"Terminated {terminated_count} workflow(s)",
+        }
+
+        if errors:
+            result["errors"] = errors
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to terminate all workflows: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to terminate workflows: {str(e)}") from e
+
+
+@evals_routes.post("/internal/workflows/purge-all")
+async def purge_all_workflows():
+    """Purge all workflow instances (removes them from history).
+
+    Returns:
+        dict: Purge status with count of purged workflows
+    """
+    try:
+        from dapr.ext.workflow import DaprWorkflowClient
+
+        workflow_client = DaprWorkflowClient()
+
+        # List all instances
+        instances = workflow_client.list_instances()
+
+        purged_count = 0
+        errors = []
+
+        for instance in instances:
+            try:
+                workflow_client.purge_workflow(instance.instance_id)
+                purged_count += 1
+                logger.info(f"Purged workflow: {instance.instance_id}")
+            except Exception as e:
+                error_msg = f"Failed to purge {instance.instance_id}: {str(e)}"
+                errors.append(error_msg)
+                logger.error(error_msg)
+
+        result = {"status": "success", "purged_count": purged_count, "message": f"Purged {purged_count} workflow(s)"}
+
+        if errors:
+            result["errors"] = errors
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to purge all workflows: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to purge workflows: {str(e)}") from e

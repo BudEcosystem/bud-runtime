@@ -20,7 +20,7 @@ import {
 export default function BudSentinelProbes() {
   const { openDrawerWithStep, openDrawerWithExpandedStep } = useDrawer();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedProbe, setSelectedProbe] = useState<string | null>(null);
+  const [selectedProbes, setSelectedProbes] = useState<string[]>([]);
   const [activeFilter, setActiveFilter] = useState<"all" | "pii" | "bias">(
     "all",
   );
@@ -34,9 +34,11 @@ export default function BudSentinelProbes() {
     totalProbes,
     fetchProbeById,
     setSelectedProbe: setSelectedProbeInStore,
+    setSelectedProbes: setSelectedProbesInStore,
     updateWorkflow,
     workflowLoading,
     selectedProvider,
+    currentWorkflow,
   } = useGuardrails();
 
   // Fetch probes on component mount and when search changes
@@ -82,43 +84,60 @@ export default function BudSentinelProbes() {
   };
 
   const handleNext = async () => {
-    if (!selectedProbe) {
+    if (selectedProbes.length === 0) {
       return;
     }
 
-    // Check if selected probe is a PII probe
-    const selectedProbeObject = probes.find((p) => p.id === selectedProbe);
+    // Get the selected probe objects
+    const selectedProbeObjects = probes.filter((p) => selectedProbes.includes(p.id));
 
-    if (selectedProbeObject) {
-      // Save the selected probe to the store
-      setSelectedProbeInStore(selectedProbeObject);
+    if (selectedProbeObjects.length > 0) {
+      // Save the first selected probe to the store (for backward compatibility)
+      setSelectedProbeInStore(selectedProbeObjects[0]);
+      // Save all selected probes for the PIIDetectionConfig
+      setSelectedProbesInStore(selectedProbeObjects);
 
       try {
-        // Update workflow with selected probe
-        await updateWorkflow({
+        // Build the payload with data from previous step
+        const payload: any = {
           step_number: 2,
-          probe_selections: [
-            {
-              id: selectedProbe,
-              enabled: true,
-            },
-          ],
+          probe_selections: selectedProbes.map(probeId => ({
+            id: probeId,
+          })),
           trigger_workflow: false,
-        });
+        };
 
-        const isPIIProbe =
-          selectedProbeObject.name
+        // Include workflow_id if available
+        if (currentWorkflow?.workflow_id) {
+          payload.workflow_id = currentWorkflow.workflow_id;
+        }
+
+        // Include provider data from previous step
+        if (selectedProvider?.id) {
+          payload.provider_id = selectedProvider.id;
+        }
+        if (selectedProvider?.provider_type) {
+          payload.provider_type = selectedProvider.provider_type;
+        }
+
+        // Update workflow with selected probes and provider data
+        await updateWorkflow(payload);
+
+        // Check if any selected probe is a PII probe
+        const hasPIIProbe = selectedProbeObjects.some(probe =>
+          probe.name
             ?.toLowerCase()
             .includes("personal identifier") ||
-          selectedProbeObject.name?.toLowerCase().includes("pii") ||
-          selectedProbeObject.tags?.some(
+          probe.name?.toLowerCase().includes("pii") ||
+          probe.tags?.some(
             (tag) =>
               tag.name.toLowerCase().includes("dlp") ||
               tag.name.toLowerCase().includes("personal"),
-          );
+          )
+        );
 
         // Navigate to specific configuration page based on selection
-        if (isPIIProbe) {
+        if (hasPIIProbe) {
           // PII Detection selected - go to PII configuration page
           openDrawerWithStep("pii-detection-config");
         } else {
@@ -132,7 +151,13 @@ export default function BudSentinelProbes() {
   };
 
   const toggleProbeSelection = (probeId: string) => {
-    setSelectedProbe((prev) => (prev === probeId ? null : probeId));
+    setSelectedProbes((prev) => {
+      if (prev.includes(probeId)) {
+        return prev.filter((id) => id !== probeId);
+      } else {
+        return [...prev, probeId];
+      }
+    });
   };
 
   const handleSeeMore = async (probe: any, event: React.MouseEvent) => {
@@ -206,7 +231,7 @@ export default function BudSentinelProbes() {
       onNext={handleNext}
       backText="Back"
       nextText="Next"
-      disableNext={!selectedProbe || workflowLoading}
+      disableNext={selectedProbes.length === 0 || workflowLoading}
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -286,7 +311,7 @@ export default function BudSentinelProbes() {
                       <div>
                         {categoryProbes.map((probe) => {
                           const isHovered = hoveredProbe === probe.id;
-                          const isSelected = selectedProbe === probe.id;
+                          const isSelected = selectedProbes.includes(probe.id);
 
                           return (
                             <div

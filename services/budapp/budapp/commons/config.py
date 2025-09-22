@@ -153,6 +153,7 @@ class AppConfig(BaseAppConfig):
 
     # Frontend URL
     frontend_url: AnyUrl = Field(alias="FRONTEND_URL", default="http://localhost:3000")
+    admin_frontend_url: AnyUrl = Field(alias="ADMIN_FRONTEND_URL", default="http://localhost:3002")
 
     # OAuth Settings
     use_http_only_oauth: bool = Field(False, alias="USE_HTTP_ONLY_OAUTH")

@@ -22,6 +22,10 @@ interface BenchmarkProgressProps {
     averageScore: number;
     status: "Running" | "Completed";
     progress: number;
+    progressCompleted?: number;
+    progressTotal?: number;
+    canPause?: boolean;
+    pauseUrl?: string;
   };
 }
 
@@ -41,12 +45,17 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
     <div className="bg-[#101010] rounded-lg px-[1.5rem] py-[1.2rem] border border-[#1F1F1F]">
       <div className="flex justify-between items-start mb-[0.85rem]">
         <Text_14_400_EEEEEE className="">{benchmark.title}</Text_14_400_EEEEEE>
-        <PrimaryButton
-          classNames="!px-[.55] !py-1 !text-xs mt-[.3rem]"
-          onClick={() => {}}
-        >
-          || Pause
-        </PrimaryButton>
+        {benchmark.status === "Running" && benchmark.canPause && (
+          <PrimaryButton
+            classNames="!px-[.55] !py-1 !text-xs mt-[.3rem]"
+            onClick={() => {
+              // TODO: Implement pause functionality using pauseUrl
+              console.log("Pausing run:", benchmark.pauseUrl);
+            }}
+          >
+            || Pause
+          </PrimaryButton>
+        )}
       </div>
       <div className="">
         <div className="flex items-center justify-start gap-x-[.3rem] mb-[0.7rem]">
@@ -77,7 +86,7 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
               />
             </div>
             <Text_10_400_B3B3B3 className="leading-[140%]">
-              {benchmark.progress}% 013/024 completed
+              {benchmark.progress}% {benchmark.progressCompleted ?? '013'}/{benchmark.progressTotal ?? '024'} completed
             </Text_10_400_B3B3B3>
           </div>
         </div>
