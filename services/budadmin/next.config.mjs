@@ -145,7 +145,7 @@ export default {
       },
       {
         source: '/evaluations/:evaluationId',
-        destination: '/home/evaluations/evalDetailed',
+        destination: '/home/evaluations/evalDetailed/[evaluationId]',
       },
       {
         source: '/guardrails',
