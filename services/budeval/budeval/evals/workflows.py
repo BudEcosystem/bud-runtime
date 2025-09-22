@@ -191,12 +191,12 @@ class EvaluationWorkflow:
                 "extracted_path": results.extraction_path,
                 "files_count": len(results.datasets),
                 "overall_accuracy": results.summary.overall_accuracy,
-                "total_datasets": results.summary.total_datasets,
-                "total_examples": results.summary.total_examples,
-                "total_correct": results.summary.total_correct,
+                # "total_datasets": results.summary.total_datasets,
+                # "total_examples": results.summary.total_examples,
+                # "total_correct": results.summary.total_correct,
                 "dataset_accuracies": results.summary.dataset_accuracies,
                 "message": f"Extraction completed successfully. {results.summary.total_datasets} datasets processed with {results.summary.overall_accuracy:.2f}% overall accuracy",
-                "results": results.model_dump(),
+                # "results": results.model_dump(),
             }
 
         except Exception as e:
@@ -254,7 +254,8 @@ class EvaluationWorkflow:
             # Continue with next attempt using continue_as_new to reset timer history
             request_data["attempt"] = attempt + 1
             yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
-            return ctx.continue_as_new(json.dumps(request_data))
+            ctx.continue_as_new(json.dumps(request_data))
+            return
 
         # Check job status
         job_status = monitor_result.get("job_status", {})
@@ -290,7 +291,15 @@ class EvaluationWorkflow:
                 "job_id": job_id,
                 "attempts": attempt,
                 "job_details": job_status,
-                "extraction_result": extraction_result,
+                "extraction_summary": {
+                    "success": extraction_result.get("success", False),
+                    "overall_accuracy": extraction_result.get("overall_accuracy", 0.0),
+                    "total_datasets": extraction_result.get("total_datasets", 0),
+                    "total_examples": extraction_result.get("total_examples", 0),
+                    "message": extraction_result.get("message", ""),
+                }
+                if extraction_result
+                else None,
             }
 
         # Job still running - check if we should timeout
@@ -305,7 +314,8 @@ class EvaluationWorkflow:
         # This prevents replay storm by resetting workflow history
         request_data["attempt"] = attempt + 1
         yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
-        return ctx.continue_as_new(json.dumps(request_data))
+        ctx.continue_as_new(json.dumps(request_data))
+        return
 
     @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
     @staticmethod
@@ -1050,9 +1060,14 @@ class EvaluationWorkflow:
                     status=WorkflowStatus.COMPLETED,
                 )
 
-                # Check if results were extracted
-                if _monitoring_result.get("extraction_result", {}).get("success"):
-                    notification_req.payload.content.message += " - Results extracted successfully"
+                # Check if extraction was successful using summary
+                extraction_summary = _monitoring_result.get("extraction_summary", {})
+                if extraction_summary and extraction_summary.get("success"):
+                    accuracy = extraction_summary.get("overall_accuracy", 0.0)
+                    datasets = extraction_summary.get("total_datasets", 0)
+                    notification_req.payload.content.message += (
+                        f" - Results extracted: {datasets} datasets, {accuracy:.2f}% accuracy"
+                    )
 
             elif job_status == "failed":
                 # Failure notification
@@ -1116,14 +1131,28 @@ class EvaluationWorkflow:
         )
 
         # Result Notification - Always send results regardless of status
-        extraction_result = _monitoring_result.get("extraction_result", {})
+        extraction_summary = (
+            _monitoring_result.get("extraction_summary", {}) if _monitoring_result.get("status") == "completed" else {}
+        )
 
         notification_req.payload.event = "results"
         notification_req.payload.content = NotificationContent(
             title="Evaluation Results",
-            message=extraction_result.get("message", "Evaluation completed"),
+            message=extraction_summary.get("message", "Evaluation completed"),
             status=final_status,
-            result=extraction_result if extraction_result else {},
+            result={
+                "job_id": job_id,
+                "status": _monitoring_result.get("job_status", "unknown"),
+                "storage": "clickhouse",
+                "summary": {
+                    "overall_accuracy": extraction_summary.get("overall_accuracy", 0.0),
+                    "total_datasets": extraction_summary.get("total_datasets", 0),
+                    "total_examples": extraction_summary.get("total_examples", 0),
+                }
+                if extraction_summary
+                else {},
+                "retrieval_info": f"Use job_id '{job_id}' to retrieve full results from ClickHouse",
+            },
         )
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
