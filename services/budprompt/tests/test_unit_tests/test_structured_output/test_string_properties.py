@@ -7,8 +7,8 @@ import sys
 import os
 
 import pytest
-from pydantic import BaseModel, Field, ValidationError, EmailStr, constr, IPvAnyAddress
-from ipaddress import IPv4Address, IPv6Address
+from pydantic import BaseModel, Field, ValidationError, EmailStr, constr
+from pydantic.networks import IPv4Address, IPv6Address
 from datetime import datetime, date, time, timedelta
 from typing import Optional
 from .dynamic_model_creation import json_schema_to_pydantic_model
@@ -39,8 +39,8 @@ class StringPropertiesModel(BaseModel):
 
     # Network formats
     hostname: constr(pattern=r'^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$') = Field(description="Valid hostname")
-    ipv4_address: IPvAnyAddress = Field(description="IPv4 address")
-    ipv6_address: IPvAnyAddress = Field(description="IPv6 address")
+    ipv4_address: IPv4Address = Field(description="IPv4 address")
+    ipv6_address: IPv6Address = Field(description="IPv6 address")
 
     # Optional fields for testing null handling
     optional_email: Optional[EmailStr] = None

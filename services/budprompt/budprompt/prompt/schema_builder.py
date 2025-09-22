@@ -27,7 +27,8 @@ from typing import Any, Dict, ForwardRef, List, Literal, Optional, Type, Union
 
 from budmicroframe.commons import logging
 from datamodel_code_generator import DataModelType, InputFileType, generate
-from pydantic import BaseModel, EmailStr, IPvAnyAddress, confloat, conint, conlist, constr, create_model
+from pydantic import BaseModel, EmailStr, confloat, conint, conlist, constr, create_model
+from pydantic.networks import IPv4Address, IPv6Address
 
 from budprompt.commons.exceptions import SchemaGenerationException
 
@@ -224,9 +225,8 @@ FORMAT_TYPE_MAP = {
     "time": time,
     "duration": timedelta,
     "uuid": uuid.UUID,
-    "ipv4": IPvAnyAddress,
-    "ipv6": IPvAnyAddress,
-    "ipvanyaddress": IPvAnyAddress,
+    "ipv4": IPv4Address,
+    "ipv6": IPv6Address,
     "hostname": str,  # Will use pattern validation
 }
 
