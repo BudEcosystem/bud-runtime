@@ -236,11 +236,11 @@ function LoginContent() {
 
         // Get user data - commenting out for now as it causes 404 errors
         // TODO: Fix the /users/me endpoint or handle the error gracefully
-        try {
-          await getUser();
-        } catch (error) {
-          console.log("Failed to get user data, continuing anyway:", error);
-        }
+        // try {
+        //   await getUser();
+        // } catch (error) {
+        //   console.log("Failed to get user data, continuing anyway:", error);
+        // }
 
         // Log the response to debug
         console.log("Login response data:", {
