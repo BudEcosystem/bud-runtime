@@ -163,7 +163,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/services/budprompt
         run: |
           echo "::group::Running structured output tests with coverage"
-          pytest tests/test_unit_tests/test_structured_output/ \
+          pytest tests/test_unit_tests/ \
             --cov=budprompt \
             --cov-report=xml \
             --cov-report=html \
