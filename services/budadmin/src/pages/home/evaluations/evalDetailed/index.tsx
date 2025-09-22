@@ -27,6 +27,7 @@ import Tags from "src/flows/components/DrawerTags";
 import EvalExplorerTable from "./evalExplorerTable";
 import LeaderboardTable from "./leaderboardTable";
 import LeaderboardDetails from "./details";
+import { AppRequest } from "src/pages/api/requests";
 
 interface EvaluationCard {
   id: string;
@@ -54,7 +55,10 @@ const EvalDetailed = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [activeTab, setActiveTab] = useState("3");
   const [showAllTags, setShowAllTags] = useState(false);
+  const [datasets, setDatasets] = useState<any>(null);
   const router = useRouter();
+  const evaluationId = router.query.evaluationId;
+  const id = Array.isArray(evaluationId) ? evaluationId[0] : evaluationId;
 
   const goBack = () => {
     router.back();
@@ -95,6 +99,23 @@ const EvalDetailed = () => {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Fetch datasets when id is available
+  useEffect(() => {
+    const fetchDatasets = async () => {
+      if (id) {
+        try {
+          const response = await AppRequest.Get(`/experiments/datasets?trait_ids=${id}`);
+          console.log("Datasets API Response:", response.data);
+          setDatasets(response.data);
+        } catch (error) {
+          console.error("Error fetching datasets:", error);
+        }
+      }
+    };
+
+    fetchDatasets();
+  }, [id]);
 
   return (
     <DashBoardLayout>
