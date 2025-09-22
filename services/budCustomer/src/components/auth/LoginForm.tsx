@@ -21,7 +21,7 @@ type LoginPageModalProps = {
 };
 
 const LoginForm = ({ onSubmit, isLoading = false }: LoginPageModalProps) => {
-  const { setActivePage, authError, setAuthError } = useAuthNavigation();
+  const { setActivePage, authError, setAuthError, activePage } = useAuthNavigation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isShow, setIsShow] = useState(false);
@@ -37,6 +37,10 @@ const LoginForm = ({ onSubmit, isLoading = false }: LoginPageModalProps) => {
     setMounted(true);
   }, []);
 
+  useEffect(()=> {
+    setAuthError("")
+  }, [activePage])
+  
   useEffect(() => {
     // Check if form is submittable
     const isEmailValid = email.length >= 3 && emailRegex.test(email);
