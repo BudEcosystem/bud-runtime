@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Tooltip, Select } from 'antd';
+import { Table, Tooltip, Select, Button } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useRouter } from 'next/router';
@@ -12,6 +12,11 @@ import Tags from 'src/flows/components/DrawerTags';
 import { SortIcon } from './SortIcon';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { ClientTimestamp } from '../../ClientTimestamp';
+import ProjectTags from 'src/flows/components/ProjectTags';
+import { capitalize } from '@/lib/utils';
+import { endpointStatusMapping } from '@/lib/colorMapping';
+import { errorToast, successToast } from '@/components/toast';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 
 
 interface GuardrailsListTableProps {
@@ -24,12 +29,17 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
   const projectId = propProjectId || (slug as string);
   const [searchValue, setSearchValue] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [selectedRow, setSelectedRow] = useState<any>(null);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const { contextHolder, openConfirm } = useConfirmAction()
 
   const {
     guardrails,
     isLoading,
     fetchGuardrails,
     setFilters,
+    deleteGuardrail
   } = useGuardrails();
 
   useLoaderOnLoding(isLoading);
@@ -103,6 +113,43 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
     return colors[index];
   };
 
+  const confirmDelete = (record) => {
+    if (record?.status === 'deleting' || record?.status === 'deleted') {
+      errorToast('Deployment is in deleting state, please wait for it to complete');
+      return;
+    }
+    setSelectedRow(record);
+    setConfirmVisible(true);
+    openConfirm({
+      message: `You're about to delete the ${record?.name}`,
+      description: 'Once you delete the guardrail, it will not be recovered. If the deployment code is being used anywhere it wont function. Are you sure?',
+      cancelAction: () => {
+      },
+      cancelText: 'Cancel',
+      loading: confirmLoading,
+      key: 'delete-guardrail',
+      okAction: async () => {
+        if (!record) {
+          errorToast('No record selected');
+          return;
+        };
+        setConfirmLoading(true);
+        const result = await deleteGuardrail(record.id);
+        if (result?.data) {
+          await fetchGuardrails(projectId);
+          successToast('Guardrail deleted successfully');
+        } else {
+          errorToast('Failed to delete guardrail');
+        }
+        await fetchGuardrails(projectId);
+        setConfirmLoading(false);
+        setConfirmVisible(false);
+      },
+      okText: 'Delete',
+      type: 'warining'
+    });
+  }
+
   // Table columns definition
   const columns: ColumnsType<GuardrailProfile> = [
     {
@@ -149,9 +196,10 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
       render: (status: string) => {
         const config = getStatusConfig(status);
         return (
-          <Tags
-            name={config.label}
-            color={config.color}
+          <ProjectTags
+            name={capitalize(config.label)}
+            color={endpointStatusMapping[capitalize(config.label)]}
+            textClass="text-[.75rem]"
           />
         );
       },
@@ -170,6 +218,27 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
       ),
       sorter: true,
       sortIcon: SortIcon,
+    },
+    {
+      title: '',
+      dataIndex: '',
+      key: 'actions',
+      width: 200,
+      render: (_, record) => (
+        <div className=' w-[2rem] h-auto block'>
+          <Button
+            className='bg-transparent border-none p-0'
+            onClick={(event) => {
+              event.stopPropagation();
+              confirmDelete(record)
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 15" fill="none">
+              <path fillRule="evenodd" clipRule="evenodd" d="M5.13327 1.28906C4.85713 1.28906 4.63327 1.51292 4.63327 1.78906C4.63327 2.0652 4.85713 2.28906 5.13327 2.28906H8.8666C9.14274 2.28906 9.3666 2.0652 9.3666 1.78906C9.3666 1.51292 9.14274 1.28906 8.8666 1.28906H5.13327ZM2.7666 3.65573C2.7666 3.37959 2.99046 3.15573 3.2666 3.15573H10.7333C11.0094 3.15573 11.2333 3.37959 11.2333 3.65573C11.2333 3.93187 11.0094 4.15573 10.7333 4.15573H10.2661C10.2664 4.1668 10.2666 4.17791 10.2666 4.18906V11.5224C10.2666 12.0747 9.81889 12.5224 9.2666 12.5224H4.73327C4.18098 12.5224 3.73327 12.0747 3.73327 11.5224V4.18906C3.73327 4.17791 3.73345 4.1668 3.73381 4.15573H3.2666C2.99046 4.15573 2.7666 3.93187 2.7666 3.65573ZM9.2666 4.18906L4.73327 4.18906V11.5224L9.2666 11.5224V4.18906Z" fill="#B3B3B3" />
+            </svg>
+          </Button>
+        </div>
+      ),
     },
   ];
 
@@ -190,6 +259,7 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
 
   return (
     <div className="pb-[60px] pt-[.4rem]">
+      {contextHolder}
       <Table<GuardrailProfile>
         columns={columns}
         dataSource={guardrails}
@@ -236,7 +306,7 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
               >
                 <span style={{ display: 'flex', alignItems: 'center' }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
                   <span className="ml-2">Add Guardrail</span>
                 </span>

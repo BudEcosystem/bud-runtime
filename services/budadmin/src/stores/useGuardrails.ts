@@ -54,12 +54,12 @@ interface GuardrailStore {
   setFilters: (filters: Partial<GuardrailFilters>) => void;
   setPagination: (pagination: Partial<PaginationState>) => void;
   resetFilters: () => void;
-
   // API calls
   fetchGuardrails: (
     projectId?: string,
     overrideFilters?: Partial<GuardrailFilters>
   ) => Promise<void>;
+  deleteGuardrail: (id: string) => Promise<any>;
 }
 
 // Default filters
@@ -216,6 +216,24 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
         "Failed to fetch guardrail profiles";
       message.error(errorMsg);
       set({ error: errorMsg, isLoading: false, guardrails: [] });
+    }
+  },
+  deleteGuardrail: async (id: string): Promise<any> => {
+    try {
+      const response: any = await AppRequest.Delete(
+        `/guardrails/profile/${id}`,
+        null,
+        {
+          headers: {
+            "x-resource-type": "project",
+            "x-entity-id": id,
+          },
+        }
+      );
+      // successToast(response.data.message);
+      return response;
+    } catch (error) {
+      console.error("Error deleting guardrail:", error);
     }
   },
 }));
