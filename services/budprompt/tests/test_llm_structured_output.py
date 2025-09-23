@@ -11,13 +11,14 @@ import pytest
 from pydantic import ValidationError
 from pydantic_ai import Agent
 
-from test_unit_tests.test_structured_output.dynamic_model_creation import json_schema_to_pydantic_model
-
-# Import test models from our test suite
-from test_unit_tests.test_structured_output.test_supported_types import ComprehensiveTypesModel
-from test_unit_tests.test_structured_output.test_string_properties import StringPropertiesModel
-from test_unit_tests.test_structured_output.test_number_properties import NumberPropertiesModel
-from test_unit_tests.test_structured_output.test_array_properties import ArrayPropertiesModel
+# Import all needed components from the consolidated test file
+from test_structured_output import (
+    json_schema_to_pydantic_model,
+    ComprehensiveTypesModel,
+    StringPropertiesModel,
+    NumberPropertiesModel,
+    ArrayPropertiesModel
+)
 
 
 # ============================================================================

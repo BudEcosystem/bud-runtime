@@ -66,3 +66,15 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "ci_cd: mark test as part of CI/CD pipeline"
     )
+    config.addinivalue_line(
+        "markers", "timeout: mark test with a timeout in seconds (requires pytest-timeout plugin)"
+    )
+    config.addinivalue_line(
+        "markers", "asyncio: mark test as async (handled by pytest-asyncio plugin)"
+    )
+    config.addinivalue_line(
+        "markers", "integration: mark test as an integration test"
+    )
+    config.addinivalue_line(
+        "markers", "llm: mark test as requiring LLM access"
+    )
