@@ -598,6 +598,12 @@ async def delete_user(
     session: Session = Depends(get_session),
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete an active user from the database."""
+    # Prevent users from deleting themselves
+    if user_id == current_user.id:
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST, message="You cannot delete your own account"
+        ).to_http_response()
+
     try:
         _ = await UserService(session).delete_active_user(user_id, remove_credential)
         logger.debug(f"User deleted: {user_id}")
