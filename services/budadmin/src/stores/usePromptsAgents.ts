@@ -8,14 +8,20 @@ export interface PromptAgent {
   description: string;
   prompt_type: 'simple_prompt' | 'agent';
   category?: string;
-  tags?: string[];
+  tags?: Array<{ name: string; color: string }>;
   created_at: string;
+  modified_at?: string;
   updated_at?: string;
   author?: string;
   usage_count?: number;
   rating?: number;
   is_public?: boolean;
   icon?: string;
+  model_icon?: string | null;
+  model_name?: string;
+  default_version?: number;
+  modality?: string[];
+  status?: string;
   parameters?: any;
   version?: string;
   project_id?: string;
@@ -24,7 +30,6 @@ export interface PromptAgent {
   input_variables?: any[];
   output_variables?: any[];
   model_id?: string;
-  model_name?: string;
   settings?: {
     temperature?: number;
     max_tokens?: number;
@@ -152,7 +157,7 @@ export const usePromptsAgents = create<PromptsAgentsStore>((set, get) => ({
       });
 
       if (response.data) {
-        const prompts = response.data.data || [];
+        const prompts = response.data.prompts || [];
 
         // Apply client-side filters for additional filtering (category, author, tags, rating)
         let filtered = [...prompts];
@@ -167,7 +172,7 @@ export const usePromptsAgents = create<PromptsAgentsStore>((set, get) => ({
 
         if (state.selectedTags.length > 0) {
           filtered = filtered.filter(p =>
-            state.selectedTags.some(tag => p.tags?.includes(tag))
+            state.selectedTags.some(tag => p.tags?.some(t => t.name === tag))
           );
         }
 
@@ -182,7 +187,7 @@ export const usePromptsAgents = create<PromptsAgentsStore>((set, get) => ({
         // Extract unique categories, authors, and tags for filters
         const categories = Array.from(new Set(prompts.map(p => p.category).filter(Boolean))) as string[];
         const authors = Array.from(new Set(prompts.map(p => p.author).filter(Boolean))) as string[];
-        const allTags = Array.from(new Set(prompts.flatMap(p => p.tags || [])));
+        const allTags = Array.from(new Set(prompts.flatMap(p => (p.tags || []).map(t => t.name))));
 
         set({
           prompts: prompts,

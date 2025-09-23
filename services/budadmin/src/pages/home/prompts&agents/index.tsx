@@ -71,10 +71,10 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
           </Tag>
         </div>
 
-        {(item?.updated_at || item?.created_at) && (
+        {(item?.modified_at || item?.created_at) && (
           <div className="mt-[1.2rem]">
             <Text_11_400_808080>
-              {formatDate(item?.updated_at || item?.created_at)}
+              {formatDate(item?.modified_at || item?.created_at)}
             </Text_11_400_808080>
           </div>
         )}
@@ -100,7 +100,7 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
               }}
             >
               <div className="text-[0.625rem] font-[400] leading-[100%]" style={{ color: "#EEEEEE" }}>
-                {tag}
+                {typeof tag === 'string' ? tag : tag.name}
               </div>
             </Tag>
           ))}
@@ -123,7 +123,7 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
       <div className="px-[1.6rem] pt-[.9rem] pb-[1rem] bg-[#161616] border-t-[.5px] border-t-[#1F1F1F] min-h-[32%]">
         <div className="flex items-center justify-between mb-2">
           <Text_12_400_B3B3B3>Usage & Rating</Text_12_400_B3B3B3>
-          <Text_12_400_B3B3B3>v{item.version || '1.0.0'}</Text_12_400_B3B3B3>
+          <Text_12_400_B3B3B3>v{item.default_version || item.version || '1.0'}</Text_12_400_B3B3B3>
         </div>
 
         <div className="flex items-center justify-between">
@@ -340,14 +340,14 @@ export default function PromptsAgents() {
         <div className="boardPageTop">
           <PageHeader
             headding="Prompts & Agents"
-            buttonLabel="Agent"
-            buttonPermission={hasPermission(PermissionEnum.ModelManage)}
-            buttonAction={() => {
-              openAgentDrawer();
-            }}
+            // buttonLabel="Agent"
+            // buttonPermission={hasPermission(PermissionEnum.ModelManage)}
+            // buttonAction={() => {
+            //   openAgentDrawer();
+            // }}
             ButtonIcon={PlusOutlined}
             rightComponent={
-              <div className="flex gap-x-[.2rem]">
+              <div className="flex gap-x-[.2rem] hidden">
                 <SearchHeaderInput
                   classNames="mr-[.2rem]"
                   placeholder="Search prompts and agents..."
@@ -685,7 +685,7 @@ export default function PromptsAgents() {
                   ) : (
                     <NoDataFount
                       classNames="h-[60vh]"
-                      textMessage="No prompts or agents available. Start by adding your first prompt or agent."
+                      textMessage="No prompts or agents available"
                     />
                   )}
                 </div>
