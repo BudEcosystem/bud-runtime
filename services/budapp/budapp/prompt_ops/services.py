@@ -786,7 +786,6 @@ class PromptWorkflowService(SessionMixin):
                 "endpoint_id",
                 "concurrency",
                 "model_id",
-                "cluster_id",
                 "bud_prompt_id",
             ]
             missing_keys = [key for key in required_keys if key not in required_data]
@@ -856,7 +855,7 @@ class PromptWorkflowService(SessionMixin):
                     prompt_id=db_prompt.id,
                     endpoint_id=UUID(merged_data.get("endpoint_id")),
                     model_id=UUID(merged_data.get("model_id")),
-                    cluster_id=UUID(merged_data.get("cluster_id")),
+                    cluster_id=UUID(merged_data.get("cluster_id")) if merged_data.get("cluster_id") else None,
                     version=1,  # First version
                     status=PromptVersionStatusEnum.ACTIVE,
                     created_by=current_user_id,
