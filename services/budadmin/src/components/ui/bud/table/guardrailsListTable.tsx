@@ -30,7 +30,6 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
   const [searchValue, setSearchValue] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [selectedRow, setSelectedRow] = useState<any>(null);
-  const [confirmVisible, setConfirmVisible] = useState(false);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const { contextHolder, openConfirm } = useConfirmAction()
 
@@ -113,13 +112,13 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
     return colors[index];
   };
 
-  const confirmDelete = (record) => {
-    if (record?.status === 'deleting' || record?.status === 'deleted') {
-      errorToast('Deployment is in deleting state, please wait for it to complete');
+  const confirmDelete = (record: GuardrailProfile) => {
+    // Check if guardrail should not be deleted (no such states for guardrails currently)
+    if (!record) {
+      errorToast('No guardrail selected');
       return;
     }
     setSelectedRow(record);
-    setConfirmVisible(true);
     openConfirm({
       message: `You're about to delete the ${record?.name}`,
       description: 'Once you delete the guardrail, it will not be recovered. If the deployment code is being used anywhere it wont function. Are you sure?',
@@ -143,7 +142,6 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
         }
         await fetchGuardrails(projectId);
         setConfirmLoading(false);
-        setConfirmVisible(false);
       },
       okText: 'Delete',
       type: 'warining'
