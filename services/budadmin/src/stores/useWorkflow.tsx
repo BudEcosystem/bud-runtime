@@ -160,6 +160,7 @@ export type WorkflowType = {
             trait_ids?: any;
         };
         trait_ids?: string;
+        experiment_id?: string;
     }
     template_id?: string;
 }

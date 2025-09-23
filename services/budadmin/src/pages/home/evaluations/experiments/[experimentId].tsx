@@ -330,8 +330,7 @@ const ExperimentDetailsPage = () => {
               Current Metrics
             </Text_24_600_FFFFFF>
             <Text_14_400_FFFFFF className="mb-[1rem] leading-[140%]">
-              Current metrics description metrics description metrics
-              description...
+              Comparative performance scores across evaluation categories for each model.
             </Text_14_400_FFFFFF>
             <CurrentMetricsTable
               data={experimentMetrics?.currentMetrics || []}

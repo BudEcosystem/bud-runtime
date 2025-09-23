@@ -104,7 +104,7 @@ export default function SelectEvaluation() {
 
           // Get experiment ID from workflow or drawer props
           const experimentId =
-            currentWorkflow.experiment_id || drawerProps?.experimentId;
+            currentWorkflow?.workflow_steps?.experiment_id|| drawerProps?.experimentId;
 
           if (!experimentId) {
             errorToast("Experiment ID not found");
@@ -127,8 +127,6 @@ export default function SelectEvaluation() {
             experimentId,
             payload,
           );
-
-          successToast("Evaluation datasets selected successfully");
 
           // Navigate to next step
           openDrawerWithStep("evaluation-summary");

@@ -37,17 +37,19 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
     <div className="bg-[#101010] rounded-lg px-[1.5rem] py-[1.2rem] border border-[#1F1F1F]">
       <div className="flex justify-between items-start mb-[0.85rem]">
         <Text_14_400_EEEEEE className="">{benchmark.title}</Text_14_400_EEEEEE>
-        {benchmark.status === "Running" && benchmark.canPause && (
-          <PrimaryButton
-            classNames="!px-[.55] !py-1 !text-xs mt-[.3rem]"
-            onClick={() => {
-              // TODO: Implement pause functionality using pauseUrl
-              console.log("Pausing run:", benchmark.pauseUrl);
-            }}
-          >
-            || Pause
-          </PrimaryButton>
-        )}
+        <div className="hidden">
+          {benchmark.status === "Running" && benchmark.canPause && (
+            <PrimaryButton
+              classNames="!px-[.55] !py-1 !text-xs mt-[.3rem]"
+              onClick={() => {
+                // TODO: Implement pause functionality using pauseUrl
+                console.log("Pausing run:", benchmark.pauseUrl);
+              }}
+            >
+              || Pause
+            </PrimaryButton>
+          )}
+        </div>
       </div>
       <div className="">
         <div className="flex items-center justify-start gap-x-[.3rem] mb-[0.7rem]">
@@ -60,7 +62,7 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
         </div>
 
         {/* Progress Bar */}
-        <div className="mb-4">
+        <div className="mb-4 hidden">
           <Progress
             percent={benchmark.progress}
             strokeColor="#965CDE"

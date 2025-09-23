@@ -53,6 +53,7 @@ export default function SelectModelForNewEvaluation() {
       backText="Back"
       onNext={async () => {
         try {
+          console.log("currentWorkflow:", currentWorkflow);
           // Check if we have the required data
           if (!selectedModel?.id) {
             errorToast("Please select a model");
@@ -63,10 +64,10 @@ export default function SelectModelForNewEvaluation() {
             errorToast("Workflow not found. Please start over.");
             return;
           }
-          console.log("currentWorkflow:", currentWorkflow);
+
           // Get experiment ID from workflow or drawer props
           const experimentId =
-            currentWorkflow.experiment_id || drawerProps?.experimentId;
+            currentWorkflow?.workflow_steps?.experiment_id;
 
           if (!experimentId) {
             errorToast("Experiment ID not found");
@@ -87,8 +88,6 @@ export default function SelectModelForNewEvaluation() {
             experimentId,
             payload,
           );
-
-          successToast("Model selected successfully");
 
           // Navigate to next step
           openDrawerWithStep("select-traits");

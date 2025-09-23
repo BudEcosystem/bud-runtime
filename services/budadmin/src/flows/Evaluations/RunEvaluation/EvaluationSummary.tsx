@@ -371,7 +371,7 @@ export default function EvaluationSummary() {
           }
 
           // Get experiment ID from workflow or drawer props
-          const experimentId = currentWorkflow.experiment_id || drawerProps?.experimentId;
+          const experimentId = currentWorkflow?.workflow_steps?.experiment_id|| drawerProps?.experimentId;
 
           if (!experimentId) {
             errorToast("Experiment ID not found");
@@ -475,6 +475,7 @@ export default function EvaluationSummary() {
                     handleEvaluationSelection={(evaluation) => {
                       setSelectedEvaluation(evaluation);
                     }}
+                    hideSelection={true}
                     selectedEvaluation={selectedEvaluation} />
                   : (
                     <>

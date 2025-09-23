@@ -1,4 +1,5 @@
 import { tempApiBaseUrl } from "@/components/environment";
+import { errorToast, successToast } from "@/components/toast";
 import { WorkflowType } from "@/stores/useWorkflow";
 import { AppRequest } from "src/pages/api/requests";
 import { create } from "zustand";
@@ -129,6 +130,7 @@ export const useEvaluations = create<{
   setCurrentWorkflow: (workflow: WorkflowType | null) => void;
   getCurrentWorkflow: () => WorkflowType | null;
   getWorkflowData: (experimentId: string, workflowId: string) => Promise<any>;
+  deleteWorkflow: (id: string, suppressToast?: boolean) => Promise<any>;
 }>((set, get) => ({
   loading: false,
   selectedEvals: [],
@@ -390,6 +392,25 @@ export const useEvaluations = create<{
       throw error;
     } finally {
       set({ loading: false });
+    }
+  },
+
+  deleteWorkflow: async (id: string, suppressToast?: boolean) => {
+    try {
+      const response: any = await AppRequest.Delete(
+        `${tempApiBaseUrl}/workflows/${id}`
+      );
+      if (!suppressToast) {
+        successToast(response?.data?.message || "Workflow deleted successfully");
+      }
+      set({ currentWorkflow: null, currentWorkflowId: null });
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting workflow:", error);
+      if (!suppressToast) {
+        errorToast("Failed to delete workflow");
+      }
+      throw error;
     }
   },
 

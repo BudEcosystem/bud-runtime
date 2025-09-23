@@ -110,7 +110,7 @@ export default function SelectTrait() {
 
           // Get experiment ID from workflow or drawer props
           const experimentId =
-            currentWorkflow.experiment_id || drawerProps?.experimentId;
+            currentWorkflow?.workflow_steps?.experiment_id|| drawerProps?.experimentId;
 
           if (!experimentId) {
             errorToast("Experiment ID not found");
@@ -133,8 +133,6 @@ export default function SelectTrait() {
             experimentId,
             payload,
           );
-
-          successToast("Traits selected successfully");
 
           // Navigate to next step
           openDrawerWithStep("select-evaluation");

@@ -3681,7 +3681,7 @@ const runEvaluation: DrawerFlowType = {
         "New Evaluation",
       ],
       id: "new-evaluation",
-      confirmClose: false,
+      confirmClose: true,
       step: 1,
       component: StepComponents["new-evaluation"],
       progress: [
