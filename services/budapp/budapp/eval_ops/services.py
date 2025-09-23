@@ -2381,6 +2381,27 @@ class EvaluationWorkflowService:
             # Store workflow step data with experiment_id included
             stage_data_with_experiment = request.stage_data.copy()
             stage_data_with_experiment["experiment_id"] = str(experiment_id)
+
+            # For step 3 (trait selection), enrich with trait details before storing
+            if request.step_number == 3 and "trait_ids" in stage_data_with_experiment:
+                trait_ids = stage_data_with_experiment.get("trait_ids", [])
+                traits_details = []
+                for trait_id in trait_ids:
+                    try:
+                        trait_uuid = uuid.UUID(str(trait_id))
+                        trait = self.session.query(TraitModel).filter(TraitModel.id == trait_uuid).first()
+                        if trait:
+                            traits_details.append(
+                                {
+                                    "id": str(trait.id),
+                                    "name": trait.name,
+                                    "description": trait.description,
+                                }
+                            )
+                    except (ValueError, TypeError):
+                        continue
+                stage_data_with_experiment["traits_details"] = traits_details
+
             await self._store_workflow_step(workflow.id, request.step_number, stage_data_with_experiment)
 
             # Validate step 4 dataset-trait relationships
