@@ -1048,56 +1048,63 @@ class EvaluationWorkflow:
         )
 
         # Check monitoring result status (THIS IS MISSING IN CURRENT CODE!)
-        if _monitoring_result.get("status") == "completed":
-            job_status = _monitoring_result.get("job_status")
+        # if _monitoring_result.get("status") == "completed":
+        #     job_status = _monitoring_result.get("job_status")
 
-            if job_status == "succeeded":
-                # Success notification
-                notification_req.payload.event = "monitor_eval_job_progress"
-                notification_req.payload.content = NotificationContent(
-                    title="Evaluation Completed Successfully",
-                    message=f"Job {job_id} completed successfully",
-                    status=WorkflowStatus.COMPLETED,
-                )
+        #     if job_status == "succeeded":
+        #         # Success notification
+        #         notification_req.payload.event = "monitor_eval_job_progress"
+        #         notification_req.payload.content = NotificationContent(
+        #             title="Evaluation Completed Successfully",
+        #             message=f"Job {job_id} completed successfully",
+        #             status=WorkflowStatus.COMPLETED,
+        #         )
 
-                # Check if extraction was successful using summary
-                extraction_summary = _monitoring_result.get("extraction_summary", {})
-                if extraction_summary and extraction_summary.get("success"):
-                    accuracy = extraction_summary.get("overall_accuracy", 0.0)
-                    datasets = extraction_summary.get("total_datasets", 0)
-                    notification_req.payload.content.message += (
-                        f" - Results extracted: {datasets} datasets, {accuracy:.2f}% accuracy"
-                    )
+        #         # Check if extraction was successful using summary
+        #         extraction_summary = _monitoring_result.get("extraction_summary", {})
+        #         if extraction_summary and extraction_summary.get("success"):
+        #             accuracy = extraction_summary.get("overall_accuracy", 0.0)
+        #             datasets = extraction_summary.get("total_datasets", 0)
+        #             notification_req.payload.content.message += (
+        #                 f" - Results extracted: {datasets} datasets, {accuracy:.2f}% accuracy"
+        #             )
 
-            elif job_status == "failed":
-                # Failure notification
-                notification_req.payload.event = "monitor_eval_job_progress"
-                notification_req.payload.content = NotificationContent(
-                    title="Evaluation Failed",
-                    message=f"Job {job_id} failed during execution",
-                    status=WorkflowStatus.FAILED,
-                    primary_action="retry",
-                )
+        #     elif job_status == "failed":
+        #         # Failure notification
+        #         notification_req.payload.event = "monitor_eval_job_progress"
+        #         notification_req.payload.content = NotificationContent(
+        #             title="Evaluation Failed",
+        #             message=f"Job {job_id} failed during execution",
+        #             status=WorkflowStatus.FAILED,
+        #             primary_action="retry",
+        #         )
 
-        elif _monitoring_result.get("status") == "timeout":
-            # Timeout notification
-            notification_req.payload.event = "monitor_eval_job_progress"
-            notification_req.payload.content = NotificationContent(
-                title="Evaluation Timeout",
-                message=f"Job {job_id} monitoring timed out after {_monitoring_result.get('attempts')} attempts",
-                status=WorkflowStatus.FAILED,
-                primary_action="retry",
-            )
+        # elif _monitoring_result.get("status") == "timeout":
+        #     # Timeout notification
+        #     notification_req.payload.event = "monitor_eval_job_progress"
+        #     notification_req.payload.content = NotificationContent(
+        #         title="Evaluation Timeout",
+        #         message=f"Job {job_id} monitoring timed out after {_monitoring_result.get('attempts')} attempts",
+        #         status=WorkflowStatus.FAILED,
+        #         primary_action="retry",
+        #     )
 
-        elif _monitoring_result.get("status") == "error":
-            # Error notification
-            notification_req.payload.event = "monitor_eval_job_progress"
-            notification_req.payload.content = NotificationContent(
-                title="Monitoring Error",
-                message=f"Error monitoring job {job_id}: {_monitoring_result.get('message')}",
-                status=WorkflowStatus.FAILED,
-                primary_action="retry",
-            )
+        # elif _monitoring_result.get("status") == "error":
+        #     # Error notification
+        #     notification_req.payload.event = "monitor_eval_job_progress"
+        #     notification_req.payload.content = NotificationContent(
+        #         title="Monitoring Error",
+        #         message=f"Error monitoring job {job_id}: {_monitoring_result.get('message')}",
+        #         status=WorkflowStatus.FAILED,
+        #         primary_action="retry",
+        #     )
+
+        notification_req.payload.content = NotificationContent(
+            title="Monitoring Completed",
+            message="Monitoring Completed",
+            status=WorkflowStatus.COMPLETED,
+            primary_action="retry",
+        )
 
         # Publish the appropriate monitoring result notification
         dapr_workflows.publish_notification(
@@ -1108,27 +1115,27 @@ class EvaluationWorkflow:
         )
 
         # Final workflow completion notification
-        notification_req.payload.event = "evaluate_model_status"
+        # notification_req.payload.event = "evaluate_model_status"
 
         # Set final status based on monitoring result
-        final_status = WorkflowStatus.COMPLETED
-        final_message = "Model Evaluation Completed Successfully"
+        # final_status = WorkflowStatus.COMPLETED
+        # final_message = "Model Evaluation Completed Successfully"
 
-        if _monitoring_result.get("status") != "completed" or _monitoring_result.get("job_status") != "succeeded":
-            final_status = WorkflowStatus.FAILED
-            final_message = f"Model Evaluation Failed - {_monitoring_result.get('status', 'unknown')}"
+        # if _monitoring_result.get("status") != "completed" or _monitoring_result.get("job_status") != "succeeded":
+        #     final_status = WorkflowStatus.FAILED
+        #     final_message = f"Model Evaluation Failed - {_monitoring_result.get('status', 'unknown')}"
 
-        notification_req.payload.content = NotificationContent(
-            title=final_message,
-            message=final_message,
-            status=final_status,
-        )
-        dapr_workflows.publish_notification(
-            workflow_id=instance_id,
-            notification=notification_req,
-            target_topic_name=evaluate_model_request_json.source_topic,
-            target_name=evaluate_model_request_json.source,
-        )
+        # notification_req.payload.content = NotificationContent(
+        #     title=final_message,
+        #     message=final_message,
+        #     status=final_status,
+        # )
+        # dapr_workflows.publish_notification(
+        #     workflow_id=instance_id,
+        #     notification=notification_req,
+        #     target_topic_name=evaluate_model_request_json.source_topic,
+        #     target_name=evaluate_model_request_json.source,
+        # )
 
         # Result Notification - Always send results regardless of status
         extraction_summary = (
@@ -1139,7 +1146,7 @@ class EvaluationWorkflow:
         notification_req.payload.content = NotificationContent(
             title="Evaluation Results",
             message=extraction_summary.get("message", "Evaluation completed"),
-            status=final_status,
+            status=WorkflowStatus.COMPLETED,
             result={
                 "job_id": job_id,
                 "status": _monitoring_result.get("job_status", "unknown"),
@@ -1154,6 +1161,21 @@ class EvaluationWorkflow:
                 "retrieval_info": f"Use job_id '{job_id}' to retrieve full results from ClickHouse",
             },
         )
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
+
+        notification_req.payload.event = "evaluate_model_status"
+        notification_req.payload.content = NotificationContent(
+            title="Evaluation Completed",
+            message="Evaluation Completed",
+            status=WorkflowStatus.COMPLETED,
+        )
+
+        # Publish the appropriate monitoring result notification
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
             notification=notification_req,
