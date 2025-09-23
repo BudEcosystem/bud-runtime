@@ -24,6 +24,7 @@ from budapp.eval_ops.schemas import (
     GetExperimentResponse,
     GetRunResponse,
     ListDatasetsResponse,
+    ListEvaluationsResponse,
     ListExperimentsResponse,
     ListRunsResponse,
     ListTraitsResponse,
@@ -464,7 +465,7 @@ async def review_experiment_workflow(
 
 @router.get(
     "/{experiment_id}/runs",
-    response_model=ListRunsResponse,
+    response_model=ListEvaluationsResponse,
     status_code=status.HTTP_200_OK,
     responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
 )
@@ -473,26 +474,26 @@ def list_runs(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
-    """List runs for an experiment.
+    """List completed evaluations for an experiment.
 
     - **experiment_id**: UUID of the experiment.
     - **session**: Database session dependency.
     - **current_user**: The authenticated user.
 
-    Returns a `ListRunsResponse` containing a list of runs.
+    Returns a `ListEvaluationsResponse` containing a list of completed evaluations with model, traits, and scores.
     """
     try:
-        runs = ExperimentService(session).list_runs(experiment_id, current_user.id)
+        evaluations = ExperimentService(session).list_runs(experiment_id, current_user.id)
     except HTTPException as e:
         raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to list runs") from e
+        raise HTTPException(status_code=500, detail="Failed to list evaluations") from e
 
-    return ListRunsResponse(
+    return ListEvaluationsResponse(
         code=status.HTTP_200_OK,
-        object="run.list",
-        message="Successfully listed runs",
-        runs=runs,
+        object="evaluation.list",
+        message="Successfully listed completed evaluations",
+        evaluations=evaluations,
     )
 
 
