@@ -16,6 +16,7 @@
 
 """Database models for the prompt ops module."""
 
+from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, UniqueConstraint, Uuid
@@ -96,7 +97,7 @@ class PromptVersion(Base, TimestampMixin):
     prompt_id: Mapped[UUID] = mapped_column(ForeignKey("prompt.id", ondelete="CASCADE"), nullable=False)
     endpoint_id: Mapped[UUID] = mapped_column(ForeignKey("endpoint.id", ondelete="CASCADE"), nullable=False)
     model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), nullable=False)
-    cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=False)
+    cluster_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(
         Enum(
