@@ -215,6 +215,15 @@ class WorkflowService(SessionMixin):
             bud_prompt_version = required_data.get("bud_prompt_version")
             prompt_schema_events = required_data.get(BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value)
 
+            # Handle experiment_id extraction with UUID conversion
+            experiment_id_str = required_data.get("experiment_id")
+            experiment_id = None
+            if experiment_id_str:
+                try:
+                    experiment_id = UUID(str(experiment_id_str))
+                except (ValueError, TypeError):
+                    experiment_id = None
+
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
                     ProviderModel, {"id": required_data["provider_id"]}, missing_ok=True
@@ -304,6 +313,7 @@ class WorkflowService(SessionMixin):
             )
 
             workflow_steps = RetrieveWorkflowStepData(
+                experiment_id=experiment_id if experiment_id else None,
                 provider_type=provider_type if provider_type else None,
                 provider=db_provider if db_provider else None,
                 provider_id=provider_id if provider_id else None,
