@@ -96,7 +96,7 @@ class ModelValidationEnhancer:
             logger.debug(f"Code:\n{validation_code}\n")
 
             # Execute the validation function and store it
-            exec(validation_code, validation_namespace)
+            exec(validation_code, validation_namespace)  # nosec B102 - Dynamic validation code generation is required
             func_name = f"validate_{field_name}"
             if func_name in validation_namespace:
                 validation_functions[field_name] = validation_namespace[func_name]
