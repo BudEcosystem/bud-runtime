@@ -13,6 +13,7 @@ import LoadModel from "./LoadModel";
 import { PrimaryButton } from "../ui/bud/form/Buttons";
 import { Text_14_400_757575 } from "../ui/text";
 import { TextInput, TextAreaInput } from "../ui/input";
+import { Editor } from "../flowgramEditorDemo/editor";
 
 interface AgentBoxProps {
   session: AgentSession;
@@ -198,6 +199,7 @@ function AgentBox({
           {/* Main content area */}
           <div className="flex-1 p-4 flow-editor-container">
 
+            <Editor />
 
           </div>
 

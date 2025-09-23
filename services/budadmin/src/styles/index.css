@@ -1,0 +1,70 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+.demo-fixed-node {
+  align-items: flex-start;
+  background-color: #fff;
+  border: 1px solid rgba(6, 7, 9, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.04), 0 4px 12px 0 rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  width: 240px;
+  transition: all 0.3s ease;
+}
+
+.demo-fixed-node-title {
+  background-color: #93bfe2;
+  width: 100%;
+  border-radius: 8px 8px 0 0;
+  padding: 4px 12px;
+}
+.demo-fixed-node-content {
+  padding: 16px;
+  flex-grow: 1;
+  width: 100%;
+}
+
+input {
+  color: black;
+  background-color: white;
+}
+
+.demo-fixed-adder {
+  width: 28px;
+  height: 18px;
+  background: rgb(187, 191, 196);
+  display: flex;
+  border-radius: 9px;
+  justify-content: space-evenly;
+  align-items: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+  div {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    svg {
+      width: 12px;
+      height: 12px;
+    }
+  }
+}
+
+.demo-fixed-adder.activated {
+  background: #82A7FC
+}
+
+.demo-fixed-adder.isHorizontal {
+  transform: rotate(90deg);
+}
+
+
+.gedit-playground * {
+  box-sizing: border-box;
+}

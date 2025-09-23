@@ -4,6 +4,9 @@ import "@/styles/agents.scss";
 import "@radix-ui/themes/styles.css";
 import "antd/dist/reset.css"; // Ant Design's base CSS reset
 
+import '@flowgram.ai/fixed-layout-editor/index.css';
+import '@/styles/index.css';
+
 import type { AppProps } from "next/app";
 import Toast, { errorToast } from "./../components/toast";
 import { useRouter } from "next/router";
