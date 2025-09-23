@@ -567,6 +567,9 @@ class WorkflowService(SessionMixin):
         # Combine all lists using set union
         all_keys = set().union(*workflow_keys.values())
 
+        # Add experiment_id as it's used in evaluation workflows
+        all_keys.add("experiment_id")
+
         return list(all_keys)
 
     async def retrieve_or_create_workflow(
