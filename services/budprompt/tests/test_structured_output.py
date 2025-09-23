@@ -298,6 +298,7 @@ def types_dynamic_model():
 # STRING PROPERTIES - SUCCESS TEST CASES
 # ============================================================================
 
+@pytest.mark.ci_cd
 def test_success_string_valid_patterns(string_dynamic_model):
     """Test that valid patterns are accepted."""
     valid_data = {
@@ -321,6 +322,7 @@ def test_success_string_valid_patterns(string_dynamic_model):
     assert instance.postal_code == "94105"
 
 
+@pytest.mark.ci_cd
 def test_success_string_extended_postal_code(string_dynamic_model):
     """Test extended postal code format."""
     valid_data = {
@@ -342,6 +344,7 @@ def test_success_string_extended_postal_code(string_dynamic_model):
     assert instance.postal_code == "94105-1234"
 
 
+@pytest.mark.ci_cd
 def test_success_string_valid_email_formats(string_dynamic_model):
     """Test various valid email formats."""
     base_data = {
@@ -371,6 +374,7 @@ def test_success_string_valid_email_formats(string_dynamic_model):
         assert instance.email == email
 
 
+@pytest.mark.ci_cd
 def test_success_string_valid_datetime_formats(string_dynamic_model):
     """Test various valid datetime formats."""
     base_data = {
@@ -400,6 +404,7 @@ def test_success_string_valid_datetime_formats(string_dynamic_model):
         assert instance.datetime_field
 
 
+@pytest.mark.ci_cd
 def test_success_string_valid_ipv4_addresses(string_dynamic_model):
     """Test various valid IPv4 addresses."""
     base_data = {
@@ -431,6 +436,7 @@ def test_success_string_valid_ipv4_addresses(string_dynamic_model):
         assert str(instance.ipv4_address) == ip
 
 
+@pytest.mark.ci_cd
 def test_success_string_valid_ipv6_addresses(string_dynamic_model):
     """Test various valid IPv6 addresses."""
     base_data = {
@@ -462,6 +468,7 @@ def test_success_string_valid_ipv6_addresses(string_dynamic_model):
         assert str(instance.ipv6_address) == str(IPvAnyAddress(ip))
 
 
+@pytest.mark.ci_cd
 def test_success_string_valid_hostnames(string_dynamic_model):
     """Test various valid hostnames."""
     base_data = {
@@ -496,6 +503,7 @@ def test_success_string_valid_hostnames(string_dynamic_model):
 # STRING PROPERTIES - ERROR TEST CASES
 # ============================================================================
 
+@pytest.mark.ci_cd
 def test_failure_string_invalid_username_pattern(string_dynamic_model):
     """Test that invalid username patterns are rejected."""
     invalid_data = {
@@ -518,6 +526,7 @@ def test_failure_string_invalid_username_pattern(string_dynamic_model):
     assert "username" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_string_invalid_phone_pattern(string_dynamic_model):
     """Test that invalid phone patterns are rejected."""
     invalid_data = {
@@ -540,6 +549,7 @@ def test_failure_string_invalid_phone_pattern(string_dynamic_model):
     assert "phone" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_string_invalid_postal_code_pattern(string_dynamic_model):
     """Test that invalid postal codes are rejected."""
     invalid_data = {
@@ -562,6 +572,7 @@ def test_failure_string_invalid_postal_code_pattern(string_dynamic_model):
     assert "postal_code" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_string_invalid_email_format(string_dynamic_model):
     """Test that invalid email formats are rejected."""
     invalid_emails = [
@@ -594,6 +605,7 @@ def test_failure_string_invalid_email_format(string_dynamic_model):
         assert "email" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_string_invalid_uuid_format(string_dynamic_model):
     """Test that invalid UUID formats are rejected."""
     invalid_uuids = [
@@ -624,6 +636,7 @@ def test_failure_string_invalid_uuid_format(string_dynamic_model):
         assert "uuid_field" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_string_invalid_datetime_format(string_dynamic_model):
     """Test that invalid datetime formats are rejected."""
     invalid_datetimes = [
@@ -654,6 +667,7 @@ def test_failure_string_invalid_datetime_format(string_dynamic_model):
         assert "datetime_field" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_string_invalid_ipv4_format(string_dynamic_model):
     """Test that invalid IPv4 addresses are rejected."""
     invalid_ips = [
@@ -685,6 +699,7 @@ def test_failure_string_invalid_ipv4_format(string_dynamic_model):
         assert "ipv4_address" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_success_string_optional_fields_with_none(string_dynamic_model):
     """Test that optional fields can be None."""
     valid_data = {
@@ -709,6 +724,7 @@ def test_success_string_optional_fields_with_none(string_dynamic_model):
     assert instance.optional_pattern is None
 
 
+@pytest.mark.ci_cd
 def test_success_string_optional_fields_with_values(string_dynamic_model):
     """Test that optional fields can have valid values."""
     valid_data = {
@@ -737,6 +753,7 @@ def test_success_string_optional_fields_with_values(string_dynamic_model):
 # ARRAY PROPERTIES - SUCCESS TEST CASES
 # ============================================================================
 
+@pytest.mark.ci_cd
 def test_success_array_valid_within_bounds(array_dynamic_model):
     """Test arrays within min and max bounds."""
     valid_data = {
@@ -757,6 +774,7 @@ def test_success_array_valid_within_bounds(array_dynamic_model):
     assert len(instance.items) == 4
 
 
+@pytest.mark.ci_cd
 def test_success_array_minimum_items_boundary(array_dynamic_model):
     """Test arrays at minimum boundary."""
     valid_data = {
@@ -777,6 +795,7 @@ def test_success_array_minimum_items_boundary(array_dynamic_model):
     assert len(instance.metadata) == 0
 
 
+@pytest.mark.ci_cd
 def test_success_array_maximum_items_boundary(array_dynamic_model):
     """Test arrays at maximum boundary."""
     valid_data = {
@@ -803,6 +822,7 @@ def test_success_array_maximum_items_boundary(array_dynamic_model):
     assert len(instance.metadata) == 5
 
 
+@pytest.mark.ci_cd
 def test_success_array_of_objects(array_dynamic_model):
     """Test arrays containing objects."""
     valid_data = {
@@ -826,6 +846,7 @@ def test_success_array_of_objects(array_dynamic_model):
     assert instance.metadata[0]["name"] == "author" if isinstance(instance.metadata[0], dict) else instance.metadata[0].name == "author"
 
 
+@pytest.mark.ci_cd
 def test_success_array_nested_arrays(array_dynamic_model):
     """Test nested array structures."""
     valid_data = {
@@ -850,6 +871,7 @@ def test_success_array_nested_arrays(array_dynamic_model):
     assert instance.matrix[0][0] == 10
 
 
+@pytest.mark.ci_cd
 def test_success_array_empty_arrays_where_allowed(array_dynamic_model):
     """Test that empty arrays are accepted where min_length=0 or unspecified."""
     valid_data = {
@@ -874,6 +896,7 @@ def test_success_array_empty_arrays_where_allowed(array_dynamic_model):
 # ARRAY PROPERTIES - ERROR TEST CASES
 # ============================================================================
 
+@pytest.mark.ci_cd
 def test_failure_array_below_minimum_items(array_dynamic_model):
     """Test that arrays below minimum items are rejected."""
     invalid_data = {
@@ -893,6 +916,7 @@ def test_failure_array_below_minimum_items(array_dynamic_model):
     assert "tags" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_array_coordinates_too_few(array_dynamic_model):
     """Test that coordinates with too few items are rejected."""
     invalid_data = {
@@ -912,6 +936,7 @@ def test_failure_array_coordinates_too_few(array_dynamic_model):
     assert "coordinates" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_array_items_too_few(array_dynamic_model):
     """Test that items with too few elements are rejected."""
     invalid_data = {
@@ -931,6 +956,7 @@ def test_failure_array_items_too_few(array_dynamic_model):
     assert "items" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_array_matrix_too_few_rows(array_dynamic_model):
     """Test that matrix with too few rows is rejected."""
     invalid_data = {
@@ -950,6 +976,7 @@ def test_failure_array_matrix_too_few_rows(array_dynamic_model):
     assert "matrix" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_array_above_maximum_items(array_dynamic_model):
     """Test that arrays above maximum items are rejected."""
     invalid_data = {
@@ -969,6 +996,7 @@ def test_failure_array_above_maximum_items(array_dynamic_model):
     assert "tags" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_array_coordinates_too_many(array_dynamic_model):
     """Test that coordinates with too many items are rejected."""
     invalid_data = {
@@ -988,6 +1016,7 @@ def test_failure_array_coordinates_too_many(array_dynamic_model):
     assert "coordinates" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_array_top_five_too_many(array_dynamic_model):
     """Test that top_five with too many items is rejected."""
     invalid_data = {
@@ -1007,6 +1036,7 @@ def test_failure_array_top_five_too_many(array_dynamic_model):
     assert "top_five" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_array_matrix_too_many_rows(array_dynamic_model):
     """Test that matrix with too many rows is rejected."""
     invalid_data = {
@@ -1026,6 +1056,7 @@ def test_failure_array_matrix_too_many_rows(array_dynamic_model):
     assert "matrix" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_array_matrix_wrong_column_count(array_dynamic_model):
     """Test that matrix rows with wrong column count are rejected."""
     invalid_data = {
@@ -1045,6 +1076,7 @@ def test_failure_array_matrix_wrong_column_count(array_dynamic_model):
     assert "matrix" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_array_wrong_item_type_in_array(array_dynamic_model):
     """Test that arrays with wrong item types are rejected."""
     invalid_data = {
@@ -1064,6 +1096,7 @@ def test_failure_array_wrong_item_type_in_array(array_dynamic_model):
     assert "tags" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_array_wrong_object_structure_in_array(array_dynamic_model):
     """Test that arrays with wrong object structure are rejected."""
     invalid_data = {
@@ -1086,6 +1119,7 @@ def test_failure_array_wrong_object_structure_in_array(array_dynamic_model):
     assert "metadata" in str(exc_info.value) or "value" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_success_array_optional_arrays_with_none(array_dynamic_model):
     """Test that optional arrays can be None."""
     valid_data = {
@@ -1107,6 +1141,7 @@ def test_success_array_optional_arrays_with_none(array_dynamic_model):
     assert instance.optional_empty_allowed is None
 
 
+@pytest.mark.ci_cd
 def test_success_array_optional_arrays_with_valid_values(array_dynamic_model):
     """Test that optional arrays can have valid values."""
     valid_data = {
@@ -1128,6 +1163,7 @@ def test_success_array_optional_arrays_with_valid_values(array_dynamic_model):
     assert len(instance.optional_empty_allowed) == 0
 
 
+@pytest.mark.ci_cd
 def test_failure_array_optional_arrays_still_enforce_constraints(array_dynamic_model):
     """Test that optional arrays still enforce constraints when provided."""
     # Test too many items in optional array
@@ -1150,6 +1186,7 @@ def test_failure_array_optional_arrays_still_enforce_constraints(array_dynamic_m
     assert "optional_tags" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_success_array_large_unconstrained_array(array_dynamic_model):
     """Test that unconstrained arrays can be very large."""
     valid_data = {
@@ -1168,6 +1205,7 @@ def test_success_array_large_unconstrained_array(array_dynamic_model):
     assert len(instance.unconstrained_array) == 10000
 
 
+@pytest.mark.ci_cd
 def test_success_array_arrays_with_duplicate_values(array_dynamic_model):
     """Test that arrays can contain duplicate values."""
     valid_data = {
@@ -1190,6 +1228,7 @@ def test_success_array_arrays_with_duplicate_values(array_dynamic_model):
     assert all(val == 1 for val in instance.top_five)
 
 
+@pytest.mark.ci_cd
 def test_success_array_mixed_numeric_types_in_number_array(array_dynamic_model):
     """Test that mixed numeric types are handled correctly."""
     valid_data = {
@@ -1214,6 +1253,7 @@ def test_success_array_mixed_numeric_types_in_number_array(array_dynamic_model):
 # NUMBER PROPERTIES - SUCCESS TEST CASES
 # ============================================================================
 
+@pytest.mark.ci_cd
 def test_success_number_valid_integer_minimum_maximum(number_dynamic_model):
     """Test integers within minimum and maximum bounds."""
     valid_data = {
@@ -1233,6 +1273,7 @@ def test_success_number_valid_integer_minimum_maximum(number_dynamic_model):
     assert instance.score == 50
 
 
+@pytest.mark.ci_cd
 def test_success_number_integer_boundary_values(number_dynamic_model):
     """Test integer values at boundaries."""
     # Test minimum boundary for age (inclusive)
@@ -1268,6 +1309,7 @@ def test_success_number_integer_boundary_values(number_dynamic_model):
     assert instance.even_between_10_and_100 == 100
 
 
+@pytest.mark.ci_cd
 def test_success_number_multiple_of_constraint_integers(number_dynamic_model):
     """Test multipleOf constraint for integers."""
     valid_multiples_of_five = [0, 5, 10, 15, 20, 100, -5, -10]
@@ -1289,6 +1331,7 @@ def test_success_number_multiple_of_constraint_integers(number_dynamic_model):
         assert instance.multiple_of_five == multiple
 
 
+@pytest.mark.ci_cd
 def test_success_number_valid_float_minimum_maximum(number_dynamic_model):
     """Test floats within minimum and maximum bounds."""
     valid_data = {
@@ -1309,6 +1352,7 @@ def test_success_number_valid_float_minimum_maximum(number_dynamic_model):
     assert instance.ratio == 0.618
 
 
+@pytest.mark.ci_cd
 def test_success_number_float_boundary_values(number_dynamic_model):
     """Test float values at boundaries."""
     # Test minimum boundary for temperature (inclusive)
@@ -1344,6 +1388,7 @@ def test_success_number_float_boundary_values(number_dynamic_model):
     assert instance.percentage == 100.0
 
 
+@pytest.mark.ci_cd
 def test_success_number_multiple_of_constraint_floats(number_dynamic_model):
     """Test multipleOf constraint for floats."""
     valid_multiples_of_quarter = [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 10.75, -0.25]
@@ -1365,6 +1410,7 @@ def test_success_number_multiple_of_constraint_floats(number_dynamic_model):
         assert instance.step_value == multiple
 
 
+@pytest.mark.ci_cd
 def test_success_number_combined_constraints(number_dynamic_model):
     """Test fields with multiple constraints combined."""
     # Test even numbers between 10 and 100
@@ -1400,6 +1446,7 @@ def test_success_number_combined_constraints(number_dynamic_model):
 # NUMBER PROPERTIES - ERROR TEST CASES
 # ============================================================================
 
+@pytest.mark.ci_cd
 def test_failure_number_invalid_integer_below_minimum(number_dynamic_model):
     """Test that integers below minimum are rejected."""
     invalid_data = {
@@ -1419,6 +1466,7 @@ def test_failure_number_invalid_integer_below_minimum(number_dynamic_model):
     assert "age" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_number_invalid_integer_above_maximum(number_dynamic_model):
     """Test that integers above maximum are rejected."""
     invalid_data = {
@@ -1438,6 +1486,7 @@ def test_failure_number_invalid_integer_above_maximum(number_dynamic_model):
     assert "age" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_number_invalid_exclusive_boundaries_integer(number_dynamic_model):
     """Test that exclusive boundaries are properly enforced for integers."""
     # Test exclusive minimum (score > 0)
@@ -1475,6 +1524,7 @@ def test_failure_number_invalid_exclusive_boundaries_integer(number_dynamic_mode
     assert "score" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_number_invalid_multiple_of_integer(number_dynamic_model):
     """Test that non-multiples are rejected for integers."""
     invalid_data = {
@@ -1494,6 +1544,7 @@ def test_failure_number_invalid_multiple_of_integer(number_dynamic_model):
     assert "multiple_of_five" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_number_invalid_float_below_minimum(number_dynamic_model):
     """Test that floats below minimum are rejected."""
     invalid_data = {
@@ -1513,6 +1564,7 @@ def test_failure_number_invalid_float_below_minimum(number_dynamic_model):
     assert "temperature" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_number_invalid_float_above_maximum(number_dynamic_model):
     """Test that floats above maximum are rejected."""
     invalid_data = {
@@ -1532,6 +1584,7 @@ def test_failure_number_invalid_float_above_maximum(number_dynamic_model):
     assert "temperature" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_number_invalid_exclusive_boundaries_float(number_dynamic_model):
     """Test that exclusive boundaries are properly enforced for floats."""
     # Test exclusive minimum (ratio > 0.0)
@@ -1569,6 +1622,7 @@ def test_failure_number_invalid_exclusive_boundaries_float(number_dynamic_model)
     assert "ratio" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_number_invalid_multiple_of_float(number_dynamic_model):
     """Test that non-multiples are rejected for floats."""
     invalid_data = {
@@ -1588,6 +1642,7 @@ def test_failure_number_invalid_multiple_of_float(number_dynamic_model):
     assert "step_value" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_number_invalid_combined_constraints(number_dynamic_model):
     """Test that combined constraints are all enforced."""
     # Test odd number for even_between_10_and_100
@@ -1625,6 +1680,7 @@ def test_failure_number_invalid_combined_constraints(number_dynamic_model):
     assert "even_between_10_and_100" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_success_number_optional_fields_with_none(number_dynamic_model):
     """Test that optional fields can be None."""
     valid_data = {
@@ -1646,6 +1702,7 @@ def test_success_number_optional_fields_with_none(number_dynamic_model):
     assert instance.optional_temperature is None
 
 
+@pytest.mark.ci_cd
 def test_success_number_optional_fields_with_valid_values(number_dynamic_model):
     """Test that optional fields can have valid values."""
     valid_data = {
@@ -1667,6 +1724,7 @@ def test_success_number_optional_fields_with_valid_values(number_dynamic_model):
     assert instance.optional_temperature == 37.5
 
 
+@pytest.mark.ci_cd
 def test_failure_number_optional_fields_with_invalid_values(number_dynamic_model):
     """Test that optional fields still enforce constraints when provided."""
     # Test invalid age in optional field
@@ -1689,6 +1747,7 @@ def test_failure_number_optional_fields_with_invalid_values(number_dynamic_model
     assert "optional_age" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_success_number_floating_point_precision(number_dynamic_model):
     """Test floating point precision edge cases."""
     valid_data = {
@@ -1709,6 +1768,7 @@ def test_success_number_floating_point_precision(number_dynamic_model):
     assert instance.ratio < 1.0
 
 
+@pytest.mark.ci_cd
 def test_success_number_negative_multiples(number_dynamic_model):
     """Test negative values with multipleOf constraint."""
     valid_data = {
@@ -1732,6 +1792,7 @@ def test_success_number_negative_multiples(number_dynamic_model):
 # SUPPORTED TYPES - SUCCESS TEST CASES
 # ============================================================================
 
+@pytest.mark.ci_cd
 def test_success_types_all_valid_types(types_dynamic_model):
     """Test that all valid type values are accepted."""
     valid_data = {
@@ -1770,6 +1831,7 @@ def test_success_types_all_valid_types(types_dynamic_model):
     assert instance.integer_enum == 2
 
 
+@pytest.mark.ci_cd
 def test_success_types_optional_fields_with_none(types_dynamic_model):
     """Test that optional fields can be None."""
     valid_data = {
@@ -1793,6 +1855,7 @@ def test_success_types_optional_fields_with_none(types_dynamic_model):
     assert instance.optional_object is None
 
 
+@pytest.mark.ci_cd
 def test_success_types_any_of_alternative_types(types_dynamic_model):
     """Test anyOf field with different valid types."""
     # Test with string
@@ -1819,6 +1882,7 @@ def test_success_types_any_of_alternative_types(types_dynamic_model):
     assert instance.any_of_field == 999
 
 
+@pytest.mark.ci_cd
 def test_success_types_empty_arrays(types_dynamic_model):
     """Test that empty arrays are valid when allowed."""
     valid_data = {
@@ -1844,6 +1908,7 @@ def test_success_types_empty_arrays(types_dynamic_model):
 # SUPPORTED TYPES - ERROR TEST CASES
 # ============================================================================
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_string_type(types_dynamic_model):
     """Test that invalid string type raises validation error."""
     invalid_data = {
@@ -1865,6 +1930,7 @@ def test_failure_types_invalid_string_type(types_dynamic_model):
     assert "string_field" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_number_type(types_dynamic_model):
     """Test that invalid string type raises validation error."""
     invalid_data = {
@@ -1886,6 +1952,7 @@ def test_failure_types_invalid_number_type(types_dynamic_model):
     assert "number_field" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_boolean_type(types_dynamic_model):
     """Test that invalid boolean type raises validation error."""
     invalid_data = {
@@ -1907,6 +1974,7 @@ def test_failure_types_invalid_boolean_type(types_dynamic_model):
     assert "boolean_field" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_integer_type(types_dynamic_model):
     """Test that invalid integer type raises validation error."""
     invalid_data = {
@@ -1928,6 +1996,7 @@ def test_failure_types_invalid_integer_type(types_dynamic_model):
     assert "integer_field" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_enum_value(types_dynamic_model):
     """Test that invalid enum values raise validation error."""
     invalid_data = {
@@ -1949,6 +2018,7 @@ def test_failure_types_invalid_enum_value(types_dynamic_model):
     assert "string_enum" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_integer_enum_value(types_dynamic_model):
     """Test that invalid integer enum values raise validation error."""
     invalid_data = {
@@ -1970,6 +2040,7 @@ def test_failure_types_invalid_integer_enum_value(types_dynamic_model):
     assert "integer_enum" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_object_structure(types_dynamic_model):
     """Test that invalid object structure raises validation error."""
     invalid_data = {
@@ -1995,6 +2066,7 @@ def test_failure_types_invalid_object_structure(types_dynamic_model):
     assert "zipcode" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_array_item_type(types_dynamic_model):
     """Test that arrays with wrong item types raise validation error."""
     invalid_data = {
@@ -2016,6 +2088,7 @@ def test_failure_types_invalid_array_item_type(types_dynamic_model):
     assert "array_field" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_missing_required_field(types_dynamic_model):
     """Test that missing required fields raise validation error."""
     invalid_data = {
@@ -2037,6 +2110,7 @@ def test_failure_types_missing_required_field(types_dynamic_model):
     assert "string_field" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_any_of_type(types_dynamic_model):
     """Test that invalid anyOf types raise validation error."""
     invalid_data = {
@@ -2058,6 +2132,7 @@ def test_failure_types_invalid_any_of_type(types_dynamic_model):
     assert "any_of_field" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_integer_array_item_type(types_dynamic_model):
     """Test that integer arrays with wrong item types raise validation error."""
     invalid_data = {
@@ -2079,6 +2154,7 @@ def test_failure_types_invalid_integer_array_item_type(types_dynamic_model):
     assert "integer_array" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_complex_any_of_type(types_dynamic_model):
     """Test that complex_any_of rejects invalid union types."""
     invalid_data = {
@@ -2100,6 +2176,7 @@ def test_failure_types_invalid_complex_any_of_type(types_dynamic_model):
     assert "complex_any_of" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_optional_string_type(types_dynamic_model):
     """Test that optional_string rejects non-string values when provided."""
     invalid_data = {
@@ -2123,6 +2200,7 @@ def test_failure_types_invalid_optional_string_type(types_dynamic_model):
     assert "optional_string" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_failure_types_invalid_optional_object_structure(types_dynamic_model):
     """Test that optional_object rejects invalid Address structure when provided."""
     invalid_data = {
@@ -2146,6 +2224,7 @@ def test_failure_types_invalid_optional_object_structure(types_dynamic_model):
     assert "optional_object" in str(exc_info.value) or "zipcode" in str(exc_info.value)
 
 
+@pytest.mark.ci_cd
 def test_success_types_float_as_integer(types_dynamic_model):
     """Test that float values for integer fields are handled correctly."""
     data = {
@@ -2166,6 +2245,7 @@ def test_success_types_float_as_integer(types_dynamic_model):
     assert instance.integer_field == 42
 
 
+@pytest.mark.ci_cd
 def test_failure_types_numeric_string_coercion(types_dynamic_model):
     """Test that numeric strings are not automatically coerced."""
     invalid_data = {
