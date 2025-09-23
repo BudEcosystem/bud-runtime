@@ -464,7 +464,7 @@ class ExperimentService:
                     title=f"Progress Overview of {evaluation.name}",
                     objective=evaluation.description,
                     current=None,
-                    progress=None,
+                    progress=ProgressInfo(percent=0, completed=0, total=0),
                     current_evaluation="",
                     current_model=current_model_name,
                     processing_rate_per_min=0,
