@@ -9,6 +9,7 @@ import { endpointStatusMapping } from "@/lib/colorMapping";
 interface RunHistoryItem {
   runId: string;
   model: string;
+  traitName: string;
   status: "Completed" | "Failed" | "Running";
   startedDate: string;
   duration: string;
@@ -22,15 +23,15 @@ interface RunsHistoryTableProps {
 const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
   const columns: ColumnsType<RunHistoryItem> = [
     {
-      title: "Run ID",
-      dataIndex: "runId",
-      key: "runId",
-      render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
-    },
-    {
       title: "Model",
       dataIndex: "model",
       key: "model",
+      render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
+    },
+    {
+      title: "Trait Name",
+      dataIndex: "traitName",
+      key: "traitName",
       render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
     },
     {
@@ -65,13 +66,11 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
       render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
     },
     {
-      title: "Evaluated Benchmark and Score",
+      title: "Trait Score",
       dataIndex: "benchmarkScore",
       key: "benchmarkScore",
       render: (text: string) => (
         <div className="flex space-x-2">
-          <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-          <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
           <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
         </div>
       ),
