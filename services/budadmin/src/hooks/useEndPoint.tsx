@@ -234,7 +234,7 @@ getEndpointClusterDetails: async (endpointId: string, projectId?) => {
       // successToast(response.data.message);
       return response;
     } catch (error) {
-      console.error("Error creating model:", error);
+      console.error("Error deleting deployment:", error);
     }
   },
   updateEndPoint: async (endpointId: string, data: any) => {
@@ -245,7 +245,7 @@ getEndpointClusterDetails: async (endpointId: string, projectId?) => {
       );
       successToast(response.data.message);
     } catch (error) {
-      console.error("Error creating model:", error);
+      console.error("Error updating deployment:", error);
     }
   },
 getAdapters: async (params: GetAdapterParams, projectId?) => {

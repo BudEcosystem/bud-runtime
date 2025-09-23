@@ -696,7 +696,7 @@ const AnalyticsComponent: React.FC<AnalyticsProps> = ({ data }) => {
           <Image
             preview={false}
             width={20}
-            className="w-[1.5em] h-[1.5e]"
+            className="w-[1.5em] h-[1.5em]"
             src="/icons/yellowPencil.png"
             alt="Logo"
           />

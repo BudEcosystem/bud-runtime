@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 import aiohttp
 from budmicroframe.commons.schemas import WorkflowMetadataResponse
 from fastapi import HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -37,22 +37,34 @@ from budapp.eval_ops.models import (
     Run as RunModel,
 )
 from budapp.eval_ops.schemas import (
+    BudgetStats,
     ConfigureRunsRequest,
     CreateDatasetRequest,
     CreateExperimentRequest,
+    CurrentMetric,
     DatasetFilter,
     EvaluationWorkflowResponse,
     EvaluationWorkflowStepRequest,
+    ExperimentStats,
     ExperimentWorkflowResponse,
     ExperimentWorkflowStepData,
     ExperimentWorkflowStepRequest,
+    JudgeInfo,
     ModelSummary,
+    ProcessingRate,
+    ProgressActions,
+    ProgressDataset,
+    ProgressInfo,
+    ProgressOverview,
+    RuntimeStats,
+    TokenStats,
     TraitBasic,
     TraitSummary,
     UpdateDatasetRequest,
     UpdateExperimentRequest,
     UpdateRunRequest,
 )
+from budapp.eval_ops.schemas import Evaluation as EvaluationSchema
 from budapp.eval_ops.schemas import (
     ExpDataset as DatasetSchema,
 )
@@ -337,34 +349,18 @@ class ExperimentService:
         Raises:
             HTTPException(status_code=404): If experiment not found or access denied.
         """
-        from datetime import datetime
+        logger.info("Getting experiment - services")
 
-        from budapp.eval_ops.schemas import (
-            BudgetStats,
-            CurrentMetric,
-            ExperimentStats,
-            JudgeInfo,
-            ProcessingRate,
-            ProgressActions,
-            ProgressDataset,
-            ProgressInfo,
-            ProgressOverview,
-            RuntimeStats,
-            TokenStats,
-        )
-
+        # Get the Experiment
         ev = self.session.get(ExperimentModel, ev_id)
         if not ev or ev.created_by != user_id or ev.status == "deleted":
-            raise HTTPException(
+            raise ClientException(
+                message="Experiment not found or access denied",
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Experiment not found or access denied",
             )
 
         # Create experiment schema and enrich with models, traits, and status
         exp_data = ExperimentSchema.from_orm(ev)
-        exp_data.models = self.get_models_for_experiment(ev.id)
-        exp_data.traits = self.get_traits_for_experiment(ev.id)
-        exp_data.status = self.compute_experiment_status(ev.id)
 
         # Set default values for stats that are not yet available
         exp_data.stats = ExperimentStats(
@@ -374,55 +370,155 @@ class ExperimentService:
             processing_rate=ProcessingRate(current_per_min=0, target_per_min=0),
         )
 
+        # Objective
         exp_data.objective = ev.description or ""
 
-        # Get real current metrics from experiment runs
-        exp_data.current_metrics = self._get_current_metrics(ev.id)
+        # Traits and Models
+        exp_data.models = self.get_models_for_experiment(ev.id)
 
-        import uuid as uuid_lib
+        # Get all evaluations for the experiment
+        evaluations = (
+            self.session.query(Evaluation)
+            .filter(Evaluation.experiment_id == ev.id)
+            .order_by(Evaluation.created_at.desc())
+            .all()
+        )
 
-        # Generate actual UUIDs for run IDs (for progress_overview demo data)
-        run_id_1 = str(uuid_lib.uuid4())
-        run_id_2 = str(uuid_lib.uuid4())
+        # Extract unique trait IDs from all evaluations
+        trait_ids_set = set()
+        for evaluation in evaluations:
+            if evaluation.trait_ids:
+                trait_ids_set.update(evaluation.trait_ids)
 
-        exp_data.progress_overview = [
-            ProgressOverview(
-                run_id=run_id_1,
-                title="Progress Overview of Run 1",
-                objective="Compare GPT-4 and Claude-3 performance across academic benchmarks",
-                current=ProgressDataset(dataset_label="MMLU - Mathematical Reasoning"),
-                progress=ProgressInfo(percent=65, completed=813, total=1247),
-                current_evaluation="TruthfulQA",
-                current_model="GPT-4 Turbo",
-                processing_rate_per_min=47,
-                average_score_pct=78.5,
-                eta_minutes=45,
-                status="running",
-                actions=ProgressActions(
-                    can_pause=True,
-                    pause_url=f"/experiments/{ev_id}/runs/{run_id_1}/pause",
-                ),
-            ),
-            ProgressOverview(
-                run_id=run_id_2,
-                title="Progress Overview of Run 2",
-                objective="Compare GPT-4 and Claude-3 performance across academic benchmarks",
-                current=ProgressDataset(dataset_label="MMLU - Mathematical Reasoning"),
-                progress=ProgressInfo(percent=65, completed=813, total=1247),
-                current_evaluation="TruthfulQA",
-                current_model="GPT-4 Turbo",
-                processing_rate_per_min=47,
-                average_score_pct=78.5,
-                eta_minutes=45,
-                status="running",
-                actions=ProgressActions(
-                    can_pause=True,
-                    pause_url=f"/experiments/{ev_id}/runs/{run_id_2}/pause",
-                ),
-            ),
+        # Batch fetch all traits at once
+        traits_list = []
+        if trait_ids_set:
+            traits_list = self.session.query(TraitModel).filter(TraitModel.id.in_(list(trait_ids_set))).all()
+        traits_dict = {str(trait.id): trait.name for trait in traits_list}
+        traits = list(traits_dict.values())
+
+        # Build current metrics with placeholder values
+        # Build current metrics in table format: traits as rows, models as columns
+        current_metrics_table = {}
+
+        # Initialize table with traits as keys
+        for trait in traits:
+            current_metrics_table[trait] = {}
+
+        # If no models exist in the experiment, create dummy models for demonstration
+        models_to_use = (
+            exp_data.models
+            if exp_data.models
+            else [
+                # Add some dummy models for demonstration when no real models exist
+                type("MockModel", (), {"name": "GPT-4"})(),
+                type("MockModel", (), {"name": "Claude-3.5"})(),
+                type("MockModel", (), {"name": "Llama-3"})(),
+            ]
+        )
+
+        # For each model used in the experiment, collect scores per trait
+        for model_summary in models_to_use:
+            model_name = model_summary.name
+
+            # Initialize all traits with dummy score data for this model
+            for i, trait in enumerate(traits):
+                # Add some variation to dummy scores based on trait index and model name hash
+                base_score = 0.6 + (hash(f"{model_name}_{trait}") % 40) / 100.0  # Score between 0.6-1.0
+                current_metrics_table[trait][model_name] = {
+                    "value": round(base_score, 3),
+                    "higher_is_better": True,
+                    "status": "completed" if i % 2 == 0 else "pending",  # Mix of completed and pending
+                }
+
+            # Get actual scores from evaluations if available
+            # This would need to be implemented based on your actual metrics/results structure
+            # For now using dummy placeholder values above
+
+        # Convert table format to list of dictionaries
+        exp_data.current_metrics = []
+        for trait_name, model_scores in current_metrics_table.items():
+            metric_dict = {
+                "trait_name": trait_name,
+                "model_scores": model_scores,  # Dictionary of model_name -> {value, higher_is_better, status}
+            }
+            exp_data.current_metrics.append(metric_dict)
+
+        # Get evaluations with Running & Pending status
+        evaluations_running = [
+            eval
+            for eval in evaluations
+            if eval.status in [EvaluationStatusEnum.RUNNING.value, EvaluationStatusEnum.PENDING.value]
         ]
 
-        exp_data.updated_at = datetime.fromisoformat("2024-01-13T00:00:00Z")
+        # Batch fetch all runs for running evaluations
+        evaluation_ids = [eval.id for eval in evaluations_running]
+        all_runs = []
+        if evaluation_ids:
+            all_runs = (
+                self.session.query(RunModel)
+                .filter(
+                    RunModel.evaluation_id.in_(evaluation_ids),
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .order_by(RunModel.created_at.desc())
+                .all()
+            )
+
+        # Group runs by evaluation_id
+        evaluation_runs_map = {}
+        for run in all_runs:
+            if run.evaluation_id not in evaluation_runs_map:
+                evaluation_runs_map[run.evaluation_id] = []
+            evaluation_runs_map[run.evaluation_id].append(run)
+
+        # Collect all unique model IDs from runs
+        model_ids = set()
+        for runs in evaluation_runs_map.values():
+            for run in runs:
+                if run.model_id:
+                    model_ids.add(run.model_id)
+
+        # Batch fetch all models at once
+        models_dict = {}
+        if model_ids:
+            models = self.session.query(ModelTable).filter(ModelTable.id.in_(list(model_ids))).all()
+            models_dict = {model.id: model for model in models}
+
+        # Build progress overview with cached model data
+        progress_overview = []
+        for evaluation in evaluations_running:
+            eval_runs = evaluation_runs_map.get(evaluation.id, [])
+            current_model_name = ""
+
+            if eval_runs and eval_runs[0].model_id:
+                model = models_dict.get(eval_runs[0].model_id)
+                if model:
+                    current_model_name = model.name
+                else:
+                    # Log missing model but don't fail
+                    logger.warning(f"Model {eval_runs[0].model_id} not found in database")
+                    current_model_name = "Unknown Model"
+
+            progress_overview.append(
+                ProgressOverview(
+                    run_id=str(evaluation.id),
+                    title=f"Progress Overview of {evaluation.name}",
+                    objective=evaluation.description,
+                    current=None,
+                    progress=ProgressInfo(percent=0, completed=0, total=0),
+                    current_evaluation="",
+                    current_model=current_model_name,
+                    processing_rate_per_min=0,
+                    average_score_pct=0,
+                    eta_minutes=25,
+                    status=evaluation.status,
+                    actions=None,
+                )
+            )
+
+        # Final Response
+        exp_data.progress_overview = progress_overview
 
         return exp_data
 
@@ -1733,7 +1829,17 @@ class ExperimentWorkflowService:
 
             # If this is the final step and trigger_workflow is True, create the experiment
             if request.step_number == 5 and request.trigger_workflow:
-                await self._create_experiment_from_workflow(workflow.id, current_user_id)
+                experiment_id = await self._create_experiment_from_workflow(workflow.id, current_user_id)
+
+                # Store the experiment_id in a workflow step for retrieval
+                await WorkflowStepDataManager(self.session).insert_one(
+                    WorkflowStepModel(
+                        workflow_id=workflow.id,
+                        step_number=6,  # Use step 6 to store the result
+                        data={"experiment_id": str(experiment_id)},
+                    )
+                )
+
                 # Mark workflow as completed
                 # await WorkflowDataManager(self.session).update_by_fields(
                 #     workflow,
@@ -1903,6 +2009,10 @@ class ExperimentWorkflowService:
             {"workflow_id": workflow_id, "step_number": step_number},
             missing_ok=True,
         )
+
+        step_data = stage_data.copy()  # Create a copy to avoid modifying original
+        if "experiment_id" in stage_data:
+            step_data["experiment_id"] = str(stage_data["experiment_id"])
 
         if existing_step:
             # Update existing step
@@ -2268,8 +2378,10 @@ class EvaluationWorkflowService:
                     detail=f"Invalid step number {request.step_number}. Must be between 1 and 5",
                 )
 
-            # Store workflow step data
-            await self._store_workflow_step(workflow.id, request.step_number, request.stage_data)
+            # Store workflow step data with experiment_id included
+            stage_data_with_experiment = request.stage_data.copy()
+            stage_data_with_experiment["experiment_id"] = str(experiment_id)
+            await self._store_workflow_step(workflow.id, request.step_number, stage_data_with_experiment)
 
             # Validate step 4 dataset-trait relationships
             if request.step_number == 4:
@@ -2590,6 +2702,7 @@ class EvaluationWorkflowService:
         all_data = await self._get_accumulated_step_data(workflow_id)
         model_id = all_data.get("step_2", {}).get("model_id")
         dataset_ids = all_data.get("step_4", {}).get("dataset_ids", [])
+        trait_ids = all_data.get("step_3", {}).get("trait_ids", [])
 
         # Common details for evaluation
         evaluation_name = all_data.get("step_1", {}).get("name", "Evaluation")
@@ -2624,6 +2737,16 @@ class EvaluationWorkflowService:
                 detail=f"Invalid model ID format: {model_id}",
             )
 
+        # Convert trait_ids to strings for JSONB storage
+        trait_id_strings = []
+        for trait_id in trait_ids:
+            try:
+                # Validate as UUID and convert to string for JSONB storage
+                validated_uuid = uuid.UUID(str(trait_id))
+                trait_id_strings.append(str(validated_uuid))
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid trait ID format: {trait_id}, skipping")
+
         # Create Evaluation
         evaluation = Evaluation(
             experiment_id=experiment_id,
@@ -2632,6 +2755,7 @@ class EvaluationWorkflowService:
             workflow_id=workflow_id,
             created_by=current_user_id,
             status=EvaluationStatusEnum.PENDING.value,
+            trait_ids=trait_id_strings,
         )
         self.session.add(evaluation)
         self.session.flush()

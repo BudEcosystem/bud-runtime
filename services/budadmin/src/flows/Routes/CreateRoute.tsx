@@ -148,7 +148,7 @@ export default function CreateRoute() {
                   options={[
                     { value: "SimpleShuffle", label: "Simple Shuffle" },
                     { value: "LeastBusy", label: "Least Busy" },
-                    { value: "Advanced", label: "Advanced" },
+                    // { value: "Advanced", label: "Advanced" },
                   ]}
                 />
               </div>

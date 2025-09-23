@@ -38,6 +38,7 @@ class RetrieveWorkflowStepData(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
+    experiment_id: UUID4 | None = None
     provider_type: ModelProviderTypeEnum | GuardrailProviderTypeEnum | None = None
     provider: Provider | None = None
     cloud_model: CloudModel | None = None

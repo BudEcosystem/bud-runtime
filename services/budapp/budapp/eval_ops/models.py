@@ -1,6 +1,7 @@
 # budapp/eval_ops/models.py
 
 from enum import Enum as PyEnum
+from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
@@ -94,6 +95,7 @@ class Evaluation(Base, TimestampMixin):
         nullable=False,
         default=EvaluationStatusEnum.PENDING.value,
     )
+    trait_ids: Mapped[Optional[list[str]]] = mapped_column(JSONB, nullable=True)
 
     # Relationships
     experiment = relationship("Experiment", back_populates="evaluations")
