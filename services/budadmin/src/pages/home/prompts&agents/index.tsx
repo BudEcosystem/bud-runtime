@@ -31,128 +31,17 @@ import { PermissionEnum, useUser } from "src/stores/useUser";
 import { PlusOutlined } from "@ant-design/icons";
 import { useAgentStore } from "@/stores/useAgentStore";
 import AgentDrawer from "@/components/agents/AgentDrawer";
+import { usePromptsAgents, type PromptAgent } from "@/stores/usePromptsAgents";
 
-// Types
-interface PromptAgent {
-  id: string;
-  name: string;
-  description: string;
-  type: 'prompt' | 'agent';
-  category: string;
-  tags: string[];
-  created_at: string;
-  modified_at: string;
-  author: string;
-  usage_count: number;
-  rating: number;
-  is_public: boolean;
-  icon?: string;
-  parameters?: any;
-  version: string;
-}
-
-// Mock data for demonstration
-const mockPromptsAgents: PromptAgent[] = [
-  {
-    id: "1",
-    name: "Code Review Assistant",
-    description: "An intelligent agent that performs comprehensive code reviews with security, performance, and best practice checks",
-    type: "agent",
-    category: "Development",
-    tags: ["code-review", "security", "performance", "best-practices"],
-    created_at: "2024-01-15T10:00:00Z",
-    modified_at: "2024-01-20T14:30:00Z",
-    author: "BudAI Team",
-    usage_count: 1250,
-    rating: 4.8,
-    is_public: true,
-    version: "1.2.0"
-  },
-  {
-    id: "2",
-    name: "SQL Query Optimizer",
-    description: "Analyzes and optimizes SQL queries for better performance and efficiency",
-    type: "prompt",
-    category: "Database",
-    tags: ["sql", "optimization", "database", "performance"],
-    created_at: "2024-01-10T09:00:00Z",
-    modified_at: "2024-01-18T11:00:00Z",
-    author: "Data Team",
-    usage_count: 890,
-    rating: 4.6,
-    is_public: true,
-    version: "2.0.0"
-  },
-  {
-    id: "3",
-    name: "Documentation Generator",
-    description: "Automatically generates comprehensive documentation from code comments and structure",
-    type: "agent",
-    category: "Documentation",
-    tags: ["documentation", "automation", "markdown", "api-docs"],
-    created_at: "2024-01-08T08:00:00Z",
-    modified_at: "2024-01-16T10:00:00Z",
-    author: "DevOps Team",
-    usage_count: 2100,
-    rating: 4.9,
-    is_public: true,
-    version: "3.1.0"
-  },
-  {
-    id: "4",
-    name: "Test Case Generator",
-    description: "Creates comprehensive test cases based on code analysis and requirements",
-    type: "prompt",
-    category: "Testing",
-    tags: ["testing", "qa", "automation", "unit-tests"],
-    created_at: "2024-01-05T07:00:00Z",
-    modified_at: "2024-01-14T09:00:00Z",
-    author: "QA Team",
-    usage_count: 1500,
-    rating: 4.7,
-    is_public: true,
-    version: "1.5.0"
-  },
-  {
-    id: "5",
-    name: "Security Vulnerability Scanner",
-    description: "Scans code for security vulnerabilities and provides remediation suggestions",
-    type: "agent",
-    category: "Security",
-    tags: ["security", "vulnerability", "scanning", "compliance"],
-    created_at: "2024-01-03T06:00:00Z",
-    modified_at: "2024-01-12T08:00:00Z",
-    author: "Security Team",
-    usage_count: 3200,
-    rating: 4.95,
-    is_public: true,
-    version: "4.0.0"
-  },
-  {
-    id: "6",
-    name: "API Response Formatter",
-    description: "Formats and structures API responses according to best practices",
-    type: "prompt",
-    category: "API",
-    tags: ["api", "formatting", "rest", "json"],
-    created_at: "2024-01-01T05:00:00Z",
-    modified_at: "2024-01-10T07:00:00Z",
-    author: "API Team",
-    usage_count: 750,
-    rating: 4.5,
-    is_public: true,
-    version: "1.0.0"
-  }
-];
 
 function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) {
   const { openDrawer } = useDrawer();
 
-  const getTypeColor = (type: string) => {
+  const getTypeColor = (type?: string) => {
     return type === 'agent' ? '#965CDE' : '#5CADFF';
   };
 
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = (type?: string) => {
     return type === 'agent' ? '>' : '=�';
   };
 
@@ -169,23 +58,23 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
       <div className="px-[1.6rem] min-h-[230px]">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-[2.40125rem] h-[2.40125rem] bg-[#1F1F1F] rounded-[5px] flex items-center justify-center text-[1.2rem]">
-            {getTypeIcon(item.type)}
+            {getTypeIcon(item.prompt_type)}
           </div>
           <Tag
             className="border-0 rounded-[4px] px-2 py-1"
             style={{
-              backgroundColor: getTypeColor(item.type) + '20',
-              color: getTypeColor(item.type),
+              backgroundColor: getTypeColor(item.prompt_type) + '20',
+              color: getTypeColor(item.prompt_type),
             }}
           >
-            {item.type === 'agent' ? 'Agent' : 'Prompt'}
+            {item.prompt_type === 'agent' ? 'Agent' : 'Prompt'}
           </Tag>
         </div>
 
-        {item?.modified_at && (
+        {(item?.updated_at || item?.created_at) && (
           <div className="mt-[1.2rem]">
             <Text_11_400_808080>
-              {formatDate(item?.created_at)}
+              {formatDate(item?.updated_at || item?.created_at)}
             </Text_11_400_808080>
           </div>
         )}
@@ -201,7 +90,7 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
         </Text_13_400_B3B3B3>
 
         <div className="flex items-center flex-wrap py-[1.1em] gap-[.3rem]">
-          {item.tags.slice(0, 3).map((tag, idx) => (
+          {(item.tags || []).slice(0, 3).map((tag, idx) => (
             <Tag
               key={idx}
               className="text-[#B3B3B3] border-[0] rounded-[6px] py-[.3rem] px-[.4rem]"
@@ -215,7 +104,7 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
               </div>
             </Tag>
           ))}
-          {item.tags.length > 3 && (
+          {(item.tags || []).length > 3 && (
             <Tag
               className="text-[#B3B3B3] border-[0] rounded-[6px] py-[.3rem] px-[.4rem]"
               style={{
@@ -224,7 +113,7 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
               }}
             >
               <div className="text-[0.625rem] font-[400] leading-[100%]" style={{ color: "#808080" }}>
-                +{item.tags.length - 3}
+                +{(item.tags || []).length - 3}
               </div>
             </Tag>
           )}
@@ -234,7 +123,7 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
       <div className="px-[1.6rem] pt-[.9rem] pb-[1rem] bg-[#161616] border-t-[.5px] border-t-[#1F1F1F] min-h-[32%]">
         <div className="flex items-center justify-between mb-2">
           <Text_12_400_B3B3B3>Usage & Rating</Text_12_400_B3B3B3>
-          <Text_12_400_B3B3B3>v{item.version}</Text_12_400_B3B3B3>
+          <Text_12_400_B3B3B3>v{item.version || '1.0.0'}</Text_12_400_B3B3B3>
         </div>
 
         <div className="flex items-center justify-between">
@@ -247,7 +136,7 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
               }}
             >
               <div className="text-[0.625rem] font-[400] leading-[100%]" style={{ color: "#EEEEEE" }}>
-                {item.usage_count.toLocaleString()} uses
+                {(item.usage_count || 0).toLocaleString()} uses
               </div>
             </Tag>
 
@@ -259,7 +148,7 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
               }}
             >
               <div className="text-[0.625rem] font-[400] leading-[100%]" style={{ color: "#EEEEEE" }}>
-                P {item.rating}
+                P {item.rating || 0}
               </div>
             </Tag>
           </div>
@@ -272,7 +161,7 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
             }}
           >
             <div className="text-[0.625rem] font-[400] leading-[100%]" style={{ color: "#EEEEEE" }}>
-              {item.category}
+              {item.category || 'Uncategorized'}
             </div>
           </Tag>
         </div>
@@ -344,63 +233,54 @@ export default function PromptsAgents() {
   const { openDrawer } = useDrawer();
   const { openAgentDrawer } = useAgentStore();
 
+  // Use the store
+  const {
+    filteredPrompts,
+    isLoading,
+    searchQuery,
+    selectedType,
+    selectedCategory,
+    selectedAuthor,
+    selectedTags,
+    ratingMin,
+    ratingMax,
+    categories,
+    authors,
+    allTags,
+    fetchPrompts,
+    setSearchQuery,
+    setSelectedType,
+    setSelectedCategory,
+    setSelectedAuthor,
+    setSelectedTags,
+    setRatingRange,
+    applyFilters,
+    resetFilters: storeResetFilters,
+  } = usePromptsAgents();
+
   // State
-  const [filteredData, setFilteredData] = useState<PromptAgent[]>(mockPromptsAgents);
   const [currentPage, setCurrentPage] = useState(1);
   const [tempFilter, setTempFilter] = useState<any>(defaultFilter);
   const [filter, setFilter] = useState<any>(defaultFilter);
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [filterReset, setFilterReset] = useState(false);
 
-  // Mock data for filters
-  const categories = ["Development", "Database", "Documentation", "Testing", "Security", "API"];
-  const authors = ["BudAI Team", "Data Team", "DevOps Team", "QA Team", "Security Team", "API Team"];
-  const allTags = Array.from(new Set(mockPromptsAgents.flatMap(item => item.tags)));
-
   const load = useCallback(
     async (filter: any) => {
-      showLoader();
-
-      // Simulate API call with filtering
-      let filtered = [...mockPromptsAgents];
-
-      if (filter.name) {
-        filtered = filtered.filter(item =>
-          item.name.toLowerCase().includes(filter.name.toLowerCase()) ||
-          item.description.toLowerCase().includes(filter.name.toLowerCase())
-        );
+      // Update store filters
+      if (filter.name !== undefined) setSearchQuery(filter.name);
+      if (filter.type !== undefined) setSelectedType(filter.type);
+      if (filter.category !== undefined) setSelectedCategory(filter.category);
+      if (filter.author !== undefined) setSelectedAuthor(filter.author);
+      if (filter.tags !== undefined) setSelectedTags(filter.tags);
+      if (filter.rating_min !== undefined || filter.rating_max !== undefined) {
+        setRatingRange(filter.rating_min, filter.rating_max);
       }
 
-      if (filter.type) {
-        filtered = filtered.filter(item => item.type === filter.type);
-      }
-
-      if (filter.category) {
-        filtered = filtered.filter(item => item.category === filter.category);
-      }
-
-      if (filter.author) {
-        filtered = filtered.filter(item => item.author === filter.author);
-      }
-
-      if (filter.tags?.length > 0) {
-        filtered = filtered.filter(item =>
-          filter.tags.some((tag: string) => item.tags.includes(tag))
-        );
-      }
-
-      if (filter.rating_min) {
-        filtered = filtered.filter(item => item.rating >= filter.rating_min);
-      }
-
-      if (filter.rating_max) {
-        filtered = filtered.filter(item => item.rating <= filter.rating_max);
-      }
-
-      setFilteredData(filtered);
-      hideLoader();
+      // Apply filters will trigger the API call
+      await applyFilters();
     },
-    []
+    [setSearchQuery, setSelectedType, setSelectedCategory, setSelectedAuthor, setSelectedTags, setRatingRange, applyFilters]
   );
 
   const handleOpenChange = (open: boolean) => {
@@ -408,18 +288,19 @@ export default function PromptsAgents() {
     setTempFilter(filter);
   };
 
-  const applyFilter = () => {
+  const applyFilter = async () => {
     setFilterOpen(false);
     setFilter(tempFilter);
     setCurrentPage(1);
-    load(tempFilter);
+    await load(tempFilter);
     setFilterReset(false);
   };
 
-  const resetFilter = () => {
+  const resetFilter = async () => {
     setTempFilter(defaultFilter);
     setCurrentPage(1);
     setFilterReset(true);
+    await storeResetFilters();
   };
 
   const removeSelectedTag = (key: string, item: any) => {
@@ -440,14 +321,17 @@ export default function PromptsAgents() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      load(filter);
+      if (filter.name !== undefined) {
+        setSearchQuery(filter.name);
+        fetchPrompts();
+      }
       setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
   }, [filter.name]);
 
   useEffect(() => {
-    load(defaultFilter);
+    fetchPrompts();
   }, []);
 
   return (
@@ -525,7 +409,7 @@ export default function PromptsAgents() {
                                   size="large"
                                   className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
                                   options={[
-                                    { label: "Prompt", value: "prompt" },
+                                    { label: "Prompt", value: "simple_prompt" },
                                     { label: "Agent", value: "agent" },
                                   ]}
                                   onChange={(value) => {
@@ -772,9 +656,13 @@ export default function PromptsAgents() {
                   removeSelectedTag(key, item);
                 }}
               />
-              {filteredData?.length > 0 ? (
+              {isLoading ? (
+                <div className="flex items-center justify-center h-[60vh]">
+                  <div className="text-[#B3B3B3]">Loading prompts and agents...</div>
+                </div>
+              ) : filteredPrompts?.length > 0 ? (
                 <div className="grid gap-[1.1rem] grid-cols-3 1680px:mt-[1.75rem] pb-[1.1rem]">
-                  {filteredData.map((item, index) => (
+                  {filteredPrompts.map((item, index) => (
                     <PromptAgentCard key={item.id} item={item} index={index} />
                   ))}
                 </div>

@@ -151,7 +151,9 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     {
       label: "Prompts",
       route: "/prompts&agents",
-      iconSvg: true,
+      icon: '/icons/prompt.png',
+      iconWhite: '/icons/promptWhite.png',
+      // iconSvg: true,
       cmd: "7",
       customSvg: "prompts",
     },
