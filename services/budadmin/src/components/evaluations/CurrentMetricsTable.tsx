@@ -63,8 +63,8 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
             return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
           }
           // Convert to percentage (multiply by 100 if value is between 0 and 1)
-          const displayValue = scoreData.value <= 1 ? (scoreData.value * 100).toFixed(1) : scoreData.value.toFixed(1);
-          return <Text_12_400_EEEEEE>{displayValue}%</Text_12_400_EEEEEE>;
+          const displayValue = scoreData.value;
+          return <Text_12_400_EEEEEE>{displayValue}</Text_12_400_EEEEEE>;
         },
       });
     });
