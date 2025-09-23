@@ -1,3 +1,5 @@
+import { Pending } from "src/flows/components/StatusIcons";
+
 export const endpointStatusMapping = {
   "Not Started": "#EEEEEE",
   "Not Available": "#EC7575",
@@ -15,6 +17,7 @@ export const endpointStatusMapping = {
   Stopped: "#DE5CD1",
   Available: "#479D5F",
   Invited: "#D1B854",
+  Pending: "#D1B854",
   Active: "#479D5F",
   Success: "#479D5F",
 };

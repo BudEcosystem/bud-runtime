@@ -95,7 +95,7 @@ export default function CommonStatus({
         } else {
             data = response.data;
         }
-        if(success_payload_type == 'performance_benchmark') {
+        if (success_payload_type == 'performance_benchmark') {
             data = response?.data
         }
         const newSteps = data?.workflow_steps[events_field_id]?.steps;
@@ -115,7 +115,7 @@ export default function CommonStatus({
     }, [workflowId]);
 
     const handleNotification = useCallback(async (data: any) => {
-
+        console.log(`data`, data)
         try {
             if (!data) {
                 return;
@@ -152,11 +152,13 @@ export default function CommonStatus({
             // getWorkflow();
             onFailed();
         }
+        console.log(`data.message`, data.message)
     }, [steps, workflowId]);
 
     useEffect(() => {
         console.log(`socket`, socket)
         if (socket) {
+            console.log(handleNotification)
             socket.on("notification_received", handleNotification);
         }
 

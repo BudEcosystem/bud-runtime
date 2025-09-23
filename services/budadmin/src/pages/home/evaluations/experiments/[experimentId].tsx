@@ -21,6 +21,7 @@ import { Image } from "antd";
 import { CustomBreadcrumb } from "@/components/ui/bud/card/DrawerBreadCrumbNavigation";
 import Tags from "src/flows/components/DrawerTags";
 import { useDrawer } from "src/hooks/useDrawer";
+import { capitalize } from "@/lib/utils";
 
 interface ExperimentDetails {
   id: string;
@@ -359,7 +360,7 @@ const ExperimentDetailsPage = () => {
                     eta: `${progressItem.eta_minutes} min`,
                     processingRate: progressItem.processing_rate_per_min,
                     averageScore: progressItem.average_score_pct,
-                    status: progressItem.status === "running" ? "Running" as const : "Completed" as const,
+                    status: progressItem.status,
                     progress: progressItem.progress.percent,
                     progressCompleted: progressItem.progress.completed,
                     progressTotal: progressItem.progress.total,
