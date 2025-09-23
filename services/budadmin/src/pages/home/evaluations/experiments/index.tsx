@@ -467,7 +467,7 @@ const ExperimentsTable = () => {
           title={() => (
             <div className="flex justify-between items-center px-[0.75rem] py-[1rem]">
               <Text_16_600_FFFFFF>Experiments</Text_16_600_FFFFFF>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 hidden">
                 <SearchHeaderInput
                   searchValue={searchValue}
                   setSearchValue={setSearchValue}
