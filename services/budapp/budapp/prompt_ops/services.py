@@ -105,6 +105,20 @@ class PromptService(SessionMixin):
             endpoint = default_version_obj.endpoint if default_version_obj else None
             model = default_version_obj.model if default_version_obj else None
 
+            # Determine the model icon based on provider type
+            model_icon = None
+            if model:
+                if (
+                    model.provider_type in [ModelProviderTypeEnum.HUGGING_FACE, ModelProviderTypeEnum.CLOUD_MODEL]
+                    and model.provider_id
+                    and model.provider
+                ):
+                    # Use provider icon for cloud and HF models
+                    model_icon = model.provider.icon
+                else:
+                    # Use model's own icon
+                    model_icon = model.icon
+
             prompt_item = PromptListItem(
                 id=prompt.id,
                 name=prompt.name,
@@ -113,7 +127,7 @@ class PromptService(SessionMixin):
                 created_at=prompt.created_at,
                 modified_at=prompt.modified_at,
                 prompt_type=prompt.prompt_type,
-                model_icon=model.icon if model else None,
+                model_icon=model_icon,
                 model_name=model.name if model else "",
                 default_version=default_version_obj.version if default_version_obj else None,
                 modality=model.modality if model else None,
