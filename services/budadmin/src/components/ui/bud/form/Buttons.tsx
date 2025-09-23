@@ -42,6 +42,7 @@ export function PrimaryButton({
                 paddingLeft: ".7rem",
                 paddingRight: ".7rem",
                 cursor: "not-allowed",
+                borderRadius: "0.3rem",
               }}
             >
               {Children}
@@ -68,6 +69,7 @@ export function PrimaryButton({
             minWidth: "4rem",
             paddingLeft: ".7rem",
             paddingRight: ".7rem",
+            borderRadius: "0.3rem",
           }}
         >
           {!permission ? (

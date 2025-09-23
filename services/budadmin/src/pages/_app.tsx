@@ -1,5 +1,6 @@
 import "@/styles/globals.css";
 import "@/styles/globals.scss";
+import "@/styles/agents.scss";
 import "@radix-ui/themes/styles.css";
 import "antd/dist/reset.css"; // Ant Design's base CSS reset
 

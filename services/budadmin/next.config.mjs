@@ -151,6 +151,11 @@ export default {
         source: '/guardrails',
         destination: '/home/guardrails',
       },
+
+      {
+        source: '/prompts&agents',
+        destination: '/home/prompts&agents',
+      },
     ];
   },
   env: {
