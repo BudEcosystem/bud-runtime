@@ -1,6 +1,7 @@
 # budapp/eval_ops/models.py
 
 from enum import Enum as PyEnum
+from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
@@ -40,6 +41,13 @@ class ModalityEnum(PyEnum):
     EMBEDDING = "embedding"  # Embedding data, e.g., vector representations of text, images, or audio
 
 
+class EvaluationStatusEnum(PyEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 # ------------------------ Core Tables ------------------------
 
 
@@ -52,7 +60,10 @@ class Experiment(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(
-        PG_ENUM(*[e.value for e in ExperimentStatusEnum], name="experiment_status_enum"),
+        PG_ENUM(
+            *[e.value for e in ExperimentStatusEnum],
+            name="experiment_status_enum",
+        ),
         nullable=False,
         default=ExperimentStatusEnum.ACTIVE.value,
     )
@@ -62,6 +73,33 @@ class Experiment(Base, TimestampMixin):
 
     # Relationships
     runs = relationship("Run", back_populates="experiment", cascade="all, delete-orphan")
+    evaluations = relationship("Evaluation", back_populates="experiment", cascade="all, delete-orphan")
+
+
+class Evaluation(Base, TimestampMixin):
+    """Evaluations represent grouped model-dataset testing sessions within an experiment."""
+
+    __tablename__ = "evaluations"
+
+    id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    experiment_id: Mapped[uuid4] = mapped_column(ForeignKey("experiments.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=True)
+    workflow_id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    created_by: Mapped[uuid4] = mapped_column(ForeignKey("user.id"), nullable=False)
+    status: Mapped[str] = mapped_column(
+        PG_ENUM(
+            *[e.value for e in EvaluationStatusEnum],
+            name="evaluation_status_enum",
+        ),
+        nullable=False,
+        default=EvaluationStatusEnum.PENDING.value,
+    )
+    trait_ids: Mapped[Optional[list[str]]] = mapped_column(JSONB, nullable=True)
+
+    # Relationships
+    experiment = relationship("Experiment", back_populates="evaluations")
+    runs = relationship("Run", back_populates="evaluation", cascade="all, delete-orphan")
 
 
 class Run(Base, TimestampMixin):
@@ -72,6 +110,9 @@ class Run(Base, TimestampMixin):
 
     id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     experiment_id: Mapped[uuid4] = mapped_column(ForeignKey("experiments.id"), nullable=False)
+    evaluation_id: Mapped[uuid4] = mapped_column(
+        ForeignKey("evaluations.id"), nullable=True
+    )  # Nullable for backward compatibility
     run_index: Mapped[int] = mapped_column(Integer, nullable=False)  # Auto-incrementing index per experiment
     model_id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     dataset_version_id: Mapped[uuid4] = mapped_column(ForeignKey("exp_dataset_versions.id"), nullable=False)
@@ -84,6 +125,7 @@ class Run(Base, TimestampMixin):
 
     # Relationships
     experiment = relationship("Experiment", back_populates="runs")
+    evaluation = relationship("Evaluation", back_populates="runs")
     dataset_version = relationship("ExpDatasetVersion", back_populates="runs")
     metrics = relationship("ExpMetric", back_populates="run", cascade="all, delete-orphan")
     raw_results = relationship("ExpRawResult", back_populates="run", cascade="all, delete-orphan")
@@ -113,7 +155,12 @@ class ExpTrait(Base, TimestampMixin):
     icon: Mapped[str] = mapped_column(String, nullable=True)
 
     # Relationships
-    datasets = relationship("ExpDataset", secondary="exp_traits_dataset_pivot", back_populates="traits", lazy="select")
+    datasets = relationship(
+        "ExpDataset",
+        secondary="exp_traits_dataset_pivot",
+        back_populates="traits",
+        lazy="select",
+    )
 
 
 class ExpDataset(Base, TimestampMixin):
@@ -150,8 +197,17 @@ class ExpDataset(Base, TimestampMixin):
     )  # Stores evaluation type configurations like {"gen": "demo_gsm8k_chat_gen", "ppl": "config_name"}
 
     # Relationships
-    versions = relationship("ExpDatasetVersion", back_populates="dataset", cascade="all, delete-orphan")
-    traits = relationship("ExpTrait", secondary="exp_traits_dataset_pivot", back_populates="datasets", lazy="select")
+    versions = relationship(
+        "ExpDatasetVersion",
+        back_populates="dataset",
+        cascade="all, delete-orphan",
+    )
+    traits = relationship(
+        "ExpTrait",
+        secondary="exp_traits_dataset_pivot",
+        back_populates="datasets",
+        lazy="select",
+    )
 
 
 class ExpTraitsDatasetPivot(Base, TimestampMixin):
@@ -181,7 +237,14 @@ class ExpDatasetVersion(Base, TimestampMixin):
 
 class ExpMetric(Base):
     __tablename__ = "exp_metrics"
-    __table_args__ = (UniqueConstraint("run_id", "metric_name", "mode", name="uq_expmetrics_run_metric_mode"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id",
+            "metric_name",
+            "mode",
+            name="uq_expmetrics_run_metric_mode",
+        ),
+    )
 
     id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     run_id: Mapped[uuid4] = mapped_column(ForeignKey("runs.id"), nullable=False)

@@ -1,10 +1,10 @@
+use std::collections::HashMap;
 use tensorzero_internal::inference::types::{
     AudioTranscriptionInferenceResult, AudioTranslationInferenceResult, AudioType,
     EmbeddingInferenceResult, ImageData, ImageGenerationInferenceResult, InferenceResult,
     ModerationInferenceResult, ModerationResult, TextToSpeechInferenceResult, Usage,
 };
 use uuid::Uuid;
-use std::collections::HashMap;
 
 #[test]
 fn test_embedding_inference_result_creation() {
@@ -181,9 +181,18 @@ fn test_moderation_inference_result_creation() {
 fn test_audio_type_serialization() {
     use serde_json;
 
-    assert_eq!(serde_json::to_string(&AudioType::Transcription).unwrap(), "\"transcription\"");
-    assert_eq!(serde_json::to_string(&AudioType::Translation).unwrap(), "\"translation\"");
-    assert_eq!(serde_json::to_string(&AudioType::TextToSpeech).unwrap(), "\"text_to_speech\"");
+    assert_eq!(
+        serde_json::to_string(&AudioType::Transcription).unwrap(),
+        "\"transcription\""
+    );
+    assert_eq!(
+        serde_json::to_string(&AudioType::Translation).unwrap(),
+        "\"translation\""
+    );
+    assert_eq!(
+        serde_json::to_string(&AudioType::TextToSpeech).unwrap(),
+        "\"text_to_speech\""
+    );
 }
 
 #[test]
@@ -205,19 +214,20 @@ fn test_inference_result_endpoint_type_mapping() {
 
     assert_eq!(embedding_result.endpoint_type(), "embedding");
 
-    let audio_transcription = InferenceResult::AudioTranscription(AudioTranscriptionInferenceResult {
-        inference_id,
-        created: 1642694400,
-        text: "test".to_string(),
-        language: None,
-        duration_seconds: None,
-        words: None,
-        segments: None,
-        usage: Default::default(),
-        model_inference_results: vec![],
-        inference_params: Default::default(),
-        original_response: None,
-    });
+    let audio_transcription =
+        InferenceResult::AudioTranscription(AudioTranscriptionInferenceResult {
+            inference_id,
+            created: 1642694400,
+            text: "test".to_string(),
+            language: None,
+            duration_seconds: None,
+            words: None,
+            segments: None,
+            usage: Default::default(),
+            model_inference_results: vec![],
+            inference_params: Default::default(),
+            original_response: None,
+        });
 
     assert_eq!(audio_transcription.endpoint_type(), "audio_transcription");
 }

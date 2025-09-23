@@ -273,6 +273,9 @@ ModelSourceEnum = create_dynamic_enum(
         "bedrock",
         "text-completion-codestral",
         "huggingface",
+        "bud_sentinel",
+        "azure_content_safety",
+        "aws_comprehend",
     ],
 )
 
@@ -796,6 +799,9 @@ class ProxyProviderEnum(StrEnum):
     TOGETHER = "together"
     XAI = "xai"
     BUD_SENTINEL = "bud-sentinel"
+    BUDDOC = "buddoc"
+    AZURE_CONTENT_SAFETY = "azure-content-safety"
+    AWS_COMPREHEND = "aws-comprehend"
 
 
 # class ModelTemplateTypeEnum(StrEnum):
@@ -3057,19 +3063,20 @@ class ModelEndpointEnum(Enum):
 
     CHAT = "/v1/chat/completions"
     COMPLETION = "/v1/completions"
-    IMAGE_GENERATION = "/v1/images/generations"
-    IMAGE_EDIT = "/v1/images/edits"
-    IMAGE_VARIATION = "/v1/images/variations"
+    EMBEDDING = "/v1/embeddings"
+    RESPONSES = "/v1/responses"
     AUDIO_TRANSCRIPTION = "/v1/audio/transcriptions"
     AUDIO_TRANSLATION = "/v1/audio/translations"
     TEXT_TO_SPEECH = "/v1/audio/speech"
-    REALTIME_SESSION = "/v1/realtime/sessions"
-    REALTIME_TRANSCRIPTION = "/v1/realtime/transcription_sessions"
-    EMBEDDING = "/v1/embeddings"
+    DOCUMENT = "/v1/documents"  # Document processing endpoint for MLLM models
     BATCH = "/v1/batch"
-    RESPONSES = "/v1/responses"
+    IMAGE_GENERATION = "/v1/images/generations"
+    IMAGE_EDIT = "/v1/images/edits"
+    IMAGE_VARIATION = "/v1/images/variations"
     RERANK = "/v1/rerank"  # https://docs.litellm.ai/docs/rerank
     MODERATION = "/v1/moderations"  # https://docs.litellm.ai/docs/moderation
+    # REALTIME_SESSION = "/v1/realtime/sessions"
+    # REALTIME_TRANSCRIPTION = "/v1/realtime/transcription_sessions"
 
     @classmethod
     def serialize_endpoints(cls, selected_endpoints: List["ModelEndpointEnum"]) -> Dict[str, Any]:
@@ -3094,13 +3101,14 @@ class ModelEndpointEnum(Enum):
             cls.AUDIO_TRANSCRIPTION: "Transcription",
             cls.AUDIO_TRANSLATION: "Audio Translation",
             cls.TEXT_TO_SPEECH: "Speech generation",
-            cls.REALTIME_SESSION: "Real-time Session",
-            cls.REALTIME_TRANSCRIPTION: "Real-time Transcription",
+            # cls.REALTIME_SESSION: "Real-time Session",
+            # cls.REALTIME_TRANSCRIPTION: "Real-time Transcription",
             cls.EMBEDDING: "Embeddings",
             cls.BATCH: "Batch",
             cls.RESPONSES: "Responses",
             cls.RERANK: "Reranking",
             cls.MODERATION: "Moderation",
+            cls.DOCUMENT: "Document",
         }
 
         # Create result dictionary
@@ -3195,10 +3203,12 @@ class ProviderCapabilityEnum(Enum):
                to model inference endpoints.
         MODERATION: Represents providers that offer content moderation, safety, or
                     guardrail endpoints.
+        LOCAL: Represents providers that expose local or user-managed runtimes.
     """
 
     MODEL = "model"
     MODERATION = "moderation"
+    LOCAL = "local"
 
 
 class AuditActionEnum(StrEnum):

@@ -28,6 +28,10 @@ export default {
         destination: '/auth/resetPassword',
       },
       {
+        source: '/reset-password',
+        destination: '/auth/reset-password',
+      },
+      {
         source: '/dashboard',
         destination: '/home/dashboard',
       },
@@ -141,7 +145,7 @@ export default {
       },
       {
         source: '/evaluations/:evaluationId',
-        destination: '/home/evaluations/evalDetailed',
+        destination: '/home/evaluations/evalDetailed/[evaluationId]',
       },
       {
         source: '/guardrails',

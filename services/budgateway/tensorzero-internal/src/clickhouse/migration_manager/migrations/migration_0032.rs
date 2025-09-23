@@ -118,12 +118,30 @@ impl Migration for Migration0032<'_> {
 
         // Create indices for common query patterns with idempotent checks
         let indices = vec![
-            ("idx_model_name", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_model_name model_name TYPE set(100) GRANULARITY 4;"#),
-            ("idx_country_code", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_country_code country_code TYPE set(300) GRANULARITY 4;"#),
-            ("idx_status_code", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_status_code status_code TYPE set(20) GRANULARITY 4;"#),
-            ("idx_is_blocked", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_is_blocked is_blocked TYPE minmax GRANULARITY 1;"#),
-            ("idx_endpoint_id", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_endpoint_id endpoint_id TYPE bloom_filter(0.01) GRANULARITY 4;"#),
-            ("idx_client_ip", r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_client_ip client_ip TYPE bloom_filter(0.01) GRANULARITY 8;"#),
+            (
+                "idx_model_name",
+                r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_model_name model_name TYPE set(100) GRANULARITY 4;"#,
+            ),
+            (
+                "idx_country_code",
+                r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_country_code country_code TYPE set(300) GRANULARITY 4;"#,
+            ),
+            (
+                "idx_status_code",
+                r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_status_code status_code TYPE set(20) GRANULARITY 4;"#,
+            ),
+            (
+                "idx_is_blocked",
+                r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_is_blocked is_blocked TYPE minmax GRANULARITY 1;"#,
+            ),
+            (
+                "idx_endpoint_id",
+                r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_endpoint_id endpoint_id TYPE bloom_filter(0.01) GRANULARITY 4;"#,
+            ),
+            (
+                "idx_client_ip",
+                r#"ALTER TABLE GatewayAnalytics ADD INDEX idx_client_ip client_ip TYPE bloom_filter(0.01) GRANULARITY 8;"#,
+            ),
         ];
 
         for (index_name, index_query) in indices {
@@ -132,18 +150,23 @@ impl Migration for Migration0032<'_> {
                 "SELECT count() FROM system.data_skipping_indices WHERE table = 'GatewayAnalytics' AND name = '{}' AND database = currentDatabase()",
                 index_name
             );
-            let result = self.clickhouse
+            let result = self
+                .clickhouse
                 .run_query_synchronous(check_query, None)
                 .await?;
 
             if result.trim() == "0" {
                 // Index doesn't exist, create it
-                if let Err(e) = self.clickhouse
+                if let Err(e) = self
+                    .clickhouse
                     .run_query_synchronous(index_query.to_string(), None)
                     .await
                 {
                     // Handle the case where index was created concurrently
-                    if !e.to_string().contains("index with this name already exists") {
+                    if !e
+                        .to_string()
+                        .contains("index with this name already exists")
+                    {
                         return Err(e);
                     }
                 }

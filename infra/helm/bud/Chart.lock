@@ -26,5 +26,8 @@ dependencies:
 - name: mongodb
   repository: https://charts.bitnami.com/bitnami
   version: 16.5.31
-digest: sha256:a6340b361f5acec8a99ca4124be53b22577c87a1c1e30b5a48127d60c27aa151
-generated: "2025-08-13T11:26:21.367260593+05:30"
+- name: mimir-distributed
+  repository: https://grafana.github.io/helm-charts
+  version: 5.8.0
+digest: sha256:7be661e078d065d24a752f04f035494469c1afeba80073c1bf6616ed35774827
+generated: "2025-09-22T16:51:34.252403567+05:30"

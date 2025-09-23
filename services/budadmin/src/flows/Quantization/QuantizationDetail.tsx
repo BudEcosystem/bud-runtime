@@ -11,7 +11,7 @@ import { Text_12_300_EEEEEE, Text_12_400_FFFFFF } from "@/components/ui/text";
 import CustomPopover from "../components/customPopover";
 import { ConfigProvider, Select, Image } from "antd";
 import { useDeployModel } from "src/stores/useDeployModel";
-import { useContext, useEffect } from "react";
+import { useContext } from "react";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { useModels } from "src/hooks/useModels";
 
@@ -36,50 +36,58 @@ export default function QuantizationDetail() {
   ];
 
   const handleNext = async () => {
-    form.submit();
+    // form.submit();
+
+    // Use the form values or the initialized values
+    const workflowData = quantizationWorkflow || getInitialValues();
 
     const result = await createQuantizationWorkflow(
-      quantizationWorkflow.modelName,
-      quantizationWorkflow.type,
-      quantizationWorkflow.hardware,
+      workflowData.modelName,
+      workflowData.type,
+      workflowData.hardware,
     );
     if (!result) {
       return;
     }
-    // setQuantizationWorkflow(values);
     openDrawerWithStep("quantization-method");
   };
 
   const handleChange = (name: string, value: any) => {
     form.setFieldsValue({ [name]: value });
     form.validateFields([name]);
-    setQuantizationWorkflow({ ...quantizationWorkflow, [name]: value });
+
+    // Get current workflow or initialize with defaults
+    const currentWorkflow = quantizationWorkflow || getInitialValues();
+    setQuantizationWorkflow({ ...currentWorkflow, [name]: value });
   };
 
-  useEffect(() => {
-    let defaultValues = {
-      type: typeItems[0].value,
-      hardware: hardwareItems[0].value,
-      modelName: selectedModel?.name + "_INT8",
+  // Get initial values for the form - this ensures we have data on first render
+  const getInitialValues = () => {
+    // If quantizationWorkflow already has data, use it
+    if (quantizationWorkflow && quantizationWorkflow.modelName) {
+      return quantizationWorkflow;
+    }
+
+    // Otherwise, create default values
+    return {
+      type: quantizationWorkflow?.type || typeItems[0].value,
+      hardware: quantizationWorkflow?.hardware || hardwareItems[0].value,
+      modelName: quantizationWorkflow?.modelName || (selectedModel?.name ? `${selectedModel.name}_INT8` : ""),
+      method: quantizationWorkflow?.method || null,
+      weight: quantizationWorkflow?.weight || null,
+      activation: quantizationWorkflow?.activation || null,
+      clusterId: quantizationWorkflow?.clusterId || null
     };
-    if (quantizationWorkflow?.type) {
-      defaultValues.type = quantizationWorkflow?.type;
-    }
-    if (quantizationWorkflow?.hardware) {
-      defaultValues.hardware = quantizationWorkflow?.hardware;
-    }
-    if (quantizationWorkflow?.modelName) {
-      defaultValues.modelName = quantizationWorkflow?.modelName;
-    }
-    setQuantizationWorkflow({ ...quantizationWorkflow, ...defaultValues });
-  }, []);
+  };
+
+  const initialValues = getInitialValues();
 
   return (
     <BudForm
-      data={quantizationWorkflow}
+      data={initialValues}
       backText="Back"
       nextText="Next"
-      disableNext={!quantizationWorkflow?.modelName}
+      disableNext={!initialValues.modelName}
       onBack={() => {
         closeDrawer();
       }}

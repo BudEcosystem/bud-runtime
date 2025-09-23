@@ -9,6 +9,9 @@ import {
   Text_10_400_B3B3B3,
 } from "@/components/ui/text";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
+import ProjectTags from "src/flows/components/ProjectTags";
+import { capitalize } from "@/lib/utils";
+import { endpointStatusMapping } from "@/lib/colorMapping";
 
 interface BenchmarkProgressProps {
   benchmark: {
@@ -20,38 +23,36 @@ interface BenchmarkProgressProps {
     eta: string;
     processingRate: number;
     averageScore: number;
-    status: "Running" | "Completed";
+    status: string;
     progress: number;
+    progressCompleted?: number;
+    progressTotal?: number;
+    canPause?: boolean;
+    pauseUrl?: string;
   };
 }
 
 const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Running":
-        return "#D1B854";
-      case "Completed":
-        return "#52C41A";
-      default:
-        return "#757575";
-    }
-  };
-
   return (
     <div className="bg-[#101010] rounded-lg px-[1.5rem] py-[1.2rem] border border-[#1F1F1F]">
       <div className="flex justify-between items-start mb-[0.85rem]">
         <Text_14_400_EEEEEE className="">{benchmark.title}</Text_14_400_EEEEEE>
-        <PrimaryButton
-          classNames="!px-[.55] !py-1 !text-xs mt-[.3rem]"
-          onClick={() => {}}
-        >
-          || Pause
-        </PrimaryButton>
+        {benchmark.status === "Running" && benchmark.canPause && (
+          <PrimaryButton
+            classNames="!px-[.55] !py-1 !text-xs mt-[.3rem]"
+            onClick={() => {
+              // TODO: Implement pause functionality using pauseUrl
+              console.log("Pausing run:", benchmark.pauseUrl);
+            }}
+          >
+            || Pause
+          </PrimaryButton>
+        )}
       </div>
       <div className="">
         <div className="flex items-center justify-start gap-x-[.3rem] mb-[0.7rem]">
           <Text_12_600_EEEEEE className="leading-[140%]">
-            Objective: 
+            Objective:
           </Text_12_600_EEEEEE>
           <Text_12_400_EEEEEE className="leading-[140%]">
             {benchmark.objective}
@@ -77,7 +78,7 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
               />
             </div>
             <Text_10_400_B3B3B3 className="leading-[140%]">
-              {benchmark.progress}% 013/024 completed
+              {benchmark.progress}% {benchmark.progressCompleted ?? '013'}/{benchmark.progressTotal ?? '024'} completed
             </Text_10_400_B3B3B3>
           </div>
         </div>
@@ -175,11 +176,13 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
               </div>
               <Text_12_400_B3B3B3>Status</Text_12_400_B3B3B3>
             </div>
-            <Text_12_400_EEEEEE
-              style={{ color: getStatusColor(benchmark.status) }}
-            >
-              {benchmark.status}
-            </Text_12_400_EEEEEE>
+            <div>
+              <ProjectTags
+                name={capitalize(benchmark.status)}
+                color={endpointStatusMapping[capitalize(benchmark.status)]}
+                textClass="text-[.75rem]"
+              />
+            </div>
           </div>
         </div>
       </div>

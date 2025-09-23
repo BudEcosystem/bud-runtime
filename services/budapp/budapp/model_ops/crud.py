@@ -25,7 +25,14 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 
 from budapp.commons import logging
-from budapp.commons.constants import CloudModelStatusEnum, EndpointStatusEnum, ModelProviderTypeEnum, ModelStatusEnum
+from budapp.commons.constants import (
+    CloudModelStatusEnum,
+    EndpointStatusEnum,
+    ModalityEnum,
+    ModelEndpointEnum,
+    ModelProviderTypeEnum,
+    ModelStatusEnum,
+)
 from budapp.commons.db_utils import DataManagerUtils
 from budapp.commons.exceptions import DatabaseException
 from budapp.endpoint_ops.models import DeploymentPricing, Endpoint
@@ -54,8 +61,12 @@ class ProviderDataManager(DataManagerUtils):
         search: bool = False,
     ) -> Tuple[List[ProviderModel], int]:
         """Get all providers from the database."""
-        if "capabilities" in filters and not isinstance(filters["capabilities"], list):
-            filters["capabilities"] = [filters["capabilities"]]
+        # Handle capabilities filter separately for array containment
+        capabilities_filter = None
+        if "capabilities" in filters:
+            if not isinstance(filters["capabilities"], list):
+                filters["capabilities"] = [filters["capabilities"]]
+            capabilities_filter = filters.pop("capabilities")
 
         await self.validate_fields(ProviderModel, filters)
 
@@ -67,6 +78,11 @@ class ProviderDataManager(DataManagerUtils):
         else:
             stmt = select(ProviderModel).filter_by(**filters)
             count_stmt = select(func.count()).select_from(ProviderModel).filter_by(**filters)
+
+        # Apply capabilities filter using array containment operator
+        if capabilities_filter:
+            stmt = stmt.filter(ProviderModel.capabilities.contains(capabilities_filter))
+            count_stmt = count_stmt.filter(ProviderModel.capabilities.contains(capabilities_filter))
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)
@@ -650,6 +666,7 @@ class CloudModelDataManager(DataManagerUtils):
         json_filters = {"tags": filters.pop("tags", []), "tasks": filters.pop("tasks", [])}
         explicit_filters = {
             "modality": filters.pop("modality", []),
+            "supported_endpoints": filters.pop("supported_endpoints", []),
             "author": filters.pop("author", []),
             "model_size_min": filters.pop("model_size_min", None),
             "model_size_max": filters.pop("model_size_max", None),
@@ -673,9 +690,20 @@ class CloudModelDataManager(DataManagerUtils):
             explicit_conditions.append(task_conditions)
 
         if explicit_filters["modality"]:
-            # Check any of modality present in the field
-            modality_condition = CloudModel.modality.overlap(explicit_filters["modality"])
+            requested_modalities = [
+                modality.value if isinstance(modality, ModalityEnum) else modality
+                for modality in explicit_filters["modality"]
+            ]
+            modality_condition = CloudModel.modality.contains(requested_modalities)
             explicit_conditions.append(modality_condition)
+
+        if explicit_filters["supported_endpoints"]:
+            requested_endpoints = [
+                endpoint.value if isinstance(endpoint, ModelEndpointEnum) else endpoint
+                for endpoint in explicit_filters["supported_endpoints"]
+            ]
+            endpoint_condition = CloudModel.supported_endpoints.contains(requested_endpoints)
+            explicit_conditions.append(endpoint_condition)
 
         if explicit_filters["author"]:
             # Check any of author present in the field

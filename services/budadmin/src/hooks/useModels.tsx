@@ -199,22 +199,23 @@ export interface IModel {
 }
 
 type GetModelParams = {
-  page: number;
-  limit: number;
-  order_by?: string;
-  name?: string;
-  description?: string;
-  tag?: string;
-  tasks?: string[];
-  modality?: string[];
-  author?: string[];
-  model_size_min?: number;
-  model_size_max?: number;
-  table_source?: "model" | "cloud_model";
-  search?: string;
-  source?: string;
-  base_model?: string;
-  base_model_relation?: string;
+    page: number;
+    limit: number;
+    order_by?: string;
+    name?: string;
+    description?: string;
+    tag?: string;
+    tasks?: string[]
+    modality?: string[];
+    author?: string[];
+    model_size_min?: number;
+    model_size_max?: number;
+    table_source?: "model" | "cloud_model";
+    search?: string;
+    source?: string;
+    base_model?: string;
+    base_model_relation?: string;
+    supported_endpoints?: string[];
 };
 
 // create zustand store

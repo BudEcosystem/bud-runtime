@@ -18,17 +18,23 @@ import {
 interface GuardRailDetail {
   id: string;
   name: string;
-  type: string;
-  category: string[];
+  uri?: string;
+  type?: string;
+  category?: string[];
+  tags?: Array<{ name: string; color: string }>;
   description?: string;
-  provider?: string;
+  provider?: string | { id: string; name: string; description: string; type: string; icon: string; capabilities: string[] };
+  provider_type?: string;
   deployments?: number;
-  status?: "active" | "inactive" | "pending";
+  status?: string;
   modality?: string[];
+  modality_types?: string[];
   scannerType?: string[];
+  scanner_types?: string[];
   guardType?: string[];
+  guard_types?: string[];
   typeCategories?: string[];
-  examples?: {
+  examples?: string[] | {
     title: string;
     content: string;
     description?: string;
@@ -39,38 +45,22 @@ export default function ViewGuardRailDetails() {
   const { openDrawerWithStep, closeDrawer, drawerProps } = useDrawer();
   const [guardrail, setGuardrail] = useState<GuardRailDetail | null>(null);
 
-  // Get guardrail data - in real app, fetch from API based on ID
+  // Get guardrail data
   useEffect(() => {
-    // Using dummy data for now
-    const dummyData: GuardRailDetail = drawerProps?.guardrail || {
-      id: "1",
-      name: "PII Detection",
-      type: "pii",
-      category: ["harm", "compliance", "privacy"],
-      description:
-        "Advanced PII detection guardrail that identifies and masks personal identifiable information including SSN, credit cards, emails, phone numbers, addresses, and other sensitive data.",
-      provider: "Bud Sentinel",
-      deployments: 12,
-      status: "active",
-      modality: ["Text", "Image", "Audio", "Code"],
-      scannerType: ["Semantic", "Text", "RegEx", "Classifier"],
-      guardType: ["Input", "Output", "Retrieval", "Agent"],
-      typeCategories: ["PII", "Harm", "Prompt Injection", "Jailbreak"],
-      examples: [
-        {
-          title: "Example 1",
-          content:
-            "Input: My credit card is 4532-1234-5678-9012\nOutput: My credit card is [REDACTED]",
-          description: "Credit card detection and masking",
-        },
-        {
-          title: "Example 2",
-          content: "Input: SSN: 123-45-6789\nOutput: SSN: [REDACTED]",
-          description: "Social security number redaction",
-        },
-      ],
-    };
-    setGuardrail(dummyData);
+    if (drawerProps?.guardrail) {
+      // Map the API data to component format
+      const apiData = drawerProps.guardrail;
+      const mappedData: GuardRailDetail = {
+        ...apiData,
+        // Map arrays from API format
+        modality: apiData.modality_types || apiData.modality || [],
+        scannerType: apiData.scanner_types || apiData.scannerType || [],
+        guardType: apiData.guard_types || apiData.guardType || [],
+        // Extract categories from tags if available
+        typeCategories: apiData.tags ? apiData.tags.map(tag => tag.name) : apiData.typeCategories || [],
+      };
+      setGuardrail(mappedData);
+    }
   }, [drawerProps]);
 
   const handleDeploy = () => {
@@ -82,18 +72,23 @@ export default function ViewGuardRailDetails() {
     closeDrawer();
   };
 
-  const getTypeIcon = (type?: string) => {
-    switch (type) {
-      case "pii":
-        return "🔒";
-      case "jailbreak":
-        return "🚫";
-      case "toxicity":
-        return "⚠️";
-      case "bias":
-        return "⚖️";
+  const getTypeIcon = (guardrail?: GuardRailDetail) => {
+    const typeIdentifier = guardrail?.uri || guardrail?.type || '';
+    switch (typeIdentifier.toLowerCase()) {
+      case 'pii':
+      case 'personal_identifier_information':
+        return '🔒';
+      case 'secrets':
+      case 'credentials':
+        return '🔐';
+      case 'jailbreak':
+        return '🚫';
+      case 'toxicity':
+        return '⚠️';
+      case 'bias':
+        return '⚖️';
       default:
-        return "🛡️";
+        return '🛡️';
     }
   };
 
@@ -115,12 +110,17 @@ export default function ViewGuardRailDetails() {
           <div className="px-[1.35rem] pt-[1rem]">
             <div className="flex items-start gap-[1rem] mb-[1.5rem]">
               <div className="w-[3rem] h-[3rem] bg-[#1F1F1F] rounded-[8px] flex items-center justify-center text-[1.5rem]">
-                {getTypeIcon(guardrail.type)}
+                {getTypeIcon(guardrail)}
               </div>
               <div className="flex-1">
-                <Text_16_600_FFFFFF className="mb-[0.5rem]">
+                <Text_16_600_FFFFFF className="mb-[0.25rem]">
                   {guardrail.name}
                 </Text_16_600_FFFFFF>
+                {guardrail.provider && (
+                  <Text_12_400_B3B3B3 className="mb-[0.5rem]">
+                    by {typeof guardrail.provider === 'object' ? guardrail.provider.name : guardrail.provider}
+                  </Text_12_400_B3B3B3>
+                )}
                 <Text_13_400_B3B3B3 className="leading-[1.4]">
                   {guardrail.description}
                 </Text_13_400_B3B3B3>
@@ -201,26 +201,32 @@ export default function ViewGuardRailDetails() {
               </Text_14_600_FFFFFF>
 
               <div className="space-y-[0.75rem]">
-                {guardrail.examples?.map((example, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-[6px] p-[1rem] hover:border-[#757575] transition-all"
-                  >
-                    <Text_12_400_B3B3B3 className="mb-[0.5rem]">
-                      {example.title}
-                    </Text_12_400_B3B3B3>
-                    {example.description && (
-                      <Text_11_400_808080 className="mb-[0.5rem]">
-                        {example.description}
-                      </Text_11_400_808080>
-                    )}
-                    <div className="bg-[#1F1F1F] rounded-[4px] p-[0.75rem]">
-                      <pre className="text-[#B3B3B3] text-[0.75rem] whitespace-pre-wrap font-mono">
-                        {example.content}
-                      </pre>
+                {guardrail.examples?.map((example, idx) => {
+                  // Handle both string array and object array formats
+                  const isString = typeof example === 'string';
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-[6px] p-[1rem] hover:border-[#757575] transition-all"
+                    >
+                      {!isString && example.title && (
+                        <Text_12_400_B3B3B3 className="mb-[0.5rem]">
+                          {example.title}
+                        </Text_12_400_B3B3B3>
+                      )}
+                      {!isString && example.description && (
+                        <Text_11_400_808080 className="mb-[0.5rem]">
+                          {example.description}
+                        </Text_11_400_808080>
+                      )}
+                      <div className="bg-[#1F1F1F] rounded-[4px] p-[0.75rem]">
+                        <pre className="text-[#B3B3B3] text-[0.75rem] whitespace-pre-wrap font-mono">
+                          {isString ? example : example.content}
+                        </pre>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -229,7 +235,9 @@ export default function ViewGuardRailDetails() {
               <div className="flex items-center gap-[2rem]">
                 <div>
                   <Text_11_400_808080>Provider</Text_11_400_808080>
-                  <Text_12_400_B3B3B3>{guardrail.provider}</Text_12_400_B3B3B3>
+                  <Text_12_400_B3B3B3>
+                    {typeof guardrail.provider === 'object' ? guardrail.provider.name : guardrail.provider}
+                  </Text_12_400_B3B3B3>
                 </div>
                 <div>
                   <Text_11_400_808080>Status</Text_11_400_808080>

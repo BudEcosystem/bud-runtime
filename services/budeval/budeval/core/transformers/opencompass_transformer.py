@@ -40,7 +40,9 @@ class OpenCompassTransformer(BaseTransformer):
     def _load_eval_manifest(self) -> None:
         """Load evaluation manifest with dataset mappings."""
         manifest_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "data", "eval_manifest.json"
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
+            "data",
+            "eval_manifest.json",
         )
 
         with open(manifest_path, "r") as f:

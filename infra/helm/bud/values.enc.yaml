@@ -50,6 +50,14 @@ minio:
     auth:
         rootUser: ENC[AES256_GCM,data:4Wv2BVKu,iv:eS2FtBlWJ5G3+nwsQluLAw83MK3rl9iBOHBblvWOLQY=,tag:al2ODUgHHJEGQDHEGeQn0g==,type:str]
         rootPassword: ENC[AES256_GCM,data:IxJBqh9jyIphUg==,iv:zTZgNrVk808U3/+F4huhNvl5e6Ns64rnWK7dmFy+WIY=,tag:FW7WGPivXNR/hspTdWRLtg==,type:str]
+mimir-distributed:
+    mimir:
+        structuredConfig:
+            common:
+                storage:
+                    s3:
+                        secret_access_key: ENC[AES256_GCM,data:LhLkhs3iMygb8w==,iv:oeF0ktxacDbqKEBfJiCKrTLfR8zfF5qXc73JtgqUezU=,tag:98cBqs7iEtdvqn+pK6Tl2Q==,type:str]
+                        access_key_id: ENC[AES256_GCM,data:lhws3V2x,iv:CHKtxkLbnmGLStEnqPK5tU0Ds7pvJJWi+PXD+vZgGcA=,tag:2PkzPd+x2mXdlxPx8DmH4w==,type:str]
 novuExtra:
     email: ENC[AES256_GCM,data:b8JTBSq3tkLtJAfG5rzVjg==,iv:wiLx8sJl22QN/Pu2Yt9Mswx5KsOHGqicQBrFfIi4eFU=,tag:l8WoIShK+kLTaszhxDc9sQ==,type:str]
     password: ENC[AES256_GCM,data:Mlitqu37QK8yJ48qAhtPLRfyaZRddymT,iv:0WViKRJSjuzYnZBf5Ht2/mbSjhDrRLy8JGAepBrOPpA=,tag:ryVYuneUwgh0N6STnRdgYg==,type:str]
@@ -100,7 +108,7 @@ sops:
             azNnZS8zRkl0aFFSWE9aWFJlbWEvak0KLZpbg5sUnFXY824DQfiproWfk9Yf2o1k
             aQ1torDEnZV3EFgfCs+ncc58isI3hx71zb9vw3Y4ROpkRcO5BuUgug==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2025-08-16T16:06:12Z"
-    mac: ENC[AES256_GCM,data:pRhNobpp1wdUm5Rrl9fOxJ3pzLT0ijYuOZMTzqQEMr9nTQeZQfUuzWmNGfDgYyW4D1/FpLQdW/V1eT0s2adZFsqi0dLYMk62wCzvnRgyUeeFcUmlbwdOgZWJNSX7sjI99aP40cs0T5MgfwUhnq0L0REHrEnumPFifFHeUapUS7A=,iv:XSPe4hJpv82j+wYHUY+1zZTDxHAhrNg6el4qZpHt9kA=,tag:foxtxxOpc2C+09J8mVdEYg==,type:str]
+    lastmodified: "2025-09-22T12:41:49Z"
+    mac: ENC[AES256_GCM,data:Gt/Rp+pHsAkBvzGgz5lQ+m84EPL6vXXZIWnkYjzz6vLFUIChUEbeK+fLR5P2xxqUZl9A1mfVOXHyAB+5qTKzwvaKRIc/CiJQHIy25EnkDRlzMUQkutF/CGiDztqAFB55To2yhAHXGdcgm+r4R/1qip6OjeR5boSBnCewSZTwm70=,iv:xu7fx/QK0pqkObPOiOdcORJEx0KFKtKAlYOnAdD9fxA=,tag:f8VdX/Rqvs31EgmRvdg0tQ==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.10.2

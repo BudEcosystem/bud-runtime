@@ -53,6 +53,8 @@ spec:
             value: {{ .Values.microservices.budprompt.daprid }}
           - name: FRONTEND_URL
             value: {{ include "bud.ingress.url.budcustomer" . }}
+          - name: ADMIN_FRONTEND_URL
+            value: {{ include "bud.ingress.url.budadmin" . }}
           - name: CORS_ORIGINS
             value: {{ join "," .Values.microservices.budapp.corsOrigins }},{{ include "bud.ingress.url.budadmin" $ }},{{ include "bud.ingress.url.budplayground" $ }},{{ include "bud.ingress.url.budcustomer" $ }}
         {{- $root := . }}

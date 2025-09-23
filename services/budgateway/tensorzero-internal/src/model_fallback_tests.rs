@@ -18,6 +18,7 @@ mod tests {
             }),
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         assert!(model_config.fallback_models.is_some());
@@ -37,6 +38,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         assert!(model_config.fallback_models.is_none());

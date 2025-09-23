@@ -72,6 +72,7 @@ export default function InviteMembers() {
                   message: "Please add users",
                 },
               ]}
+              userType="admin"
             />
           </DrawerCard>
         </BudDrawerLayout>

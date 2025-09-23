@@ -25,6 +25,8 @@ import aiohttp
 from budmicroframe.commons import logging
 from sqlalchemy.orm import Session
 
+from budapp.initializers.provider_seeder import PROVIDERS_SEEDER_FILE_PATH
+
 from ..commons.config import app_settings
 from ..commons.constants import GuardrailProviderTypeEnum, GuardrailStatusEnum
 from ..commons.database import engine
@@ -181,19 +183,55 @@ class GuardrailSyncScheduler:
         probe_data_by_uri = {}
         provider_id_by_type = {}
 
-        # Get provider IDs from the Provider table
+        # Get or create provider IDs from the Provider table
         with Session(engine) as session:
             from ..model_ops.crud import ProviderDataManager
             from ..model_ops.models import Provider
+            from ..model_ops.schemas import ProviderCreate
 
             for provider in providers:
                 provider_type = provider.get("provider_type", "")
-                db_provider = await ProviderDataManager(session).retrieve_by_fields(
-                    Provider, {"type": provider_type}, missing_ok=True
-                )
-                if db_provider:
-                    provider_id_by_type[provider_type] = str(db_provider.id)
-                    logger.debug("Found provider %s with ID %s", provider_type, db_provider.id)
+
+                # Create provider data for upsert
+                provider_data = ProviderCreate(
+                    name=provider.get("name", provider_type),
+                    description=provider.get("description", f"Provider for {provider_type}"),
+                    type=provider_type,
+                    icon=provider.get("icon", ""),
+                    capabilities=provider.get("capabilities", []),
+                ).model_dump()
+
+                # Upsert provider (create if doesn't exist, update if exists)
+                db_provider = await ProviderDataManager(session).upsert_one(Provider, provider_data, ["type"])
+                session.commit()
+
+                provider_id_by_type[provider_type] = str(db_provider.id)
+                logger.debug("Upserted provider %s with ID %s", provider_type, db_provider.id)
+
+        # Save guardrail providers to json file similar to model_ops scheduler
+        # NOTE: this json is used in proprietary/credentials/provider-info api
+        providers_data = {}
+        with open(PROVIDERS_SEEDER_FILE_PATH, "r") as f:
+            providers_data = json.load(f)
+
+        # Update with guardrail providers
+        for provider in providers:
+            provider_type = provider.get("provider_type", "")
+            # Only add if not already present (don't override existing model providers)
+            if provider_type not in providers_data:
+                providers_data[provider_type] = {
+                    "name": provider.get("name", provider_type),
+                    "type": provider_type,
+                    "description": provider.get("description", f"Provider for {provider_type}"),
+                    "icon": provider.get("icon", ""),
+                    "credentials": provider.get("credentials", []),
+                    "capabilities": provider.get("capabilities", []),
+                }
+
+        # Write back to file
+        with open(PROVIDERS_SEEDER_FILE_PATH, "w") as f:
+            json.dump(providers_data, f, indent=4)
+        logger.debug("Updated providers seeder file with guardrail providers")
 
         # Process probes from each provider
         for provider in providers:
@@ -201,7 +239,7 @@ class GuardrailSyncScheduler:
             provider_id = provider_id_by_type.get(provider_type)
 
             if not provider_id:
-                logger.warning("No provider found for type %s, skipping probes", provider_type)
+                logger.error("Provider ID not found for type %s after upsert, skipping probes", provider_type)
                 continue
 
             for probe in provider.get("probes", []):

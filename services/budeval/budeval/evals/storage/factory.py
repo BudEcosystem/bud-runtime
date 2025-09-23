@@ -1,14 +1,11 @@
 """Storage factory for creating storage adapters based on configuration.
 
-This module intentionally returns a distinct ClickHouse storage instance per
-thread to avoid cross-event-loop usage of a single connection pool. Reusing a
-single async connection pool across different threads/event loops can lead to
-errors like "Future attached to a different loop" when awaited from a loop
-different from the one that created the pool.
+This module provides a simple factory pattern for storage adapters.
+The synchronous ClickHouse implementation avoids event loop conflicts
+that can occur in Dapr workflows.
 """
 
-import threading
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from budeval.commons.config import app_settings
 from budeval.commons.logging import logging
@@ -17,15 +14,7 @@ from .base import StorageAdapter
 from .filesystem import FilesystemStorage
 
 
-# Lazy import ClickHouse to avoid import errors when not installed
-if TYPE_CHECKING:
-    from .clickhouse import ClickHouseStorage
-
 logger = logging.getLogger(__name__)
-
-# Maintain per-thread ClickHouse storage instances to keep each connection pool
-# bound to the event loop that initializes and uses it within that thread.
-_clickhouse_storage_by_thread: dict[int, "ClickHouseStorage"] = {}
 
 
 def get_storage_adapter(backend: Optional[str] = None) -> StorageAdapter:
@@ -42,8 +31,6 @@ def get_storage_adapter(backend: Optional[str] = None) -> StorageAdapter:
         ValueError: If the backend type is not supported
         ImportError: If ClickHouse dependencies are not available
     """
-    global _clickhouse_storage_by_thread
-
     # Use provided backend or fall back to configuration
     storage_backend = backend or app_settings.storage_backend
 
@@ -53,22 +40,19 @@ def get_storage_adapter(backend: Optional[str] = None) -> StorageAdapter:
         return FilesystemStorage()
 
     elif storage_backend == "clickhouse":
-        # Per-thread instance to avoid cross-event-loop future issues
-        thread_id = threading.get_ident()
-        if thread_id not in _clickhouse_storage_by_thread:
-            try:
-                from .clickhouse import ClickHouseStorage
+        try:
+            from .clickhouse_sync import ClickHouseSyncStorage
 
-                _clickhouse_storage_by_thread[thread_id] = ClickHouseStorage()
-                logger.info("ClickHouse storage adapter created for thread %s", thread_id)
-            except ImportError as e:
-                logger.error(f"ClickHouse dependencies not available: {e}")
-                raise ImportError(
-                    "ClickHouse storage requires 'asynch' and 'clickhouse-connect' packages. "
-                    "Install with: pip install asynch clickhouse-connect"
-                ) from e
+            storage_instance = ClickHouseSyncStorage()
+            logger.info("ClickHouse sync storage adapter created")
+            return storage_instance
 
-        return _clickhouse_storage_by_thread[thread_id]
+        except ImportError as e:
+            logger.error(f"ClickHouse dependencies not available: {e}")
+            raise ImportError(
+                "ClickHouse storage requires 'clickhouse-connect' package. "
+                "Install with: pip install clickhouse-connect"
+            ) from e
 
     else:
         supported_backends = ["filesystem", "clickhouse"]
@@ -95,7 +79,11 @@ async def close_storage(storage: StorageAdapter) -> None:
     """
     if hasattr(storage, "close"):
         logger.info(f"Closing {storage.__class__.__name__}")
-        await storage.close()
+        # Handle both sync and async close methods
+        if hasattr(storage.close, "__await__"):
+            await storage.close()
+        else:
+            storage.close()
         logger.info(f"{storage.__class__.__name__} closed successfully")
 
 
@@ -107,11 +95,19 @@ def get_storage_info() -> dict:
     """
     backend = app_settings.storage_backend
 
-    info = {"backend": backend, "available_backends": ["filesystem", "clickhouse"]}
+    info = {
+        "backend": backend,
+        "available_backends": ["filesystem", "clickhouse"],
+    }
 
     if backend == "filesystem":
         storage = FilesystemStorage()
-        info.update({"base_path": str(storage.base_path), "description": "Local filesystem storage with JSON files"})
+        info.update(
+            {
+                "base_path": str(storage.base_path),
+                "description": "Local filesystem storage with JSON files",
+            }
+        )
 
     elif backend == "clickhouse":
         info.update(
@@ -122,7 +118,7 @@ def get_storage_info() -> dict:
                 "user": app_settings.clickhouse_user,
                 "batch_size": app_settings.clickhouse_batch_size,
                 "async_insert": app_settings.clickhouse_async_insert,
-                "description": "ClickHouse database storage with optimized schema",
+                "description": "ClickHouse database storage with synchronous client",
             }
         )
 
@@ -138,7 +134,11 @@ async def health_check_storage(storage: StorageAdapter) -> dict:
     Returns:
         Dictionary with health check results
     """
-    result = {"backend": storage.__class__.__name__, "healthy": False, "error": None}
+    result = {
+        "backend": storage.__class__.__name__,
+        "healthy": False,
+        "error": None,
+    }
 
     try:
         if hasattr(storage, "health_check"):

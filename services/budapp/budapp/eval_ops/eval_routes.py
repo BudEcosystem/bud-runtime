@@ -33,7 +33,11 @@ from budapp.eval_ops.schemas import (
     UpdateRunRequest,
     UpdateRunResponse,
 )
-from budapp.eval_ops.services import EvaluationWorkflowService, ExperimentService, ExperimentWorkflowService
+from budapp.eval_ops.services import (
+    EvaluationWorkflowService,
+    ExperimentService,
+    ExperimentWorkflowService,
+)
 from budapp.user_ops.models import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 
@@ -114,7 +118,11 @@ def list_experiments(
     try:
         offset = (page - 1) * limit
         experiments, total_count = ExperimentService(session).list_experiments(
-            user_id=current_user.id, project_id=project_id, experiment_id=id, offset=offset, limit=limit
+            user_id=current_user.id,
+            project_id=project_id,
+            experiment_id=id,
+            offset=offset,
+            limit=limit,
         )
     except Exception as e:
         logger.debug(f"Failed to list experiments: {e}", exc_info=True)
@@ -180,10 +188,19 @@ def list_datasets(
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
     name: Annotated[Optional[str], Query(description="Filter by dataset name")] = None,
-    modalities: Annotated[Optional[str], Query(description="Filter by modalities (comma-separated)")] = None,
-    language: Annotated[Optional[str], Query(description="Filter by languages (comma-separated)")] = None,
+    modalities: Annotated[
+        Optional[str],
+        Query(description="Filter by modalities (comma-separated)"),
+    ] = None,
+    language: Annotated[
+        Optional[str],
+        Query(description="Filter by languages (comma-separated)"),
+    ] = None,
     domains: Annotated[Optional[str], Query(description="Filter by domains (comma-separated)")] = None,
-    trait_ids: Annotated[Optional[str], Query(description="Filter by trait UUIDs (comma-separated)")] = None,
+    trait_ids: Annotated[
+        Optional[str],
+        Query(description="Filter by trait UUIDs (comma-separated)"),
+    ] = None,
 ):
     """List datasets with optional filtering and pagination."""
     try:
@@ -198,7 +215,10 @@ def list_datasets(
                 try:
                     trait_id_list.append(uuid.UUID(tid.strip()))
                 except ValueError:
-                    raise HTTPException(status_code=400, detail=f"Invalid UUID format for trait_id: {tid}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid UUID format for trait_id: {tid}",
+                    )
 
         filters = DatasetFilter(
             name=name,
@@ -728,7 +748,10 @@ def get_dataset_by_id(
     },
 )
 async def evaluation_workflow_step(
-    experiment_id: Annotated[uuid.UUID, Path(..., description="ID of experiment to create evaluation for")],
+    experiment_id: Annotated[
+        uuid.UUID,
+        Path(..., description="ID of experiment to create evaluation for"),
+    ],
     request: EvaluationWorkflowStepRequest,
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -792,7 +815,10 @@ async def evaluation_workflow_step(
 )
 async def get_evaluation_workflow_data(
     experiment_id: Annotated[uuid.UUID, Path(..., description="ID of experiment")],
-    workflow_id: Annotated[uuid.UUID, Path(..., description="ID of evaluation workflow to retrieve")],
+    workflow_id: Annotated[
+        uuid.UUID,
+        Path(..., description="ID of evaluation workflow to retrieve"),
+    ],
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
@@ -830,7 +856,10 @@ async def get_evaluation_workflow_data(
     },
 )
 async def get_experiment_evaluations(
-    experiment_id: Annotated[uuid.UUID, Path(..., description="ID of experiment to get evaluations for")],
+    experiment_id: Annotated[
+        uuid.UUID,
+        Path(..., description="ID of experiment to get evaluations for"),
+    ],
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):

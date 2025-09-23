@@ -110,12 +110,26 @@ class DirectSearchOptimizer:
         """Initialize the search space based on device constraints."""
         # Get max devices per node for TP constraint
         if "node_distribution" in self.device_config:
+            # Cluster-aware configuration from grouped devices
             self.max_tp = self.device_config.get("max_devices_per_node", 1)
             self.max_pp = self.device_config.get("total_nodes_with_device", 1)
+            logger.info(
+                f"Using cluster-aware search space: device_type={self.device_config.get('device_type')}, "
+                f"max_tp={self.max_tp} (max devices/node), max_pp={self.max_pp} (nodes with device)"
+            )
         else:
+            # Fallback for individual device (shouldn't happen with new workflow)
             self.max_tp = self.device_config.get("available_count", 1)
             cluster_topology = self.device_config.get("cluster_topology", {})
             self.max_pp = cluster_topology.get("total_nodes", 1)
+            # If no cluster topology and no available_count, default to 1
+            if self.max_tp == 0:
+                self.max_tp = 1
+            if self.max_pp == 0:
+                self.max_pp = 1
+            logger.warning(
+                f"Using fallback search space (individual device): max_tp={self.max_tp}, max_pp={self.max_pp}"
+            )
 
         # Find minimum TP required to run the model (even with concurrency=1)
         self.min_tp = self._find_minimum_tp_required()
@@ -154,6 +168,12 @@ class DirectSearchOptimizer:
             or 0
         )
 
+        device_type = self.device_config.get("device_type", self.device_config.get("type", "unknown"))
+        logger.info(
+            f"Finding minimum TP for {self.model} on {device_type} with {device_memory_gb:.2f}GB memory, "
+            f"max_tp={self.max_tp}"
+        )
+
         # Try TP sizes in powers of 2: 1, 2, 4, 8, etc.
         max_possible_tp = self.max_tp
 
@@ -164,11 +184,12 @@ class DirectSearchOptimizer:
 
             # Test if this TP can handle concurrency=1 (minimum viable configuration)
             if self._check_memory_requirements(tp, 1, 1):
+                logger.info(f"Minimum TP required: {tp} for {self.model} on {device_type}")
                 return tp
 
         # If we get here, even the highest TP can't fit the model
         logger.warning(
-            f"Model {self.model} cannot fit on device with {device_memory_gb:.2f}GB memory "
+            f"Model {self.model} cannot fit on {device_type} device with {device_memory_gb:.2f}GB memory "
             f"even with maximum TP={max_possible_tp}. This device may be too small for this model."
         )
         return max_possible_tp  # Return max TP to avoid further attempts
@@ -180,18 +201,29 @@ class DirectSearchOptimizer:
             return False
 
         # Check total devices needed
-        total_devices = tp_size * pp_size
+        total_devices_needed = tp_size * pp_size
+
         if "node_distribution" in self.device_config:
+            # Use total_devices from cluster config
             available_devices = self.device_config.get("total_devices", 0)
         else:
+            # Fallback
             cluster_topology = self.device_config.get("cluster_topology", {})
             available_devices = cluster_topology.get("total_cluster_devices", 0)
             # If no cluster topology, use available_count
             if available_devices == 0:
                 available_devices = self.device_config.get("available_count", 0)
 
-        if total_devices > available_devices:
-            logger.debug(f"Not enough devices: need {total_devices}, have {available_devices}")
+        if total_devices_needed > available_devices:
+            logger.debug(
+                f"Not enough devices: need {total_devices_needed} (TP={tp_size} x PP={pp_size}), "
+                f"have {available_devices} available"
+            )
+            return False
+
+        # Additional check for TP constraint (devices must be on same node)
+        if "max_devices_per_node" in self.device_config and tp_size > self.device_config["max_devices_per_node"]:
+            logger.debug(f"TP={tp_size} exceeds max devices per node ({self.device_config['max_devices_per_node']})")
             return False
 
         # Check memory requirements
@@ -396,8 +428,12 @@ class DirectSearchOptimizer:
 
         Returns list of results, with the first one being the optimal (lowest cost that meets targets).
         """
+        device_type = self.device_config.get("device_type", self.device_config.get("type", "unknown"))
+        logger.info(
+            f"Starting direct search for model {self.model} on {device_type} - "
+            f"Valid TP sizes: {self.valid_tp_sizes}, Valid PP sizes: {self.valid_pp_sizes}"
+        )
         logger.debug(
-            f"Starting direct search for model {self.model} - "
             f"Targets: TTFT<={self.target_ttft}s, E2E<={self.target_e2e_latency}s, Throughput>={self.target_throughput_per_user} tok/s"
         )
 

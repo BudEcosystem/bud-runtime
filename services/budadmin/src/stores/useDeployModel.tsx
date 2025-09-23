@@ -43,6 +43,8 @@ const modalityTypeList = [
   {
     id: "1",
     type: ["llm", "mllm"],
+    modalities: ["text_input", "text_output"],
+    endpoints: [],
     icon: "/images/drawer/brain.png",
     name: "LLM, Multi-Model LLM",
     description: "Add LLM, Multi-Model LLM",
@@ -50,33 +52,52 @@ const modalityTypeList = [
   {
     id: "2",
     type: ["embedding"],
+    modalities: ["text_input"],
+    endpoints: ["/v1/embeddings"],
     icon: "/images/drawer/embedding.png",
     name: "Embedding models",
     description: "Add Embedding models",
   },
   {
     id: "speech_to_text",
+    modalities: ["audio_input", "text_output"],
+    endpoints: ["/v1/audio/transcriptions", "/v1/audio/translations"],
     icon: "/images/drawer/speachToText.png",
     name: "Speech to text",
     description: "Add Speech to text models",
   },
   {
     id: "text_to_speech",
+    modalities: ["text_input", "audio_output"],
+    endpoints: ["/v1/audio/speech"],
     icon: "/images/drawer/textToSpeach.png",
     name: "Text to Speech",
     description: "Add Text to Speech models",
   },
   {
     id: "action_transformers",
+    modalities: [],
+    endpoints: [],
     icon: "/images/drawer/compare.png",
     name: "Action Transformers",
     description: "Add Action Transformers models",
+  },
+  {
+    id: "document",
+    type: ["mllm"],
+    modalities: ["image_input", "text_output"],
+    endpoints: ["/v1/documents"],
+    icon: "/images/drawer/document.png",
+    name: "Document",
+    description: "Add Document processing models",
   },
 ];
 
 export type ModalityType = {
   id: string;
   type?: string[];
+  modalities?: string[];
+  endpoints?: string[];
   icon: string;
   name: string;
   description: string;
@@ -234,6 +255,8 @@ export const useDeployModel = create<{
   updateCredentialsLocal: (credentials: Credentials) => Promise<any>;
   localModelDetails: any;
   setLocalModelDetails: (details: any) => void;
+  cameFromDocumentList: boolean;
+  setCameFromDocumentList: (value: boolean) => void;
   startSecurityScan: () => Promise<any>;
 
   cancelModelDeployment: (id: string, projectId?: string) => Promise<any>;
@@ -289,6 +312,10 @@ export const useDeployModel = create<{
   modalityType: null,
   currentWorkflow: null,
   selectedProvider: null,
+  cameFromDocumentList: false,
+  setCameFromDocumentList: (value: boolean) => {
+    set({ cameFromDocumentList: value });
+  },
   setCurrentWorkflow: (workflow: WorkflowType) => {
     set({ currentWorkflow: workflow });
   },
@@ -401,6 +428,7 @@ export const useDeployModel = create<{
       status: {},
       selectedProvider: null,
       providerType: null,
+      cameFromDocumentList: false,
       cloudModelDetails: {
         name: "",
         tags: [],

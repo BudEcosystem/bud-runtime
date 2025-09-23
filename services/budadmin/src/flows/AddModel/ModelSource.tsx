@@ -17,6 +17,7 @@ export default function ModelSource() {
     updateProviderTypeLocal,
     setCloudModelDetails,
     setLocalModelDetails,
+    modalityType
   } = useDeployModel();
 
   const { openDrawerWithStep, previousStep } = useDrawer();
@@ -50,7 +51,13 @@ export default function ModelSource() {
             ? ""
             : "",
       });
-      openDrawerWithStep("add-local-model");
+
+      // Check if Document modality and Hugging Face are selected
+      if (modalityType?.id === "document" && providerType?.id === "hugging_face") {
+        openDrawerWithStep("document-model-list");
+      } else {
+        openDrawerWithStep("add-local-model");
+      }
     }
   };
 

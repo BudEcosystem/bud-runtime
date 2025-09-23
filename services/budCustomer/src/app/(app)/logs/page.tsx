@@ -117,12 +117,13 @@ export default function ObservabilityPage() {
   }, []); // Run only on mount
 
   // Handle search with debounce
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchInferences(); // Fetch all with current filters
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchValue, fetchInferences]);
+  // useEffect(() => {
+  //   const timer = setTimeout(() => {
+  //     console.log("fetchInferences")
+  //     fetchInferences(); // Fetch all with current filters
+  //   }, 500);
+  //   return () => clearTimeout(timer);
+  // }, [searchValue, fetchInferences]);
 
   // Copy inference ID to clipboard
   const copyToClipboard = (text: string) => {
@@ -290,7 +291,7 @@ export default function ObservabilityPage() {
       ),
     },
     {
-      title: "Deployment",
+      title: "Model",
       dataIndex: "endpoint_name",
       key: "endpoint_name",
       width: 200,
@@ -662,7 +663,7 @@ export default function ObservabilityPage() {
                         <InferenceFilters
                           projectId={"all"} // Pass a dummy ID for global view
                           onFiltersChange={() => fetchInferences()}
-                          skipEndpointsFetch={true} // Skip fetching endpoints in logs page
+                          skipEndpointsFetch={false} // Skip fetching endpoints in logs page
                         />
                       </div>
 

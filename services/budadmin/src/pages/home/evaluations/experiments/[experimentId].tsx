@@ -21,6 +21,7 @@ import { Image } from "antd";
 import { CustomBreadcrumb } from "@/components/ui/bud/card/DrawerBreadCrumbNavigation";
 import Tags from "src/flows/components/DrawerTags";
 import { useDrawer } from "src/hooks/useDrawer";
+import { capitalize } from "@/lib/utils";
 
 interface ExperimentDetails {
   id: string;
@@ -114,37 +115,6 @@ const ExperimentDetailsPage = () => {
     ],
   };
 
-  // Dummy data for experimentBenchmarks
-  const experimentBenchmarks = {
-    benchmarkProgress: [
-      {
-        id: "bench-1",
-        title: "Multi-Modal Understanding Benchmark",
-        objective:
-          "Evaluate model performance on text and image understanding tasks",
-        currentEvaluation: "Image Captioning",
-        currentModel: "GPT-4 Vision",
-        eta: "2h 30m",
-        processingRate: 125,
-        averageScore: 87.5,
-        status: "Running" as const,
-        progress: 65,
-      },
-      {
-        id: "bench-2",
-        title: "Code Generation Quality",
-        objective:
-          "Test code generation accuracy across multiple programming languages",
-        currentEvaluation: "Python Code Generation",
-        currentModel: "Claude-3",
-        eta: "1h 15m",
-        processingRate: 200,
-        averageScore: 91.2,
-        status: "Running" as const,
-        progress: 82,
-      },
-    ],
-  };
 
   // Dummy data for runs history
   const dummyRunsHistory = [
@@ -185,11 +155,6 @@ const ExperimentDetailsPage = () => {
   useEffect(() => {
     console.log("Experiment Details:", experimentDetails);
   }, [experimentDetails]);
-
-  const handleNewEvaluation = () => {
-    // Navigate to new evaluation flow
-    router.push("/home/evaluations?tab=experiments&action=new");
-  };
 
   if (loading) {
     return (
@@ -281,7 +246,7 @@ const ExperimentDetailsPage = () => {
                 (showAllTags
                   ? experimentDetails.tags
                   : experimentDetails.tags.slice(0, 5)
-                ).map((tag, index) => (
+                ).map((tag: string, index: number) => (
                   <Tags
                     key={index}
                     name={tag}
@@ -383,9 +348,28 @@ const ExperimentDetailsPage = () => {
               benchmarks
             </Text_14_400_FFFFFF>
             <div className="space-y-[1rem]">
-              {experimentBenchmarks?.benchmarkProgress?.map((benchmark) => (
-                <BenchmarkProgress key={benchmark.id} benchmark={benchmark} />
-              )) || (
+              {experimentDetails?.progress_overview?.length > 0 ? (
+                experimentDetails.progress_overview.map((progressItem: any) => {
+                  // Map the API response to the BenchmarkProgress component's expected format
+                  const benchmark = {
+                    id: progressItem.run_id,
+                    title: progressItem.title,
+                    objective: progressItem.objective,
+                    currentEvaluation: progressItem.current_evaluation,
+                    currentModel: progressItem.current_model,
+                    eta: `${progressItem.eta_minutes} min`,
+                    processingRate: progressItem.processing_rate_per_min,
+                    averageScore: progressItem.average_score_pct,
+                    status: progressItem.status,
+                    progress: progressItem.progress.percent,
+                    progressCompleted: progressItem.progress.completed,
+                    progressTotal: progressItem.progress.total,
+                    canPause: progressItem.actions?.can_pause,
+                    pauseUrl: progressItem.actions?.pause_url
+                  };
+                  return <BenchmarkProgress key={benchmark.id} benchmark={benchmark} />;
+                })
+              ) : (
                 <Text_14_400_FFFFFF>
                   No benchmark data available
                 </Text_14_400_FFFFFF>

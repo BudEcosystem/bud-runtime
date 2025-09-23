@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -35,11 +36,36 @@ class ClickHouseStorage(StorageAdapter):
         """Initialize ClickHouse storage adapter."""
         self._pool: Optional[Pool] = None
         self._config = app_settings
+        self._thread_id = threading.get_ident()
+        self._loop_id: Optional[int] = None
+
+        # Track which event loop this instance was created in
+        try:
+            current_loop = asyncio.get_running_loop()
+            self._loop_id = id(current_loop)
+        except RuntimeError:
+            pass
 
     async def initialize(self) -> None:
         """Initialize connection pool and run migrations if needed."""
         if self._pool is not None:
             return
+
+        # Check if we're in a different event loop than when created
+        current_thread = threading.get_ident()
+        current_loop_id = None
+        try:
+            current_loop = asyncio.get_running_loop()
+            current_loop_id = id(current_loop)
+        except RuntimeError:
+            pass
+
+        if current_thread != self._thread_id or (current_loop_id is not None and current_loop_id != self._loop_id):
+            logger.warning(
+                f"ClickHouse storage initialized in different context: "
+                f"created in thread {self._thread_id}/loop {self._loop_id}, "
+                f"now in thread {current_thread}/loop {current_loop_id}"
+            )
 
         logger.info("Initializing ClickHouse connection pool")
 

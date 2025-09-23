@@ -128,6 +128,20 @@ class ClusterRegistry:
         # Save the configuration to the file
         config_data = json.loads(configuration_decrypted)
 
+        # Add insecure-skip-tls-verify to all clusters to fix TLS certificate issues
+        # Also remove conflicting certificate fields to avoid kubectl errors
+        if "clusters" in config_data and isinstance(config_data["clusters"], list):
+            for cluster in config_data["clusters"]:
+                if "cluster" in cluster and isinstance(cluster["cluster"], dict):
+                    cluster["cluster"]["insecure-skip-tls-verify"] = True
+                    # Remove conflicting certificate fields when using insecure mode
+                    cluster["cluster"].pop("certificate-authority", None)
+                    cluster["cluster"].pop("certificate-authority-data", None)
+                    cluster["cluster"].pop("tls-server-name", None)
+                    logger.debug(
+                        f"Added insecure-skip-tls-verify and removed cert fields for cluster: {cluster.get('name', 'unknown')}"
+                    )
+
         with open(file_path, "w") as f:
             json.dump(config_data, f, indent=2)
 
