@@ -1787,7 +1787,17 @@ class ExperimentWorkflowService:
 
             # If this is the final step and trigger_workflow is True, create the experiment
             if request.step_number == 5 and request.trigger_workflow:
-                await self._create_experiment_from_workflow(workflow.id, current_user_id)
+                experiment_id = await self._create_experiment_from_workflow(workflow.id, current_user_id)
+
+                # Store the experiment_id in a workflow step for retrieval
+                await WorkflowStepDataManager(self.session).insert_one(
+                    WorkflowStepModel(
+                        workflow_id=workflow.id,
+                        step_number=6,  # Use step 6 to store the result
+                        data={"experiment_id": str(experiment_id)},
+                    )
+                )
+
                 # Mark workflow as completed
                 # await WorkflowDataManager(self.session).update_by_fields(
                 #     workflow,
@@ -1957,6 +1967,10 @@ class ExperimentWorkflowService:
             {"workflow_id": workflow_id, "step_number": step_number},
             missing_ok=True,
         )
+
+        step_data = stage_data.copy()  # Create a copy to avoid modifying original
+        if "experiment_id" in stage_data:
+            step_data["experiment_id"] = str(stage_data["experiment_id"])
 
         if existing_step:
             # Update existing step
@@ -2322,8 +2336,10 @@ class EvaluationWorkflowService:
                     detail=f"Invalid step number {request.step_number}. Must be between 1 and 5",
                 )
 
-            # Store workflow step data
-            await self._store_workflow_step(workflow.id, request.step_number, request.stage_data)
+            # Store workflow step data with experiment_id included
+            stage_data_with_experiment = request.stage_data.copy()
+            stage_data_with_experiment["experiment_id"] = str(experiment_id)
+            await self._store_workflow_step(workflow.id, request.step_number, stage_data_with_experiment)
 
             # Validate step 4 dataset-trait relationships
             if request.step_number == 4:
