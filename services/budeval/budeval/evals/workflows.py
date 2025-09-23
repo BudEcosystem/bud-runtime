@@ -18,7 +18,7 @@ from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 from budeval.commons.logging import logging
 from budeval.commons.storage_config import StorageConfig
-from budeval.commons.utils import update_workflow_data_in_statestore
+from budeval.commons.utils import check_workflow_status_in_statestore, update_workflow_data_in_statestore
 from budeval.core.schemas import (
     DatasetCategory,
     GenericDatasetConfig,
@@ -719,13 +719,32 @@ class EvaluationWorkflow:
             workflow_id=instance_id,
         )
 
-        # Starting The Notification
         notification_req = notification_request.model_copy(deep=True)
-        notification_req.payload.event = "verify_cluster_connection"
+
+        notification_req = notification_request.model_copy(deep=True)
+        notification_req.payload.event = "evaluate_model_status"
         notification_req.payload.content = NotificationContent(
-            title="Starting Cluster Connectivity Check",
-            message="Starting Cluster Connectivity Check",
+            title="Evaluation Started",
+            message="Evaluation Started",
             status=WorkflowStatus.STARTED,
+        )
+
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
+
+        # ----
+        #
+        # Set initial ETA
+        notification_req.payload.event = "eta"
+        eta_minutes = 30
+        notification_req.payload.content = NotificationContent(
+            title="Estimated time to completion",
+            message=f"{eta_minutes}",
+            status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
@@ -734,12 +753,12 @@ class EvaluationWorkflow:
             target_name=evaluate_model_request_json.source,
         )
 
-        # Set initial ETA
-        notification_req.payload.event = "eta"
-        eta_minutes = 30
+        # Starting The Notification
+
+        notification_req.payload.event = "verify_cluster_connection"
         notification_req.payload.content = NotificationContent(
-            title="Estimated time to completion",
-            message=f"{eta_minutes}",
+            title="Starting Cluster Connectivity Check",
+            message="Starting Cluster Connectivity Check",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -793,7 +812,7 @@ class EvaluationWorkflow:
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{25}",
+            message=f"{29}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -874,7 +893,7 @@ class EvaluationWorkflow:
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{22}",
+            message=f"{27}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -975,7 +994,7 @@ class EvaluationWorkflow:
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{21}",
+            message=f"{25}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -1015,7 +1034,7 @@ class EvaluationWorkflow:
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{20}",
+            message=f"{23}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -1099,11 +1118,9 @@ class EvaluationWorkflow:
         #         primary_action="retry",
         #     )
 
+        notification_req.payload.event = "monitor_eval_job_progress"
         notification_req.payload.content = NotificationContent(
-            title="Monitoring Completed",
-            message="Monitoring Completed",
-            status=WorkflowStatus.COMPLETED,
-            primary_action="retry",
+            title="Monitoring Completed", message="Monitoring Completed", status=WorkflowStatus.COMPLETED
         )
 
         # Publish the appropriate monitoring result notification
@@ -1141,6 +1158,11 @@ class EvaluationWorkflow:
         extraction_summary = (
             _monitoring_result.get("extraction_summary", {}) if _monitoring_result.get("status") == "completed" else {}
         )
+
+        workflow_status = check_workflow_status_in_statestore(instance_id)
+        if workflow_status:
+            logger.info(f"Workflow status: {workflow_status}")
+            return workflow_status
 
         notification_req.payload.event = "results"
         notification_req.payload.content = NotificationContent(

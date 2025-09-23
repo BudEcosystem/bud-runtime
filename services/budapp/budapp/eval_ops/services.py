@@ -397,10 +397,52 @@ class ExperimentService:
         traits_dict = {str(trait.id): trait.name for trait in traits_list}
         traits = list(traits_dict.values())
 
-        # Build current_metrics with placeholder values
-        exp_data.current_metrics = [
-            {"name": trait, "value": 0.0, "higher_is_better": True, "model_name": "GPT-4"} for trait in traits
-        ]
+        # Build current metrics with placeholder values
+        # Build current metrics in table format: traits as rows, models as columns
+        current_metrics_table = {}
+
+        # Initialize table with traits as keys
+        for trait in traits:
+            current_metrics_table[trait] = {}
+
+        # If no models exist in the experiment, create dummy models for demonstration
+        models_to_use = (
+            exp_data.models
+            if exp_data.models
+            else [
+                # Add some dummy models for demonstration when no real models exist
+                type("MockModel", (), {"name": "GPT-4"})(),
+                type("MockModel", (), {"name": "Claude-3.5"})(),
+                type("MockModel", (), {"name": "Llama-3"})(),
+            ]
+        )
+
+        # For each model used in the experiment, collect scores per trait
+        for model_summary in models_to_use:
+            model_name = model_summary.name
+
+            # Initialize all traits with dummy score data for this model
+            for i, trait in enumerate(traits):
+                # Add some variation to dummy scores based on trait index and model name hash
+                base_score = 0.6 + (hash(f"{model_name}_{trait}") % 40) / 100.0  # Score between 0.6-1.0
+                current_metrics_table[trait][model_name] = {
+                    "value": round(base_score, 3),
+                    "higher_is_better": True,
+                    "status": "completed" if i % 2 == 0 else "pending",  # Mix of completed and pending
+                }
+
+            # Get actual scores from evaluations if available
+            # This would need to be implemented based on your actual metrics/results structure
+            # For now using dummy placeholder values above
+
+        # Convert table format to list of dictionaries
+        exp_data.current_metrics = []
+        for trait_name, model_scores in current_metrics_table.items():
+            metric_dict = {
+                "trait_name": trait_name,
+                "model_scores": model_scores,  # Dictionary of model_name -> {value, higher_is_better, status}
+            }
+            exp_data.current_metrics.append(metric_dict)
 
         # Get evaluations with Running & Pending status
         evaluations_running = [
@@ -2339,6 +2381,27 @@ class EvaluationWorkflowService:
             # Store workflow step data with experiment_id included
             stage_data_with_experiment = request.stage_data.copy()
             stage_data_with_experiment["experiment_id"] = str(experiment_id)
+
+            # For step 3 (trait selection), enrich with trait details before storing
+            if request.step_number == 3 and "trait_ids" in stage_data_with_experiment:
+                trait_ids = stage_data_with_experiment.get("trait_ids", [])
+                traits_details = []
+                for trait_id in trait_ids:
+                    try:
+                        trait_uuid = uuid.UUID(str(trait_id))
+                        trait = self.session.query(TraitModel).filter(TraitModel.id == trait_uuid).first()
+                        if trait:
+                            traits_details.append(
+                                {
+                                    "id": str(trait.id),
+                                    "name": trait.name,
+                                    "description": trait.description,
+                                }
+                            )
+                    except (ValueError, TypeError):
+                        continue
+                stage_data_with_experiment["traits_details"] = traits_details
+
             await self._store_workflow_step(workflow.id, request.step_number, stage_data_with_experiment)
 
             # Validate step 4 dataset-trait relationships

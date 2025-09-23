@@ -14,6 +14,7 @@ import { useDeployModel } from "src/stores/useDeployModel";
 import loaderIcn from "public/icons/loader.gif";
 import { Text_12_400_5B6168 } from "../../text";
 import { usePerfomanceBenchmark } from "src/stores/usePerfomanceBenchmark";
+import { useEvaluations } from "@/hooks/useEvaluations";
 
 
 interface FooterProps {
@@ -69,7 +70,8 @@ export interface BudFormProps extends FooterProps {
 export function BudForm(props: BudFormProps) {
   const { deleteWorkflow } = useDeployModel();
   const { currentWorkflow, loading } = useDeployModel();
-  const { currentWorkflow:performanceCurrentWorkflow, loading: performanceLoading, deleteWorkflow :performanceDeleteWorkflow} = usePerfomanceBenchmark();
+  const { currentWorkflow: performanceCurrentWorkflow, loading: performanceLoading, deleteWorkflow: performanceDeleteWorkflow } = usePerfomanceBenchmark();
+  const { currentWorkflow: evalCurrentWorkflow, loading: evalLoading, deleteWorkflow: evalDeleteWorkflow } = useEvaluations();
 
   const { step, cancelAlert, setCancelAlert, closeDrawer, closeExpandedStep, expandedStep } = useDrawer();
   const { form, isExpandedView } = useContext(BudFormContext);
@@ -97,7 +99,7 @@ export function BudForm(props: BudFormProps) {
     form={form}
     validateTrigger={["onBlur", "onSubmit"]}
     // Blur logic
-    className={`flex flex-col h-full  relative` }
+    className={`flex flex-col h-full  relative`}
     scrollToFirstError
     onValuesChange={props.onValuesChange}
     feedbackIcons={() => {
@@ -117,7 +119,7 @@ export function BudForm(props: BudFormProps) {
       }
     }}
   >
-    {(loading || performanceLoading || props.drawerLoading) && <div className="flex items-center justify-center h-full w-full absolute bg-opacity-50  z-[100000000000000]">
+    {(loading || performanceLoading || evalLoading || props.drawerLoading) && <div className="flex items-center justify-center h-full w-full absolute bg-opacity-50  z-[100000000000000]">
       <Spin />
     </div>}
     {isExpandedView ? <div
@@ -135,9 +137,11 @@ export function BudForm(props: BudFormProps) {
         confirmAction={async () => {
           if (currentWorkflow?.workflow_id) {
             await deleteWorkflow(currentWorkflow.workflow_id);
-          }
-          if (performanceCurrentWorkflow?.workflow_id) {
+          } else if (performanceCurrentWorkflow?.workflow_id) {
             await performanceDeleteWorkflow(performanceCurrentWorkflow?.workflow_id);
+
+          } else if (evalCurrentWorkflow?.workflow_id) {
+            await evalDeleteWorkflow(evalCurrentWorkflow?.workflow_id);
           }
           closeDrawer();
           setCancelAlert(false);

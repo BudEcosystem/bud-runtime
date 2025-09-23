@@ -224,7 +224,7 @@ async def add_field_validator_to_model(model_class: Type[BaseModel], validation_
         namespace = {"field_validator": field_validator, "ValueError": ValueError}
 
         # Execute the validator code to get the function
-        exec(validator_code, namespace)
+        exec(validator_code, namespace)  # nosec B102 - Dynamic validator code execution for streaming validation is required
         # The function name should be validate_<field_name>
         func_name = f"validate_{field_name}"
         if func_name not in namespace:

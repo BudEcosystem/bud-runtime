@@ -224,6 +224,23 @@ class WorkflowService(SessionMixin):
                 except (ValueError, TypeError):
                     experiment_id = None
 
+            # Handle trait_ids extraction with UUID conversion
+            trait_ids_raw = required_data.get("trait_ids")
+            trait_ids = None
+            if trait_ids_raw:
+                trait_ids = []
+                if isinstance(trait_ids_raw, list):
+                    for tid in trait_ids_raw:
+                        try:
+                            trait_ids.append(UUID(str(tid)))
+                        except (ValueError, TypeError):
+                            continue
+                if not trait_ids:
+                    trait_ids = None
+
+            # Extract traits_details directly
+            traits_details = required_data.get("traits_details")
+
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
                     ProviderModel, {"id": required_data["provider_id"]}, missing_ok=True
@@ -314,6 +331,8 @@ class WorkflowService(SessionMixin):
 
             workflow_steps = RetrieveWorkflowStepData(
                 experiment_id=experiment_id if experiment_id else None,
+                trait_ids=trait_ids if trait_ids else None,
+                traits_details=traits_details if traits_details else None,
                 provider_type=provider_type if provider_type else None,
                 provider=db_provider if db_provider else None,
                 provider_id=provider_id if provider_id else None,
@@ -566,6 +585,11 @@ class WorkflowService(SessionMixin):
 
         # Combine all lists using set union
         all_keys = set().union(*workflow_keys.values())
+
+        # Add evaluation workflow specific keys
+        all_keys.add("experiment_id")
+        all_keys.add("trait_ids")
+        all_keys.add("traits_details")
 
         return list(all_keys)
 

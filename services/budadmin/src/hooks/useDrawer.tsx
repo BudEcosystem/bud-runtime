@@ -57,6 +57,7 @@ export const useDrawer = create<{
     set({ expandedStep: null });
   },
   minimizeProcess: (step: DrawerStepParsedType) => {
+    console.log("Minimizing process", step);
     get().timeout && clearTimeout(get().timeout);
     get().closeDrawer();
     set((state) => {
