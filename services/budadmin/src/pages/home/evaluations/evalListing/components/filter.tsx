@@ -66,7 +66,6 @@ const HorizontalScrollFilter = ({
 
   // Setup scroll listener
   useEffect(() => {
-    console.log("filters", filters);
     const container = scrollContainerRef.current;
     if (container) {
       checkScrollPosition();

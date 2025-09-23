@@ -117,6 +117,10 @@ const BudIsland: React.FC = () => {
     getWorkflowList();
   }, [isOpen, user]);
 
+  useEffect(() => {
+      console.log(`workflowList`, workflowList)
+  }, [workflowList]);
+
   // Hide the minimized item after 5 seconds
   useEffect(() => {
     if (lastNotification) {

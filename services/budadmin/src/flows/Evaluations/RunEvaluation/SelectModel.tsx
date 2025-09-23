@@ -21,7 +21,7 @@ export default function SelectModelForNewEvaluation() {
   const { openDrawerWithStep, drawerProps } = useDrawer();
   const { setSelectedModel, selectedModel, stepFive } =
     usePerfomanceBenchmark();
-  const { createEvaluationWorkflow, currentWorkflow } = useEvaluations();
+  const { createWorkflow, currentWorkflow } = useEvaluations();
 
   useEffect(() => {
     fetchModels({
@@ -53,6 +53,7 @@ export default function SelectModelForNewEvaluation() {
       backText="Back"
       onNext={async () => {
         try {
+          console.log("currentWorkflow:", currentWorkflow);
           // Check if we have the required data
           if (!selectedModel?.id) {
             errorToast("Please select a model");
@@ -66,7 +67,7 @@ export default function SelectModelForNewEvaluation() {
 
           // Get experiment ID from workflow or drawer props
           const experimentId =
-            currentWorkflow.experiment_id || drawerProps?.experimentId;
+            currentWorkflow?.workflow_steps?.experiment_id;
 
           if (!experimentId) {
             errorToast("Experiment ID not found");
@@ -83,12 +84,10 @@ export default function SelectModelForNewEvaluation() {
           };
 
           // Call the API
-          const response = await createEvaluationWorkflow(
+          const response = await createWorkflow(
             experimentId,
             payload,
           );
-
-          successToast("Model selected successfully");
 
           // Navigate to next step
           openDrawerWithStep("select-traits");

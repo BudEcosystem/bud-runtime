@@ -17,7 +17,7 @@ import { Model, useModels } from "src/hooks/useModels";
 
 
 export default function EvaluationSummary() {
-  const { getWorkflowData, workflowData, currentWorkflow, createEvaluationWorkflow } = useEvaluations();
+  const { getWorkflowData, workflowData, currentWorkflow, createWorkflow } = useEvaluations();
   const { getModel, selectedModel: selectedModelFromStore } = useModels();
   const [isLoadingData, setIsLoadingData] = React.useState(true);
   const [evaluations, setEvaluations] = React.useState<Evaluation[]>([]);
@@ -218,80 +218,80 @@ export default function EvaluationSummary() {
 
           // Extract other relevant data from next_step_data.summary
           if (data.next_step_data?.summary) {
-              const summary = data.next_step_data.summary;
+            const summary = data.next_step_data.summary;
 
-              // Update deployment specs with data from summary if available
-              const updatedSpecs: SpecificationTableItemProps[] = [];
+            // Update deployment specs with data from summary if available
+            const updatedSpecs: SpecificationTableItemProps[] = [];
 
-              if (summary.model_name || selectedModelData?.name) {
-                updatedSpecs.push({
-                  name: "Model",
-                  value: summary.model_name || selectedModelData?.name || "GPT-4o",
-                  icon: "/images/drawer/tag.png",
-                });
-              }
-
-              if (summary.deployment_name) {
-                updatedSpecs.push({
-                  name: "Deployment",
-                  value: summary.deployment_name,
-                  icon: "/images/drawer/tag.png",
-                });
-              }
-
-              if (summary.template_name) {
-                updatedSpecs.push({
-                  name: "Template",
-                  value: summary.template_name,
-                  icon: "/images/drawer/template-1.png",
-                });
-              }
-
-              if (summary.cluster_name) {
-                updatedSpecs.push({
-                  name: "Cluster",
-                  value: summary.cluster_name,
-                  icon: "/images/drawer/tag.png",
-                });
-              }
-
-              if (summary.dataset_size) {
-                updatedSpecs.push({
-                  name: "Dataset Size",
-                  value: summary.dataset_size,
-                  icon: "/images/drawer/context.png",
-                });
-              }
-
-              if (summary.evaluation_type) {
-                updatedSpecs.push({
-                  name: "Evaluation Type",
-                  value: Array.isArray(summary.evaluation_type) ? summary.evaluation_type : [summary.evaluation_type],
-                  tagColor: "#4CAF50",
-                });
-              }
-
-              if (summary.created_by) {
-                updatedSpecs.push({
-                  name: "Created By",
-                  value: summary.created_by,
-                  icon: "/images/drawer/tag.png",
-                });
-              }
-
-              if (summary.status) {
-                updatedSpecs.push({
-                  name: "Status",
-                  value: summary.status,
-                  icon: "/images/drawer/current.png",
-                });
-              }
-
-              // Only update specs if we have data from summary
-              if (updatedSpecs.length > 0) {
-                detDeploymentSpecs(updatedSpecs);
-              }
+            if (summary.model_name || selectedModelData?.name) {
+              updatedSpecs.push({
+                name: "Model",
+                value: summary.model_name || selectedModelData?.name || "GPT-4o",
+                icon: "/images/drawer/tag.png",
+              });
             }
+
+            if (summary.deployment_name) {
+              updatedSpecs.push({
+                name: "Deployment",
+                value: summary.deployment_name,
+                icon: "/images/drawer/tag.png",
+              });
+            }
+
+            if (summary.template_name) {
+              updatedSpecs.push({
+                name: "Template",
+                value: summary.template_name,
+                icon: "/images/drawer/template-1.png",
+              });
+            }
+
+            if (summary.cluster_name) {
+              updatedSpecs.push({
+                name: "Cluster",
+                value: summary.cluster_name,
+                icon: "/images/drawer/tag.png",
+              });
+            }
+
+            if (summary.dataset_size) {
+              updatedSpecs.push({
+                name: "Dataset Size",
+                value: summary.dataset_size,
+                icon: "/images/drawer/context.png",
+              });
+            }
+
+            if (summary.evaluation_type) {
+              updatedSpecs.push({
+                name: "Evaluation Type",
+                value: Array.isArray(summary.evaluation_type) ? summary.evaluation_type : [summary.evaluation_type],
+                tagColor: "#4CAF50",
+              });
+            }
+
+            if (summary.created_by) {
+              updatedSpecs.push({
+                name: "Created By",
+                value: summary.created_by,
+                icon: "/images/drawer/tag.png",
+              });
+            }
+
+            if (summary.status) {
+              updatedSpecs.push({
+                name: "Status",
+                value: summary.status,
+                icon: "/images/drawer/current.png",
+              });
+            }
+
+            // Only update specs if we have data from summary
+            if (updatedSpecs.length > 0) {
+              detDeploymentSpecs(updatedSpecs);
+            }
+          }
         } else {
           // Use mock data if no workflow data available
           console.log('No workflow data available, using mock data');
@@ -371,7 +371,7 @@ export default function EvaluationSummary() {
           }
 
           // Get experiment ID from workflow or drawer props
-          const experimentId = currentWorkflow.experiment_id || drawerProps?.experimentId;
+          const experimentId = currentWorkflow?.workflow_steps?.experiment_id || drawerProps?.experimentId;
 
           if (!experimentId) {
             errorToast("Experiment ID not found");
@@ -390,7 +390,7 @@ export default function EvaluationSummary() {
           console.log("Triggering evaluation workflow with payload:", payload);
 
           // Call the API to trigger the evaluation
-          const response = await createEvaluationWorkflow(experimentId, payload);
+          const response = await createWorkflow(experimentId, payload);
 
           console.log("Evaluation workflow triggered successfully:", response);
 
@@ -459,8 +459,8 @@ export default function EvaluationSummary() {
         </BudDrawerLayout>
         <BudDrawerLayout>
           <DrawerTitleCard
-            title="Evaluation Summary"
-            description="Description for ..."
+            title="Selected Triats"
+            description="Evaluation criteria chosen to test and benchmark the model's capabilities"
             classNames="pt-[.8rem]"
             descriptionClass="pt-[.3rem]"
           />
@@ -469,25 +469,13 @@ export default function EvaluationSummary() {
 
             <div className="evaluationCardWrap w-full ">
               <div className="evaluationCard w-full mt-[0rem]">
-                {filteredEvaluations.length > 0 ?
-                  <EvaluationList
-                    evaluations={filteredEvaluations}
-                    handleEvaluationSelection={(evaluation) => {
-                      setSelectedEvaluation(evaluation);
-                    }}
-                    selectedEvaluation={selectedEvaluation} />
-                  : (
-                    <>
-                      <div
-                        className="mt-[1.5rem]"
-                      />
-                      <BudStepAlert
-                        type="warining"
-                        title='No Evaluations Found'
-                        description='No evaluations match your search criteria. Try adjusting your search terms.'
-                      />
-                    </>
-                  )}
+                <EvaluationList
+                  evaluations={currentWorkflow.workflow_steps.traits_details}
+                  handleEvaluationSelection={(evaluation) => {
+                    setSelectedEvaluation(evaluation);
+                  }}
+                  hideSelection={true}
+                  selectedEvaluation={selectedEvaluation} />
               </div>
             </div>
           </div>
