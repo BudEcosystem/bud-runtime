@@ -1,7 +1,7 @@
 import React from "react";
 import { Table } from "antd";
 import { ColumnsType } from "antd/es/table";
-import { Text_12_400_EEEEEE, Text_12_400_B3B3B3 } from "@/components/ui/text";
+import { Text_12_400_EEEEEE } from "@/components/ui/text";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { capitalize } from "@/lib/utils";
 import { endpointStatusMapping } from "@/lib/colorMapping";
