@@ -92,28 +92,14 @@ const ExperimentDetailsPage = () => {
     getExperimentRuns,
   } = useEvaluations();
 
-  // Dummy data for experimentMetrics
-  const experimentMetrics = {
-    budgetUsed: 45.67,
-    budgetTotal: 100.0,
-    tokensProcessed: 2500000,
-    runtime: 185, // in minutes
-    processingRate: 13500,
-    currentMetrics: [
-      { evaluation: "Code Generation", gpt4Score: 92.5, claude3Score: 89.3 },
-      {
-        evaluation: "Language Understanding",
-        gpt4Score: 94.2,
-        claude3Score: 93.8,
-      },
-      { evaluation: "Reasoning", gpt4Score: 88.7, claude3Score: 91.2 },
-      {
-        evaluation: "Math Problem Solving",
-        gpt4Score: 85.4,
-        claude3Score: 87.9,
-      },
-    ],
-  };
+  // Use actual metrics from experimentDetails
+  const experimentMetrics = experimentDetails ? {
+    budgetUsed: experimentDetails.budget_used || 45.67,
+    budgetTotal: experimentDetails.budget_total || 100.0,
+    tokensProcessed: experimentDetails.tokens_processed || 2500000,
+    runtime: experimentDetails.runtime || 185, // in minutes
+    processingRate: experimentDetails.processing_rate || 13500,
+  } : null;
 
 
   // Dummy data for runs history
@@ -121,6 +107,7 @@ const ExperimentDetailsPage = () => {
     {
       runId: "run-001",
       model: "GPT-4",
+      traitName: "Knowledge",
       status: "Completed" as const,
       startedDate: "2024-01-15T10:30:00Z",
       duration: "2h 15m",
@@ -129,6 +116,7 @@ const ExperimentDetailsPage = () => {
     {
       runId: "run-002",
       model: "Claude-3",
+      traitName: "Examination",
       status: "Completed" as const,
       startedDate: "2024-01-15T13:45:00Z",
       duration: "2h 30m",
@@ -137,6 +125,7 @@ const ExperimentDetailsPage = () => {
     {
       runId: "run-003",
       model: "Llama-2",
+      traitName: "Knowledge",
       status: "Running" as const,
       startedDate: "2024-01-15T16:00:00Z",
       duration: "1h 45m",
@@ -266,7 +255,7 @@ const ExperimentDetailsPage = () => {
               )}
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-[3.1rem]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-[3.1rem] hidden">
             {experimentMetrics ? (
               <>
                 <MetricCard
@@ -330,11 +319,10 @@ const ExperimentDetailsPage = () => {
               Current Metrics
             </Text_24_600_FFFFFF>
             <Text_14_400_FFFFFF className="mb-[1rem] leading-[140%]">
-              Current metrics description metrics description metrics
-              description...
+              Comparative performance scores across evaluation categories for each model.
             </Text_14_400_FFFFFF>
             <CurrentMetricsTable
-              data={experimentMetrics?.currentMetrics || []}
+              data={experimentDetails?.current_metrics || []}
             />
           </div>
 
@@ -383,14 +371,19 @@ const ExperimentDetailsPage = () => {
               Runs History
             </Text_24_600_FFFFFF>
             <Text_14_400_FFFFFF className="mb-[1rem] leading-[140%]">
-              Runs history description history description history
-              description...
+              Historical record of all evaluation runs with their status, duration, and benchmark scores.
             </Text_14_400_FFFFFF>
             <RunsHistoryTable
               data={
-                experimentRuns?.runsHistory ||
-                experimentRuns ||
-                dummyRunsHistory
+                experimentRuns?.evaluations?.map((evaluation: any) => ({
+                  runId: evaluation.evaluation_id,
+                  model: evaluation.model_name,
+                  traitName: evaluation.trait_name,
+                  status: "Completed" as const,
+                  startedDate: new Date(evaluation.started_date).toLocaleDateString() + " " + new Date(evaluation.started_date).toLocaleTimeString(),
+                  duration: `${evaluation.duration_minutes}m`,
+                  benchmarkScore: `${evaluation.trait_score}`
+                })) || dummyRunsHistory
               }
             />
           </div>

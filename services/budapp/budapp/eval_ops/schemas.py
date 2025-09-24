@@ -738,6 +738,27 @@ class ExperimentEvaluationsResponse(SuccessResponse):
     evaluations: List[RunWithEvaluations] = Field(..., description="List of runs with evaluation details")
 
 
+# ------------------------ Evaluation Listing Schemas ------------------------
+
+
+class EvaluationListItem(BaseModel):
+    """A single evaluation item in the completed evaluations list."""
+
+    evaluation_name: str = Field(..., description="Name of the evaluation")
+    evaluation_id: UUID4 = Field(..., description="UUID of the evaluation")
+    model_name: str = Field(..., description="Name of the model used")
+    started_date: datetime = Field(..., description="Date when the evaluation was started")
+    duration_minutes: int = Field(..., description="Duration of the evaluation in minutes (30-40 min hardcoded)")
+    trait_name: str = Field(..., description="Name of the trait")
+    trait_score: float = Field(..., description="Score for this trait (random value for now)")
+
+
+class ListEvaluationsResponse(SuccessResponse):
+    """Response schema for listing completed evaluations."""
+
+    evaluations: List[EvaluationListItem] = Field(..., description="List of completed evaluations")
+
+
 # ------------------------ Run History Schemas ------------------------
 
 

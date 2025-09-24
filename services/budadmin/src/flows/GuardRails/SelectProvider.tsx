@@ -143,16 +143,6 @@ export default function SelectProvider() {
       (p) => p.type?.toLowerCase() !== "aws_comprehend"
     ) || [];
 
-  // Add custom probe option to bud providers
-  const customProbeOption = {
-    id: "custom-probe",
-    name: "Create custom probe",
-    description:
-      "Create your custom probe with Bud sentinel for tools, agents, prompts, models or routes.",
-    icon: "⚙️",
-    type: "custom",
-  };
-
   const allBudProviders = [...budProviders];
 
   // Keep static third-party providers for now

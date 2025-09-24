@@ -89,7 +89,9 @@ class PromptDataManager(DataManagerUtils):
                 joinedload(PromptModel.default_version)
                 .joinedload(PromptVersionModel.endpoint)
                 .joinedload(EndpointModel.model),
-                joinedload(PromptModel.default_version).joinedload(PromptVersionModel.model),
+                joinedload(PromptModel.default_version)
+                .joinedload(PromptVersionModel.model)
+                .joinedload(ModelModel.provider),
             )
         )
 

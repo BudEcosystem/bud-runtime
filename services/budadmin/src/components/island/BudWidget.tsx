@@ -24,6 +24,7 @@ import { errorToast } from "../toast";
 import { FormProgressStatus } from "../ui/bud/progress/FormProgress";
 import { calculateEta } from "src/flows/utils/calculateETA";
 import IconRender from "src/flows/components/BudIconRender";
+import { useEvaluations } from "@/hooks/useEvaluations";
 
 export function getFailedStep(data: WorkflowListItem) {
   return data?.progress?.steps?.find(
@@ -88,6 +89,10 @@ export function BudWidget({
     setDeploymentCluster,
     setSelectedCredentials,
   } = useDeployModel();
+
+  const {
+    getWorkflow: getEvaluationWorkflow,
+  } = useEvaluations();
   const { openDrawerWithStep } = useDrawer();
   const { close } = useIsland();
   const [loading, setLoading] = useState(false);
@@ -156,6 +161,10 @@ export function BudWidget({
       workflow = await getWorkflowCloud(data.id);
     } else {
       workflow = await getWorkflow(data.id);
+    }
+
+    if (data.workflow_type === "evaluate_model") {
+      workflow = await getEvaluationWorkflow(data.id);
     }
     setLoading(false);
     if (workflow.workflow_steps) {
