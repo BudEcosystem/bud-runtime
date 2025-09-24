@@ -87,6 +87,12 @@ class Provider(BaseModel):
     icon: str
     capabilities: list[ProviderCapabilityEnum]
 
+    @field_validator("capabilities", mode="before")
+    @classmethod
+    def handle_none_capabilities(cls, v):
+        """Convert None to empty list for capabilities."""
+        return v if v is not None else []
+
 
 class ProviderResponse(PaginatedSuccessResponse):
     """Provider response schema."""
