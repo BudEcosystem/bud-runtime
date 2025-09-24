@@ -555,7 +555,13 @@ class PromptService(SessionMixin):
             ) from e
 
     async def get_integrations(
-        self, prompt_id: Optional[UUID] = None, offset: int = 0, limit: int = 10
+        self,
+        prompt_id: Optional[UUID] = None,
+        offset: int = 0,
+        limit: int = 10,
+        filters: dict = {},
+        order_by: list = [],
+        search: bool = False,
     ) -> tuple[list[IntegrationListItem], int]:
         """Get integrations list.
 
@@ -661,13 +667,33 @@ class PromptService(SessionMixin):
             # This is just mock data for testing
         }
 
-        # Filter by prompt_id if provided
+        # Apply filters
         filtered_integrations = mock_integrations
+
+        # Filter by name if provided
+        if filters.get("name"):
+            name_filter = filters["name"].lower().strip()
+            filtered_integrations = [
+                integration for integration in filtered_integrations if name_filter in integration.name.lower()
+            ]
+
+        # Apply search functionality
+        if search and filters.get("name"):
+            # Search is essentially the same as name filtering for our use case
+            # But could be extended to search in other fields like type
+            search_term = filters["name"].lower().strip()
+            filtered_integrations = [
+                integration
+                for integration in filtered_integrations
+                if search_term in integration.name.lower() or search_term in integration.type.lower()
+            ]
+
+        # Filter by prompt_id if provided
         if prompt_id:
             # For now, return a subset for testing when prompt_id is provided
             # In production, this will filter based on actual prompt-integration relationships
             # For demo purposes, return first 3 integrations for any prompt_id
-            filtered_integrations = mock_integrations[:3]
+            filtered_integrations = filtered_integrations[:3]
 
         # Apply pagination
         total_count = len(filtered_integrations)

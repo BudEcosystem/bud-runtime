@@ -42,6 +42,7 @@ from .schemas import (
     EditPromptRequest,
     EditPromptVersionRequest,
     GetPromptVersionResponse,
+    IntegrationFilter,
     IntegrationListResponse,
     PromptConfigGetResponse,
     PromptConfigRequest,
@@ -707,9 +708,12 @@ async def get_prompt_config(
 async def list_integrations(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[IntegrationFilter, Depends()],
     prompt_id: Optional[UUID] = Query(None, description="Filter integrations connected to a specific prompt"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
 ) -> Union[IntegrationListResponse, ErrorResponse]:
     """List all integrations with optional filtering by prompt_id.
 
@@ -730,10 +734,13 @@ async def list_integrations(
     # Calculate offset
     offset = (page - 1) * limit
 
+    # Convert filter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True)
+
     try:
         # Get integrations from service
         integrations_list, count = await PromptService(session).get_integrations(
-            prompt_id=prompt_id, offset=offset, limit=limit
+            prompt_id=prompt_id, offset=offset, limit=limit, filters=filters_dict, order_by=order_by, search=search
         )
 
         return IntegrationListResponse(

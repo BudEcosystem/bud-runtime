@@ -599,6 +599,12 @@ class IntegrationListResponse(PaginatedSuccessResponse):
     integrations: list[IntegrationListItem] = []
 
 
+class IntegrationFilter(BaseModel):
+    """Filter schema for integration list API."""
+
+    name: str | None = None
+
+
 class Integration(BaseModel):
     """Internal schema for full integration data."""
 
