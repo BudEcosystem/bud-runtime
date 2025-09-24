@@ -85,7 +85,7 @@ class Provider(BaseModel):
     description: str
     type: str
     icon: str
-    capabilities: list[ProviderCapabilityEnum] = Field(default_factory=list)
+    capabilities: list[ProviderCapabilityEnum]
 
     @field_validator("capabilities", mode="before")
     @classmethod
