@@ -24,6 +24,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model
 
 from ..cluster_ops.schemas import ClusterResponse
 from ..commons.constants import (
+    IntegrationAuthTypeEnum,
     ModalityEnum,
     PromptStatusEnum,
     PromptTypeEnum,
@@ -578,3 +579,33 @@ class PromptConfigCopyRequest(BaseModel):
         True, description="If true, replace entire target config. If false, merge only fields present in source"
     )
     set_as_default: bool = Field(True, description="Whether to set the copied version as default for target prompt")
+
+
+class IntegrationListItem(BaseModel):
+    """Schema for individual integration item in list."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    icon: str
+
+
+class IntegrationListResponse(PaginatedSuccessResponse):
+    """Integration list response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    integrations: list[IntegrationListItem] = []
+
+
+class Integration(BaseModel):
+    """Internal schema for full integration data."""
+
+    id: UUID4
+    name: str
+    type: str
+    icon: str
+    auth_type: IntegrationAuthTypeEnum
+    credential: Dict[str, Any]
+    url: str

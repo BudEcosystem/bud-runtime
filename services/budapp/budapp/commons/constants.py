@@ -891,6 +891,24 @@ class PromptTypeEnum(StrEnum):
     SIMPLE_PROMPT = auto()
 
 
+class IntegrationAuthTypeEnum(StrEnum):
+    """Enumeration of integration authentication types.
+
+    Attributes:
+        BASIC: Basic authentication with username/password.
+        BEARER: Bearer token authentication.
+        HEADERS: Custom headers authentication.
+        OAUTH: OAuth authentication.
+        NONE: No authentication required.
+    """
+
+    BASIC = auto()
+    BEARER = auto()
+    HEADERS = auto()
+    OAUTH = auto()
+    NONE = auto()
+
+
 class PromptStatusEnum(StrEnum):
     """Enumeration of prompt statuses.
 

@@ -30,6 +30,7 @@ from ..commons.constants import (
     BUD_INTERNAL_WORKFLOW,
     BudServeWorkflowStepEventName,
     EndpointStatusEnum,
+    IntegrationAuthTypeEnum,
     ModelProviderTypeEnum,
     ProjectStatusEnum,
     PromptStatusEnum,
@@ -58,6 +59,8 @@ from .models import PromptVersion as PromptVersionModel
 from .schemas import (
     CreatePromptWorkflowRequest,
     CreatePromptWorkflowSteps,
+    Integration,
+    IntegrationListItem,
     PromptConfigCopyRequest,
     PromptConfigGetResponse,
     PromptConfigRequest,
@@ -549,6 +552,148 @@ class PromptService(SessionMixin):
             raise ClientException(
                 message="Failed to delete prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
+
+    async def get_integrations(
+        self, prompt_id: Optional[UUID] = None, offset: int = 0, limit: int = 10
+    ) -> tuple[list[IntegrationListItem], int]:
+        """Get integrations list.
+
+        TODO: Currently returns hardcoded data until mcp_foundry service is available.
+        When prompt_id is provided, filters integrations connected to that prompt.
+
+        Args:
+            prompt_id: Optional UUID to filter integrations for a specific prompt
+            offset: Pagination offset
+            limit: Pagination limit
+
+        Returns:
+            Tuple of (list of integrations, total count)
+        """
+        # Validate prompt if prompt_id is provided
+        if prompt_id:
+            db_prompt = await PromptDataManager(self.session).retrieve_by_fields(  # noqa: F841
+                PromptModel,
+                fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE},
+            )
+
+        # TODO: Hardcoded integration data until mcp_foundry service is ready
+        # This simulates what we'll get from the mcp_foundry service
+        mock_integrations = [
+            Integration(
+                id=UUID("a1b2c3d4-e5f6-4321-8765-432109876543"),
+                name="GitHub",
+                type="version_control",
+                icon="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                auth_type=IntegrationAuthTypeEnum.OAUTH,
+                credential={"access_token": "required", "refresh_token": "optional"},
+                url="https://api.github.com",
+            ),
+            Integration(
+                id=UUID("b2c3d4e5-f6a7-5432-9876-543210987654"),
+                name="Slack",
+                type="communication",
+                icon="https://a.slack-edge.com/80588/marketing/img/meta/favicon-32.png",
+                auth_type=IntegrationAuthTypeEnum.BEARER,
+                credential={"bot_token": "required", "app_token": "optional"},
+                url="https://slack.com/api",
+            ),
+            Integration(
+                id=UUID("c3d4e5f6-a7b8-6543-0987-654321098765"),
+                name="Jira",
+                type="project_management",
+                icon="https://wac-cdn.atlassian.com/dam/jcr:b544631f-b225-441b-9e05-57b0fd0d495b/Jira%20Software-icon-blue.svg",
+                auth_type=IntegrationAuthTypeEnum.BASIC,
+                credential={"api_token": "required", "email": "required", "domain": "required"},
+                url="https://api.atlassian.com",
+            ),
+            Integration(
+                id=UUID("d4e5f6a7-b8c9-7654-1098-765432109876"),
+                name="PostgreSQL",
+                type="database",
+                icon="https://www.postgresql.org/media/img/about/press/elephant.png",
+                auth_type=IntegrationAuthTypeEnum.BASIC,
+                credential={
+                    "host": "required",
+                    "port": "required",
+                    "username": "required",
+                    "password": "required",
+                    "database": "required",
+                },
+                url="postgresql://",
+            ),
+            Integration(
+                id=UUID("e5f6a7b8-c9d0-8765-2109-876543210987"),
+                name="AWS S3",
+                type="storage",
+                icon="https://upload.wikimedia.org/wikipedia/commons/b/bc/Amazon-S3-Logo.svg",
+                auth_type=IntegrationAuthTypeEnum.HEADERS,
+                credential={"access_key_id": "required", "secret_access_key": "required", "region": "required"},
+                url="https://s3.amazonaws.com",
+            ),
+            Integration(
+                id=UUID("f6a7b8c9-d0e1-9876-3210-987654321098"),
+                name="OpenAI",
+                type="ai_provider",
+                icon="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg",
+                auth_type=IntegrationAuthTypeEnum.BEARER,
+                credential={"api_key": "required", "organization_id": "optional"},
+                url="https://api.openai.com",
+            ),
+            Integration(
+                id=UUID("a7b8c9d0-e1f2-0987-4321-098765432109"),
+                name="MongoDB",
+                type="database",
+                icon="https://www.mongodb.com/assets/images/global/favicon.ico",
+                auth_type=IntegrationAuthTypeEnum.BASIC,
+                credential={"connection_string": "required"},
+                url="mongodb://",
+            ),
+            Integration(
+                id=UUID("b8c9d0e1-f2a3-1098-5432-109876543210"),
+                name="Redis",
+                type="cache",
+                icon="https://redis.io/images/redis-white.png",
+                auth_type=IntegrationAuthTypeEnum.BASIC,
+                credential={"host": "required", "port": "required", "password": "optional"},
+                url="redis://",
+            ),
+        ]
+
+        # Simulated mapping of integrations to prompt_ids for testing
+        # In production, this will come from the database or mcp_foundry service
+        prompt_integration_mapping = {  # noqa: F841
+            # Example: specific prompts have specific integrations
+            # This is just mock data for testing
+        }
+
+        # Filter by prompt_id if provided
+        filtered_integrations = mock_integrations
+        if prompt_id:
+            # For now, return a subset for testing when prompt_id is provided
+            # In production, this will filter based on actual prompt-integration relationships
+            # For demo purposes, return first 3 integrations for any prompt_id
+            filtered_integrations = mock_integrations[:3]
+
+        # Apply pagination
+        total_count = len(filtered_integrations)
+        paginated_integrations = filtered_integrations[offset : offset + limit]
+
+        # Convert to response format (only id, name, icon)
+        integration_items = [
+            IntegrationListItem(
+                id=integration.id,
+                name=integration.name,
+                icon=integration.icon,
+            )
+            for integration in paginated_integrations
+        ]
+
+        logger.debug(
+            f"Returning {len(integration_items)} integrations out of {total_count} total"
+            f"{f' for prompt_id {prompt_id}' if prompt_id else ''}"
+        )
+
+        return integration_items, total_count
 
     async def _perform_copy_prompt_config_request(self, request: PromptConfigCopyRequest) -> Dict[str, Any]:
         """Perform the actual copy-config request to budprompt service via Dapr.

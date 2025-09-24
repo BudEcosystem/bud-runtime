@@ -42,6 +42,7 @@ from .schemas import (
     EditPromptRequest,
     EditPromptVersionRequest,
     GetPromptVersionResponse,
+    IntegrationListResponse,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -681,4 +682,73 @@ async def get_prompt_config(
         logger.exception(f"Failed to retrieve prompt configuration: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve prompt configuration"
+        ).to_http_response()
+
+
+@router.get(
+    "/integrations",
+    responses={
+        status.HTTP_200_OK: {
+            "model": IntegrationListResponse,
+            "description": "Successfully listed integrations",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="List all integrations with optional filtering by prompt_id",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def list_integrations(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: Optional[UUID] = Query(None, description="Filter integrations connected to a specific prompt"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+) -> Union[IntegrationListResponse, ErrorResponse]:
+    """List all integrations with optional filtering by prompt_id.
+
+    This endpoint returns a list of available integrations. When prompt_id is provided,
+    it filters to show only integrations connected to that specific prompt.
+    Currently returns hardcoded data until mcp_foundry service is available.
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        prompt_id: Optional UUID to filter integrations for a specific prompt
+        page: Page number for pagination
+        limit: Number of items per page
+
+    Returns:
+        IntegrationListResponse with the list of integrations or ErrorResponse on failure
+    """
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    try:
+        # Get integrations from service
+        integrations_list, count = await PromptService(session).get_integrations(
+            prompt_id=prompt_id, offset=offset, limit=limit
+        )
+
+        return IntegrationListResponse(
+            integrations=integrations_list,
+            total_record=count,
+            page=page,
+            limit=limit,
+            object="integrations.list",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to list integrations: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list integrations: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list integrations"
         ).to_http_response()
