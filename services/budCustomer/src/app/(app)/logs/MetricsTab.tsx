@@ -145,7 +145,7 @@ function MetricCard({
 }: any) {
   return (
     <div
-      className="p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] min-h-[7.8125rem] flex flex-col items-start justify-between"
+      className="p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] min-h-[7.8125rem] h-full flex flex-col items-start justify-between"
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-color)",
