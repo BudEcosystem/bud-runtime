@@ -102,36 +102,6 @@ const ExperimentDetailsPage = () => {
   } : null;
 
 
-  // Dummy data for runs history
-  const dummyRunsHistory = [
-    {
-      runId: "run-001",
-      model: "GPT-4",
-      traitName: "Knowledge",
-      status: "Completed" as const,
-      startedDate: "2024-01-15T10:30:00Z",
-      duration: "2h 15m",
-      benchmarkScore: "92.5%",
-    },
-    {
-      runId: "run-002",
-      model: "Claude-3",
-      traitName: "Examination",
-      status: "Completed" as const,
-      startedDate: "2024-01-15T13:45:00Z",
-      duration: "2h 30m",
-      benchmarkScore: "91.2%",
-    },
-    {
-      runId: "run-003",
-      model: "Llama-2",
-      traitName: "Knowledge",
-      status: "Running" as const,
-      startedDate: "2024-01-15T16:00:00Z",
-      duration: "1h 45m",
-      benchmarkScore: "-",
-    },
-  ];
 
   useEffect(() => {
     if (experimentId && typeof experimentId === "string") {
@@ -141,9 +111,7 @@ const ExperimentDetailsPage = () => {
       getExperimentRuns(experimentId);
     }
   }, [experimentId]);
-  useEffect(() => {
-    console.log("Experiment Details:", experimentDetails);
-  }, [experimentDetails]);
+
 
   if (loading) {
     return (
@@ -255,15 +223,15 @@ const ExperimentDetailsPage = () => {
               )}
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-[3.1rem] hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-[3.1rem]">
             {experimentMetrics ? (
               <>
-                <MetricCard
+                {/* <MetricCard
                   title="Budget Used"
                   value={`$${experimentMetrics.budgetUsed?.toFixed(2) || "0.00"}`}
                   subtitle={`/ $${experimentMetrics.budgetTotal?.toFixed(2) || "100.00"}`}
                   color="#965CDE"
-                />
+                /> */}
                 <MetricCard
                   title="Tokens Processed"
                   value={`${((experimentMetrics.tokensProcessed || 0) / 1000000).toFixed(1)}M`}
@@ -383,7 +351,7 @@ const ExperimentDetailsPage = () => {
                   startedDate: new Date(evaluation.started_date).toLocaleDateString() + " " + new Date(evaluation.started_date).toLocaleTimeString(),
                   duration: `${evaluation.duration_minutes}m`,
                   benchmarkScore: `${evaluation.trait_score}`
-                })) || dummyRunsHistory
+                })) || []
               }
             />
           </div>
