@@ -2922,6 +2922,104 @@ EMOJIS = [
     "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
 ]
 
+# Integration Authentication Credentials Mapping
+INTEGRATION_AUTH_CREDENTIALS_MAP = {
+    IntegrationAuthTypeEnum.BASIC: [
+        {
+            "type": "text",
+            "field": "username",
+            "label": "Username",
+            "order": 1,
+            "required": True,
+            "description": "Your username for basic authentication",
+        },
+        {
+            "type": "password",
+            "field": "password",
+            "label": "Password",
+            "order": 2,
+            "required": True,
+            "description": "Your password for basic authentication",
+        },
+    ],
+    IntegrationAuthTypeEnum.BEARER: [
+        {
+            "type": "password",
+            "field": "token",
+            "label": "Bearer Token",
+            "order": 1,
+            "required": True,
+            "description": "Your bearer token for API authentication",
+        }
+    ],
+    IntegrationAuthTypeEnum.OAUTH: [
+        {
+            "type": "dropdown",
+            "field": "grant_type",
+            "label": "Grant Type",
+            "order": 1,
+            "required": True,
+            "description": "OAuth grant type",
+            "options": ["client_credentials", "authorization_code"],
+        },
+        {
+            "type": "text",
+            "field": "client_id",
+            "label": "Client ID",
+            "order": 2,
+            "required": True,
+            "description": "Your OAuth client ID",
+        },
+        {
+            "type": "password",
+            "field": "client_secret",
+            "label": "Client Secret",
+            "order": 3,
+            "required": True,
+            "description": "Your OAuth client secret",
+        },
+        {
+            "type": "url",
+            "field": "token_url",
+            "label": "Token URL",
+            "order": 4,
+            "required": True,
+            "description": "OAuth token endpoint URL",
+        },
+        {
+            "type": "text",
+            "field": "scopes",
+            "label": "Scopes",
+            "order": 5,
+            "required": False,
+            "description": "Space-separated list of OAuth scopes",
+        },
+    ],
+    IntegrationAuthTypeEnum.HEADERS: [
+        {
+            "type": "button",
+            "field": "add_header_button",
+            "label": "Add Header",
+            "order": 1,
+            "required": False,
+            "description": "Click to add a new header",
+        },
+        {
+            "type": "array",
+            "field": "headers",
+            "label": "Custom Headers",
+            "required": True,
+            "description": "Add custom authentication headers",
+            "item_schema": {
+                "key": {"type": "text", "label": "Header Key", "placeholder": "e.g., X-API-Key"},
+                "value": {"type": "text", "label": "Header Value", "placeholder": "Enter header value"},
+            },
+            "min_items": 1,
+        },
+    ],
+    IntegrationAuthTypeEnum.NONE: [],
+}
+
 # Define success messages for different workflow types
 WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.MODEL_DEPLOYMENT: "Successfully cancelled model deployment.",

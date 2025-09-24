@@ -607,5 +607,5 @@ class Integration(BaseModel):
     type: str
     icon: str
     auth_type: IntegrationAuthTypeEnum
-    credential: Dict[str, Any]
+    credential_schema: List[Dict[str, Any]]
     url: str
