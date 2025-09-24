@@ -716,6 +716,109 @@ class PromptService(SessionMixin):
 
         return integration_items, total_count
 
+    async def get_integration_by_id(self, integration_id: UUID) -> Integration:
+        """Get a single integration by its ID.
+
+        Currently returns from hardcoded data until mcp_foundry service is available.
+
+        Args:
+            integration_id: UUID of the integration to retrieve
+
+        Returns:
+            Integration object with full details
+
+        Raises:
+            ClientException: If integration not found
+        """
+        # TODO: Hardcoded integration data until mcp_foundry service is ready
+        # This simulates what we'll get from the mcp_foundry service
+        mock_integrations = [
+            Integration(
+                id=UUID("550e8400-e29b-41d4-a716-446655440001"),
+                name="GitHub",
+                type="version_control",
+                icon="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                auth_type=IntegrationAuthTypeEnum.OAUTH,
+                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.OAUTH, []),
+                url="https://api.github.com",
+            ),
+            Integration(
+                id=UUID("550e8400-e29b-41d4-a716-446655440002"),
+                name="Slack",
+                type="communication",
+                icon="https://a.slack-edge.com/80588/marketing/img/meta/favicon-32.png",
+                auth_type=IntegrationAuthTypeEnum.BEARER,
+                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BEARER, []),
+                url="https://slack.com/api",
+            ),
+            Integration(
+                id=UUID("550e8400-e29b-41d4-a716-446655440003"),
+                name="Jira",
+                type="project_management",
+                icon="https://wac-cdn.atlassian.com/dam/jcr:b544631f-b225-441b-9e05-57b0fd0d495b/Jira%20Software-icon-blue.svg",
+                auth_type=IntegrationAuthTypeEnum.BASIC,
+                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
+                url="https://api.atlassian.com",
+            ),
+            Integration(
+                id=UUID("550e8400-e29b-41d4-a716-446655440004"),
+                name="PostgreSQL",
+                type="database",
+                icon="https://www.postgresql.org/media/img/about/press/elephant.png",
+                auth_type=IntegrationAuthTypeEnum.BASIC,
+                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
+                url="postgresql://",
+            ),
+            Integration(
+                id=UUID("550e8400-e29b-41d4-a716-446655440005"),
+                name="AWS S3",
+                type="storage",
+                icon="https://upload.wikimedia.org/wikipedia/commons/b/bc/Amazon-S3-Logo.svg",
+                auth_type=IntegrationAuthTypeEnum.HEADERS,
+                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.HEADERS, []),
+                url="https://s3.amazonaws.com",
+            ),
+            Integration(
+                id=UUID("550e8400-e29b-41d4-a716-446655440006"),
+                name="OpenAI",
+                type="ai_provider",
+                icon="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg",
+                auth_type=IntegrationAuthTypeEnum.BEARER,
+                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BEARER, []),
+                url="https://api.openai.com",
+            ),
+            Integration(
+                id=UUID("550e8400-e29b-41d4-a716-446655440007"),
+                name="MongoDB",
+                type="database",
+                icon="https://www.mongodb.com/assets/images/global/favicon.ico",
+                auth_type=IntegrationAuthTypeEnum.BASIC,
+                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
+                url="mongodb://",
+            ),
+            Integration(
+                id=UUID("550e8400-e29b-41d4-a716-446655440008"),
+                name="Redis",
+                type="cache",
+                icon="https://redis.io/images/redis-white.png",
+                auth_type=IntegrationAuthTypeEnum.BASIC,
+                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
+                url="redis://",
+            ),
+        ]
+
+        # Find the integration by ID
+        for integration in mock_integrations:
+            if integration.id == integration_id:
+                logger.debug(f"Found integration: {integration.name} (ID: {integration_id})")
+                return integration
+
+        # If not found, raise exception
+        logger.error(f"Integration not found: {integration_id}")
+        raise ClientException(
+            message=f"Integration with ID {integration_id} not found", status_code=status.HTTP_404_NOT_FOUND
+        )
+
     async def _perform_copy_prompt_config_request(self, request: PromptConfigCopyRequest) -> Dict[str, Any]:
         """Perform the actual copy-config request to budprompt service via Dapr.
 

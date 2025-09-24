@@ -615,3 +615,11 @@ class Integration(BaseModel):
     auth_type: IntegrationAuthTypeEnum
     credential_schema: List[Dict[str, Any]]
     url: str
+
+
+class IntegrationResponse(SuccessResponse):
+    """Response schema for single integration retrieval."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    integration: Integration

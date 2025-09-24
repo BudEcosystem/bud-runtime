@@ -44,6 +44,7 @@ from .schemas import (
     GetPromptVersionResponse,
     IntegrationFilter,
     IntegrationListResponse,
+    IntegrationResponse,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -758,4 +759,62 @@ async def list_integrations(
         logger.exception(f"Failed to list integrations: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list integrations"
+        ).to_http_response()
+
+
+@router.get(
+    "/integrations/{integration_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": IntegrationResponse,
+            "description": "Successfully retrieved integration",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Integration not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Retrieve a single integration by ID",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_integration(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    integration_id: UUID,
+) -> Union[IntegrationResponse, ErrorResponse]:
+    """Retrieve a single integration with its full details.
+
+    This endpoint returns complete integration information including the
+    credential schema needed to render authentication forms dynamically.
+    Currently returns hardcoded data until mcp_foundry service is available.
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        integration_id: UUID of the integration to retrieve
+
+    Returns:
+        IntegrationResponse with full integration details or ErrorResponse on failure
+    """
+    try:
+        # Get the integration from service
+        integration = await PromptService(session).get_integration_by_id(integration_id)
+
+        return IntegrationResponse(
+            integration=integration,
+            message="Integration retrieved successfully",
+            code=status.HTTP_200_OK,
+            object="integration.get",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to retrieve integration: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve integration: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve integration"
         ).to_http_response()
