@@ -623,3 +623,38 @@ class IntegrationResponse(SuccessResponse):
     model_config = ConfigDict(extra="ignore")
 
     integration: Integration
+
+
+class Tool(BaseModel):
+    """Schema for tool data."""
+
+    id: UUID4
+    name: str
+    description: str
+    type: str
+    schema: Dict[str, Any]
+
+
+class ToolListItem(BaseModel):
+    """Schema for tool item in list response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    type: str
+
+
+class ToolFilter(BaseModel):
+    """Filter schema for tool list API."""
+
+    integration_type: str
+    name: str | None = None
+
+
+class ToolListResponse(PaginatedSuccessResponse):
+    """Tool list response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    tools: list[ToolListItem] = []

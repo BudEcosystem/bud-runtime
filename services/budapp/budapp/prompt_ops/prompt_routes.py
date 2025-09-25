@@ -59,6 +59,8 @@ from .schemas import (
     PromptVersionResponse,
     SinglePromptResponse,
     SinglePromptVersionResponse,
+    ToolFilter,
+    ToolListResponse,
 )
 from .services import PromptService, PromptVersionService, PromptWorkflowService
 
@@ -817,4 +819,91 @@ async def get_integration(
         logger.exception(f"Failed to retrieve integration: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve integration"
+        ).to_http_response()
+
+
+@router.get(
+    "/tools",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ToolListResponse,
+            "description": "Successfully listed tools",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="List tools filtered by integration type",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def list_tools(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[ToolFilter, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[ToolListResponse, ErrorResponse]:
+    """List all tools filtered by integration type.
+
+    This endpoint returns a list of available tools for a specific integration type.
+    The integration_type parameter is MANDATORY.
+    Currently returns hardcoded data until mcp_foundry service is available.
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        filters: Tool filters including mandatory integration_type
+        page: Page number for pagination
+        limit: Number of items per page
+        order_by: Ordering fields
+        search: Enable search functionality
+
+    Returns:
+        ToolListResponse with the list of tools or ErrorResponse on failure
+    """
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert filter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    # Validate that integration_type is provided (it's mandatory in the schema)
+    if not filters.integration_type:
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST, message="integration_type is required"
+        ).to_http_response()
+
+    try:
+        # Get tools from service
+        tools_list, count = await PromptService(session).get_tools(
+            integration_type=filters.integration_type,
+            offset=offset,
+            limit=limit,
+            filters=filters_dict,
+            order_by=order_by,
+            search=search,
+        )
+
+        return ToolListResponse(
+            tools=tools_list,
+            total_record=count,
+            page=page,
+            limit=limit,
+            object="tools.list",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to list tools: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list tools: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list tools"
         ).to_http_response()
