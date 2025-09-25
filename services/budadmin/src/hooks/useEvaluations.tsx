@@ -306,8 +306,10 @@ export const useEvaluations = create<{
     set({ loading: true });
     try {
       const response: any = await AppRequest.Post(`${tempApiBaseUrl}/experiments/`, payload);
+      console.log('response', response)
       return response.data;
     } catch (error) {
+      console.log('error', error)
       console.error("Error creating experiment:", error);
       throw error;
     } finally {

@@ -50,7 +50,7 @@ export default function RunEvaluationSuccess() {
             </div>
             <div className="max-w-[90%] mt-[1rem] mb-[3rem] flex flex-col items-center justify-center">
               <Text_24_600_EEEEEE className="text-center leading-[2rem] mb-[1.2rem] max-w-[90%]">
-                Evaluation Successfully Triggered!
+                Evaluation Ran Successfully!
               </Text_24_600_EEEEEE>
               <Text_12_400_B3B3B3 className="text-center">
                 You can now view the results and metrics for {currentWorkflow?.workflow_steps?.name} in the experiment details page.
