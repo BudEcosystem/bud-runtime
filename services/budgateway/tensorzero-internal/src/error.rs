@@ -1110,6 +1110,22 @@ impl Error {
 impl IntoResponse for Error {
     /// Log the error and convert it into an Axum response
     fn into_response(self) -> Response {
+        // Helper function to parse provider error messages
+        fn parse_provider_error_message(message: &str) -> Value {
+            if let Ok(json_msg) = serde_json::from_str::<Value>(message) {
+                // If it's a JSON object with an "error" field, extract just the error
+                if let Some(error_obj) = json_msg.get("error") {
+                    error_obj.clone()
+                } else {
+                    // If no "error" field, use the whole JSON
+                    json_msg
+                }
+            } else {
+                // If not valid JSON, use the raw message
+                json!(message)
+            }
+        }
+
         // Helper function to extract provider error details from nested errors
         fn extract_provider_error(error: &Error) -> Option<(Value, Option<StatusCode>)> {
             match error.get_details() {
@@ -1118,19 +1134,7 @@ impl IntoResponse for Error {
                     status_code,
                     ..
                 } => {
-                    // Try to parse the message as JSON and extract the "error" field
-                    let provider_error = if let Ok(json_msg) = serde_json::from_str::<Value>(message) {
-                        // If it's a JSON object with an "error" field, extract just the error
-                        if let Some(error_obj) = json_msg.get("error") {
-                            error_obj.clone()
-                        } else {
-                            // If no "error" field, use the whole JSON
-                            json_msg
-                        }
-                    } else {
-                        // If not valid JSON, use the raw message
-                        json!(message)
-                    };
+                    let provider_error = parse_provider_error_message(message);
                     Some((provider_error, *status_code))
                 }
                 ErrorDetails::ModelProvidersExhausted { provider_errors } => {
@@ -1145,6 +1149,36 @@ impl IntoResponse for Error {
             }
         }
 
+        // Helper function to build response with provider error
+        fn build_provider_error_response(
+            error: &Error,
+            provider_error: Value,
+            provider_status: Option<StatusCode>,
+        ) -> (StatusCode, Value) {
+            let status = provider_status.unwrap_or_else(|| error.status_code());
+            let body = json!({
+                "error": error.to_string(),
+                "provider_error": provider_error
+            });
+            (status, body)
+        }
+
+        // Helper function to handle errors with nested provider errors
+        fn handle_nested_provider_error<'a, I>(
+            error: &Error,
+            mut errors_iter: I,
+        ) -> (StatusCode, Value)
+        where
+            I: Iterator<Item = (&'a String, &'a Error)>,
+        {
+            if let Some((_, nested_error)) = errors_iter.next() {
+                if let Some((provider_error, provider_status)) = extract_provider_error(nested_error) {
+                    return build_provider_error_response(error, provider_error, provider_status);
+                }
+            }
+            (error.status_code(), json!({"error": error.to_string()}))
+        }
+
         // Check if this is a provider error that we should pass through
         let (status_code, body) = match self.get_details() {
             // For provider client errors, include the provider error details
@@ -1153,97 +1187,23 @@ impl IntoResponse for Error {
                 status_code: provider_status_code,
                 ..
             } => {
-                // Use the provider's status code if available
-                let status = provider_status_code.unwrap_or_else(|| self.status_code());
-
-                // Try to parse the message as JSON and extract the "error" field
-                let provider_error = if let Ok(json_msg) = serde_json::from_str::<Value>(message) {
-                    // If it's a JSON object with an "error" field, extract just the error
-                    if let Some(error_obj) = json_msg.get("error") {
-                        error_obj.clone()
-                    } else {
-                        // If no "error" field, use the whole JSON
-                        json_msg
-                    }
-                } else {
-                    // If not valid JSON, use the raw message
-                    json!(message)
-                };
-
-                let body = json!({
-                    "error": self.to_string(),
-                    "provider_error": provider_error
-                });
-                (status, body)
+                let provider_error = parse_provider_error_message(message);
+                build_provider_error_response(&self, provider_error, *provider_status_code)
             }
             // For all variants failed, try to extract the underlying provider error
             ErrorDetails::AllVariantsFailed { errors } => {
-                // Try to extract provider error from nested errors
-                let provider_info = errors
-                    .iter()
-                    .next()
-                    .and_then(|(_, e)| extract_provider_error(e));
-
-                if let Some((provider_error, provider_status)) = provider_info {
-                    let status = provider_status.unwrap_or_else(|| self.status_code());
-                    let body = json!({
-                        "error": self.to_string(),
-                        "provider_error": provider_error
-                    });
-                    (status, body)
-                } else {
-                    // Default case
-                    let body = json!({"error": self.to_string()});
-                    (self.status_code(), body)
-                }
+                handle_nested_provider_error(&self, errors.iter())
             }
             // For model providers exhausted, extract the underlying provider error
             ErrorDetails::ModelProvidersExhausted { provider_errors } => {
-                // Try to extract provider error from nested errors
-                let provider_info = provider_errors
-                    .iter()
-                    .next()
-                    .and_then(|(_, e)| extract_provider_error(e));
-
-                if let Some((provider_error, provider_status)) = provider_info {
-                    let status = provider_status.unwrap_or_else(|| self.status_code());
-                    let body = json!({
-                        "error": self.to_string(),
-                        "provider_error": provider_error
-                    });
-                    (status, body)
-                } else {
-                    // Default case
-                    let body = json!({"error": self.to_string()});
-                    (self.status_code(), body)
-                }
+                handle_nested_provider_error(&self, provider_errors.iter())
             }
             // For model chain exhausted, extract the underlying provider error
             ErrorDetails::ModelChainExhausted { model_errors } => {
-                // Try to extract provider error from nested errors
-                let provider_info = model_errors
-                    .iter()
-                    .next()
-                    .and_then(|(_, e)| extract_provider_error(e));
-
-                if let Some((provider_error, provider_status)) = provider_info {
-                    let status = provider_status.unwrap_or_else(|| self.status_code());
-                    let body = json!({
-                        "error": self.to_string(),
-                        "provider_error": provider_error
-                    });
-                    (status, body)
-                } else {
-                    // Default case
-                    let body = json!({"error": self.to_string()});
-                    (self.status_code(), body)
-                }
+                handle_nested_provider_error(&self, model_errors.iter())
             }
             // Default case for other errors
-            _ => {
-                let body = json!({"error": self.to_string()});
-                (self.status_code(), body)
-            }
+            _ => (self.status_code(), json!({"error": self.to_string()})),
         };
 
         (status_code, Json(body)).into_response()
