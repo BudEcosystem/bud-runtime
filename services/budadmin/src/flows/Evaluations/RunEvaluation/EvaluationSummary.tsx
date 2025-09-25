@@ -98,7 +98,7 @@ export default function EvaluationSummary() {
             if (modelData.model_size) {
               specs.push({
                 name: "Model Size",
-                value: `${(modelData.model_size / 1000000000).toFixed(0)}B parameters`,
+                value: `${(modelData.model_size / 1000000000).toFixed(2)}B parameters`,
                 icon: "/images/drawer/context.png",
               });
             }
