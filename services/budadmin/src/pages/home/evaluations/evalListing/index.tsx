@@ -30,8 +30,10 @@ const EvaluationList = () => {
   const router = useRouter();
   const [searchValue, setSearchValue] = useState("");
 
-  const handleEvaluationClick = useCallback((evaluationId: string) => {
-    router.push(`/evaluations/${evaluationId}`);
+  const handleEvaluationClick = useCallback((evaluation: Evaluation) => {
+    // Store the selected evaluation data in sessionStorage to pass to the detail page
+    sessionStorage.setItem('selectedEvaluation', JSON.stringify(evaluation));
+    router.push(`/evaluations/${evaluation.id}`);
   }, [router]);
 
   const handleFilterToggle = useCallback((filterName: string) => {
@@ -151,7 +153,7 @@ const EvaluationList = () => {
           <div
             key={evaluation.id}
             className="w-[49.2%] bg-[#101010] border border-[#1F1F1F] rounded-[0.4rem] px-[1.5rem] py-[1.1rem] hover:shadow-[1px_1px_6px_-1px_#2e3036] transition-all cursor-pointer flex flex-col justify-between"
-            onClick={() => handleEvaluationClick(evaluation.id)}
+            onClick={() => handleEvaluationClick(evaluation)}
           >
             <div className="flex flex-col justify-start">
               <div className=" flex justify-between items-start mb-[.5rem]">
