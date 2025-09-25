@@ -609,6 +609,28 @@ where
     s.parse::<u64>().map_err(serde::de::Error::custom)
 }
 
+/// Struct for inserting failure details into the ModelInferenceDetails table
+#[derive(Debug, Clone, Serialize)]
+pub struct ModelInferenceDetailsInsert {
+    pub inference_id: uuid::Uuid,
+    pub request_ip: Option<std::net::Ipv4Addr>,
+    pub project_id: uuid::Uuid,
+    pub endpoint_id: uuid::Uuid,
+    pub model_id: uuid::Uuid,
+    pub cost: Option<f64>,
+    pub response_analysis: Option<serde_json::Value>,
+    pub is_success: bool,
+    pub request_arrival_time: chrono::DateTime<chrono::Utc>,
+    pub request_forward_time: chrono::DateTime<chrono::Utc>,
+    pub api_key_id: Option<uuid::Uuid>,
+    pub user_id: Option<uuid::Uuid>,
+    pub api_key_project_id: Option<uuid::Uuid>,
+    pub error_code: Option<String>,
+    pub error_message: Option<String>,
+    pub error_type: Option<String>,
+    pub status_code: Option<u16>,
+}
+
 #[cfg(test)]
 mod tests {
 

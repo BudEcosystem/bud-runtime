@@ -96,6 +96,10 @@ async def add_metrics(request: BulkCloudEventBase) -> Response:
                     inference_metric.api_key_id,  # api_key_id (auth metadata)
                     inference_metric.user_id,  # user_id (auth metadata)
                     inference_metric.api_key_project_id,  # api_key_project_id (auth metadata)
+                    inference_metric.error_code,  # error_code
+                    inference_metric.error_message,  # error_message
+                    inference_metric.error_type,  # error_type
+                    inference_metric.status_code,  # status_code
                 )
                 batch_data.append(inference_data)
             except ValidationError as e:
