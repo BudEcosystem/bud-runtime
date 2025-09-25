@@ -833,11 +833,8 @@ class ObservabilityMetricsService:
 
         # Convert results to InferenceListItem objects
         items = []
-        failed_count = 0
         for row in results:
             is_success = bool(row[10])
-            if not is_success:
-                failed_count += 1
             items.append(
                 InferenceListItem(
                     inference_id=row[0],
