@@ -38,17 +38,10 @@ interface EvaluationCard {
   timestamp: string;
 }
 
-const sampletags = [
+// This will be replaced with dynamic tags from selectedEvaluation
+const defaultTags = [
   { name: "text", color: "#D1B854" },
   { name: "image", color: "#D1B854" },
-  { name: "video", color: "#D1B854" },
-  { name: "actions", color: "#D1B854" },
-  { name: "embeddings", color: "#D1B854" },
-  { name: "text", color: "#D1B854" },
-  { name: "text", color: "#D1B854" },
-  { name: "text", color: "#D1B854" },
-  { name: "text", color: "#D1B854" },
-  { name: "text", color: "#D1B854" },
 ];
 
 const EvalDetailed = () => {
@@ -56,6 +49,8 @@ const EvalDetailed = () => {
   const [activeTab, setActiveTab] = useState("3");
   const [showAllTags, setShowAllTags] = useState(false);
   const [datasets, setDatasets] = useState<any>(null);
+  const [datasetDetails, setDatasetDetails] = useState<any>(null);
+  const [selectedEvaluation, setSelectedEvaluation] = useState<any>(null);
   const router = useRouter();
   const evaluationId = router.query.evaluationId;
   const id = Array.isArray(evaluationId) ? evaluationId[0] : evaluationId;
@@ -63,6 +58,29 @@ const EvalDetailed = () => {
   const goBack = () => {
     router.back();
   };
+
+  // Compute tags from selected evaluation
+  const evaluationTags = React.useMemo(() => {
+    if (!selectedEvaluation) return defaultTags;
+
+    const tags = [];
+
+    // Add modality tags
+    if (selectedEvaluation.modalities) {
+      selectedEvaluation.modalities.forEach(modality => {
+        tags.push({ name: modality, color: "#42CACF" });
+      });
+    }
+
+    // Add trait tags
+    if (selectedEvaluation.traits) {
+      selectedEvaluation.traits.forEach(trait => {
+        tags.push({ name: trait.name || trait, color: "#D1B854" });
+      });
+    }
+
+    return tags.length > 0 ? tags : defaultTags;
+  }, [selectedEvaluation]);
 
   const HeaderContent = () => {
     return (
@@ -98,6 +116,14 @@ const EvalDetailed = () => {
 
   useEffect(() => {
     setIsMounted(true);
+
+    // Retrieve the selected evaluation from sessionStorage
+    const storedEvaluation = sessionStorage.getItem('selectedEvaluation');
+    if (storedEvaluation) {
+      const evaluation = JSON.parse(storedEvaluation);
+      setSelectedEvaluation(evaluation);
+      console.log('Retrieved selected evaluation:', evaluation);
+    }
   }, []);
 
   // Fetch datasets when id is available
@@ -108,6 +134,12 @@ const EvalDetailed = () => {
           const response = await AppRequest.Get(`/experiments/datasets?trait_ids=${id}`);
           console.log("Datasets API Response:", response.data);
           setDatasets(response.data);
+
+          // If we have datasets, fetch the first dataset's details as an example
+          if (response.data && response.data.datasets && response.data.datasets.length > 0) {
+            const firstDatasetId = response.data.datasets[0].dataset_id;
+            await fetchDatasetById(firstDatasetId);
+          }
         } catch (error) {
           console.error("Error fetching datasets:", error);
         }
@@ -116,6 +148,28 @@ const EvalDetailed = () => {
 
     fetchDatasets();
   }, [id]);
+
+  // Function to fetch a specific dataset by ID
+  const fetchDatasetById = async (datasetId: string) => {
+    try {
+      console.log(`Fetching dataset with ID: ${datasetId}`);
+      const response = await AppRequest.Get(`/experiments/datasets/${datasetId}`);
+      console.log("Dataset Details API Response:", response.data);
+      setDatasetDetails(response.data);
+
+      // Log the dataset data structure for debugging
+      console.log("Dataset ID:", datasetId);
+      console.log("Dataset Name:", response.data?.dataset?.name);
+      console.log("Dataset Description:", response.data?.dataset?.description);
+      console.log("Dataset Questions Count:", response.data?.dataset?.questions?.length);
+      console.log("Full Dataset Response:", JSON.stringify(response.data, null, 2));
+
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching dataset ${datasetId}:`, error);
+      throw error;
+    }
+  };
 
   return (
     <DashBoardLayout>
@@ -129,21 +183,15 @@ const EvalDetailed = () => {
         <div className="w-full px-[3.6rem] flex-1 overflow-y-auto no-scrollbar">
           <div className="w-full pt-[1.8rem]">
             <div className="w-full flex justify-between items-center">
-              <Text_28_600_FFFFFF>LiveMathBench</Text_28_600_FFFFFF>
-              <PrimaryButton
-                classNames="shadow-purple-glow"
-                textClass="text-[0.8125rem]"
-              >
-                Run Evaluation
-              </PrimaryButton>
+              <Text_28_600_FFFFFF>
+                {selectedEvaluation?.name || datasetDetails?.dataset?.name || datasets?.datasets?.[0]?.name || "Loading..."}
+              </Text_28_600_FFFFFF>
             </div>
             <Text_14_400_FFFFFF className="leading-[140%] mt-[.5rem] max-w-[80%]">
-              LiveMathBench can capture LLM capabilities in complex reasoning
-              tasks, including challenging latest question sets from various
-              mathematical competitions.
+              {selectedEvaluation?.description || datasetDetails?.dataset?.description || datasets?.datasets?.[0]?.description || "Loading dataset description..."}
             </Text_14_400_FFFFFF>
             <div className="flex flex-wrap justify-start items-center gap-[.3rem] mt-[1.3rem] max-w-[80%]">
-              {(showAllTags ? sampletags : sampletags.slice(0, 5)).map(
+              {(showAllTags ? evaluationTags : evaluationTags.slice(0, 5)).map(
                 (item, index) => (
                   <Tags
                     key={index}
@@ -155,12 +203,12 @@ const EvalDetailed = () => {
                   />
                 ),
               )}
-              {sampletags.length > 5 && (
+              {evaluationTags.length > 5 && (
                 <button
                   onClick={() => setShowAllTags(!showAllTags)}
                   className="px-3 py-1 text-[#EEEEEE] hover:text-[#FFFFFF] transition-colors duration-200 text-[.65rem] font-[400]"
                 >
-                  {showAllTags ? "Show less" : `+${sampletags.length - 5} more`}
+                  {showAllTags ? "Show less" : `+${evaluationTags.length - 5} more`}
                 </button>
               )}
             </div>
