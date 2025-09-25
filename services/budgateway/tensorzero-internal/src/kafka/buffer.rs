@@ -151,6 +151,10 @@ mod tests {
             api_key_id: None,
             api_key_project_id: None,
             user_id: None,
+            error_code: None,
+            error_message: None,
+            error_type: None,
+            status_code: None,
         };
         ObservabilityEntry::new(event)
     }
