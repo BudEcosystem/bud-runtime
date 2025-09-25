@@ -658,3 +658,11 @@ class ToolListResponse(PaginatedSuccessResponse):
     model_config = ConfigDict(extra="ignore")
 
     tools: list[ToolListItem] = []
+
+
+class ToolResponse(SuccessResponse):
+    """Response schema for single tool retrieval."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    tool: Tool

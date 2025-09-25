@@ -61,6 +61,7 @@ from .schemas import (
     SinglePromptVersionResponse,
     ToolFilter,
     ToolListResponse,
+    ToolResponse,
 )
 from .services import PromptService, PromptVersionService, PromptWorkflowService
 
@@ -907,3 +908,40 @@ async def list_tools(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list tools"
         ).to_http_response()
+
+
+@router.get("/tools/{tool_id}", response_model=ToolResponse)
+async def get_tool(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    tool_id: UUID,
+    session: Session = Depends(get_session),
+) -> ToolResponse:
+    """Get a single tool by ID.
+
+    Args:
+        tool_id: Tool ID to retrieve
+        session: Database session
+        current_user: Authenticated user
+
+    Returns:
+        Tool details with complete schema
+    """
+    try:
+        prompt_service = PromptService(session)
+        tool = await prompt_service.get_tool_by_id(tool_id)
+
+        return ToolResponse(
+            tool=tool,
+            success=True,
+            message="Tool retrieved successfully",
+            code=status.HTTP_200_OK,
+        )
+    except ClientException as e:
+        logger.error(f"Failed to get tool: {e}")
+        raise ClientException(message=e.message, status_code=e.status_code)
+    except Exception as e:
+        logger.exception(f"Failed to get tool: {e}")
+        raise ClientException(
+            message="Failed to get tool",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

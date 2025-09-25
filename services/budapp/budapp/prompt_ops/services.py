@@ -1001,6 +1001,92 @@ class PromptService(SessionMixin):
 
         return tool_items, total_count
 
+    async def get_tool_by_id(self, tool_id: UUID) -> Tool:
+        """Get a single tool by ID.
+
+        Args:
+            tool_id: Tool ID to retrieve
+
+        Returns:
+            Tool object with complete details
+
+        Raises:
+            ClientException: If tool not found
+        """
+        logger.debug(f"Getting tool with ID: {tool_id}")
+
+        # Mock MCP Foundry response (simulating what we'll receive from the actual service)
+        # In production, this will be replaced with an actual API call to MCP Foundry
+        mcp_foundry_response = {
+            "id": str(tool_id),
+            "originalName": "add_comment_to_pending_review",
+            "displayName": "Add Comment To Pending Review",
+            "description": "Add review comment to the requester&#x27;s latest pending pull request review. A pending review needs to already exist to call this (check with the user if not sure).",
+            "inputSchema": {
+                "properties": {
+                    "body": {
+                        "description": "The text of the review comment",
+                        "type": "string",
+                    },
+                    "line": {
+                        "description": "The line of the blob in the pull request diff that the comment applies to. For multi-line comments, the last line of the range",
+                        "type": "number",
+                    },
+                    "owner": {"description": "Repository owner", "type": "string"},
+                    "path": {
+                        "description": "The relative path to the file that necessitates a comment",
+                        "type": "string",
+                    },
+                    "pullNumber": {
+                        "description": "Pull request number",
+                        "type": "number",
+                    },
+                    "repo": {"description": "Repository name", "type": "string"},
+                    "side": {
+                        "description": "The side of the diff to comment on. LEFT indicates the previous state, RIGHT indicates the new state",
+                        "enum": ["LEFT", "RIGHT"],
+                        "type": "string",
+                    },
+                    "startLine": {
+                        "description": "For multi-line comments, the first line of the range that the comment applies to",
+                        "type": "number",
+                    },
+                    "startSide": {
+                        "description": "For multi-line comments, the starting side of the diff that the comment applies to. LEFT indicates the previous state, RIGHT indicates the new state",
+                        "enum": ["LEFT", "RIGHT"],
+                        "type": "string",
+                    },
+                    "subjectType": {
+                        "description": "The level at which the comment is targeted",
+                        "enum": ["FILE", "LINE"],
+                        "type": "string",
+                    },
+                },
+                "required": [
+                    "owner",
+                    "repo",
+                    "pullNumber",
+                    "path",
+                    "body",
+                    "subjectType",
+                ],
+                "type": "object",
+            },
+        }
+
+        # Parse MCP response to Tool format
+        tool = Tool(
+            id=UUID(mcp_foundry_response["id"]),
+            name=mcp_foundry_response["displayName"],
+            description=mcp_foundry_response["description"],
+            type=mcp_foundry_response["originalName"],
+            schema=mcp_foundry_response["inputSchema"],
+        )
+
+        logger.debug(f"Successfully retrieved tool: {tool.name} with ID: {tool_id}")
+
+        return tool
+
     async def _perform_copy_prompt_config_request(self, request: PromptConfigCopyRequest) -> Dict[str, Any]:
         """Perform the actual copy-config request to budprompt service via Dapr.
 
