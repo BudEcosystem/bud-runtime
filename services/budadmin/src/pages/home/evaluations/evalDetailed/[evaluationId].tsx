@@ -28,6 +28,7 @@ import EvalExplorerTable from "./evalExplorerTable";
 import LeaderboardTable from "./leaderboardTable";
 import LeaderboardDetails from "./details";
 import { AppRequest } from "src/pages/api/requests";
+import { capitalize } from "@/lib/utils";
 
 interface EvaluationCard {
   id: string;
@@ -105,8 +106,8 @@ const EvalDetailed = () => {
               </div>
             </button>
             <CustomBreadcrumb
-              urls={["/evaluations", `name`]}
-              data={["Evaluations", `name`]}
+              urls={["/evaluations", selectedEvaluation?.name || datasetDetails?.dataset?.name || datasets?.datasets?.[0]?.name]}
+              data={["Evaluations", selectedEvaluation?.name || datasetDetails?.dataset?.name || datasets?.datasets?.[0]?.name]}
             />
           </div>
         )}
@@ -198,7 +199,7 @@ const EvalDetailed = () => {
                     name={item.name}
                     color={item.color}
                     classNames={
-                      showAllTags && index >= 5 ? "animate-fadeIn" : ""
+                       `capitalize ${showAllTags && index >= 5 ? "animate-fadeIn" : ""}`
                     }
                   />
                 ),
