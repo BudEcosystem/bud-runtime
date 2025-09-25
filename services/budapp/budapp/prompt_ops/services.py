@@ -587,7 +587,7 @@ class PromptService(SessionMixin):
 
         # TODO: Hardcoded integration data until mcp_foundry service is ready
         # This simulates what we'll get from the mcp_foundry service
-        mock_integrations = [
+        integrations = [
             Integration(
                 id=UUID("550e8400-e29b-41d4-a716-446655440001"),
                 name="GitHub",
@@ -606,100 +606,11 @@ class PromptService(SessionMixin):
                 credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BEARER, []),
                 url="https://slack.com/api",
             ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440003"),
-                name="Jira",
-                type="jira",
-                icon="https://wac-cdn.atlassian.com/dam/jcr:b544631f-b225-441b-9e05-57b0fd0d495b/Jira%20Software-icon-blue.svg",
-                auth_type=IntegrationAuthTypeEnum.BASIC,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
-                url="https://api.atlassian.com",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440004"),
-                name="PostgreSQL",
-                type="postgresql",
-                icon="https://www.postgresql.org/media/img/about/press/elephant.png",
-                auth_type=IntegrationAuthTypeEnum.BASIC,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
-                url="postgresql://",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440005"),
-                name="AWS S3",
-                type="aws_s3",
-                icon="https://upload.wikimedia.org/wikipedia/commons/b/bc/Amazon-S3-Logo.svg",
-                auth_type=IntegrationAuthTypeEnum.HEADERS,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.HEADERS, []),
-                url="https://s3.amazonaws.com",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440006"),
-                name="OpenAI",
-                type="openai",
-                icon="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg",
-                auth_type=IntegrationAuthTypeEnum.BEARER,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BEARER, []),
-                url="https://api.openai.com",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440007"),
-                name="MongoDB",
-                type="mongodb",
-                icon="https://www.mongodb.com/assets/images/global/favicon.ico",
-                auth_type=IntegrationAuthTypeEnum.BASIC,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
-                url="mongodb://",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440008"),
-                name="Redis",
-                type="redis",
-                icon="https://redis.io/images/redis-white.png",
-                auth_type=IntegrationAuthTypeEnum.BASIC,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
-                url="redis://",
-            ),
         ]
 
-        # Simulated mapping of integrations to prompt_ids for testing
-        # In production, this will come from the database or mcp_foundry service
-        prompt_integration_mapping = {  # noqa: F841
-            # Example: specific prompts have specific integrations
-            # This is just mock data for testing
-        }
-
-        # Apply filters
-        filtered_integrations = mock_integrations
-
-        # Filter by name if provided
-        if filters.get("name"):
-            name_filter = filters["name"].lower().strip()
-            filtered_integrations = [
-                integration for integration in filtered_integrations if name_filter in integration.name.lower()
-            ]
-
-        # Apply search functionality
-        if search and filters.get("name"):
-            # Search is essentially the same as name filtering for our use case
-            # But could be extended to search in other fields like type
-            search_term = filters["name"].lower().strip()
-            filtered_integrations = [
-                integration
-                for integration in filtered_integrations
-                if search_term in integration.name.lower() or search_term in integration.type.lower()
-            ]
-
-        # Filter by prompt_id if provided
-        if prompt_id:
-            # For now, return a subset for testing when prompt_id is provided
-            # In production, this will filter based on actual prompt-integration relationships
-            # For demo purposes, return first 3 integrations for any prompt_id
-            filtered_integrations = filtered_integrations[:3]
-
         # Apply pagination
-        total_count = len(filtered_integrations)
-        paginated_integrations = filtered_integrations[offset : offset + limit]
+        total_count = len(integrations)
+        paginated_integrations = integrations[offset : offset + limit]
 
         # Convert to response format (only id, name, icon)
         integration_items = [
@@ -734,92 +645,17 @@ class PromptService(SessionMixin):
         """
         # TODO: Hardcoded integration data until mcp_foundry service is ready
         # This simulates what we'll get from the mcp_foundry service
-        mock_integrations = [
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440001"),
-                name="GitHub",
-                type="github",
-                icon="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-                auth_type=IntegrationAuthTypeEnum.OAUTH,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.OAUTH, []),
-                url="https://api.github.com",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440002"),
-                name="Slack",
-                type="slack",
-                icon="https://a.slack-edge.com/80588/marketing/img/meta/favicon-32.png",
-                auth_type=IntegrationAuthTypeEnum.BEARER,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BEARER, []),
-                url="https://slack.com/api",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440003"),
-                name="Jira",
-                type="jira",
-                icon="https://wac-cdn.atlassian.com/dam/jcr:b544631f-b225-441b-9e05-57b0fd0d495b/Jira%20Software-icon-blue.svg",
-                auth_type=IntegrationAuthTypeEnum.BASIC,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
-                url="https://api.atlassian.com",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440004"),
-                name="PostgreSQL",
-                type="postgresql",
-                icon="https://www.postgresql.org/media/img/about/press/elephant.png",
-                auth_type=IntegrationAuthTypeEnum.BASIC,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
-                url="postgresql://",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440005"),
-                name="AWS S3",
-                type="aws_s3",
-                icon="https://upload.wikimedia.org/wikipedia/commons/b/bc/Amazon-S3-Logo.svg",
-                auth_type=IntegrationAuthTypeEnum.HEADERS,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.HEADERS, []),
-                url="https://s3.amazonaws.com",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440006"),
-                name="OpenAI",
-                type="openai",
-                icon="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg",
-                auth_type=IntegrationAuthTypeEnum.BEARER,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BEARER, []),
-                url="https://api.openai.com",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440007"),
-                name="MongoDB",
-                type="mongodb",
-                icon="https://www.mongodb.com/assets/images/global/favicon.ico",
-                auth_type=IntegrationAuthTypeEnum.BASIC,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
-                url="mongodb://",
-            ),
-            Integration(
-                id=UUID("550e8400-e29b-41d4-a716-446655440008"),
-                name="Redis",
-                type="redis",
-                icon="https://redis.io/images/redis-white.png",
-                auth_type=IntegrationAuthTypeEnum.BASIC,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BASIC, []),
-                url="redis://",
-            ),
-        ]
-
-        # Find the integration by ID
-        for integration in mock_integrations:
-            if integration.id == integration_id:
-                logger.debug(f"Found integration: {integration.name} (ID: {integration_id})")
-                return integration
-
-        # If not found, raise exception
-        logger.error(f"Integration not found: {integration_id}")
-        raise ClientException(
-            message=f"Integration with ID {integration_id} not found", status_code=status.HTTP_404_NOT_FOUND
+        integration = Integration(
+            id=integration_id,
+            name="GitHub",
+            type="github",
+            icon="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+            auth_type=IntegrationAuthTypeEnum.OAUTH,
+            credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.OAUTH, []),
+            url="https://api.github.com",
         )
+
+        return integration
 
     async def get_tools(
         self,
@@ -849,137 +685,75 @@ class PromptService(SessionMixin):
         # Simulating MCP Foundry response based on integration_type
 
         # Mock MCP Foundry response data
-        mock_mcp_foundry_response = []
-
-        if integration_type == "github":
-            mock_mcp_foundry_response = [
-                {
-                    "id": "3cbd6002-2c87-4eb1-96e1-f6aeadbeee26",
-                    "originalName": "add_comment_to_pending_review",
-                    "displayName": "Add Comment To Pending Review",
-                    "description": "Add review comment to the requester's latest pending pull request review",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "body": {"type": "string", "description": "The text of the review comment"},
-                            "line": {"type": "number", "description": "The line of the blob in the pull request diff"},
-                            "owner": {"type": "string", "description": "Repository owner"},
-                            "repo": {"type": "string", "description": "Repository name"},
-                            "path": {"type": "string", "description": "The relative path to the file"},
-                            "pullNumber": {"type": "number", "description": "Pull request number"},
+        mock_mcp_foundry_response = [
+            {
+                "id": "3cbd6002-2c87-4eb1-96e1-f6aeadbeee26",
+                "originalName": "add_comment_to_pending_review",
+                "displayName": "Add Comment To Pending Review",
+                "description": "Add review comment to the requester&#x27;s latest pending pull request review. A pending review needs to already exist to call this (check with the user if not sure).",
+                "inputSchema": {
+                    "properties": {
+                        "body": {
+                            "description": "The text of the review comment",
+                            "type": "string",
                         },
-                        "required": ["owner", "repo", "pullNumber", "path", "body"],
-                    },
-                },
-                {
-                    "id": "49312959-3975-40e1-b6c3-11b3548caad1",
-                    "originalName": "add_issue_comment",
-                    "displayName": "Add Issue Comment",
-                    "description": "Add a comment to a specific issue in a GitHub repository",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "body": {"type": "string", "description": "Comment content"},
-                            "issue_number": {"type": "number", "description": "Issue number to comment on"},
-                            "owner": {"type": "string", "description": "Repository owner"},
-                            "repo": {"type": "string", "description": "Repository name"},
+                        "line": {
+                            "description": "The line of the blob in the pull request diff that the comment applies to. For multi-line comments, the last line of the range",
+                            "type": "number",
                         },
-                        "required": ["owner", "repo", "issue_number", "body"],
-                    },
-                },
-                {
-                    "id": "7a8b9c0d-1e2f-4456-889a-bcdef0123456",
-                    "originalName": "create_pull_request",
-                    "displayName": "Create Pull Request",
-                    "description": "Create a new pull request in a GitHub repository",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "title": {"type": "string", "description": "Pull request title"},
-                            "body": {"type": "string", "description": "Pull request description"},
-                            "head": {"type": "string", "description": "Source branch"},
-                            "base": {"type": "string", "description": "Target branch"},
-                            "owner": {"type": "string", "description": "Repository owner"},
-                            "repo": {"type": "string", "description": "Repository name"},
+                        "owner": {"description": "Repository owner", "type": "string"},
+                        "path": {
+                            "description": "The relative path to the file that necessitates a comment",
+                            "type": "string",
                         },
-                        "required": ["owner", "repo", "title", "head", "base"],
-                    },
-                },
-            ]
-        elif integration_type == "slack":
-            mock_mcp_foundry_response = [
-                {
-                    "id": "8b9c0d1e-2f34-4678-90ab-cdef12345678",
-                    "originalName": "send_slack_message",
-                    "displayName": "Send Slack Message",
-                    "description": "Send a message to a Slack channel",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "channel": {"type": "string", "description": "Slack channel ID or name"},
-                            "text": {"type": "string", "description": "Message text"},
-                            "thread_ts": {"type": "string", "description": "Thread timestamp for replies"},
+                        "pullNumber": {
+                            "description": "Pull request number",
+                            "type": "number",
                         },
-                        "required": ["channel", "text"],
-                    },
-                },
-                {
-                    "id": "1a2b3c4d-5e6f-4890-92bc-def345678901",
-                    "originalName": "create_slack_channel",
-                    "displayName": "Create Slack Channel",
-                    "description": "Create a new Slack channel",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string", "description": "Channel name"},
-                            "is_private": {"type": "boolean", "description": "Whether channel is private"},
-                            "description": {"type": "string", "description": "Channel description"},
+                        "repo": {"description": "Repository name", "type": "string"},
+                        "side": {
+                            "description": "The side of the diff to comment on. LEFT indicates the previous state, RIGHT indicates the new state",
+                            "enum": ["LEFT", "RIGHT"],
+                            "type": "string",
                         },
-                        "required": ["name"],
-                    },
-                },
-            ]
-        elif integration_type == "jira":
-            mock_mcp_foundry_response = [
-                {
-                    "id": "9c0d1e2f-3456-4890-a1bc-def234567890",
-                    "originalName": "create_jira_ticket",
-                    "displayName": "Create Jira Ticket",
-                    "description": "Create a new issue in Jira",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "project": {"type": "string", "description": "Project key"},
-                            "summary": {"type": "string", "description": "Issue summary"},
-                            "description": {"type": "string", "description": "Issue description"},
-                            "issueType": {"type": "string", "description": "Issue type (Bug, Task, Story)"},
+                        "startLine": {
+                            "description": "For multi-line comments, the first line of the range that the comment applies to",
+                            "type": "number",
                         },
-                        "required": ["project", "summary", "issueType"],
+                        "startSide": {
+                            "description": "For multi-line comments, the starting side of the diff that the comment applies to. LEFT indicates the previous state, RIGHT indicates the new state",
+                            "enum": ["LEFT", "RIGHT"],
+                            "type": "string",
+                        },
+                        "subjectType": {
+                            "description": "The level at which the comment is targeted",
+                            "enum": ["FILE", "LINE"],
+                            "type": "string",
+                        },
                     },
+                    "required": [
+                        "owner",
+                        "repo",
+                        "pullNumber",
+                        "path",
+                        "body",
+                        "subjectType",
+                    ],
+                    "type": "object",
                 },
-            ]
-
+            }
+        ]
         # Parse MCP Foundry response to Tool format
         tools = []
         for item in mock_mcp_foundry_response:
             tool = Tool(
                 id=UUID(item["id"]),
-                name=item["displayName"],  # displayName → name
+                name=item["displayName"],
                 description=item["description"],
-                type=item["originalName"],  # originalName → type
-                schema=item["inputSchema"],  # inputSchema → schema
+                type=item["originalName"],
+                schema=item["inputSchema"],
             )
             tools.append(tool)
-
-        # Apply name filter if provided
-        if filters.get("name"):
-            name_filter = filters["name"].lower().strip()
-            tools = [tool for tool in tools if name_filter in tool.name.lower()]
-
-        # Apply search functionality
-        if search and filters.get("name"):
-            search_term = filters["name"].lower().strip()
-            tools = [tool for tool in tools if search_term in tool.name.lower() or search_term in tool.type.lower()]
 
         # Apply pagination
         total_count = len(tools)
