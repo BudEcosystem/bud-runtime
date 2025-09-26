@@ -15,7 +15,7 @@ export default function DeployModelConfiguration() {
 
   useEffect(() => {
     // Check workflow_steps from API response for parser metadata
-    const workflowSteps = currentWorkflow?.workflow_steps || {};
+    const workflowSteps = currentWorkflow?.workflow_steps;
 
     // Check if simulator metadata contains parser information
     const simulatorEvents = workflowSteps?.bud_simulator_events;
@@ -25,9 +25,9 @@ export default function DeployModelConfiguration() {
     const clusterMetadata = deploymentCluster || {};
 
     // Priority: Workflow steps from API > Simulator metadata > Current cluster metadata
-    const toolParserType = workflowSteps.tool_calling_parser_type || simulatorMetadata.tool_calling_parser_type || clusterMetadata.tool_calling_parser_type;
-    const reasoningParserType = workflowSteps.reasoning_parser_type || simulatorMetadata.reasoning_parser_type || clusterMetadata.reasoning_parser_type;
-    const chatTemplate = workflowSteps.chat_template || simulatorMetadata.chat_template || clusterMetadata.chat_template;
+    const toolParserType = (workflowSteps as any)?.tool_calling_parser_type || simulatorMetadata.tool_calling_parser_type || clusterMetadata.tool_calling_parser_type;
+    const reasoningParserType = (workflowSteps as any)?.reasoning_parser_type || simulatorMetadata.reasoning_parser_type || clusterMetadata.reasoning_parser_type;
+    const chatTemplate = (workflowSteps as any)?.chat_template || simulatorMetadata.chat_template || clusterMetadata.chat_template;
 
     const hasToolParser = !!toolParserType;
     const hasReasoningParser = !!reasoningParserType;

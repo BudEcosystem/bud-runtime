@@ -11,7 +11,7 @@ const DeploymentConfigurationForm: React.FC = () => {
   const { deploymentConfiguration, currentWorkflow, deploymentCluster } = useDeployModel();
 
   // Check workflow_steps from API response for parser metadata
-  const workflowSteps = currentWorkflow?.workflow_steps || {};
+  const workflowSteps = currentWorkflow?.workflow_steps;
 
   // Extract simulator metadata
   const simulatorEvents = workflowSteps?.bud_simulator_events;
@@ -21,8 +21,8 @@ const DeploymentConfigurationForm: React.FC = () => {
   const clusterMetadata = deploymentCluster || {};
 
   // Priority: Workflow steps from API > Simulator metadata > Current cluster metadata
-  const toolParserType = workflowSteps.tool_calling_parser_type || simulatorMetadata.tool_calling_parser_type || clusterMetadata.tool_calling_parser_type;
-  const reasoningParserType = workflowSteps.reasoning_parser_type || simulatorMetadata.reasoning_parser_type || clusterMetadata.reasoning_parser_type;
+  const toolParserType = (workflowSteps as any)?.tool_calling_parser_type || simulatorMetadata.tool_calling_parser_type || clusterMetadata.tool_calling_parser_type;
+  const reasoningParserType = (workflowSteps as any)?.reasoning_parser_type || simulatorMetadata.reasoning_parser_type || clusterMetadata.reasoning_parser_type;
 
   const hasToolParser = !!toolParserType;
   const hasReasoningParser = !!reasoningParserType;
