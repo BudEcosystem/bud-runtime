@@ -23,22 +23,28 @@ def get_hf_config_sliding_window(model: str) -> Union[Optional[int], List[Option
 
 def fetch_compatible_engines(
     model_architecture: str,
-) -> Optional[str]:
+    model_uri: Optional[str] = None,
+) -> Optional[List[dict]]:
     """Retrieve a list of compatible engines for a given model using the BudConnect API.
 
     This function makes an API call to the BudConnect service to get a list of compatible
     engines for the specified model.
 
     Args:
-        model_name (str): The name of the model for which compatible engines are being retrieved.
+        model_architecture (str): The architecture of the model (e.g., "MistralForCausalLM").
+        model_uri (Optional[str]): The URI of the model (e.g., "mistralai/Mistral-7B-Instruct-v0.3").
 
     Returns:
-        Optional[str]: A string containing the compatible engines information, or None if the API call fails.
+        Optional[List[dict]]: A list of compatible engines information, or None if the API call fails.
     """
     try:
+        params = {"model_architecture": model_architecture}
+        if model_uri:
+            params["model_uri"] = model_uri
+
         response = requests.get(
             f"{app_settings.bud_connect_url}/engine/get-compatible-engines",
-            params={"model_architecture": model_architecture},
+            params=params,
             timeout=30,
         )
         response.raise_for_status()
@@ -49,7 +55,12 @@ def fetch_compatible_engines(
                 {
                     "engine_name": engine["engine"],
                     "device": engine["device_architecture"],
-                    "image": engine["container_image"],
+                    "image": engine.get("container_image"),
+                    "version": engine.get("version"),
+                    "tool_calling_parser_type": engine.get("tool_calling_parser_type"),
+                    "reasoning_parser_type": engine.get("reasoning_parser_type"),
+                    "architecture_family": engine.get("architecture_family"),
+                    "chat_template": engine.get("chat_template"),
                 }
             )
         if compatible_engines:

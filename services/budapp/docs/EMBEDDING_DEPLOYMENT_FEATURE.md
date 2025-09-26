@@ -67,7 +67,7 @@ The system supports 15 different endpoint types via `ModelEndpointEnum`:
 2. **EMBEDDING** (`/v1/embeddings`) - Vector embeddings
 
 ### Available Endpoints
-1. **COMPLETION** (`/v1/completions`) - Text completions
+1. ~~COMPLETION (`/v1/completions`) - Text completions~~ (removed)
 2. **IMAGE_GENERATION** (`/v1/images/generations`) - Image generation
 3. **IMAGE_EDIT** (`/v1/images/edits`) - Image editing
 4. **IMAGE_VARIATION** (`/v1/images/variations`) - Image variations

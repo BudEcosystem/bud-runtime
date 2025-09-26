@@ -49,7 +49,7 @@ export default function DeployModelAutoScale() {
         window: scalingSpecifcation.window,
       }}
       onBack={() => {
-        openDrawerWithStep("deploy-model-choose-cluster");
+        openDrawerWithStep("deploy-model-configuration", { direction: "backward" });
       }}
       onNext={async (values) => {
         const result = await updateScalingSpecification();

@@ -155,15 +155,6 @@ export default function UseModel() {
           size: "1024x1024",
         };
       }
-      // Check for completion endpoint
-      else if (modelSupportedEndpoints.completion?.enabled) {
-        endpoint = modelSupportedEndpoints.completion.path || "v1/completions";
-        payloadExample = {
-          model: modelName,
-          prompt: "Once upon a time",
-          max_tokens: 256,
-        };
-      }
       // Default to chat if it's enabled
       else if (modelSupportedEndpoints.chat?.enabled) {
         endpoint = modelSupportedEndpoints.chat.path || "v1/chat/completions";

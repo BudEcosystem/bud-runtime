@@ -113,6 +113,13 @@ class RetrieveWorkflowStepData(BaseModel):
     bud_prompt_id: str | None = None
     bud_prompt_version: int | str | None = None
     prompt_schema_events: dict | None = None
+    # Parser metadata from cluster/simulator
+    tool_calling_parser_type: str | None = None
+    reasoning_parser_type: str | None = None
+    chat_template: str | None = None
+    # User preferences for parsers
+    enable_tool_calling: bool | None = None
+    enable_reasoning: bool | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

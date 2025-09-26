@@ -99,6 +99,9 @@ class DeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchma
     credential_id: Optional[UUID] = None
     existing_deployment_namespace: Optional[str] = None
     provider: Optional[str] = None
+    # User preferences for parser features
+    enable_tool_calling: Optional[bool] = None
+    enable_reasoning: Optional[bool] = None
 
 
 class LocalDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchmarkParams):
@@ -143,6 +146,10 @@ class DeploymentWorkflowRequest(DeploymentCreateRequest):
     namespace: str | None = None
     platform: Optional[ClusterPlatformEnum] = None
     add_worker: bool = False
+    # Parser types fetched from BudSim (internal workflow use only)
+    tool_calling_parser_type: Optional[str] = None
+    reasoning_parser_type: Optional[str] = None
+    chat_template: Optional[str] = None
 
 
 class UpdateModelTransferStatusRequest(DeploymentWorkflowRequest):

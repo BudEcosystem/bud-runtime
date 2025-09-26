@@ -215,6 +215,13 @@ class WorkflowService(SessionMixin):
             bud_prompt_version = required_data.get("bud_prompt_version")
             prompt_schema_events = required_data.get(BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value)
 
+            # Extract parser metadata
+            tool_calling_parser_type = required_data.get("tool_calling_parser_type")
+            reasoning_parser_type = required_data.get("reasoning_parser_type")
+            chat_template = required_data.get("chat_template")
+            enable_tool_calling = required_data.get("enable_tool_calling")
+            enable_reasoning = required_data.get("enable_reasoning")
+
             # Handle experiment_id extraction with UUID conversion
             experiment_id_str = required_data.get("experiment_id")
             experiment_id = None
@@ -408,6 +415,11 @@ class WorkflowService(SessionMixin):
                 bud_prompt_id=bud_prompt_id if bud_prompt_id else None,
                 bud_prompt_version=bud_prompt_version if bud_prompt_version else None,
                 prompt_schema_events=prompt_schema_events if prompt_schema_events else None,
+                tool_calling_parser_type=tool_calling_parser_type if tool_calling_parser_type else None,
+                reasoning_parser_type=reasoning_parser_type if reasoning_parser_type else None,
+                chat_template=chat_template if chat_template else None,
+                enable_tool_calling=enable_tool_calling if enable_tool_calling else None,
+                enable_reasoning=enable_reasoning if enable_reasoning else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -544,6 +556,11 @@ class WorkflowService(SessionMixin):
                 "credential_id",
                 "endpoint_details",
                 "scaling_specification",
+                "tool_calling_parser_type",
+                "reasoning_parser_type",
+                "chat_template",
+                "enable_tool_calling",
+                "enable_reasoning",
             ],
             "guardrail_deployment": [
                 "provider_id",
