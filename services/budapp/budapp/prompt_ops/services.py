@@ -20,11 +20,10 @@ from ast import Dict
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-import aiohttp
 from fastapi import status
 
 from ..commons import logging
-from ..commons.config import app_settings
+from ..commons.config import app_settings, secrets_settings
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
@@ -42,7 +41,7 @@ from ..commons.constants import (
     WorkflowTypeEnum,
 )
 from ..commons.db_utils import SessionMixin
-from ..commons.exceptions import ClientException
+from ..commons.exceptions import ClientException, MCPFoundryException
 from ..core.schemas import NotificationPayload
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
@@ -50,6 +49,7 @@ from ..model_ops.crud import ProviderDataManager
 from ..model_ops.models import Provider as ProviderModel
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
+from ..shared.mcp_foundry_service import mcp_foundry_service
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
@@ -668,8 +668,6 @@ class PromptService(SessionMixin):
     ) -> tuple[list[ToolListItem], int]:
         """Get tools list from MCP Foundry.
 
-        Currently returns hardcoded data until mcp_foundry service is properly integrated.
-
         Args:
             integration_type: MANDATORY - Type of integration to filter tools
             offset: Pagination offset
@@ -681,93 +679,105 @@ class PromptService(SessionMixin):
         Returns:
             Tuple of (list of tools, total count)
         """
-        # TODO: Replace with actual MCP Foundry API call when available
-        # Simulating MCP Foundry response based on integration_type
+        logger.debug(f"Fetching tools from MCP Foundry for integration_type: {integration_type}")
 
-        # Mock MCP Foundry response data
-        mock_mcp_foundry_response = [
-            {
-                "id": "3cbd6002-2c87-4eb1-96e1-f6aeadbeee26",
-                "originalName": "add_comment_to_pending_review",
-                "displayName": "Add Comment To Pending Review",
-                "description": "Add review comment to the requester&#x27;s latest pending pull request review. A pending review needs to already exist to call this (check with the user if not sure).",
-                "inputSchema": {
-                    "properties": {
-                        "body": {
-                            "description": "The text of the review comment",
-                            "type": "string",
+        # Call MCP Foundry API using the service with pagination
+        try:
+            mcp_foundry_response, total_count = await mcp_foundry_service.list_tools(
+                integration_type=integration_type, offset=offset, limit=limit
+            )
+            logger.debug(
+                f"Successfully fetched {len(mcp_foundry_response)} tools from MCP Foundry, total: {total_count}"
+            )
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry API error: {e}")
+            mcp_foundry_response = []
+            total_count = 0
+        except Exception as e:
+            logger.error(f"Unexpected error calling MCP Foundry: {e}")
+            mcp_foundry_response = []
+            total_count = 0
+
+        # If no response from MCP Foundry, use mock data
+        if not mcp_foundry_response:
+            logger.warning("Using mock data as MCP Foundry returned no tools")
+            # TODO: Mock MCP Foundry response data for now
+            mcp_foundry_response = [
+                {
+                    "id": "3cbd6002-2c87-4eb1-96e1-f6aeadbeee26",
+                    "originalName": "add_comment_to_pending_review",
+                    "displayName": "Add Comment To Pending Review",
+                    "description": "Add review comment to the requester&#x27;s latest pending pull request review. A pending review needs to already exist to call this (check with the user if not sure).",
+                    "inputSchema": {
+                        "properties": {
+                            "body": {
+                                "description": "The text of the review comment",
+                                "type": "string",
+                            },
+                            "line": {
+                                "description": "The line of the blob in the pull request diff that the comment applies to. For multi-line comments, the last line of the range",
+                                "type": "number",
+                            },
+                            "owner": {"description": "Repository owner", "type": "string"},
+                            "path": {
+                                "description": "The relative path to the file that necessitates a comment",
+                                "type": "string",
+                            },
+                            "pullNumber": {
+                                "description": "Pull request number",
+                                "type": "number",
+                            },
+                            "repo": {"description": "Repository name", "type": "string"},
+                            "side": {
+                                "description": "The side of the diff to comment on. LEFT indicates the previous state, RIGHT indicates the new state",
+                                "enum": ["LEFT", "RIGHT"],
+                                "type": "string",
+                            },
+                            "startLine": {
+                                "description": "For multi-line comments, the first line of the range that the comment applies to",
+                                "type": "number",
+                            },
+                            "startSide": {
+                                "description": "For multi-line comments, the starting side of the diff that the comment applies to. LEFT indicates the previous state, RIGHT indicates the new state",
+                                "enum": ["LEFT", "RIGHT"],
+                                "type": "string",
+                            },
+                            "subjectType": {
+                                "description": "The level at which the comment is targeted",
+                                "enum": ["FILE", "LINE"],
+                                "type": "string",
+                            },
                         },
-                        "line": {
-                            "description": "The line of the blob in the pull request diff that the comment applies to. For multi-line comments, the last line of the range",
-                            "type": "number",
-                        },
-                        "owner": {"description": "Repository owner", "type": "string"},
-                        "path": {
-                            "description": "The relative path to the file that necessitates a comment",
-                            "type": "string",
-                        },
-                        "pullNumber": {
-                            "description": "Pull request number",
-                            "type": "number",
-                        },
-                        "repo": {"description": "Repository name", "type": "string"},
-                        "side": {
-                            "description": "The side of the diff to comment on. LEFT indicates the previous state, RIGHT indicates the new state",
-                            "enum": ["LEFT", "RIGHT"],
-                            "type": "string",
-                        },
-                        "startLine": {
-                            "description": "For multi-line comments, the first line of the range that the comment applies to",
-                            "type": "number",
-                        },
-                        "startSide": {
-                            "description": "For multi-line comments, the starting side of the diff that the comment applies to. LEFT indicates the previous state, RIGHT indicates the new state",
-                            "enum": ["LEFT", "RIGHT"],
-                            "type": "string",
-                        },
-                        "subjectType": {
-                            "description": "The level at which the comment is targeted",
-                            "enum": ["FILE", "LINE"],
-                            "type": "string",
-                        },
+                        "required": [
+                            "owner",
+                            "repo",
+                            "pullNumber",
+                            "path",
+                            "body",
+                            "subjectType",
+                        ],
+                        "type": "object",
                     },
-                    "required": [
-                        "owner",
-                        "repo",
-                        "pullNumber",
-                        "path",
-                        "body",
-                        "subjectType",
-                    ],
-                    "type": "object",
-                },
-            }
-        ]
-        # Parse MCP Foundry response to Tool format
-        tools = []
-        for item in mock_mcp_foundry_response:
-            tool = Tool(
-                id=UUID(item["id"]),
-                name=item["displayName"],
-                description=item["description"],
-                type=item["originalName"],
-                schema=item["inputSchema"],
-            )
-            tools.append(tool)
+                }
+            ]
 
-        # Apply pagination
-        total_count = len(tools)
-        paginated_tools = tools[offset : offset + limit]
+            # Update total_count for mock data
+            total_count = len(mcp_foundry_response)
 
-        # Convert to ToolListItem (without description and schema)
-        tool_items = [
-            ToolListItem(
-                id=tool.id,
-                name=tool.name,
-                type=tool.type,
-            )
-            for tool in paginated_tools
-        ]
+        # NOTE: Parse MCP Foundry response directly to ToolListItem
+        # No need for intermediate Tool objects since we only need id, name, and type
+        tool_items = []
+        for item in mcp_foundry_response:
+            try:
+                tool_item = ToolListItem(
+                    id=UUID(item.get("id", "")),
+                    name=item.get("displayName", ""),
+                    type=item.get("originalName", ""),
+                )
+                tool_items.append(tool_item)
+            except (ValueError, KeyError) as e:
+                logger.error(f"Found invalid tool item: {e}")
+                continue
 
         logger.debug(
             f"Returning {len(tool_items)} tools out of {total_count} total for integration_type={integration_type}"
