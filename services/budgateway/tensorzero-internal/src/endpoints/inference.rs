@@ -29,7 +29,7 @@ use crate::function::{sample_variant, FunctionConfigChat};
 use crate::gateway_util::{AppState, AppStateData, StructuredJson};
 use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
 use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
-use crate::inference::types::resolved_input::FileWithPath;
+use crate::inference::types::resolved_input::{FileWithPath, ResolvedInput};
 use crate::inference::types::storage::StoragePath;
 use crate::inference::types::{
     collect_chunks, AudioInferenceDatabaseInsert, Base64File, ChatInferenceDatabaseInsert,
@@ -37,7 +37,7 @@ use crate::inference::types::{
     FetchContext, FinishReason, ImageInferenceDatabaseInsert, InferenceResult,
     InferenceResultChunk, InferenceResultStream, Input, InternalJsonInferenceOutput,
     JsonInferenceDatabaseInsert, JsonInferenceOutput, ModelInferenceResponseWithMetadata,
-    ModerationInferenceDatabaseInsert, RequestMessage, ResolvedInput, ResolvedInputMessageContent,
+    ModerationInferenceDatabaseInsert, RequestMessage, ResolvedInputMessageContent,
     Usage,
 };
 use crate::jsonschema_util::DynamicJSONSchema;
@@ -731,6 +731,7 @@ pub async fn inference(
             inference_id,
             episode_id,
             &error,
+            &resolved_input,
             obs_metadata_clone,
             function_name_clone,
             model_name_clone,
@@ -1389,6 +1390,7 @@ async fn send_failure_event(
     inference_id: Uuid,
     _episode_id: Uuid,  // Currently unused but kept for future use
     error: &Error,
+    resolved_input: &ResolvedInput,
     observability_metadata: Option<ObservabilityMetadata>,
     function_name: Option<String>,
     model_name: Option<String>,
@@ -1479,8 +1481,8 @@ async fn send_failure_event(
         inference_id,
         raw_request: "".to_string(),  // Failed before request could be made
         raw_response: error_message.clone(),  // Store error as response
-        system: None,
-        input_messages: "".to_string(),
+        system: resolved_input.system.as_ref().and_then(|v| v.as_str()).map(|s| s.to_string()),
+        input_messages: serde_json::to_string(&resolved_input.messages).unwrap_or_default(),
         output: format!("Error: {}", error_message),
         input_tokens: None,
         output_tokens: None,
