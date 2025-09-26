@@ -189,6 +189,10 @@ class ClickHouseMigration:
             api_key_id Nullable(UUID),
             user_id Nullable(UUID),
             api_key_project_id Nullable(UUID),
+            error_code Nullable(String),
+            error_message Nullable(String),
+            error_type Nullable(String),
+            status_code Nullable(UInt16),
             created_at DateTime DEFAULT now()
         )
         ENGINE = MergeTree()
@@ -210,6 +214,8 @@ class ClickHouseMigration:
                 "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_api_key_id (api_key_id) TYPE minmax GRANULARITY 1",
                 "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_user_id (user_id) TYPE minmax GRANULARITY 1",
                 "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_api_key_project_id (api_key_project_id) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_error_type (error_type) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_status_code (status_code) TYPE minmax GRANULARITY 1",
             ]
 
             for index_query in indexes:
@@ -674,6 +680,80 @@ class ClickHouseMigration:
         except Exception as e:
             logger.warning(f"Could not update api_key_project_id (may not be critical): {e}")
 
+    async def add_error_tracking_columns(self):
+        """Add error tracking columns to ModelInferenceDetails table for failed inference tracking.
+
+        This migration adds error_code, error_message, error_type, and status_code columns
+        to track failed inferences and their error details.
+        """
+        logger.info("Adding error tracking columns to ModelInferenceDetails table...")
+
+        # Check if the table exists first
+        try:
+            table_exists = await self.client.execute_query("EXISTS TABLE ModelInferenceDetails")
+            if not table_exists or not table_exists[0][0]:
+                logger.warning("ModelInferenceDetails table does not exist. Skipping error columns migration.")
+                return
+        except Exception as e:
+            logger.error(f"Error checking if ModelInferenceDetails table exists: {e}")
+            return
+
+        # Define the columns to add with their types
+        columns_to_add = [
+            ("error_code", "Nullable(String)"),
+            ("error_message", "Nullable(String)"),
+            ("error_type", "Nullable(String)"),
+            ("status_code", "Nullable(UInt16)"),
+        ]
+
+        # Add each column
+        for column_name, column_type in columns_to_add:
+            try:
+                # Check if column already exists
+                check_column_query = f"""
+                SELECT COUNT(*)
+                FROM system.columns
+                WHERE table = 'ModelInferenceDetails'
+                  AND database = currentDatabase()
+                  AND name = '{column_name}'
+                """
+                result = await self.client.execute_query(check_column_query)
+                column_exists = result[0][0] > 0 if result else False
+
+                if not column_exists:
+                    # Add the column
+                    alter_query = f"""
+                    ALTER TABLE ModelInferenceDetails
+                    ADD COLUMN IF NOT EXISTS {column_name} {column_type}
+                    """
+                    await self.client.execute_query(alter_query)
+                    logger.info(f"Added column {column_name} ({column_type}) to ModelInferenceDetails table")
+                else:
+                    logger.info(f"Column {column_name} already exists in ModelInferenceDetails table")
+
+            except Exception as e:
+                if "already exists" in str(e).lower():
+                    logger.info(f"Column {column_name} already exists")
+                else:
+                    logger.error(f"Error adding column {column_name}: {e}")
+
+        # Add indexes for error columns
+        indexes = [
+            ("idx_error_type", "error_type", "minmax", 1),
+            ("idx_status_code", "status_code", "minmax", 1),
+        ]
+
+        for index_name, column, index_type, granularity in indexes:
+            index_query = f"ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS {index_name} ({column}) TYPE {index_type} GRANULARITY {granularity}"
+            try:
+                await self.client.execute_query(index_query)
+                logger.info(f"Index {index_name} created or already exists")
+            except Exception as e:
+                if "already exists" not in str(e).lower():
+                    logger.warning(f"Index creation warning for {index_name}: {e}")
+
+        logger.info("Error tracking columns migration completed successfully")
+
     async def run_migration(self):
         """Run the complete migration process."""
         try:
@@ -689,6 +769,7 @@ class ClickHouseMigration:
             await self.create_gateway_blocking_events_table()
             await self.add_auth_metadata_columns()  # Add auth metadata columns migration
             await self.update_api_key_project_id()  # Update api_key_project_id where null
+            await self.add_error_tracking_columns()  # Add error tracking columns for failed inferences
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 

@@ -21,6 +21,16 @@ interface RunsHistoryTableProps {
 }
 
 const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
+  // Add unique keys to handle duplicate runIds
+  const dataWithUniqueKeys = React.useMemo(() => {
+    return Array.isArray(data)
+      ? data.map((item, index) => ({
+          ...item,
+          uniqueKey: `${item.runId}-${index}-${Date.now()}`
+        }))
+      : [];
+  }, [data]);
+
   const columns: ColumnsType<RunHistoryItem> = [
     {
       title: "Model",
@@ -105,7 +115,7 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
       `}</style>
       <Table
         columns={columns}
-        dataSource={Array.isArray(data) ? data : []}
+        dataSource={dataWithUniqueKeys}
         pagination={false}
         // pagination={{
         //   pageSize: 10,
@@ -113,7 +123,7 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
         //   showQuickJumper: true,
         //   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
         // }}
-        rowKey="runId"
+        rowKey="uniqueKey"
         size="small"
         className="eval-explorer-table"
       />

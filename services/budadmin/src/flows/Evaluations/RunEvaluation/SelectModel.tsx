@@ -53,7 +53,6 @@ export default function SelectModelForNewEvaluation() {
       backText="Back"
       onNext={async () => {
         try {
-          console.log("currentWorkflow:", currentWorkflow);
           // Check if we have the required data
           if (!selectedModel?.id) {
             errorToast("Please select a model");

@@ -152,42 +152,42 @@ const Evaluations = () => {
             tabBarExtraContent={operations}
             className="h-full"
             items={[
-              // {
-              //   label: (
-              //     <div className="flex items-center gap-[0.375rem]">
-              //       <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
-              //         <Image
-              //           preview={false}
-              //           className=""
-              //           style={{ width: "auto", height: "0.875rem" }}
-              //           src="/images/evaluations/icons/summary.svg"
-              //           alt="Logo"
-              //         />
-              //       </div>
-              //       <Text_14_600_B3B3B3>Summary</Text_14_600_B3B3B3>
-              //     </div>
-              //   ),
-              //   key: "1",
-              //   children: <EvaluationSumary />,
-              // },
-              // {
-              //   label: (
-              //     <div className="flex items-center gap-[0.375rem]">
-              //       <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
-              //         <Image
-              //           preview={false}
-              //           className=""
-              //           style={{ width: "auto", height: "0.875rem" }}
-              //           src="/images/evaluations/icons/leaderboard.svg"
-              //           alt="Logo"
-              //         />
-              //       </div>
-              //       <Text_14_600_B3B3B3>Leaderboard</Text_14_600_B3B3B3>
-              //     </div>
-              //   ),
-              //   key: "2",
-              //   children: <></>,
-              // },
+              {
+                label: (
+                  <div className="flex items-center gap-[0.375rem]">
+                    <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
+                      <Image
+                        preview={false}
+                        className=""
+                        style={{ width: "auto", height: "0.875rem" }}
+                        src="/images/evaluations/icons/summary.svg"
+                        alt="Logo"
+                      />
+                    </div>
+                    <Text_14_600_B3B3B3>Summary</Text_14_600_B3B3B3>
+                  </div>
+                ),
+                key: "1",
+                children: <EvaluationSumary />,
+              },
+              {
+                label: (
+                  <div className="flex items-center gap-[0.375rem]">
+                    <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
+                      <Image
+                        preview={false}
+                        className=""
+                        style={{ width: "auto", height: "0.875rem" }}
+                        src="/images/evaluations/icons/leaderboard.svg"
+                        alt="Logo"
+                      />
+                    </div>
+                    <Text_14_600_B3B3B3>Leaderboard</Text_14_600_B3B3B3>
+                  </div>
+                ),
+                key: "2",
+                children: <></>,
+              },
               {
                 label: (
                   <div className="flex items-center gap-[0.375rem]">
@@ -203,7 +203,7 @@ const Evaluations = () => {
                     <Text_14_600_B3B3B3>Evaluations</Text_14_600_B3B3B3>
                   </div>
                 ),
-                key: "1",
+                key: "3",
                 children: <EvaluationList />,
               },
               {
@@ -221,28 +221,28 @@ const Evaluations = () => {
                     <Text_14_600_B3B3B3>Experiments</Text_14_600_B3B3B3>
                   </div>
                 ),
-                key: "2",
+                key: "4",
                 children: <ExperimentsTable />,
               },
 
-              // {
-              //   label: (
-              //     <div className="flex items-center gap-[0.375rem]">
-              //       <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
-              //         <Image
-              //           preview={false}
-              //           className=""
-              //           style={{ width: "auto", height: "0.875rem" }}
-              //           src="/images/evaluations/icons/redTeam.svg"
-              //           alt="Logo"
-              //         />
-              //       </div>
-              //       <Text_14_600_B3B3B3>Red Team</Text_14_600_B3B3B3>
-              //     </div>
-              //   ),
-              //   key: "5",
-              //   children: <></>,
-              // },
+              {
+                label: (
+                  <div className="flex items-center gap-[0.375rem]">
+                    <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
+                      <Image
+                        preview={false}
+                        className=""
+                        style={{ width: "auto", height: "0.875rem" }}
+                        src="/images/evaluations/icons/redTeam.svg"
+                        alt="Logo"
+                      />
+                    </div>
+                    <Text_14_600_B3B3B3>Red Team</Text_14_600_B3B3B3>
+                  </div>
+                ),
+                key: "5",
+                children: <></>,
+              },
             ]}
           />
         </div>

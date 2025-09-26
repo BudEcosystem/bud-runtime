@@ -319,6 +319,12 @@ class InferenceDetailsMetrics(CloudEventBase):
     user_id: Optional[UUID] = None
     api_key_project_id: Optional[UUID] = None
 
+    # Error information for failed inferences
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    error_type: Optional[str] = None
+    status_code: Optional[int] = None
+
     @field_validator("request_ip")
     @classmethod
     def validate_ip(cls, v: Optional[str]) -> Optional[str]:
@@ -430,6 +436,11 @@ class InferenceListItem(BaseModel):
     endpoint_id: Optional[UUID] = None
     model_id: Optional[UUID] = None
     endpoint_type: str = "chat"  # New field to identify inference type
+    # Error fields for failed inferences
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    error_type: Optional[str] = None
+    status_code: Optional[int] = None
 
 
 class InferenceListResponse(ResponseBase):
@@ -550,6 +561,12 @@ class InferenceDetailResponse(ResponseBase):
     cached: bool
     finish_reason: Optional[str] = None
     cost: Optional[float] = None
+
+    # Error details for failed inferences
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    error_type: Optional[str] = None
+    status_code: Optional[int] = None
 
     # Raw data (optional)
     raw_request: Optional[str] = None

@@ -117,9 +117,6 @@ const BudIsland: React.FC = () => {
     getWorkflowList();
   }, [isOpen, user]);
 
-  useEffect(() => {
-      console.log(`workflowList`, workflowList)
-  }, [workflowList]);
 
   // Hide the minimized item after 5 seconds
   useEffect(() => {
@@ -165,8 +162,6 @@ const BudIsland: React.FC = () => {
     recentlyMinimized?.step?.id &&
     (lastNotification || showMinimizedItem)
   ) {
-    console.log("recentlyMinimized", recentlyMinimized);
-    console.log("recentlyMinimized", recentlyMinimizedStep);
     title = `Minmize ${recentlyMinimizedStep?.title}`;
     statusRender = (
       <p className="text-[#EEEEEE] text-nowrap max-w-[70%] overflow-hidden overflow-ellipsis text-[0.625rem] p-0 m-0">

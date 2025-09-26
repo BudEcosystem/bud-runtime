@@ -4307,23 +4307,23 @@ const addGuardrail: DrawerFlowType = {
       ],
       confirmClose: true,
     },
-    {
-      navigation: () => ["Guardrails", "Deploying"],
-      id: "deploying-probe",
-      step: 8,
-      component: StepComponents["deploying-probe"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Probe Settings",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Deploying",
-        },
-      ],
-      confirmClose: false,
-    },
+    // {
+    //   navigation: () => ["Guardrails", "Deploying"],
+    //   id: "deploying-probe",
+    //   step: 8,
+    //   component: StepComponents["deploying-probe"],
+    //   progress: [
+    //     {
+    //       status: FormProgressStatus.completed,
+    //       title: "Probe Settings",
+    //     },
+    //     {
+    //       status: FormProgressStatus.inProgress,
+    //       title: "Deploying",
+    //     },
+    //   ],
+    //   confirmClose: false,
+    // },
     {
       navigation: () => ["Guardrails", "Success"],
       id: "probe-deployment-success",

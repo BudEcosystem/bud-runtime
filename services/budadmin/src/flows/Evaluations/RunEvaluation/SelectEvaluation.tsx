@@ -33,16 +33,13 @@ export default function SelectEvaluation() {
   const [hover, setHover] = React.useState(false);
 
   useEffect(() => {
-    // Get trait IDs from the previous step stored in workflow
-    console.log("Current workflow:", currentWorkflow);
-    console.log("Workflow steps:", currentWorkflow?.workflow_steps);
+
 
     const traitIds =
       currentWorkflow?.workflow_steps?.stage_data?.trait_ids ||
       currentWorkflow?.workflow_steps?.trait_ids ||
       [];
 
-    console.log("Extracted trait IDs:", traitIds);
 
     // Fetch evaluations/datasets filtered by selected traits
     getEvaluations({
