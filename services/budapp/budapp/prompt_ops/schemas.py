@@ -24,7 +24,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model
 
 from ..cluster_ops.schemas import ClusterResponse
 from ..commons.constants import (
-    IntegrationAuthTypeEnum,
+    ConnectorAuthTypeEnum,
     ModalityEnum,
     PromptStatusEnum,
     PromptTypeEnum,
@@ -581,8 +581,8 @@ class PromptConfigCopyRequest(BaseModel):
     set_as_default: bool = Field(True, description="Whether to set the copied version as default for target prompt")
 
 
-class IntegrationListItem(BaseModel):
-    """Schema for individual integration item in list."""
+class ConnectorListItem(BaseModel):
+    """Schema for individual connector item in list."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -591,38 +591,38 @@ class IntegrationListItem(BaseModel):
     icon: str
 
 
-class IntegrationListResponse(PaginatedSuccessResponse):
-    """Integration list response schema."""
+class ConnectorListResponse(PaginatedSuccessResponse):
+    """Connector list response schema."""
 
     model_config = ConfigDict(extra="ignore")
 
-    integrations: list[IntegrationListItem] = []
+    connectors: list[ConnectorListItem] = []
 
 
-class IntegrationFilter(BaseModel):
-    """Filter schema for integration list API."""
+class ConnectorFilter(BaseModel):
+    """Filter schema for connector list API."""
 
     name: str | None = None
 
 
-class Integration(BaseModel):
-    """Internal schema for full integration data."""
+class Connector(BaseModel):
+    """Internal schema for full connector data."""
 
     id: UUID4
     name: str
     type: str
     icon: str
-    auth_type: IntegrationAuthTypeEnum
+    auth_type: ConnectorAuthTypeEnum
     credential_schema: List[Dict[str, Any]]
     url: str
 
 
-class IntegrationResponse(SuccessResponse):
-    """Response schema for single integration retrieval."""
+class ConnectorResponse(SuccessResponse):
+    """Response schema for single connector retrieval."""
 
     model_config = ConfigDict(extra="ignore")
 
-    integration: Integration
+    connector: Connector
 
 
 class Tool(BaseModel):
@@ -648,7 +648,7 @@ class ToolListItem(BaseModel):
 class ToolFilter(BaseModel):
     """Filter schema for tool list API."""
 
-    integration_type: str
+    connector_type: str
     name: str | None = None
 
 

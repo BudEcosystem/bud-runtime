@@ -190,12 +190,12 @@ class MCPFoundryService(metaclass=SingletonMeta):
         raise MCPFoundryException(error_msg, status_code=503)
 
     async def list_tools(
-        self, integration_type: str, offset: int = 0, limit: int = 10
+        self, connector_type: str, offset: int = 0, limit: int = 10
     ) -> tuple[List[Dict[str, Any]], int]:
-        """List tools for a specific integration type with pagination.
+        """List tools for a specific connector type with pagination.
 
         Args:
-            integration_type: The type of integration (e.g., 'github', 'slack')
+            connector_type: The type of connector (e.g., 'github', 'slack')
             offset: Number of items to skip
             limit: Maximum number of items to return
 
@@ -208,7 +208,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         try:
             logger.info(
                 "Fetching tools from MCP Foundry",
-                integration_type=integration_type,
+                connector_type=connector_type,
                 offset=offset,
                 limit=limit,
             )
@@ -216,7 +216,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             # Prepare parameters for MCP Foundry API
             params = {
                 "include_inactive": "false",
-                # "tags": integration_type,  # TODO: uncomment this when MCP Foudry has tags
+                # "tags": connector_type,  # TODO: uncomment this when MCP Foundry has tags
             }
 
             # Make the API call
@@ -243,7 +243,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
 
             logger.info(
                 "Successfully fetched tools from MCP Foundry",
-                integration_type=integration_type,
+                connector_type=connector_type,
                 returned_count=len(paginated_tools),
                 total_count=total_count,
             )

@@ -28,10 +28,10 @@ from ..commons.config import app_settings, secrets_settings
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
-    INTEGRATION_AUTH_CREDENTIALS_MAP,
+    CONNECTOR_AUTH_CREDENTIALS_MAP,
     BudServeWorkflowStepEventName,
+    ConnectorAuthTypeEnum,
     EndpointStatusEnum,
-    IntegrationAuthTypeEnum,
     ModelProviderTypeEnum,
     ProjectStatusEnum,
     PromptStatusEnum,
@@ -59,10 +59,10 @@ from .crud import PromptDataManager, PromptVersionDataManager
 from .models import Prompt as PromptModel
 from .models import PromptVersion as PromptVersionModel
 from .schemas import (
+    Connector,
+    ConnectorListItem,
     CreatePromptWorkflowRequest,
     CreatePromptWorkflowSteps,
-    Integration,
-    IntegrationListItem,
     PromptConfigCopyRequest,
     PromptConfigGetResponse,
     PromptConfigRequest,
@@ -557,7 +557,7 @@ class PromptService(SessionMixin):
                 message="Failed to delete prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
-    async def get_integrations(
+    async def get_connectors(
         self,
         prompt_id: Optional[UUID] = None,
         offset: int = 0,
@@ -565,19 +565,19 @@ class PromptService(SessionMixin):
         filters: dict = {},
         order_by: list = [],
         search: bool = False,
-    ) -> tuple[list[IntegrationListItem], int]:
-        """Get integrations list.
+    ) -> tuple[list[ConnectorListItem], int]:
+        """Get connectors list.
 
         TODO: Currently returns hardcoded data until mcp_foundry service is available.
-        When prompt_id is provided, filters integrations connected to that prompt.
+        When prompt_id is provided, filters connectors connected to that prompt.
 
         Args:
-            prompt_id: Optional UUID to filter integrations for a specific prompt
+            prompt_id: Optional UUID to filter connectors for a specific prompt
             offset: Pagination offset
             limit: Pagination limit
 
         Returns:
-            Tuple of (list of integrations, total count)
+            Tuple of (list of connectors, total count)
         """
         # Validate prompt if prompt_id is provided
         if prompt_id:
@@ -586,81 +586,81 @@ class PromptService(SessionMixin):
                 fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE},
             )
 
-        # TODO: Hardcoded integration data until mcp_foundry service is ready
+        # TODO: Hardcoded connector data until mcp_foundry service is ready
         # This simulates what we'll get from the mcp_foundry service
-        integrations = [
-            Integration(
+        connectors = [
+            Connector(
                 id=UUID("550e8400-e29b-41d4-a716-446655440001"),
                 name="GitHub",
                 type="github",
                 icon="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-                auth_type=IntegrationAuthTypeEnum.OAUTH,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.OAUTH, []),
+                auth_type=ConnectorAuthTypeEnum.OAUTH,
+                credential_schema=CONNECTOR_AUTH_CREDENTIALS_MAP.get(ConnectorAuthTypeEnum.OAUTH, []),
                 url="https://api.github.com",
             ),
-            Integration(
+            Connector(
                 id=UUID("550e8400-e29b-41d4-a716-446655440002"),
                 name="Slack",
                 type="slack",
                 icon="https://a.slack-edge.com/80588/marketing/img/meta/favicon-32.png",
-                auth_type=IntegrationAuthTypeEnum.BEARER,
-                credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.BEARER, []),
+                auth_type=ConnectorAuthTypeEnum.BEARER,
+                credential_schema=CONNECTOR_AUTH_CREDENTIALS_MAP.get(ConnectorAuthTypeEnum.BEARER, []),
                 url="https://slack.com/api",
             ),
         ]
 
         # Apply pagination
-        total_count = len(integrations)
-        paginated_integrations = integrations[offset : offset + limit]
+        total_count = len(connectors)
+        paginated_connectors = connectors[offset : offset + limit]
 
         # Convert to response format (only id, name, icon)
-        integration_items = [
-            IntegrationListItem(
-                id=integration.id,
-                name=integration.name,
-                icon=integration.icon,
+        connector_items = [
+            ConnectorListItem(
+                id=connector.id,
+                name=connector.name,
+                icon=connector.icon,
             )
-            for integration in paginated_integrations
+            for connector in paginated_connectors
         ]
 
         logger.debug(
-            f"Returning {len(integration_items)} integrations out of {total_count} total"
+            f"Returning {len(connector_items)} connectors out of {total_count} total"
             f"{f' for prompt_id {prompt_id}' if prompt_id else ''}"
         )
 
-        return integration_items, total_count
+        return connector_items, total_count
 
-    async def get_integration_by_id(self, integration_id: UUID) -> Integration:
-        """Get a single integration by its ID.
+    async def get_connector_by_id(self, connector_id: UUID) -> Connector:
+        """Get a single connector by its ID.
 
         Currently returns from hardcoded data until mcp_foundry service is available.
 
         Args:
-            integration_id: UUID of the integration to retrieve
+            connector_id: UUID of the connector to retrieve
 
         Returns:
-            Integration object with full details
+            Connector object with full details
 
         Raises:
-            ClientException: If integration not found
+            ClientException: If connector not found
         """
-        # TODO: Hardcoded integration data until mcp_foundry service is ready
+        # TODO: Hardcoded connector data until mcp_foundry service is ready
         # This simulates what we'll get from the mcp_foundry service
-        integration = Integration(
-            id=integration_id,
+        connector = Connector(
+            id=connector_id,
             name="GitHub",
             type="github",
             icon="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-            auth_type=IntegrationAuthTypeEnum.OAUTH,
-            credential_schema=INTEGRATION_AUTH_CREDENTIALS_MAP.get(IntegrationAuthTypeEnum.OAUTH, []),
+            auth_type=ConnectorAuthTypeEnum.OAUTH,
+            credential_schema=CONNECTOR_AUTH_CREDENTIALS_MAP.get(ConnectorAuthTypeEnum.OAUTH, []),
             url="https://api.github.com",
         )
 
-        return integration
+        return connector
 
     async def get_tools(
         self,
-        integration_type: str,
+        connector_type: str,
         offset: int = 0,
         limit: int = 10,
         filters: dict = {},
@@ -670,7 +670,7 @@ class PromptService(SessionMixin):
         """Get tools list from MCP Foundry.
 
         Args:
-            integration_type: MANDATORY - Type of integration to filter tools
+            connector_type: MANDATORY - Type of connector to filter tools
             offset: Pagination offset
             limit: Pagination limit
             filters: Additional filters (e.g., name)
@@ -680,12 +680,12 @@ class PromptService(SessionMixin):
         Returns:
             Tuple of (list of tools, total count)
         """
-        logger.debug(f"Fetching tools from MCP Foundry for integration_type: {integration_type}")
+        logger.debug(f"Fetching tools from MCP Foundry for connector_type: {connector_type}")
 
         # Call MCP Foundry API using the service with pagination
         try:
             mcp_foundry_response, total_count = await mcp_foundry_service.list_tools(
-                integration_type=integration_type, offset=offset, limit=limit
+                connector_type=connector_type, offset=offset, limit=limit
             )
             logger.debug(
                 f"Successfully fetched {len(mcp_foundry_response)} tools from MCP Foundry, total: {total_count}"
@@ -781,7 +781,7 @@ class PromptService(SessionMixin):
                 continue
 
         logger.debug(
-            f"Returning {len(tool_items)} tools out of {total_count} total for integration_type={integration_type}"
+            f"Returning {len(tool_items)} tools out of {total_count} total for connector_type={connector_type}"
         )
 
         return tool_items, total_count

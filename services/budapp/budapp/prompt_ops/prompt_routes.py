@@ -37,14 +37,14 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
+    ConnectorFilter,
+    ConnectorListResponse,
+    ConnectorResponse,
     CreatePromptVersionRequest,
     CreatePromptWorkflowRequest,
     EditPromptRequest,
     EditPromptVersionRequest,
     GetPromptVersionResponse,
-    IntegrationFilter,
-    IntegrationListResponse,
-    IntegrationResponse,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -691,11 +691,11 @@ async def get_prompt_config(
 
 
 @router.get(
-    "/integrations",
+    "/connectors",
     responses={
         status.HTTP_200_OK: {
-            "model": IntegrationListResponse,
-            "description": "Successfully listed integrations",
+            "model": ConnectorListResponse,
+            "description": "Successfully listed connectors",
         },
         status.HTTP_400_BAD_REQUEST: {
             "model": ErrorResponse,
@@ -706,34 +706,34 @@ async def get_prompt_config(
             "description": "Server error",
         },
     },
-    description="List all integrations with optional filtering by prompt_id",
+    description="List all connectors with optional filtering by prompt_id",
 )
 @require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
-async def list_integrations(
+async def list_connectors(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    filters: Annotated[IntegrationFilter, Depends()],
-    prompt_id: Optional[UUID] = Query(None, description="Filter integrations connected to a specific prompt"),
+    filters: Annotated[ConnectorFilter, Depends()],
+    prompt_id: Optional[UUID] = Query(None, description="Filter connectors connected to a specific prompt"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=0),
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
     search: bool = False,
-) -> Union[IntegrationListResponse, ErrorResponse]:
-    """List all integrations with optional filtering by prompt_id.
+) -> Union[ConnectorListResponse, ErrorResponse]:
+    """List all connectors with optional filtering by prompt_id.
 
-    This endpoint returns a list of available integrations. When prompt_id is provided,
-    it filters to show only integrations connected to that specific prompt.
+    This endpoint returns a list of available connectors. When prompt_id is provided,
+    it filters to show only connectors connected to that specific prompt.
     Currently returns hardcoded data until mcp_foundry service is available.
 
     Args:
         current_user: The authenticated user
         session: Database session
-        prompt_id: Optional UUID to filter integrations for a specific prompt
+        prompt_id: Optional UUID to filter connectors for a specific prompt
         page: Page number for pagination
         limit: Number of items per page
 
     Returns:
-        IntegrationListResponse with the list of integrations or ErrorResponse on failure
+        ConnectorListResponse with the list of connectors or ErrorResponse on failure
     """
     # Calculate offset
     offset = (page - 1) * limit
@@ -742,84 +742,84 @@ async def list_integrations(
     filters_dict = filters.model_dump(exclude_none=True)
 
     try:
-        # Get integrations from service
-        integrations_list, count = await PromptService(session).get_integrations(
+        # Get connectors from service
+        connectors_list, count = await PromptService(session).get_connectors(
             prompt_id=prompt_id, offset=offset, limit=limit, filters=filters_dict, order_by=order_by, search=search
         )
 
-        return IntegrationListResponse(
-            integrations=integrations_list,
+        return ConnectorListResponse(
+            connectors=connectors_list,
             total_record=count,
             page=page,
             limit=limit,
-            object="integrations.list",
+            object="connectors.list",
             code=status.HTTP_200_OK,
         ).to_http_response()
     except ClientException as e:
-        logger.error(f"Failed to list integrations: {e}")
+        logger.error(f"Failed to list connectors: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
-        logger.exception(f"Failed to list integrations: {e}")
+        logger.exception(f"Failed to list connectors: {e}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list integrations"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list connectors"
         ).to_http_response()
 
 
 @router.get(
-    "/integrations/{integration_id}",
+    "/connectors/{connector_id}",
     responses={
         status.HTTP_200_OK: {
-            "model": IntegrationResponse,
-            "description": "Successfully retrieved integration",
+            "model": ConnectorResponse,
+            "description": "Successfully retrieved connector",
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "Integration not found",
+            "description": "Connector not found",
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
             "description": "Server error",
         },
     },
-    description="Retrieve a single integration by ID",
+    description="Retrieve a single connector by ID",
 )
 @require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
-async def get_integration(
+async def get_connector(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    integration_id: UUID,
-) -> Union[IntegrationResponse, ErrorResponse]:
-    """Retrieve a single integration with its full details.
+    connector_id: UUID,
+) -> Union[ConnectorResponse, ErrorResponse]:
+    """Retrieve a single connector with its full details.
 
-    This endpoint returns complete integration information including the
+    This endpoint returns complete connector information including the
     credential schema needed to render authentication forms dynamically.
     Currently returns hardcoded data until mcp_foundry service is available.
 
     Args:
         current_user: The authenticated user
         session: Database session
-        integration_id: UUID of the integration to retrieve
+        connector_id: UUID of the connector to retrieve
 
     Returns:
-        IntegrationResponse with full integration details or ErrorResponse on failure
+        ConnectorResponse with full connector details or ErrorResponse on failure
     """
     try:
-        # Get the integration from service
-        integration = await PromptService(session).get_integration_by_id(integration_id)
+        # Get the connector from service
+        connector = await PromptService(session).get_connector_by_id(connector_id)
 
-        return IntegrationResponse(
-            integration=integration,
-            message="Integration retrieved successfully",
+        return ConnectorResponse(
+            connector=connector,
+            message="Connector retrieved successfully",
             code=status.HTTP_200_OK,
-            object="integration.get",
+            object="connector.get",
         ).to_http_response()
     except ClientException as e:
-        logger.error(f"Failed to retrieve integration: {e}")
+        logger.error(f"Failed to retrieve connector: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
-        logger.exception(f"Failed to retrieve integration: {e}")
+        logger.exception(f"Failed to retrieve connector: {e}")
         return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve integration"
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve connector"
         ).to_http_response()
 
 
@@ -839,7 +839,7 @@ async def get_integration(
             "description": "Server error",
         },
     },
-    description="List tools filtered by integration type",
+    description="List tools filtered by connector type",
 )
 @require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def list_tools(
@@ -851,16 +851,16 @@ async def list_tools(
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
     search: bool = False,
 ) -> Union[ToolListResponse, ErrorResponse]:
-    """List all tools filtered by integration type.
+    """List all tools filtered by connector type.
 
-    This endpoint returns a list of available tools for a specific integration type.
-    The integration_type parameter is MANDATORY.
+    This endpoint returns a list of available tools for a specific connector type.
+    The connector_type parameter is MANDATORY.
     Currently returns hardcoded data until mcp_foundry service is available.
 
     Args:
         current_user: The authenticated user
         session: Database session
-        filters: Tool filters including mandatory integration_type
+        filters: Tool filters including mandatory connector_type
         page: Page number for pagination
         limit: Number of items per page
         order_by: Ordering fields
@@ -875,16 +875,14 @@ async def list_tools(
     # Convert filter to dictionary
     filters_dict = filters.model_dump(exclude_none=True)
 
-    # Validate that integration_type is provided (it's mandatory in the schema)
-    if not filters.integration_type:
-        return ErrorResponse(
-            code=status.HTTP_400_BAD_REQUEST, message="integration_type is required"
-        ).to_http_response()
+    # Validate that connector_type is provided (it's mandatory in the schema)
+    if not filters.connector_type:
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message="connector_type is required").to_http_response()
 
     try:
         # Get tools from service
         tools_list, count = await PromptService(session).get_tools(
-            integration_type=filters.integration_type,
+            connector_type=filters.connector_type,
             offset=offset,
             limit=limit,
             filters=filters_dict,

@@ -891,8 +891,8 @@ class PromptTypeEnum(StrEnum):
     SIMPLE_PROMPT = auto()
 
 
-class IntegrationAuthTypeEnum(StrEnum):
-    """Enumeration of integration authentication types.
+class ConnectorAuthTypeEnum(StrEnum):
+    """Enumeration of connector authentication types.
 
     Attributes:
         BASIC: Basic authentication with username/password.
@@ -2922,9 +2922,9 @@ EMOJIS = [
     "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
 ]
 
-# Integration Authentication Credentials Mapping
-INTEGRATION_AUTH_CREDENTIALS_MAP = {
-    IntegrationAuthTypeEnum.BASIC: [
+# Connector Authentication Credentials Mapping
+CONNECTOR_AUTH_CREDENTIALS_MAP = {
+    ConnectorAuthTypeEnum.BASIC: [
         {
             "type": "text",
             "field": "username",
@@ -2942,7 +2942,7 @@ INTEGRATION_AUTH_CREDENTIALS_MAP = {
             "description": "Your password for basic authentication",
         },
     ],
-    IntegrationAuthTypeEnum.BEARER: [
+    ConnectorAuthTypeEnum.BEARER: [
         {
             "type": "password",
             "field": "token",
@@ -2952,7 +2952,7 @@ INTEGRATION_AUTH_CREDENTIALS_MAP = {
             "description": "Your bearer token for API authentication",
         }
     ],
-    IntegrationAuthTypeEnum.OAUTH: [
+    ConnectorAuthTypeEnum.OAUTH: [
         {
             "type": "dropdown",
             "field": "grant_type",
@@ -2995,7 +2995,7 @@ INTEGRATION_AUTH_CREDENTIALS_MAP = {
             "description": "Space-separated list of OAuth scopes",
         },
     ],
-    IntegrationAuthTypeEnum.HEADERS: [
+    ConnectorAuthTypeEnum.HEADERS: [
         {
             "type": "button",
             "field": "add_header_button",
@@ -3017,7 +3017,7 @@ INTEGRATION_AUTH_CREDENTIALS_MAP = {
             "min_items": 1,
         },
     ],
-    IntegrationAuthTypeEnum.NONE: [],
+    ConnectorAuthTypeEnum.NONE: [],
 }
 
 # Define success messages for different workflow types
