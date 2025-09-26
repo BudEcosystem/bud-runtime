@@ -146,7 +146,7 @@ export default function ProbeSettings() {
         console.log("✅ Workflow update successful, navigating to deployment progress screen");
 
         // Navigate to deployment progress screen only on success
-        openDrawerWithStep("deploying-probe");
+        openDrawerWithStep("probe-deployment-success");
       } else {
         console.error("❌ Workflow update failed - staying on current page");
         console.error("Success value was:", success, "Type:", typeof success);
