@@ -259,6 +259,47 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def get_tool_by_id(self, tool_id: str) -> Dict[str, Any]:
+        """Get a single tool by its ID.
+
+        Args:
+            tool_id: The ID of the tool to retrieve
+
+        Returns:
+            Dict[str, Any]: Tool data from MCP Foundry
+
+        Raises:
+            MCPFoundryException: If the API call fails or tool not found
+        """
+        try:
+            logger.info(
+                "Fetching tool from MCP Foundry",
+                tool_id=tool_id,
+            )
+
+            # Make the API call
+            response = await self._make_request(
+                method="GET",
+                endpoint=f"/tools/{tool_id}",
+            )
+
+            logger.info(
+                "Successfully fetched tool from MCP Foundry",
+                tool_id=tool_id,
+                tool_name=response.get("displayName", "Unknown"),
+            )
+
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error getting tool {tool_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def close(self):
         """Close the HTTP session."""
         if self._session and not self._session.closed:
