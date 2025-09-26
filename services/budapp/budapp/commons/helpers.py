@@ -431,7 +431,7 @@ async def determine_modality_endpoints(
     result: Dict[str, Any] = {"modality": None, "endpoints": None}
     if input_modality == "llm":
         result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.CHAT, ModelEndpointEnum.COMPLETION]
+        result["endpoints"] = [ModelEndpointEnum.CHAT]
     elif input_modality == "mllm":
         result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT]
         result["endpoints"] = [ModelEndpointEnum.CHAT, ModelEndpointEnum.DOCUMENT]
@@ -495,10 +495,8 @@ async def determine_supported_endpoints(
     if {
         ModalityEnum.TEXT_INPUT.value,
         ModalityEnum.TEXT_OUTPUT.value,
-    }.issubset(modality_set):
-        endpoints.update({ModelEndpointEnum.CHAT, ModelEndpointEnum.COMPLETION})
-    elif ModalityEnum.TEXT_INPUT.value in modality_set:
-        endpoints.add(ModelEndpointEnum.COMPLETION)
+    }.issubset(modality_set) or ModalityEnum.TEXT_INPUT.value in modality_set:
+        endpoints.add(ModelEndpointEnum.CHAT)
 
     if ModalityEnum.IMAGE_OUTPUT.value in modality_set:
         endpoints.add(ModelEndpointEnum.IMAGE_GENERATION)

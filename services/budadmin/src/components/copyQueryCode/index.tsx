@@ -57,14 +57,6 @@ const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
           size: "1024x1024",
         };
       }
-      // Check for completion endpoint
-      else if (supportedEndpoints.completion?.enabled) {
-        endpoint = supportedEndpoints.completion.path || "v1/completions";
-        payloadExample = {
-          model: modelName,
-          prompt: "Once upon a time",
-          max_tokens: 256,
-        };
       }
     }
 

@@ -201,7 +201,7 @@ const newProject: DrawerFlowType = {
 const deployModel: DrawerFlowType = {
   title: "Deployment",
   description: "Deployment Under Progress",
-  totalSteps: 9,
+  totalSteps: 10,
   steps: [
     {
       navigation: () => [
@@ -237,6 +237,10 @@ const deployModel: DrawerFlowType = {
         {
           status: FormProgressStatus.notCompleted,
           title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
         },
         {
           status: FormProgressStatus.notCompleted,
@@ -285,6 +289,10 @@ const deployModel: DrawerFlowType = {
         {
           status: FormProgressStatus.notCompleted,
           title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
         },
         {
           status: FormProgressStatus.notCompleted,
@@ -338,6 +346,10 @@ const deployModel: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
           title: "Auto Scaling",
         },
         {
@@ -384,6 +396,10 @@ const deployModel: DrawerFlowType = {
         {
           status: FormProgressStatus.notCompleted,
           title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
         },
         {
           status: FormProgressStatus.notCompleted,
@@ -436,6 +452,10 @@ const deployModel: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
           title: "Auto Scaling",
         },
         {
@@ -485,6 +505,10 @@ const deployModel: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
           title: "Auto Scaling",
         },
         {
@@ -503,10 +527,10 @@ const deployModel: DrawerFlowType = {
         `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
         "Deploy Model",
       ],
-      id: "deploy-model-auto-scaling",
-      component: StepComponents["deploy-model-auto-scaling"],
-      confirmClose: true,
+      id: "deploy-model-configuration",
       step: 7,
+      component: StepComponents["deploy-model-configuration"],
+      confirmClose: true,
       progress: [
         {
           status: FormProgressStatus.completed,
@@ -534,6 +558,63 @@ const deployModel: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.inProgress,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Auto Scaling",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Status",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+    },
+    {
+      navigation: () => [
+        "Projects",
+        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        "Deploy Model",
+      ],
+      id: "deploy-model-auto-scaling",
+      component: StepComponents["deploy-model-auto-scaling"],
+      confirmClose: true,
+      step: 8,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Deploy Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Credentials",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: " Select Deployment Templates",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Deployment Specification",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Finding Clusters",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.inProgress,
           title: "Auto Scaling",
         },
         {
@@ -554,7 +635,7 @@ const deployModel: DrawerFlowType = {
       ],
       id: "deploy-model-status",
       confirmClose: true,
-      step: 8,
+      step: 9,
       component: StepComponents["deploy-model-status"],
       progress: [
         {
@@ -583,6 +664,10 @@ const deployModel: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.completed,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.completed,
           title: "Auto Scaling",
         },
         {
@@ -603,7 +688,7 @@ const deployModel: DrawerFlowType = {
       ],
       id: "deploy-model-success",
       confirmClose: false,
-      step: 9,
+      step: 10,
       component: StepComponents["deploy-model-success"],
       progress: [
         {
@@ -629,6 +714,10 @@ const deployModel: DrawerFlowType = {
         {
           status: FormProgressStatus.completed,
           title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Deployment Configuration",
         },
         {
           status: FormProgressStatus.completed,

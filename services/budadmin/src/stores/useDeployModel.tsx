@@ -201,6 +201,12 @@ export const useDeployModel = create<{
     scaleDownTolerance: number;
     window: number;
   };
+  deploymentConfiguration: {
+    enable_tool_calling: boolean;
+    enable_reasoning: boolean;
+    available_tool_parser: string | null;
+    available_reasoning_parser: string | null;
+  };
   cloudModelDetails: {
     name: string;
     tags: { name: string; color: string }[];
@@ -217,6 +223,7 @@ export const useDeployModel = create<{
   setSelectedProvider: (provider: Provider) => void;
   setDeploymentSpecification: (spec: any) => void;
   setScalingSpecification: (spec: any) => void;
+  setDeploymentConfiguration: (config: any) => void;
   setCloudModelDetails: (details: any) => void;
   setSelectedTemplate: (template: IDeploymentTemplate) => void;
   setDeploymentCluster: (cluster: any) => void;
@@ -231,6 +238,7 @@ export const useDeployModel = create<{
   updateModel: () => void;
   updateTemplate: () => void;
   getWorkflow: (id?: string) => Promise<any>;
+  updateDeploymentConfiguration: (payload?: { enable_tool_calling?: boolean; enable_reasoning?: boolean }) => Promise<any>;
   updateDeploymentSpecification: () => Promise<any>;
   updateDeploymentSpecificationAndDeploy: () => Promise<any>;
   updateScalingSpecification: () => Promise<any>;
@@ -360,6 +368,12 @@ export const useDeployModel = create<{
     scaleDownTolerance: 0.5,
     window: 60,
   },
+  deploymentConfiguration: {
+    enable_tool_calling: false,
+    enable_reasoning: false,
+    available_tool_parser: null,
+    available_reasoning_parser: null,
+  },
   cloudModelDetails: {
     name: "",
     tags: [],
@@ -371,6 +385,15 @@ export const useDeployModel = create<{
   },
   setScalingSpecification: (spec: any) => {
     set({ scalingSpecifcation: spec });
+  },
+  setDeploymentConfiguration: (config: any) => {
+    // Merge incoming partial config with existing deploymentConfiguration
+    set((state) => ({
+      deploymentConfiguration: {
+        ...state.deploymentConfiguration,
+        ...config,
+      },
+    }));
   },
   setCloudModelDetails: (details: any) => {
     set({ cloudModelDetails: details });
@@ -423,6 +446,12 @@ export const useDeployModel = create<{
         per_session_tokens_per_sec: [],
         ttft: [],
         e2e_latency: [],
+      },
+      deploymentConfiguration: {
+        enable_tool_calling: false,
+        enable_reasoning: false,
+        available_tool_parser: null,
+        available_reasoning_parser: null,
       },
       deploymentCluster: {},
       status: {},
@@ -814,6 +843,50 @@ export const useDeployModel = create<{
     }
   },
 
+  updateDeploymentConfiguration: async (payload?: { enable_tool_calling?: boolean; enable_reasoning?: boolean }) => {
+    const workflowId = get().currentWorkflow?.workflow_id;
+    const deployConfig = get().deploymentConfiguration;
+    const projectId = useProjects.getState().selectedProject?.id;
+    if (!workflowId) {
+      errorToast("Please create a workflow");
+      return;
+    }
+    get().startRequest();
+    try {
+      const enable_tool_calling =
+        typeof payload?.enable_tool_calling === 'boolean'
+          ? payload.enable_tool_calling
+          : deployConfig.enable_tool_calling;
+      const enable_reasoning =
+        typeof payload?.enable_reasoning === 'boolean'
+          ? payload.enable_reasoning
+          : deployConfig.enable_reasoning;
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/models/deploy-workflow`,
+        {
+          step_number: 7,
+          trigger_workflow: false,
+          workflow_id: workflowId,
+          enable_tool_calling,
+          enable_reasoning,
+        },
+        {
+          headers: {
+            "x-resource-type": "project",
+            "x-entity-id": projectId,
+          },
+        },
+      );
+      get().getWorkflowCloud();
+      return true;
+    } catch (error) {
+      console.error("Error updating deployment configuration:", error);
+      return false;
+    } finally {
+      get().endRequest();
+    }
+  },
+
   updateCredentials: async (credentials: Credentials) => {
     const workflowId = get().currentWorkflow?.workflow_id;
     const projectId = useProjects.getState().selectedProject?.id;
@@ -882,6 +955,8 @@ export const useDeployModel = create<{
           workflow_id: workflowId,
           endpoint_name: deployConfig.deployment_name,
           deploy_config: deployConfigPayload,
+          enable_tool_calling: get().deploymentConfiguration.enable_tool_calling,
+          enable_reasoning: get().deploymentConfiguration.enable_reasoning,
         },
         {
           headers: {
@@ -924,6 +999,8 @@ export const useDeployModel = create<{
           workflow_id: workflowId,
           endpoint_name: deployConfig.deployment_name,
           deploy_config: deployConfigPayload,
+          enable_tool_calling: get().deploymentConfiguration.enable_tool_calling,
+          enable_reasoning: get().deploymentConfiguration.enable_reasoning,
         },
         {
           headers: {
@@ -953,7 +1030,7 @@ export const useDeployModel = create<{
       const response: any = await AppRequest.Post(
         `${tempApiBaseUrl}/models/deploy-workflow`,
         {
-          step_number: 7,
+          step_number: 8,
           trigger_workflow: true,
           workflow_id: workflowId,
           scaling_specification: scalingSpecifcation,
@@ -991,6 +1068,9 @@ export const useDeployModel = create<{
           trigger_workflow: false,
           workflow_id: workflowId,
           cluster_id: cluster?.cluster_id,
+          tool_calling_parser_type: cluster?.tool_calling_parser_type,
+          reasoning_parser_type: cluster?.reasoning_parser_type,
+          chat_template: cluster?.chat_template,
         },
         {
           headers: {

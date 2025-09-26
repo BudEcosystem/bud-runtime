@@ -3082,6 +3082,11 @@ class ModelService(SessionMixin):
         trigger_workflow: bool = False,
         credential_id: Optional[UUID] = None,
         scaling_specification: Optional[ScalingSpecification] = None,
+        enable_tool_calling: Optional[bool] = None,
+        enable_reasoning: Optional[bool] = None,
+        tool_calling_parser_type: Optional[str] = None,
+        reasoning_parser_type: Optional[str] = None,
+        chat_template: Optional[str] = None,
     ) -> EndpointModel:
         """Create workflow steps and execute deployment workflow.
 
@@ -3171,6 +3176,11 @@ class ModelService(SessionMixin):
             template_id=template_id,
             credential_id=credential_id,
             scaling_specification=scaling_specification,
+            enable_tool_calling=enable_tool_calling,
+            enable_reasoning=enable_reasoning,
+            tool_calling_parser_type=tool_calling_parser_type,
+            reasoning_parser_type=reasoning_parser_type,
+            chat_template=chat_template,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
@@ -3328,6 +3338,11 @@ class ModelService(SessionMixin):
                 "deploy_config",
                 "credential_id",
                 "scaling_specification",
+                "enable_tool_calling",
+                "enable_reasoning",
+                "tool_calling_parser_type",
+                "reasoning_parser_type",
+                "chat_template",
             ]
 
             # from workflow steps extract necessary information
@@ -3401,6 +3416,11 @@ class ModelService(SessionMixin):
                     workflow_id=db_workflow.id,
                     current_user_id=current_user_id,
                     credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
+                    enable_tool_calling=required_data.get("enable_tool_calling"),
+                    enable_reasoning=required_data.get("enable_reasoning"),
+                    tool_calling_parser_type=required_data.get("tool_calling_parser_type"),
+                    reasoning_parser_type=required_data.get("reasoning_parser_type"),
+                    chat_template=required_data.get("chat_template"),
                 )
 
                 # Create deployment events for workflow tracking
@@ -3440,7 +3460,9 @@ class ModelService(SessionMixin):
                     workflow_id=db_workflow.id,
                     subscriber_id=current_user_id,
                     credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
-                    scaling_specification=required_data["scaling_specification"],
+                    scaling_specification=required_data.get("scaling_specification"),
+                    enable_tool_calling=required_data.get("enable_tool_calling"),
+                    enable_reasoning=required_data.get("enable_reasoning"),
                 )
                 model_deployment_events = {
                     "budserve_cluster_events": model_deployment_response,
@@ -3556,6 +3578,8 @@ class ModelService(SessionMixin):
         subscriber_id: UUID,
         credential_id: UUID | None = None,
         scaling_specification: Optional[ScalingSpecification] = None,
+        enable_tool_calling: Optional[bool] = None,
+        enable_reasoning: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Trigger model deployment by step."""
         logger.debug("Triggering model deployment")
@@ -3606,6 +3630,8 @@ class ModelService(SessionMixin):
             credential_id=credential_id,
             podscaler=scaling_specification,
             provider=db_model.source,
+            enable_tool_calling=enable_tool_calling,
+            enable_reasoning=enable_reasoning,
         )
         model_deployment_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
@@ -3647,6 +3673,11 @@ class ModelService(SessionMixin):
         workflow_id: UUID,
         current_user_id: UUID,
         credential_id: Optional[UUID] = None,
+        enable_tool_calling: Optional[bool] = None,
+        enable_reasoning: Optional[bool] = None,
+        tool_calling_parser_type: Optional[str] = None,
+        reasoning_parser_type: Optional[str] = None,
+        chat_template: Optional[str] = None,
     ) -> EndpointModel:
         """Create endpoint directly for cloud/proprietary models without calling budcluster.
 
@@ -3702,6 +3733,26 @@ class ModelService(SessionMixin):
         # For cloud models without a cluster, use None for both cluster_id and bud_cluster_id
 
         # Prepare endpoint data
+        # Ensure deployment_config includes engine_configs (defaults + provided values)
+        deployment_config_dict = deploy_config.model_dump()
+        engine_cfg = deployment_config_dict.get("engine_configs") or {}
+        engine_cfg.setdefault("tool_calling_parser_type", "")
+        engine_cfg.setdefault("reasoning_parser_type", "")
+        engine_cfg.setdefault("chat_template", "")
+        engine_cfg.setdefault("enable_tool_calling", False)
+        engine_cfg.setdefault("enable_reasoning", False)
+
+        if tool_calling_parser_type is not None:
+            engine_cfg["tool_calling_parser_type"] = tool_calling_parser_type
+        if reasoning_parser_type is not None:
+            engine_cfg["reasoning_parser_type"] = reasoning_parser_type
+        if chat_template is not None:
+            engine_cfg["chat_template"] = chat_template
+        if enable_tool_calling is not None:
+            engine_cfg["enable_tool_calling"] = enable_tool_calling
+        if enable_reasoning is not None:
+            engine_cfg["enable_reasoning"] = enable_reasoning
+        deployment_config_dict["engine_configs"] = engine_cfg
         endpoint_data = EndpointCreate(
             project_id=project_id,
             model_id=model_id,
@@ -3717,7 +3768,7 @@ class ModelService(SessionMixin):
             active_replicas=replicas,
             total_replicas=replicas,
             number_of_nodes=1,  # Cloud models run on 1 virtual node
-            deployment_config=deploy_config.model_dump(),
+            deployment_config=deployment_config_dict,
             node_list=[],  # Empty for cloud models
             supported_endpoints=supported_endpoints,
         )

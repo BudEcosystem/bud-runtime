@@ -140,6 +140,11 @@ class DeploymentHandler:
         podscaler: dict = None,
         input_tokens: Optional[int] = None,
         output_tokens: Optional[int] = None,
+        tool_calling_parser_type: Optional[str] = None,
+        reasoning_parser_type: Optional[str] = None,
+        enable_tool_calling: Optional[bool] = None,
+        enable_reasoning: Optional[bool] = None,
+        chat_template: Optional[str] = None,
     ):
         """Deploy nodes using Helm.
 
@@ -153,9 +158,14 @@ class DeploymentHandler:
             add_worker (bool, optional): Whether to add a worker node. Defaults to False.
             adapters (List[dict], optional): List of model adapters to deploy. Defaults to None.
             delete_on_failure (bool, optional): Whether to delete resources on failure. Defaults to True.
+            chat_template (str, optional): Chat template to use for the model. Defaults to None.
             podscaler (dict, optional): Pod autoscaling configuration. Defaults to None.
             input_tokens (Optional[int], optional): Average input/context tokens. Defaults to None.
             output_tokens (Optional[int], optional): Average output/sequence tokens. Defaults to None.
+            tool_calling_parser_type (Optional[str], optional): Parser type for tool calling. Defaults to None.
+            reasoning_parser_type (Optional[str], optional): Parser type for reasoning. Defaults to None.
+            enable_tool_calling (Optional[bool], optional): Enable tool calling feature. Defaults to None.
+            enable_reasoning (Optional[bool], optional): Enable reasoning feature. Defaults to None.
 
         Raises:
             ValueError: If the device configuration is missing required keys or if ingress_url is not provided.
@@ -219,6 +229,21 @@ class DeploymentHandler:
                 node["args"].append(f"--max-model-len={max_model_len}")
             else:
                 node["args"].append("--max-model-len=8192")  # Default fallback
+
+            # Add parser configuration if enabled
+            if enable_tool_calling and tool_calling_parser_type:
+                node["args"].append("--enable-auto-tool-choice")
+                node["args"].append(f"--tool-call-parser={tool_calling_parser_type}")
+                logger.info(f"Enabled tool calling with parser: {tool_calling_parser_type}")
+                # Add chat template if provided
+                if chat_template:
+                    node["args"].append(f"--chat-template={chat_template}")
+                    logger.info(f"Using chat template: {chat_template}")
+
+            if enable_reasoning and reasoning_parser_type:
+                # Add reasoning-specific args based on parser type
+                node["args"].append(f"--reasoning-parser={reasoning_parser_type}")
+                # Add other reasoning parser configurations as needed
 
             # Update the full_node_list with the modified args
             full_node_list[idx]["args"] = node["args"].copy()
@@ -628,7 +653,11 @@ class SimulatorHandler:
         concurrency: Optional[int] = None,
         feedback: Optional[list[dict[str, Any]]] = None,
     ):
-        """Get the configuration of a simulator by cluster id and simulator id."""
+        """Get the configuration of a simulator by cluster id and simulator id.
+
+        Returns:
+            tuple: (node_list, metadata) where metadata contains parser information
+        """
         get_deployment_config_request = GetDeploymentConfigRequest(
             workflow_id=simulator_id,
             cluster_id=cluster_id,
@@ -651,6 +680,13 @@ class SimulatorHandler:
                     raise Exception(f"Failed to get simulator configurations: {response_str}")
                 response_data = json.loads(response_str)
 
+                # Extract parser metadata from response
+                metadata = {
+                    "tool_calling_parser_type": response_data.get("tool_calling_parser_type"),
+                    "reasoning_parser_type": response_data.get("reasoning_parser_type"),
+                    "chat_template": response_data.get("chat_template"),
+                }
+
                 # Handle both legacy nodes[] and new node_groups[] formats
                 node_groups = response_data.get("node_groups", [])
                 legacy_nodes = response_data.get("nodes", [])
@@ -667,7 +703,7 @@ class SimulatorHandler:
 
         except Exception as e:
             raise Exception(f"Failed to get simulator config: {str(e)}") from e
-        return node_list
+        return node_list, metadata
 
 
 class BudserveHandler:

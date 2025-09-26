@@ -24,7 +24,7 @@ export default function DeployModelChooseCluster() {
       onNext={async (values) => {
         const result = await updateCluster();
         if (result) {
-          openDrawerWithStep("deploy-model-auto-scaling");
+          openDrawerWithStep("deploy-model-configuration", { direction: "forward" });
         }
       }}
       nextText="Next"
