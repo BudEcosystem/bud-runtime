@@ -57,7 +57,6 @@ const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
           size: "1024x1024",
         };
       }
-      }
     }
 
     return { endpoint, payloadExample };
