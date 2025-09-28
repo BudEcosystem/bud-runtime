@@ -176,6 +176,29 @@ class PromptVersionDataManager(DataManagerUtils):
         max_version = result.scalar()
         return (max_version or 0) + 1
 
+    async def get_prompt_versions_by_endpoint_id(self, endpoint_id: UUID) -> List[PromptVersionModel]:
+        """Get all active prompt versions using a specific endpoint.
+
+        Args:
+            endpoint_id: The ID of the endpoint to check
+
+        Returns:
+            List of active prompt versions that are using the endpoint
+        """
+        stmt = (
+            select(PromptVersionModel)
+            .join(PromptModel, PromptVersionModel.prompt_id == PromptModel.id)
+            .where(
+                and_(
+                    PromptVersionModel.endpoint_id == endpoint_id,
+                    PromptVersionModel.status != PromptVersionStatusEnum.DELETED,
+                    PromptModel.status == PromptStatusEnum.ACTIVE,
+                )
+            )
+            .options(joinedload(PromptVersionModel.prompt))
+        )
+        return self.scalars_all(stmt)
+
     async def soft_delete_by_prompt_id(self, prompt_id: UUID) -> int:
         """Soft delete all prompt versions for a given prompt."""
         stmt = (
