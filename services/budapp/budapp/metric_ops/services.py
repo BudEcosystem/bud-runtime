@@ -230,7 +230,7 @@ class BudMetricService(SessionMixin):
             )
             if not project:
                 raise ClientException("Project not found", status_code=status.HTTP_404_NOT_FOUND)
-            
+
             # Check if user is member of the project
             project_service = ProjectService(self.session)
             try:
