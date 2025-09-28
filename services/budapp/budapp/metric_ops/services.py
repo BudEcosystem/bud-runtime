@@ -230,7 +230,7 @@ class BudMetricService(SessionMixin):
             )
             if not project:
                 raise ClientException("Project not found", status_code=status.HTTP_404_NOT_FOUND)
-
+            
             # Check if user is member of the project
             project_service = ProjectService(self.session)
             try:
@@ -293,7 +293,25 @@ class BudMetricService(SessionMixin):
 
                 if response.status != status.HTTP_200_OK:
                     logger.error(f"Inference list request failed: status={response.status}, response={response_data}")
-                    error_message = response_data.get("detail", "Failed to list inferences")
+                    error_detail = response_data.get("detail", "Failed to list inferences")
+
+                    # Handle validation errors from budmetrics
+                    if isinstance(error_detail, list) and len(error_detail) > 0:
+                        # Extract the first error message
+                        first_error = error_detail[0]
+                        if isinstance(first_error, dict):
+                            error_message = first_error.get("msg", "Validation error")
+                            # Add more context if available
+                            if "loc" in first_error:
+                                field = ".".join(str(x) for x in first_error["loc"] if x != "body")
+                                error_message = f"{field}: {error_message}"
+                        else:
+                            error_message = str(error_detail)
+                    elif isinstance(error_detail, str):
+                        error_message = error_detail
+                    else:
+                        error_message = "Failed to list inferences"
+
                     raise ClientException(
                         error_message,
                         status_code=response.status,

@@ -32,7 +32,7 @@ use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
 use crate::inference::types::resolved_input::{FileWithPath, ResolvedInput};
 use crate::inference::types::storage::StoragePath;
 use crate::inference::types::{
-    collect_chunks, AudioInferenceDatabaseInsert, Base64File, ChatInferenceDatabaseInsert,
+    collect_chunks, serialize_or_log, AudioInferenceDatabaseInsert, Base64File, ChatInferenceDatabaseInsert,
     CollectChunksArgs, ContentBlockChatOutput, ContentBlockChunk, EmbeddingInferenceDatabaseInsert,
     FetchContext, FinishReason, ImageInferenceDatabaseInsert, InferenceResult,
     InferenceResultChunk, InferenceResultStream, Input, InternalJsonInferenceOutput,
@@ -1476,13 +1476,16 @@ async fn send_failure_event(
 
     // Also write to ClickHouse for failed inferences
     // First, create a ModelInference record (required for JOIN queries)
+
+    let serialized_input = serialize_or_log(&resolved_input.messages);
+
     let model_inference = crate::inference::types::ModelInferenceDatabaseInsert {
         id: uuid::Uuid::now_v7(),
         inference_id,
         raw_request: "".to_string(),  // Failed before request could be made
         raw_response: error_message.clone(),  // Store error as response
         system: resolved_input.system.as_ref().and_then(|v| v.as_str()).map(|s| s.to_string()),
-        input_messages: serde_json::to_string(&resolved_input.messages).unwrap_or_default(),
+        input_messages: serialized_input.clone(),
         output: format!("Error: {}", error_message),
         input_tokens: None,
         output_tokens: None,
@@ -1497,6 +1500,7 @@ async fn send_failure_event(
         endpoint_type: "chat".to_string(),
         guardrail_scan_summary: Some(serde_json::json!({}).to_string()),
     };
+
 
     // Write the ModelInference record
     if let Err(e) = clickhouse_connection_info
