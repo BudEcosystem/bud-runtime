@@ -748,7 +748,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
           <TabPane tab="Performance" key="performance">
             <div style={{ padding: 24 }}>{renderPerformanceMetrics()}</div>
           </TabPane>
-          {(selectedInference.is_success === false ||true)  && (
+          {(selectedInference.is_success === false) && (
             <TabPane tab="Error Details" key="error">
               <div style={{ padding: 24 }}>
                 <Alert
