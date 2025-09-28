@@ -33,6 +33,7 @@ from budapp.model_ops.crud import ProviderDataManager
 from budapp.credential_ops.services import CredentialService
 from budapp.workflow_ops.services import WorkflowService
 from budapp.model_ops.models import Provider as ProviderModel
+from budapp.prompt_ops.crud import PromptVersionDataManager
 from budapp.shared.notification_service import BudNotifyService
 
 
@@ -89,6 +90,7 @@ async def test_delete_cloud_model_endpoint_immediate_deletion():
     mock_workflow_manager = AsyncMock(spec=WorkflowDataManager)
     mock_workflow_step_manager = AsyncMock(spec=WorkflowStepDataManager)
     mock_provider_manager = AsyncMock(spec=ProviderDataManager)
+    mock_prompt_version_manager = AsyncMock(spec=PromptVersionDataManager)
     mock_credential_service = AsyncMock(spec=CredentialService)
     mock_notify_service = AsyncMock(spec=BudNotifyService)
     mock_workflow_service = AsyncMock(spec=WorkflowService)
@@ -97,6 +99,7 @@ async def test_delete_cloud_model_endpoint_immediate_deletion():
     mock_endpoint_manager.retrieve_by_fields.return_value = mock_endpoint
     mock_endpoint_manager.update_by_fields.return_value = mock_endpoint
     mock_provider_manager.retrieve_by_fields.return_value = mock_provider
+    mock_prompt_version_manager.get_prompt_versions_by_endpoint_id.return_value = []  # No active prompts
     mock_workflow_service.retrieve_or_create_workflow.return_value = mock_workflow
     mock_credential_service.update_proxy_cache.return_value = None
     mock_notify_service.send_notification.return_value = None
@@ -116,6 +119,7 @@ async def test_delete_cloud_model_endpoint_immediate_deletion():
          patch('budapp.endpoint_ops.services.WorkflowDataManager', return_value=mock_workflow_manager), \
          patch('budapp.endpoint_ops.services.WorkflowStepDataManager', return_value=mock_workflow_step_manager), \
          patch('budapp.endpoint_ops.services.ProviderDataManager', return_value=mock_provider_manager), \
+         patch('budapp.endpoint_ops.services.PromptVersionDataManager', return_value=mock_prompt_version_manager), \
          patch('budapp.endpoint_ops.services.CredentialService', return_value=mock_credential_service), \
          patch('budapp.endpoint_ops.services.BudNotifyService', return_value=mock_notify_service), \
          patch('budapp.endpoint_ops.services.WorkflowService', return_value=mock_workflow_service):
@@ -223,6 +227,7 @@ async def test_delete_regular_model_endpoint_workflow_deletion():
     mock_workflow_manager = AsyncMock(spec=WorkflowDataManager)
     mock_workflow_step_manager = AsyncMock(spec=WorkflowStepDataManager)
     mock_provider_manager = AsyncMock(spec=ProviderDataManager)
+    mock_prompt_version_manager = AsyncMock(spec=PromptVersionDataManager)
     mock_credential_service = AsyncMock(spec=CredentialService)
     mock_workflow_service = AsyncMock(spec=WorkflowService)
 
@@ -230,6 +235,7 @@ async def test_delete_regular_model_endpoint_workflow_deletion():
     mock_endpoint_manager.retrieve_by_fields.return_value = mock_endpoint
     mock_endpoint_manager.update_by_fields.return_value = mock_endpoint
     mock_provider_manager.retrieve_by_fields.return_value = mock_provider
+    mock_prompt_version_manager.get_prompt_versions_by_endpoint_id.return_value = []  # No active prompts
     mock_workflow_service.retrieve_or_create_workflow.return_value = mock_workflow
     mock_credential_service.update_proxy_cache.return_value = None
     mock_workflow_step_manager.insert_one.return_value = None
@@ -248,6 +254,7 @@ async def test_delete_regular_model_endpoint_workflow_deletion():
          patch('budapp.endpoint_ops.services.WorkflowDataManager', return_value=mock_workflow_manager), \
          patch('budapp.endpoint_ops.services.WorkflowStepDataManager', return_value=mock_workflow_step_manager), \
          patch('budapp.endpoint_ops.services.ProviderDataManager', return_value=mock_provider_manager), \
+         patch('budapp.endpoint_ops.services.PromptVersionDataManager', return_value=mock_prompt_version_manager), \
          patch('budapp.endpoint_ops.services.CredentialService', return_value=mock_credential_service), \
          patch('budapp.endpoint_ops.services.WorkflowService', return_value=mock_workflow_service):
 
@@ -349,6 +356,7 @@ async def test_delete_cloud_model_endpoint_with_cluster_follows_workflow():
     mock_workflow_manager = AsyncMock(spec=WorkflowDataManager)
     mock_workflow_step_manager = AsyncMock(spec=WorkflowStepDataManager)
     mock_provider_manager = AsyncMock(spec=ProviderDataManager)
+    mock_prompt_version_manager = AsyncMock(spec=PromptVersionDataManager)
     mock_credential_service = AsyncMock(spec=CredentialService)
     mock_workflow_service = AsyncMock(spec=WorkflowService)
 
@@ -356,6 +364,7 @@ async def test_delete_cloud_model_endpoint_with_cluster_follows_workflow():
     mock_endpoint_manager.retrieve_by_fields.return_value = mock_endpoint
     mock_endpoint_manager.update_by_fields.return_value = mock_endpoint
     mock_provider_manager.retrieve_by_fields.return_value = mock_provider
+    mock_prompt_version_manager.get_prompt_versions_by_endpoint_id.return_value = []  # No active prompts
     mock_workflow_service.retrieve_or_create_workflow.return_value = mock_workflow
     mock_credential_service.update_proxy_cache.return_value = None
     mock_workflow_step_manager.insert_one.return_value = None
@@ -374,6 +383,7 @@ async def test_delete_cloud_model_endpoint_with_cluster_follows_workflow():
          patch('budapp.endpoint_ops.services.WorkflowDataManager', return_value=mock_workflow_manager), \
          patch('budapp.endpoint_ops.services.WorkflowStepDataManager', return_value=mock_workflow_step_manager), \
          patch('budapp.endpoint_ops.services.ProviderDataManager', return_value=mock_provider_manager), \
+         patch('budapp.endpoint_ops.services.PromptVersionDataManager', return_value=mock_prompt_version_manager), \
          patch('budapp.endpoint_ops.services.CredentialService', return_value=mock_credential_service), \
          patch('budapp.endpoint_ops.services.WorkflowService', return_value=mock_workflow_service):
 
