@@ -2,7 +2,8 @@
 import React from "react";
 import { Box, Spinner } from "@radix-ui/themes";
 import Image from "next/image";
-import loaderIcn from "./../../../public/icons/loader.gif";
+// Use direct path for public assets in Next.js
+const loaderIcn = "/icons/loader.gif";
 
 interface LoaderProps {
   isLoading: boolean;
