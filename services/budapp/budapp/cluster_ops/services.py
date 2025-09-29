@@ -789,7 +789,7 @@ class ClusterService(SessionMixin):
                 )
                 update_data = {
                     "status": ClusterStatusEnum.ERROR,
-                    "reason": f"Cluster stuck in DELETING state for {time_in_deleting.days} days",
+                    "reason": f"Cluster stuck in DELETING state for {time_in_deleting}",
                 }
                 await ClusterDataManager(self.session).update_by_fields(db_cluster, update_data)
                 return  # Successfully handled, no error
