@@ -14,7 +14,7 @@ import TagsInput, { Tag } from "@/components/ui/bud/dataEntry/TagsInput";
 const { TextArea } = Input;
 
 export default function AgentConfiguration() {
-  const { openDrawerWithStep, closeDrawer } = useDrawer();
+  const { openDrawerWithStep } = useDrawer();
   const [form] = Form.useForm();
 
   // State for form values
@@ -37,7 +37,7 @@ export default function AgentConfiguration() {
 
   const handleNext = async () => {
     try {
-      const values = await form.validateFields();
+      await form.validateFields();
 
       if (!deploymentName) {
         errorToast("Please enter a deployment name");
