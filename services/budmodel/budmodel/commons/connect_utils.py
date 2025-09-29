@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -56,23 +57,63 @@ class BudConnectClient:
         Raises:
             ModelExtractionException: If fetching fails with non-404 error.
         """
+        # Try direct details endpoint first
         url = f"{self.base_url}/model/models/{model_uri}/details"
-        logger.info("Fetching model details from BudConnect: %s", url)
+        logger.info("Fetching model details from BudConnect: %s", model_uri)
 
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(url, headers={"accept": "application/json"}, timeout=self.timeout)
+
                 if response.status_code == 404:
-                    logger.info("Model not found in BudConnect: %s", model_uri)
-                    return None
+                    logger.info("Model not found via details endpoint, trying search API: %s", model_uri)
+                    return await self._fetch_model_via_search(model_uri)
+
                 response.raise_for_status()
-                return response.json()
+                result = response.json()
+                logger.info("Successfully fetched model from BudConnect: %s", model_uri)
+                return result
         except httpx.HTTPError as e:
-            logger.exception("HTTP error fetching model details from BudConnect: %s", str(e))
-            raise ModelExtractionException(f"Failed to fetch model details: {str(e)}") from e
+            # If details endpoint fails, try search API as fallback
+            logger.warning("Details endpoint failed, trying search API fallback: %s", str(e))
+            try:
+                return await self._fetch_model_via_search(model_uri)
+            except Exception as search_error:
+                logger.exception("Both details and search APIs failed: %s", str(search_error))
+                raise ModelExtractionException(f"Failed to fetch model details: {str(e)}") from e
         except Exception as e:
             logger.exception("Unexpected error fetching model details from BudConnect: %s", str(e))
             raise ModelExtractionException(f"Unexpected error: {str(e)}") from e
+
+    async def _fetch_model_via_search(self, model_uri: str) -> Optional[Dict[str, Any]]:
+        """Fetch model via search API as fallback.
+
+        Args:
+            model_uri: URI of the model to search for.
+
+        Returns:
+            Dictionary containing model details, or None if not found.
+        """
+        search_url = f"{self.base_url}/model/?search={model_uri}"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(search_url, headers={"accept": "application/json"}, timeout=self.timeout)
+            response.raise_for_status()
+            result = response.json()
+
+            models = result.get("models", [])
+            if not models:
+                logger.info("Model not found via search API: %s", model_uri)
+                return None
+
+            # Find exact match
+            for model in models:
+                if model.get("uri") == model_uri:
+                    logger.info("Found model via search API: %s", model_uri)
+                    return model
+
+            logger.info("No exact match found in search results for: %s", model_uri)
+            return None
 
     async def save_model_details(self, model_data: Dict[str, Any]) -> Dict[str, Any]:
         """Save model details to BudConnect.
@@ -86,8 +127,8 @@ class BudConnectClient:
         Raises:
             ModelExtractionException: If saving fails.
         """
-        url = f"{self.base_url}/model/models"
-        logger.info("Saving model details to BudConnect: %s", model_data.get("uri"))
+        url = f"{self.base_url}/model/"
+        logger.info("Saving model to BudConnect: %s", model_data.get("uri"))
 
         try:
             async with httpx.AsyncClient() as client:
@@ -97,11 +138,21 @@ class BudConnectClient:
                     headers={"accept": "application/json", "content-type": "application/json"},
                     timeout=self.timeout,
                 )
+
+                # Log error response if status is not successful
+                if response.status_code >= 400:
+                    logger.error("BudConnect API error (status %s): %s", response.status_code, response.text[:500])
+
                 response.raise_for_status()
+                result = response.json()
                 logger.info("Successfully saved model to BudConnect: %s", model_data.get("uri"))
-                return response.json()
+                return result
         except httpx.HTTPError as e:
             logger.exception("HTTP error saving model details to BudConnect: %s", str(e))
+            # Try to log response body if available
+            if hasattr(e, "response") and e.response is not None:
+                with contextlib.suppress(Exception):
+                    logger.error("Error response body: %s", e.response.text)
             raise ModelExtractionException(f"Failed to save model details: {str(e)}") from e
         except Exception as e:
             logger.exception("Unexpected error saving model details to BudConnect: %s", str(e))
@@ -128,15 +179,17 @@ class BudConnectClient:
         if engine:
             params["engine"] = engine
 
-        logger.info("Fetching compatible models from BudConnect: %s (page=%s, limit=%s)", url, page, limit)
+        logger.info("Fetching compatible models from BudConnect (page=%s, limit=%s)", page, limit)
 
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     url, params=params, headers={"accept": "application/json"}, timeout=self.timeout
                 )
+
                 response.raise_for_status()
-                return response.json()
+                result = response.json()
+                return result
         except httpx.HTTPError as e:
             logger.exception("HTTP error fetching compatible models from BudConnect: %s", str(e))
             raise ModelExtractionException(f"Failed to fetch compatible models: {str(e)}") from e
@@ -161,15 +214,106 @@ class BudConnectMapper:
         Returns:
             Dictionary formatted for BudConnect API.
         """
-        # Parse modality string back to list
+        # Parse modality string back to list and map to BudConnect enum values
         modality_str = model_info.get("modality", "")
         modality_list = [m.strip() for m in modality_str.split(",")] if modality_str else []
 
+        # Map modality values to BudConnect enum values
+        # BudConnect expects: text_input, text_output, image_input, image_output, audio_input, audio_output
+        budconnect_modality = []
+        for modality in modality_list:
+            if modality.lower() in ["llm", "text", "text_input", "text-generation"]:
+                # LLMs typically support both text input and output
+                if "text_input" not in budconnect_modality:
+                    budconnect_modality.append("text_input")
+                if "text_output" not in budconnect_modality:
+                    budconnect_modality.append("text_output")
+            elif modality.lower() in ["vision", "image", "image_input"]:
+                if "image_input" not in budconnect_modality:
+                    budconnect_modality.append("image_input")
+            elif modality.lower() in ["image_output", "image-generation"]:
+                if "image_output" not in budconnect_modality:
+                    budconnect_modality.append("image_output")
+            elif modality.lower() in ["audio", "audio_input", "speech"]:
+                if "audio_input" not in budconnect_modality:
+                    budconnect_modality.append("audio_input")
+            elif modality.lower() in ["audio_output", "tts", "text-to-speech"]:
+                if "audio_output" not in budconnect_modality:
+                    budconnect_modality.append("audio_output")
+            else:
+                # Default to text for unknown modalities
+                logger.warning("Unknown modality '%s', defaulting to text_input/text_output", modality)
+                if "text_input" not in budconnect_modality:
+                    budconnect_modality.append("text_input")
+                if "text_output" not in budconnect_modality:
+                    budconnect_modality.append("text_output")
+
+        # If no modality mapping succeeded, default to text
+        if not budconnect_modality:
+            budconnect_modality = ["text_input", "text_output"]
+
+        # Huggingface provider ID from BudConnect
+        HUGGINGFACE_PROVIDER_ID = "3f7ce438-8f4b-4737-8c73-7c2c336d1d1a"
+
+        # Map HuggingFace tasks/pipeline_tags to BudConnect API endpoints
+        # Based on model capabilities, determine which OpenAI-compatible endpoints it supports
+        tasks = model_info.get("tasks", [])
+        endpoints = []
+
+        for task in tasks:
+            task_lower = task.lower() if isinstance(task, str) else ""
+
+            # Text generation models -> chat completions and/or completions
+            if any(
+                keyword in task_lower
+                for keyword in ["text-generation", "text2text-generation", "conversational", "chat"]
+            ):
+                if "/v1/chat/completions" not in endpoints:
+                    endpoints.append("/v1/chat/completions")
+                if "/v1/completions" not in endpoints:
+                    endpoints.append("/v1/completions")
+
+            # Image generation models
+            elif any(keyword in task_lower for keyword in ["text-to-image", "image-generation"]):
+                if "/v1/images/generations" not in endpoints:
+                    endpoints.append("/v1/images/generations")
+
+            # Image editing models
+            elif "image-to-image" in task_lower or "image-editing" in task_lower:
+                if "/v1/images/edits" not in endpoints:
+                    endpoints.append("/v1/images/edits")
+
+            # Audio transcription models
+            elif "automatic-speech-recognition" in task_lower or "speech-recognition" in task_lower:
+                if "/v1/audio/transcriptions" not in endpoints:
+                    endpoints.append("/v1/audio/transcriptions")
+
+            # Audio translation models
+            elif "audio-translation" in task_lower or "speech-translation" in task_lower:
+                if "/v1/audio/translations" not in endpoints:
+                    endpoints.append("/v1/audio/translations")
+
+            # Text-to-speech models
+            elif "text-to-speech" in task_lower or "tts" in task_lower:
+                if "/v1/audio/speech" not in endpoints:
+                    endpoints.append("/v1/audio/speech")
+
+            # Embedding models
+            elif any(keyword in task_lower for keyword in ["feature-extraction", "sentence-similarity", "embedding"]):
+                if "/v1/embeddings" not in endpoints:
+                    endpoints.append("/v1/embeddings")
+
+        # If no endpoints were mapped but it's a text model, default to completions
+        if not endpoints and budconnect_modality and "text_output" in budconnect_modality:
+            endpoints = ["/v1/chat/completions", "/v1/completions"]
+
         budconnect_data = {
             "uri": model_info.get("uri", ""),
+            "provider_id": HUGGINGFACE_PROVIDER_ID,  # Required field
             "provider_name": model_info.get("author", "Unknown"),
             "description": model_info.get("description", ""),
-            "modality": modality_list,
+            "modality": budconnect_modality,
+            "endpoints": endpoints,  # Mapped from tasks to API endpoints
             "tags": model_info.get("tags", []),
             "tasks": model_info.get("tasks", []),
             "use_cases": model_info.get("use_cases", []),
@@ -342,13 +486,12 @@ class BudConnectMapper:
         formatted_evals = []
 
         for eval_item in evaluations:
-            formatted_evals.append(
-                {
-                    "name": eval_item.get("name", ""),
-                    "score": eval_item.get("score", 0),
-                    "metric_type": "accuracy",  # Default metric type
-                }
-            )
+            formatted_eval = {
+                "name": eval_item.get("name", ""),
+                "score": eval_item.get("score", 0),
+                "metric_type": "accuracy",  # Default metric type
+            }
+            formatted_evals.append(formatted_eval)
 
         return formatted_evals
 
