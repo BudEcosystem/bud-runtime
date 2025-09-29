@@ -140,6 +140,12 @@ import DeployingProbe from "./GuardRails/DeployingProbe";
 import ProbeDeploymentSuccess from "./GuardRails/ProbeDeploymentSuccess";
 import ProbeDetails from "./GuardRails/ProbeDetails";
 import ViewGuardRailDetails from "./GuardRails/ViewGuardRailDetails";
+import AddAgentSelectProject from "./AddAgent";
+import AddAgentSelectModel from "./AddAgent/SelectModel";
+import AddAgentConfiguration from "./AddAgent/AgentConfiguration";
+import AddAgentDeploymentWarning from "./AddAgent/DeploymentWarning";
+import AddAgentSuccess from "./AddAgent/AgentSuccess";
+import AddAgentSelectType from "./AddAgent/SelectAgentType";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -297,6 +303,14 @@ export const StepComponents = {
   "probe-deployment-success": ProbeDeploymentSuccess,
   "probe-details": ProbeDetails,
   "view-guardrail-details": ViewGuardRailDetails,
+
+  // AddAgent
+  "add-agent-select-type": AddAgentSelectType,
+  "add-agent-select-project": AddAgentSelectProject,
+  "add-agent-select-model": AddAgentSelectModel,
+  "add-agent-configuration": AddAgentConfiguration,
+  "add-agent-deployment-warning": AddAgentDeploymentWarning,
+  "add-agent-success": AddAgentSuccess,
 
 };
 

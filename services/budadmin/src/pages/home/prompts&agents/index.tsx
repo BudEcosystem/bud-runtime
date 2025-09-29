@@ -29,7 +29,7 @@ import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import NoDataFount from "@/components/ui/noDataFount";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import { PlusOutlined } from "@ant-design/icons";
-// import { useAgentStore } from "@/stores/useAgentStore";
+import { useAgentStore } from "@/stores/useAgentStore";
 import AgentDrawer from "@/components/agents/AgentDrawer";
 import { usePromptsAgents, type PromptAgent } from "@/stores/usePromptsAgents";
 
@@ -231,7 +231,8 @@ export default function PromptsAgents() {
   const { hasPermission, loadingUser } = useUser();
   const { showLoader, hideLoader } = useLoader();
   const { openDrawer } = useDrawer();
-  // const { openAgentDrawer } = useAgentStore();
+  // to flowgram
+  const { openAgentDrawer } = useAgentStore();
 
   // Use the store
   const {
@@ -340,11 +341,11 @@ export default function PromptsAgents() {
         <div className="boardPageTop">
           <PageHeader
             headding="Prompts & Agents"
-            // buttonLabel="Agent"
-            // buttonPermission={hasPermission(PermissionEnum.ModelManage)}
-            // buttonAction={() => {
-            //   openAgentDrawer();
-            // }}
+            buttonLabel="Agent"
+            buttonPermission={hasPermission(PermissionEnum.ModelManage)}
+            buttonAction={() => {
+              openDrawer("add-agent");
+            }}
             ButtonIcon={PlusOutlined}
             rightComponent={
               <div className="flex gap-x-[.2rem] hidden">

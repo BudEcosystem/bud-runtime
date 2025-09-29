@@ -4466,6 +4466,209 @@ const addGuardrail: DrawerFlowType = {
   ],
 };
 
+// Flow For Adding Agent
+const addAgent: DrawerFlowType = {
+  title: "Add Agent",
+  description: "Create a new agent",
+  totalSteps: 6,
+  steps: [
+    {
+      navigation: () => ["Select Type", "Add Agent"],
+      id: "add-agent-select-type",
+      step: 1,
+      component: StepComponents["add-agent-select-type"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Review",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Select Project", "Add Agent"],
+      id: "add-agent-select-project",
+      step: 2,
+      component: StepComponents["add-agent-select-project"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Review",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Select Model", "Add Agent"],
+      id: "add-agent-select-model",
+      step: 3,
+      component: StepComponents["add-agent-select-model"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Review",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Configuration", "Add Agent"],
+      id: "add-agent-configuration",
+      step: 4,
+      component: StepComponents["add-agent-configuration"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Review",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Review", "Add Agent"],
+      id: "add-agent-deployment-warning",
+      step: 5,
+      component: StepComponents["add-agent-deployment-warning"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Review",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: false,
+    },
+    {
+      navigation: () => ["Success", "Add Agent"],
+      id: "add-agent-success",
+      step: 6,
+      component: StepComponents["add-agent-success"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Review",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Success",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 const flows = {
   "new-project": newProject,
   "deploy-model": deployModel,
@@ -4531,6 +4734,8 @@ const flows = {
   // blocking rules
   "create-blocking-rule": createBlockingRule,
   "view-blocking-rule": viewBlockingRule,
+  // agent
+  "add-agent": addAgent,
 };
 
 export const flowMapping: {
