@@ -326,6 +326,7 @@ class EndpointDataManager(DataManagerUtils):
             "modality": filters.pop("modality", []),
             "model_size": filters.pop("model_size", None),
             "model_name": filters.pop("model_name", None),
+            "tool_enabled": filters.pop("tool_enabled", None),  # JSONB field filter
         }
 
         # Validate the remaining filters
@@ -354,6 +355,21 @@ class EndpointDataManager(DataManagerUtils):
             # Convert model size to a pre-defined range of numbers
             model_size_min, model_size_max = get_param_range(explicit_filters["model_size"])
             explicit_conditions.append(Model.model_size.between(model_size_min, model_size_max))
+
+        # Add tool_enabled filter condition if specified
+        if explicit_filters["tool_enabled"] is not None:
+            if explicit_filters["tool_enabled"]:
+                # Filter for endpoints where enable_tool_calling is true
+                explicit_conditions.append(EndpointModel.deployment_config["enable_tool_calling"].astext == "true")
+            else:
+                # Filter for endpoints where enable_tool_calling is false, null, or doesn't exist
+                explicit_conditions.append(
+                    or_(
+                        EndpointModel.deployment_config["enable_tool_calling"].astext == "false",
+                        EndpointModel.deployment_config["enable_tool_calling"].is_(None),
+                        EndpointModel.deployment_config.is_(None),
+                    )
+                )
 
         # Generate statements according to search or filters
         if search:
