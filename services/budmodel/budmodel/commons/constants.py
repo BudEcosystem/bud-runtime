@@ -64,6 +64,7 @@ class ModelExtractionStatus(StrEnum):
 
     COMPLETED = auto()
     PARTIAL = auto()
+    CACHED = auto()  # Retrieved from BudConnect cache
 
 
 class LeaderboardDataOrigin(StrEnum):
