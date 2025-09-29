@@ -1,7 +1,7 @@
 import React from "react";
 import { Table } from "antd";
 import { ColumnsType } from "antd/es/table";
-import { Text_12_400_EEEEEE, Text_12_400_B3B3B3 } from "@/components/ui/text";
+import { Text_12_400_EEEEEE } from "@/components/ui/text";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { capitalize } from "@/lib/utils";
 import { endpointStatusMapping } from "@/lib/colorMapping";
@@ -9,6 +9,7 @@ import { endpointStatusMapping } from "@/lib/colorMapping";
 interface RunHistoryItem {
   runId: string;
   model: string;
+  traitName: string;
   status: "Completed" | "Failed" | "Running";
   startedDate: string;
   duration: string;
@@ -20,17 +21,27 @@ interface RunsHistoryTableProps {
 }
 
 const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
+  // Add unique keys to handle duplicate runIds
+  const dataWithUniqueKeys = React.useMemo(() => {
+    return Array.isArray(data)
+      ? data.map((item, index) => ({
+          ...item,
+          uniqueKey: `${item.runId}-${index}-${Date.now()}`
+        }))
+      : [];
+  }, [data]);
+
   const columns: ColumnsType<RunHistoryItem> = [
-    {
-      title: "Run ID",
-      dataIndex: "runId",
-      key: "runId",
-      render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
-    },
     {
       title: "Model",
       dataIndex: "model",
       key: "model",
+      render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
+    },
+    {
+      title: "Trait Name",
+      dataIndex: "traitName",
+      key: "traitName",
       render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
     },
     {
@@ -65,13 +76,11 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
       render: (text: string) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
     },
     {
-      title: "Evaluated Benchmark and Score",
+      title: "Trait Score",
       dataIndex: "benchmarkScore",
       key: "benchmarkScore",
       render: (text: string) => (
         <div className="flex space-x-2">
-          <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-          <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
           <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
         </div>
       ),
@@ -106,7 +115,7 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
       `}</style>
       <Table
         columns={columns}
-        dataSource={Array.isArray(data) ? data : []}
+        dataSource={dataWithUniqueKeys}
         pagination={false}
         // pagination={{
         //   pageSize: 10,
@@ -114,7 +123,7 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
         //   showQuickJumper: true,
         //   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
         // }}
-        rowKey="runId"
+        rowKey="uniqueKey"
         size="small"
         className="eval-explorer-table"
       />

@@ -1,8 +1,8 @@
 import { tempApiBaseUrl } from "@/components/environment";
-import { Worker } from "cluster";
+import { errorToast, successToast } from "@/components/toast";
+import { WorkflowType } from "@/stores/useWorkflow";
 import { AppRequest } from "src/pages/api/requests";
 import { create } from "zustand";
-
 
 
 export interface GetEvaluationsPayload {
@@ -71,18 +71,6 @@ export interface TraitSimple {
   exps_ids: string[];
 }
 
-// Evaluation workflow type
-export interface EvaluationWorkflow {
-  workflow_id: string;
-  experiment_id: string;
-  current_step: number;
-  total_steps: number;
-  status: string;
-  workflow_steps: any; // This will store step-specific data
-  created_at?: string;
-  updated_at?: string;
-}
-
 export interface MetaLinks {
   manifest_id: string;
 }
@@ -124,7 +112,7 @@ export const useEvaluations = create<{
   experimentMetrics: any;
   experimentBenchmarks: any;
   experimentRuns: any;
-  currentWorkflow: EvaluationWorkflow | null;
+  currentWorkflow: WorkflowType | null;
   currentWorkflowId: string | null;
   workflowData: any;
   evaluationDetails: any;
@@ -137,10 +125,12 @@ export const useEvaluations = create<{
   getExperimentDetails: (id: string) => Promise<any>;
   getExperimentRuns: (id: string) => Promise<any>;
   createExperiment: (payload: any) => Promise<any>;
-  createEvaluationWorkflow: (experimentId: string, payload: any) => Promise<any>;
-  setCurrentWorkflow: (workflow: EvaluationWorkflow | null) => void;
-  getCurrentWorkflow: () => EvaluationWorkflow | null;
+  createWorkflow: (experimentId: string, payload: any) => Promise<any>;
+  getWorkflow: (id?: string) => Promise<any>;
+  setCurrentWorkflow: (workflow: WorkflowType | null) => void;
+  getCurrentWorkflow: () => WorkflowType | null;
   getWorkflowData: (experimentId: string, workflowId: string) => Promise<any>;
+  deleteWorkflow: (id: string, suppressToast?: boolean) => Promise<any>;
 }>((set, get) => ({
   loading: false,
   selectedEvals: [],
@@ -171,13 +161,11 @@ export const useEvaluations = create<{
       if (payload?.language) params.append('language', payload.language);
       if (payload?.domains) params.append('domains', payload.domains);
       if (payload?.trait_ids && payload.trait_ids.length > 0) {
-        console.log('Adding trait_ids to params:', payload.trait_ids);
         payload.trait_ids.forEach(id => params.append('trait_ids', id));
       }
 
       const queryString = params.toString();
       const url = `${tempApiBaseUrl}/experiments/datasets${queryString ? `?${queryString}` : ''}`;
-      console.log('Fetching evaluations with URL:', url);
 
       const response: any = await AppRequest.Get(url);
       set({ evaluationsList: response.data.datasets });
@@ -197,10 +185,8 @@ export const useEvaluations = create<{
     set({ loading: true });
     try {
       const url = `${tempApiBaseUrl}/experiments/datasets/${datasetId}`;
-      console.log('Fetching evaluation details with URL:', url);
 
       const response: any = await AppRequest.Get(url);
-      console.log('Evaluation details response:', response.data);
 
       set({ evaluationDetails: response.data });
       return response.data;
@@ -262,9 +248,7 @@ export const useEvaluations = create<{
       if (payload?.order) params.append('order', payload.order);
       if (payload?.orderBy) params.append('orderBy', payload.orderBy);
 
-      const queryString = params.toString();
       const url = `${tempApiBaseUrl}/experiments/`;
-      // const url = `${tempApiBaseUrl}/experiments${queryString ? `?${queryString}` : ''}`;
 
       const response: any = await AppRequest.Get(url);
       // Ensure experimentsList is always an array
@@ -322,8 +306,10 @@ export const useEvaluations = create<{
     set({ loading: true });
     try {
       const response: any = await AppRequest.Post(`${tempApiBaseUrl}/experiments/`, payload);
+      console.log('response', response)
       return response.data;
     } catch (error) {
+      console.log('error', error)
       console.error("Error creating experiment:", error);
       throw error;
     } finally {
@@ -331,64 +317,19 @@ export const useEvaluations = create<{
     }
   },
 
-  createEvaluationWorkflow: async (experimentId: string, payload: any) => {
+  createWorkflow: async (experimentId: string, payload: any) => {
     set({ loading: true });
     try {
-      const response: any = await AppRequest.Post(`${tempApiBaseUrl}/experiments/${experimentId}/evaluations/workflow`, payload);
-
-      // Save the workflow response in currentWorkflow
-      const currentWorkflowData = get().currentWorkflow;
-
-      // Merge stage_data from payload into workflow_steps
-      const updatedWorkflowSteps = {
-        ...currentWorkflowData?.workflow_steps,
-        ...response.data.workflow_steps,
-        ...response.data,
-        // Explicitly merge the stage_data from the current payload
-        stage_data: {
-          ...currentWorkflowData?.workflow_steps?.stage_data,
-          ...payload.stage_data
-        }
-      };
-
-      const workflow: EvaluationWorkflow = {
-        workflow_id: response.data.workflow_id || response.data.id || payload.workflow_id,
-        experiment_id: experimentId,
-        current_step: payload.step_number || response.data.current_step || 1,
-        total_steps: response.data.total_steps || 5,
-        status: response.data.status || 'in_progress',
-        workflow_steps: updatedWorkflowSteps,
-        created_at: response.data.created_at || currentWorkflowData?.created_at,
-        updated_at: response.data.updated_at || new Date().toISOString()
-      };
-
-      console.log('Saving workflow with steps:', workflow.workflow_steps);
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/experiments/${experimentId}/evaluations/workflow`,
+        payload
+      );
+      const workflow: WorkflowType = response.data;;
       set({ currentWorkflow: workflow });
       set({ currentWorkflowId: workflow.workflow_id });
 
-      // Fetch the updated workflow data (similar to add model workflow)
-      const workflowId = workflow.workflow_id;
-      if (workflowId) {
-        try {
-          const workflowResponse: any = await AppRequest.Get(`${tempApiBaseUrl}/workflows/${workflowId}`);
-          if (workflowResponse && workflowResponse.data) {
-            // Update currentWorkflow with the fetched data
-            const fetchedWorkflow: EvaluationWorkflow = {
-              ...workflow,
-              ...workflowResponse.data,
-              workflow_steps: {
-                ...workflow.workflow_steps,
-                ...workflowResponse.data.workflow_steps
-              }
-            };
-            set({ currentWorkflow: fetchedWorkflow });
-            console.log('Updated workflow with fetched data:', fetchedWorkflow);
-          }
-        } catch (error) {
-          console.error("Error fetching workflow after creation:", error);
-          // Continue even if GET fails, we already have the workflow from POST
-        }
-      }
+      // Fetch the updated workflow data using getWorkflow (similar to getWorkflowCloud pattern)
+      await get().getWorkflow(workflow.workflow_id);
 
       return response.data;
     } catch (error) {
@@ -399,7 +340,31 @@ export const useEvaluations = create<{
     }
   },
 
-  setCurrentWorkflow: (workflow: EvaluationWorkflow | null) => {
+  getWorkflow: async (id?: string) => {
+    const workflowId = id || get().currentWorkflow?.workflow_id;
+    if (!workflowId) {
+      return;
+    }
+    set({ loading: true });
+    try {
+      const response: any = await AppRequest.Get(
+        `${tempApiBaseUrl}/workflows/${workflowId}`
+      );
+      if (response && response.data) {
+        const workflow: WorkflowType = response.data;
+        set({ currentWorkflow: workflow });
+        return workflow;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error fetching workflow:", error);
+      return false;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  setCurrentWorkflow: (workflow: WorkflowType | null) => {
     set({ currentWorkflow: workflow });
     set({ currentWorkflowId: workflow?.workflow_id || null });
   },
@@ -412,10 +377,8 @@ export const useEvaluations = create<{
     set({ loading: true });
     try {
       const url = `${tempApiBaseUrl}/experiments/${experimentId}/evaluations/workflow/${workflowId}`;
-      console.log('Fetching workflow data with URL:', url);
 
       const response: any = await AppRequest.Get(url);
-      console.log('Workflow data response:', response.data);
 
       set({ workflowData: response.data });
       return response.data;
@@ -424,6 +387,25 @@ export const useEvaluations = create<{
       throw error;
     } finally {
       set({ loading: false });
+    }
+  },
+
+  deleteWorkflow: async (id: string, suppressToast?: boolean) => {
+    try {
+      const response: any = await AppRequest.Delete(
+        `${tempApiBaseUrl}/workflows/${id}`
+      );
+      if (!suppressToast) {
+        successToast(response?.data?.message || "Workflow deleted successfully");
+      }
+      set({ currentWorkflow: null, currentWorkflowId: null });
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting workflow:", error);
+      if (!suppressToast) {
+        errorToast("Failed to delete workflow");
+      }
+      throw error;
     }
   },
 

@@ -10,37 +10,15 @@ import os
 import pytest
 from pydantic import ValidationError
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.providers.openai import OpenAIProvider
-from pydantic_ai.settings import ModelSettings
 
-from .dynamic_model_creation import json_schema_to_pydantic_model
-
-# Import test models from our test suite
-from .test_supported_types import ComprehensiveTypesModel
-from .test_string_properties import StringPropertiesModel
-from .test_number_properties import NumberPropertiesModel
-from .test_array_properties import ArrayPropertiesModel
-
-
-# ============================================================================
-# LLM CONFIGURATION
-# ============================================================================
-
-# Bud LLM setup
-bud_provider = OpenAIProvider(
-    base_url="http://20.66.97.208/v1",
-    api_key="sk_",
+# Import all needed components from the consolidated test file
+from test_structured_output import (
+    json_schema_to_pydantic_model,
+    ComprehensiveTypesModel,
+    StringPropertiesModel,
+    NumberPropertiesModel,
+    ArrayPropertiesModel
 )
-
-# Alternative Bud proxy endpoint (commented out)
-# bud_provider = OpenAIProvider(
-#     base_url="https://bud-proxy.bud.studio/v1",
-#     api_key="bud_admin_b2MPwByJL5u94r4CLEU8Z8CZrcdGNeX2A4_uZN7L7HY",
-# )
-
-settings = ModelSettings(temperature=0.1)
-bud_model = OpenAIModel(model_name="qwen3-32b", provider=bud_provider, settings=settings)
 
 
 # ============================================================================
@@ -48,8 +26,14 @@ bud_model = OpenAIModel(model_name="qwen3-32b", provider=bud_provider, settings=
 # ============================================================================
 
 @pytest.mark.asyncio
-async def test_comprehensive_types():
-    """Test comprehensive types model with LLM generation."""
+@pytest.mark.integration
+@pytest.mark.llm
+async def test_comprehensive_types(llm_model):
+    """Test comprehensive types model with LLM generation.
+
+    Args:
+        llm_model: Fixture providing configured LLM model from conftest.py
+    """
 
     # Convert Pydantic model to JSON schema
     schema = ComprehensiveTypesModel.model_json_schema()
@@ -59,7 +43,7 @@ async def test_comprehensive_types():
 
     # Create agent with dynamic model
     agent = Agent(
-        model=bud_model,
+        model=llm_model,
         output_type=DynamicModel,
         system_prompt="You are a structured output generator. Generate valid random data that matches the exact schema provided.",
         retries=3
@@ -75,8 +59,14 @@ async def test_comprehensive_types():
 
 
 @pytest.mark.asyncio
-async def test_string_properties():
-    """Test string properties model with LLM generation."""
+@pytest.mark.integration
+@pytest.mark.llm
+async def test_string_properties(llm_model):
+    """Test string properties model with LLM generation.
+
+    Args:
+        llm_model: Fixture providing configured LLM model from conftest.py
+    """
     # Convert to JSON schema
     schema = StringPropertiesModel.model_json_schema()
 
@@ -85,7 +75,7 @@ async def test_string_properties():
 
     # Create agent
     agent = Agent(
-        model=bud_model,
+        model=llm_model,
         output_type=DynamicModel,
         system_prompt="""Generate valid data for all string fields:
         - username: 3-20 alphanumeric characters with underscores
@@ -113,8 +103,14 @@ async def test_string_properties():
 
 
 @pytest.mark.asyncio
-async def test_number_properties():
-    """Test number properties model with LLM generation."""
+@pytest.mark.integration
+@pytest.mark.llm
+async def test_number_properties(llm_model):
+    """Test number properties model with LLM generation.
+
+    Args:
+        llm_model: Fixture providing configured LLM model from conftest.py
+    """
     # Convert to JSON schema
     schema = NumberPropertiesModel.model_json_schema()
 
@@ -123,7 +119,7 @@ async def test_number_properties():
 
     # Create agent
     agent = Agent(
-        model=bud_model,
+        model=llm_model,
         output_type=DynamicModel,
         system_prompt="""Generate valid numeric data:
         - age: 0-150 inclusive
@@ -149,8 +145,14 @@ async def test_number_properties():
 
 
 @pytest.mark.asyncio
-async def test_array_properties():
-    """Test array properties model with LLM generation."""
+@pytest.mark.integration
+@pytest.mark.llm
+async def test_array_properties(llm_model):
+    """Test array properties model with LLM generation.
+
+    Args:
+        llm_model: Fixture providing configured LLM model from conftest.py
+    """
     # Convert to JSON schema
     schema = ArrayPropertiesModel.model_json_schema()
 
@@ -159,7 +161,7 @@ async def test_array_properties():
 
     # Create agent
     agent = Agent(
-        model=bud_model,
+        model=llm_model,
         output_type=DynamicModel,
         system_prompt="""Generate valid array data:
         - tags: 1-10 string items
@@ -180,12 +182,3 @@ async def test_array_properties():
     print(f"\nGenerated Output: {result.output.model_dump()}")
 
     _ = ArrayPropertiesModel.model_validate(result.output.model_dump())
-
-
-# ============================================================================
-# RUN TESTS WITH PYTEST
-# ============================================================================
-# To run these tests:
-# pytest test_openai_structured_output/test_llm_structured_output.py -v -s
-# Or to run a specific test:
-# pytest test_openai_structured_output/test_llm_structured_output.py::test_comprehensive_types -v -s

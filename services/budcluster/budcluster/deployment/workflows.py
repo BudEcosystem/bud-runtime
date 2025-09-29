@@ -307,6 +307,11 @@ class CreateDeploymentWorkflow:
             workflow_status = check_workflow_status_in_statestore(workflow_id)
             if workflow_status:
                 return workflow_status
+            # Get parser types from workflow request (fetched from BudSim)
+            tool_calling_parser = getattr(deploy_engine_request_json, "tool_calling_parser_type", None)
+            reasoning_parser = getattr(deploy_engine_request_json, "reasoning_parser_type", None)
+            chat_template = getattr(deploy_engine_request_json, "chat_template", None)
+
             status, namespace, deployment_url, number_of_nodes, node_list = deployment_handler.deploy(
                 node_list=node_list,
                 endpoint_name=endpoint_name,
@@ -318,6 +323,11 @@ class CreateDeploymentWorkflow:
                 podscaler=podscaler,
                 input_tokens=deploy_engine_request_json.input_tokens,
                 output_tokens=deploy_engine_request_json.output_tokens,
+                tool_calling_parser_type=tool_calling_parser,
+                reasoning_parser_type=reasoning_parser,
+                enable_tool_calling=deploy_engine_request_json.enable_tool_calling,
+                enable_reasoning=deploy_engine_request_json.enable_reasoning,
+                chat_template=chat_template,
             )
             update_workflow_data_in_statestore(
                 str(workflow_id),
@@ -737,13 +747,17 @@ class CreateDeploymentWorkflow:
                         }
                     simulator_config.append(node_info)
             elif deployment_request_json.simulator_id:
-                simulator_config = asyncio.run(
+                simulator_config, metadata = asyncio.run(
                     SimulatorHandler().get_cluster_simulator_config(
                         deployment_request_json.cluster_id,
                         deployment_request_json.simulator_id,
                         deployment_request_json.concurrency,
                     )
                 )
+                # Store metadata for later use in deployment
+                deployment_request_json.tool_calling_parser_type = metadata.get("tool_calling_parser_type")
+                deployment_request_json.reasoning_parser_type = metadata.get("reasoning_parser_type")
+                deployment_request_json.chat_template = metadata.get("chat_template")
             logger.info(f"Simulator config got from budsim: {simulator_config}")
             deployment_request_json.simulator_config = simulator_config
         except Exception as e:
@@ -1349,13 +1363,17 @@ class CreateCloudDeploymentWorkflow:
                         }
                     )
             elif deployment_request_json.simulator_id:
-                simulator_config = asyncio.run(
+                simulator_config, metadata = asyncio.run(
                     SimulatorHandler().get_cluster_simulator_config(
                         deployment_request_json.cluster_id,
                         deployment_request_json.simulator_id,
                         deployment_request_json.concurrency,
                     )
                 )
+                # Store metadata for later use in deployment (cloud workflow)
+                deployment_request_json.tool_calling_parser_type = metadata.get("tool_calling_parser_type")
+                deployment_request_json.reasoning_parser_type = metadata.get("reasoning_parser_type")
+                deployment_request_json.chat_template = metadata.get("chat_template")
             logger.info(f"Simulator config got from budsim: {simulator_config}")
             deployment_request_json.simulator_config = simulator_config
         except Exception as e:

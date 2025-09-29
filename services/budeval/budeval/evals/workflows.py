@@ -18,7 +18,7 @@ from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 from budeval.commons.logging import logging
 from budeval.commons.storage_config import StorageConfig
-from budeval.commons.utils import update_workflow_data_in_statestore
+from budeval.commons.utils import check_workflow_status_in_statestore, update_workflow_data_in_statestore
 from budeval.core.schemas import (
     DatasetCategory,
     GenericDatasetConfig,
@@ -191,12 +191,12 @@ class EvaluationWorkflow:
                 "extracted_path": results.extraction_path,
                 "files_count": len(results.datasets),
                 "overall_accuracy": results.summary.overall_accuracy,
-                "total_datasets": results.summary.total_datasets,
-                "total_examples": results.summary.total_examples,
-                "total_correct": results.summary.total_correct,
+                # "total_datasets": results.summary.total_datasets,
+                # "total_examples": results.summary.total_examples,
+                # "total_correct": results.summary.total_correct,
                 "dataset_accuracies": results.summary.dataset_accuracies,
                 "message": f"Extraction completed successfully. {results.summary.total_datasets} datasets processed with {results.summary.overall_accuracy:.2f}% overall accuracy",
-                "results": results.model_dump(),
+                # "results": results.model_dump(),
             }
 
         except Exception as e:
@@ -213,156 +213,109 @@ class EvaluationWorkflow:
     @dapr_workflows.register_workflow  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
     @staticmethod
     def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
-        """Child workflow dedicated to monitoring a job until completion."""
+        """Child workflow dedicated to monitoring a job until completion.
+
+        Uses continue_as_new pattern to prevent replay storms from timer accumulation.
+        """
         logger = logging.getLogger("::EVAL:: MonitorJobWorkflow")
 
-        # Load From State
         # Parse monitoring request
         try:
             request_data = json.loads(monitor_request)
             job_id = request_data["job_id"]
-            # kubeconfig = request_data["kubeconfig"]  # Not used in this function
             _parent_workflow_id = request_data["parent_workflow_id"]
-            # namespace = request_data.get("namespace") or StorageConfig.get_current_namespace()  # Not used in this function
             max_attempts = request_data.get("max_attempts", 360)
             poll_interval = request_data.get("poll_interval", 5)
+            attempt = request_data.get("attempt", 1)  # Track current attempt
         except Exception as e:
             logger.error(f"Error parsing monitor request: {e}", exc_info=True)
             return {"status": "error", "message": str(e)}
 
-        for attempt in range(1, max_attempts + 1):
-            # Monitor job
-            monitor_result = yield ctx.call_activity(
-                EvaluationWorkflow.monitor_eval_job_simple,
-                input=json.dumps(request_data),
-            )
+        logger.debug(f"Monitoring job {job_id}, attempt {attempt}/{max_attempts}")
 
-            if not monitor_result.get("success"):
-                logger.warning(f"Monitoring attempt {attempt} failed")
-                yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
-                continue
+        # Monitor job once per workflow execution
+        monitor_result = yield ctx.call_activity(
+            EvaluationWorkflow.monitor_eval_job_simple,
+            input=json.dumps(request_data),
+        )
 
-            job_status = monitor_result.get("job_status", {})
-            status = job_status.get("status", "unknown")
+        # Handle monitoring failure
+        if not monitor_result.get("success"):
+            logger.warning(f"Monitoring attempt {attempt} failed")
 
-            # Check if complete
-            if status in ["succeeded", "failed", "not_found"]:
-                logger.info(f"Job {job_id} completed with status: {status}")
-
-                # Extract results if succeeded
-                extraction_result = None
-                if status == "succeeded":
-                    # Get model name from notification data or use default
-                    notification_data = request_data.get("notification_data", {})
-                    model_name = notification_data.get("model_name", "unknown-model")
-
-                    extraction_request = {
-                        "job_id": job_id,
-                        "model_name": model_name,
-                        "kubeconfig": request_data.get("kubeconfig"),
-                        "namespace": request_data.get("namespace", "budeval"),
-                        "experiment_id": notification_data.get("experiment_id"),
-                    }
-
-                    extraction_result = yield ctx.call_activity(
-                        EvaluationWorkflow.extract_results_simple,
-                        input=json.dumps(extraction_request),
-                    )
-
+            # Check if we should continue trying
+            if attempt >= max_attempts:
                 return {
-                    "status": "completed",
-                    "job_status": status,
+                    "status": "timeout",
                     "job_id": job_id,
-                    "attempts": attempt,
-                    "job_details": job_status,
-                    "extraction_result": extraction_result,
+                    "message": f"Monitoring failed after {max_attempts} attempts",
                 }
 
-            # Wait before next check
+            # Continue with next attempt using continue_as_new to reset timer history
+            request_data["attempt"] = attempt + 1
             yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
+            ctx.continue_as_new(json.dumps(request_data))
+            return
 
-        # Timeout
-        return {
-            "status": "timeout",
-            "job_id": job_id,
-            "message": f"Timed out after {max_attempts} attempts",
-        }
+        # Check job status
+        job_status = monitor_result.get("job_status", {})
+        status = job_status.get("status", "unknown")
 
-        # for attempt in range(1, max_attempts + 1):
-        #     # Check job status
-        #     monitor_activity_request = {
-        #         "job_id": job_id,
-        #         "kubeconfig": kubeconfig,
-        #         "namespace": namespace,
-        #     }
+        # Job completed - handle results
+        if status in ["succeeded", "failed", "not_found"]:
+            logger.info(f"Job {job_id} completed with status: {status} after {attempt} attempts")
 
-        #     monitor_result = yield ctx.call_activity(
-        #         EvaluationWorkflow.monitor_eval_job_progress,
-        #         input=json.dumps(monitor_activity_request),
-        #     )
+            # Extract results if succeeded
+            extraction_result = None
+            if status == "succeeded":
+                # Get model name from notification data or use default
+                notification_data = request_data.get("notification_data", {})
+                model_name = notification_data.get("model_name", "unknown-model")
 
-        #     # Check if monitoring activity failed
-        #     if monitor_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
-        #         logger.warning(f"Monitoring attempt {attempt} failed: {monitor_result.get('message')}")
-        #         # Wait before retry
-        #         yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
-        #         continue
+                extraction_request = {
+                    "job_id": job_id,
+                    "model_name": model_name,
+                    "kubeconfig": request_data.get("kubeconfig"),
+                    "namespace": request_data.get("namespace", "budeval"),
+                    "experiment_id": notification_data.get("experiment_id"),
+                }
 
-        #     # Extract job status
-        #     job_status_data = monitor_result.get("param", {})
-        #     job_status = job_status_data.get("status", "unknown")
-        #     job_details = job_status_data.get("details", {})
+                extraction_result = yield ctx.call_activity(
+                    EvaluationWorkflow.extract_results_simple,
+                    input=json.dumps(extraction_request),
+                )
 
-        #     # Determine if job is complete
-        #     job_completed = False
-        #     final_status = None
+            return {
+                "status": "completed",
+                "job_status": status,
+                "job_id": job_id,
+                "attempts": attempt,
+                "job_details": job_status,
+                "extraction_summary": {
+                    "success": extraction_result.get("success", False),
+                    "overall_accuracy": extraction_result.get("overall_accuracy", 0.0),
+                    "total_datasets": extraction_result.get("total_datasets", 0),
+                    "total_examples": extraction_result.get("total_examples", 0),
+                    "message": extraction_result.get("message", ""),
+                }
+                if extraction_result
+                else None,
+            }
 
-        #     if job_status in ["completed", "succeeded", "failed", "error"]:
-        #         job_completed = True
-        #         final_status = job_status
-        #     elif job_details:
-        #         # Check if job was not found (terminal state)
-        #         job_phase = job_details.get("phase", "")
-        #         if job_phase == "NotFound":
-        #             job_completed = True
-        #             final_status = "failed"
-        #             logger.warning(f"Job {job_id} not found in cluster - marking as failed")
-        #         else:
-        #             # Check Kubernetes job details
-        #             try:
-        #                 succeeded = int(job_details.get("succeeded", 0))
-        #                 failed = int(job_details.get("failed", 0))
+        # Job still running - check if we should timeout
+        if attempt >= max_attempts:
+            return {
+                "status": "timeout",
+                "job_id": job_id,
+                "message": f"Timed out after {max_attempts} attempts",
+            }
 
-        #                 if succeeded > 0:
-        #                     job_completed = True
-        #                     final_status = "succeeded"
-        #                 elif failed > 0:
-        #                     job_completed = True
-        #                     final_status = "failed"
-        #             except (ValueError, TypeError):
-        #                 pass
-
-        #     # If job completed, return result
-        #     if job_completed:
-        #         logger.info(f"Job {job_id} completed with status: {final_status}")
-        #         return {
-        #             "status": "completed",
-        #             "job_status": final_status,
-        #             "job_id": job_id,
-        #             "attempts": attempt,
-        #             "job_details": job_status_data,
-        #         }
-
-        #     # Wait before next check
-        #     yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
-
-        # # Timeout reached
-        # logger.warning(f"Job {job_id} monitoring timed out after {max_attempts} attempts")
-        # return {
-        #     "status": "timeout",
-        #     "job_id": job_id,
-        #     "message": f"Monitoring timed out after {max_attempts} attempts",
-        # }
+        # Continue monitoring with next attempt using continue_as_new
+        # This prevents replay storm by resetting workflow history
+        request_data["attempt"] = attempt + 1
+        yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
+        ctx.continue_as_new(json.dumps(request_data))
+        return
 
     @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
     @staticmethod
@@ -766,13 +719,32 @@ class EvaluationWorkflow:
             workflow_id=instance_id,
         )
 
-        # Starting The Notification
         notification_req = notification_request.model_copy(deep=True)
-        notification_req.payload.event = "verify_cluster_connection"
+
+        notification_req = notification_request.model_copy(deep=True)
+        notification_req.payload.event = "evaluate_model_status"
         notification_req.payload.content = NotificationContent(
-            title="Starting Cluster Connectivity Check",
-            message="Starting Cluster Connectivity Check",
+            title="Evaluation Started",
+            message="Evaluation Started",
             status=WorkflowStatus.STARTED,
+        )
+
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
+
+        # ----
+        #
+        # Set initial ETA
+        notification_req.payload.event = "eta"
+        eta_minutes = 30
+        notification_req.payload.content = NotificationContent(
+            title="Estimated time to completion",
+            message=f"{eta_minutes}",
+            status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
@@ -781,12 +753,12 @@ class EvaluationWorkflow:
             target_name=evaluate_model_request_json.source,
         )
 
-        # Set initial ETA
-        notification_req.payload.event = "eta"
-        eta_minutes = 30
+        # Starting The Notification
+
+        notification_req.payload.event = "verify_cluster_connection"
         notification_req.payload.content = NotificationContent(
-            title="Estimated time to completion",
-            message=f"{eta_minutes}",
+            title="Starting Cluster Connectivity Check",
+            message="Starting Cluster Connectivity Check",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -840,7 +812,7 @@ class EvaluationWorkflow:
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{25}",
+            message=f"{29}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -921,7 +893,7 @@ class EvaluationWorkflow:
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{22}",
+            message=f"{27}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -1022,7 +994,7 @@ class EvaluationWorkflow:
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
-            message=f"{21}",
+            message=f"{25}",
             status=WorkflowStatus.RUNNING,
         )
         dapr_workflows.publish_notification(
@@ -1058,6 +1030,20 @@ class EvaluationWorkflow:
             target_name=evaluate_model_request_json.source,
         )
 
+        # notify activity ETA
+        notification_req.payload.event = "eta"
+        notification_req.payload.content = NotificationContent(
+            title="Estimated time to completion",
+            message=f"{23}",
+            status=WorkflowStatus.RUNNING,
+        )
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
+
         # Start Monitoring Child Workflow
         monitor_workflow_request = {
             "job_id": job_id,
@@ -1080,11 +1066,122 @@ class EvaluationWorkflow:
             instance_id=f"{instance_id}_monitor_{job_id}",
         )
 
+        # Check monitoring result status (THIS IS MISSING IN CURRENT CODE!)
+        # if _monitoring_result.get("status") == "completed":
+        #     job_status = _monitoring_result.get("job_status")
+
+        #     if job_status == "succeeded":
+        #         # Success notification
+        #         notification_req.payload.event = "monitor_eval_job_progress"
+        #         notification_req.payload.content = NotificationContent(
+        #             title="Evaluation Completed Successfully",
+        #             message=f"Job {job_id} completed successfully",
+        #             status=WorkflowStatus.COMPLETED,
+        #         )
+
+        #         # Check if extraction was successful using summary
+        #         extraction_summary = _monitoring_result.get("extraction_summary", {})
+        #         if extraction_summary and extraction_summary.get("success"):
+        #             accuracy = extraction_summary.get("overall_accuracy", 0.0)
+        #             datasets = extraction_summary.get("total_datasets", 0)
+        #             notification_req.payload.content.message += (
+        #                 f" - Results extracted: {datasets} datasets, {accuracy:.2f}% accuracy"
+        #             )
+
+        #     elif job_status == "failed":
+        #         # Failure notification
+        #         notification_req.payload.event = "monitor_eval_job_progress"
+        #         notification_req.payload.content = NotificationContent(
+        #             title="Evaluation Failed",
+        #             message=f"Job {job_id} failed during execution",
+        #             status=WorkflowStatus.FAILED,
+        #             primary_action="retry",
+        #         )
+
+        # elif _monitoring_result.get("status") == "timeout":
+        #     # Timeout notification
+        #     notification_req.payload.event = "monitor_eval_job_progress"
+        #     notification_req.payload.content = NotificationContent(
+        #         title="Evaluation Timeout",
+        #         message=f"Job {job_id} monitoring timed out after {_monitoring_result.get('attempts')} attempts",
+        #         status=WorkflowStatus.FAILED,
+        #         primary_action="retry",
+        #     )
+
+        # elif _monitoring_result.get("status") == "error":
+        #     # Error notification
+        #     notification_req.payload.event = "monitor_eval_job_progress"
+        #     notification_req.payload.content = NotificationContent(
+        #         title="Monitoring Error",
+        #         message=f"Error monitoring job {job_id}: {_monitoring_result.get('message')}",
+        #         status=WorkflowStatus.FAILED,
+        #         primary_action="retry",
+        #     )
+
         notification_req.payload.event = "monitor_eval_job_progress"
         notification_req.payload.content = NotificationContent(
-            title="Evaluation Completed",
-            message=f"Evaluation completed - {job_id}",
+            title="Monitoring Completed", message="Monitoring Completed", status=WorkflowStatus.COMPLETED
+        )
+
+        # Publish the appropriate monitoring result notification
+        dapr_workflows.publish_notification(
+            workflow_id=instance_id,
+            notification=notification_req,
+            target_topic_name=evaluate_model_request_json.source_topic,
+            target_name=evaluate_model_request_json.source,
+        )
+
+        # Final workflow completion notification
+        # notification_req.payload.event = "evaluate_model_status"
+
+        # Set final status based on monitoring result
+        # final_status = WorkflowStatus.COMPLETED
+        # final_message = "Model Evaluation Completed Successfully"
+
+        # if _monitoring_result.get("status") != "completed" or _monitoring_result.get("job_status") != "succeeded":
+        #     final_status = WorkflowStatus.FAILED
+        #     final_message = f"Model Evaluation Failed - {_monitoring_result.get('status', 'unknown')}"
+
+        # notification_req.payload.content = NotificationContent(
+        #     title=final_message,
+        #     message=final_message,
+        #     status=final_status,
+        # )
+        # dapr_workflows.publish_notification(
+        #     workflow_id=instance_id,
+        #     notification=notification_req,
+        #     target_topic_name=evaluate_model_request_json.source_topic,
+        #     target_name=evaluate_model_request_json.source,
+        # )
+
+        # Result Notification - Always send results regardless of status
+        extraction_summary = (
+            _monitoring_result.get("extraction_summary", {}) if _monitoring_result.get("status") == "completed" else {}
+        )
+
+        workflow_status = check_workflow_status_in_statestore(instance_id)
+        if workflow_status:
+            logger.info(f"Workflow status: {workflow_status}")
+            return workflow_status
+
+        notification_req.payload.event = "results"
+        notification_req.payload.content = NotificationContent(
+            title="Evaluation Results",
+            message=extraction_summary.get("message", "Evaluation completed"),
             status=WorkflowStatus.COMPLETED,
+            result={
+                "job_id": job_id,
+                "status": _monitoring_result.get("job_status", "unknown"),
+                "storage": "clickhouse",
+                "summary": {
+                    "overall_accuracy": extraction_summary.get("overall_accuracy", 0.0),
+                    "total_datasets": extraction_summary.get("total_datasets", 0),
+                    "total_examples": extraction_summary.get("total_examples", 0),
+                }
+                if extraction_summary
+                else {},
+                "retrieval_info": f"Use job_id '{job_id}' to retrieve full results from ClickHouse",
+            },
         )
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
@@ -1093,21 +1190,14 @@ class EvaluationWorkflow:
             target_name=evaluate_model_request_json.source,
         )
 
-        ### Final Result
-        notification_req.payload.event = "results"
-        notification_req.payload.content = NotificationContent(
-            title="Fetching cluster nodes info successful",
-            message="Cluster nodes info fetched successfully",
-            status=WorkflowStatus.COMPLETED,
-            result={},
-        )
-
         notification_req.payload.event = "evaluate_model_status"
         notification_req.payload.content = NotificationContent(
-            title="Model Evaluation Completed",
-            message="Model Evaluation Completed",
+            title="Evaluation Completed",
+            message="Evaluation Completed",
             status=WorkflowStatus.COMPLETED,
         )
+
+        # Publish the appropriate monitoring result notification
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
             notification=notification_req,

@@ -275,7 +275,7 @@ async def add_validator_to_model_async(model_class: Type[BaseModel], validation_
 
     # Execute the validator code to get the function
     try:
-        exec(validator_code, namespace)
+        exec(validator_code, namespace)  # nosec B102 - Dynamic validator generation for Pydantic models is required
         validator_func = namespace["validate_model"]
     except Exception as e:
         logger.error(f"Error in generated validator code: {e}")

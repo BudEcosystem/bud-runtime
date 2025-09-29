@@ -22,7 +22,7 @@ export default function SelectEvaluation() {
     expandedStep,
   } = useDrawer();
   const {
-    createEvaluationWorkflow,
+    createWorkflow,
     currentWorkflow,
     getEvaluations,
     evaluationsList,
@@ -33,16 +33,13 @@ export default function SelectEvaluation() {
   const [hover, setHover] = React.useState(false);
 
   useEffect(() => {
-    // Get trait IDs from the previous step stored in workflow
-    console.log("Current workflow:", currentWorkflow);
-    console.log("Workflow steps:", currentWorkflow?.workflow_steps);
+
 
     const traitIds =
       currentWorkflow?.workflow_steps?.stage_data?.trait_ids ||
       currentWorkflow?.workflow_steps?.trait_ids ||
       [];
 
-    console.log("Extracted trait IDs:", traitIds);
 
     // Fetch evaluations/datasets filtered by selected traits
     getEvaluations({
@@ -104,7 +101,7 @@ export default function SelectEvaluation() {
 
           // Get experiment ID from workflow or drawer props
           const experimentId =
-            currentWorkflow.experiment_id || drawerProps?.experimentId;
+            currentWorkflow?.workflow_steps?.experiment_id|| drawerProps?.experimentId;
 
           if (!experimentId) {
             errorToast("Experiment ID not found");
@@ -123,12 +120,10 @@ export default function SelectEvaluation() {
           };
 
           // Call the API
-          const response = await createEvaluationWorkflow(
+          const response = await createWorkflow(
             experimentId,
             payload,
           );
-
-          successToast("Evaluation datasets selected successfully");
 
           // Navigate to next step
           openDrawerWithStep("evaluation-summary");

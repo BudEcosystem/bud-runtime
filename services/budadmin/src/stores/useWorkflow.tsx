@@ -45,6 +45,12 @@ export type BudSimilatorEvent = {
     workflow_name: string;
     progress_type: string;
     recommended_cluster_count?: number;
+    metadata?: {
+        tool_calling_parser_type?: string;
+        reasoning_parser_type?: string;
+        chat_template?: string;
+        [key: string]: any;
+    };
 }
 
 
@@ -114,6 +120,9 @@ export type WorkflowType = {
     total_steps: number;
     object: string;
     message: string;
+    experiment_id?: string;
+    created_at?: string;
+    updated_at?: string;
     workflow_steps: {
         model: Model;
         add_model_modality: string[];
@@ -153,6 +162,12 @@ export type WorkflowType = {
         endpoint?: Endpoint;
         quantization_config?: QuantizationDetails;
         adapter_config?: AdapterDetails;
+        stage_data?: {
+            trait_ids?: any;
+        };
+        trait_ids?: string;
+        traits_details?: any;
+        experiment_id?: string;
     }
     template_id?: string;
 }

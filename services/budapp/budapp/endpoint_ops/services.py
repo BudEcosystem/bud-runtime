@@ -110,6 +110,30 @@ ENDPOINT_PATH_TO_NAME = {member.value: member.name.lower() for member in ModelEn
 class EndpointService(SessionMixin):
     """Endpoint service."""
 
+    # Default engine configuration injected into deployment_config on success
+    _ENGINE_CONFIG_DEFAULTS: Dict[str, Any] = {
+        "tool_calling_parser_type": "",
+        "reasoning_parser_type": "",
+        "chat_template": "",
+        "enable_tool_calling": False,
+        "enable_reasoning": False,
+    }
+
+    @classmethod
+    def _with_engine_configs(
+        cls, deploy_config: Optional[Dict[str, Any]], engine_configs: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Ensure deployment_config contains engine_configs with default keys.
+
+        Existing values in deploy_config["engine_configs"] or provided engine_configs take precedence over defaults.
+        """
+        base: Dict[str, Any] = dict(deploy_config or {})
+        existing: Dict[str, Any] = dict((base.get("engine_configs") or {}))
+        provided: Dict[str, Any] = dict(engine_configs or {})
+        merged_engine = {**cls._ENGINE_CONFIG_DEFAULTS, **existing, **provided}
+        base["engine_configs"] = merged_engine
+        return base
+
     async def get_all_endpoints(
         self,
         project_id: Optional[UUID],
@@ -431,6 +455,12 @@ class EndpointService(SessionMixin):
             "cluster_id",  # bud_cluster_id
             "endpoint_name",
             "deploy_config",
+            # Engine configs passed via earlier steps
+            "tool_calling_parser_type",
+            "reasoning_parser_type",
+            "chat_template",
+            "enable_tool_calling",
+            "enable_reasoning",
         ]
 
         # from workflow steps extract necessary information
@@ -497,6 +527,21 @@ class EndpointService(SessionMixin):
         logger.debug(f"Final supported endpoints for endpoint: {enabled_endpoints}")
 
         # Create endpoint in database
+        # Normalize deployment config with engine configs (merge defaults with provided values)
+        engine_cfg_input = {}
+        for k in (
+            "tool_calling_parser_type",
+            "reasoning_parser_type",
+            "chat_template",
+            "enable_tool_calling",
+            "enable_reasoning",
+        ):
+            if k in required_data:
+                engine_cfg_input[k] = required_data[k]
+        normalized_deploy_config = self._with_engine_configs(
+            required_data["deploy_config"], engine_configs=engine_cfg_input
+        )
+
         endpoint_data = EndpointCreate(
             model_id=required_data["model_id"],
             project_id=required_data["project_id"],
@@ -512,7 +557,7 @@ class EndpointService(SessionMixin):
             number_of_nodes=number_of_nodes,
             active_replicas=active_replicas,
             total_replicas=total_replicas,
-            deployment_config=required_data["deploy_config"],
+            deployment_config=normalized_deploy_config,
             node_list=[node["name"] for node in node_list],
             supported_endpoints=enabled_endpoints,
         )

@@ -126,7 +126,7 @@ interface GuardrailsState {
   workflowError: string | null;
 
   // Workflow actions
-  createWorkflow: (providerId: string) => Promise<void>;
+  createWorkflow: (providerId: string, providerType?: string) => Promise<void>;
   updateWorkflow: (data: Partial<GuardrailsWorkflow>) => Promise<boolean>;
   getWorkflow: (workflowId?: string) => Promise<void>;
   clearWorkflow: () => void;
@@ -326,7 +326,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   },
 
   // Create workflow
-  createWorkflow: async (providerId: string) => {
+  createWorkflow: async (providerId: string, providerType?: string) => {
     set({ workflowLoading: true, workflowError: null });
 
     try {
@@ -334,6 +334,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
         "/guardrails/deploy-workflow",
         {
           provider_id: providerId,
+          provider_type: providerType,
           step_number: 1,
           workflow_total_steps: 5, // Not counting the first step
           trigger_workflow: false,

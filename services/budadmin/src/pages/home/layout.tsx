@@ -149,23 +149,32 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       cmd: "6",
     },
     {
+      label: "Prompts",
+      route: "/prompts&agents",
+      icon: '/icons/prompt.png',
+      iconWhite: '/icons/promptWhite.png',
+      // iconSvg: true,
+      cmd: "7",
+      customSvg: "prompts",
+    },
+    {
       label: "Observability",
       route: "/observability",
       iconSvg: true,
-      cmd: "7",
+      cmd: "8",
     },
     {
       label: "Evaluations",
       route: "/evaluations",
       icon: '/icons/simulations.png',
       iconWhite: '/icons/simulationsWhite.svg',
-      cmd: "8",
+      cmd: "9",
     },
     {
       label: "Guard Rails",
       route: "/guardrails",
-      icon: '/icons/simulations.png',
-      iconWhite: '/icons/simulationsWhite.svg',
+      icon: '/icons/guard.png',
+      iconWhite: '/icons/guardWhite.png',
       cmd: "9",
     },
   ]
@@ -226,13 +235,13 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   }, []);
 
 
-  useEffect(() => {
-    console.log("Novu Notification Center version:", pkg.version);
-    console.log("process.env.NEXT_PUBLIC_BASE_URL", process.env.NEXT_PUBLIC_BASE_URL);
-    console.log("process.env.NEXT_PUBLIC_NOVU_SOCKET_URL", process.env.NEXT_PUBLIC_NOVU_SOCKET_URL);
-    console.log("process.env.NEXT_PUBLIC_NOVU_BASE_URL", process.env.NEXT_PUBLIC_NOVU_BASE_URL);
-    console.log("process.env.NEXT_PUBLIC_NOVU_APP_ID", process.env.NEXT_PUBLIC_NOVU_APP_ID);
-  }, []);
+  // useEffect(() => {
+  //   console.log("Novu Notification Center version:", pkg.version);
+  //   console.log("process.env.NEXT_PUBLIC_BASE_URL", process.env.NEXT_PUBLIC_BASE_URL);
+  //   console.log("process.env.NEXT_PUBLIC_NOVU_SOCKET_URL", process.env.NEXT_PUBLIC_NOVU_SOCKET_URL);
+  //   console.log("process.env.NEXT_PUBLIC_NOVU_BASE_URL", process.env.NEXT_PUBLIC_NOVU_BASE_URL);
+  //   console.log("process.env.NEXT_PUBLIC_NOVU_APP_ID", process.env.NEXT_PUBLIC_NOVU_APP_ID);
+  // }, []);
 
   const handleOpenChange = (open: boolean) => {
     setGeneralOpen(open);
@@ -370,25 +379,47 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                         <div className="flex items-center gap-2">
                           <div className="LinkIcn">
                             {tab.iconSvg ? (
-                              // Folder SVG for Observability
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="14"
-                                height="14"
-                                viewBox="0 0 14 15"
-                                fill="none"
-                                className={classNames(
-                                  "w-[0.875em] h-[0.875em] 1920px:w-[1em] 1920px:h-[1em]",
-                                  (isHovered === tab.route || isActive) ? "fill-[#EEEEEE]" : "fill-[#B3B3B3]"
-                                )}
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  clipRule="evenodd"
-                                  d="M1.75 2.11719C1.50828 2.11719 1.3125 2.31296 1.3125 2.55469V12.4922C1.3125 12.7339 1.50828 12.9297 1.75 12.9297H12.25C12.4917 12.9297 12.6875 12.7339 12.6875 12.4922V4.74219C12.6875 4.50046 12.4917 4.30469 12.25 4.30469H7.875C7.71148 4.30469 7.56147 4.21718 7.48353 4.07718L6.39147 2.11719H1.75ZM0.4375 2.55469C0.4375 1.82951 1.02483 1.24219 1.75 1.24219H6.625C6.78852 1.24219 6.93853 1.3297 7.01647 1.4697L8.10853 3.42969H12.25C12.9752 3.42969 13.5625 4.01701 13.5625 4.74219V12.4922C13.5625 13.2174 12.9752 13.8047 12.25 13.8047H1.75C1.02483 13.8047 0.4375 13.2174 0.4375 12.4922V2.55469Z"
-                                  fill="currentColor"
-                                />
-                              </svg>
+                              tab.customSvg === "prompts" ? (
+                                // Message/Chat bubble SVG for Prompts
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 14 14"
+                                  fill="none"
+                                  className={classNames(
+                                    "w-[0.875em] h-[0.875em] 1920px:w-[1em] 1920px:h-[1em]",
+                                    (isHovered === tab.route || isActive) ? "fill-[#EEEEEE]" : "fill-[#B3B3B3]"
+                                  )}
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    clipRule="evenodd"
+                                    d="M2 1.5C1.17157 1.5 0.5 2.17157 0.5 3V9C0.5 9.82843 1.17157 10.5 2 10.5H3.5V12.5C3.5 12.7761 3.72386 13 4 13C4.13807 13 4.26858 12.9414 4.35858 12.8414L6.70711 10.5H12C12.8284 10.5 13.5 9.82843 13.5 9V3C13.5 2.17157 12.8284 1.5 12 1.5H2ZM1.5 3C1.5 2.72386 1.72386 2.5 2 2.5H12C12.2761 2.5 12.5 2.72386 12.5 3V9C12.5 9.27614 12.2761 9.5 12 9.5H6.5C6.36193 9.5 6.23142 9.55858 6.14142 9.65858L4.5 11.2929V10C4.5 9.72386 4.27614 9.5 4 9.5H2C1.72386 9.5 1.5 9.27614 1.5 9V3ZM4 4.5C3.72386 4.5 3.5 4.72386 3.5 5C3.5 5.27614 3.72386 5.5 4 5.5H10C10.2761 5.5 10.5 5.27614 10.5 5C10.5 4.72386 10.2761 4.5 10 4.5H4ZM3.5 7C3.5 6.72386 3.72386 6.5 4 6.5H8C8.27614 6.5 8.5 6.72386 8.5 7C8.5 7.27614 8.27614 7.5 8 7.5H4C3.72386 7.5 3.5 7.27614 3.5 7Z"
+                                    fill="currentColor"
+                                  />
+                                </svg>
+                              ) : (
+                                // Folder SVG for Observability
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 14 15"
+                                  fill="none"
+                                  className={classNames(
+                                    "w-[0.875em] h-[0.875em] 1920px:w-[1em] 1920px:h-[1em]",
+                                    (isHovered === tab.route || isActive) ? "fill-[#EEEEEE]" : "fill-[#B3B3B3]"
+                                  )}
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    clipRule="evenodd"
+                                    d="M1.75 2.11719C1.50828 2.11719 1.3125 2.31296 1.3125 2.55469V12.4922C1.3125 12.7339 1.50828 12.9297 1.75 12.9297H12.25C12.4917 12.9297 12.6875 12.7339 12.6875 12.4922V4.74219C12.6875 4.50046 12.4917 4.30469 12.25 4.30469H7.875C7.71148 4.30469 7.56147 4.21718 7.48353 4.07718L6.39147 2.11719H1.75ZM0.4375 2.55469C0.4375 1.82951 1.02483 1.24219 1.75 1.24219H6.625C6.78852 1.24219 6.93853 1.3297 7.01647 1.4697L8.10853 3.42969H12.25C12.9752 3.42969 13.5625 4.01701 13.5625 4.74219V12.4922C13.5625 13.2174 12.9752 13.8047 12.25 13.8047H1.75C1.02483 13.8047 0.4375 13.2174 0.4375 12.4922V2.55469Z"
+                                    fill="currentColor"
+                                  />
+                                </svg>
+                              )
                             ) : (
                               <>
                                 {/* Hovered Icon (White) */}

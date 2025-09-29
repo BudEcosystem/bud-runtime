@@ -145,11 +145,16 @@ export default {
       },
       {
         source: '/evaluations/:evaluationId',
-        destination: '/home/evaluations/evalDetailed',
+        destination: '/home/evaluations/evalDetailed/[evaluationId]',
       },
       {
         source: '/guardrails',
         destination: '/home/guardrails',
+      },
+
+      {
+        source: '/prompts&agents',
+        destination: '/home/prompts&agents',
       },
     ];
   },

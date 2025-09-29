@@ -91,49 +91,57 @@ export default function SelectProvider() {
     setIsCreatingWorkflow(true);
 
     try {
-      // Create workflow with the selected provider
-      await createWorkflow(selectedProvider);
+      // Determine provider_type based on the selected provider's type
+      let providerType = "cloud"; // Default to cloud
 
-      // Navigate to the appropriate next step based on provider
-      if (selectedProvider === "custom-probe") {
-        openDrawerWithStep("select-probe-type");
-      } else if (selectedProvider === "azure-ai-foundry") {
-        openDrawerWithStep("politeness-detection");
-      } else if (
-        selectedProviderData?.name?.toLowerCase().includes("bud") ||
-        selectedProviderData?.type === "cloud"
-      ) {
-        // For Bud or cloud providers from API
-        openDrawerWithStep("bud-sentinel-probes");
-      } else {
-        // For other providers, we can add different flows later
-        openDrawerWithStep("politeness-detection");
+      if (selectedProviderData?.type === "bud_sentinel") {
+        providerType = "bud";
+      } else if (selectedProviderData?.type) {
+        // For any other type that's not bud_sentinel, use cloud
+        providerType = "cloud";
       }
+
+      // Create workflow with the selected provider and provider_type
+      await createWorkflow(selectedProvider, providerType);
+
+      // Always navigate to the Probes List screen
+      openDrawerWithStep("bud-sentinel-probes");
     } catch (error) {
       console.error("Failed to create workflow:", error);
     } finally {
       setIsCreatingWorkflow(false);
     }
+
+    // Create workflow with the selected provider
+    //   await createWorkflow(selectedProvider);
+
+    //   // Navigate to the appropriate next step based on provider
+    //   if (selectedProvider === "custom-probe") {
+    //     openDrawerWithStep("select-probe-type");
+    //   } else if (selectedProvider === "azure-ai-foundry") {
+    //     openDrawerWithStep("politeness-detection");
+    //   } else if (
+    //     selectedProviderData?.name?.toLowerCase().includes("bud") ||
+    //     selectedProviderData?.type === "cloud"
+    //   ) {
+    //     // For Bud or cloud providers from API
+    //     openDrawerWithStep("bud-sentinel-probes");
+    //   } else {
+    //     // For other providers, we can add different flows later
+    //     openDrawerWithStep("politeness-detection");
+    //   }
+    // } catch (error) {
+    //   console.error("Failed to create workflow:", error);
+    // } finally {
+    //   setIsCreatingWorkflow(false);
+    // }
   };
 
-  // Filter API providers for Bud section (cloud providers from API)
+  // Filter API providers for Bud section (exclude only aws_comprehend)
   const budProviders =
     apiProviders?.filter(
-      (p) =>
-        p.type?.toLowerCase() === "cloud" ||
-        p.type?.toLowerCase() === "cloud_provider" ||
-        p.name?.toLowerCase().includes("bud"),
+      (p) => p.type?.toLowerCase() !== "aws_comprehend"
     ) || [];
-
-  // Add custom probe option to bud providers
-  const customProbeOption = {
-    id: "custom-probe",
-    name: "Create custom probe",
-    description:
-      "Create your custom probe with Bud sentinel for tools, agents, prompts, models or routes.",
-    icon: "⚙️",
-    type: "custom",
-  };
 
   const allBudProviders = [...budProviders];
 

@@ -61,8 +61,12 @@ class ProviderDataManager(DataManagerUtils):
         search: bool = False,
     ) -> Tuple[List[ProviderModel], int]:
         """Get all providers from the database."""
-        if "capabilities" in filters and not isinstance(filters["capabilities"], list):
-            filters["capabilities"] = [filters["capabilities"]]
+        # Handle capabilities filter separately for array containment
+        capabilities_filter = None
+        if "capabilities" in filters:
+            if not isinstance(filters["capabilities"], list):
+                filters["capabilities"] = [filters["capabilities"]]
+            capabilities_filter = filters.pop("capabilities")
 
         await self.validate_fields(ProviderModel, filters)
 
@@ -74,6 +78,11 @@ class ProviderDataManager(DataManagerUtils):
         else:
             stmt = select(ProviderModel).filter_by(**filters)
             count_stmt = select(func.count()).select_from(ProviderModel).filter_by(**filters)
+
+        # Apply capabilities filter using array containment operator
+        if capabilities_filter:
+            stmt = stmt.filter(ProviderModel.capabilities.contains(capabilities_filter))
+            count_stmt = count_stmt.filter(ProviderModel.capabilities.contains(capabilities_filter))
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)

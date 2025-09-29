@@ -32,6 +32,7 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [submittable, setSubmittable] = useState(false);
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const passwordRegex = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_])(?!.*\s).{8,}$/;
 
   const [mounted, setMounted] = useState(false);
 
@@ -56,7 +57,7 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
         if (field === "email")
           return value.length >= 3 && emailRegex.test(value);
         if (field === "password" || field === "confirmPassword")
-          return value.length >= 8;
+          return value.length >= 8 && passwordRegex.test(value);
         return value.length > 0;
       }) && formData.password === formData.confirmPassword;
 
@@ -84,8 +85,8 @@ const RegisterForm = ({ onSubmit }: RegisterFormProps) => {
         break;
       case "password":
         if (!value) error = "Please input your password!";
-        else if (value.length < 8)
-          error = "Password must be at least 8 characters long";
+        else if (!passwordRegex.test(value))
+          error = "Password must be 8+ characters, include atleast one uppercase, lowercase, digit, special character, and no spaces.";
         break;
       case "confirmPassword":
         if (!value) error = "Please confirm your password!";
