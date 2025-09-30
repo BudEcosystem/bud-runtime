@@ -4,3 +4,24 @@ ingress:
 
 # disable keel
 deploymentAnnotations: null
+
+# imagePullPolicy: IfNotPresent
+
+microservices:
+    budmodel:
+        storageSize: "1Ti"
+    buddoc:
+        image: dittops/buddoc:nightly
+    budapp:
+        image: dittops/budapp:nightly
+    budgateway:
+        image: dittops/budgateway:nightly
+    budsim:
+        image: dittops/budsim:nightly
+    budcluster:
+        image: dittops/budcluster:nightly
+    askbud:
+        image: dittops/ask-bud:nightly
+    global:
+        env:
+            LOG_LEVEL: DEBUG

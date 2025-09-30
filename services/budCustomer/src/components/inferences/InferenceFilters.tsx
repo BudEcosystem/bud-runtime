@@ -346,12 +346,12 @@ const InferenceFilters: React.FC<InferenceFiltersProps> = ({
 
             <Col span={4}>
               <Form.Item
-                label={<span className="text-[#B3B3B3]">Deployment</span>}
+                label={<span className="text-[#B3B3B3]">Model</span>}
                 name="endpointId"
               >
                 <Select
                   style={{ width: "100%" }}
-                  placeholder="All Deployments"
+                  placeholder="All Models"
                   allowClear
                   className="bg-[#1A1A1A]"
                   dropdownStyle={{

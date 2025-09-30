@@ -16,6 +16,7 @@ from budapp.commons.constants import (
     AuditActionEnum,
     AuditResourceTypeEnum,
     EndpointStatusEnum,
+    GuardrailDeploymentStatusEnum,
     ModelProviderTypeEnum,
     NotificationCategory,
     NotificationStatus,
@@ -28,6 +29,8 @@ from budapp.commons.db_utils import SessionMixin
 from budapp.commons.security import RSAHandler
 from budapp.endpoint_ops.crud import AdapterDataManager, EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
+from budapp.guardrails.crud import GuardrailsDeploymentDataManager
+from budapp.guardrails.models import GuardrailDeployment
 from budapp.model_ops.crud import ProviderDataManager
 
 # from ..models import Route as RouteModel
@@ -316,6 +319,24 @@ class CredentialService(SessionMixin):
                 "endpoint_id": str(adapter.id),
                 "model_id": str(adapter.model_id),
                 "project_id": str(project_id),  # Adapters don't have direct project_id, use the passed project_id
+            }
+
+        # Get standalone guardrail deployments (where endpoint_id is None)
+        guardrail_deployments, _ = await GuardrailsDeploymentDataManager(self.session).get_all_deployments(
+            offset=0,
+            limit=1000,  # Get all deployments for the project
+            filters={"project_id": project_id, "endpoint_id": None},
+        )
+        for deployment in guardrail_deployments:
+            # Skip deleted deployments
+            if deployment[0].status == GuardrailDeploymentStatusEnum.DELETED:
+                continue
+            # For standalone guardrail deployments, use deployment name as key
+            # endpoint_id is the deployment id itself, model_id is the guardrail profile id
+            models[deployment[0].name] = {
+                "endpoint_id": str(deployment[0].id),
+                "model_id": str(deployment[0].profile_id),  # Using profile_id as model_id
+                "project_id": str(deployment[0].project_id),
             }
 
         redis_service = RedisService()

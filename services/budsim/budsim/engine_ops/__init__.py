@@ -182,7 +182,9 @@ def get_minimal_engine_args_and_envs(engine_name: str, engine_args: Optional[Dic
     return {"args": minimal_args, "envs": minimal_envs}
 
 
-def get_compatible_engines(model_name: str, proprietary_only: bool = False) -> List[Dict[str, str]]:
+def get_compatible_engines(
+    model_name: str, model_uri: Optional[str] = None, proprietary_only: bool = False
+) -> List[Dict[str, str]]:
     """Retrieve a list of compatible engines for a given model.
 
     This function checks the compatibility of specified engines with the provided model name.
@@ -191,32 +193,27 @@ def get_compatible_engines(model_name: str, proprietary_only: bool = False) -> L
 
     Args:
         model_name (str): The name of the model for which compatible engines are being retrieved.
+        model_uri (Optional[str]): The URI of the model (e.g., "mistralai/Mistral-7B-Instruct-v0.3").
+        proprietary_only (bool): Whether to return only proprietary engines.
 
     Returns:
-        List[Tuple[str, str]]: A list of tuples where each tuple contains the scheduler name
-        and the compatible device type (e.g., ("vllm", "cpu")).
+        List[Dict[str, str]]: A list of dictionaries containing engine information.
     """
-    # compatible_engines = []
-    # engines = ("vllm",) if not proprietary_only else ("litellm",)
-    # devices = ("cpu", "cuda", "hpu") if not proprietary_only else ("cpu",)
+    try:
+        config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+        for arch in config.architectures:
+            compatible_engines = fetch_compatible_engines(model_architecture=arch, model_uri=model_uri)
+            logger.info(f"Compatible engines for {model_name}: {compatible_engines}")
+            if compatible_engines:
+                return compatible_engines
+    except Exception as e:
+        logger.warning(f"Failed to get config for {model_name}: {str(e)}")
 
-    # # TODO: Add sglang once it's supported
-    # for engine_name in engines:
-    #     engine_compatibility = get_engine_compatibility_checks(engine_name)()
-    #     if engine_compatibility.check_model_compatibility(model_name):
-    #         for device in devices:
-    #             if engine_compatibility.check_device_compatibility(device) is not None:
-    #                 compatible_engines.append({"engine_name": engine_name, "device": device})
-
-    # return compatible_engines
-    config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-    for arch in config.architectures:
-        compatible_engines = fetch_compatible_engines(model_architecture=arch)
-        logger.info(f"Compatible engines: {compatible_engines}")
-        if compatible_engines:
-            return compatible_engines
     if proprietary_only:
         compatible_engines = [{"engine_name": "litellm", "device": "cpu", "image": app_settings.litellm_image}]
+    else:
+        compatible_engines = []
+
     logger.info(f"No compatible engines found for model {model_name}")
     return compatible_engines
 

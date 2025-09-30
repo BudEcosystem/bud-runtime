@@ -518,6 +518,7 @@ class BudSimulatorRequest(BaseModel):
     """Request schema for Bud Simulator."""
 
     pretrained_model_uri: str
+    model_uri: Optional[str] = Field(None, description="Original cloud/HuggingFace URI of the model")
     input_tokens: int
     output_tokens: int
     concurrency: int
@@ -568,6 +569,10 @@ class RecommendedCluster(BaseModel):
     resource_details: list[dict]
     required_devices: list[dict]
     benchmarks: RecommendedClusterData
+    # Parser metadata from simulator
+    tool_calling_parser_type: str | None = None
+    reasoning_parser_type: str | None = None
+    chat_template: str | None = None
 
 
 class RecommendedClusterResponse(SuccessResponse):

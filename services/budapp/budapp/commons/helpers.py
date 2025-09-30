@@ -24,7 +24,7 @@ import shutil
 import string
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from huggingface_hub.utils import validate_repo_id
 from huggingface_hub.utils._validators import HFValidationError
@@ -417,7 +417,7 @@ async def determine_modality_endpoints(
     input_modality: Literal[
         "llm", "mllm", "image", "embedding", "text_to_speech", "speech_to_text", "llm_embedding", "mllm_embedding"
     ],
-) -> List[Dict[str, str]]:
+) -> Dict[str, Any]:
     """Determine the endpoints for the given modality.
 
     Args:
@@ -428,13 +428,13 @@ async def determine_modality_endpoints(
     """
     from ..commons.constants import ModalityEnum, ModelEndpointEnum
 
-    result = {"modality": None, "endpoints": None}
+    result: Dict[str, Any] = {"modality": None, "endpoints": None}
     if input_modality == "llm":
         result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.CHAT, ModelEndpointEnum.COMPLETION]
+        result["endpoints"] = [ModelEndpointEnum.CHAT]
     elif input_modality == "mllm":
         result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.CHAT]
+        result["endpoints"] = [ModelEndpointEnum.CHAT, ModelEndpointEnum.DOCUMENT]
     elif input_modality == "image":
         result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_OUTPUT]
         result["endpoints"] = [ModelEndpointEnum.IMAGE_GENERATION]
@@ -495,10 +495,8 @@ async def determine_supported_endpoints(
     if {
         ModalityEnum.TEXT_INPUT.value,
         ModalityEnum.TEXT_OUTPUT.value,
-    }.issubset(modality_set):
-        endpoints.update({ModelEndpointEnum.CHAT, ModelEndpointEnum.COMPLETION})
-    elif ModalityEnum.TEXT_INPUT.value in modality_set:
-        endpoints.add(ModelEndpointEnum.COMPLETION)
+    }.issubset(modality_set) or ModalityEnum.TEXT_INPUT.value in modality_set:
+        endpoints.add(ModelEndpointEnum.CHAT)
 
     if ModalityEnum.IMAGE_OUTPUT.value in modality_set:
         endpoints.add(ModelEndpointEnum.IMAGE_GENERATION)
@@ -522,14 +520,14 @@ async def determine_supported_endpoints(
         endpoints.add(ModelEndpointEnum.IMAGE_VARIATION)
 
     # Real-time endpoints for audio+text bidirectional
-    if {
-        ModalityEnum.AUDIO_INPUT.value,
-        ModalityEnum.AUDIO_OUTPUT.value,
-        ModalityEnum.TEXT_INPUT.value,
-        ModalityEnum.TEXT_OUTPUT.value,
-    }.issubset(modality_set):
-        endpoints.add(ModelEndpointEnum.REALTIME_SESSION)
-        endpoints.add(ModelEndpointEnum.REALTIME_TRANSCRIPTION)
+    # if {
+    #     ModalityEnum.AUDIO_INPUT.value,
+    #     ModalityEnum.AUDIO_OUTPUT.value,
+    #     ModalityEnum.TEXT_INPUT.value,
+    #     ModalityEnum.TEXT_OUTPUT.value,
+    # }.issubset(modality_set):
+    #     endpoints.add(ModelEndpointEnum.REALTIME_SESSION)
+    #     endpoints.add(ModelEndpointEnum.REALTIME_TRANSCRIPTION)
 
     if not endpoints:
         # Add default endpoint

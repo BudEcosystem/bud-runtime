@@ -63,7 +63,7 @@ export const SelectAdapterModel = () => {
     }
   }, [adapterWorkflow]);
   const handleNext = async () => {
-    form.submit();
+    // form.submit();
 
     const result = await createAddAdapterWorkflow(
       clusterDetails?.id,

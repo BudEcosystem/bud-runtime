@@ -49,3 +49,7 @@ dependencies:
     version: 16.5.31
     repository: https://charts.bitnami.com/bitnami
     condition: mongodb.enabled
+  - name: mimir-distributed
+    version: 5.8.0
+    repository: https://grafana.github.io/helm-charts
+    condition: mimir-distributed.enabled

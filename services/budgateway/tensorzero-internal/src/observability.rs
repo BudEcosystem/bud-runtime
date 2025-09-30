@@ -123,7 +123,7 @@ pub fn build_opentelemetry_layer<T: SpanExporter + 'static>(
 
 /// A helper trait to apply layers to a `Router`.
 /// Without this trait, we would need to write something like:
-/// ```rust
+/// ```text
 /// // in `tensorzero-internal`
 /// fn make_my_layer() -> SomeType
 ///

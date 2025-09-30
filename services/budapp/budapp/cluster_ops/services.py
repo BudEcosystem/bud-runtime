@@ -1941,6 +1941,10 @@ class ClusterService(SessionMixin):
                         over_all_throughput=over_all_throughput_data,
                         concurrency=concurrency_data,
                     ),
+                    # Add parser metadata from simulator
+                    tool_calling_parser_type=recommended_cluster_data.get("tool_calling_parser_type"),
+                    reasoning_parser_type=recommended_cluster_data.get("reasoning_parser_type"),
+                    chat_template=recommended_cluster_data.get("chat_template"),
                 )
             )
 

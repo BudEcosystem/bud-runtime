@@ -9,6 +9,7 @@ import DeployModel from "src/flows/DeployModel";
 import DeployModelChooseCluster from "src/flows/DeployModelChooseCluster";
 import DeployModelSpecification from "src/flows/DeployModelSpecification";
 import DeployModelTemplate from "src/flows/DeployModelTemplate";
+import DeployModelConfiguration from "src/flows/DeployModelConfiguration";
 import DeployModelCredentialSelect from "src/flows/DeployModel/DeployModelCredentialSelect";
 import InviteMembers from "src/flows/InviteMembers";
 import NewProject from "src/flows/NewProject";
@@ -28,6 +29,7 @@ import RunModelSuccess from "src/flows/RunModelEvaluations/RunModelSuccess";
 import StopWarning from "src/flows/RunModelEvaluations/StopWarning";
 import EditModel from "src/flows/EditModel/EditModel";
 import AddLocalModel from "src/flows/AddModel/Local/AddLocalModel";
+import DocumentModelList from "src/flows/AddModel/Local/DocumentModelList";
 import AddingModelToRepo from "src/flows/AddModel/Local/AddingModelToRepo";
 import SelectOrAddCredentials from "src/flows/AddModel/Local/SelectOrAddCredentials";
 import ScanCompleted from "src/flows/AddModel/Local/ScanCompleted";
@@ -147,6 +149,7 @@ export const StepComponents = {
   "deploy-model": DeployModel,
   "deploy-model-credential-select": DeployModelCredentialSelect,
   "deploy-model-template": DeployModelTemplate,
+  "deploy-model-configuration": DeployModelConfiguration,
   "deploy-model-specification": DeployModelSpecification,
   "deploy-cluster-status": DeployClusterStatus,
   "deploy-model-choose-cluster": DeployModelChooseCluster,
@@ -169,6 +172,7 @@ export const StepComponents = {
   "view-message-model": CreateProjectSuccess,
   "view-message-cluster": CreateProjectSuccess,
   "add-local-model": AddLocalModel,
+  "document-model-list": DocumentModelList,
   "extracting-model": ExtractingModel,
   "adding-model-to-repo": AddingModelToRepo,
   "select-or-add-credentials": SelectOrAddCredentials,

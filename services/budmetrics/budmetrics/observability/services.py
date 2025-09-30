@@ -504,7 +504,8 @@ class ObservabilityMetricsService:
         Args:
             batch_data: List of tuples containing (inference_id, request_ip, project_id,
                        endpoint_id, model_id, cost, response_analysis, is_success,
-                       request_arrival_time, request_forward_time, api_key_id, user_id, api_key_project_id)
+                       request_arrival_time, request_forward_time, api_key_id, user_id, api_key_project_id,
+                       error_code, error_message, error_type, status_code)
 
         Returns:
             dict: Insertion results with counts and duplicate inference_ids
@@ -565,9 +566,9 @@ class ObservabilityMetricsService:
         # Build VALUES clause using raw SQL similar to simple_seeder
         values = []
         for record in new_records:
-            # Handle both old format (10 fields) and new format (13 fields)
+            # Handle different formats based on record length
             if len(record) == 10:
-                # Legacy format without auth metadata
+                # Legacy format without auth metadata and error fields
                 (
                     inference_id,
                     request_ip,
@@ -583,8 +584,12 @@ class ObservabilityMetricsService:
                 api_key_id = None
                 user_id = None
                 api_key_project_id = None
-            else:
-                # New format with auth metadata
+                error_code = None
+                error_message = None
+                error_type = None
+                status_code = None
+            elif len(record) == 13:
+                # Format with auth metadata but no error fields
                 (
                     inference_id,
                     request_ip,
@@ -599,6 +604,31 @@ class ObservabilityMetricsService:
                     api_key_id,
                     user_id,
                     api_key_project_id,
+                ) = record
+                error_code = None
+                error_message = None
+                error_type = None
+                status_code = None
+            else:
+                # New format with auth metadata and error fields (17 fields)
+                (
+                    inference_id,
+                    request_ip,
+                    project_id,
+                    endpoint_id,
+                    model_id,
+                    cost,
+                    response_analysis,
+                    is_success,
+                    request_arrival_time,
+                    request_forward_time,
+                    api_key_id,
+                    user_id,
+                    api_key_project_id,
+                    error_code,
+                    error_message,
+                    error_type,
+                    status_code,
                 ) = record
 
             # Format each row
@@ -615,7 +645,11 @@ class ObservabilityMetricsService:
                 f"'{request_forward_time.strftime('%Y-%m-%d %H:%M:%S')}', "
                 f"{self._escape_string(str(api_key_id)) if api_key_id else 'NULL'}, "
                 f"{self._escape_string(str(user_id)) if user_id else 'NULL'}, "
-                f"{self._escape_string(str(api_key_project_id)) if api_key_project_id else 'NULL'})"
+                f"{self._escape_string(str(api_key_project_id)) if api_key_project_id else 'NULL'}, "
+                f"{self._escape_string(error_code) if error_code else 'NULL'}, "
+                f"{self._escape_string(error_message) if error_message else 'NULL'}, "
+                f"{self._escape_string(error_type) if error_type else 'NULL'}, "
+                f"{status_code if status_code is not None else 'NULL'})"
             )
             values.append(row)
 
@@ -625,7 +659,7 @@ class ObservabilityMetricsService:
         INSERT INTO ModelInferenceDetails
         (inference_id, request_ip, project_id, endpoint_id, model_id,
          cost, response_analysis, is_success, request_arrival_time, request_forward_time,
-         api_key_id, user_id, api_key_project_id)
+         api_key_id, user_id, api_key_project_id, error_code, error_message, error_type, status_code)
         VALUES {",".join(values)}
         """  # nosec B608
 
@@ -774,7 +808,11 @@ class ObservabilityMetricsService:
             mid.api_key_project_id,
             mid.endpoint_id,
             mid.model_id,
-            coalesce(mi.endpoint_type, 'chat') as endpoint_type
+            coalesce(mi.endpoint_type, 'chat') as endpoint_type,
+            mid.error_code,
+            mid.error_message,
+            mid.error_type,
+            mid.status_code
         FROM ModelInference mi
         INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
         LEFT JOIN ChatInference ci ON mi.inference_id = ci.id AND mi.endpoint_type = 'chat'
@@ -796,6 +834,7 @@ class ObservabilityMetricsService:
         # Convert results to InferenceListItem objects
         items = []
         for row in results:
+            is_success = bool(row[10])
             items.append(
                 InferenceListItem(
                     inference_id=row[0],
@@ -808,13 +847,17 @@ class ObservabilityMetricsService:
                     total_tokens=row[7] or 0,
                     response_time_ms=row[8] or 0,
                     cost=row[9],
-                    is_success=bool(row[10]),
+                    is_success=is_success,
                     cached=bool(row[11]),
                     project_id=row[12],
                     api_key_project_id=row[13],  # Added api_key_project_id
                     endpoint_id=row[14],
                     model_id=row[15],
                     endpoint_type=row[16],
+                    error_code=row[17],
+                    error_message=row[18],
+                    error_type=row[19],
+                    status_code=row[20],
                 )
             )
 
@@ -895,6 +938,11 @@ class ObservabilityMetricsService:
                 toValidUTF8(mi.gateway_request) as gateway_request,
                 toValidUTF8(mi.gateway_response) as gateway_response,
                 coalesce(mi.endpoint_type, 'chat') as endpoint_type,
+                -- Error fields
+                mid.error_code,
+                mid.error_message,
+                mid.error_type,
+                mid.status_code,
                 -- Gateway Analytics fields
                 ga.client_ip,
                 ga.proxy_chain,
@@ -916,8 +964,8 @@ class ObservabilityMetricsService:
                 ga.is_bot,
                 ga.method,
                 ga.path,
-                toValidUTF8(ga.query_params) as query_params,
-                toValidUTF8(ga.request_headers) as request_headers,
+                ga.query_params as query_params,
+                ga.request_headers as request_headers,
                 ga.body_size,
                 ga.api_key_id,
                 ga.auth_method,
@@ -982,7 +1030,12 @@ class ObservabilityMetricsService:
                 toValidUTF8(mi.raw_response) as raw_response,
                 toValidUTF8(mi.gateway_request) as gateway_request,
                 toValidUTF8(mi.gateway_response) as gateway_response,
-                coalesce(mi.endpoint_type, 'chat') as endpoint_type
+                coalesce(mi.endpoint_type, 'chat') as endpoint_type,
+                -- Error fields
+                mid.error_code,
+                mid.error_message,
+                mid.error_type,
+                mid.status_code
             FROM ModelInference mi
             INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
             LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
@@ -1341,6 +1394,10 @@ class ObservabilityMetricsService:
                 cached=bool(row_dict.get("cached")) if row_dict.get("cached") is not None else False,
                 finish_reason=str(row_dict.get("finish_reason")) if row_dict.get("finish_reason") else None,
                 cost=float(row_dict.get("cost")) if row_dict.get("cost") else None,
+                error_code=str(row_dict.get("error_code")) if row_dict.get("error_code") else None,
+                error_message=str(row_dict.get("error_message")) if row_dict.get("error_message") else None,
+                error_type=str(row_dict.get("error_type")) if row_dict.get("error_type") else None,
+                status_code=int(row_dict.get("status_code")) if row_dict.get("status_code") else None,
                 raw_request=str(row_dict.get("raw_request")) if row_dict.get("raw_request") else None,
                 raw_response=str(row_dict.get("raw_response")) if row_dict.get("raw_response") else None,
                 gateway_request=str(row_dict.get("gateway_request")) if row_dict.get("gateway_request") else None,

@@ -149,6 +149,10 @@ export type Cluster = {
   cost_per_token?: number;
   total_resources?: number;
   resources_used?: number;
+  // Parser metadata from simulator
+  tool_calling_parser_type?: string | null;
+  reasoning_parser_type?: string | null;
+  chat_template?: string | null;
   required_devices?: {
     device_type: string;
     num_replicas: number;

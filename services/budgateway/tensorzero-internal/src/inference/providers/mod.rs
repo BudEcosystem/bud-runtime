@@ -4,8 +4,10 @@ pub mod aws_common;
 mod aws_http_client;
 pub mod aws_sagemaker;
 pub mod azure;
+pub mod azure_content_safety;
 pub mod base;
 pub mod batch;
+pub mod buddoc;
 pub mod deepseek;
 #[cfg(any(test, feature = "e2e_tests"))]
 pub mod dummy;

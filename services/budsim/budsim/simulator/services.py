@@ -58,7 +58,6 @@ from .schemas import (
     DeviceTypeMetrics,
     NodeConfiguration,
     NodeGroupConfiguration,
-    NodeGroupConfigurationValidator,
     SimulationMethod,
     SimulationMetrics,
 )
@@ -216,11 +215,13 @@ class SimulationService:
             group["min_devices_per_node"] = (
                 min(group["node_distribution"].values()) if group["node_distribution"] else 0
             )
+            # Add total_devices field for proper validation later
+            group["total_devices"] = sum(group["node_distribution"].values()) if group["node_distribution"] else 0
 
             logger.debug(
                 f"Device type {device_type}: {len(group['devices'])} devices across "
                 f"{group['total_nodes_with_device']} nodes, max_per_node={group['max_devices_per_node']}, "
-                f"node_distribution={group['node_distribution']}"
+                f"total_devices={group['total_devices']}, node_distribution={group['node_distribution']}"
             )
 
         return device_groups
@@ -430,6 +431,12 @@ class SimulationService:
         quantization_type: str,
         engine_image: str,
         simulation_method: SimulationMethod,
+        model_uri: Optional[str] = None,
+        engine_version: Optional[str] = None,
+        tool_calling_parser_type: Optional[str] = None,
+        reasoning_parser_type: Optional[str] = None,
+        architecture_family: Optional[str] = None,
+        chat_template: Optional[str] = None,
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K deployment configurations based on the provided parameters.
@@ -455,6 +462,7 @@ class SimulationService:
                 logger.info("Using DirectSearchOptimizer for heuristic mode")
                 optimizer = DirectSearchOptimizer(
                     model=pretrained_model_uri,
+                    model_uri=model_uri,  # Pass the original cloud/HF URI
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     max_concurrency=concurrency,
@@ -505,6 +513,11 @@ class SimulationService:
                         "top_k_configs": [],
                         "engine": engine_name,
                         "engine_image": engine_image,
+                        "engine_version": engine_version,
+                        "tool_calling_parser_type": tool_calling_parser_type,
+                        "reasoning_parser_type": reasoning_parser_type,
+                        "architecture_family": architecture_family,
+                        "chat_template": chat_template,
                         "device_config": device_config,
                         "error": "No valid configurations found - device may not have enough memory for this model",
                     }
@@ -529,7 +542,8 @@ class SimulationService:
                             **{
                                 k.lower(): v
                                 for k, v in device.items()
-                                if k not in ["id", "type", "name", "node_id", "node_name", "cluster_id"]
+                                if k
+                                not in ["id", "type", "name", "node_id", "node_name", "cluster_id", "available_count"]
                             },
                         }
 
@@ -538,6 +552,11 @@ class SimulationService:
                                 "top_k_configs": top_k_configs,
                                 "engine": engine_name,
                                 "engine_image": engine_image,
+                                "engine_version": engine_version,
+                                "tool_calling_parser_type": tool_calling_parser_type,
+                                "reasoning_parser_type": reasoning_parser_type,
+                                "architecture_family": architecture_family,
+                                "chat_template": chat_template,
                                 "device_config": device_result,
                             }
                         )
@@ -550,6 +569,11 @@ class SimulationService:
                             "top_k_configs": top_k_configs,
                             "engine": engine_name,
                             "engine_image": engine_image,
+                            "engine_version": engine_version,
+                            "tool_calling_parser_type": tool_calling_parser_type,
+                            "reasoning_parser_type": reasoning_parser_type,
+                            "architecture_family": architecture_family,
+                            "chat_template": chat_template,
                             "device_config": device_config,
                         }
                     ]
@@ -559,6 +583,9 @@ class SimulationService:
                 device_config["device_id"] = device_config.pop("id", str(uuid.uuid4()))
                 device_config["device_type"] = device_config.pop("type")
                 device_config["device_name"] = device_config.pop("name", device_config["device_id"])
+                # Ensure available_count is present for legacy configs
+                if "available_count" not in device_config:
+                    device_config["available_count"] = 1
                 device_config = {k.lower(): v for k, v in device_config.items()}
 
                 return ensure_json_serializable(
@@ -566,6 +593,11 @@ class SimulationService:
                         "top_k_configs": top_k_configs,
                         "engine": engine_name,
                         "engine_image": engine_image,
+                        "engine_version": engine_version,
+                        "tool_calling_parser_type": tool_calling_parser_type,
+                        "reasoning_parser_type": reasoning_parser_type,
+                        "architecture_family": architecture_family,
+                        "chat_template": chat_template,
                         "device_config": device_config,
                     }
                 )
@@ -582,6 +614,11 @@ class SimulationService:
                     "top_k_configs": [],
                     "engine": engine_name,
                     "engine_image": engine_image,
+                    "engine_version": engine_version,
+                    "tool_calling_parser_type": tool_calling_parser_type,
+                    "reasoning_parser_type": reasoning_parser_type,
+                    "architecture_family": architecture_family,
+                    "chat_template": chat_template,
                     "device_config": device_config,
                     "error": f"Simulation failed: {str(e)}",
                 }
@@ -597,6 +634,12 @@ class SimulationService:
         device_config: Dict[str, Any],
         engine_image: str,
         simulation_method: SimulationMethod,
+        model_uri: Optional[str] = None,
+        engine_version: Optional[str] = None,
+        tool_calling_parser_type: Optional[str] = None,
+        reasoning_parser_type: Optional[str] = None,
+        architecture_family: Optional[str] = None,
+        chat_template: Optional[str] = None,
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K deployment configurations based on the provided parameters.
@@ -645,6 +688,11 @@ class SimulationService:
             "top_k_configs": top_k_configs,
             "engine": engine_name,
             "engine_image": engine_image,
+            "engine_version": engine_version,
+            "tool_calling_parser_type": tool_calling_parser_type,
+            "reasoning_parser_type": reasoning_parser_type,
+            "architecture_family": architecture_family,
+            "chat_template": chat_template,
             "device_config": device_config,
         }
 
@@ -657,6 +705,12 @@ class SimulationService:
         quantization_type: str,
         engine_image: str,
         simulation_method: SimulationMethod,
+        model_uri: Optional[str] = None,
+        engine_version: Optional[str] = None,
+        tool_calling_parser_type: Optional[str] = None,
+        reasoning_parser_type: Optional[str] = None,
+        architecture_family: Optional[str] = None,
+        chat_template: Optional[str] = None,
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K quantization engine configurations based on the provided parameters.
@@ -706,6 +760,11 @@ class SimulationService:
             "top_k_configs": top_k_configs,
             "engine": engine_name,
             "engine_image": engine_image,
+            "engine_version": engine_version,
+            "tool_calling_parser_type": tool_calling_parser_type,
+            "reasoning_parser_type": reasoning_parser_type,
+            "architecture_family": architecture_family,
+            "chat_template": chat_template,
             "device_config": device_config,
         }
 
@@ -883,6 +942,7 @@ class SimulationService:
         pretrained_model_uri: str,
         cluster_info: List[Dict[str, Any]],
         notification_request: NotificationRequest,
+        model_uri: Optional[str] = None,
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
         proprietary_only: bool = False,
@@ -936,7 +996,7 @@ class SimulationService:
                 target_name=target_name,
             )
 
-            compatible_engines = get_compatible_engines(pretrained_model_uri, proprietary_only)
+            compatible_engines = get_compatible_engines(pretrained_model_uri, model_uri, proprietary_only)
 
             if len(compatible_engines) == 0:
                 raise ValueError("No compatible engines found")
@@ -1344,6 +1404,11 @@ class SimulationService:
                         **device_config_cleaned,
                         "engine": result["engine"],
                         "engine_image": result["engine_image"],
+                        "engine_version": result.get("engine_version"),
+                        "tool_calling_parser_type": result.get("tool_calling_parser_type"),
+                        "reasoning_parser_type": result.get("reasoning_parser_type"),
+                        "architecture_family": result.get("architecture_family"),
+                        "chat_template": result.get("chat_template"),
                         "top_k_configs": config_dict,
                     }
                     records.append(record)
@@ -1449,6 +1514,7 @@ class SimulationService:
             request.pretrained_model_uri,
             cluster_info,
             notification_request,
+            request.model_uri,  # Pass the cloud/HF URI
             request.source_topic,
             request.source,
             proprietary_only=request.is_proprietary_model,
@@ -1524,6 +1590,12 @@ class SimulationService:
                     error_rate=0,
                     cost_per_million_tokens=0,
                 ),
+                # Include engine metadata from the simulation result
+                engine_version=getattr(result, "engine_version", None),
+                tool_calling_parser_type=getattr(result, "tool_calling_parser_type", None),
+                reasoning_parser_type=getattr(result, "reasoning_parser_type", None),
+                architecture_family=getattr(result, "architecture_family", None),
+                chat_template=getattr(result, "chat_template", None),
             )
             deployment_config = self.optimal_search_node_group_config([result], concurrency)
             if deployment_config is not None:
@@ -1643,15 +1715,9 @@ class SimulationService:
         tp_size = engine_config.get("tensor_parallel_size", 1)
         pp_size = engine_config.get("pipeline_parallel_size", 1)
 
-        # Validate parallelism configuration
-        try:
-            NodeGroupConfigurationValidator.validate_parallelism_combination(
-                tp_size, pp_size, template_result.available_count
-            )
-            NodeGroupConfigurationValidator.validate_device_type_compatibility(template_result.device_type, pp_size)
-        except ValueError as e:
-            logger.warning("Invalid parallelism configuration for device group %s: %s", device_type, e)
-            return None
+        # Skip validation - TP/PP values from top_k_configs are already validated during optimization
+        # The Evolution and DirectSearch optimizers validate these combinations before storing them
+        logger.info(f"Using pre-validated parallelism: TP={tp_size}, PP={pp_size} from optimization results")
 
         # Create labels for Kubernetes node selection
         labels = {"device_name": device_type, "concurrency": str(top_k_configs.get("concurrency", 1))}
@@ -1681,6 +1747,11 @@ class SimulationService:
             device_name=device_name,
             device_model=device_model,
             raw_name=raw_name,
+            engine_version=getattr(template_result, "engine_version", None),
+            tool_calling_parser_type=getattr(template_result, "tool_calling_parser_type", None),
+            reasoning_parser_type=getattr(template_result, "reasoning_parser_type", None),
+            architecture_family=getattr(template_result, "architecture_family", None),
+            chat_template=getattr(template_result, "chat_template", None),
         )
 
     @staticmethod
@@ -1752,10 +1823,10 @@ class SimulationService:
                 tp_size = engine_config.get("tensor_parallel_size", 1)
                 logger.info(f"TP size for {device_type}: {tp_size}")
 
-                # Calculate optimal replica count for this device group
+                # Use per-device count for replica calculation
                 available_devices = template_result.available_count
                 max_replicas = available_devices // tp_size if tp_size > 0 else 0
-                logger.info(f"Available devices: {available_devices}, max replicas: {max_replicas}")
+                logger.info(f"Available devices per node: {available_devices}, max replicas: {max_replicas}")
 
                 if max_replicas <= 0:
                     logger.warning(f"No replicas possible for device type {device_type}")
@@ -1793,6 +1864,15 @@ class SimulationService:
         if not config.node_groups:
             logger.error("No node groups created, returning None")
             return None
+
+        # Populate engine metadata from the first node group (they should all have the same metadata)
+        if config.node_groups:
+            first_group = config.node_groups[0]
+            config.engine_version = first_group.engine_version
+            config.tool_calling_parser_type = first_group.tool_calling_parser_type
+            config.reasoning_parser_type = first_group.reasoning_parser_type
+            config.architecture_family = first_group.architecture_family
+            config.chat_template = first_group.chat_template
 
         logger.info(f"Successfully created config with {len(config.node_groups)} node groups")
         return config

@@ -1,11 +1,51 @@
 import axios from "axios";
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 import { errorToast } from "./../../components/toast";
-import router from "next/router";
+
+const serializeParams = (params?: Record<string, any>) => {
+  if (!params) {
+    return "";
+  }
+
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item !== undefined && item !== null) {
+          searchParams.append(key, String(item));
+        }
+      });
+      return;
+    }
+
+    if (typeof value === "object") {
+      // Allow nested objects by flattening their entries
+      Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+        if (nestedValue !== undefined && nestedValue !== null) {
+          searchParams.append(`${key}.${nestedKey}`, String(nestedValue));
+        }
+      });
+      return;
+    }
+
+    searchParams.append(key, String(value));
+  });
+
+  return searchParams.toString();
+};
 
 export const axiosInstance = axios.create({
   baseURL: baseUrl,
 });
+
+axiosInstance.defaults.paramsSerializer = {
+  serialize: serializeParams,
+};
 
 let Token = null;
 let isRefreshing = false;
@@ -48,20 +88,33 @@ axiosInstance.interceptors.request.use(
 
     const isPublicEndpoint =
       config.url?.includes("auth/login") ||
+      config.url?.includes("auth/register") ||
       config.url?.includes("users/reset-password") ||
+      config.url?.includes("users/validate-reset-token") ||
+      config.url?.includes("users/reset-password-with-token") ||
       config.url?.includes("auth/refresh-token");
 
     if (!Token && !isPublicEndpoint) {
-      // Prevent redirect loop
+      // Prevent redirect loop - also allow reset-password page
       if (
         typeof window !== "undefined" &&
-        window.location.pathname !== "/login"
+        window.location.pathname !== "/login" &&
+        window.location.pathname !== "/reset-password" &&
+        window.location.pathname !== "/auth/reset-password"
       ) {
         if (!isRedirecting) {
           isRedirecting = true;
           localStorage.clear();
           window.location.replace("/login");
         }
+      }
+      // Don't reject for public pages
+      if (
+        typeof window !== "undefined" &&
+        (window.location.pathname === "/reset-password" ||
+         window.location.pathname === "/auth/reset-password")
+      ) {
+        return config;
       }
       return Promise.reject(new Error("No access token found"));
     }

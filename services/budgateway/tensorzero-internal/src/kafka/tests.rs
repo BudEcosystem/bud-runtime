@@ -26,6 +26,10 @@ async fn test_mock_kafka_observability_event() {
         api_key_id: None,
         api_key_project_id: None,
         user_id: None,
+        error_code: None,
+        error_message: None,
+        error_type: None,
+        status_code: None,
     };
 
     // Send the event
@@ -78,6 +82,10 @@ async fn test_mock_kafka_buffer_and_batch() {
             api_key_id: None,
             api_key_project_id: None,
             user_id: None,
+            error_code: None,
+            error_message: None,
+            error_type: None,
+            status_code: None,
         };
         events.push(event.clone());
         kafka_conn.add_observability_event(event).await.unwrap();
@@ -117,6 +125,10 @@ async fn test_kafka_disabled() {
         api_key_id: None,
         api_key_project_id: None,
         user_id: None,
+        error_code: None,
+        error_message: None,
+        error_type: None,
+        status_code: None,
     };
 
     // This should succeed without doing anything
@@ -146,6 +158,10 @@ async fn test_kafka_event_validation() {
         api_key_id: None,
         api_key_project_id: None,
         user_id: None,
+        error_code: None,
+        error_message: None,
+        error_type: None,
+        status_code: None,
     };
 
     let validation_result = cloudevents::validate_event(&event);

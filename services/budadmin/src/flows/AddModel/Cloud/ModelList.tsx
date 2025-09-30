@@ -16,7 +16,7 @@ export default function ModelList() {
   const [page, setPage] = React.useState(1);
   const [limit, setLimit] = React.useState(100);
 
-  const { selectedProvider } = useDeployModel();
+  const { selectedProvider, modalityType } = useDeployModel();
   const [models, setModels] = React.useState([]);
   const { isExpandedViewOpen } = useContext(BudFormContext);
 
@@ -34,15 +34,39 @@ export default function ModelList() {
   }, [currentWorkflow]);
 
   useEffect(() => {
+    const endpoints = modalityType?.endpoints && modalityType.endpoints.length > 0
+      ? modalityType.endpoints
+      : undefined;
+    const modalities = !endpoints && modalityType?.modalities && modalityType.modalities.length > 0
+      ? modalityType.modalities
+      : undefined;
+
+    if (!selectedProvider?.type) {
+      setModels([]);
+      return;
+    }
+
     fetchModels({
       page,
       limit,
       table_source: "cloud_model",
       source: selectedProvider?.type,
+      modality: modalities,
+      supported_endpoints: endpoints,
     }).then((data) => {
       setModels(data);
     });
-  }, []);
+  }, [selectedProvider?.type, modalityType?.modalities, modalityType?.endpoints, page, limit, fetchModels]);
+
+  useEffect(() => {
+    if (!selectedModel) {
+      return;
+    }
+
+    if (!models.some((model) => model.id === selectedModel.id)) {
+      setSelectedModel(null);
+    }
+  }, [models, selectedModel, setSelectedModel]);
 
   const filteredModels = models?.filter((model) => {
     return (

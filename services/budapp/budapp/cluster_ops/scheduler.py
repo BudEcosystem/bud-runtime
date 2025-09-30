@@ -237,6 +237,7 @@ class RecommendedClusterScheduler:
         if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
             bud_simulator_request = BudSimulatorRequest(
                 pretrained_model_uri=db_model.uri,
+                model_uri=db_model.uri,  # Cloud models use URI for both
                 input_tokens=1024,  # context length
                 output_tokens=128,  # sequence length
                 concurrency=10,  # concurrent requests
@@ -249,7 +250,8 @@ class RecommendedClusterScheduler:
             )
         else:
             bud_simulator_request = BudSimulatorRequest(
-                pretrained_model_uri=db_model.local_path,
+                pretrained_model_uri=db_model.local_path if db_model.local_path else db_model.uri,
+                model_uri=db_model.uri,  # Always pass the original URI
                 input_tokens=1024,
                 output_tokens=128,
                 concurrency=10,

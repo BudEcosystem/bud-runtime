@@ -18,17 +18,31 @@ export async function POST(req: Request) {
   // Extract client IP from headers
   const xForwardedFor = req.headers.get('x-forwarded-for');
   const xRealIp = req.headers.get('x-real-ip');
-  // In production, Next.js will set x-forwarded-for with the client's IP
-  const clientIp = xForwardedFor?.split(',')[0].trim() || xRealIp || 'unknown';
+  const cfConnectingIp = req.headers.get('cf-connecting-ip'); // Cloudflare
+  const trueClientIp = req.headers.get('true-client-ip'); // Cloudflare Enterprise
 
-  console.log(`Client IP detection - X-Forwarded-For: ${xForwardedFor}, X-Real-IP: ${xRealIp}, Final IP: ${clientIp}`);
+  // In Kubernetes/production, pass the entire X-Forwarded-For chain
+  // Let budgateway handle the logic of extracting the public IP
+  let clientIp = 'unknown';
+  let forwardedChain = '';
+
+  if (xForwardedFor) {
+    // Pass the entire chain, budgateway will extract the public IP
+    forwardedChain = xForwardedFor;
+    clientIp = xForwardedFor; // Still use full chain for forwarding
+  } else if (cfConnectingIp) {
+    clientIp = cfConnectingIp;
+  } else if (trueClientIp) {
+    clientIp = trueClientIp;
+  } else if (xRealIp) {
+    clientIp = xRealIp;
+  }
 
   // Accept either JWT (Bearer token) or API key
   if (!authorization && !apiKey) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  console.log(metadata.base_url || copyCodeApiBaseUrl)
   const proxyOpenAI = createOpenAI({
     // custom settings, e.g.
     baseURL: metadata.base_url || copyCodeApiBaseUrl,
@@ -44,8 +58,13 @@ export async function POST(req: Request) {
           // Pass through the API key header if present
           ...(apiKey && { 'api-key': apiKey }),
           // Forward the client IP to budgateway for accurate geolocation
+          // Pass the entire chain for X-Forwarded-For so budgateway can find the public IP
           'X-Forwarded-For': clientIp,
-          'X-Real-IP': clientIp
+          // For X-Real-IP, prefer the original value if present, otherwise use clientIp
+          'X-Real-IP': xRealIp || clientIp,
+          // Add custom headers that won't be modified by intermediate proxies
+          'X-Original-Client-IP': clientIp,
+          'X-Playground-Client-IP': xForwardedFor || xRealIp || cfConnectingIp || trueClientIp || 'unknown'
         },
         body: JSON.stringify({
           id,
@@ -69,7 +88,6 @@ export async function POST(req: Request) {
           }
         })
       }
-      console.log('fetch', request);
       return fetch(input, request);
     }
   });

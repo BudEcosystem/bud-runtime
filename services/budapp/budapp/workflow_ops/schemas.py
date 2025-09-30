@@ -38,6 +38,9 @@ class RetrieveWorkflowStepData(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
+    experiment_id: UUID4 | None = None
+    trait_ids: list[UUID4] | None = None
+    traits_details: list[dict] | None = None
     provider_type: ModelProviderTypeEnum | GuardrailProviderTypeEnum | None = None
     provider: Provider | None = None
     cloud_model: CloudModel | None = None
@@ -110,6 +113,13 @@ class RetrieveWorkflowStepData(BaseModel):
     bud_prompt_id: str | None = None
     bud_prompt_version: int | str | None = None
     prompt_schema_events: dict | None = None
+    # Parser metadata from cluster/simulator
+    tool_calling_parser_type: str | None = None
+    reasoning_parser_type: str | None = None
+    chat_template: str | None = None
+    # User preferences for parsers
+    enable_tool_calling: bool | None = None
+    enable_reasoning: bool | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

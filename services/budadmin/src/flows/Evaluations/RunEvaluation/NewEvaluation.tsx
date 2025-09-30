@@ -15,7 +15,6 @@ import {
   NameIconInput,
 } from "@/components/ui/bud/dataEntry/ProjectNameInput";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
-import { useDeployModel } from "src/stores/useDeployModel";
 import { isValidModelName } from "@/lib/utils";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 import { useRouter } from "next/router";
@@ -24,23 +23,16 @@ import { successToast, errorToast } from "@/components/toast";
 
 export default function NewEvaluation() {
   const { openDrawerWithStep, drawerProps } = useDrawer();
-  const {
-    currentWorkflow,
-    updateModelDetailsLocal,
-    updateCredentialsLocal,
-    localModelDetails,
-    deleteWorkflow,
-  } = useDeployModel();
   const { values, form } = useContext(BudFormContext);
   const router = useRouter();
-  const { createEvaluationWorkflow } = useEvaluations();
+  const { createWorkflow } = useEvaluations();
 
   // Get experiment ID from drawer props
   const experimentId = drawerProps?.experimentId as string;
 
   return (
     <BudForm
-      data={localModelDetails}
+      data={""}
       onBack={async () => {
         openDrawerWithStep("select-use-case");
       }}
@@ -62,12 +54,10 @@ export default function NewEvaluation() {
           };
 
           // Call the API
-          const response = await createEvaluationWorkflow(
+          const response = await createWorkflow(
             experimentId,
             payload,
           );
-
-          successToast("Evaluation workflow created successfully");
 
           // Navigate to next step
           openDrawerWithStep("select-model-new-evaluation");

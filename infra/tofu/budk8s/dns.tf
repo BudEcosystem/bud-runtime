@@ -35,14 +35,14 @@ locals {
     flatten([
       for env in local.environments : [
         for srv in local.services :
-        srv == "" ? "${env}.${var.zone_domain}" : "${srv}.${env}.${var.zone_domain}"
+        srv == "" ? "${env}.${var.zone.domain}" : "${srv}.${env}.${var.zone.domain}"
       ]
     ])
     ,
     flatten([
       for env in local.environments_pde : [
         for srv in concat(local.services_pde, local.services) :
-        srv == "" ? "${env}.${var.zone_domain}" : "${srv}.${env}.${var.zone_domain}"
+        srv == "" ? "${env}.${var.zone.domain}" : "${srv}.${env}.${var.zone.domain}"
       ]
     ])
   ))
@@ -56,20 +56,20 @@ locals {
     )) : ip => ip
   }
 
-  ingress_domain = "ingress.k8s.${var.zone_domain}"
+  ingress_domain = "ingress.k8s.${var.zone.domain}"
 }
 
 resource "cloudflare_dns_record" "primary_ipv4" {
-  zone_id = var.zone_id
-  name    = "primary.k8s.${var.zone_domain}"
+  zone_id = var.zone.id
+  name    = "primary.k8s.${var.zone.domain}"
   ttl     = 3600
   type    = "A"
   content = module.azure.ip.primary.v4
   proxied = false
 }
 resource "cloudflare_dns_record" "primary_ipv6" {
-  zone_id = var.zone_id
-  name    = "primary.k8s.${var.zone_domain}"
+  zone_id = var.zone.id
+  name    = "primary.k8s.${var.zone.domain}"
   ttl     = 3600
   type    = "AAAA"
   content = module.azure.ip.primary.v6
@@ -78,7 +78,7 @@ resource "cloudflare_dns_record" "primary_ipv6" {
 
 resource "cloudflare_dns_record" "ingress_ipv4" {
   for_each = local.ingress_ipv4
-  zone_id  = var.zone_id
+  zone_id  = var.zone.id
   name     = local.ingress_domain
   ttl      = 3600
   type     = "A"
@@ -87,7 +87,7 @@ resource "cloudflare_dns_record" "ingress_ipv4" {
 }
 resource "cloudflare_dns_record" "ingerss_ipv6" {
   for_each = local.ingress_ipv6
-  zone_id  = var.zone_id
+  zone_id  = var.zone.id
   name     = local.ingress_domain
   ttl      = 3600
   type     = "AAAA"
@@ -96,7 +96,7 @@ resource "cloudflare_dns_record" "ingerss_ipv6" {
 }
 resource "cloudflare_dns_record" "services" {
   for_each = local.services_with_envs
-  zone_id  = var.zone_id
+  zone_id  = var.zone.id
   name     = each.key
   ttl      = 3600
   type     = "CNAME"

@@ -82,8 +82,8 @@ export default function QuantizationMethod() {
     if (!result_advanced) {
       return;
     }
-    openDrawerWithStep("quantization-simulation-status");
-    // openDrawerWithStep("advanced-settings")
+    // openDrawerWithStep("quantization-simulation-status");
+    openDrawerWithStep("advanced-settings")
   };
 
   return (

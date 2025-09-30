@@ -9,6 +9,7 @@ import { useDrawer } from "src/hooks/useDrawer";
 import CustomPopover from "src/flows/components/customPopover";
 import { successToast } from "@/components/toast";
 import useGuardrails from "src/hooks/useGuardrails";
+import { AppRequest } from "src/pages/api/requests";
 import {
   Text_10_400_757575,
   Text_12_400_757575,
@@ -17,16 +18,25 @@ import {
 } from "@/components/ui/text";
 import Tags from "../components/DrawerTags";
 
+interface ProbeRuleWithProbe {
+  rule: any; // ProbeRule type from useGuardrails
+  probeId: string;
+  probeName: string;
+}
+
 export default function PIIDetectionConfig() {
   const { openDrawerWithStep } = useDrawer();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRules, setSelectedRules] = useState<string[]>([]);
+  const [selectedRules, setSelectedRules] = useState<{ probeId: string; ruleId: string }[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [hoveredRule, setHoveredRule] = useState<string | null>(null);
+  const [allRules, setAllRules] = useState<ProbeRuleWithProbe[]>([]);
+  const [isLoadingRules, setIsLoadingRules] = useState(false);
 
   // Use the guardrails hook
   const {
     selectedProbe,
+    selectedProbes,
     probeRules,
     rulesLoading,
     fetchProbeRules,
@@ -34,19 +44,66 @@ export default function PIIDetectionConfig() {
     updateWorkflow,
     workflowLoading,
     currentWorkflow,
+    selectedProvider,
   } = useGuardrails();
 
-  // Fetch rules when component mounts or selected probe changes
+  // Fetch rules for all selected probes
   useEffect(() => {
-    if (selectedProbe?.id) {
-      fetchProbeRules(selectedProbe.id);
-    }
+    const fetchAllRules = async () => {
+      const probesArray = selectedProbes?.length > 0 ? selectedProbes : (selectedProbe ? [selectedProbe] : []);
+      setAllRules([]); // Clear existing rules
+      setIsLoadingRules(true);
+
+      if (probesArray.length > 0) {
+        // Fetch rules for each selected probe in parallel
+        const fetchPromises = probesArray.map(async (probe) => {
+          if (!probe?.id) return [];
+
+          try {
+            // Directly call the API to fetch rules for this probe
+            const response = await AppRequest.Get(
+              `/guardrails/probe/${probe.id}/rules`,
+              {
+                params: {
+                  page: 1,
+                  limit: 100, // Get all rules
+                },
+              },
+            );
+
+            if (response.data?.rules) {
+              // Map each rule with its probe information
+              return response.data.rules.map((rule: any) => ({
+                rule,
+                probeId: probe.id,
+                probeName: probe.name
+              }));
+            }
+            return [];
+          } catch (error) {
+            console.error(`Failed to fetch rules for probe ${probe.name}:`, error);
+            return [];
+          }
+        });
+
+        // Wait for all fetches to complete
+        const results = await Promise.all(fetchPromises);
+
+        // Flatten the results and set all rules
+        const combinedRules = results.flat();
+        setAllRules(combinedRules);
+      }
+
+      setIsLoadingRules(false);
+    };
+
+    fetchAllRules();
 
     // Clear rules when component unmounts
     return () => {
-      clearProbeRules();
+      setAllRules([]);
     };
-  }, [selectedProbe?.id]);
+  }, [selectedProbes?.length, selectedProbe?.id]);
 
   const getRuleIcon = (ruleName: string) => {
     const name = ruleName.toLowerCase();
@@ -80,12 +137,11 @@ export default function PIIDetectionConfig() {
     return "🔒";
   };
 
-  // Configuration data from selected probe
-  const probeTypes = selectedProbe?.tags?.map((tag) => tag.name) || [
-    "Semantic",
-    "Text",
-    "RegEx",
-  ];
+  // Configuration data from selected probes
+  const probesArray = selectedProbes?.length > 0 ? selectedProbes : (selectedProbe ? [selectedProbe] : []);
+  const probeTypes = Array.from(new Set(
+    probesArray.flatMap(probe => probe?.tags?.map(tag => tag.name) || [])
+  )).filter(Boolean);
   const guardTypes = ["Input", "Output", "Retrieval", "Agent"];
 
   const handleBack = () => {
@@ -98,36 +154,70 @@ export default function PIIDetectionConfig() {
     }
 
     try {
-      // Convert selected rule IDs to the expected object format
-      const ruleSelections = selectedRules.map(ruleId => {
-        // Find the rule object from probeRules
-        const rule = probeRules.find(r => r.id === ruleId);
-        return {
-          rule_id: ruleId,
-          enabled: true,
-          // Include other rule properties if needed
-          name: rule?.name || "",
-          description: rule?.description || ""
-        };
+      // Group selected rules by probe ID
+      const rulesByProbe = selectedRules.reduce((acc, selection) => {
+        if (!acc[selection.probeId]) {
+          acc[selection.probeId] = [];
+        }
+        acc[selection.probeId].push(selection.ruleId);
+        return acc;
+      }, {} as Record<string, string[]>);
+
+      // Build probe_selections array with rules for each probe
+      // Include all probes, even those without selected rules
+      const probesArray = selectedProbes?.length > 0 ? selectedProbes : (selectedProbe ? [selectedProbe] : []);
+      const probeSelections = probesArray.map(probe => {
+        const selectedRuleIds = rulesByProbe[probe.id] || [];
+
+        // Get all rules for this probe from allRules
+        const probeRules = allRules.filter(r => r.probeId === probe.id);
+
+        if (probeRules.length > 0 && selectedRuleIds.length > 0) {
+          // Include all rules with their status (active if selected, disabled if not)
+          const rulesWithStatus = probeRules.map(ruleWithProbe => ({
+            id: ruleWithProbe.rule.id,
+            status: selectedRuleIds.includes(ruleWithProbe.rule.id) ? "active" : "disabled"
+          }));
+
+          return {
+            id: probe.id,
+            rules: rulesWithStatus
+          };
+        } else if (selectedRuleIds.length > 0) {
+          // Fallback: if we don't have all rules, just include selected ones as active
+          return {
+            id: probe.id,
+            rules: selectedRuleIds.map(ruleId => ({
+              id: ruleId,
+              status: "active"
+            }))
+          };
+        } else {
+          // Probe without selected rules
+          return {
+            id: probe.id
+          };
+        }
       });
 
-      // Build the update payload with workflow_id if available
+      // Build the update payload
       const updatePayload: any = {
-        step_number: 2, // Both probe selection and rule selection are step 2
-        workflow_total_steps: 5, // Not counting the first step
-        probe_selections: [
-          {
-            probe_id: selectedProbe?.id || "",
-            enabled: true,
-            rule_selections: ruleSelections, // Array of rule objects
-          },
-        ],
+        step_number: 2,
+        probe_selections: probeSelections,
         trigger_workflow: false,
       };
 
-      // Add workflow_id if it exists in currentWorkflow
+      // Include workflow_id if available
       if (currentWorkflow?.workflow_id) {
         updatePayload.workflow_id = currentWorkflow.workflow_id;
+      }
+
+      // Include provider data from previous step
+      if (selectedProvider?.id) {
+        updatePayload.provider_id = selectedProvider.id;
+      }
+      if (selectedProvider?.provider_type) {
+        updatePayload.provider_type = selectedProvider.provider_type;
       }
 
       // Update workflow with selected rules
@@ -140,30 +230,38 @@ export default function PIIDetectionConfig() {
     }
   };
 
-  const toggleRuleSelection = (ruleId: string) => {
-    setSelectedRules((prev) =>
-      prev.includes(ruleId)
-        ? prev.filter((id) => id !== ruleId)
-        : [...prev, ruleId],
-    );
+  const toggleRuleSelection = (ruleId: string, probeId: string) => {
+    setSelectedRules((prev) => {
+      const exists = prev.some(s => s.probeId === probeId && s.ruleId === ruleId);
+      if (exists) {
+        return prev.filter(s => !(s.probeId === probeId && s.ruleId === ruleId));
+      } else {
+        return [...prev, { probeId, ruleId }];
+      }
+    });
   };
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
     if (checked) {
-      setSelectedRules(getFilteredRules().map((rule) => rule.id));
+      const allRuleSelections = getFilteredRules().map((ruleWithProbe) => ({
+        probeId: ruleWithProbe.probeId,
+        ruleId: ruleWithProbe.rule.id
+      }));
+      setSelectedRules(allRuleSelections);
     } else {
       setSelectedRules([]);
     }
   };
 
   const getFilteredRules = () => {
-    if (!searchTerm) return probeRules;
+    if (!searchTerm) return allRules;
 
-    return probeRules.filter(
-      (rule) =>
-        rule.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        rule.description.toLowerCase().includes(searchTerm.toLowerCase()),
+    return allRules.filter(
+      (ruleWithProbe) =>
+        ruleWithProbe.rule.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ruleWithProbe.rule.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ruleWithProbe.probeName.toLowerCase().includes(searchTerm.toLowerCase()),
     );
   };
 
@@ -176,15 +274,20 @@ export default function PIIDetectionConfig() {
       onNext={handleNext}
       backText="Back"
       nextText="Next"
-      disableNext={selectedRules.length === 0}
+      disableNext={selectedRules.length === 0 || workflowLoading}
     >
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
-            title={selectedProbe?.name || "PII Detection"}
+            title={
+              probesArray.length > 1
+                ? `Configure ${probesArray.length} Probes`
+                : (probesArray[0]?.name || "PII Detection")
+            }
             description={
-              selectedProbe?.description ||
-              "Configure PII detection rules to identify and protect sensitive personal information"
+              probesArray.length > 1
+                ? `Configure detection rules for ${probesArray.map(p => p?.name).join(", ")}`
+                : (probesArray[0]?.description || "Configure PII detection rules to identify and protect sensitive personal information")
             }
             classNames="pt-[.8rem]"
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
@@ -255,21 +358,25 @@ export default function PIIDetectionConfig() {
 
               {/* Rules List - ModelListCard Style */}
               <div className="max-h-[400px] overflow-y-auto">
-                {rulesLoading ? (
+                {isLoadingRules ? (
                   <div className="flex justify-center py-[3rem]">
                     <Spin size="large" />
                   </div>
                 ) : (
-                  filteredRules.map((rule) => {
-                    const isHovered = hoveredRule === rule.id;
-                    const isSelected = selectedRules.includes(rule.id);
+                  filteredRules.map((ruleWithProbe) => {
+                    const rule = ruleWithProbe.rule;
+                    const ruleKey = `${ruleWithProbe.probeId}-${rule.id}`;
+                    const isHovered = hoveredRule === ruleKey;
+                    const isSelected = selectedRules.some(
+                      s => s.probeId === ruleWithProbe.probeId && s.ruleId === rule.id
+                    );
 
                     return (
                       <div
-                        key={rule.id}
-                        onMouseEnter={() => setHoveredRule(rule.id)}
+                        key={ruleKey}
+                        onMouseEnter={() => setHoveredRule(ruleKey)}
                         onMouseLeave={() => setHoveredRule(null)}
-                        onClick={() => toggleRuleSelection(rule.id)}
+                        onClick={() => toggleRuleSelection(rule.id, ruleWithProbe.probeId)}
                         className={`pt-[1.05rem] pb-[0.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] border-y-[#1F1F1F] hover:border-[#757575] flex-row flex border-box hover:bg-[#FFFFFF08] transition-all ${
                           isSelected ? "bg-[#FFFFFF08] border-[#965CDE]" : ""
                         }`}
@@ -285,7 +392,7 @@ export default function PIIDetectionConfig() {
                         <div className="flex justify-between flex-col w-full max-w-[85%]">
                           <div className="flex items-center justify-between">
                             <div
-                              className="flex flex-grow max-w-[90%]"
+                              className="flex flex-col flex-grow max-w-[90%]"
                               style={{
                                 width:
                                   isHovered || isSelected ? "12rem" : "90%",
@@ -296,6 +403,11 @@ export default function PIIDetectionConfig() {
                                   {rule.name}
                                 </div>
                               </CustomPopover>
+                              {probesArray.length > 1 && (
+                                <div className="text-[#965CDE] text-[0.625rem] mt-[0.2rem]">
+                                  {ruleWithProbe.probeName}
+                                </div>
+                              )}
                             </div>
 
                             {/* Actions Section */}
@@ -318,7 +430,7 @@ export default function PIIDetectionConfig() {
                                   onClick={(e) => e.stopPropagation()}
                                   onChange={(e) => {
                                     e.stopPropagation();
-                                    toggleRuleSelection(rule.id);
+                                    toggleRuleSelection(rule.id, ruleWithProbe.probeId);
                                   }}
                                 />
                               </CustomPopover>
@@ -337,7 +449,7 @@ export default function PIIDetectionConfig() {
                   })
                 )}
 
-                {!rulesLoading && filteredRules.length === 0 && (
+                {!isLoadingRules && filteredRules.length === 0 && (
                   <div className="text-center py-[2rem]">
                     <Text_12_400_757575>
                       No rules found matching your search

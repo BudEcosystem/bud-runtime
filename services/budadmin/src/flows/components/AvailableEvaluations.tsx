@@ -130,9 +130,9 @@ export default function EvaluationList({
   selectedEvaluation: Evaluation | null;
   hideSelection?: boolean;
 }) {
-  return evaluations?.map((evaluation) => (
+  return evaluations?.map((evaluation, index) => (
     <EvaluationCard
-      key={evaluation.id}
+      key={`${evaluation.id}-${index}`}
       data={evaluation}
       hideSelection={hideSelection}
       selected={evaluation.id === selectedEvaluation?.id}

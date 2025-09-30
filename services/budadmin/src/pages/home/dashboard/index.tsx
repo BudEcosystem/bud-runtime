@@ -953,7 +953,7 @@ const Dashboard = () => {
             {/* number of api calls chart */}
             <div className="cardBG w-[49.1%] cardSetTwo  py-[1.9rem] px-[1.65rem] border border-[#1F1F1F] rounded-md">
               <Flex className="justify-between align-center">
-                <Text_19_600_EEEEEE>Number of API Calls</Text_19_600_EEEEEE>
+                <Text_19_600_EEEEEE>API Calls</Text_19_600_EEEEEE>
                 <Segmented
                   options={segmentOptions}
                   value={segmentOptions.find(

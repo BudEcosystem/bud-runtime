@@ -63,6 +63,16 @@ pub struct ObservabilityEvent {
     pub user_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key_project_id: Option<String>,
+
+    // Error information for failed inferences
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_code: Option<u16>,
 }
 
 impl CloudEvent {
@@ -158,6 +168,10 @@ mod tests {
             api_key_id: None,
             user_id: None,
             api_key_project_id: None,
+            error_code: None,
+            error_message: None,
+            error_type: None,
+            status_code: None,
         };
 
         let entry = ObservabilityEntry::new(event);
@@ -186,6 +200,10 @@ mod tests {
             api_key_id: None,
             user_id: None,
             api_key_project_id: None,
+            error_code: None,
+            error_message: None,
+            error_type: None,
+            status_code: None,
         };
 
         // Valid event

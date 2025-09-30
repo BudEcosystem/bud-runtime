@@ -960,3 +960,38 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
         result = self.execute_all(stmt)
 
         return result, count
+
+    async def get_existing_deployments_for_endpoints(
+        self, endpoint_ids: List[UUID]
+    ) -> Dict[UUID, GuardrailDeployment]:
+        """Get existing guardrail deployments for given endpoint IDs.
+
+        Returns a dictionary mapping endpoint_id to deployment for endpoints that have
+        non-deleted guardrail deployments. The deployment objects include the related
+        endpoint and profile data via eager loading.
+
+        Args:
+            endpoint_ids: List of endpoint IDs to check
+
+        Returns:
+            Dict mapping endpoint_id to GuardrailDeployment for endpoints with existing deployments
+        """
+        if not endpoint_ids:
+            return {}
+
+        stmt = (
+            select(GuardrailDeployment)
+            .where(GuardrailDeployment.endpoint_id.in_(endpoint_ids))
+            .where(GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED)
+            .options(joinedload(GuardrailDeployment.profile), joinedload(GuardrailDeployment.endpoint))
+        )
+
+        result = self.execute_all(stmt)
+
+        # Convert to dictionary keyed by endpoint_id
+        existing_deployments = {}
+        for deployment in result:
+            if deployment[0].endpoint_id:
+                existing_deployments[deployment[0].endpoint_id] = deployment[0]
+
+        return existing_deployments

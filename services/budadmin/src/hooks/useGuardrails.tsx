@@ -106,8 +106,10 @@ interface GuardrailsState {
 
   // Single probe
   selectedProbe: Probe | null;
+  selectedProbes: Probe[]; // Multiple selected probes
   fetchProbeById: (id: string) => Promise<void>;
   setSelectedProbe: (probe: Probe | null) => void;
+  setSelectedProbes: (probes: Probe[]) => void;
   clearSelectedProbe: () => void;
 
   // Selected project for guardrail deployment
@@ -124,8 +126,8 @@ interface GuardrailsState {
   workflowError: string | null;
 
   // Workflow actions
-  createWorkflow: (providerId: string) => Promise<void>;
-  updateWorkflow: (data: Partial<GuardrailsWorkflow>) => Promise<void>;
+  createWorkflow: (providerId: string, providerType?: string) => Promise<void>;
+  updateWorkflow: (data: Partial<GuardrailsWorkflow>) => Promise<boolean>;
   getWorkflow: (workflowId?: string) => Promise<void>;
   clearWorkflow: () => void;
 
@@ -162,6 +164,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   selectedProviderType: null,
 
   selectedProbe: null,
+  selectedProbes: [], // Initialize empty array for multiple probes
   selectedProject: null,
   selectedDeployment: null,
 
@@ -214,7 +217,6 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       if (params?.search) {
         queryParams.search = params.search;
       }
-
       const response = await AppRequest.Get("/guardrails/probes", {
         params: queryParams,
       });
@@ -244,7 +246,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
     set({ probesLoading: true, probesError: null });
 
     try {
-      const response = await AppRequest.Get(`/guardrails/probes/${id}`);
+      const response = await AppRequest.Get(`/guardrails/probe/${id}`);
 
       if (response.data) {
         set({
@@ -298,9 +300,14 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
     set({ selectedProbe: probe });
   },
 
+  // Set multiple selected probes
+  setSelectedProbes: (probes: Probe[]) => {
+    set({ selectedProbes: probes });
+  },
+
   // Clear selected probe
   clearSelectedProbe: () => {
-    set({ selectedProbe: null });
+    set({ selectedProbe: null, selectedProbes: [] });
   },
 
   // Set selected project
@@ -319,7 +326,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   },
 
   // Create workflow
-  createWorkflow: async (providerId: string) => {
+  createWorkflow: async (providerId: string, providerType?: string) => {
     set({ workflowLoading: true, workflowError: null });
 
     try {
@@ -327,6 +334,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
         "/guardrails/deploy-workflow",
         {
           provider_id: providerId,
+          provider_type: providerType,
           step_number: 1,
           workflow_total_steps: 5, // Not counting the first step
           trigger_workflow: false,
@@ -336,7 +344,6 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       if (response.data) {
         set({
           currentWorkflow: response.data,
-          workflowLoading: false,
         });
 
         // Fetch the workflow data after creation
@@ -349,15 +356,19 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
         workflowLoading: false,
         currentWorkflow: null,
       });
+    } finally {
+      // Ensure workflowLoading is always set to false
+      set({ workflowLoading: false });
     }
   },
 
-  // Update workflow
-  updateWorkflow: async (data: Partial<GuardrailsWorkflow>) => {
+  // Update workflow - returns true on success, false on failure
+  updateWorkflow: async (data: Partial<GuardrailsWorkflow>): Promise<boolean> => {
     const currentWorkflow = get().currentWorkflow;
     if (!currentWorkflow?.workflow_id) {
+      console.error("updateWorkflow: No active workflow found");
       errorToast("No active workflow found");
-      return;
+      return false;
     }
 
     set({ workflowLoading: true, workflowError: null });
@@ -368,26 +379,59 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
         ...data,
       };
 
+      console.log("updateWorkflow: Sending request to /guardrails/deploy-workflow");
       const response = await AppRequest.Post(
         "/guardrails/deploy-workflow",
         payload,
       );
 
-      if (response.data) {
+      console.log("updateWorkflow: Response received:", {
+        status: response?.status,
+        hasData: !!response?.data,
+        dataKeys: response?.data ? Object.keys(response.data) : []
+      });
+
+      // Check for successful response (status 200-299)
+      if (response && response.status >= 200 && response.status < 300 && response.data) {
         set({
           currentWorkflow: response.data,
-          workflowLoading: false,
         });
 
         // Fetch the workflow data after update
         await get().getWorkflow(currentWorkflow.workflow_id);
+
+        console.log("updateWorkflow: ✅ Success with status:", response.status);
+        // Return true to indicate success
+        return true;
       }
+
+      // If we get here, something went wrong
+      const errorMsg = response?.data?.detail || response?.data?.message || "No response data from workflow update";
+      console.error("updateWorkflow: ❌ Failed:", errorMsg, "Status:", response?.status);
+      errorToast(errorMsg);
+      set({ workflowLoading: false });
+      return false;
     } catch (error: any) {
-      errorToast(error?.message || "Failed to update workflow");
+      console.error("updateWorkflow: Caught error:", error);
+
+      const errorMessage = error?.response?.data?.detail ||
+                          error?.response?.data?.message ||
+                          error?.message ||
+                          "Failed to update workflow";
+
+      console.error("updateWorkflow: ❌ Error message:", errorMessage);
+      errorToast(errorMessage);
+
       set({
-        workflowError: error?.message || "Failed to update workflow",
+        workflowError: errorMessage,
         workflowLoading: false,
       });
+
+      // Always return false on error
+      return false;
+    } finally {
+      // Ensure workflowLoading is always set to false
+      set({ workflowLoading: false });
     }
   },
 
@@ -402,21 +446,22 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
 
     try {
       const response = await AppRequest.Get(
-        `/guardrails/deployment-workflow/${id}`,
+        `/workflows/${id}`,
       );
 
       if (response.data) {
         set({
           currentWorkflow: response.data,
-          workflowLoading: false,
         });
       }
     } catch (error: any) {
       errorToast(error?.message || "Failed to fetch workflow");
       set({
         workflowError: error?.message || "Failed to fetch workflow",
-        workflowLoading: false,
       });
+    } finally {
+      // Ensure workflowLoading is always set to false
+      set({ workflowLoading: false });
     }
   },
 
@@ -451,7 +496,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       }
 
       const response = await AppRequest.Get(
-        `/guardrails/probes/${probeId}/rules`,
+        `/guardrails/probe/${probeId}/rules`,
         {
           params: queryParams,
         },

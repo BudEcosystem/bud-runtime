@@ -57,7 +57,8 @@ class AppConfig(BaseAppConfig):
 
     # ClickHouse Configuration (moved from SecretsConfig)
     clickhouse_host: str = Field(default="okb80nfy88.ap-southeast-1.aws.clickhouse.cloud", alias="CLICKHOUSE_HOST")
-    clickhouse_port: int = Field(default=9000, alias="CLICKHOUSE_PORT")
+    clickhouse_port: int = Field(default=9000, alias="CLICKHOUSE_PORT")  # Native protocol port
+    clickhouse_http_port: int = Field(default=8123, alias="CLICKHOUSE_HTTP_PORT")  # HTTP port for clickhouse-connect
     clickhouse_database: str = Field(default="budeval", alias="CLICKHOUSE_DATABASE")
     clickhouse_user: str = Field(default="default", alias="CLICKHOUSE_USER")
     clickhouse_password: str = Field(default="N_8Bq67UGItUD", alias="CLICKHOUSE_PASSWORD")

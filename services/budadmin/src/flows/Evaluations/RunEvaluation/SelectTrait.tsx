@@ -14,7 +14,7 @@ export default function SelectTrait() {
   const [limit, setLimit] = React.useState(1000);
   const { openDrawerWithStep, drawerProps } = useDrawer();
   const [hover, setHover] = React.useState(false);
-  const { createEvaluationWorkflow, currentWorkflow, getTraits, traitsList } =
+  const { createWorkflow, currentWorkflow, getTraits, traitsList } =
     useEvaluations();
 
   const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
@@ -110,7 +110,7 @@ export default function SelectTrait() {
 
           // Get experiment ID from workflow or drawer props
           const experimentId =
-            currentWorkflow.experiment_id || drawerProps?.experimentId;
+            currentWorkflow?.workflow_steps?.experiment_id|| drawerProps?.experimentId;
 
           if (!experimentId) {
             errorToast("Experiment ID not found");
@@ -129,12 +129,10 @@ export default function SelectTrait() {
           };
 
           // Call the API
-          const response = await createEvaluationWorkflow(
+          const response = await createWorkflow(
             experimentId,
             payload,
           );
-
-          successToast("Traits selected successfully");
 
           // Navigate to next step
           openDrawerWithStep("select-evaluation");
