@@ -335,6 +335,11 @@ class NotificationService(SessionMixin):
         # Update progress in workflow
         await self._update_workflow_progress(BudServeWorkflowStepEventName.EVALUATION_EVENTS.value, payload)
 
+        return NotificationResponse(
+            object="notification",
+            message="Evaluation results are updated",
+        ).to_http_response()
+
         # # Handle evaluation completion/failure events similar to cluster creation
         # if payload.event == "results":
         #     from ..eval_ops.services import EvaluationWorkflowService
