@@ -19,6 +19,7 @@
 from budmicroframe.commons import logging
 
 from ..commons.connect_utils import BudConnectClient, BudConnectMapper
+from ..commons.exceptions import ModelExtractionException
 from .models import ModelInfoCRUD
 from .schemas import CloudModelExtractionRequest, CloudModelExtractionResponse, ModelInfo
 
@@ -47,6 +48,9 @@ class CloudModelExtractionService:
 
             # Fetch data from external service
             cloud_data = await client.fetch_model_details(request.model_uri)
+
+            if cloud_data is None:
+                raise ModelExtractionException(f"Model '{request.model_uri}' not found in BudConnect.")
 
             # Map to ModelInfo schema
             model_info_data = self.mapper.map_to_model_info(cloud_data)
