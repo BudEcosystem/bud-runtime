@@ -109,8 +109,8 @@ class HuggingFaceWithBudConnect:
         # Convert ModelInfo to dict for mapping
         model_info_dict = model_info.model_dump(mode="json")
 
-        # Map to BudConnect format
-        budconnect_data = self.mapper.model_info_to_budconnect(model_info_dict, model_evals)
+        # Map to BudConnect format (pass client for dynamic provider ID fetching)
+        budconnect_data = await self.mapper.model_info_to_budconnect(model_info_dict, model_evals, self.client)
 
         # Save to BudConnect
         await self.client.save_model_details(budconnect_data)

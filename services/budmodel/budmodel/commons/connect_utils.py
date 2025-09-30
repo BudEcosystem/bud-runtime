@@ -25,7 +25,7 @@ import httpx
 from budmicroframe.commons import logging
 
 from .config import app_settings
-from .constants import ModelExtractionStatus
+from .constants import HUGGINGFACE_PROVIDER_ID_FALLBACK, ModelExtractionStatus
 from .exceptions import ModelExtractionException
 
 
@@ -44,6 +44,8 @@ class BudConnectClient:
         """
         self.base_url = base_url or app_settings.budconnect_url
         self.timeout = timeout or app_settings.budconnect_timeout
+        # Cache for provider IDs to avoid repeated API calls
+        self._provider_cache: Dict[str, str] = {}
 
     async def fetch_model_details(self, model_uri: str) -> Optional[Dict[str, Any]]:
         """Fetch model details from BudConnect.
@@ -113,6 +115,73 @@ class BudConnectClient:
                     return model
 
             logger.info("No exact match found in search results for: %s", model_uri)
+            return None
+
+    async def get_provider_id(self, provider_name: str) -> Optional[str]:
+        """Fetch provider ID from BudConnect by provider name.
+
+        Args:
+            provider_name: Name of the provider (e.g., "Huggingface", "OpenAI").
+
+        Returns:
+            Provider ID if found, None otherwise.
+        """
+        # Check cache first
+        cache_key = provider_name.lower()
+        if cache_key in self._provider_cache:
+            return self._provider_cache[cache_key]
+
+        # Fetch from API
+        url = f"{self.base_url}/providers/"
+        params = {"search": provider_name}
+
+        logger.info("Fetching provider ID for: %s", provider_name)
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    url, params=params, headers={"accept": "application/json"}, timeout=self.timeout
+                )
+                response.raise_for_status()
+                result = response.json()
+
+                providers = result.get("providers", [])
+                if not providers:
+                    logger.warning("No provider found with name: %s", provider_name)
+                    return None
+
+                # Find exact match (case-insensitive)
+                for provider in providers:
+                    if provider.get("name", "").lower() == provider_name.lower():
+                        provider_id = provider.get("id")
+                        if provider_id:
+                            logger.info("Found provider ID for %s: %s", provider_name, provider_id)
+                            # Cache the result
+                            self._provider_cache[cache_key] = provider_id
+                            return provider_id
+
+                # If no exact match, use the first result as fallback
+                first_provider = providers[0]
+                provider_id = first_provider.get("id")
+                if provider_id:
+                    logger.warning(
+                        "No exact match for provider %s, using first result: %s (ID: %s)",
+                        provider_name,
+                        first_provider.get("name"),
+                        provider_id,
+                    )
+                    # Cache the result
+                    self._provider_cache[cache_key] = provider_id
+                    return provider_id
+
+                logger.warning("No valid provider ID found for: %s", provider_name)
+                return None
+
+        except httpx.HTTPError as e:
+            logger.error("Failed to fetch provider ID for %s: %s", provider_name, str(e))
+            return None
+        except Exception as e:
+            logger.exception("Unexpected error fetching provider ID: %s", str(e))
             return None
 
     async def save_model_details(self, model_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -202,14 +271,17 @@ class BudConnectMapper:
     """Maps BudConnect API responses to internal schemas and vice versa."""
 
     @staticmethod
-    def model_info_to_budconnect(
-        model_info: Dict[str, Any], model_evals: Optional[List[Dict[str, Any]]] = None
+    async def model_info_to_budconnect(
+        model_info: Dict[str, Any],
+        model_evals: Optional[List[Dict[str, Any]]] = None,
+        client: Optional[BudConnectClient] = None,
     ) -> Dict[str, Any]:
         """Convert ModelInfo to BudConnect format for saving.
 
         Args:
             model_info: ModelInfo data dictionary.
             model_evals: Optional list of model evaluation data.
+            client: Optional BudConnect client for fetching provider IDs.
 
         Returns:
             Dictionary formatted for BudConnect API.
@@ -252,8 +324,20 @@ class BudConnectMapper:
         if not budconnect_modality:
             budconnect_modality = ["text_input", "text_output"]
 
-        # Huggingface provider ID from BudConnect
-        HUGGINGFACE_PROVIDER_ID = "3f7ce438-8f4b-4737-8c73-7c2c336d1d1a"
+        # Get provider ID dynamically
+        provider_id = None
+        if client:
+            # Try to get provider ID from BudConnect
+            provider_name = model_info.get("author", "Huggingface")
+            if provider_name.lower() in ["huggingface", "hugging face", "hf"]:
+                provider_name = "Huggingface"
+            provider_id = await client.get_provider_id(provider_name)
+
+        # Fallback to known provider IDs if API call fails
+        if not provider_id:
+            # Use the known Huggingface provider ID as fallback
+            provider_id = HUGGINGFACE_PROVIDER_ID_FALLBACK
+            logger.warning("Using fallback provider ID for Huggingface: %s", provider_id)
 
         # Map HuggingFace tasks/pipeline_tags to BudConnect API endpoints
         # Based on model capabilities, determine which OpenAI-compatible endpoints it supports
@@ -309,7 +393,7 @@ class BudConnectMapper:
 
         budconnect_data = {
             "uri": model_info.get("uri", ""),
-            "provider_id": HUGGINGFACE_PROVIDER_ID,  # Required field
+            "provider_id": provider_id,  # Required field - dynamically fetched
             "provider_name": model_info.get("author", "Unknown"),
             "description": model_info.get("description", ""),
             "modality": budconnect_modality,
