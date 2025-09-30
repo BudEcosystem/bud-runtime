@@ -297,6 +297,13 @@ class PromptSchemaRequest(CloudEventBase):
     schema: SchemaBase = Field(None, description="JSON schema for structured input/output (None for unstructured)")
     type: Literal["input", "output"] = Field(..., description="Type of schema - either 'input' or 'output'")
     deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
+    # Fields for API key bypass during validation
+    endpoint_id: Optional[str] = Field(None, description="Endpoint ID for API key bypass")
+    model_id: Optional[str] = Field(None, description="Model ID for API key bypass")
+    project_id: Optional[str] = Field(None, description="Project ID for API key bypass")
+    user_id: Optional[str] = Field(None, description="User ID for API key bypass")
+    api_key_project_id: Optional[str] = Field(None, description="API key project ID for API key bypass")
+    access_token: Optional[str] = Field(None, description="JWT access token to be hashed for API key bypass")
 
 
 class PromptSchemaResponse(ResponseBase):

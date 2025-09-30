@@ -40,6 +40,7 @@ from ..commons.exceptions import (
     TemplateRenderingException,
 )
 from ..commons.helpers import run_async
+from ..commons.security import HashManager
 from ..shared.redis_service import RedisService
 from .executors import SimplePromptExecutor
 from .revised_code.field_validation import generate_validation_function
@@ -318,7 +319,10 @@ class PromptConfigurationService:
 
     @staticmethod
     async def _generate_codes_async(
-        validations: Dict[str, Dict[str, str]], deployment_name: str, max_concurrent: int = 10
+        validations: Dict[str, Dict[str, str]],
+        deployment_name: str,
+        max_concurrent: int = 10,
+        access_token: str = None,
     ) -> Dict[str, Dict[str, Dict[str, str]]]:
         """Generate validation codes asynchronously for all fields.
 
@@ -326,6 +330,7 @@ class PromptConfigurationService:
             validations: Field validation prompts by model name
             deployment_name: The name of the model deployment to use
             max_concurrent: Maximum number of concurrent LLM calls
+            access_token: The access token to use for authentication
 
         Returns:
             Dictionary with validation codes structure
@@ -340,7 +345,7 @@ class PromptConfigurationService:
         async def generate_with_semaphore(field_name: str, prompt: str):
             """Generate validation code with semaphore limit."""
             async with semaphore:
-                return await generate_validation_function(field_name, prompt, deployment_name)
+                return await generate_validation_function(field_name, prompt, deployment_name, access_token)
 
         # Process validations
         if validations:
@@ -364,6 +369,65 @@ class PromptConfigurationService:
         return result
 
     @staticmethod
+    def _store_api_key_bypass(
+        hashed_token: str,
+        deployment_name: str,
+        endpoint_id: Optional[str],
+        model_id: Optional[str],
+        project_id: Optional[str],
+        user_id: Optional[str],
+        api_key_project_id: Optional[str],
+        ttl: int = 3600,
+    ) -> None:
+        """Store API key bypass data in Redis for validation process.
+
+        Args:
+            hashed_token: The hashed JWT token
+            deployment_name: The deployment name for the cache entry
+            endpoint_id: The endpoint ID
+            model_id: The model ID
+            project_id: The project ID
+            user_id: The user ID
+            api_key_project_id: The API key project ID
+            ttl: Time to live in seconds (default 3600 seconds = 1 hour)
+        """
+        redis_service = RedisService()
+
+        # Build cache data structure matching budapp format
+        cache_data = {
+            deployment_name: {
+                "endpoint_id": str(endpoint_id) if endpoint_id else None,
+                "model_id": str(model_id) if model_id else None,
+                "project_id": str(project_id) if project_id else None,
+            },
+            "__metadata__": {
+                "api_key_id": None,  # Not applicable for JWT
+                "user_id": str(user_id) if user_id else None,
+                "api_key_project_id": str(api_key_project_id) if api_key_project_id else None,
+            },
+        }
+
+        redis_key = f"api_key:{hashed_token}"
+        cache_json = json.dumps(cache_data)
+
+        # Store in Redis with TTL
+        run_async(redis_service.set(redis_key, cache_json, ex=ttl))
+        logger.debug(f"Stored API key bypass for deployment {deployment_name} with TTL {ttl} seconds")
+
+    @staticmethod
+    def _remove_api_key_bypass(hashed_token: str) -> None:
+        """Remove API key bypass data from Redis after validation.
+
+        Args:
+            hashed_token: The hashed JWT token
+        """
+        redis_service = RedisService()
+        redis_key = f"api_key:{hashed_token}"
+
+        run_async(redis_service.delete(redis_key))
+        logger.debug("Removed API key bypass from Redis after validation")
+
+    @staticmethod
     def generate_validation_codes(
         workflow_id: str,
         notification_request: NotificationRequest,
@@ -372,6 +436,12 @@ class PromptConfigurationService:
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
         max_concurrent: int = 10,
+        access_token: Optional[str] = None,
+        endpoint_id: Optional[str] = None,
+        model_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        api_key_project_id: Optional[str] = None,
     ) -> Optional[Dict[str, Dict[str, Dict[str, str]]]]:
         """Generate validation code for all fields using LLM in parallel.
 
@@ -413,10 +483,35 @@ class PromptConfigurationService:
         try:
             # Run the async code generation only if there are validations
             validation_codes = None
+            hashed_token = None
+
             if validations:
+                # Store API key bypass in Redis if access_token is provided
+                if access_token:
+                    # Hash the JWT token using the same pattern as budapp
+                    hashed_token = HashManager().create_sha_256_hash(f"bud-{access_token}")
+                    PromptConfigurationService._store_api_key_bypass(
+                        hashed_token=hashed_token,
+                        deployment_name=deployment_name,
+                        endpoint_id=endpoint_id,
+                        model_id=model_id,
+                        project_id=project_id,
+                        user_id=user_id,
+                        api_key_project_id=api_key_project_id,
+                        ttl=3600,  # Fixed 1 hour TTL for validation process
+                    )
+                    logger.debug("Stored API key bypass for validation generation with TTL 3600 seconds")
+
                 validation_codes = run_async(
-                    PromptConfigurationService._generate_codes_async(validations, deployment_name, max_concurrent)
+                    PromptConfigurationService._generate_codes_async(
+                        validations, deployment_name, max_concurrent, access_token
+                    )
                 )
+
+                # Remove API key bypass after validation code generation
+                if hashed_token:
+                    PromptConfigurationService._remove_api_key_bypass(hashed_token)
+
                 if not validation_codes:
                     raise Exception("Failed to generate validation codes")
 
@@ -748,6 +843,13 @@ class PromptConfigurationService:
             request.deployment_name,
             request.source_topic,
             request.source,
+            max_concurrent=10,
+            access_token=request.access_token,
+            endpoint_id=request.endpoint_id,
+            model_id=request.model_id,
+            project_id=request.project_id,
+            user_id=request.user_id,
+            api_key_project_id=request.api_key_project_id,
         )
 
         # Store prompt configuration in Redis
