@@ -17,6 +17,7 @@
 
 """Implements core services and business logic that power the microservices, including key functionality and integrations."""
 
+import asyncio
 import json
 import math
 import os
@@ -70,6 +71,7 @@ from .exceptions import (
     UnsupportedModelException,
 )
 from .huggingface import HuggingFaceModelInfo, HuggingfaceUtils
+from .huggingface_budconnect import HuggingFaceWithBudConnect
 from .license import LicenseExtractor
 from .local_model import LocalModelDownloadService, LocalModelExtraction
 from .models import ModelInfoCRUD
@@ -754,7 +756,25 @@ class ModelExtractionService:
             # initializing model evals
             model_evals = []
             if provider_type == "hugging_face":
-                model_info, model_evals = HuggingFaceModelInfo().from_pretrained(model_uri, hf_token)
+                # Try to get from BudConnect first, then extract if needed
+                budconnect_extractor = HuggingFaceWithBudConnect()
+
+                try:
+                    # Run async extraction in sync context
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        model_info, model_evals, from_cache = loop.run_until_complete(
+                            budconnect_extractor.extract_model_info(model_uri, hf_token)
+                        )
+                        logger.info("Model info extracted (from_cache=%s): %s", from_cache, model_uri)
+                    finally:
+                        loop.close()
+                except Exception as e:
+                    logger.warning("BudConnect integration failed, falling back to direct extraction: %s", str(e))
+                    # Fallback to direct HuggingFace extraction
+                    model_info, model_evals = HuggingFaceModelInfo().from_pretrained(model_uri, hf_token)
+
                 ModelExtractionService.validate_model_extraction(model_info, model_evals, True)
             elif provider_type in ["url", "disk"]:
                 model_info = LocalModelExtraction(model_uri, model_path).extract_model_info()
