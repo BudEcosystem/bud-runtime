@@ -116,6 +116,7 @@ class PromptSchemaWorkflow:
                 "workflow_id": workflow_id,
                 "notification_request": notification_request_dict,
                 "validations": request.schema.validations,
+                "deployment_name": request.deployment_name,
                 "target_topic_name": request.source_topic,
                 "target_name": request.source,
             },

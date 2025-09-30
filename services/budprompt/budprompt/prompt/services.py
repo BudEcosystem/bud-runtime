@@ -318,12 +318,13 @@ class PromptConfigurationService:
 
     @staticmethod
     async def _generate_codes_async(
-        validations: Dict[str, Dict[str, str]], max_concurrent: int = 10
+        validations: Dict[str, Dict[str, str]], deployment_name: str, max_concurrent: int = 10
     ) -> Dict[str, Dict[str, Dict[str, str]]]:
         """Generate validation codes asynchronously for all fields.
 
         Args:
             validations: Field validation prompts by model name
+            deployment_name: The name of the model deployment to use
             max_concurrent: Maximum number of concurrent LLM calls
 
         Returns:
@@ -339,7 +340,7 @@ class PromptConfigurationService:
         async def generate_with_semaphore(field_name: str, prompt: str):
             """Generate validation code with semaphore limit."""
             async with semaphore:
-                return await generate_validation_function(field_name, prompt)
+                return await generate_validation_function(field_name, prompt, deployment_name)
 
         # Process validations
         if validations:
@@ -367,6 +368,7 @@ class PromptConfigurationService:
         workflow_id: str,
         notification_request: NotificationRequest,
         validations: Optional[Dict[str, Dict[str, str]]],
+        deployment_name: str,
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
         max_concurrent: int = 10,
@@ -377,6 +379,7 @@ class PromptConfigurationService:
             workflow_id: Workflow identifier for tracking
             notification_request: Notification request for status updates
             validations: Field validation prompts by model name
+            deployment_name: The name of the model deployment to use
             target_topic_name: Optional target topic for notifications
             target_name: Optional target name for notifications
             max_concurrent: Maximum number of concurrent LLM calls
@@ -412,8 +415,10 @@ class PromptConfigurationService:
             validation_codes = None
             if validations:
                 validation_codes = run_async(
-                    PromptConfigurationService._generate_codes_async(validations, max_concurrent)
+                    PromptConfigurationService._generate_codes_async(validations, deployment_name, max_concurrent)
                 )
+                if not validation_codes:
+                    raise Exception("Failed to generate validation codes")
 
             notification_req.payload.content = NotificationContent(
                 title="Successfully generated validation codes",
@@ -740,6 +745,7 @@ class PromptConfigurationService:
             workflow_id,
             notification_request,
             request.schema.validations,
+            request.deployment_name,
             request.source_topic,
             request.source,
         )
