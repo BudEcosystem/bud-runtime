@@ -3,32 +3,21 @@ import { FlowDocumentJSON } from '@flowgram.ai/fixed-layout-editor';
 export const multiInputs: FlowDocumentJSON = {
   nodes: [
     {
-      id: 'input_0',
-      type: 'input',  // this node holds multiple inputs
-      data: { title: 'Input' ,
-        inputs: [
-          { id: 'input_1', label: 'Input 1', value: '' },
-          { id: 'input_2', label: 'Input 2', value: '' },
-          { id: 'input_3', label: 'Input 3', value: '' },
-        ],
+      id: 'multiInputs_0',
+      type: 'multiInputs',
+      data: {
+        title: 'User Information Form',
+        inputs: [],
       },
-      // blocks: [
-      //   {
-      //     id: 'inputVar_1',
-      //     type: 'input', // sub-input inside the main node
-      //     data: { title: 'Input Variable 1' },
-      //   },
-      //   {
-      //     id: 'inputVar_2',
-      //     type: 'input',
-      //     data: { title: 'Input Variable 2' },
-      //   },
-      //   {
-      //     id: 'inputVar_3',
-      //     type: 'input',
-      //     data: { title: 'Input Variable 3' },
-      //   },
-      // ],
+    },
+    {
+      id: 'cardInput_0',
+      type: 'cardInput',
+      data: {
+        title: 'Additional Details',
+        description: 'Optional information',
+        inputs: [],
+      },
     },
     {
       id: 'systemPrompt_0',
@@ -47,7 +36,8 @@ export const multiInputs: FlowDocumentJSON = {
     },
   ],
   connections: [
-    { from: 'input_0', to: 'systemPrompt_0' },
+    { from: 'multiInputs_0', to: 'cardInput_0' },
+    { from: 'cardInput_0', to: 'systemPrompt_0' },
     { from: 'systemPrompt_0', to: 'promptMessages_0' },
     { from: 'promptMessages_0', to: 'outputMessages_0' },
   ],

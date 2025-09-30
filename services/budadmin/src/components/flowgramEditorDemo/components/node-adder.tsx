@@ -80,8 +80,8 @@ export const NodeAdder = (props: {
     //     ) : null}
     //   </div>
     // </Dropdown>
-    <>{nodeRegistries.map((registry) => (
-    <div onClick={() => {
+    <>{nodeRegistries.map((registry, index) => (
+    <div key={registry.type || index} onClick={() => {
                 const props = registry?.onAdd(context, from);
                 add(props);
               }}></div>))}

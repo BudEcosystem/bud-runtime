@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: MIT
  */
 
+import React from 'react';
 import { nanoid } from 'nanoid';
 import { FlowNodeRegistry } from '@flowgram.ai/fixed-layout-editor';
+import { MultiInputCard } from './components/multi-input-card';
 
 /**
  * 自定义节点注册
@@ -85,12 +87,14 @@ export const nodeRegistries: FlowNodeRegistry[] = [
       return {
         id: `multiInputs_${nanoid(5)}`,
         type: 'multiInputs',
-        blocks: [
-          { id: nanoid(5), type: 'input', data: { title: 'input_0' } },
-          { id: nanoid(5), type: 'input', data: { title: 'input_1' } },
-          { id: nanoid(5), type: 'input', data: { title: 'input_3' } },
-        ],
+        data: {
+          title: 'Multi-Input Card',
+          inputs: [],
+        },
       };
+    },
+    formMeta: {
+      render: ({ node }) => <MultiInputCard node={node} />,
     },
   },
   {
@@ -113,6 +117,26 @@ export const nodeRegistries: FlowNodeRegistry[] = [
         type: 'end',
         data: { title: 'End' },
       };
+    },
+  },
+  {
+    type: 'cardInput',
+    meta: {
+      defaultExpanded: true,
+    },
+    onAdd() {
+      return {
+        id: `cardInput_${nanoid(5)}`,
+        type: 'cardInput',
+        data: {
+          title: 'Form Card',
+          description: 'A card with multiple input fields',
+          inputs: [],
+        },
+      };
+    },
+    formMeta: {
+      render: ({ node }) => <MultiInputCard node={node} />,
     },
   },
 ];
