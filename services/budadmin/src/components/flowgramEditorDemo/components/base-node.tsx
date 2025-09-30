@@ -6,7 +6,7 @@
 import { FlowNodeEntity, useNodeRender, useClientContext } from '@flowgram.ai/fixed-layout-editor';
 // import { IconDeleteStroked } from '@douyinfe/semi-icons';
 
-export const BaseNode = ({ node }: { node: FlowNodeEntity }) => {
+export const BaseNode = ({ node, onNodeClick }: { node: FlowNodeEntity; onNodeClick?: (nodeType: string) => void }) => {
   const ctx = useClientContext();
   /**
    * Provides methods related to node rendering
@@ -32,6 +32,14 @@ export const BaseNode = ({ node }: { node: FlowNodeEntity }) => {
         // trigger drag node
         // nodeRender.startDrag(e);
         e.stopPropagation();
+      }}
+      onClick={() => {
+        // Call the onNodeClick callback with the node type
+        if (onNodeClick) {
+          // Get node type from the node - FlowNodeEntity has type property
+          const nodeType = node?.type || 'unknown';
+          onNodeClick(nodeType);
+        }
       }}
       style={{
         opacity: nodeRender.dragging ? 0.3 : 1,

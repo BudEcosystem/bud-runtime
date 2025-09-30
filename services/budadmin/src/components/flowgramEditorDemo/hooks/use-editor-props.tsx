@@ -25,14 +25,15 @@ import { BaseNode } from '../components/base-node';
 
 export function useEditorProps(
   initialData: FlowDocumentJSON, // 初始化数据
-  nodeRegistries: FlowNodeRegistry[] // 节点定义
+  nodeRegistries: FlowNodeRegistry[], // 节点定义
+  onNodeClick?: (nodeType: string) => void // Callback for node clicks
 ): FixedLayoutProps {
   const DragNode = ({ node }: any) => {
   return (
     <div
       style={{
         padding: '8px 12px',
-        background: '#eee',
+        background: '#060606',
         border: '1px solid #ccc',
         borderRadius: '6px',
         boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
@@ -107,7 +108,7 @@ export function useEditorProps(
           [FlowRendererKey.SLOT_ADDER]: SlotAdder,
           [FlowRendererKey.DRAG_NODE]: DragNode,
         },
-        renderDefaultNode: BaseNode, // 节点渲染
+        renderDefaultNode: (props: any) => <BaseNode {...props} onNodeClick={onNodeClick} />, // 节点渲染
         renderTexts: {
           [FlowTextKey.LOOP_END_TEXT]: 'loop end',
           [FlowTextKey.LOOP_TRAVERSE_TEXT]: 'looping',
@@ -196,6 +197,6 @@ export function useEditorProps(
         // }),
       ],
     }),
-    []
+    [initialData, nodeRegistries, onNodeClick]
   );
 }

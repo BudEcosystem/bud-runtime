@@ -1,34 +1,27 @@
 'use client';
 
 import React, { useState } from "react";
-import { Button, Dropdown, Tooltip, Image } from "antd";
+import { Dropdown, Tooltip } from "antd";
 import {
-  PlusOutlined,
   CloseOutlined,
   CopyOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
 import { useAgentStore, AgentSession, AgentVariable } from "@/stores/useAgentStore";
 import LoadModel from "./LoadModel";
-import { PrimaryButton } from "../ui/bud/form/Buttons";
-import { Text_14_400_757575 } from "../ui/text";
-import { TextInput, TextAreaInput } from "../ui/input";
 import { Editor } from "../flowgramEditorDemo/editor";
+import { SettingsSidebar, SettingsType } from "./settings/SettingsSidebar";
 
 interface AgentBoxProps {
   session: AgentSession;
   index: number;
   totalSessions: number;
-  onToggleRightSidebar?: () => void;
-  isRightSidebarOpen?: boolean;
 }
 
 function AgentBox({
   session,
   index,
-  totalSessions,
-  onToggleRightSidebar,
-  isRightSidebarOpen = false
+  totalSessions
 }: AgentBoxProps) {
   // All hooks must be called before any conditional returns
   const {
@@ -45,10 +38,8 @@ function AgentBox({
   const [localSystemPrompt, setLocalSystemPrompt] = useState(session?.systemPrompt || "");
   const [localPromptMessages, setLocalPromptMessages] = useState(session?.promptMessages || "");
   const [openLoadModel, setOpenLoadModel] = useState(false);
-  const [openInput, setOpenInput] = useState(true);
-  const [openSystemPrompt, setOpenSystemPrompt] = useState(true);
-  const [openPromptMessages, setOpenPromptMessages] = useState(true);
-  const [openOutput, setOpenOutput] = useState(true);
+  const [activeSettings, setActiveSettings] = useState<SettingsType>(SettingsType.INPUT);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
 
   // Handle case where session is null early
   if (!session) {
@@ -69,6 +60,49 @@ function AgentBox({
 
   const handleDeleteVariable = (variableId: string) => {
     if (session) deleteVariable(session.id, variableId);
+  };
+
+  const handleAddOutputVariable = () => {
+    if (session) addOutputVariable(session.id);
+  };
+
+  const handleSystemPromptChange = (value: string) => {
+    setLocalSystemPrompt(value);
+    if (session) updateSession(session.id, { systemPrompt: value });
+  };
+
+  const handlePromptMessagesChange = (value: string) => {
+    setLocalPromptMessages(value);
+    if (session) updateSession(session.id, { promptMessages: value });
+  };
+
+  // Handler for when a flowgram card is clicked
+  const handleNodeClick = (nodeType: string) => {
+    console.log("Node clicked:", nodeType);
+    // Map node types to settings types - based on actual node types from initial-data.ts
+    switch(nodeType) {
+      case 'multiInputs':
+      case 'cardInput':
+        setActiveSettings(SettingsType.INPUT);
+        if (!isRightSidebarOpen) setIsRightSidebarOpen(true);
+        break;
+      case 'systemPrompt':
+        setActiveSettings(SettingsType.SYSTEM_PROMPT);
+        if (!isRightSidebarOpen) setIsRightSidebarOpen(true);
+        break;
+      case 'promptMessages':
+        setActiveSettings(SettingsType.PROMPT_MESSAGE);
+        if (!isRightSidebarOpen) setIsRightSidebarOpen(true);
+        break;
+      case 'output':
+        setActiveSettings(SettingsType.OUTPUT);
+        if (!isRightSidebarOpen) setIsRightSidebarOpen(true);
+        break;
+      default:
+        // Default to input settings for unknown types
+        setActiveSettings(SettingsType.INPUT);
+        if (!isRightSidebarOpen) setIsRightSidebarOpen(true);
+    }
   };
 
   const menuItems = [
@@ -111,16 +145,24 @@ function AgentBox({
 
         {/* Right Section - Action Buttons */}
         <div className="flex items-center gap-1">
-          {/* Settings Button */}
+          {/* Settings Button - Works as toggle */}
           <button
-            style={{
-              display: isRightSidebarOpen ? "none" : "block",
+            className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer ${
+              isRightSidebarOpen ? 'bg-[#965CDE] bg-opacity-20' : ''
+            }`}
+            onClick={() => {
+              if (isRightSidebarOpen) {
+                setIsRightSidebarOpen(false);  // Close if open
+              } else {
+                setActiveSettings(SettingsType.INPUT);  // Open with Input settings by default
+                setIsRightSidebarOpen(true);
+              }
             }}
-            className="w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer"
-            onClick={onToggleRightSidebar}
           >
-            <div className="w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
-              <Tooltip title="Settings">
+            <div className={`w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group ${
+              isRightSidebarOpen ? 'text-[#965CDE]' : 'text-[#B3B3B3] hover:text-[#FFFFFF]'
+            }`}>
+              <Tooltip title={isRightSidebarOpen ? "Close Settings" : "Settings"}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="18"
@@ -195,202 +237,37 @@ function AgentBox({
 
       {/* Content */}
       <div className="flex-1 overflow-hidden relative">
-        <div className={`flex w-full h-full transition-all duration-300 ease-in-out ${isRightSidebarOpen ? 'pr-[15rem]' : 'pr-0'}`}>
+        <div
+          className={`flex w-full h-full transition-all duration-300 ease-in-out ${isRightSidebarOpen ? 'pr-[15rem]' : 'pr-0'}`}
+          onClick={() => {
+            // Close settings when clicking outside the settings box but inside the agent box
+            if (isRightSidebarOpen) {
+              setIsRightSidebarOpen(false);
+            }
+          }}
+        >
           {/* Main content area */}
           <div className="flex-1 p-4 flow-editor-container">
 
-            <Editor />
+            <Editor onNodeClick={handleNodeClick} />
 
           </div>
 
           {/* Settings Sidebar */}
-          <div className={`settings-box absolute p-3 right-0 top-0 h-full  transition-all duration-300 ease-in-out ${isRightSidebarOpen ? 'translate-x-0' : 'translate-x-full'
-            }`}>
-            <div className="flex flex-col h-full w-[15rem] py-3 prompt-settings border border-[#1F1F1F] bg-[#0A0A0A] overflow-y-auto rounded-[12px]">
-              {/* Input Section */}
-              <div className="flex flex-col w-full px-[.4rem] py-[1.5rem] border-b border-[#1F1F1F]">
-                <div
-                  className="flex flex-row items-center gap-[1rem] px-[.3rem] justify-between cursor-pointer"
-                  onClick={() => setOpenInput(!openInput)}
-                >
-                  <div className="flex flex-row items-center gap-[.4rem] py-[.5rem]">
-                    <Text_14_400_757575>Input</Text_14_400_757575>
-                  </div>
-                  <div className="flex flex-row items-center gap-[.5rem]">
-                    <PrimaryButton
-                      size="small"
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        handleAddVariable();
-                      }}
-                      className="bg-[#965CDE] border-none text-white hover:bg-[#8050C8] h-6 px-2 text-xs !rounded-[12px]"
-                    >
-                      + Add Variable
-                    </PrimaryButton>
-                    <Image
-                      src="/icons/customArrow.png"
-                      className={`w-[.75rem] transform transition-transform rotate-0 ${openInput ? "" : "rotate-180"}`}
-                      preview={false}
-                      alt="chevron"
-                    />
-                  </div>
-                </div>
-                {openInput && (
-                  <div className="space-y-2 px-[.5rem] pt-2">
-                    {(session?.inputVariables || []).map((variable, idx) => (
-                      <div key={variable.id} className="relative group">
-                        <div className="relative">
-                          <TextInput
-                            className="!w-full !max-w-full !h-[2rem] !text-[#EEEEEE] !text-xs !placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem]"
-                            value={variable.value}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleVariableChange(variable.id, "value", e.target.value)}
-                            placeholder={`Input Variable ${idx + 1}`}
-                          />
-                          {(session?.inputVariables?.length || 0) > 1 && (
-                            <button
-                              onClick={() => handleDeleteVariable(variable.id)}
-                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <CloseOutlined className="text-[#808080] hover:text-[#FF4444] text-xs" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* System Prompt Section */}
-              <div className="flex flex-col w-full px-[.4rem] py-[1rem] border-b border-[#1F1F1F]">
-                <div
-                  className="flex flex-row items-center gap-[1rem] px-[.3rem] justify-between cursor-pointer"
-                  onClick={() => setOpenSystemPrompt(!openSystemPrompt)}
-                >
-                  <div className="flex flex-row items-center gap-[.4rem] py-[.5rem]">
-                    <Text_14_400_757575>System Prompt</Text_14_400_757575>
-                  </div>
-                  <div className="flex flex-row items-center">
-                    <Image
-                      src="/icons/customArrow.png"
-                      className={`w-[.75rem] transform transition-transform rotate-0 ${openSystemPrompt ? "" : "rotate-180"}`}
-                      preview={false}
-                      alt="chevron"
-                    />
-                  </div>
-                </div>
-                {openSystemPrompt && (
-                  <div className="space-y-2 px-[.5rem] pt-2">
-                    <TextAreaInput
-                      className="!w-full !max-w-full !min-h-[4rem] !text-[#EEEEEE] !text-xs !placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE]"
-                      value={localSystemPrompt}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-                        setLocalSystemPrompt(e.target.value);
-                        if (session) updateSession(session.id, { systemPrompt: e.target.value });
-                      }}
-                      placeholder="Enter System Prompt..."
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Prompt Messages Section */}
-              <div className="flex flex-col w-full px-[.4rem] py-[1rem] border-b border-[#1F1F1F]">
-                <div
-                  className="flex flex-row items-center gap-[1rem] px-[.3rem] justify-between cursor-pointer"
-                  onClick={() => setOpenPromptMessages(!openPromptMessages)}
-                >
-                  <div className="flex flex-row items-center gap-[.4rem] py-[.5rem]">
-                    <Text_14_400_757575>Prompt Messages</Text_14_400_757575>
-                  </div>
-                  <div className="flex flex-row items-center">
-                    <Image
-                      src="/icons/customArrow.png"
-                      className={`w-[.75rem] transform transition-transform rotate-0 ${openPromptMessages ? "" : "rotate-180"}`}
-                      preview={false}
-                      alt="chevron"
-                    />
-                  </div>
-                </div>
-                {openPromptMessages && (
-                  <div className="space-y-2 px-[.5rem] pt-2">
-                    <div className="border border-[#2A2A2A] rounded-md p-2 min-h-[100px]">
-                      <TextAreaInput
-                        className="!w-full !max-w-full !border-0 !p-0 !min-h-[4rem] !text-[#EEEEEE] !text-xs !placeholder-[#606060]"
-                        value={localPromptMessages}
-                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-                          setLocalPromptMessages(e.target.value);
-                          if (session) updateSession(session.id, { promptMessages: e.target.value });
-                        }}
-                        placeholder="Add Prompt Messages..."
-                      />
-                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-[#1A1A1A]">
-                        <span className="text-[#606060] text-xs">53%</span>
-                        <button className="text-[#606060] hover:text-[#965CDE] text-xs">
-                          <PlusOutlined className="mr-1" />
-                          Add
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Output Variables Section */}
-              <div className="flex flex-col w-full px-[.4rem] py-[1rem]">
-                <div
-                  className="flex flex-row items-center gap-[1rem] px-[.3rem] justify-between cursor-pointer"
-                  onClick={() => setOpenOutput(!openOutput)}
-                >
-                  <div className="flex flex-row items-center gap-[.4rem] py-[.5rem]">
-                    <Text_14_400_757575>Output</Text_14_400_757575>
-                  </div>
-                  <div className="flex flex-row items-center gap-[.5rem]">
-                    <Button
-                      size="small"
-                      icon={<PlusOutlined />}
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        addOutputVariable(session.id);
-                      }}
-                      className="bg-[#5CADFF] border-none text-white hover:bg-[#4A9AED] h-6 px-2 text-xs"
-                    >
-                      Add Variable
-                    </Button>
-                    <Image
-                      src="/icons/customArrow.png"
-                      className={`w-[.75rem] transform transition-transform rotate-0 ${openOutput ? "" : "rotate-180"}`}
-                      preview={false}
-                      alt="chevron"
-                    />
-                  </div>
-                </div>
-                {openOutput && (
-                  <div className="space-y-2 px-[.5rem] pt-2">
-                    {(session?.outputVariables || []).map((variable, idx) => (
-                      <div key={variable.id} className="relative group">
-                        <div className="relative">
-                          <TextInput
-                            className="!w-full !max-w-full !h-[2rem] !text-[#EEEEEE] !text-xs !placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#5CADFF] focus:!border-[#5CADFF] px-[.4rem]"
-                            value={variable.value}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleVariableChange(variable.id, "value", e.target.value)}
-                            placeholder={`Output Variable ${idx + 1}`}
-                            readOnly
-                          />
-                          <button
-                            onClick={() => handleDeleteVariable(variable.id)}
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <CloseOutlined className="text-[#808080] hover:text-[#FF4444] text-xs" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <SettingsSidebar
+            session={session}
+            isOpen={isRightSidebarOpen}
+            activeSettings={activeSettings}
+            onClose={() => setIsRightSidebarOpen(false)}
+            onAddInputVariable={handleAddVariable}
+            onAddOutputVariable={handleAddOutputVariable}
+            onVariableChange={handleVariableChange}
+            onDeleteVariable={handleDeleteVariable}
+            onSystemPromptChange={handleSystemPromptChange}
+            onPromptMessagesChange={handlePromptMessagesChange}
+            localSystemPrompt={localSystemPrompt}
+            localPromptMessages={localPromptMessages}
+          />
         </div>
       </div>
     </div>

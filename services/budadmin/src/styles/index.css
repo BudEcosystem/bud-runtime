@@ -67,4 +67,5 @@ input {
 
 .gedit-playground * {
   box-sizing: border-box;
+  /* background-color: #060606; */
 }

@@ -139,4 +139,52 @@ export const nodeRegistries: FlowNodeRegistry[] = [
       render: ({ node }) => <MultiInputCard node={node} />,
     },
   },
+  {
+    type: 'systemPrompt',
+    meta: {
+      defaultExpanded: true,
+    },
+    onAdd() {
+      return {
+        id: `systemPrompt_${nanoid(5)}`,
+        type: 'systemPrompt',
+        data: {
+          title: 'System Prompt',
+          placeholder: 'Enter System Prompt',
+        },
+      };
+    },
+  },
+  {
+    type: 'promptMessages',
+    meta: {
+      defaultExpanded: true,
+    },
+    onAdd() {
+      return {
+        id: `promptMessages_${nanoid(5)}`,
+        type: 'promptMessages',
+        data: {
+          title: 'Prompt Messages',
+          placeholder: 'Enter Prompt Messages',
+        },
+      };
+    },
+  },
+  {
+    type: 'output',
+    meta: {
+      defaultExpanded: true,
+    },
+    onAdd() {
+      return {
+        id: `output_${nanoid(5)}`,
+        type: 'output',
+        data: {
+          title: 'Output',
+          placeholder: 'Output will appear here',
+        },
+      };
+    },
+  },
 ];
