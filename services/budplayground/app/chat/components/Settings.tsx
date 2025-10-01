@@ -222,7 +222,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
                             type="number"
                             onChange={(value) => handleChange({repeat_penalty: value})}
                         />
-                        <SliderInput
+                        {/* <SliderInput
                             title="Top P Sampling"
                             min={0.01}
                             max={1}
@@ -230,7 +230,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
                             defaultValue={settings?.top_p_sampling || 0}
                             value={settings?.top_p_sampling || 0}
                             onChange={(value) => handleChange({top_p_sampling: value})}
-                        />
+                        /> */}
                         {/* <SliderInput
                             title="Min P Sampling"
                             min={0.01}
