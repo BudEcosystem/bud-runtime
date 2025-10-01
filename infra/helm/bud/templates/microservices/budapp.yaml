@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budapp.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -130,3 +131,4 @@ spec:
   deadLetterTopic: poisonMessages
 scopes:
   - budapp
+{{ end }}

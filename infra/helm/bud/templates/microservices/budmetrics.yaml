@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budmetrics.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -75,3 +76,4 @@ spec:
     maxAwaitDurationMs: 50
 scopes:
   - budmetrics
+{{ end }}

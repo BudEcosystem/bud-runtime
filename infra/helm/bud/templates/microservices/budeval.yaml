@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budeval.enabled false) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -148,3 +149,4 @@ spec:
   deadLetterTopic: poisonMessages
 scopes:
   - budeval
+{{ end }}

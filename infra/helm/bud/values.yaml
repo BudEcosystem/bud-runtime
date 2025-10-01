@@ -41,9 +41,11 @@ microservices:
 
   # backend exposed services
   budgateway:
+    enabled: true
     image: budstudio/budgateway:nightly
     env: {}
   askbud:
+    enabled: true
     image: budstudio/askbud:nightly
     daprid: askbud
     model: qwen3-32b
@@ -56,6 +58,7 @@ microservices:
       INFERENCE_API_KEY: "test"
       INFERENCE_URL: http://20.66.97.208/v1/
   budapp:
+    enabled: true
     image: budstudio/budapp:nightly
     daprid: budapp
     corsOrigins:
@@ -86,6 +89,7 @@ microservices:
 
   # backend internal services
   budcluster:
+    enabled: true
     image: budstudio/budcluster:nightly
     daprid: budcluster
     env:
@@ -117,6 +121,7 @@ microservices:
       MINIO_ENDPOINT: '{{ include "bud.ingress.hosts.s3" $ }}'
       MINIO_SECURE: "{{ .Values.ingress.httpsEnabled }}"
   budmetrics:
+    enabled: true
     daprid: budmetrics
     image: budstudio/budmetrics:nightly
     env:
@@ -135,6 +140,7 @@ microservices:
       SECRETS_CLICKHOUSE_USER: "{{ .Values.clickhouse.auth.username }}"
       SECRETS_CLICKHOUSE_PASSWORD: "{{ .Values.clickhouse.auth.password }}"
   budmodel:
+    enabled: true
     image: budstudio/budmodel:nightly
     daprid: budmodel
     storageClassName: nfs-csi
@@ -148,6 +154,7 @@ microservices:
       PSQL_PASSWORD: budmodel
       PSQL_DB_NAME: budmodel
   budeval:
+    enabled: true
     image: budstudio/budeval:nightly
     daprid: budeval
     storageClassName: nfs-csi
@@ -158,6 +165,7 @@ microservices:
       PSQL_PASSWORD: budeval
       PSQL_DB_NAME: budeval
   budsim:
+    enabled: true
     image: budstudio/budsim:nightly
     daprid: budsim
     env:
@@ -169,6 +177,7 @@ microservices:
       PSQL_PASSWORD: budsim
       PSQL_DB_NAME: budsim
   buddoc:
+    enabled: true
     image: budstudio/buddoc:nightly
     daprid: buddoc
     env:
@@ -183,10 +192,12 @@ microservices:
       MAX_FILE_SIZE_MB: "50"
       TEMP_UPLOAD_DIR: /tmp/buddoc_uploads
   budnotify:
+    enabled: true
     image: budstudio/budnotify:nightly
     daprid: budnotify
     pubsubTopic: notificationMessages
   budprompt:
+    enabled: true
     daprid: budprompt
     image: budstudio/budprompt:nightly
     env:

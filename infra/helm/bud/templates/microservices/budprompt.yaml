@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budprompt.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -70,3 +71,4 @@ spec:
   deadLetterTopic: poisonMessages
 scopes:
   - budprompt
+{{ end }}
