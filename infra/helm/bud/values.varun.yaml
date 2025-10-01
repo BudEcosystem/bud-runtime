@@ -8,7 +8,7 @@ deploymentAnnotations: null
 microservices:
     budprompt:
         image: vsrvarun/budprompt:vsr
-    budapp:
-        image: vsrvarun/budapp:vsr
         env:
             REDIS_DB_INDEX: "2"
+    budapp:
+        image: vsrvarun/budapp:vsr
