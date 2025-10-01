@@ -193,10 +193,11 @@ class EvaluationWorkflow:
                 "extracted_path": results.extraction_path,
                 "files_count": len(results.datasets),
                 "overall_accuracy": results.summary.overall_accuracy,
-                # "total_datasets": results.summary.total_datasets,
-                # "total_examples": results.summary.total_examples,
-                # "total_correct": results.summary.total_correct,
+                "total_datasets": results.summary.total_datasets,
+                "total_examples": results.summary.total_examples,
+                "total_correct": results.summary.total_correct,
                 "dataset_accuracies": results.summary.dataset_accuracies,
+                "model_name": results.summary.model_name,
                 "message": f"Extraction completed successfully. {results.summary.total_datasets} datasets processed with {results.summary.overall_accuracy:.2f}% overall accuracy",
                 # "results": results.model_dump(),
             }
@@ -299,6 +300,8 @@ class EvaluationWorkflow:
                     "overall_accuracy": extraction_result.get("overall_accuracy", 0.0),
                     "total_datasets": extraction_result.get("total_datasets", 0),
                     "total_examples": extraction_result.get("total_examples", 0),
+                    "dataset_accuracies": extraction_result.get("dataset_accuracies", {}),
+                    "model_name": extraction_result.get("model_name", ""),
                     "message": extraction_result.get("message", ""),
                 }
                 if extraction_result
@@ -1168,6 +1171,10 @@ class EvaluationWorkflow:
             _monitoring_result.get("extraction_summary", {}) if _monitoring_result.get("status") == "completed" else {}
         )
 
+        # Debug log to verify extraction_summary contents
+        logger.debug(f"Monitoring result status: {_monitoring_result.get('status')}")
+        logger.debug(f"Extraction summary received: {json.dumps(extraction_summary, default=str)}")
+
         workflow_status = check_workflow_status_in_statestore(instance_id)
         if workflow_status:
             logger.info(f"Workflow status: {workflow_status}")
@@ -1182,15 +1189,22 @@ class EvaluationWorkflow:
                 "job_id": job_id,
                 "status": _monitoring_result.get("job_status", "unknown"),
                 "storage": "clickhouse",
+                "model_name": extraction_summary.get("model_name", "unknown"),
                 "summary": {
                     "overall_accuracy": extraction_summary.get("overall_accuracy", 0.0),
                     "total_datasets": extraction_summary.get("total_datasets", 0),
                     "total_examples": extraction_summary.get("total_examples", 0),
+                    "dataset_results": extraction_summary.get("dataset_accuracies", {}),
                 }
                 if extraction_summary
                 else {},
                 "retrieval_info": f"Use job_id '{job_id}' to retrieve full results from ClickHouse",
             },
+        )
+
+        # Log the notification content in a readable JSON format for debugging
+        logger.info(
+            f"Sending evaluation results notification: {json.dumps(notification_req.payload.content.model_dump(), indent=2)}"
         )
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
