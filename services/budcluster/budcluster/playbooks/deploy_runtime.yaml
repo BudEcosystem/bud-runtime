@@ -40,8 +40,6 @@
           containerPort: "{{ container_port | int }}"
           adapters: "{{ adapters }}"
           hfToken: "{{ hf_token }}"
-          imagePullSecrets:
-            auth: "{{ image_pull_secrets }}"
           volumeType: "{{ volume_type }}"
           nfs:
             server: "{{ nfs_server }}"
