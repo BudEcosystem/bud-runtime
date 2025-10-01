@@ -53,7 +53,8 @@ class OpenCompassOutputStructure(BaseModel):
 class ProcessedEvaluationResults(BaseModel):
     """Complete processed evaluation results."""
 
-    job_id: str = Field(..., description="Unique job identifier")
+    job_id: str = Field(..., description="Kubernetes job identifier")
+    evaluation_id: Optional[str] = Field(None, description="Original evaluation request UUID")
     model_name: str = Field(..., description="Name of the evaluated model")
     engine: str = Field(..., description="Evaluation engine used")
     experiment_id: Optional[str] = Field(None, description="Experiment ID this evaluation belongs to")
