@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budadmin.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -74,3 +75,4 @@ spec:
   selector:
     app: {{ .Release.Name }}-budadmin
   type: ClusterIP
+{{ end }}

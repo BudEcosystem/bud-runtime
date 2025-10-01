@@ -27,6 +27,7 @@ ingress:
 microservices:
   # frontend services
   budadmin:
+    enabled: true
     image: budstudio/budadmin:nightly
     env: {}
   budcustomer:
@@ -34,6 +35,7 @@ microservices:
     image: budstudio/budcustomer:nightly
     env: {}
   budplayground:
+    enabled: true
     image: budstudio/budplayground:nightly
     env: {}
 
