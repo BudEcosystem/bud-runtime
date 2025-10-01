@@ -1105,6 +1105,7 @@ class PromptWorkflowService(SessionMixin):
                 "workflow_id": str(workflow_id),
             },
             "source_topic": f"{app_settings.source_topic}",
+            "debug": True,  # TODO: Remove this after testing
         }
 
         # Add API key bypass fields if available
