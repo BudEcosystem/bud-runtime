@@ -1132,7 +1132,9 @@ class EvaluationWorkflow:
 
         notification_req.payload.event = "monitor_eval_job_progress"
         notification_req.payload.content = NotificationContent(
-            title="Monitoring Completed", message="Monitoring Completed", status=WorkflowStatus.COMPLETED
+            title="Monitoring Completed",
+            message="Monitoring Completed",
+            status=WorkflowStatus.COMPLETED,
         )
 
         # Publish the appropriate monitoring result notification
@@ -1228,7 +1230,13 @@ class EvaluationWorkflow:
             target_name=evaluate_model_request_json.source,
         )
 
-        return
+        # Return workflow result to prevent Dapr from marking it as FAILED
+        return {
+            "workflow_id": instance_id,
+            "status": "completed",
+            "job_id": job_id,
+            "extraction_summary": extraction_summary,
+        }
 
     async def __call__(
         self, request: StartEvaluationRequest, workflow_id: str | None = None
