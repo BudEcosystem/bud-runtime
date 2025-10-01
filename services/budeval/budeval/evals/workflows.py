@@ -1171,6 +1171,10 @@ class EvaluationWorkflow:
             _monitoring_result.get("extraction_summary", {}) if _monitoring_result.get("status") == "completed" else {}
         )
 
+        # Debug log to verify extraction_summary contents
+        logger.debug(f"Monitoring result status: {_monitoring_result.get('status')}")
+        logger.debug(f"Extraction summary received: {json.dumps(extraction_summary, default=str)}")
+
         workflow_status = check_workflow_status_in_statestore(instance_id)
         if workflow_status:
             logger.info(f"Workflow status: {workflow_status}")
