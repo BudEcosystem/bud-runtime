@@ -193,7 +193,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
                             value={`${settings?.sequence_length || 0}`}
                             defaultValue={`${settings?.sequence_length || 0}`}
                             type="number"
-                            onChange={(value) => handleChange({sequence_length: parseInt(value) || 0})}
+                            onChange={(value) => handleChange({sequence_length: Math.max(0, parseInt(value, 10) || 0)})}
                         />}
                     </div>
                 ),
