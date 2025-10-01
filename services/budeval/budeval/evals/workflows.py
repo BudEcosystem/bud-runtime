@@ -1203,7 +1203,7 @@ class EvaluationWorkflow:
         )
 
         # Log the notification content in a readable JSON format for debugging
-        logger.info(
+        logger.debug(
             f"Sending evaluation results notification: {json.dumps(notification_req.payload.content.model_dump(), indent=2)}"
         )
         dapr_workflows.publish_notification(
