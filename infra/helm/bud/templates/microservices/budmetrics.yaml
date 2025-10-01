@@ -38,10 +38,10 @@ spec:
               name: {{ .Release.Name}}-bud-global
         resources:
           limits:
-            memory: 8192Mi
+            memory: 256Mi
             cpu: 2
           requests:
-            memory: 2048Mi
+            memory: 128Mi
             cpu: 250m
 ---
 apiVersion: v1
