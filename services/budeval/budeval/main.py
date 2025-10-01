@@ -17,8 +17,14 @@
 """The main entry point for the application, initializing the FastAPI app and setting up the application's lifespan management, including configuration and secret syncs."""
 
 import asyncio
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+
+
+# Disable gRPC fork support to prevent deadlocks with ansible_runner
+# This must be set before any gRPC imports
+os.environ["GRPC_ENABLE_FORK_SUPPORT"] = "0"
 
 from budmicroframe.commons import logging
 from budmicroframe.main import configure_app, schedule_secrets_and_config_sync

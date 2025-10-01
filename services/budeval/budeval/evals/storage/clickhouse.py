@@ -472,6 +472,7 @@ class ClickHouseStorage(StorageAdapter):
 
             job_data = {
                 "job_id": job_id,
+                "evaluation_id": results.get("evaluation_id"),
                 "experiment_id": results.get("experiment_id"),
                 "model_name": results.get("model_name", ""),
                 "engine": results.get("engine", "opencompass"),
@@ -491,7 +492,7 @@ class ClickHouseStorage(StorageAdapter):
             # Insert new record - ReplacingMergeTree will deduplicate based on ORDER BY key
             query = """
             INSERT INTO budeval.evaluation_jobs
-            (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
+            (job_id, evaluation_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
              overall_accuracy, total_datasets, total_examples, total_correct,
              extracted_at, created_at, updated_at)
             VALUES
@@ -507,14 +508,25 @@ class ClickHouseStorage(StorageAdapter):
         engine: str = "opencompass",
         status: str = "running",
         job_start_time: Optional[datetime] = None,
+        evaluation_id: Optional[str] = None,
     ) -> None:
         """Create an initial job record at the start of execution.
 
         Sets job_end_time equal to job_start_time and duration to 0.0.
+
+        Args:
+            job_id: Kubernetes job ID (e.g., opencompass-<uuid>)
+            experiment_id: Optional experiment grouping ID
+            model_name: Name of the model being evaluated
+            engine: Evaluation engine (opencompass, lighteval, etc.)
+            status: Job status (running, succeeded, failed)
+            job_start_time: When the job started
+            evaluation_id: Original evaluation request UUID from StartEvaluationRequest
         """
         start_time = job_start_time or datetime.now()
         job_row = {
             "job_id": job_id,
+            "evaluation_id": evaluation_id,
             "experiment_id": experiment_id,
             "model_name": model_name,
             "engine": engine,
@@ -533,7 +545,7 @@ class ClickHouseStorage(StorageAdapter):
 
         query = """
         INSERT INTO budeval.evaluation_jobs
-        (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
+        (job_id, evaluation_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
          overall_accuracy, total_datasets, total_examples, total_correct,
          extracted_at, created_at, updated_at)
         VALUES
@@ -541,7 +553,9 @@ class ClickHouseStorage(StorageAdapter):
 
         async with self.get_connection() as conn, conn.cursor() as cursor:
             await cursor.execute(query, [job_row])
-            logger.info(f"Created initial job record for {job_id} with status={status}, start_time={start_time}")
+            logger.info(
+                f"Created initial job record for {job_id} (eval_id: {evaluation_id}) with status={status}, start_time={start_time}"
+            )
 
     async def update_job_status(
         self,
@@ -553,6 +567,7 @@ class ClickHouseStorage(StorageAdapter):
         job_start_time: Optional[datetime] = None,
         job_end_time: Optional[datetime] = None,
         job_duration_seconds: Optional[float] = None,
+        evaluation_id: Optional[str] = None,
     ) -> None:
         """Update job status using ClickHouse-specific upsert pattern."""
         async with self.get_connection() as conn, conn.cursor() as cursor:
@@ -588,6 +603,7 @@ class ClickHouseStorage(StorageAdapter):
 
             job_row = {
                 "job_id": job_id,
+                "evaluation_id": evaluation_id,
                 "experiment_id": experiment_id,
                 "model_name": model_name,
                 "engine": engine,
@@ -607,7 +623,7 @@ class ClickHouseStorage(StorageAdapter):
             # Insert new record - ReplacingMergeTree will deduplicate based on ORDER BY key
             query = """
             INSERT INTO budeval.evaluation_jobs
-            (job_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
+            (job_id, evaluation_id, experiment_id, model_name, engine, status, job_start_time, job_end_time, job_duration_seconds,
              overall_accuracy, total_datasets, total_examples, total_correct,
              extracted_at, created_at, updated_at)
             VALUES
@@ -626,6 +642,7 @@ class ClickHouseStorage(StorageAdapter):
         for dataset in datasets:
             record = {
                 "job_id": job_id,
+                "evaluation_id": results.get("evaluation_id"),
                 "experiment_id": results.get("experiment_id"),
                 "model_name": results.get("model_name", ""),
                 "dataset_name": dataset.get("dataset_name", ""),
@@ -643,7 +660,7 @@ class ClickHouseStorage(StorageAdapter):
 
         query = """
         INSERT INTO budeval.dataset_results
-        (job_id, experiment_id, model_name, dataset_name, accuracy, total_examples, correct_examples,
+        (job_id, evaluation_id, experiment_id, model_name, dataset_name, accuracy, total_examples, correct_examples,
          evaluated_at, metadata, created_at)
         VALUES
         """
@@ -661,6 +678,7 @@ class ClickHouseStorage(StorageAdapter):
         """Save predictions in batches for optimal performance."""
         datasets = results.get("datasets", [])
         model_name = results.get("model_name", "")
+        evaluation_id = results.get("evaluation_id")
         experiment_id = results.get("experiment_id")
         evaluated_at = self._parse_datetime(results.get("extracted_at"))
 
@@ -682,6 +700,7 @@ class ClickHouseStorage(StorageAdapter):
                 await self._insert_prediction_batch(
                     conn,
                     job_id,
+                    evaluation_id,
                     experiment_id,
                     model_name,
                     dataset_name,
@@ -701,6 +720,7 @@ class ClickHouseStorage(StorageAdapter):
         self,
         conn,
         job_id: str,
+        evaluation_id: Optional[str],
         experiment_id: Optional[str],
         model_name: str,
         dataset_name: str,
@@ -713,6 +733,7 @@ class ClickHouseStorage(StorageAdapter):
         for pred in predictions:
             record = {
                 "job_id": job_id,
+                "evaluation_id": evaluation_id,
                 "experiment_id": experiment_id,
                 "model_name": model_name,
                 "dataset_name": dataset_name,
@@ -733,7 +754,7 @@ class ClickHouseStorage(StorageAdapter):
 
         query = """
         INSERT INTO budeval.predictions
-        (job_id, experiment_id, model_name, dataset_name, example_id, prediction_text, origin_prompt,
+        (job_id, evaluation_id, experiment_id, model_name, dataset_name, example_id, prediction_text, origin_prompt,
          model_answer, correct_answer, is_correct, evaluated_at, created_at)
         VALUES
         """

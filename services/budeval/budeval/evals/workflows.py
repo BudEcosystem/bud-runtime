@@ -160,6 +160,7 @@ class EvaluationWorkflow:
         try:
             request = json.loads(extraction_request)
             job_id = request["job_id"]
+            evaluation_id = request.get("evaluation_id")
             model_name = request["model_name"]
             kubeconfig = request.get("kubeconfig")
             namespace = request.get("namespace", "budeval")
@@ -175,6 +176,7 @@ class EvaluationWorkflow:
             results = asyncio.run(
                 processor.extract_and_process(
                     job_id=job_id,
+                    evaluation_id=evaluation_id,
                     model_name=model_name,
                     namespace=namespace,
                     kubeconfig=kubeconfig,
@@ -274,6 +276,7 @@ class EvaluationWorkflow:
 
                 extraction_request = {
                     "job_id": job_id,
+                    "evaluation_id": notification_data.get("evaluation_id"),  # Original UUID
                     "model_name": model_name,
                     "kubeconfig": request_data.get("kubeconfig"),
                     "namespace": request_data.get("namespace", "budeval"),
@@ -551,6 +554,7 @@ class EvaluationWorkflow:
                     await initialize_storage(storage)
                     # Build initial record fields
                     job_id = job_details.get("job_id")
+                    evaluation_id = str(evaluate_model_request_json.uuid)  # Original evaluation request UUID
                     model_name = evaluate_model_request_json.eval_model_info.model_name
                     engine = evaluate_model_request_json.engine.value
                     experiment_id = (
@@ -562,6 +566,7 @@ class EvaluationWorkflow:
                     if hasattr(storage, "create_initial_job_record"):
                         await storage.create_initial_job_record(
                             job_id=job_id,
+                            evaluation_id=evaluation_id,
                             experiment_id=experiment_id,
                             model_name=model_name,
                             engine=engine,
@@ -1057,6 +1062,10 @@ class EvaluationWorkflow:
                 "source_topic": evaluate_model_request_json.source_topic,
                 "source": evaluate_model_request_json.source,
                 "model_name": evaluate_model_request_json.eval_model_info.model_name,
+                "evaluation_id": str(evaluate_model_request_json.uuid),
+                "experiment_id": str(evaluate_model_request_json.experiment_id)
+                if evaluate_model_request_json.experiment_id
+                else None,
             },
         }
 
