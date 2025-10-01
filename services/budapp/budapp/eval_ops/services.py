@@ -24,6 +24,7 @@ from budapp.eval_ops.models import (
     ExperimentStatusEnum,
     RunStatusEnum,
 )
+from budapp.eval_ops.models import Evaluation as EvaluationModel
 from budapp.eval_ops.models import ExpDataset as DatasetModel
 from budapp.eval_ops.models import Experiment as ExperimentModel
 from budapp.eval_ops.models import (
@@ -450,7 +451,11 @@ class ExperimentService:
         evaluations_running = [
             eval
             for eval in evaluations
-            if eval.status in [EvaluationStatusEnum.RUNNING.value, EvaluationStatusEnum.PENDING.value]
+            if eval.status
+            in [
+                EvaluationStatusEnum.RUNNING.value,
+                EvaluationStatusEnum.PENDING.value,
+            ]
         ]
 
         # Batch fetch all runs for running evaluations
@@ -868,74 +873,111 @@ class ExperimentService:
         # First verify the experiment exists and belongs to the user
         experiment = (
             self.session.query(ExperimentModel)
-            .filter(ExperimentModel.id == experiment_id, ExperimentModel.status != ExperimentStatusEnum.DELETED.value)
+            .filter(
+                ExperimentModel.id == experiment_id,
+                ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
+            )
             .first()
         )
 
         if not experiment:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
-
-        # Get all completed evaluations (runs) for this experiment with their related data
-        from sqlalchemy.orm import joinedload
-
-        runs = (
-            self.session.query(RunModel)
-            .options(
-                joinedload(RunModel.dataset_version)
-                .joinedload(ExpDatasetVersion.dataset)
-                .joinedload(DatasetModel.traits)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
             )
-            .filter(
-                RunModel.experiment_id == experiment_id,
-                # RunModel.status == RunStatusEnum.COMPLETED.value,
-            )
-            .order_by(RunModel.created_at.desc())
+
+        # 1. Get all evaluations for the experiment
+        evaluations = (
+            self.session.query(EvaluationModel)
+            .filter(EvaluationModel.experiment_id == experiment_id)
+            .order_by(EvaluationModel.created_at.desc())
             .all()
         )
 
         evaluation_items = []
 
-        for run in runs:
-            # Get model name from endpoint table
-            model = self.session.query(ModelTable).filter(ModelTable.id == run.model_id).first()
+        # 2. For each evaluation, process its data
+        for evaluation in evaluations:
+            # Get runs associated with this evaluation
+            runs = self.session.query(RunModel).filter(RunModel.evaluation_id == evaluation.id).all()
+
+            if not runs:
+                continue
+
+            # Get the first run to extract model info (all runs in an evaluation typically use the same model)
+            first_run = runs[0]
+
+            # 4. Get model details and name
+            model = self.session.query(ModelTable).filter(ModelTable.id == first_run.model_id).first()
             model_name = model.name if model else "Unknown Model"
 
-            # Get dataset and its traits
-            dataset = run.dataset_version.dataset if run.dataset_version else None
-            traits = dataset.traits if dataset else []
+            # 2. Identify associated traits from evaluation.trait_ids
+            trait_ids = evaluation.trait_ids if evaluation.trait_ids else []
 
-            # Create evaluation items for each trait associated with the dataset
-            if traits:
+            if trait_ids:
+                # Batch fetch all traits
+                traits = (
+                    self.session.query(TraitModel)
+                    .filter(TraitModel.id.in_([uuid.UUID(tid) for tid in trait_ids]))
+                    .all()
+                )
+
+                # 3. For each trait, get associated datasets
+                trait_dataset_map = {}
                 for trait in traits:
-                    # Generate random score between 60-95 for demo purposes
-                    trait_score = round(random.uniform(60.0, 95.0), 2)
+                    # Get datasets associated with this trait
+                    datasets = (
+                        self.session.query(DatasetModel)
+                        .join(PivotModel, DatasetModel.id == PivotModel.dataset_id)
+                        .filter(PivotModel.trait_id == trait.id)
+                        .all()
+                    )
+                    trait_dataset_map[str(trait.id)] = {
+                        "trait": trait,
+                        "datasets": datasets,
+                    }
 
-                    # Generate duration between 30-40 minutes as requested
-                    duration = random.randint(30, 40)
+                # 6. Map trait_id with trait_scores
+                trait_scores_map = evaluation.trait_scores if evaluation.trait_scores else {}
+
+                # Create evaluation items for each trait
+                for trait_id_str in trait_ids:
+                    trait_data = trait_dataset_map.get(trait_id_str)
+                    if not trait_data:
+                        continue
+
+                    trait = trait_data["trait"]
+
+                    # Get trait score from trait_scores mapping, or use default
+                    trait_score = float(trait_scores_map.get(trait_id_str, 0.0))
+
+                    # Calculate duration in minutes from duration_in_seconds
+                    duration_minutes = evaluation.duration_in_seconds // 60 if evaluation.duration_in_seconds else 0
 
                     evaluation_item = EvaluationListItem(
-                        evaluation_name=f"Eval-{run.run_index}",
-                        evaluation_id=run.id,
+                        evaluation_name=evaluation.name,
+                        evaluation_id=evaluation.id,
                         model_name=model_name,
-                        started_date=run.created_at,
-                        duration_minutes=duration,
+                        started_date=evaluation.created_at,
+                        duration_minutes=duration_minutes,
                         trait_name=trait.name,
                         trait_score=trait_score,
+                        status=evaluation.status,
                     )
                     evaluation_items.append(evaluation_item)
             else:
                 # If no traits associated, create a single evaluation item with default trait
-                trait_score = round(random.uniform(60.0, 95.0), 2)
-                duration = random.randint(30, 40)
+                duration_minutes = evaluation.duration_in_seconds // 60 if evaluation.duration_in_seconds else 0
 
                 evaluation_item = EvaluationListItem(
-                    evaluation_name=f"Eval-{run.run_index}",
-                    evaluation_id=run.id,
+                    evaluation_name=evaluation.name,
+                    evaluation_id=evaluation.id,
                     model_name=model_name,
-                    started_date=run.created_at,
-                    duration_minutes=duration,
+                    started_date=evaluation.created_at,
+                    duration_minutes=duration_minutes,
                     trait_name="General",
-                    trait_score=trait_score,
+                    trait_score=0.0,
+                    status=evaluation.status,
                 )
                 evaluation_items.append(evaluation_item)
 
