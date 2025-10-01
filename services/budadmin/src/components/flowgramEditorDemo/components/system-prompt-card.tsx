@@ -9,26 +9,28 @@ export const SystemPromptCard = () => {
 
   return (
     <div className="system-prompt-card" style={{
-      background: 'white',
+      background: '#0E0E0E',
       borderRadius: '12px',
       padding: '20px',
-      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      border: '1px solid #333333',
       minWidth: '320px',
       maxWidth: '400px',
     }}>
       {/* Card Header */}
       <div style={{
-        borderBottom: '1px solid #e5e7eb',
+        borderBottom: '1px solid #333333',
         paddingBottom: '12px',
         marginBottom: '20px',
+        background: 'transparent',
       }}>
         <Field<string> name="title">
           {() => (
             <h3 style={{
               fontSize: '18px',
               fontWeight: '600',
-              color: '#1f2937',
+              color: '#EEEEEE',
               margin: 0,
+              background: 'transparent',
             }}>
               {'System Prompt'}
             </h3>
@@ -42,19 +44,20 @@ export const SystemPromptCard = () => {
         flexDirection: 'column',
         gap: '12px',
         marginBottom: '20px',
+        background: 'transparent',
       }}>
         <div style={{
           padding: '12px',
-          background: '#f9fafb',
           borderRadius: '8px',
-          border: '1px solid #e5e7eb',
           minHeight: '80px',
+          background: '#FFFFFF05',
         }}>
           <div style={{
-            fontSize: '14px',
-            color: systemPrompt ? '#374151' : '#9ca3af',
+            fontSize: '12px',
+            color: systemPrompt ? '#EEEEEE' : '#808080',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
+            background: 'transparent',
           }}>
             {systemPrompt || 'Enter system prompt'}
           </div>
@@ -64,10 +67,11 @@ export const SystemPromptCard = () => {
       {/* Card Footer */}
       <div style={{
         paddingTop: '12px',
-        borderTop: '1px solid #e5e7eb',
+        borderTop: 'none',
         fontSize: '12px',
-        color: '#6b7280',
+        color: '#808080',
         textAlign: 'center',
+        background: 'transparent',
       }}>
         {systemPrompt ? 'System prompt configured' : 'No system prompt set'}
       </div>

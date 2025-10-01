@@ -22,26 +22,28 @@ export const OutputCard = () => {
 
   return (
     <div className="output-card" style={{
-      background: 'white',
+      background: '#0E0E0E',
       borderRadius: '12px',
       padding: '20px',
-      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      border: '1px solid #333333',
       minWidth: '320px',
       maxWidth: '400px',
     }}>
       {/* Card Header */}
       <div style={{
-        borderBottom: '1px solid #e5e7eb',
+        borderBottom: '1px solid #333333',
         paddingBottom: '12px',
         marginBottom: '20px',
+        background: 'transparent',
       }}>
         <Field<string> name="title">
           {() => (
             <h3 style={{
               fontSize: '18px',
               fontWeight: '600',
-              color: '#1f2937',
+              color: '#EEEEEE',
               margin: 0,
+              background: 'transparent',
             }}>
               {'Output'}
             </h3>
@@ -55,34 +57,36 @@ export const OutputCard = () => {
         flexDirection: 'column',
         gap: '12px',
         marginBottom: '20px',
+        background: 'transparent',
       }}>
         {outputVariables.map((variable: AgentVariable, index: number) => (
           <div key={variable.id} style={{
             padding: '12px',
-            background: '#f9fafb',
             borderRadius: '8px',
-            border: '1px solid #e5e7eb',
+            background: '#FFFFFF05',
           }}>
             <div style={{
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#374151',
+              fontSize: '12px',
+              color: '#EEEEEE',
               marginBottom: '4px',
+              background: 'transparent',
             }}>
               {variable.name || `Output Variable ${index + 1}`}
             </div>
             {variable.description && (
               <div style={{
-                fontSize: '12px',
-                color: '#6b7280',
+                fontSize: '11px',
+                color: '#B3B3B3',
                 marginBottom: '8px',
+                background: 'transparent',
               }}>
                 {variable.description}
               </div>
             )}
             <div style={{
-              fontSize: '12px',
-              color: '#9ca3af',
+              fontSize: '11px',
+              color: '#808080',
+              background: 'transparent',
             }}>
               Type: {variable.dataType || 'string'}
             </div>
@@ -93,10 +97,11 @@ export const OutputCard = () => {
       {/* Card Footer */}
       <div style={{
         paddingTop: '12px',
-        borderTop: '1px solid #e5e7eb',
+        borderTop: 'none',
         fontSize: '12px',
-        color: '#6b7280',
+        color: '#808080',
         textAlign: 'center',
+        background: 'transparent',
       }}>
         {outputVariables.length} output variable{outputVariables.length !== 1 ? 's' : ''}
       </div>

@@ -67,7 +67,7 @@ input {
 
 .gedit-playground * {
   box-sizing: border-box;
-  /* background-color: #060606; */
+  background-color: #060606;
 }
 
 /* Custom Select Styles for Dark Theme */
