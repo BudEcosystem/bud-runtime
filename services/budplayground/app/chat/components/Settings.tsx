@@ -220,7 +220,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
                             min={0}
                             max={1}
                             type="number"
-                            onChange={(value) => handleChange({repeat_penalty: parseFloat(value) || 0})}
+                            onChange={(value) => handleChange({repeat_penalty: Math.min(1, Math.max(0, parseFloat(value) || 0))})}
                         />
                         {/* <SliderInput
                             title="Top P Sampling"
