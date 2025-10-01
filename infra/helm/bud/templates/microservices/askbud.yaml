@@ -30,6 +30,12 @@ spec:
         ports:
         - containerPort: 3000
         env:
+          - name: INFERENCE_MODEL
+            value: {{ .Values.microservices.askbud.model }}
+          - name: BUD_CLUSTER_APP_ID
+            value: {{ .Values.microservices.budcluster.daprid }}
+          - name: BUD_APP_ID
+            value: {{ .Values.microservices.budapp.daprid }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.askbud.env }}
           - name: {{ $key }}

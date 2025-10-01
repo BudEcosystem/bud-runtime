@@ -3,16 +3,17 @@ global:
     security:
         allowInsecureImages: true
 
-imagePullPolicy: "Always"
+# NOTE: support for https://keel.sh/
+imagePullPolicy: "IfNotPresent"
 deploymentAnnotations: {}
 
 ingress:
     enabled: true
-    # used to derive public urls for frontend services
+    # NOTE: used to derive public urls for frontend services
     httpsEnabled: true
     hosts:
         root: "bud.example.com"
-        # rest is derived from root by ./templates/_helpers.tpl
+        # NOTE: rest is derived from root by ./templates/_helpers.tpl
         budadmin: ""
         budcustomer: ""
         budplayground: ""
@@ -27,8 +28,7 @@ microservices:
     # frontend services
     budadmin:
         image: budstudio/budadmin:nightly
-        env:
-            NEXT_PUBLIC_ASK_BUD_MODEL: qwen3-32b
+        env: {}
     budcustomer:
         enabled: true
         image: budstudio/budcustomer:nightly
@@ -38,24 +38,22 @@ microservices:
         env:
             # deadlink (502 Bad Gateway)
             NEXT_PUBLIC_BASE_URL: https://api-dev.bud.studio/
-            NODE_TLS_REJECT_UNAUTHORIZED: "0"
 
     # backend exposed services
     budgateway:
         image: budstudio/budgateway:nightly
+        env: {}
     askbud:
         image: budstudio/askbud:nightly
         daprid: askbud
+        model: qwen3-32b
         env:
             PSQL_HOST: "{{ $.Release.Name }}-postgresql"
             PSQL_PORT: "5432"
             PSQL_USER: budask
             PSQL_PASSWORD: budask
             PSQL_DB_NAME: budask
-            INFERENCE_MODEL: qwen3-32b
             INFERENCE_API_KEY: "test"
-            BUD_CLUSTER_APP_ID: budcluster
-            BUD_APP_ID: budapp
             INFERENCE_URL: http://20.66.97.208/v1/
     budapp:
         image: budstudio/budapp:nightly
@@ -64,7 +62,6 @@ microservices:
             - "http://localhost:3000"
             - "http://localhost:3001"
         env:
-            APP_CONFIG: "{}"
             STATIC_DIR: /data/static-dir
 
             PSQL_HOST: "{{ $.Release.Name }}-postgresql"
@@ -92,7 +89,6 @@ microservices:
         image: budstudio/budcluster:nightly
         daprid: budcluster
         env:
-            APP_CONFIG: "{}"
             LOG_LEVEL: INFO
             RSA_KEY_NAME: rsa-private-key.pem
             VOLUME_TYPE: nfs

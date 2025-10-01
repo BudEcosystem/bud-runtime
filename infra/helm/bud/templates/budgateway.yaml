@@ -76,6 +76,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-rsa-keys
                   key: private-key-password
+          {{ $root := . }}
+          {{- range $key, $value := .Values.microservices.budgateway.env }}
+            - name: {{ $key }}
+              value: {{ tpl $value $root | quote }}
+          {{- end }}
           volumeMounts:
             - name: {{ .Release.Name }}-budgateway-config
               mountPath: /app/config
