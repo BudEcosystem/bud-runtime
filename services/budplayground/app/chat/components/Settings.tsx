@@ -193,7 +193,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
                             value={`${settings?.sequence_length || 0}`}
                             defaultValue={`${settings?.sequence_length || 0}`}
                             type="number"
-                            onChange={(value) => handleChange({sequence_length: value})}
+                            onChange={(value) => handleChange({sequence_length: parseInt(value) || 0})}
                         />}
                     </div>
                 ),
@@ -220,7 +220,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
                             min={0}
                             max={1}
                             type="number"
-                            onChange={(value) => handleChange({repeat_penalty: value})}
+                            onChange={(value) => handleChange({repeat_penalty: parseFloat(value) || 0})}
                         />
                         {/* <SliderInput
                             title="Top P Sampling"
