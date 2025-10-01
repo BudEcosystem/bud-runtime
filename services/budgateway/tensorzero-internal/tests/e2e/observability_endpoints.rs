@@ -217,10 +217,13 @@ async fn test_dummy_only_moderation_observability_clickhouse_write() {
     // Debug print the actual input value to see what's stored
     let actual_input = moderation_record["input"].as_str().unwrap();
     println!("DEBUG: Actual input stored: '{}'", actual_input);
-    assert!(
-        actual_input.contains("test message"),
-        "Input '{}' does not contain 'test message'",
-        actual_input
+
+    // The input should match what was sent in the request
+    let expected_input = "This is a test message for moderation observability";
+    assert_eq!(
+        actual_input, expected_input,
+        "Input mismatch: stored '{}' but expected '{}'",
+        actual_input, expected_input
     );
     assert!(moderation_record["flagged"].is_boolean());
 

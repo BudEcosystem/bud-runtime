@@ -99,7 +99,7 @@ Bud Stack follows a microservices architecture built on Kubernetes with Dapr for
 - **Docker & Docker Compose** (v20.10+)
 - **Git** (v2.25+)
 - **Node.js** (v20.16+) - for frontend development
-- **Python 3.10+) - for backend development
+- **Python** (v3.10+) - for backend development
 
 ### Optional (Recommended)
 

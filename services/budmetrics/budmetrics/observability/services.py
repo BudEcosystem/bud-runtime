@@ -782,7 +782,7 @@ class ObservabilityMetricsService:
             mi.timestamp,
             mi.model_name,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(coalesce(ci.input, mi.input_messages), 1, 100))
+                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(coalesce(nullif(ci.input, ''), mi.input_messages), 1, 100))
                 WHEN mi.endpoint_type = 'embedding' THEN toValidUTF8(substring(ei.input, 1, 100))
                 WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.input, 1, 100))
                 WHEN mi.endpoint_type = 'image_generation' THEN toValidUTF8(substring(ii.prompt, 1, 100))
