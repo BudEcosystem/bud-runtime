@@ -416,8 +416,6 @@ novu:
   api:
     env:
       DISABLE_USER_REGISTRATION: false
-  store:
-    encryption-key: bud-Kf9yLjGPLOz939Y1GM0nJckVoVyF
   externalDatabase:
     host: "{{ $.Release.Name }}-mongodb"
     username: novu_user
