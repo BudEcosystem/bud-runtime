@@ -14,7 +14,7 @@ import { FlowSelect } from './components/flow-select';
 // import { Minimap } from './components/minimap';
 // import { FlowSelect } from './components/flow-select';
 
-export const Editor = (props: { demo?: string; hideTools?: boolean; onNodeClick?: (nodeType: string) => void }) => {
+export const Editor = (props: { demo?: string; hideTools?: boolean; onNodeClick?: (nodeType: string, nodeId: string, nodeData: any) => void }) => {
   const editorProps = useEditorProps(
     props.demo ? FLOW_LIST[props.demo] : initialData,
     nodeRegistries,

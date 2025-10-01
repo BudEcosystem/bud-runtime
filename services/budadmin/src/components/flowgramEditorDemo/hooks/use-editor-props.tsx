@@ -19,14 +19,14 @@ import {
 import { SlotAdder } from '../components/slot-adder';
 import { NodeAdder } from '../components/node-adder';
 import { BranchAdder } from '../components/branch-adder';
-import { BaseNode } from '../components/base-node';
+import { NodeWrapper } from '../components/node-wrapper';
 
 /** semi materials */
 
 export function useEditorProps(
   initialData: FlowDocumentJSON, // 初始化数据
   nodeRegistries: FlowNodeRegistry[], // 节点定义
-  onNodeClick?: (nodeType: string) => void // Callback for node clicks
+  onNodeClick?: (nodeType: string, nodeId: string, nodeData: any) => void // Enhanced callback for node clicks
 ): FixedLayoutProps {
   const DragNode = ({ node }: any) => {
   return (
@@ -108,7 +108,7 @@ export function useEditorProps(
           [FlowRendererKey.SLOT_ADDER]: SlotAdder,
           [FlowRendererKey.DRAG_NODE]: DragNode,
         },
-        renderDefaultNode: (props: any) => <BaseNode {...props} onNodeClick={onNodeClick} />, // 节点渲染
+        renderDefaultNode: (props: any) => <NodeWrapper {...props} onNodeClick={onNodeClick} />, // 节点渲染
         renderTexts: {
           [FlowTextKey.LOOP_END_TEXT]: 'loop end',
           [FlowTextKey.LOOP_TRAVERSE_TEXT]: 'looping',

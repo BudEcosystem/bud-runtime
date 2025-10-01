@@ -6,7 +6,7 @@ export const multiInputs: FlowDocumentJSON = {
       id: 'multiInputs_0',
       type: 'multiInputs',
       data: {
-        title: 'User Information Form',
+        title: 'Input',
         inputs: [],
       },
     },
@@ -14,8 +14,8 @@ export const multiInputs: FlowDocumentJSON = {
       id: 'cardInput_0',
       type: 'cardInput',
       data: {
-        title: 'Additional Details',
-        description: 'Optional information',
+        title: 'Card Input',
+        description: '',
         inputs: [],
       },
     },

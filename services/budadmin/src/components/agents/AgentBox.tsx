@@ -10,7 +10,9 @@ import {
 import { useAgentStore, AgentSession, AgentVariable } from "@/stores/useAgentStore";
 import LoadModel from "./LoadModel";
 import { Editor } from "../flowgramEditorDemo/editor";
+import { SessionProvider } from "../flowgramEditorDemo/contexts/SessionContext";
 import { SettingsSidebar, SettingsType } from "./settings/SettingsSidebar";
+import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 
 interface AgentBoxProps {
   session: AgentSession;
@@ -18,7 +20,7 @@ interface AgentBoxProps {
   totalSessions: number;
 }
 
-function AgentBox({
+function AgentBoxInner({
   session,
   index,
   totalSessions
@@ -38,8 +40,9 @@ function AgentBox({
   const [localSystemPrompt, setLocalSystemPrompt] = useState(session?.systemPrompt || "");
   const [localPromptMessages, setLocalPromptMessages] = useState(session?.promptMessages || "");
   const [openLoadModel, setOpenLoadModel] = useState(false);
-  const [activeSettings, setActiveSettings] = useState<SettingsType>(SettingsType.INPUT);
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+
+  // Use the settings context
+  const { isOpen: isRightSidebarOpen, activeSettings, openSettings, closeSettings, toggleSettings } = useSettings();
 
   // Handle case where session is null early
   if (!session) {
@@ -77,32 +80,9 @@ function AgentBox({
   };
 
   // Handler for when a flowgram card is clicked
-  const handleNodeClick = (nodeType: string) => {
-    console.log("Node clicked:", nodeType);
-    // Map node types to settings types - based on actual node types from initial-data.ts
-    switch(nodeType) {
-      case 'multiInputs':
-      case 'cardInput':
-        setActiveSettings(SettingsType.INPUT);
-        if (!isRightSidebarOpen) setIsRightSidebarOpen(true);
-        break;
-      case 'systemPrompt':
-        setActiveSettings(SettingsType.SYSTEM_PROMPT);
-        if (!isRightSidebarOpen) setIsRightSidebarOpen(true);
-        break;
-      case 'promptMessages':
-        setActiveSettings(SettingsType.PROMPT_MESSAGE);
-        if (!isRightSidebarOpen) setIsRightSidebarOpen(true);
-        break;
-      case 'output':
-        setActiveSettings(SettingsType.OUTPUT);
-        if (!isRightSidebarOpen) setIsRightSidebarOpen(true);
-        break;
-      default:
-        // Default to input settings for unknown types
-        setActiveSettings(SettingsType.INPUT);
-        if (!isRightSidebarOpen) setIsRightSidebarOpen(true);
-    }
+  const handleNodeClick = (nodeType: string, nodeId: string, nodeData: any) => {
+    // The openSettings function in context already handles the mapping
+    openSettings(nodeType, nodeId, nodeData);
   };
 
   const menuItems = [
@@ -150,14 +130,7 @@ function AgentBox({
             className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer ${
               isRightSidebarOpen ? 'bg-[#965CDE] bg-opacity-20' : ''
             }`}
-            onClick={() => {
-              if (isRightSidebarOpen) {
-                setIsRightSidebarOpen(false);  // Close if open
-              } else {
-                setActiveSettings(SettingsType.INPUT);  // Open with Input settings by default
-                setIsRightSidebarOpen(true);
-              }
-            }}
+            onClick={toggleSettings}
           >
             <div className={`w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group ${
               isRightSidebarOpen ? 'text-[#965CDE]' : 'text-[#B3B3B3] hover:text-[#FFFFFF]'
@@ -242,15 +215,15 @@ function AgentBox({
           onClick={() => {
             // Close settings when clicking outside the settings box but inside the agent box
             if (isRightSidebarOpen) {
-              setIsRightSidebarOpen(false);
+              closeSettings();
             }
           }}
         >
           {/* Main content area */}
           <div className="flex-1 p-4 flow-editor-container">
-
-            <Editor onNodeClick={handleNodeClick} />
-
+            <SessionProvider session={session}>
+              <Editor onNodeClick={handleNodeClick} />
+            </SessionProvider>
           </div>
 
           {/* Settings Sidebar */}
@@ -258,7 +231,7 @@ function AgentBox({
             session={session}
             isOpen={isRightSidebarOpen}
             activeSettings={activeSettings}
-            onClose={() => setIsRightSidebarOpen(false)}
+            onClose={closeSettings}
             onAddInputVariable={handleAddVariable}
             onAddOutputVariable={handleAddOutputVariable}
             onVariableChange={handleVariableChange}
@@ -271,6 +244,15 @@ function AgentBox({
         </div>
       </div>
     </div>
+  );
+}
+
+// Wrapper component that provides the context
+function AgentBox(props: AgentBoxProps) {
+  return (
+    <SettingsProvider>
+      <AgentBoxInner {...props} />
+    </SettingsProvider>
   );
 }
 

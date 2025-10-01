@@ -2,18 +2,18 @@ import { Field } from '@flowgram.ai/fixed-layout-editor';
 import { AgentVariable } from '@/stores/useAgentStore';
 import { useSession } from '../contexts/SessionContext';
 
-export const MultiInputCard = () => {
+export const OutputCard = () => {
   const { session } = useSession();
 
-  // Get input variables from the session, with default if empty
-  const sessionVariables = session?.inputVariables || [];
+  // Get output variables from the session, with default if empty
+  const sessionVariables = session?.outputVariables || [];
 
-  const inputVariables: AgentVariable[] = sessionVariables.length > 0 ? sessionVariables : [
+  const outputVariables: AgentVariable[] = sessionVariables.length > 0 ? sessionVariables : [
     {
-      id: 'default-1',
-      name: 'Input Variable 1',
+      id: 'default-output-1',
+      name: 'Output Variable 1',
       value: '',
-      type: 'input',
+      type: 'output',
       description: '',
       dataType: 'string',
       defaultValue: ''
@@ -21,7 +21,7 @@ export const MultiInputCard = () => {
   ];
 
   return (
-    <div className="multi-input-card" style={{
+    <div className="output-card" style={{
       background: 'white',
       borderRadius: '12px',
       padding: '20px',
@@ -43,20 +43,20 @@ export const MultiInputCard = () => {
               color: '#1f2937',
               margin: 0,
             }}>
-              {'Input'}
+              {'Output'}
             </h3>
           )}
         </Field>
       </div>
 
-      {/* Input Variables List */}
+      {/* Output Variables List */}
       <div style={{
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
         marginBottom: '20px',
       }}>
-        {inputVariables.map((variable: AgentVariable, index: number) => (
+        {outputVariables.map((variable: AgentVariable, index: number) => (
           <div key={variable.id} style={{
             padding: '12px',
             background: '#f9fafb',
@@ -69,7 +69,7 @@ export const MultiInputCard = () => {
               color: '#374151',
               marginBottom: '4px',
             }}>
-              {variable.name || `Input Variable ${index + 1}`}
+              {variable.name || `Output Variable ${index + 1}`}
             </div>
             {variable.description && (
               <div style={{
@@ -98,7 +98,7 @@ export const MultiInputCard = () => {
         color: '#6b7280',
         textAlign: 'center',
       }}>
-        {inputVariables.length} input variable{inputVariables.length !== 1 ? 's' : ''}
+        {outputVariables.length} output variable{outputVariables.length !== 1 ? 's' : ''}
       </div>
     </div>
   );

@@ -6,6 +6,9 @@ export interface AgentVariable {
   name: string;
   value: string;
   type: "input" | "output";
+  description?: string;
+  dataType?: "string" | "number" | "boolean" | "array" | "object";
+  defaultValue?: string;
 }
 
 export interface AgentSession {
@@ -84,7 +87,10 @@ const createDefaultSession = (): AgentSession => ({
       id: generateVariableId(),
       name: "Input Variable 1",
       value: "",
-      type: "input"
+      type: "input",
+      description: "",
+      dataType: "string",
+      defaultValue: ""
     }
   ],
   outputVariables: [],
@@ -183,7 +189,10 @@ export const useAgentStore = create<AgentStore>()(
           id: generateVariableId(),
           name: `Input Variable ${session.inputVariables.length + 1}`,
           value: "",
-          type: "input"
+          type: "input",
+          description: "",
+          dataType: "string",
+          defaultValue: ""
         };
 
         set({
@@ -207,7 +216,10 @@ export const useAgentStore = create<AgentStore>()(
           id: generateVariableId(),
           name: `Output Variable ${session.outputVariables.length + 1}`,
           value: "",
-          type: "output"
+          type: "output",
+          description: "",
+          dataType: "string",
+          defaultValue: ""
         };
 
         set({

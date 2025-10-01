@@ -7,6 +7,9 @@ import React from 'react';
 import { nanoid } from 'nanoid';
 import { FlowNodeRegistry } from '@flowgram.ai/fixed-layout-editor';
 import { MultiInputCard } from './components/multi-input-card';
+import { OutputCard } from './components/output-card';
+import { SystemPromptCard } from './components/system-prompt-card';
+import { PromptMessagesCard } from './components/prompt-messages-card';
 
 /**
  * 自定义节点注册
@@ -88,13 +91,13 @@ export const nodeRegistries: FlowNodeRegistry[] = [
         id: `multiInputs_${nanoid(5)}`,
         type: 'multiInputs',
         data: {
-          title: 'Multi-Input Card',
+          title: 'Input',
           inputs: [],
         },
       };
     },
     formMeta: {
-      render: ({ node }) => <MultiInputCard node={node} />,
+      render: () => <MultiInputCard />,
     },
   },
   {
@@ -129,14 +132,14 @@ export const nodeRegistries: FlowNodeRegistry[] = [
         id: `cardInput_${nanoid(5)}`,
         type: 'cardInput',
         data: {
-          title: 'Form Card',
-          description: 'A card with multiple input fields',
+          title: 'Card Input',
+          description: '',
           inputs: [],
         },
       };
     },
     formMeta: {
-      render: ({ node }) => <MultiInputCard node={node} />,
+      render: () => <MultiInputCard />,
     },
   },
   {
@@ -154,6 +157,9 @@ export const nodeRegistries: FlowNodeRegistry[] = [
         },
       };
     },
+    formMeta: {
+      render: () => <SystemPromptCard />,
+    },
   },
   {
     type: 'promptMessages',
@@ -170,6 +176,9 @@ export const nodeRegistries: FlowNodeRegistry[] = [
         },
       };
     },
+    formMeta: {
+      render: () => <PromptMessagesCard />,
+    },
   },
   {
     type: 'output',
@@ -185,6 +194,9 @@ export const nodeRegistries: FlowNodeRegistry[] = [
           placeholder: 'Output will appear here',
         },
       };
+    },
+    formMeta: {
+      render: () => <OutputCard />,
     },
   },
 ];

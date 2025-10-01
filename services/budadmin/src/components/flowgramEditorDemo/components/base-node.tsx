@@ -3,11 +3,10 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { FlowNodeEntity, useNodeRender, useClientContext } from '@flowgram.ai/fixed-layout-editor';
+import { FlowNodeEntity, useNodeRender } from '@flowgram.ai/fixed-layout-editor';
 // import { IconDeleteStroked } from '@douyinfe/semi-icons';
 
-export const BaseNode = ({ node, onNodeClick }: { node: FlowNodeEntity; onNodeClick?: (nodeType: string) => void }) => {
-  const ctx = useClientContext();
+export const BaseNode = ({ node }: { node: FlowNodeEntity }) => {
   /**
    * Provides methods related to node rendering
    * 提供节点渲染相关的方法
@@ -33,26 +32,11 @@ export const BaseNode = ({ node, onNodeClick }: { node: FlowNodeEntity; onNodeCl
         // nodeRender.startDrag(e);
         e.stopPropagation();
       }}
-      onClick={() => {
-        // Call the onNodeClick callback with the node type
-        if (onNodeClick) {
-          // Get node type from the node - FlowNodeEntity has type property
-          const nodeType = node?.type || 'unknown';
-          onNodeClick(nodeType);
-        }
-      }}
       style={{
         opacity: nodeRender.dragging ? 0.3 : 1,
         ...(nodeRender.isBlockOrderIcon || nodeRender.isBlockIcon ? { width: 260 } : {}),
       }}
     >
-      {!nodeRender.readonly && (
-        <div onClick={() => ctx.operation.deleteNode(nodeRender.node)}>Delete</div>
-        // <IconDeleteStroked
-        //   style={{ position: 'absolute', right: 4, top: 4 }}
-        //   onClick={() => ctx.operation.deleteNode(nodeRender.node)}
-        // />
-      )}
       {form?.render()}
     </div>
   );

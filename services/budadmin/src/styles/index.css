@@ -69,3 +69,47 @@ input {
   box-sizing: border-box;
   /* background-color: #060606; */
 }
+
+/* Custom Select Styles for Dark Theme */
+.custom-select .ant-select-selector {
+  background-color: #0A0A0A !important;
+  border: 1px solid #2A2A2A !important;
+  color: #EEEEEE !important;
+  height: 32px !important;
+  font-size: 12px !important;
+}
+
+.custom-select .ant-select-selector:hover {
+  border-color: #965CDE !important;
+}
+
+.custom-select.ant-select-focused .ant-select-selector {
+  border-color: #965CDE !important;
+  box-shadow: none !important;
+}
+
+.custom-select .ant-select-arrow {
+  color: #808080 !important;
+}
+
+.custom-select .ant-select-selection-placeholder {
+  color: #606060 !important;
+}
+
+.ant-select-dropdown {
+  background-color: #0A0A0A !important;
+  border: 1px solid #2A2A2A !important;
+}
+
+.ant-select-item {
+  color: #EEEEEE !important;
+  font-size: 12px !important;
+}
+
+.ant-select-item-option-active {
+  background-color: #1A1A1A !important;
+}
+
+.ant-select-item-option-selected {
+  background-color: #965CDE20 !important;
+}
