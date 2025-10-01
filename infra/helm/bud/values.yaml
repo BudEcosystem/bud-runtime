@@ -56,6 +56,7 @@ microservices:
             INFERENCE_API_KEY: "test"
             BUD_CLUSTER_APP_ID: budcluster
             BUD_APP_ID: budapp
+            INFERENCE_URL: http://20.66.97.208/v1/
     budapp:
         image: budstudio/budapp:nightly
         daprid: budapp
