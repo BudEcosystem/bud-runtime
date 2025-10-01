@@ -341,6 +341,41 @@ class RunWithResults(BaseModel):
         from_attributes = True
 
 
+class RunDetailedWithMetrics(BaseModel):
+    """Run with complete dataset details, model details, and metrics."""
+
+    id: UUID4 = Field(..., description="The UUID of the run.")
+    experiment_id: UUID4 = Field(..., description="The UUID of the parent experiment.")
+    run_index: int = Field(..., description="Auto-incrementing index within the experiment.")
+    status: RunStatusEnum = Field(..., description="Current status of the run.")
+    config: Optional[dict] = Field(None, description="Run-specific configuration.")
+
+    # Model details
+    model: Optional[dict] = Field(
+        None,
+        description="Complete model information including id, name, and deployment details.",
+    )
+
+    # Dataset details
+    dataset: Optional[dict] = Field(None, description="Complete dataset information with version details.")
+
+    # Metrics
+    metrics: List[dict] = Field(
+        [],
+        description="List of metrics for this run with metric_name, mode, and metric_value.",
+    )
+    raw_results: Optional[dict] = Field(None, description="Raw results preview for this run.")
+
+    # Timestamps
+    created_at: Optional[datetime] = Field(None, description="Timestamp when the run was created.")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp.")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
 class ListRunsResponse(SuccessResponse):
     """Response schema for listing runs."""
 
