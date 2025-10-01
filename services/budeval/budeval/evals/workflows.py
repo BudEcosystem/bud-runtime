@@ -18,7 +18,7 @@ from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 from budeval.commons.logging import logging
 from budeval.commons.storage_config import StorageConfig
-from budeval.commons.utils import check_workflow_status_in_statestore, update_workflow_data_in_statestore
+from budeval.commons.utils import update_workflow_data_in_statestore
 from budeval.core.schemas import (
     DatasetCategory,
     GenericDatasetConfig,
@@ -1175,10 +1175,10 @@ class EvaluationWorkflow:
         logger.debug(f"Monitoring result status: {_monitoring_result.get('status')}")
         logger.debug(f"Extraction summary received: {json.dumps(extraction_summary, default=str)}")
 
-        workflow_status = check_workflow_status_in_statestore(instance_id)
-        if workflow_status:
-            logger.info(f"Workflow status: {workflow_status}")
-            return workflow_status
+        # workflow_status = check_workflow_status_in_statestore(instance_id)
+        # if workflow_status:
+        #     logger.info(f"Workflow status: {workflow_status}")
+        #     return workflow_status
 
         notification_req.payload.event = "results"
         notification_req.payload.content = NotificationContent(
