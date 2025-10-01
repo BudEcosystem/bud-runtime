@@ -38,11 +38,26 @@ function AgentBoxInner({
   } = useAgentStore();
 
   const [localSystemPrompt, setLocalSystemPrompt] = useState(session?.systemPrompt || "");
-  const [localPromptMessages, setLocalPromptMessages] = useState(session?.promptMessages || "");
+  // Ensure promptMessages is always a string, even if it comes as an array from corrupted data
+  const [localPromptMessages, setLocalPromptMessages] = useState(
+    typeof session?.promptMessages === 'string'
+      ? session.promptMessages
+      : ""
+  );
   const [openLoadModel, setOpenLoadModel] = useState(false);
 
   // Use the settings context
   const { isOpen: isRightSidebarOpen, activeSettings, openSettings, closeSettings, toggleSettings } = useSettings();
+
+  // Update local state when session changes
+  React.useEffect(() => {
+    setLocalSystemPrompt(session?.systemPrompt || "");
+    setLocalPromptMessages(
+      typeof session?.promptMessages === 'string'
+        ? session.promptMessages
+        : ""
+    );
+  }, [session?.systemPrompt, session?.promptMessages]);
 
   // Handle case where session is null early
   if (!session) {

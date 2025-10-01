@@ -82,6 +82,8 @@ const createDefaultSession = (): AgentSession => ({
   id: generateId(),
   name: `Agent ${new Date().toLocaleTimeString()}`,
   active: true,
+  systemPrompt: "",
+  promptMessages: "",  // Explicitly set as empty string
   inputVariables: [
     {
       id: generateVariableId(),
@@ -168,6 +170,9 @@ export const useAgentStore = create<AgentStore>()(
           ...sessionToDuplicate,
           id: generateId(),
           name: `${sessionToDuplicate.name} (Copy)`,
+          promptMessages: typeof sessionToDuplicate.promptMessages === 'string'
+            ? sessionToDuplicate.promptMessages
+            : "",  // Ensure promptMessages is always a string
           createdAt: new Date(),
           updatedAt: new Date(),
           position: get().sessions.length
@@ -310,10 +315,29 @@ export const useAgentStore = create<AgentStore>()(
     }),
     {
       name: "agent-store",
+      version: 1, // Adding version to force migration
       partialize: (state) => ({
         sessions: state.sessions,
         activeSessionIds: state.activeSessionIds
-      })
+      }),
+      // Migration to fix promptMessages if it's an array
+      migrate: (persistedState: any, _version: number) => {
+        // Clean up any corrupted promptMessages data
+        if (persistedState && persistedState.sessions) {
+          persistedState.sessions = persistedState.sessions.map((session: any) => {
+            // If promptMessages is an array or object, convert it to empty string
+            if (typeof session.promptMessages !== 'string') {
+              return {
+                ...session,
+                promptMessages: "",
+                systemPrompt: session.systemPrompt || ""
+              };
+            }
+            return session;
+          });
+        }
+        return persistedState;
+      }
     }
   )
 );
