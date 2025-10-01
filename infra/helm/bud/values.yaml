@@ -4,13 +4,14 @@ global:
         allowInsecureImages: true
 
 imagePullPolicy: "Always"
+deploymentAnnotations: {}
 
 ingress:
     enabled: true
     # used to derive public urls for frontend services
     httpsEnabled: true
     hosts:
-        root: "dev.bud.studio"
+        root: "bud.example.com"
         # rest is derived from root by ./templates/_helpers.tpl
         budadmin: ""
         budcustomer: ""
@@ -453,12 +454,3 @@ minio:
             - name: novu-local
             - name: models-registry
             - name: model-info
-            - name: mimir-blocks
-            - name: mimir-alertmanager
-            - name: mimir-ruler
-
-deploymentAnnotations:
-    keel.sh/policy: force
-    keel.sh/trigger: poll
-    keel.sh/match-tag: true
-    keel.sh/pollSchedule: "@every 1m"
