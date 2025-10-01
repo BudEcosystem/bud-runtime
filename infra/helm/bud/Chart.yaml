@@ -3,6 +3,7 @@ apiVersion: v2
 name: bud
 description: Bud Helm chart for Kubernetes
 type: application
+icon: https://budecosystem.com/logo.svg
 
 version: 0.1.0
 appVersion: "0.24.0"
@@ -41,3 +42,6 @@ dependencies:
     version: 16.5.31
     repository: https://charts.bitnami.com/bitnami
     condition: mongodb.enabled
+  - name: novu
+    version: 0.1.6
+    repository: file://charts/novu
