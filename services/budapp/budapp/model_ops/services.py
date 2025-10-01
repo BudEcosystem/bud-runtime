@@ -3718,7 +3718,13 @@ class ModelService(SessionMixin):
         #     # This should not happen as this method is only for cloud models
         #     raise ClientException("Direct endpoint creation is only supported for cloud models")
 
-        supported_endpoints = db_model.supported_endpoints if db_model else []
+        if not db_model:
+            raise ClientException(f"Active model with id {model_id} not found.")
+
+        if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
+            raise ClientException("Direct endpoint creation is only supported for cloud models")
+
+        supported_endpoints = db_model.supported_endpoints
 
         # Generate namespace and deployment URL
         # Use model.uri as namespace for cloud models
