@@ -894,7 +894,7 @@ class PromptWorkflowService(SessionMixin):
         return db_workflow
 
     async def create_prompt_schema_workflow(
-        self, current_user_id: UUID, request: PromptSchemaRequest
+        self, current_user_id: UUID, request: PromptSchemaRequest, access_token: str
     ) -> WorkflowModel:
         """Create a prompt schema workflow with validation."""
         # Get request data
@@ -998,7 +998,7 @@ class PromptWorkflowService(SessionMixin):
             try:
                 # Perform model extraction
                 await self._perform_prompt_schema_creation(
-                    current_step_number, merged_data, current_user_id, db_workflow
+                    current_step_number, merged_data, current_user_id, db_workflow, access_token
                 )
             except ClientException as e:
                 raise e
@@ -1006,7 +1006,12 @@ class PromptWorkflowService(SessionMixin):
         return db_workflow
 
     async def _perform_prompt_schema_creation(
-        self, current_step_number: int, data: Dict, current_user_id: UUID, db_workflow: WorkflowModel
+        self,
+        current_step_number: int,
+        data: Dict,
+        current_user_id: UUID,
+        db_workflow: WorkflowModel,
+        access_token: str,
     ) -> None:
         """Perform prompt schema creation request to budprompt app.
 
@@ -1015,8 +1020,31 @@ class PromptWorkflowService(SessionMixin):
             data: request body to send to budprompt.
             current_user_id: the id of the current user.
             db_workflow: the workflow instance.
+            access_token: JWT access token for API key bypass.
         """
-        bud_prompt_schema_response = await self._perform_prompt_schema_request(data, current_user_id, db_workflow.id)
+        # Fetch endpoint details if deployment_name is provided
+        endpoint_id = None
+        model_id = None
+        project_id = None
+
+        deployment_name = data.get("deployment_name")
+        if deployment_name:
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel,
+                {"name": deployment_name},
+                exclude_fields={"status": EndpointStatusEnum.DELETED},
+                missing_ok=True,
+            )
+
+            if db_endpoint:
+                endpoint_id = str(db_endpoint.id)
+                model_id = str(db_endpoint.model_id)
+                project_id = str(db_endpoint.project_id)
+
+        # Pass the extracted fields to the request
+        bud_prompt_schema_response = await self._perform_prompt_schema_request(
+            data, current_user_id, db_workflow.id, endpoint_id, model_id, project_id, access_token
+        )
 
         # Add payload dict to response
         for step in bud_prompt_schema_response["steps"]:
@@ -1040,12 +1068,25 @@ class PromptWorkflowService(SessionMixin):
         )
 
     async def _perform_prompt_schema_request(
-        self, data: Dict[str, Any], current_user_id: UUID, workflow_id: UUID
+        self,
+        data: Dict[str, Any],
+        current_user_id: UUID,
+        workflow_id: UUID,
+        endpoint_id: Optional[str] = None,
+        model_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        access_token: Optional[str] = None,
     ) -> Dict:
         """Perform prompt schema creation request to budprompt app.
 
         Args:
             data: request body to send to budprompt.
+            current_user_id: the id of the current user.
+            workflow_id: the workflow instance id.
+            endpoint_id: the endpoint id for API key bypass.
+            model_id: the model id for API key bypass.
+            project_id: the project id for API key bypass.
+            access_token: JWT access token for API key bypass.
         """
         license_faq_fetch_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-schema"
@@ -1065,6 +1106,19 @@ class PromptWorkflowService(SessionMixin):
             },
             "source_topic": f"{app_settings.source_topic}",
         }
+
+        # Add API key bypass fields if available
+        if endpoint_id:
+            payload["endpoint_id"] = endpoint_id
+        if model_id:
+            payload["model_id"] = model_id
+        if project_id:
+            payload["project_id"] = project_id
+            payload["api_key_project_id"] = project_id  # Same as project_id
+        if current_user_id:
+            payload["user_id"] = str(current_user_id)
+        if access_token:
+            payload["access_token"] = access_token
 
         logger.debug(f"Performing create prompt schema request to budprompt {payload}")
         try:
