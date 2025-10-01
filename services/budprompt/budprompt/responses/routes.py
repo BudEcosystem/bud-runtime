@@ -20,7 +20,8 @@ import logging
 from typing import Union
 
 from budmicroframe.commons.schemas import ErrorResponse
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from ..prompt.schemas import PromptExecuteResponse
 from .schemas import ResponseCreateRequest
@@ -28,6 +29,9 @@ from .services import ResponsesService
 
 
 logger = logging.getLogger(__name__)
+
+# NOTE: Optional Bearer token security (auto_error=False makes it optional)
+security = HTTPBearer()
 
 # Responses Router
 responses_router = APIRouter(
@@ -53,6 +57,7 @@ responses_router = APIRouter(
 )
 async def create_response(
     request: ResponseCreateRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),  # noqa: B008
 ) -> Union[PromptExecuteResponse, ErrorResponse]:
     """Create a response using a prompt template.
 
@@ -62,19 +67,24 @@ async def create_response(
 
     Args:
         request: The prompt request containing id, variables, and optional version
+        credentials: Optional bearer token credentials for API authentication
 
     Returns:
         PromptExecuteResponse with execution result or ErrorResponse on failure
     """
     logger.info(f"Received response creation request for prompt: {request.prompt.id}")
 
+    # Extract bearer token from credentials if present
+    api_key = credentials.credentials if credentials else None
+
     # Create service instance
     service = ResponsesService()
 
-    # Execute the prompt
+    # Execute the prompt with optional authorization
     result = await service.execute_prompt(
         prompt_params=request.prompt,
         input=request.input,
+        api_key=api_key,
     )
 
     return result

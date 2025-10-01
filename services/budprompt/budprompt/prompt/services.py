@@ -172,12 +172,17 @@ class PromptExecutorService:
             clean_model_cache()
 
     async def execute_prompt(
-        self, request: PromptExecuteData, input_data: Optional[Union[Dict[str, Any], str]]
+        self,
+        request: PromptExecuteData,
+        input_data: Optional[Union[Dict[str, Any], str]],
+        api_key: Optional[str] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt based on the request.
 
         Args:
             request: Prompt execution request
+            input_data: Input data for the prompt
+            api_key: Optional API key for authorization
 
         Returns:
             The result of the prompt execution or a generator for streaming
@@ -201,6 +206,7 @@ class PromptExecutorService:
                 enable_tools=request.enable_tools,
                 allow_multiple_calls=request.allow_multiple_calls,
                 system_prompt_role=request.system_prompt_role,
+                api_key=api_key,
             )
 
             return result

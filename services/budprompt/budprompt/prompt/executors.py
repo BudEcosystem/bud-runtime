@@ -318,6 +318,7 @@ class SimplePromptExecutorDeprecated:
         llm_retry_limit: Optional[int] = None,
         allow_multiple_calls: bool = True,
         system_prompt_role: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Agent:
         """Create Pydantic AI agent with automatic parameter routing.
 
@@ -328,6 +329,7 @@ class SimplePromptExecutorDeprecated:
             llm_retry_limit: Number of retries for validation failures
             allow_multiple_calls: Whether to allow multiple LLM calls
             system_prompt_role: Role for system prompts (system/developer/user)
+            api_key: Optional API key for authorization
 
         Returns:
             Configured AI agent
@@ -336,8 +338,11 @@ class SimplePromptExecutorDeprecated:
         # This automatically routes BudEcosystem parameters to extra_body
         openai_settings = self._convert_to_openai_settings(model_settings)
 
+        # Create provider with api_key (handles None internally)
+        provider = BudServeProvider(api_key=api_key)
+
         # Create model using BudServeProvider with system_prompt_role
-        model = self.provider.get_model(
+        model = provider.get_model(
             model_name=deployment_name, system_prompt_role=system_prompt_role, settings=openai_settings
         )
 
@@ -545,7 +550,6 @@ class SimplePromptExecutor:
 
     def __init__(self):
         """Initialize the SimplePromptExecutor."""
-        self.provider = BudServeProvider()
         self.model_generator = CustomModelGenerator()
 
     async def execute(
@@ -563,6 +567,7 @@ class SimplePromptExecutor:
         enable_tools: bool = False,
         allow_multiple_calls: bool = True,
         system_prompt_role: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt with structured or unstructured input and output.
 
@@ -580,6 +585,7 @@ class SimplePromptExecutor:
             enable_tools: Enable tool calling capability (requires allow_multiple_calls=true)
             allow_multiple_calls: Allow multiple LLM calls for retries and tools
             system_prompt_role: Role for system prompts (system/developer/user)
+            api_key: Optional API key for authorization
 
         Returns:
             Output data (Dict for structured, str for unstructured) or AsyncGenerator for streaming
@@ -621,6 +627,7 @@ class SimplePromptExecutor:
                 llm_retry_limit if output_validation and not stream else None,
                 allow_multiple_calls,
                 system_prompt_role,
+                api_key=api_key,
             )
 
             # Build message history from all messages
@@ -646,6 +653,7 @@ class SimplePromptExecutor:
                         llm_retry_limit=llm_retry_limit or 3,
                         messages=message_history,
                         system_prompt_role=system_prompt_role,
+                        api_key=api_key,
                     )
                 else:
                     # Regular streaming without validation
@@ -793,6 +801,7 @@ class SimplePromptExecutor:
         llm_retry_limit: Optional[int] = None,
         allow_multiple_calls: bool = True,
         system_prompt_role: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Agent:
         """Create Pydantic AI agent with automatic parameter routing.
 
@@ -803,6 +812,7 @@ class SimplePromptExecutor:
             llm_retry_limit: Number of retries for validation failures
             allow_multiple_calls: Whether to allow multiple LLM calls
             system_prompt_role: Role for system prompts (system/developer/user)
+            api_key: Optional API key for authorization
 
         Returns:
             Configured AI agent
@@ -811,8 +821,11 @@ class SimplePromptExecutor:
         # This automatically routes BudEcosystem parameters to extra_body
         openai_settings = self._convert_to_openai_settings(model_settings)
 
+        # Create provider with api_key (handles None internally)
+        provider = BudServeProvider(api_key=api_key)
+
         # Create model using BudServeProvider with system_prompt_role
-        model = self.provider.get_model(
+        model = provider.get_model(
             model_name=deployment_name, system_prompt_role=system_prompt_role, settings=openai_settings
         )
 

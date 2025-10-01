@@ -46,12 +46,15 @@ class ResponsesService:
         """Initialize the ResponsesService."""
         self.redis_service = RedisService()
 
-    async def execute_prompt(self, prompt_params: ResponsePromptParam, input: Optional[str] = None) -> Dict[str, Any]:
+    async def execute_prompt(
+        self, prompt_params: ResponsePromptParam, input: Optional[str] = None, api_key: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Execute prompt using template from Redis.
 
         Args:
             prompt_params: Prompt parameters including id, version, and variables
             input: Optional input text for the prompt
+            api_key: Optional API key for authorization
 
         Returns:
             Dictionary containing the execution result
@@ -106,7 +109,7 @@ class ResponsesService:
 
             input_data = prompt_params.variables if prompt_params.variables else input
 
-            result = await PromptExecutorService().execute_prompt(prompt_execute_data, input_data)
+            result = await PromptExecutorService().execute_prompt(prompt_execute_data, input_data, api_key=api_key)
 
             # Log successful execution
             logger.info(f"Successfully executed prompt: {prompt_id}")
