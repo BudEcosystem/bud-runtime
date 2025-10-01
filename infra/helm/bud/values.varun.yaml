@@ -10,5 +10,6 @@ microservices:
         image: vsrvarun/budprompt:vsr
         env:
             REDIS_DB_INDEX: "2"
+            BUD_GATEWAY_BASE_URL: https://gateway.varun.bud.studio/v1
     budapp:
         image: vsrvarun/budapp:vsr
