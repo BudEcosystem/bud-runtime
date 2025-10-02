@@ -4473,18 +4473,18 @@ const addAgent: DrawerFlowType = {
   totalSteps: 6,
   steps: [
     {
-      navigation: () => ["Select Type", "Add Agent"],
-      id: "add-agent-select-type",
+      navigation: () => ["Select Project", "Add Agent"],
+      id: "add-agent-select-project",
       step: 1,
-      component: StepComponents["add-agent-select-type"],
+      component: StepComponents["add-agent-select-project"],
       progress: [
         {
           status: FormProgressStatus.inProgress,
-          title: "Select Type",
+          title: "Select Project",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Select Project",
+          title: "Select Type",
         },
         {
           status: FormProgressStatus.notCompleted,
@@ -4503,21 +4503,21 @@ const addAgent: DrawerFlowType = {
           title: "Success",
         },
       ],
-      confirmClose: true,
+      confirmClose: false,
     },
     {
-      navigation: () => ["Select Project", "Add Agent"],
-      id: "add-agent-select-project",
+      navigation: () => ["Select Type", "Add Agent"],
+      id: "add-agent-select-type",
       step: 2,
-      component: StepComponents["add-agent-select-project"],
+      component: StepComponents["add-agent-select-type"],
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Select Type",
+          title: "Select Project",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Select Project",
+          title: "Select Type",
         },
         {
           status: FormProgressStatus.notCompleted,
@@ -4546,11 +4546,11 @@ const addAgent: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Select Type",
+          title: "Select Project",
         },
         {
           status: FormProgressStatus.completed,
-          title: "Select Project",
+          title: "Select Type",
         },
         {
           status: FormProgressStatus.inProgress,
@@ -4579,11 +4579,11 @@ const addAgent: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Select Type",
+          title: "Select Project",
         },
         {
           status: FormProgressStatus.completed,
-          title: "Select Project",
+          title: "Select Type",
         },
         {
           status: FormProgressStatus.completed,
@@ -4608,11 +4608,11 @@ const addAgent: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Select Type",
+          title: "Select Project",
         },
         {
           status: FormProgressStatus.completed,
-          title: "Select Project",
+          title: "Select Type",
         },
         {
           status: FormProgressStatus.completed,
@@ -4641,11 +4641,11 @@ const addAgent: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Select Type",
+          title: "Select Project",
         },
         {
           status: FormProgressStatus.completed,
-          title: "Select Project",
+          title: "Select Type",
         },
         {
           status: FormProgressStatus.completed,

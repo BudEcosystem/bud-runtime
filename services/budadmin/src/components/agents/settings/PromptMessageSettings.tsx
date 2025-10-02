@@ -47,7 +47,7 @@ export const PromptMessageSettings: React.FC<PromptMessageSettingsProps> = ({
     if (messages.length > 0 && Object.keys(messageOpenStates).length === 0) {
       setMessageOpenStates({ [messages[0].id]: true });
     }
-  }, []);
+  }, [messages, messageOpenStates]);
 
   const handleAddMessage = () => {
     const newMessage: PromptMessage = {
