@@ -164,8 +164,20 @@ const TextAreaInput: React.FC<TextAreaInputProps> = ({
 }) => (
   <TextArea
     size="1"
-    style={{ fontSize: "0.740625rem !important" }}
-    className={`w-full max-w-[350px] min-h-[50px] text-[0.740625rem] font-light text-[#44474D] h-[1.75rem] bg-[#0f0f0f] outline-[.5px] outline-[white] rounded-md border border-[#212225] shadow-none bg-transparent placeholder:text-xs placeholder:font-light hover:border-[#63656c] ${className}`}
+    style={{
+      fontSize: "0.740625rem",
+      fontWeight: 400,
+      color: '#44474D',
+      maxWidth: '350px',
+      minHeight: '50px',
+      height: '1.75rem',
+      backgroundColor: '#0f0f0f',
+      outlineWidth: '.5px',
+      outlineColor: 'white',
+      borderWidth: '1px',
+      borderColor: '#212225',
+     }}
+    className={`w-full rounded-md shadow-none hover:border-[#63656c] ${className}`}
     {...props}
   />
 );

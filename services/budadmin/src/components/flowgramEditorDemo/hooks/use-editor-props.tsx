@@ -16,9 +16,9 @@ import {
   FlowTextKey,
 } from '@flowgram.ai/fixed-layout-editor';
 
-import { SlotAdder } from '../components/slot-adder';
-import { NodeAdder } from '../components/node-adder';
-import { BranchAdder } from '../components/branch-adder';
+// import { SlotAdder } from '../components/slot-adder'; // Removed add node functionality
+// import { NodeAdder } from '../components/node-adder'; // Removed add node functionality
+// import { BranchAdder } from '../components/branch-adder'; // Removed add node functionality
 import { NodeWrapper } from '../components/node-wrapper';
 
 /** semi materials */
@@ -103,9 +103,9 @@ export function useEditorProps(
            * Components can be customized based on key business-side requirements.
            * 这里可以根据 key 业务侧定制组件
            */
-          [FlowRendererKey.ADDER]: NodeAdder,
-          [FlowRendererKey.BRANCH_ADDER]: BranchAdder,
-          [FlowRendererKey.SLOT_ADDER]: SlotAdder,
+          [FlowRendererKey.ADDER]: () => null, // Disabled add node functionality
+          [FlowRendererKey.BRANCH_ADDER]: () => null, // Disabled add branch functionality
+          [FlowRendererKey.SLOT_ADDER]: () => null, // Disabled add slot functionality
           [FlowRendererKey.DRAG_NODE]: DragNode,
         },
         renderDefaultNode: (props: any) => <NodeWrapper {...props} onNodeClick={onNodeClick} />, // 节点渲染

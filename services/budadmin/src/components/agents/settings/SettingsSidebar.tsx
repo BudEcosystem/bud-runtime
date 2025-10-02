@@ -123,7 +123,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
       }`}
       onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside settings
     >
-      <div className="flex flex-col h-full w-[15rem] py-3 prompt-settings border border-[#1F1F1F] bg-[#0A0A0A] overflow-y-auto rounded-[12px]">
+      <div className="flex flex-col h-full w-[15rem] prompt-settings border border-[#1F1F1F] bg-[#0A0A0A] overflow-y-auto rounded-[12px]">
         {renderSettings()}
       </div>
     </div>

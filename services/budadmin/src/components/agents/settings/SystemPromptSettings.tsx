@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Image } from "antd";
-import { Text_14_400_757575 } from "../../ui/text";
+import { Checkbox } from "antd";
+import { Text_16_400_EEEEEE, Text_10_400_757575 } from "../../ui/text";
 import { TextAreaInput } from "../../ui/input";
 
 interface SystemPromptSettingsProps {
@@ -16,38 +16,43 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
   systemPrompt,
   onSystemPromptChange
 }) => {
-  const [isOpen, setIsOpen] = React.useState(true);
+  const [allowMultipleCalls, setAllowMultipleCalls] = React.useState(false);
 
   return (
-    <div className="flex flex-col w-full px-[.4rem] py-[1rem] border-b border-[#1F1F1F]">
-      <div
-        className="flex flex-row items-center gap-[1rem] px-[.3rem] justify-between cursor-pointer"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <div className="flex flex-row items-center gap-[.4rem] py-[.5rem]">
-          <Text_14_400_757575>System Prompt</Text_14_400_757575>
-        </div>
-        <div className="flex flex-row items-center">
-          <Image
-            src="/icons/customArrow.png"
-            className={`w-[.75rem] transform transition-transform rotate-0 ${isOpen ? "" : "rotate-180"}`}
-            preview={false}
-            alt="chevron"
-          />
+    <div className="flex flex-col w-full px-[1rem] py-[1.5rem] bg-[#0A0A0A] border-b border-[#1F1F1F]">
+      {/* Header */}
+      <div className="mb-4">
+        <Text_16_400_EEEEEE>System Prompt</Text_16_400_EEEEEE>
+      </div>
+
+      {/* Text Area */}
+      <div className="mb-4">
+        <TextAreaInput
+          className="!w-full !max-w-full !min-h-[7.5rem] text-[#EEEEEE] text-sm placeholder:text-[#757575] bg-[#0F0F0F] border-[#2A2A2A] hover:border-[#965CDE] focus:border-[#965CDE] !rounded-lg"
+          value={systemPrompt}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+            onSystemPromptChange(e.target.value);
+          }}
+          placeholder="Enter system prompt..."
+          style={{ color: '#EEEEEE' }}
+        />
+      </div>
+
+      {/* Checkbox Section */}
+      <div className="space-y-2">
+        <Checkbox
+          checked={allowMultipleCalls}
+          onChange={(e) => setAllowMultipleCalls(e.target.checked)}
+          className="text-[#EEEEEE]"
+        >
+          <Text_16_400_EEEEEE className="text-[#EEEEEE] text-sm">Allow multiple calls</Text_16_400_EEEEEE>
+        </Checkbox>
+        <div className="pl-6">
+          <Text_10_400_757575 className='leading-[140%]'>
+            This option allows hghcgjhkjhknj bhjvjfg hcvn mhbj,bnvnhfccnv hvbnvhcn
+          </Text_10_400_757575>
         </div>
       </div>
-      {isOpen && (
-        <div className="space-y-2 px-[.5rem] pt-2">
-          <TextAreaInput
-            className="!w-full !max-w-full !min-h-[4rem] !text-[#EEEEEE] !text-xs !placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE]"
-            value={systemPrompt}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-              onSystemPromptChange(e.target.value);
-            }}
-            placeholder="Enter System Prompt..."
-          />
-        </div>
-      )}
     </div>
   );
 };
