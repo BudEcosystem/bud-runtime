@@ -3697,133 +3697,54 @@ class EvaluationWorkflowService:
                 WorkflowModel, {"id": workflow_id}
             )
             if not db_workflow:
-                logger.error(f"Workflow {workflow_id} not found for evaluation completion")
+                logger.error(f"::EvalResult:: Workflow {workflow_id} not found for evaluation completion")
                 raise ClientException(f"Workflow {workflow_id} not found")
 
-            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
-                {"workflow_id": workflow_id}
-            )
+            db_workflow = cast(WorkflowModel, db_workflow)
+            logger.warning(f"::EvalResult:: Workflow {db_workflow.id} found")
 
-            # Define the keys required for evaluation completion
-            keys_of_interest = [
-                "experiment_id",
-                "run_ids",
-                "evaluation_id",
-            ]
+            # Evaluation ID
+            status_str = (payload.content.status or "").upper()
+            logger.warning(f":EvalResult:: Status {status_str}")
 
-            # From workflow steps extract necessary information
-            required_data = {}
-            for db_workflow_step in db_workflow_steps:
-                if db_workflow_step.data:
-                    for key in keys_of_interest:
-                        if key in db_workflow_step.data:
-                            required_data[key] = db_workflow_step.data[key]
+            job_id = payload.content.result.job_id
+            evaluation_id = job_id.split("-", 1)[1] if "-" in job_id else job_id
+            logger.warning(f":EvalResult:: Evaluation ID {evaluation_id}")
 
-            logger.warning("Collected required data from workflow steps")
+            # Rest of the logics
+            evaluation_uuid = uuid.UUID(evaluation_id)
+            evaluation = self.session.get(EvaluationModel, evaluation_uuid)
 
-            # Get experiment details
-            experiment_id = required_data.get("experiment_id")
-            if not experiment_id:
-                # Try to extract from stage_data if available
-                for step in db_workflow_steps:
-                    if step.data and "stage_data" in step.data:
-                        stage_data = step.data["stage_data"]
-                        if "experiment_id" in stage_data:
-                            experiment_id = stage_data["experiment_id"]
-                            break
+            if not evaluation:
+                logger.error(f"::EvalResult:: Evaluation {evaluation_uuid} not found")
+                raise ClientException(f"Evaluation {evaluation_uuid} not found")
 
-            if not experiment_id:
-                logger.error("Could not find experiment_id in workflow steps")
-                raise ClientException("Experiment ID not found in workflow data")
+            # 2. Get the runs
+            runs = self.session.query(RunModel).filter(RunModel.evaluation_id == evaluation.id).all()
 
-            # Get the experiment
-            experiment = self.session.get(ExperimentModel, experiment_id)
-            if not experiment:
-                logger.error(f"Experiment {experiment_id} not found")
-                raise ClientException(f"Experiment {experiment_id} not found")
+            logger.warning(f"::EvalResult:: Found {len(runs)} runs for evaluation {evaluation.id}")
 
-            # Extract evaluation results from payload
-            evaluation_results = payload.content.result if payload.content and payload.content.result else {}
-            evaluation_status = evaluation_results.get("status", "completed")
+            # Update Evaluation Status
+            evaluation.status = EvaluationStatusEnum.COMPLETED.value
+            self.session.commit()
 
-            # Update workflow step data with final status
-            execution_status = {
-                "status": "success" if evaluation_status == "completed" else "error",
-                "message": f"Evaluation {evaluation_status}",
-                "results": evaluation_results,
-            }
+            # For Each Run
+            for run in runs:
+                run.status = RunStatusEnum.COMPLETED.value
+                self.session.commit()
 
-            workflow_data = {}
+            # Send Success Notification
             try:
-                # Update runs if we have run information
-                run_ids = required_data.get("run_ids", [])
-                if run_ids:
-                    for run_id in run_ids:
-                        try:
-                            run = self.session.get(RunModel, run_id)
-                            if run:
-                                run.status = (
-                                    RunStatusEnum.COMPLETED.value
-                                    if evaluation_status == "completed"
-                                    else RunStatusEnum.FAILED.value
-                                )
-                                if hasattr(run, "evaluation_status"):
-                                    run.evaluation_status = evaluation_status
-                                if evaluation_results.get("scores"):
-                                    run.scores = evaluation_results["scores"]
-                        except Exception as e:
-                            logger.error(f"Failed to update run {run_id}: {e}")
-
-                    self.session.commit()
-                    logger.info(f"Updated {len(run_ids)} runs with evaluation results")
-
-                # Mark workflow as completed
-                workflow_data = {"status": WorkflowStatusEnum.COMPLETED}
-
-            except Exception as e:
-                logger.exception(f"Failed to update evaluation results: {e}")
-                execution_status.update(
-                    {
-                        "status": "error",
-                        "message": f"Failed to update evaluation results: {str(e)}",
-                    }
-                )
-                workflow_data = {
-                    "status": WorkflowStatusEnum.FAILED,
-                    "reason": str(e),
-                }
-
-            finally:
-                # Update workflow step with execution status
-                workflow_step_data = {
-                    "workflow_execution_status": execution_status,
-                    "experiment_id": str(experiment_id),
-                }
-
-                # Update current step number
-                current_step_number = db_workflow.current_step + 1
-                workflow_current_step = current_step_number
-
-                # Update or create next workflow step
-                db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                    db_workflow.id, current_step_number, workflow_step_data
-                )
-                logger.warning(f"Updated workflow step {db_workflow_step.id} with evaluation completion status")
-
-                # Update workflow
-                workflow_data.update({"current_step": workflow_current_step})
-                await WorkflowDataManager(self.session).update_by_fields(db_workflow, workflow_data)
-
-                # Send success notification to workflow creator
                 notification_request = (
                     NotificationBuilder()
                     .set_content(
-                        title=experiment.name,
-                        message=f"Evaluation {evaluation_status}",
-                        icon=getattr(experiment, "icon", None),
-                        result=NotificationResult(target_id=experiment.id, target_type="workflow").model_dump(
-                            exclude_none=True, exclude_unset=True
-                        ),
+                        title=evaluation.name,
+                        message=f"Evaluation {evaluation.status}",
+                        icon=None,
+                        result=NotificationResult(
+                            target_id=db_workflow.id,
+                            target_type="workflow",
+                        ).model_dump(exclude_none=True, exclude_unset=True),
                     )
                     .set_payload(
                         workflow_id=str(db_workflow.id),
@@ -3833,8 +3754,9 @@ class EvaluationWorkflowService:
                     .build()
                 )
                 await BudNotifyService().send_notification(notification_request)
-                logger.info(f"Sent evaluation completion notification for experiment {experiment_id}")
+            except Exception as e:
+                logger.warning(f"::EvalResult:: Failed to send notification: {e}")
 
         except Exception as e:
-            logger.exception(f"Failed to handle evaluation completion event: {e}")
-            raise ClientException(f"Failed to process evaluation completion: {str(e)}")
+            logger.exception(f"::EvalResult:: Failed to handle evaluation completion event: {e}")
+            raise ClientException(f"::EvalResult:: Failed to process evaluation completion: {str(e)}")
