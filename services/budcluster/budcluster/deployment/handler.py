@@ -187,7 +187,6 @@ class DeploymentHandler:
             "namespace": namespace,
             "nodes": [],
             "container_port": app_settings.engine_container_port,
-            "image_pull_secrets": {},
             "ingress_host": ingress_url,
             "volume_type": app_settings.volume_type,
             "model_name": namespace,
@@ -606,7 +605,6 @@ api_key_location = "env::API_KEY"
         values = {
             "hf_token": hf_token,
             "namespace": namespace,
-            "image_pull_secrets": {},
             "volume_type": app_settings.volume_type,
             "quantization_job_image": app_settings.quantization_job_image,
             "quantization_config": qunatization_config,

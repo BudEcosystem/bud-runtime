@@ -18,7 +18,7 @@
 
 import json
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -778,8 +778,28 @@ class ClusterService(SessionMixin):
 
         # Check if cluster is already in deleting state
         if db_cluster.status == ClusterStatusEnum.DELETING:
-            logger.error("Cluster %s is already in deleting state", db_cluster.id)
-            raise ClientException("Cluster is already in deleting state")
+            # Check how long the cluster has been in deleting state
+            time_in_deleting = datetime.now(timezone.utc) - db_cluster.updated_at
+
+            if time_in_deleting > timedelta(days=1):
+                # Move to ERROR state if stuck in DELETING for more than 24 hours
+                logger.warning(
+                    f"Cluster {db_cluster.id} has been in DELETING state for {time_in_deleting}. "
+                    "Moving to ERROR state."
+                )
+                update_data = {
+                    "status": ClusterStatusEnum.ERROR,
+                    "reason": f"Cluster stuck in DELETING state for {time_in_deleting}",
+                }
+                await ClusterDataManager(self.session).update_by_fields(db_cluster, update_data)
+                return  # Successfully handled, no error
+            else:
+                # Log as info and treat as success (idempotent operation)
+                logger.info(
+                    f"Cluster {db_cluster.id} already in DELETING state for {time_in_deleting}. "
+                    "Ignoring duplicate status update."
+                )
+                return  # Successfully handled, no error
 
         # Update data
         update_data = {"status": payload.content.result["status"]}

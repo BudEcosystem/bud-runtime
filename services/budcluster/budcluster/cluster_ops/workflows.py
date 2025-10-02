@@ -1823,6 +1823,60 @@ class DeleteClusterWorkflow:
 
 
 class UpdateClusterStatusWorkflow:
+    @dapr_workflows.register_activity
+    @staticmethod
+    def compute_cluster_status(ctx: wf.WorkflowActivityContext, cluster_id: str) -> dict:
+        """Compute cluster status and node info in an activity thread.
+
+        Returns a JSON-serializable dict with keys:
+        - status: ClusterStatusEnum value
+        - nodes_info_present: bool
+        - node_info: list
+        - node_status_change: bool
+        - cluster_id: str
+        """
+        logger = logging.get_logger("ComputeClusterStatus")
+        try:
+            with DBSession() as session:
+                db_cluster = asyncio.run(ClusterService(session)._get_cluster(cluster_id, missing_ok=True))
+                if db_cluster is None:
+                    logger.info(f"Cluster {cluster_id} not found in the database")
+                    return {"skipped": True, "cluster_id": cluster_id, "reason": "cluster_not_found"}
+
+            # Decrypt config
+            config_dict = {}
+            if db_cluster.configuration:
+                try:
+                    with DaprServiceCrypto() as dapr_service:
+                        configuration_decrypted = dapr_service.decrypt_data(db_cluster.configuration)
+                        config_dict = json.loads(configuration_decrypted)
+                    logger.debug(f"Successfully decrypted config for cluster {cluster_id}")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt config for cluster {cluster_id}: {e}")
+                    return {
+                        "skipped": True,
+                        "cluster_id": cluster_id,
+                        "reason": "crypto_unavailable",
+                    }
+
+            # Compute node status
+            cluster_status, nodes_info_present, node_info, node_status_change = asyncio.run(
+                ClusterOpsService.update_node_status(db_cluster.id, config_dict)
+            )
+
+            return {
+                "status": cluster_status,
+                "prev_status": db_cluster.status,
+                "nodes_info_present": nodes_info_present,
+                "node_info": node_info,
+                "node_status_change": node_status_change,
+                "cluster_id": str(db_cluster.id),
+                "skipped": False,
+            }
+        except Exception as e:
+            logger.exception(f"Failed to compute cluster status for {cluster_id}: {e}")
+            return {"skipped": True, "cluster_id": cluster_id, "reason": str(e)}
+
     @dapr_workflows.register_workflow
     @staticmethod
     def update_cluster_status(ctx: wf.DaprWorkflowContext, cluster_id: str):
@@ -1831,33 +1885,21 @@ class UpdateClusterStatusWorkflow:
         instance_id = str(ctx.instance_id)
         logger.info(f"Updating cluster status for workflow_id: {instance_id}")
 
-        with DBSession() as session:
-            db_cluster = asyncio.run(ClusterService(session)._get_cluster(cluster_id, missing_ok=True))
-            if db_cluster is None:
-                logger.info(f"Cluster {cluster_id} not found in the database")
-                # condition for update cluster status job completed
-                # will happen when cluster is deleted
-                return
-
-        # Decrypt config inside the workflow, like deployment workflows do
-        config_dict = {}
-        if db_cluster.configuration:
-            try:
-                with DaprServiceCrypto() as dapr_service:
-                    configuration_decrypted = dapr_service.decrypt_data(db_cluster.configuration)
-                    config_dict = json.loads(configuration_decrypted)
-                logger.debug(f"Successfully decrypted config for cluster {cluster_id}")
-            except Exception as e:
-                logger.error(f"Failed to decrypt config for cluster {cluster_id}: {e}")
-                # Can't proceed without config - return early
-                logger.warning(f"Skipping node status update for cluster {cluster_id} due to crypto error")
-                return {"status": "skipped", "cluster_id": cluster_id, "reason": "crypto_unavailable"}
-
-        # Pass the decrypted config to update_node_status
-        cluster_status, nodes_info_present, node_info, node_status_change = asyncio.run(
-            ClusterOpsService.update_node_status(db_cluster.id, config_dict)
+        # Delegate heavy lifting to an activity to avoid blocking workflow thread
+        result = yield ctx.call_activity(
+            UpdateClusterStatusWorkflow.compute_cluster_status,
+            input=cluster_id,
         )
-        if cluster_status != db_cluster.status or not nodes_info_present or node_status_change:
+        if result.get("skipped"):
+            logger.info(f"Skipping update for cluster {cluster_id}: {result.get('reason')}")
+            return result
+
+        cluster_status = result["status"]
+        prev_status = result.get("prev_status")
+        nodes_info_present = result["nodes_info_present"]
+        node_info = result["node_info"]
+        node_status_change = result["node_status_change"]
+        if cluster_status != prev_status or not nodes_info_present or node_status_change:
             logger.info(f"Sending cluster status notification: {cluster_status}")
             event_name = "cluster-status-update"
             event_type = "results"

@@ -168,6 +168,12 @@ export interface InferenceDetail {
   cost?: number;
   endpoint_type?: string;
 
+  // Error details
+  error_code?: string;
+  error_message?: string;
+  error_type?: string;
+  status_code?: number;
+
   // Raw data
   raw_request?: string;
   raw_response?: string;

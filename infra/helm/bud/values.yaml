@@ -465,7 +465,7 @@ deploymentAnnotations:
 
 # https://github.com/grafana/mimir/blob/main/operations/helm/charts/mimir-distributed/small.yaml
 mimir-distributed:
-    enabled: true
+    enabled: false
     alertmanager:
         persistentVolume:
             enabled: true

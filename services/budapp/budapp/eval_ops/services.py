@@ -24,6 +24,7 @@ from budapp.eval_ops.models import (
     ExperimentStatusEnum,
     RunStatusEnum,
 )
+from budapp.eval_ops.models import Evaluation as EvaluationModel
 from budapp.eval_ops.models import ExpDataset as DatasetModel
 from budapp.eval_ops.models import Experiment as ExperimentModel
 from budapp.eval_ops.models import (
@@ -376,7 +377,7 @@ class ExperimentService:
         exp_data.objective = ev.description or ""
 
         # Traits and Models
-        exp_data.models = self.get_models_for_experiment(ev.id)
+        # exp_data.models = self.get_models_for_experiment(ev.id)
 
         # Get all evaluations for the experiment
         evaluations = (
@@ -396,61 +397,146 @@ class ExperimentService:
         traits_list = []
         if trait_ids_set:
             traits_list = self.session.query(TraitModel).filter(TraitModel.id.in_(list(trait_ids_set))).all()
-        traits_dict = {str(trait.id): trait.name for trait in traits_list}
-        traits = list(traits_dict.values())
 
-        # Build current metrics with placeholder values
-        # Build current metrics in table format: traits as rows, models as columns
-        current_metrics_table = {}
+        # Get all the runs with metrics and get the run details as well as metric details
+        # Build current metrics table: each row represents a run with its evaluation, dataset, model, traits, and scores
 
-        # Initialize table with traits as keys
-        for trait in traits:
-            current_metrics_table[trait] = {}
-
-        # If no models exist in the experiment, create dummy models for demonstration
-        models_to_use = (
-            exp_data.models
-            if exp_data.models
-            else [
-                # Add some dummy models for demonstration when no real models exist
-                type("MockModel", (), {"name": "GPT-4"})(),
-                type("MockModel", (), {"name": "Claude-3.5"})(),
-                type("MockModel", (), {"name": "Llama-3"})(),
-            ]
+        # Get all runs for the experiment
+        all_experiment_runs = (
+            self.session.query(RunModel)
+            .filter(
+                RunModel.experiment_id == ev.id,
+                RunModel.status != RunStatusEnum.DELETED.value,
+            )
+            .order_by(RunModel.created_at.desc())
+            .all()
         )
 
-        # For each model used in the experiment, collect scores per trait
-        for model_summary in models_to_use:
-            model_name = model_summary.name
+        # Batch fetch all related data to avoid N+1 queries
+        run_ids = [run.id for run in all_experiment_runs]
+        evaluation_ids = [run.evaluation_id for run in all_experiment_runs if run.evaluation_id]
+        model_ids = [run.model_id for run in all_experiment_runs if run.model_id]
+        dataset_version_ids = [run.dataset_version_id for run in all_experiment_runs if run.dataset_version_id]
 
-            # Initialize all traits with dummy score data for this model
-            for i, trait in enumerate(traits):
-                # Add some variation to dummy scores based on trait index and model name hash
-                base_score = 0.6 + (hash(f"{model_name}_{trait}") % 40) / 100.0  # Score between 0.6-1.0
-                current_metrics_table[trait][model_name] = {
-                    "value": round(base_score, 3),
-                    "higher_is_better": True,
-                    "status": "completed" if i % 2 == 0 else "pending",  # Mix of completed and pending
-                }
+        # Batch fetch evaluations
+        evaluations_dict = {}
+        if evaluation_ids:
+            evaluations_batch = self.session.query(Evaluation).filter(Evaluation.id.in_(evaluation_ids)).all()
+            evaluations_dict = {eval.id: eval for eval in evaluations_batch}
 
-            # Get actual scores from evaluations if available
-            # This would need to be implemented based on your actual metrics/results structure
-            # For now using dummy placeholder values above
+        # Batch fetch models
+        models_dict = {}
+        if model_ids:
+            models_batch = self.session.query(ModelTable).filter(ModelTable.id.in_(model_ids)).all()
+            models_dict = {model.id: model for model in models_batch}
 
-        # Convert table format to list of dictionaries
+        # Batch fetch endpoints
+        endpoints_dict = {}
+        if model_ids:
+            endpoints_batch = self.session.query(EndpointModel).filter(EndpointModel.model_id.in_(model_ids)).all()
+            endpoints_dict = {endpoint.model_id: endpoint for endpoint in endpoints_batch}
+
+        # Batch fetch dataset versions and datasets
+        datasets_dict = {}
+        dataset_ids_for_traits = []
+        if dataset_version_ids:
+            dataset_versions_batch = (
+                self.session.query(ExpDatasetVersion).filter(ExpDatasetVersion.id.in_(dataset_version_ids)).all()
+            )
+            for dv in dataset_versions_batch:
+                datasets_dict[dv.id] = dv.dataset
+                if dv.dataset:
+                    dataset_ids_for_traits.append(dv.dataset.id)
+
+        # Batch fetch traits for all datasets
+        traits_by_dataset = {}
+        if dataset_ids_for_traits:
+            traits_pivot = (
+                self.session.query(PivotModel, TraitModel)
+                .join(TraitModel, PivotModel.trait_id == TraitModel.id)
+                .filter(PivotModel.dataset_id.in_(dataset_ids_for_traits))
+                .all()
+            )
+            for pivot, trait in traits_pivot:
+                if pivot.dataset_id not in traits_by_dataset:
+                    traits_by_dataset[pivot.dataset_id] = []
+                traits_by_dataset[pivot.dataset_id].append(trait.name)
+
+        # Batch fetch all metrics for all runs
+        metrics_by_run = {}
+        if run_ids:
+            metrics_batch = self.session.query(MetricModel).filter(MetricModel.run_id.in_(run_ids)).all()
+            for metric in metrics_batch:
+                if metric.run_id not in metrics_by_run:
+                    metrics_by_run[metric.run_id] = []
+                metrics_by_run[metric.run_id].append(metric)
+
+        # Build current metrics as a list of run records
         exp_data.current_metrics = []
-        for trait_name, model_scores in current_metrics_table.items():
-            metric_dict = {
-                "trait_name": trait_name,
-                "model_scores": model_scores,  # Dictionary of model_name -> {value, higher_is_better, status}
+
+        for run in all_experiment_runs:
+            # Get evaluation details from batched data
+            evaluation_name = "N/A"
+            if run.evaluation_id and run.evaluation_id in evaluations_dict:
+                evaluation_name = evaluations_dict[run.evaluation_id].name
+
+            # Get model details from batched data
+            model_name = "Unknown Model"
+            deployment_name = None
+            if run.model_id and run.model_id in models_dict:
+                model_name = models_dict[run.model_id].name
+                if run.model_id in endpoints_dict:
+                    deployment_name = endpoints_dict[run.model_id].namespace
+
+            # Get dataset and its traits from batched data
+            dataset_name = "Unknown Dataset"
+            traits_list = []
+            if run.dataset_version_id and run.dataset_version_id in datasets_dict:
+                dataset = datasets_dict[run.dataset_version_id]
+                if dataset:
+                    dataset_name = dataset.name
+                    traits_list = traits_by_dataset.get(dataset.id, [])
+
+            # Get metrics from batched data
+            metrics = metrics_by_run.get(run.id, [])
+
+            # Calculate average score
+            score_value = 0.0
+            judge_model = None  # TODO: Get judge model from config if available
+            if metrics:
+                total = sum(float(m.metric_value) for m in metrics)
+                score_value = round(total / len(metrics), 2)
+
+            # Format score with judge model if available
+            score_display = f"{score_value}%"
+            if judge_model:
+                score_display = f"{score_value}% - {judge_model}"
+
+            # Build the current metric record
+            metric_record = {
+                "evaluation": evaluation_name,
+                "dataset": dataset_name,
+                "deployment_name": deployment_name or "Not deployed",
+                "score": score_display,
+                "score_value": score_value,  # Raw value for sorting
+                "traits": traits_list,
+                "last_run": getattr(run, "updated_at", None) or getattr(run, "created_at", None),
+                "status": run.status,
+                "run_id": str(run.id),
+                "model_name": model_name,
             }
-            exp_data.current_metrics.append(metric_dict)
+
+            exp_data.current_metrics.append(metric_record)
 
         # Get evaluations with Running & Pending status
         evaluations_running = [
             eval
             for eval in evaluations
-            if eval.status in [EvaluationStatusEnum.RUNNING.value, EvaluationStatusEnum.PENDING.value]
+            if eval.status
+            in [
+                EvaluationStatusEnum.RUNNING.value,
+                EvaluationStatusEnum.PENDING.value,
+            ]
         ]
 
         # Batch fetch all runs for running evaluations
@@ -868,74 +954,111 @@ class ExperimentService:
         # First verify the experiment exists and belongs to the user
         experiment = (
             self.session.query(ExperimentModel)
-            .filter(ExperimentModel.id == experiment_id, ExperimentModel.status != ExperimentStatusEnum.DELETED.value)
+            .filter(
+                ExperimentModel.id == experiment_id,
+                ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
+            )
             .first()
         )
 
         if not experiment:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
-
-        # Get all completed evaluations (runs) for this experiment with their related data
-        from sqlalchemy.orm import joinedload
-
-        runs = (
-            self.session.query(RunModel)
-            .options(
-                joinedload(RunModel.dataset_version)
-                .joinedload(ExpDatasetVersion.dataset)
-                .joinedload(DatasetModel.traits)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
             )
-            .filter(
-                RunModel.experiment_id == experiment_id,
-                # RunModel.status == RunStatusEnum.COMPLETED.value,
-            )
-            .order_by(RunModel.created_at.desc())
+
+        # 1. Get all evaluations for the experiment
+        evaluations = (
+            self.session.query(EvaluationModel)
+            .filter(EvaluationModel.experiment_id == experiment_id)
+            .order_by(EvaluationModel.created_at.desc())
             .all()
         )
 
         evaluation_items = []
 
-        for run in runs:
-            # Get model name from endpoint table
-            model = self.session.query(ModelTable).filter(ModelTable.id == run.model_id).first()
+        # 2. For each evaluation, process its data
+        for evaluation in evaluations:
+            # Get runs associated with this evaluation
+            runs = self.session.query(RunModel).filter(RunModel.evaluation_id == evaluation.id).all()
+
+            if not runs:
+                continue
+
+            # Get the first run to extract model info (all runs in an evaluation typically use the same model)
+            first_run = runs[0]
+
+            # 4. Get model details and name
+            model = self.session.query(ModelTable).filter(ModelTable.id == first_run.model_id).first()
             model_name = model.name if model else "Unknown Model"
 
-            # Get dataset and its traits
-            dataset = run.dataset_version.dataset if run.dataset_version else None
-            traits = dataset.traits if dataset else []
+            # 2. Identify associated traits from evaluation.trait_ids
+            trait_ids = evaluation.trait_ids if evaluation.trait_ids else []
 
-            # Create evaluation items for each trait associated with the dataset
-            if traits:
+            if trait_ids:
+                # Batch fetch all traits
+                traits = (
+                    self.session.query(TraitModel)
+                    .filter(TraitModel.id.in_([uuid.UUID(tid) for tid in trait_ids]))
+                    .all()
+                )
+
+                # 3. For each trait, get associated datasets
+                trait_dataset_map = {}
                 for trait in traits:
-                    # Generate random score between 60-95 for demo purposes
-                    trait_score = round(random.uniform(60.0, 95.0), 2)
+                    # Get datasets associated with this trait
+                    datasets = (
+                        self.session.query(DatasetModel)
+                        .join(PivotModel, DatasetModel.id == PivotModel.dataset_id)
+                        .filter(PivotModel.trait_id == trait.id)
+                        .all()
+                    )
+                    trait_dataset_map[str(trait.id)] = {
+                        "trait": trait,
+                        "datasets": datasets,
+                    }
 
-                    # Generate duration between 30-40 minutes as requested
-                    duration = random.randint(30, 40)
+                # 6. Map trait_id with trait_scores
+                trait_scores_map = evaluation.trait_scores if evaluation.trait_scores else {}
+
+                # Create evaluation items for each trait
+                for trait_id_str in trait_ids:
+                    trait_data = trait_dataset_map.get(trait_id_str)
+                    if not trait_data:
+                        continue
+
+                    trait = trait_data["trait"]
+
+                    # Get trait score from trait_scores mapping, or use default
+                    trait_score = float(trait_scores_map.get(trait_id_str, 0.0))
+
+                    # Calculate duration in minutes from duration_in_seconds
+                    duration_minutes = evaluation.duration_in_seconds // 60 if evaluation.duration_in_seconds else 0
 
                     evaluation_item = EvaluationListItem(
-                        evaluation_name=f"Eval-{run.run_index}",
-                        evaluation_id=run.id,
+                        evaluation_name=evaluation.name,
+                        evaluation_id=evaluation.id,
                         model_name=model_name,
-                        started_date=run.created_at,
-                        duration_minutes=duration,
+                        started_date=evaluation.created_at,
+                        duration_minutes=duration_minutes,
                         trait_name=trait.name,
                         trait_score=trait_score,
+                        status=evaluation.status,
                     )
                     evaluation_items.append(evaluation_item)
             else:
                 # If no traits associated, create a single evaluation item with default trait
-                trait_score = round(random.uniform(60.0, 95.0), 2)
-                duration = random.randint(30, 40)
+                duration_minutes = evaluation.duration_in_seconds // 60 if evaluation.duration_in_seconds else 0
 
                 evaluation_item = EvaluationListItem(
-                    evaluation_name=f"Eval-{run.run_index}",
-                    evaluation_id=run.id,
+                    evaluation_name=evaluation.name,
+                    evaluation_id=evaluation.id,
                     model_name=model_name,
-                    started_date=run.created_at,
-                    duration_minutes=duration,
+                    started_date=evaluation.created_at,
+                    duration_minutes=duration_minutes,
                     trait_name="General",
-                    trait_score=trait_score,
+                    trait_score=0.0,
+                    status=evaluation.status,
                 )
                 evaluation_items.append(evaluation_item)
 
@@ -986,6 +1109,111 @@ class ExperimentService:
             config=run.config,
             metrics=metrics_data,
             raw_results=raw_results_data,
+        )
+
+    def get_run_with_detailed_metrics(self, run_id: uuid.UUID, user_id: uuid.UUID) -> "RunDetailedWithMetrics":
+        """Get a run with complete dataset details, model details, and metrics.
+
+        Parameters:
+            run_id (uuid.UUID): ID of the run.
+            user_id (uuid.UUID): ID of the user.
+
+        Returns:
+            RunDetailedWithMetrics: Run schema with complete dataset, model, and metrics information.
+
+        Raises:
+            HTTPException(status_code=404): If run not found or access denied.
+        """
+        from budapp.eval_ops.schemas import RunDetailedWithMetrics
+
+        run = self.session.get(RunModel, run_id)
+        if not run or run.experiment.created_by != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Run not found or access denied",
+            )
+
+        # Get metrics for this run
+        metrics = self.session.query(MetricModel).filter(MetricModel.run_id == run_id).all()
+        metrics_data = [
+            {
+                "metric_name": metric.metric_name,
+                "mode": metric.mode,
+                "metric_value": float(metric.metric_value),
+            }
+            for metric in metrics
+        ]
+
+        # Get raw results for this run
+        raw_result = self.session.query(RawResultModel).filter(RawResultModel.run_id == run_id).first()
+        raw_results_data = raw_result.preview_results if raw_result else None
+
+        # Get model details
+        model_details = None
+        if run.model_id:
+            model = self.session.query(ModelTable).filter(ModelTable.id == run.model_id).first()
+            if model:
+                # Get deployment name from endpoint if exists
+                endpoint = self.session.query(EndpointModel).filter(EndpointModel.model_id == run.model_id).first()
+                model_details = {
+                    "id": str(model.id),
+                    "name": model.name,
+                    "display_name": model.display_name,
+                    "deployment_name": endpoint.namespace if endpoint else None,
+                    "description": model.description,
+                }
+
+        # Get dataset details with version information
+        dataset_details = None
+        if run.dataset_version_id:
+            dataset_version = (
+                self.session.query(ExpDatasetVersion).filter(ExpDatasetVersion.id == run.dataset_version_id).first()
+            )
+            if dataset_version and dataset_version.dataset:
+                dataset = dataset_version.dataset
+
+                # Get traits associated with this dataset
+                traits = (
+                    self.session.query(TraitModel)
+                    .join(PivotModel, TraitModel.id == PivotModel.trait_id)
+                    .filter(PivotModel.dataset_id == dataset.id)
+                    .all()
+                )
+
+                dataset_details = {
+                    "id": str(dataset.id),
+                    "name": dataset.name,
+                    "description": dataset.description,
+                    "version": dataset_version.version,
+                    "version_id": str(dataset_version.id),
+                    "estimated_input_tokens": dataset.estimated_input_tokens,
+                    "estimated_output_tokens": dataset.estimated_output_tokens,
+                    "language": dataset.language,
+                    "domains": dataset.domains,
+                    "modalities": dataset.modalities,
+                    "task_type": dataset.task_type,
+                    "traits": [
+                        {
+                            "id": str(trait.id),
+                            "name": trait.name,
+                            "description": trait.description,
+                        }
+                        for trait in traits
+                    ],
+                }
+
+        return RunDetailedWithMetrics(
+            id=run.id,
+            experiment_id=run.experiment_id,
+            run_index=run.run_index,
+            status=RunStatusEnum(run.status),
+            config=run.config,
+            model=model_details,
+            dataset=dataset_details,
+            metrics=metrics_data,
+            raw_results=raw_results_data,
+            created_at=run.created_at,
+            updated_at=run.updated_at,
         )
 
     def update_run(

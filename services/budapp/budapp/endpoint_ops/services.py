@@ -60,6 +60,7 @@ from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model as ModelsModel
 from ..model_ops.models import Provider as ProviderModel
 from ..model_ops.services import ModelServiceUtil
+from ..prompt_ops.crud import PromptVersionDataManager
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..shared.redis_service import RedisService
 from ..user_ops.models import User as UserModel
@@ -165,6 +166,15 @@ class EndpointService(SessionMixin):
 
         if db_endpoint.status == EndpointStatusEnum.DELETING:
             raise ClientException("Deployment is already deleting")
+
+        # Check if any active prompts are using this endpoint
+        prompt_versions = await PromptVersionDataManager(self.session).get_prompt_versions_by_endpoint_id(endpoint_id)
+        if prompt_versions:
+            prompt_names = [f"{pv.prompt.name}" for pv in prompt_versions]
+            raise ClientException(
+                f"Cannot delete deployment. It is being used by prompt '{prompt_names[0]}'",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         if db_endpoint.model.provider_type in [ModelProviderTypeEnum.HUGGING_FACE, ModelProviderTypeEnum.CLOUD_MODEL]:
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(

@@ -15,3 +15,11 @@
 #  -----------------------------------------------------------------------------
 
 """The main package initializer. This package provides tools, utilities, and best practices for developing Python microservices using Dapr."""
+
+# Disable gRPC fork support to prevent deadlocks with ansible_runner
+# This MUST be set before any imports that might load gRPC
+import os
+
+
+os.environ["GRPC_ENABLE_FORK_SUPPORT"] = "0"
+os.environ["GRPC_POLL_STRATEGY"] = "poll"
