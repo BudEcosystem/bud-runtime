@@ -3581,36 +3581,47 @@ class EvaluationWorkflowService:
             logger.info(f"Triggering budeval evaluation for {len(runs)} runs in experiment {experiment_id}")
             logger.info("*" * 10)
 
-            # Collect all datasets from runs, starting with the demo dataset
-            all_datasets = ["demo_gsm8k_chat_gen"]
-
-            # Get model and endpoint information from the first run
-            # first_run = runs[0]
-            # model = self.session.query(ModelTable).filter(ModelTable.id == first_run.model_id).first()
-            # endpoint = self.session.query(EndpointModel).filter(EndpointModel.model_id == first_run.model_id).first()
-
-            # if not model or not endpoint:
-            #     logger.error(f"Model or endpoint not found for first run {first_run.id}")
-            #     return None
+            # Collect all datasets from runs by extracting eval_type configurations from database
+            all_datasets = []
 
             # Add datasets from each run (avoiding duplicates)
-            # for run in runs:
-            #     try:
-            #         if hasattr(run, 'dataset_version') and run.dataset_version and run.dataset_version.dataset:
-            #             dataset_id = run.dataset_version.dataset.dataset_id
-            #             if dataset_id not in all_datasets:
-            #                 all_datasets.append(dataset_id)
-            #     except Exception as e:
-            #         logger.warning(f"Could not retrieve dataset for run {run.id}: {e}")
+            for run in runs:
+                try:
+                    if run.dataset_version and run.dataset_version.dataset:
+                        dataset = run.dataset_version.dataset
+                        eval_types = dataset.eval_types
+
+                        if eval_types and isinstance(eval_types, dict):
+                            # Extract the "gen" evaluation type configuration
+                            # You can make this configurable based on run.config if needed
+                            if "gen" in eval_types:
+                                dataset_config = eval_types["gen"]
+                                if dataset_config and dataset_config not in all_datasets:
+                                    all_datasets.append(dataset_config)
+                                    logger.info(f"Added dataset config '{dataset_config}' from run {run.id}")
+                            else:
+                                logger.warning(f"Run {run.id}: Dataset '{dataset.name}' has no 'gen' eval_type")
+                        else:
+                            logger.warning(f"Run {run.id}: Dataset '{dataset.name}' has no eval_types configured")
+                except Exception as e:
+                    logger.error(
+                        f"Could not retrieve dataset configuration for run {run.id}: {e}",
+                        exc_info=True,
+                    )
 
             # Prepare single evaluation request with all datasets
+            if not all_datasets:
+                logger.error(f"No datasets with eval_types found for experiment {experiment_id}")
+                raise ClientException("No datasets with valid eval_type configurations found")
+
+            logger.info(f"Collected {len(all_datasets)} dataset configurations: {all_datasets}")
 
             evaluation_request = {
                 "model_name": "qwen3-32b",
                 "endpoint": "http://20.66.97.208/v1",
                 "api_key": "sk-BudLiteLLMMasterKey_123",
                 "extra_args": {},
-                "datasets": ["demo_gsm8k_chat_gen"],  # all_datasets,
+                "datasets": all_datasets,
                 "kubeconfig": "",  # TODO: Get actual kubeconfig
                 # Use service name as source for CloudEvent metadata (not the topic)
                 "source": app_settings.name,
@@ -3618,6 +3629,8 @@ class EvaluationWorkflowService:
                 "experiment_id": experiment_id,  # Include experiment ID for tracking
                 "evaluation_id": str(evaluation_id),  # TODO: Update to actual evaluation ID
             }
+
+            logger.warning(f"::BUDEVAL:: Triggering budeval evaluation {evaluation_request}")
 
             # Update all runs status to running
             for run in runs:
