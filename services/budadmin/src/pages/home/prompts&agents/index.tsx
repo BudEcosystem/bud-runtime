@@ -231,9 +231,8 @@ export default function PromptsAgents() {
   const { hasPermission, loadingUser } = useUser();
   const { showLoader, hideLoader } = useLoader();
   const { openDrawer } = useDrawer();
-  // to flowgram
   const { openAgentDrawer } = useAgentStore();
-
+// openAgentDrawer();
   // Use the store
   const {
     filteredPrompts,
