@@ -3109,6 +3109,9 @@ class EvaluationWorkflowService:
             next_run_index += 1
             runs_created += 1
 
+        # commit changes
+        self.session.commit()
+
         self.session.commit()
 
         # Trigger budeval evaluation for all created runs
@@ -3681,6 +3684,8 @@ class EvaluationWorkflowService:
         Raises:
             ClientException: If the evaluation update fails
         """
+        from sqlalchemy import select
+
         from budapp.commons.constants import NotificationTypeEnum
         from budapp.core.schemas import NotificationResult
         from budapp.shared.notification_service import (
@@ -3707,31 +3712,49 @@ class EvaluationWorkflowService:
             status_str = (payload.content.status or "").upper()
             logger.warning(f":EvalResult:: Status {status_str}")
 
-            job_id = payload.content.result.job_id
-            evaluation_id = job_id.split("-", 1)[1] if "-" in job_id else job_id
-            logger.warning(f":EvalResult:: Evaluation ID {evaluation_id}")
+            # Extract job_id from result dictionary with error handling
+            try:
+                job_id = payload.content.result.get("job_id")
+                if not job_id:
+                    raise ClientException("Missing job_id in evaluation completion notification")
+                evaluation_id = job_id.split("-", 1)[1] if "-" in job_id else job_id
+                logger.warning(f":EvalResult:: Evaluation ID {evaluation_id}")
+
+                # Convert to UUID with proper error handling
+                evaluation_uuid = uuid.UUID(evaluation_id)
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.error(f"::EvalResult:: Invalid evaluation ID format: {e}")
+                raise ClientException(f"Invalid evaluation ID format: {e}")
 
             # Rest of the logics
-            evaluation_uuid = uuid.UUID(evaluation_id)
             evaluation = self.session.get(EvaluationModel, evaluation_uuid)
 
             if not evaluation:
                 logger.error(f"::EvalResult:: Evaluation {evaluation_uuid} not found")
                 raise ClientException(f"Evaluation {evaluation_uuid} not found")
 
-            # 2. Get the runs
-            runs = self.session.query(RunModel).filter(RunModel.evaluation_id == evaluation.id).all()
+            # 2. Get the runs using modern SQLAlchemy pattern
+            try:
+                runs_stmt = select(RunModel).where(RunModel.evaluation_id == evaluation.id)
+                runs = self.session.execute(runs_stmt).scalars().all()
 
-            logger.warning(f"::EvalResult:: Found {len(runs)} runs for evaluation {evaluation.id}")
+                logger.warning(f"::EvalResult:: Found {len(runs)} runs for evaluation {evaluation.id}")
 
-            # Update Evaluation Status
-            evaluation.status = EvaluationStatusEnum.COMPLETED.value
-            self.session.commit()
+                # Update Evaluation Status
+                evaluation.status = EvaluationStatusEnum.COMPLETED.value
 
-            # For Each Run
-            for run in runs:
-                run.status = RunStatusEnum.COMPLETED.value
+                # Update all runs status
+                for run in runs:
+                    run.status = RunStatusEnum.COMPLETED.value
+
+                # Single commit for all changes to ensure atomicity
                 self.session.commit()
+                logger.warning(f"::EvalResult:: Successfully updated evaluation {evaluation.id} and {len(runs)} runs")
+
+            except Exception as db_error:
+                self.session.rollback()
+                logger.error(f"::EvalResult:: Database error during evaluation update: {db_error}")
+                raise ClientException(f"Database error during evaluation update: {db_error}")
 
             # Send Success Notification
             try:
