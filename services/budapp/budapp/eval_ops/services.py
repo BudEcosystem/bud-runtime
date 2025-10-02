@@ -253,7 +253,7 @@ class ExperimentService:
                         run_index=next_run_index,
                         model_id=model_id,
                         dataset_version_id=dataset_version.id,
-                        status=RunStatusEnum.PENDING.value,
+                        status=RunStatusEnum.RUNNING.value,
                         config=req.evaluation_config or {},
                     )
                     self.session.add(run)
@@ -2502,7 +2502,7 @@ class ExperimentWorkflowService:
                         run_index=run_index,
                         model_id=model_uuid,
                         dataset_version_id=dataset_version.id,
-                        status=RunStatusEnum.PENDING.value,
+                        status=RunStatusEnum.RUNNING.value,
                         config=combined_data.evaluation_config,
                     )
                     self.session.add(run)
@@ -3069,7 +3069,7 @@ class EvaluationWorkflowService:
             description=evaluation_description,
             workflow_id=workflow_id,
             created_by=current_user_id,
-            status=EvaluationStatusEnum.PENDING.value,
+            status=EvaluationStatusEnum.RUNNING.value,
             trait_ids=trait_id_strings,
         )
         self.session.add(evaluation)
@@ -3102,7 +3102,7 @@ class EvaluationWorkflowService:
                 evaluation_id=evaluation.id,
                 model_id=model_uuid,
                 dataset_version_id=dataset_version.id,
-                status=RunStatusEnum.PENDING.value,
+                status=RunStatusEnum.RUNNING.value,
                 config={},
             )
             self.session.add(run)
@@ -3570,7 +3570,6 @@ class EvaluationWorkflowService:
                 .filter(
                     RunModel.evaluation_id == evaluation_id,
                     RunModel.experiment_id == experiment_id,
-                    RunModel.status == RunStatusEnum.PENDING.value,
                 )
                 .all()
             )
@@ -3671,6 +3670,9 @@ class EvaluationWorkflowService:
         except Exception as e:
             logger.error(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")
             raise ClientException(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")
+
+    async def update_eval_run_status_from_notification(self, payload) -> None:
+        pass
 
     async def create_evaluation_from_notification_event(self, payload) -> None:
         """Create/update evaluation records from notification event.
