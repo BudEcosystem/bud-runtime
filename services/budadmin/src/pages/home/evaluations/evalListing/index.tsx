@@ -1,14 +1,13 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import React from "react";
-import { Image } from "antd";
+import { Image, Popover } from "antd";
 import {
   Text_10_400_B3B3B3,
   Text_10_400_D1B854,
-  Text_10_400_EEEEEE,
-  Text_14_400_EEEEEE,
+  Text_12_400_EEEEEE,
+  Text_16_400_EEEEEE,
 } from "../../../../components/ui/text";
-import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { useRouter } from "next/router";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import HorizontalScrollFilter from "./components/filter";
@@ -20,6 +19,7 @@ import {
 
 const EvaluationList = () => {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const [descriptionOverflows, setDescriptionOverflows] = useState<Map<string, boolean>>(new Map());
   const {
     getEvaluations,
     evaluationsList,
@@ -29,6 +29,7 @@ const EvaluationList = () => {
   } = useEvaluations();
   const router = useRouter();
   const [searchValue, setSearchValue] = useState("");
+  const descriptionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const handleEvaluationClick = useCallback((evaluation: Evaluation) => {
     // Store the selected evaluation data in sessionStorage to pass to the detail page
@@ -157,9 +158,9 @@ const EvaluationList = () => {
           >
             <div className="flex flex-col justify-start">
               <div className=" flex justify-between items-start mb-[.5rem]">
-                <Text_14_400_EEEEEE className="text-[16px]">
+                <Text_16_400_EEEEEE className="text-[16px]">
                   {evaluation.name}
-                </Text_14_400_EEEEEE>
+                </Text_16_400_EEEEEE>
               </div>
 
               {/* Combined Type and Trait Tags */}
@@ -191,32 +192,115 @@ const EvaluationList = () => {
               </div>
 
               {/* Description */}
-              <Text_10_400_EEEEEE className="line-clamp-2 mb-[2.15rem] leading-[140%]">
-                {evaluation.description}
-              </Text_10_400_EEEEEE>
+              <div className="mb-[2.15rem] relative">
+                <div
+                  ref={(el: HTMLDivElement | null) => {
+                    if (el) {
+                      descriptionRefs.current.set(evaluation.id, el);
+                      // Check if text overflows after rendering
+                      setTimeout(() => {
+                        const lineHeight = 16.8; // 140% of 12px
+                        const maxLines = 3;
+                        const maxHeight = lineHeight * maxLines;
+                        if (el.scrollHeight > maxHeight) {
+                          setDescriptionOverflows(prev => new Map(prev).set(evaluation.id, true));
+                        }
+                      }, 10);
+                    }
+                  }}
+                  className="text-xs font-normal text-[#EEEEEE] line-clamp-3 leading-[140%]"
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {evaluation.description}
+                </div>
+                {descriptionOverflows.get(evaluation.id) && (
+                  <Popover
+                    content={
+                      <div className="max-w-[400px] px-[.75rem] pb-[.75rem] ">
+                        <div className="text-xs font-normal text-[#EEEEEE] leading-[140%]">
+                          {evaluation.description}
+                        </div>
+                      </div>
+                    }
+                    title={
+                      <span className="text-white font-medium px-[.75rem] !pt-[.55rem]">{evaluation.name}</span>
+                    }
+                    trigger="click"
+                    placement="top"
+                    color="#1F1F1F"
+                    arrow={true}
+                  >
+                    <button
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[#D1B854] text-[10px] hover:text-[#E5CC60] transition-colors mt-1 underline inline-block"
+                    >
+                      See more
+                    </button>
+                  </Popover>
+                )}
+              </div>
             </div>
 
             {/* Footer */}
             <div className=" flex items-center justify-between mb-[.2rem]">
               <div className="flex items-center justify-start gap-[.6rem]">
-                <div className="flex justify-center h-[0.75rem] w-[0.75rem]">
-                  <Image
-                    preview={false}
-                    className=""
-                    style={{ width: "auto", height: "0.75rem" }}
-                    src="/images/evaluations/icons/cat.svg"
-                    alt="Logo"
-                  />
-                </div>
-                <div className="flex justify-center h-[0.75rem] w-[0.75rem]">
-                  <Image
-                    preview={false}
-                    className=""
-                    style={{ width: "auto", height: "0.75rem" }}
-                    src="/images/evaluations/icons/lense.svg"
-                    alt="Logo"
-                  />
-                </div>
+                {evaluation.meta_links?.github && (
+                  <a
+                    href={evaluation.meta_links.github}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex justify-center h-[0.75rem] w-[0.75rem] hover:opacity-80 transition-opacity"
+                  >
+                    <Image
+                      preview={false}
+                      className=""
+                      style={{ width: "auto", height: "0.75rem" }}
+                      src="/images/evaluations/icons/cat.svg"
+                      alt="GitHub"
+                    />
+                  </a>
+                )}
+                {evaluation.meta_links?.paper && (
+                  <a
+                    href={evaluation.meta_links.paper}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex justify-center h-[0.75rem] w-[0.75rem] hover:opacity-80 transition-opacity"
+                  >
+                    <Image
+                      preview={false}
+                      className=""
+                      style={{ width: "auto", height: "0.75rem" }}
+                      src="/images/evaluations/icons/lense.svg"
+                      alt="Paper"
+                    />
+                  </a>
+                )}
+                {evaluation.meta_links?.website && (
+                  <a
+                    href={evaluation.meta_links.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex justify-center h-[.9rem] w-[.9rem] hover:opacity-80 transition-opacity"
+                  >
+                    <Image
+                      preview={false}
+                      className=""
+                      style={{ width: "auto", height: ".9rem" }}
+                      src="/images/icons/Globe.png"
+                      alt="Website"
+                    />
+                  </a>
+                )}
               </div>
               <div className="flex items-center gap-1 justify-end">
                 <div className="flex justify-center h-[0.75rem] w-[0.75rem]">
@@ -228,7 +312,32 @@ const EvaluationList = () => {
                     alt="Logo"
                   />
                 </div>
-                {/* <Text_10_400_B3B3B3>{evaluation.timestamp}</Text_10_400_B3B3B3> */}
+                <Text_10_400_B3B3B3 className="mr-2">
+                  {evaluation.meta_links?.create_date
+                    ? new Date(evaluation.meta_links.create_date).toLocaleDateString('en-US', {
+                      month: '2-digit',
+                      day: '2-digit',
+                      year: 'numeric'
+                    })
+                    : ''}
+                </Text_10_400_B3B3B3>
+                {evaluation.meta_links?.creator?.avatar && (
+                  <div className="creator">
+                    <div className="flex justify-center h-[1.5rem] w-[1.5rem]">
+                      <Image
+                        preview={false}
+                        className="rounded-full"
+                        style={{
+                          width: "1.5rem",
+                          height: "auto",
+                          objectFit: "cover"
+                        }}
+                        src={evaluation.meta_links.creator.avatar}
+                        alt={evaluation.meta_links.creator.name || "Creator"}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
