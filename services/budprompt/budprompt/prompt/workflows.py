@@ -119,6 +119,12 @@ class PromptSchemaWorkflow:
                 "deployment_name": request.deployment_name,
                 "target_topic_name": request.source_topic,
                 "target_name": request.source,
+                "access_token": request.access_token,
+                "endpoint_id": request.endpoint_id,
+                "model_id": request.model_id,
+                "project_id": request.project_id,
+                "user_id": request.user_id,
+                "api_key_project_id": request.api_key_project_id,
             },
             retry_policy=retry_policy,
         )
