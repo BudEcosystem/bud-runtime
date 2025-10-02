@@ -73,6 +73,20 @@ export interface TraitSimple {
 
 export interface MetaLinks {
   manifest_id: string;
+  github?: string;
+  paper?: string;
+  papers?: string[];
+  website?: string;
+  author?: string;
+  author_url?: string;
+  website_url?: string;
+  create_date?: string;
+  creator?: {
+    avatar?: string;
+    name?: string;
+    nickname?: string;
+    uid?: string;
+  }
 }
 
 export interface SampleQuestionsAnswers {
