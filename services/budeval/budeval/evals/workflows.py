@@ -1169,13 +1169,13 @@ class EvaluationWorkflow:
         # )
 
         # Result Notification - Always send results regardless of status
-        # extraction_summary = (
-        #     _monitoring_result.get("extraction_summary", {}) if _monitoring_result.get("status") == "completed" else {}
-        # )
+        extraction_summary = (
+            _monitoring_result.get("extraction_summary", {}) if _monitoring_result.get("status") == "completed" else {}
+        )
 
-        # # Debug log to verify extraction_summary contents
-        # logger.debug(f"Monitoring result status: {_monitoring_result.get('status')}")
-        # logger.debug(f"Extraction summary received: {json.dumps(extraction_summary, default=str)}")
+        # Debug log to verify extraction_summary contents
+        logger.debug(f"Monitoring result status: {_monitoring_result.get('status')}")
+        logger.debug(f"Extraction summary received: {json.dumps(extraction_summary, default=str)}")
 
         # workflow_status = check_workflow_status_in_statestore(instance_id)
         # if workflow_status:
@@ -1185,28 +1185,28 @@ class EvaluationWorkflow:
         notification_req.payload.event = "results"
         notification_req.payload.content = NotificationContent(
             title="Evaluation Results",
-            message="Evaluation completed",
+            message=extraction_summary.get("message", "Evaluation completed"),
             status=WorkflowStatus.COMPLETED,
             result={
                 "job_id": job_id,
-                # "status": _monitoring_result.get("job_status", "unknown"),
-                # "storage": "clickhouse",
-                # "model_name": extraction_summary.get("model_name", "unknown"),
-                # "summary": {
-                #     "overall_accuracy": extraction_summary.get("overall_accuracy", 0.0),
-                #     "total_datasets": extraction_summary.get("total_datasets", 0),
-                #     "total_examples": extraction_summary.get("total_examples", 0),
-                #     "dataset_results": extraction_summary.get("dataset_accuracies", {}),
-                # }
-                # if extraction_summary
-                # else {},
-                # "retrieval_info": f"Use job_id '{job_id}' to retrieve full results from ClickHouse",
+                "status": _monitoring_result.get("job_status", "unknown"),
+                "storage": "clickhouse",
+                "model_name": extraction_summary.get("model_name", "unknown"),
+                "summary": {
+                    "overall_accuracy": extraction_summary.get("overall_accuracy", 0.0),
+                    "total_datasets": extraction_summary.get("total_datasets", 0),
+                    "total_examples": extraction_summary.get("total_examples", 0),
+                    "dataset_results": extraction_summary.get("dataset_accuracies", {}),
+                }
+                if extraction_summary
+                else {},
+                "retrieval_info": f"Use job_id '{job_id}' to retrieve full results from ClickHouse",
             },
         )
 
         # Log the notification content in a readable JSON format for debugging
         logger.debug(
-            f"Sending evaluation results notification: {json.dumps(notification_req.payload.content.model_dump(), indent=2)}"
+            f"Sending evaluation results notification: {notification_req.payload.content.model_dump_json(indent=2)}"
         )
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
