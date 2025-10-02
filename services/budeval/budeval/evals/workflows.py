@@ -18,7 +18,10 @@ from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 from budeval.commons.logging import logging
 from budeval.commons.storage_config import StorageConfig
-from budeval.commons.utils import update_workflow_data_in_statestore
+from budeval.commons.utils import (
+    check_workflow_status_in_statestore,
+    update_workflow_data_in_statestore,
+)
 from budeval.core.schemas import (
     DatasetCategory,
     GenericDatasetConfig,
@@ -1208,6 +1211,9 @@ class EvaluationWorkflow:
         logger.debug(
             f"Sending evaluation results notification: {notification_req.payload.content.model_dump_json(indent=2)}"
         )
+        workflow_status = check_workflow_status_in_statestore(instance_id)
+        if workflow_status:
+            return
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
             notification=notification_req,
@@ -1231,7 +1237,11 @@ class EvaluationWorkflow:
         )
 
         # Return workflow result to prevent Dapr from marking it as FAILED
-        return {"workflow_id": instance_id, "status": "completed", "job_id": job_id}
+        return {
+            "workflow_id": instance_id,
+            "status": "completed",
+            "job_id": job_id,
+        }
 
     async def __call__(
         self, request: StartEvaluationRequest, workflow_id: str | None = None
