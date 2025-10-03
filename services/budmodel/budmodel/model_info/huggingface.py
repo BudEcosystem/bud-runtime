@@ -63,10 +63,25 @@ class HuggingFaceModelInfo(BaseModelInfo):
         """Load a model from Hugging Face Hub."""
         hf_repo_readme = get_hf_repo_readme(pretrained_model_name_or_path, token)
         model_analysis = get_model_analysis(hf_repo_readme)
-        model_card = ModelCard.load(
-            pretrained_model_name_or_path,
-            token=token,
-        )
+
+        # Handle missing README.md gracefully
+        model_card = None
+        try:
+            model_card = ModelCard.load(
+                pretrained_model_name_or_path,
+                token=token,
+            )
+        except hf_hub_errors.EntryNotFoundError as e:
+            logger.warning(
+                "README.md not found for %s, creating minimal ModelCard: %s", pretrained_model_name_or_path, str(e)
+            )
+        except Exception as e:
+            logger.error("Failed to load ModelCard for %s: %s", pretrained_model_name_or_path, str(e))
+
+        if model_card is None:
+            # Create a minimal ModelCard if loading failed
+            model_card = ModelCard(data={}, content="")
+
         language = model_card.data.get("language") or []
 
         if language and not isinstance(language, list):
