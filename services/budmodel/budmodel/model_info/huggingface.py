@@ -80,7 +80,7 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
         if model_card is None:
             # Create a minimal ModelCard if loading failed
-            model_card = ModelCard(data={}, content="")
+            model_card = ModelCard("")
 
         language = model_card.data.get("language") or []
 
