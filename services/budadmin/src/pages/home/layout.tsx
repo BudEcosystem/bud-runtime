@@ -175,7 +175,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       route: "/guardrails",
       icon: '/icons/guard.png',
       iconWhite: '/icons/guardWhite.png',
-      cmd: "9",
+      cmd: "10",
     },
   ]
 
