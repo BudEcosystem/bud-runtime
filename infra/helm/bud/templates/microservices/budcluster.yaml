@@ -46,10 +46,10 @@ spec:
               name: {{ .Release.Name}}-bud-global
         resources:
           limits:
-            memory: 1024Mi
+            memory: 4096Mi
             cpu: 1
           requests:
-            memory: 256Mi
+            memory: 2048Mi
             cpu: 250m
         volumeMounts:
         - name: crypto-keys
