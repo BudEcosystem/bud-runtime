@@ -85,7 +85,7 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
                         {hasMore && (
                             <Popover
                                 content={
-                                    <div className="flex flex-wrap gap-1 max-w-[300px]">
+                                    <div className="flex flex-wrap gap-1 max-w-[300px] p-[0.5rem]">
                                         {traits.map((trait, idx) => (
                                             <ProjectTags
                                                 key={idx}
@@ -98,7 +98,7 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
                                     </div>
                                 }
                                 title={
-                                    <span className="text-white font-medium">All Traits</span>
+                                    <span className="text-white font-medium px-[0.5rem]">All Traits</span>
                                 }
                                 trigger="hover"
                                 placement="top"

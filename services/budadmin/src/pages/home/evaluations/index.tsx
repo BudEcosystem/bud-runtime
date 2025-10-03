@@ -218,7 +218,7 @@ const Evaluations = () => {
                         alt="Logo"
                       />
                     </div>
-                    <Text_14_600_B3B3B3>Evaluations</Text_14_600_B3B3B3>
+                    <Text_14_600_B3B3B3>Evaluations Hub</Text_14_600_B3B3B3>
                   </div>
                 ),
                 key: "3",
