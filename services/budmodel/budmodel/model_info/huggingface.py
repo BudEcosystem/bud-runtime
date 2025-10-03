@@ -65,6 +65,7 @@ class HuggingFaceModelInfo(BaseModelInfo):
         model_analysis = get_model_analysis(hf_repo_readme)
 
         # Handle missing README.md gracefully
+        model_card = None
         try:
             model_card = ModelCard.load(
                 pretrained_model_name_or_path,
@@ -74,11 +75,11 @@ class HuggingFaceModelInfo(BaseModelInfo):
             logger.warning(
                 "README.md not found for %s, creating minimal ModelCard: %s", pretrained_model_name_or_path, str(e)
             )
-            # Create a minimal ModelCard with empty data
-            model_card = ModelCard(data={}, content="")
         except Exception as e:
             logger.error("Failed to load ModelCard for %s: %s", pretrained_model_name_or_path, str(e))
-            # Create a minimal ModelCard with empty data as fallback
+
+        if model_card is None:
+            # Create a minimal ModelCard if loading failed
             model_card = ModelCard(data={}, content="")
 
         language = model_card.data.get("language") or []
