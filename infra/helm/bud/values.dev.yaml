@@ -5,6 +5,10 @@ ingress:
 storage:
     budmodelRegistry:
         size: "1Ti"
+        className: nfs-csi
+    budevalDataset:
+        className: nfs-csi
+
 minio:
     persistence:
         size: "1Ti"
