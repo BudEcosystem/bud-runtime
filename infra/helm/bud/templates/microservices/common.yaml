@@ -13,23 +13,28 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-bud-models-registry
 spec:
-  storageClassName: {{ .Values.microservices.budmodel.storageClassName }}
+{{ if .Values.storage.budmodelRegistry.className }}
+  storageClassName: {{ .Values.storage.budmodelRegistry.className }}
+{{ end }}
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: {{ .Values.microservices.budmodel.storageSize }}
+      storage: {{ .Values.storage.budmodelRegistry.size }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-bud-add-dir-budmo
 spec:
+{{ if .Values.storage.budmodelAddDir.className }}
+  storageClassName: {{ .Values.storage.budmodelAddDir.className }}
+{{ end }}
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi
+      storage: {{ .Values.storage.budmodelAddDir.size }}
 ---
 apiVersion: v1
 kind: Secret

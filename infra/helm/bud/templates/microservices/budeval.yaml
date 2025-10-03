@@ -4,12 +4,14 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-budeval-dataset
 spec:
-  storageClassName: {{ .Values.microservices.budeval.storageClassName }}
+{{ if .Values.storage.budevalDataset.className }}
+  storageClassName: {{ .Values.storage.budevalDataset.className }}
+{{ end }}
   accessModes:
     - ReadWriteMany
   resources:
     requests:
-      storage: 32Gi
+      storage: {{ .Values.storage.budevalDataset.size }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

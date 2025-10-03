@@ -2,9 +2,9 @@ ingress:
     hosts:
         root: "dev.bud.studio"
 
-microservices:
-    budmodel:
-        storageSize: "1Ti"
+storage:
+    budmodelRegistry:
+        size: "1Ti"
 minio:
     persistence:
         size: "1Ti"

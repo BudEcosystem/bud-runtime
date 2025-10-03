@@ -7,6 +7,20 @@ global:
 imagePullPolicy: "IfNotPresent"
 deploymentAnnotations: {}
 
+storage:
+  budmodelRegistry:
+    className: ""
+    size: 32Gi
+  budmodelAddDir:
+    className: ""
+    size: 20Gi
+  budevalDataset:
+    className: ""
+    size: 20Gi
+  budappStaticDir:
+    className: ""
+    size: 20Gi
+
 ingress:
   enabled: true
   # NOTE: used to derive public urls for frontend services
@@ -143,8 +157,6 @@ microservices:
     enabled: true
     image: budstudio/budmodel:nightly
     daprid: budmodel
-    storageClassName: nfs-csi
-    storageSize: "32Gi"
     env:
       LOG_LEVEL: INFO
 
@@ -157,7 +169,6 @@ microservices:
     enabled: true
     image: budstudio/budeval:nightly
     daprid: budeval
-    storageClassName: nfs-csi
     env:
       PSQL_HOST: "{{ $.Release.Name }}-postgresql"
       PSQL_PORT: "5432"
