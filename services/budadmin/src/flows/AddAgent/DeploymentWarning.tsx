@@ -3,69 +3,45 @@ import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import React, { useState, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
+import { Text_12_400_757575, Text_14_400_EEEEEE, Text_14_600_EEEEEE } from "@/components/ui/text";
 import { errorToast } from "@/components/toast";
+import { Alert } from "antd";
 
 export default function DeploymentWarning() {
-  const { openDrawerWithStep, closeDrawer } = useDrawer();
+  const { openDrawerWithStep } = useDrawer();
   const [loading, setLoading] = useState(false);
 
   // Get stored configuration data
   const [configData, setConfigData] = useState<any>(null);
   const [modelData, setModelData] = useState<any>(null);
   const [projectData, setProjectData] = useState<any>(null);
+  const [warningData, setWarningData] = useState<any>(null);
 
   useEffect(() => {
     // Retrieve stored data from localStorage
     const config = localStorage.getItem("addAgent_configuration");
     const model = localStorage.getItem("addAgent_selectedModel");
     const project = localStorage.getItem("addAgent_selectedProject");
+    const warnings = localStorage.getItem("addAgent_warnings");
 
     if (config) setConfigData(JSON.parse(config));
     if (model) setModelData(JSON.parse(model));
     if (project) setProjectData(JSON.parse(project));
+    if (warnings) setWarningData(JSON.parse(warnings));
   }, []);
 
   const handleNext = async () => {
     setLoading(true);
     try {
-      // Here you would typically make an API call to create the agent
-      // For now, we'll simulate the process
+      // Clear the warning data as user has acknowledged it
+      localStorage.removeItem("addAgent_warnings");
 
-      // Prepare the agent creation payload
-      // const agentPayload = {
-      //   project_id: projectData?.project?.id || projectData?.id,
-      //   model_id: modelData?.id,
-      //   name: configData?.deploymentName,
-      //   tags: configData?.tags,
-      //   description: configData?.description,
-      //   configuration: {
-      //     min_concurrency: configData?.minConcurrency,
-      //     max_concurrency: configData?.maxConcurrency,
-      //     auto_scale: configData?.autoScale,
-      //     auto_caching: configData?.autoCaching,
-      //     auto_logging: configData?.autoLogging,
-      //   },
-      //   // Auto-scale configuration based on warning
-      //   auto_scale_config: {
-      //     max_replicas: 8, // As shown in the warning
-      //     concurrent_requests: 100,
-      //   }
-      // };
-
-      // TODO: Replace with actual API call
-      // const response = await AppRequest.Post("/agents", agentPayload);
-      // Note: projectData will be used in the actual API call
-
-      // Simulate success
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Navigate to success screen (data will be cleared there)
+      // Navigate to success screen
       openDrawerWithStep("add-agent-success");
 
     } catch (error) {
-      console.error("Failed to create agent:", error);
-      errorToast("Failed to create agent. Please try again.");
+      console.error("Failed to proceed:", error);
+      errorToast("Failed to proceed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -75,11 +51,22 @@ export default function DeploymentWarning() {
     openDrawerWithStep("add-agent-configuration");
   };
 
-  // Calculate warning details based on configuration
-  const concurrentRequests = configData?.maxConcurrency || 10;
-  const currentMaxReplicas = configData?.autoScale ? 4 : 1; // Default values
-  const recommendedMaxReplicas = 8;
-  const deploymentName = modelData?.name || "llama-8";
+  // Get warning/error details
+  const hasWarnings = warningData?.warnings && warningData.warnings.length > 0;
+  const hasErrors = warningData?.errors && warningData.errors.length > 0;
+  const hasValidationIssues = warningData?.validation_issues && warningData.validation_issues.length > 0;
+
+  // Build display message based on actual warnings/errors
+  const getWarningMessage = () => {
+    if (warningData?.warnings && warningData.warnings.length > 0) {
+      return warningData.warnings.join(" ");
+    }
+
+    // Fallback to default warning message if no specific warnings
+    const concurrentRequests = configData?.maxConcurrency || 10;
+    const deploymentName = modelData?.name || "the model";
+    return `The deployment is configured with ${concurrentRequests} concurrent requests and auto-scale settings which may not be sufficient to support the given concurrency for the prompt. Consider adjusting the max replica settings for ${deploymentName} deployment auto-scaling.`;
+  };
 
   return (
     <BudForm
@@ -87,17 +74,17 @@ export default function DeploymentWarning() {
       onNext={handleNext}
       onBack={handleBack}
       backText="Back"
-      nextText={loading ? "Creating..." : "Next"}
+      nextText={loading ? "Proceeding..." : "Proceed Anyway"}
       disableNext={loading}
     >
       <BudWraperBox>
         <BudDrawerLayout>
           <div className="px-[1.35rem] pt-[1.5rem] pb-[1.35rem]">
-            {/* Warning Header */}
+            {/* Warning/Error Header */}
             <div style={{ display: "flex", alignItems: "flex-start" }}>
               <img
-                src="/images/drawer/warning.png"
-                alt="Warning"
+                src={hasErrors ? "/images/drawer/error.png" : "/images/drawer/warning.png"}
+                alt={hasErrors ? "Error" : "Warning"}
                 style={{
                   width: "55px",
                   marginRight: 24,
@@ -105,9 +92,74 @@ export default function DeploymentWarning() {
                   marginTop: 11,
                 }}
               />
-              <div className="flex flex-col gap-y-[12px] pt-[5px]">
-                <Text_14_400_EEEEEE>Warning</Text_14_400_EEEEEE>
-                <Text_12_400_757575>The deployment is deployed with 100 concurrent request and auto scale to 4 replica which is not sufficient to support the given concurrency for the prompt. Do you like to increase the max replica of the llama-8 deployment auto scaling?</Text_12_400_757575>
+              <div className="flex flex-col gap-y-[12px] pt-[5px] flex-1">
+                <Text_14_600_EEEEEE>
+                  {hasErrors ? "Configuration Errors" : "Configuration Warnings"}
+                </Text_14_600_EEEEEE>
+
+                {/* Display warnings */}
+                {hasWarnings && (
+                  <div className="space-y-2">
+                    {warningData.warnings.map((warning: string, index: number) => (
+                      <Alert
+                        key={`warning-${index}`}
+                        message={warning}
+                        type="warning"
+                        showIcon
+                        className="bg-yellow-900/20 border-yellow-600/30"
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Display errors */}
+                {hasErrors && (
+                  <div className="space-y-2">
+                    {warningData.errors.map((error: string, index: number) => (
+                      <Alert
+                        key={`error-${index}`}
+                        message={error}
+                        type="error"
+                        showIcon
+                        className="bg-red-900/20 border-red-600/30"
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Display validation issues */}
+                {hasValidationIssues && (
+                  <div className="space-y-2">
+                    {warningData.validation_issues.map((issue: string, index: number) => (
+                      <Alert
+                        key={`validation-${index}`}
+                        message={issue}
+                        type="info"
+                        showIcon
+                        className="bg-blue-900/20 border-blue-600/30"
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Display recommendations if available */}
+                {warningData?.recommendations && Object.keys(warningData.recommendations).length > 0 && (
+                  <div className="mt-4">
+                    <Text_14_400_EEEEEE className="mb-2">Recommendations:</Text_14_400_EEEEEE>
+                    <div className="space-y-1">
+                      {Object.entries(warningData.recommendations).map(([key, value]: [string, any]) => (
+                        <Text_12_400_757575 key={key}>
+                          • {key}: {value}
+                        </Text_12_400_757575>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Fallback message if no specific warnings/errors */}
+                {!hasWarnings && !hasErrors && !hasValidationIssues && (
+                  <Text_12_400_757575>{getWarningMessage()}</Text_12_400_757575>
+                )}
               </div>
             </div>
           </div>

@@ -19,6 +19,8 @@ export interface AgentSession {
   active: boolean;
   modelId?: string;
   modelName?: string;
+  workflowId?: string;
+  promptId?: string;
   selectedDeployment?: {
     id: string;
     name: string;
@@ -61,7 +63,7 @@ interface AgentStore {
   deleteVariable: (sessionId: string, variableId: string) => void;
 
   // UI Actions
-  openAgentDrawer: () => void;
+  openAgentDrawer: (workflowId?: string) => void;
   closeAgentDrawer: () => void;
   setSelectedSession: (id: string | null) => void;
   openModelSelector: () => void;
@@ -73,11 +75,11 @@ interface AgentStore {
 }
 
 const generateId = () => {
-  return `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `agent_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
 const generateVariableId = () => {
-  return `var_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
 const createDefaultSession = (): AgentSession => ({
@@ -277,10 +279,20 @@ export const useAgentStore = create<AgentStore>()(
       },
 
       // UI Actions
-      openAgentDrawer: () => {
+      openAgentDrawer: (workflowId?: string) => {
         const sessions = get().sessions;
         if (sessions.length === 0) {
-          get().createSession();
+          const sessionId = get().createSession();
+          // If workflow_id is provided, update the created session with it
+          if (workflowId && sessionId) {
+            get().updateSession(sessionId, { workflowId });
+          }
+        } else if (workflowId) {
+          // Update the current active session with the workflow_id
+          const activeSessionId = get().selectedSessionId || get().activeSessionIds[0];
+          if (activeSessionId) {
+            get().updateSession(activeSessionId, { workflowId });
+          }
         }
         set({ isAgentDrawerOpen: true });
       },

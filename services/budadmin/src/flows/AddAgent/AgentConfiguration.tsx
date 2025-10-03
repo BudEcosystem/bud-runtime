@@ -2,20 +2,31 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import { Form, InputNumber, Switch, Input } from "antd";
+import { Form, InputNumber, Switch } from "antd";
 import { errorToast } from "@/components/toast";
 import TextInput from "../components/TextInput";
+import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 import InfoLabel from "@/components/ui/bud/dataEntry/InfoLabel";
 import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 import TagsInput, { Tag } from "@/components/ui/bud/dataEntry/TagsInput";
-
-const { TextArea } = Input;
+import { useAddAgent } from "@/stores/useAddAgent";
+import { AppRequest } from "src/pages/api/requests";
+import { tempApiBaseUrl } from "@/components/environment";
 
 export default function AgentConfiguration() {
   const { openDrawerWithStep } = useDrawer();
   const [form] = Form.useForm();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Use the Add Agent store for workflow management
+  const {
+    currentWorkflow,
+    selectedProject,
+    setAgentConfiguration,
+    getWorkflow
+  } = useAddAgent();
 
   // State for form values
   const [deploymentName, setDeploymentName] = useState("");
@@ -26,6 +37,16 @@ export default function AgentConfiguration() {
   const [autoScale, setAutoScale] = useState(true);
   const [autoCaching, setCaching] = useState(true);
   const [autoLogging, setAutoLogging] = useState(true);
+  const [rateLimit, setRateLimit] = useState(false);
+  const [rateLimitValue, setRateLimitValue] = useState(10);
+  const [triggerWorkflow, setTriggerWorkflow] = useState(false);
+
+  // Load workflow on component mount if it exists
+  useEffect(() => {
+    if (currentWorkflow?.workflow_id) {
+      getWorkflow(currentWorkflow.workflow_id);
+    }
+  }, [currentWorkflow?.workflow_id, getWorkflow]);
 
   // Tag options for the tags input
   const tagOptions: Tag[] = [
@@ -33,6 +54,9 @@ export default function AgentConfiguration() {
     { name: "production", color: "#4ECDC4" },
     { name: "development", color: "#45B7D1" },
     { name: "staging", color: "#96CEB4" },
+    { name: "hardware", color: "#EC7575" },
+    { name: "intel", color: "#479D5F" },
+    { name: "performance", color: "#DE5CD1" },
   ];
 
   const handleNext = async () => {
@@ -49,29 +73,119 @@ export default function AgentConfiguration() {
         return;
       }
 
-      // Get previously stored data
-      const projectData = localStorage.getItem("addAgent_selectedProject");
-      const modelData = localStorage.getItem("addAgent_selectedModel");
+      if (!currentWorkflow?.workflow_id) {
+        errorToast("Workflow not initialized. Please start from the beginning.");
+        return;
+      }
 
-      // Store configuration data
-      const configData = {
-        deploymentName,
-        tags,
-        description,
-        minConcurrency,
-        maxConcurrency,
-        autoScale,
-        autoCaching,
-        autoLogging,
-        project: projectData ? JSON.parse(projectData) : null,
-        model: modelData ? JSON.parse(modelData) : null,
-      };
+      setIsSubmitting(true);
 
-      localStorage.setItem("addAgent_configuration", JSON.stringify(configData));
+      try {
+        // Get previously stored data
+        const projectData = localStorage.getItem("addAgent_selectedProject");
+        const modelData = localStorage.getItem("addAgent_selectedModel");
 
-      // Navigate to the deployment warning screen
-      openDrawerWithStep("add-agent-deployment-warning");
+        // Store configuration data in the Add Agent store
+        const configData = {
+          name: deploymentName,
+          description,
+          system_prompt: "", // Will be set in a later step
+          temperature: 0.7,
+          max_tokens: 2048,
+          top_p: 1,
+          frequency_penalty: 0,
+          presence_penalty: 0,
+          tools: [],
+          knowledge_base: [],
+        };
+        setAgentConfiguration(configData);
 
+        // Store full configuration data in localStorage
+        const fullConfigData = {
+          deploymentName,
+          tags,
+          description,
+          minConcurrency,
+          maxConcurrency,
+          autoScale,
+          autoCaching,
+          autoLogging,
+          rateLimit,
+          rateLimitValue,
+          triggerWorkflow,
+          project: projectData ? JSON.parse(projectData) : null,
+          model: modelData ? JSON.parse(modelData) : null,
+        };
+        localStorage.setItem("addAgent_configuration", JSON.stringify(fullConfigData));
+
+        // Prepare the workflow API payload
+        const payload: any = {
+          workflow_id: currentWorkflow.workflow_id,
+          step_number: 4,
+          name: deploymentName,
+          description: description || "",
+          tags: tags,
+          auto_scale: autoScale,
+          caching: autoCaching,
+          concurrency: [minConcurrency, maxConcurrency],
+          rate_limit: rateLimit,
+          rate_limit_value: rateLimitValue,
+          trigger_workflow: triggerWorkflow
+        };
+
+        // Include bud_prompt_id if it exists in the workflow
+        if (currentWorkflow.workflow_steps?.bud_prompt_id) {
+          payload.bud_prompt_id = currentWorkflow.workflow_steps.bud_prompt_id;
+        } else if ((currentWorkflow as any).bud_prompt_id) {
+          payload.bud_prompt_id = (currentWorkflow as any).bud_prompt_id;
+        }
+
+        // Call the workflow API for step 4
+        const response = await AppRequest.Post(
+          `${tempApiBaseUrl}/prompts/prompt-workflow`,
+          payload,
+          {
+            headers: {
+              "x-resource-type": "project",
+              "x-entity-id": selectedProject?.id || currentWorkflow.workflow_steps?.project?.id
+            }
+          }
+        );
+
+        if (response?.data) {
+          // Update the workflow in the store
+          await getWorkflow(currentWorkflow.workflow_id);
+
+          // Check if there are warnings or errors in the response
+          const hasWarnings = response.data.warnings && response.data.warnings.length > 0;
+          const hasErrors = response.data.errors && response.data.errors.length > 0;
+          const hasValidationIssues = response.data.validation_issues && response.data.validation_issues.length > 0;
+
+          // Store warning/error data if present
+          if (hasWarnings || hasErrors || hasValidationIssues) {
+            const warningData = {
+              warnings: response.data.warnings || [],
+              errors: response.data.errors || [],
+              validation_issues: response.data.validation_issues || [],
+              recommendations: response.data.recommendations || {}
+            };
+            localStorage.setItem("addAgent_warnings", JSON.stringify(warningData));
+
+            // Navigate to the deployment warning screen
+            openDrawerWithStep("add-agent-deployment-warning");
+          } else {
+            // No warnings or errors, go directly to success screen
+            openDrawerWithStep("add-agent-success");
+          }
+        } else {
+          errorToast("Failed to save agent configuration");
+        }
+      } catch (error) {
+        console.error("Failed to save agent configuration:", error);
+        errorToast("Failed to save agent configuration");
+      } finally {
+        setIsSubmitting(false);
+      }
     } catch (error) {
       console.error("Validation failed:", error);
     }
@@ -88,12 +202,13 @@ export default function AgentConfiguration() {
       onBack={handleBack}
       backText="Back"
       nextText="Next"
+      disableNext={isSubmitting}
     >
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
-            title="Title"
-            description="Agent's description"
+            title="Agent Configuration"
+            description="Configure your agent's deployment settings and capabilities"
             classNames="pt-[.8rem]"
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />
@@ -135,25 +250,17 @@ export default function AgentConfiguration() {
 
             {/* Description */}
             <div className="mb-[1.5rem]">
-              <Form.Item name="description" className="mb-[1rem]">
-                <div className="float-label">
-                  <InfoLabel
-                    text="Description"
-                    content="Provide a detailed description of your agent's purpose and capabilities"
-                  />
-                  <TextArea
-                    placeholder="Enter description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={4}
-                    className="mt-[.5rem] bg-transparent text-[#EEEEEE] border-[#757575] hover:border-[#EEEEEE] focus:border-[#EEEEEE]"
-                    style={{
-                      backgroundColor: "transparent",
-                      color: "#EEEEEE",
-                    }}
-                  />
-                </div>
-              </Form.Item>
+              <TextAreaInput
+                name="description"
+                label="Description"
+                required={false}
+                info="Provide a detailed description of your agent's purpose and capabilities"
+                placeholder="Enter description"
+                value={description}
+                onChange={(value: string) => setDescription(value)}
+                rules={[]}
+                formItemClassnames="mb-[1rem]"
+              />
             </div>
 
             {/* Concurrency Settings */}
@@ -170,10 +277,10 @@ export default function AgentConfiguration() {
                     max={100}
                     value={minConcurrency}
                     onChange={(value) => setMinConcurrency(value || 1)}
-                    className="w-full bg-transparent text-[#EEEEEE] border-[#757575]"
+                    controls={false}
+                    className="w-full [&_input]:!bg-transparent [&_input]:!text-[#EEEEEE] [&]:!bg-transparent [&]:!border-[#757575] hover:[&]:!border-[#EEEEEE] focus-within:[&]:!border-[#EEEEEE]"
                     style={{
                       backgroundColor: "transparent",
-                      color: "#EEEEEE",
                     }}
                   />
                 </div>
@@ -184,10 +291,10 @@ export default function AgentConfiguration() {
                     max={100}
                     value={maxConcurrency}
                     onChange={(value) => setMaxConcurrency(value || 10)}
-                    className="w-full bg-transparent text-[#EEEEEE] border-[#757575]"
+                    controls={false}
+                    className="w-full [&_input]:!bg-transparent [&_input]:!text-[#EEEEEE] [&]:!bg-transparent [&]:!border-[#757575] hover:[&]:!border-[#EEEEEE] focus-within:[&]:!border-[#EEEEEE]"
                     style={{
                       backgroundColor: "transparent",
-                      color: "#EEEEEE",
                     }}
                   />
                 </div>
@@ -234,6 +341,55 @@ export default function AgentConfiguration() {
                   onChange={setAutoLogging}
                   style={{
                     backgroundColor: autoLogging ? "#965CDE" : "#757575",
+                  }}
+                />
+              </div>
+
+              {/* Rate Limiting */}
+              <div className="flex justify-between items-center py-[.5rem]">
+                <div className="flex items-center gap-[.5rem]">
+                  <Text_14_400_EEEEEE>Rate Limiting</Text_14_400_EEEEEE>
+                </div>
+                <Switch
+                  checked={rateLimit}
+                  onChange={setRateLimit}
+                  style={{
+                    backgroundColor: rateLimit ? "#965CDE" : "#757575",
+                  }}
+                />
+              </div>
+
+              {/* Rate Limit Value */}
+              {rateLimit && (
+                <div className="ml-[2rem]">
+                  <InfoLabel
+                    text="Rate Limit (requests/second)"
+                    content="Maximum number of requests per second"
+                  />
+                  <InputNumber
+                    min={1}
+                    max={1000}
+                    value={rateLimitValue}
+                    onChange={(value) => setRateLimitValue(value || 10)}
+                    controls={false}
+                    className="w-full mt-[.5rem] [&_input]:!bg-transparent [&_input]:!text-[#EEEEEE] [&]:!bg-transparent [&]:!border-[#757575] hover:[&]:!border-[#EEEEEE] focus-within:[&]:!border-[#EEEEEE]"
+                    style={{
+                      backgroundColor: "transparent",
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Trigger Workflow */}
+              <div className="flex justify-between items-center py-[.5rem]">
+                <div className="flex items-center gap-[.5rem]">
+                  <Text_14_400_EEEEEE>Trigger Workflow</Text_14_400_EEEEEE>
+                </div>
+                <Switch
+                  checked={triggerWorkflow}
+                  onChange={setTriggerWorkflow}
+                  style={{
+                    backgroundColor: triggerWorkflow ? "#965CDE" : "#757575",
                   }}
                 />
               </div>

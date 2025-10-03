@@ -68,7 +68,7 @@ export default function SelectAgentType() {
     if (currentWorkflow?.workflow_id) {
       getWorkflow(currentWorkflow.workflow_id);
     }
-  }, []);
+  }, [currentWorkflow?.workflow_id, getWorkflow]);
 
   const handleNext = async () => {
     if (!selectedType) {
@@ -118,8 +118,8 @@ export default function SelectAgentType() {
         // Update the workflow in the store
         await getWorkflow(currentWorkflow.workflow_id);
 
-        // Open the agent drawer
-        openAgentDrawer();
+        // Open the agent drawer with workflow_id
+        openAgentDrawer(currentWorkflow.workflow_id);
 
         // Navigate to the next step (Select Model)
         openDrawerWithStep("add-agent-select-model");

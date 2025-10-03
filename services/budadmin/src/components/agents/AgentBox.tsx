@@ -14,6 +14,10 @@ import { SessionProvider } from "../flowgramEditorDemo/contexts/SessionContext";
 import { SettingsSidebar, SettingsType } from "./settings/SettingsSidebar";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { PrimaryButton } from "../ui/bud/form/Buttons";
+import { buildPromptSchemaFromSession } from "@/utils/promptSchemaBuilder";
+import { successToast, errorToast } from "@/components/toast";
+import { tempApiBaseUrl } from "@/components/environment";
+import { AppRequest } from "src/pages/api/requests";
 
 interface AgentBoxProps {
   session: AgentSession;
@@ -36,6 +40,7 @@ function AgentBoxInner({
     updateVariable,
     deleteVariable,
     createSession,
+    closeAgentDrawer,
   } = useAgentStore();
 
   const [localSystemPrompt, setLocalSystemPrompt] = useState(session?.systemPrompt || "");
@@ -46,6 +51,7 @@ function AgentBoxInner({
       : ""
   );
   const [openLoadModel, setOpenLoadModel] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Use the settings context
   const { isOpen: isRightSidebarOpen, activeSettings, openSettings, closeSettings, toggleSettings } = useSettings();
@@ -101,6 +107,76 @@ function AgentBoxInner({
     openSettings(nodeType, nodeId, nodeData);
   };
 
+  const handleSavePromptSchema = async () => {
+    if (!session) {
+      errorToast("No session data available");
+      return;
+    }
+
+    // Check if deployment is selected
+    if (!session.selectedDeployment?.name) {
+      errorToast("Please select a deployment model first");
+      return;
+    }
+
+    // Check if workflow_id exists, if not we need to get it from add agent workflow
+    if (!session.workflowId) {
+      errorToast("Workflow ID is not available. Please create the agent workflow first.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      // Determine the type based on whether we have output variables
+      const type = session.outputVariables && session.outputVariables.length > 0 ? "output" : "input";
+
+      // Build the payload using the utility function with required parameters
+      const payload = buildPromptSchemaFromSession(
+        session,
+        type,
+        1,     // step_number
+        0,     // workflow_total_steps (0 for single step save)
+        false  // trigger_workflow
+      );
+
+      // Make the API call
+      const response = await AppRequest.Post(
+        `${tempApiBaseUrl}/prompts/prompt-schema`,
+        payload
+      );
+
+      if (response && response.data) {
+        successToast("Prompt schema saved successfully");
+
+        // Optionally update the session with the response data if needed
+        // For example, if the API returns an ID or updated workflow info
+        if (response.data.id || response.data.schema_id || response.data.prompt_id) {
+          updateSession(session.id, {
+            workflowId: session.workflowId, // Keep existing workflow_id
+            promptId: response.data.prompt_id || response.data.id // Store prompt_id if returned
+          });
+        }
+
+        // Close the agent drawer after successful save
+        setTimeout(() => {
+          closeAgentDrawer();
+        }, 500); // Small delay to show the success message
+      }
+    } catch (error: any) {
+      console.error("Error saving prompt schema:", error);
+      // Handle validation errors better
+      if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
+        const firstError = error.response.data.detail[0];
+        errorToast(firstError.msg || "Failed to save prompt schema");
+      } else {
+        errorToast(error?.response?.data?.detail || "Failed to save prompt schema");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const menuItems = [
     {
       key: 'duplicate',
@@ -130,7 +206,13 @@ function AgentBoxInner({
         {/* Left Section - Session Info and Load Model */}
         <div className="flex items-center gap-3">
           <span className="text-[#808080] text-xs font-medium">V{index + 1}</span>
-          <PrimaryButton>Save</PrimaryButton>
+          <PrimaryButton
+            onClick={handleSavePromptSchema}
+            loading={isSaving}
+            disabled={isSaving}
+          >
+            {isSaving ? "Saving..." : "Save"}
+          </PrimaryButton>
         </div>
 
         {/* Center Section - Load Model */}
