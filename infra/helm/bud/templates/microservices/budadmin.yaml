@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budadmin.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -45,6 +46,8 @@ spec:
             value: {{ include "bud.ingress.url.budplayground" $ }}
           - name: NEXT_PUBLIC_ASK_BUD_URL
             value: '{{ include "bud.ingress.url.budask" $ }}/v1'
+          - name: NEXT_PUBLIC_ASK_BUD_MODEL
+            value: {{ .Values.microservices.askbud.model }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budadmin.env }}
           - name: {{ $key }}
@@ -72,3 +75,4 @@ spec:
   selector:
     app: {{ .Release.Name }}-budadmin
   type: ClusterIP
+{{ end }}

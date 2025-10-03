@@ -253,7 +253,7 @@ class ExperimentService:
                         run_index=next_run_index,
                         model_id=model_id,
                         dataset_version_id=dataset_version.id,
-                        status=RunStatusEnum.PENDING.value,
+                        status=RunStatusEnum.RUNNING.value,
                         config=req.evaluation_config or {},
                     )
                     self.session.add(run)
@@ -2502,7 +2502,7 @@ class ExperimentWorkflowService:
                         run_index=run_index,
                         model_id=model_uuid,
                         dataset_version_id=dataset_version.id,
-                        status=RunStatusEnum.PENDING.value,
+                        status=RunStatusEnum.RUNNING.value,
                         config=combined_data.evaluation_config,
                     )
                     self.session.add(run)
@@ -3069,7 +3069,7 @@ class EvaluationWorkflowService:
             description=evaluation_description,
             workflow_id=workflow_id,
             created_by=current_user_id,
-            status=EvaluationStatusEnum.PENDING.value,
+            status=EvaluationStatusEnum.RUNNING.value,
             trait_ids=trait_id_strings,
         )
         self.session.add(evaluation)
@@ -3102,12 +3102,15 @@ class EvaluationWorkflowService:
                 evaluation_id=evaluation.id,
                 model_id=model_uuid,
                 dataset_version_id=dataset_version.id,
-                status=RunStatusEnum.PENDING.value,
+                status=RunStatusEnum.RUNNING.value,
                 config={},
             )
             self.session.add(run)
             next_run_index += 1
             runs_created += 1
+
+        # commit changes
+        self.session.commit()
 
         self.session.commit()
 
@@ -3567,7 +3570,6 @@ class EvaluationWorkflowService:
                 .filter(
                     RunModel.evaluation_id == evaluation_id,
                     RunModel.experiment_id == experiment_id,
-                    RunModel.status == RunStatusEnum.PENDING.value,
                 )
                 .all()
             )
@@ -3579,36 +3581,47 @@ class EvaluationWorkflowService:
             logger.info(f"Triggering budeval evaluation for {len(runs)} runs in experiment {experiment_id}")
             logger.info("*" * 10)
 
-            # Collect all datasets from runs, starting with the demo dataset
-            all_datasets = ["demo_gsm8k_chat_gen"]
-
-            # Get model and endpoint information from the first run
-            # first_run = runs[0]
-            # model = self.session.query(ModelTable).filter(ModelTable.id == first_run.model_id).first()
-            # endpoint = self.session.query(EndpointModel).filter(EndpointModel.model_id == first_run.model_id).first()
-
-            # if not model or not endpoint:
-            #     logger.error(f"Model or endpoint not found for first run {first_run.id}")
-            #     return None
+            # Collect all datasets from runs by extracting eval_type configurations from database
+            all_datasets = []
 
             # Add datasets from each run (avoiding duplicates)
-            # for run in runs:
-            #     try:
-            #         if hasattr(run, 'dataset_version') and run.dataset_version and run.dataset_version.dataset:
-            #             dataset_id = run.dataset_version.dataset.dataset_id
-            #             if dataset_id not in all_datasets:
-            #                 all_datasets.append(dataset_id)
-            #     except Exception as e:
-            #         logger.warning(f"Could not retrieve dataset for run {run.id}: {e}")
+            for run in runs:
+                try:
+                    if run.dataset_version and run.dataset_version.dataset:
+                        dataset = run.dataset_version.dataset
+                        eval_types = dataset.eval_types
+
+                        if eval_types and isinstance(eval_types, dict):
+                            # Extract the "gen" evaluation type configuration
+                            # You can make this configurable based on run.config if needed
+                            if "gen" in eval_types:
+                                dataset_config = eval_types["gen"]
+                                if dataset_config and dataset_config not in all_datasets:
+                                    all_datasets.append(dataset_config)
+                                    logger.info(f"Added dataset config '{dataset_config}' from run {run.id}")
+                            else:
+                                logger.warning(f"Run {run.id}: Dataset '{dataset.name}' has no 'gen' eval_type")
+                        else:
+                            logger.warning(f"Run {run.id}: Dataset '{dataset.name}' has no eval_types configured")
+                except Exception as e:
+                    logger.error(
+                        f"Could not retrieve dataset configuration for run {run.id}: {e}",
+                        exc_info=True,
+                    )
 
             # Prepare single evaluation request with all datasets
+            if not all_datasets:
+                logger.error(f"No datasets with eval_types found for experiment {experiment_id}")
+                raise ClientException("No datasets with valid eval_type configurations found")
+
+            logger.info(f"Collected {len(all_datasets)} dataset configurations: {all_datasets}")
 
             evaluation_request = {
                 "model_name": "qwen3-32b",
                 "endpoint": "http://20.66.97.208/v1",
                 "api_key": "sk-BudLiteLLMMasterKey_123",
                 "extra_args": {},
-                "datasets": ["demo_gsm8k_chat_gen"],  # all_datasets,
+                "datasets": all_datasets,
                 "kubeconfig": "",  # TODO: Get actual kubeconfig
                 # Use service name as source for CloudEvent metadata (not the topic)
                 "source": app_settings.name,
@@ -3616,6 +3629,8 @@ class EvaluationWorkflowService:
                 "experiment_id": experiment_id,  # Include experiment ID for tracking
                 "evaluation_id": str(evaluation_id),  # TODO: Update to actual evaluation ID
             }
+
+            logger.warning(f"::BUDEVAL:: Triggering budeval evaluation {evaluation_request}")
 
             # Update all runs status to running
             for run in runs:
@@ -3669,6 +3684,9 @@ class EvaluationWorkflowService:
             logger.error(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")
             raise ClientException(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")
 
+    async def update_eval_run_status_from_notification(self, payload) -> None:
+        pass
+
     async def create_evaluation_from_notification_event(self, payload) -> None:
         """Create/update evaluation records from notification event.
 
@@ -3681,6 +3699,8 @@ class EvaluationWorkflowService:
         Raises:
             ClientException: If the evaluation update fails
         """
+        from sqlalchemy import select
+
         from budapp.commons.constants import NotificationTypeEnum
         from budapp.core.schemas import NotificationResult
         from budapp.shared.notification_service import (
@@ -3697,133 +3717,72 @@ class EvaluationWorkflowService:
                 WorkflowModel, {"id": workflow_id}
             )
             if not db_workflow:
-                logger.error(f"Workflow {workflow_id} not found for evaluation completion")
+                logger.error(f"::EvalResult:: Workflow {workflow_id} not found for evaluation completion")
                 raise ClientException(f"Workflow {workflow_id} not found")
 
-            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
-                {"workflow_id": workflow_id}
-            )
+            db_workflow = cast(WorkflowModel, db_workflow)
+            logger.warning(f"::EvalResult:: Workflow {db_workflow.id} found")
 
-            # Define the keys required for evaluation completion
-            keys_of_interest = [
-                "experiment_id",
-                "run_ids",
-                "evaluation_id",
-            ]
+            # Evaluation ID
+            status_str = (payload.content.status or "").upper()
+            logger.warning(f":EvalResult:: Status {status_str}")
 
-            # From workflow steps extract necessary information
-            required_data = {}
-            for db_workflow_step in db_workflow_steps:
-                if db_workflow_step.data:
-                    for key in keys_of_interest:
-                        if key in db_workflow_step.data:
-                            required_data[key] = db_workflow_step.data[key]
-
-            logger.warning("Collected required data from workflow steps")
-
-            # Get experiment details
-            experiment_id = required_data.get("experiment_id")
-            if not experiment_id:
-                # Try to extract from stage_data if available
-                for step in db_workflow_steps:
-                    if step.data and "stage_data" in step.data:
-                        stage_data = step.data["stage_data"]
-                        if "experiment_id" in stage_data:
-                            experiment_id = stage_data["experiment_id"]
-                            break
-
-            if not experiment_id:
-                logger.error("Could not find experiment_id in workflow steps")
-                raise ClientException("Experiment ID not found in workflow data")
-
-            # Get the experiment
-            experiment = self.session.get(ExperimentModel, experiment_id)
-            if not experiment:
-                logger.error(f"Experiment {experiment_id} not found")
-                raise ClientException(f"Experiment {experiment_id} not found")
-
-            # Extract evaluation results from payload
-            evaluation_results = payload.content.result if payload.content and payload.content.result else {}
-            evaluation_status = evaluation_results.get("status", "completed")
-
-            # Update workflow step data with final status
-            execution_status = {
-                "status": "success" if evaluation_status == "completed" else "error",
-                "message": f"Evaluation {evaluation_status}",
-                "results": evaluation_results,
-            }
-
-            workflow_data = {}
+            # Extract job_id from result dictionary with error handling
             try:
-                # Update runs if we have run information
-                run_ids = required_data.get("run_ids", [])
-                if run_ids:
-                    for run_id in run_ids:
-                        try:
-                            run = self.session.get(RunModel, run_id)
-                            if run:
-                                run.status = (
-                                    RunStatusEnum.COMPLETED.value
-                                    if evaluation_status == "completed"
-                                    else RunStatusEnum.FAILED.value
-                                )
-                                if hasattr(run, "evaluation_status"):
-                                    run.evaluation_status = evaluation_status
-                                if evaluation_results.get("scores"):
-                                    run.scores = evaluation_results["scores"]
-                        except Exception as e:
-                            logger.error(f"Failed to update run {run_id}: {e}")
+                job_id = payload.content.result.get("job_id")
+                if not job_id:
+                    raise ClientException("Missing job_id in evaluation completion notification")
+                evaluation_id = job_id.split("-", 1)[1] if "-" in job_id else job_id
+                logger.warning(f":EvalResult:: Evaluation ID {evaluation_id}")
 
-                    self.session.commit()
-                    logger.info(f"Updated {len(run_ids)} runs with evaluation results")
+                # Convert to UUID with proper error handling
+                evaluation_uuid = uuid.UUID(evaluation_id)
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.error(f"::EvalResult:: Invalid evaluation ID format: {e}")
+                raise ClientException(f"Invalid evaluation ID format: {e}")
 
-                # Mark workflow as completed
-                workflow_data = {"status": WorkflowStatusEnum.COMPLETED}
+            # Rest of the logics
+            evaluation = self.session.get(EvaluationModel, evaluation_uuid)
 
-            except Exception as e:
-                logger.exception(f"Failed to update evaluation results: {e}")
-                execution_status.update(
-                    {
-                        "status": "error",
-                        "message": f"Failed to update evaluation results: {str(e)}",
-                    }
-                )
-                workflow_data = {
-                    "status": WorkflowStatusEnum.FAILED,
-                    "reason": str(e),
-                }
+            if not evaluation:
+                logger.error(f"::EvalResult:: Evaluation {evaluation_uuid} not found")
+                raise ClientException(f"Evaluation {evaluation_uuid} not found")
 
-            finally:
-                # Update workflow step with execution status
-                workflow_step_data = {
-                    "workflow_execution_status": execution_status,
-                    "experiment_id": str(experiment_id),
-                }
+            # 2. Get the runs using modern SQLAlchemy pattern
+            try:
+                runs_stmt = select(RunModel).where(RunModel.evaluation_id == evaluation.id)
+                runs = self.session.execute(runs_stmt).scalars().all()
 
-                # Update current step number
-                current_step_number = db_workflow.current_step + 1
-                workflow_current_step = current_step_number
+                logger.warning(f"::EvalResult:: Found {len(runs)} runs for evaluation {evaluation.id}")
 
-                # Update or create next workflow step
-                db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                    db_workflow.id, current_step_number, workflow_step_data
-                )
-                logger.warning(f"Updated workflow step {db_workflow_step.id} with evaluation completion status")
+                # Update Evaluation Status
+                evaluation.status = EvaluationStatusEnum.COMPLETED.value
 
-                # Update workflow
-                workflow_data.update({"current_step": workflow_current_step})
-                await WorkflowDataManager(self.session).update_by_fields(db_workflow, workflow_data)
+                # Update all runs status
+                for run in runs:
+                    run.status = RunStatusEnum.COMPLETED.value
 
-                # Send success notification to workflow creator
+                # Single commit for all changes to ensure atomicity
+                self.session.commit()
+                logger.warning(f"::EvalResult:: Successfully updated evaluation {evaluation.id} and {len(runs)} runs")
+
+            except Exception as db_error:
+                self.session.rollback()
+                logger.error(f"::EvalResult:: Database error during evaluation update: {db_error}")
+                raise ClientException(f"Database error during evaluation update: {db_error}")
+
+            # Send Success Notification
+            try:
                 notification_request = (
                     NotificationBuilder()
                     .set_content(
-                        title=experiment.name,
-                        message=f"Evaluation {evaluation_status}",
-                        icon=getattr(experiment, "icon", None),
-                        result=NotificationResult(target_id=experiment.id, target_type="workflow").model_dump(
-                            exclude_none=True, exclude_unset=True
-                        ),
+                        title=evaluation.name,
+                        message=f"Evaluation {evaluation.status}",
+                        icon=None,
+                        result=NotificationResult(
+                            target_id=db_workflow.id,
+                            target_type="workflow",
+                        ).model_dump(exclude_none=True, exclude_unset=True),
                     )
                     .set_payload(
                         workflow_id=str(db_workflow.id),
@@ -3833,8 +3792,9 @@ class EvaluationWorkflowService:
                     .build()
                 )
                 await BudNotifyService().send_notification(notification_request)
-                logger.info(f"Sent evaluation completion notification for experiment {experiment_id}")
+            except Exception as e:
+                logger.warning(f"::EvalResult:: Failed to send notification: {e}")
 
         except Exception as e:
-            logger.exception(f"Failed to handle evaluation completion event: {e}")
-            raise ClientException(f"Failed to process evaluation completion: {str(e)}")
+            logger.exception(f"::EvalResult:: Failed to handle evaluation completion event: {e}")
+            raise ClientException(f"::EvalResult:: Failed to process evaluation completion: {str(e)}")

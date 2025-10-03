@@ -1,8 +1,8 @@
 {{- if not (empty $.Values.clickhouseExtra.autoCreateDB) }}
 apiVersion: v1
-kind: ConfigMap # TODO: convert to secret or nix
+kind: ConfigMap
 metadata:
-  name: {{ .Release.Name }}-clickhouse-db-create-script
+  name: "{{ .Release.Name }}-clickhouse-db-create-script"
 data:
   script.sh: |-
     ch_isready() {
@@ -37,20 +37,20 @@ data:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-clickhouse-db-create
+  name: "{{ .Release.Name }}-clickhouse-db-create"
 spec:
   template:
     spec:
       volumes:
-        - name: {{ .Release.Name }}-clickhouse-db-create-script
+        - name: "{{ .Release.Name }}-clickhouse-db-create-script"
           configMap:
-            name: {{ .Release.Name }}-clickhouse-db-create-script
+            name: "{{ .Release.Name }}-clickhouse-db-create-script"
       containers:
       - name: clickhouse-db-create
-        image: {{ .Values.clickhouse.image.repository }}:{{ .Values.clickhouse.image.tag }}
+        image: "{{ .Values.clickhouse.image.repository }}:{{ .Values.clickhouse.image.tag }}"
         volumeMounts:
           - mountPath: "/var/script.sh"
-            name: {{ .Release.Name }}-clickhouse-db-create-script
+            name: "{{ .Release.Name }}-clickhouse-db-create-script"
             subPath: script.sh
             readOnly: true
         command: ["/bin/bash", "/var/script.sh"]
