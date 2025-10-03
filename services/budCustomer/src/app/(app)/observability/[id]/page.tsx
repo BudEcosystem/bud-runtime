@@ -36,6 +36,7 @@ import {
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import ProjectTags from "@/flows/components/ProjectTags";
+import { errorToast } from "@/components/toast";
 
 const { Paragraph } = Typography;
 
@@ -837,9 +838,14 @@ export default function ObservabilityDetailPage({
                 <Button
                   size="small"
                   icon={<DownloadOutlined />}
-                  onClick={() =>
-                    downloadJson(inferenceData.messages, "conversation")
-                  }
+                  onClick={() =>{
+                    if(inferenceData.messages && inferenceData?.messages?.length > 0){
+                      downloadJson(inferenceData.messages, "conversation")
+                    }
+                    else {
+                      errorToast("No conversation data to download")
+                    }
+                  }}
                   className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
                 >
                   Download
