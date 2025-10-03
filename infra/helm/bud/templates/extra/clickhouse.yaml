@@ -1,6 +1,6 @@
 {{- if not (empty $.Values.clickhouseExtra.autoCreateDB) }}
 apiVersion: v1
-kind: Secret
+kind: ConfigMap
 metadata:
   name: "{{ .Release.Name }}-clickhouse-db-create-script"
 data:
@@ -43,8 +43,8 @@ spec:
     spec:
       volumes:
         - name: "{{ .Release.Name }}-clickhouse-db-create-script"
-          secret:
-            secretName: "{{ .Release.Name }}-clickhouse-db-create-script"
+          configMap:
+            name: "{{ .Release.Name }}-clickhouse-db-create-script"
       containers:
       - name: clickhouse-db-create
         image: "{{ .Values.clickhouse.image.repository }}:{{ .Values.clickhouse.image.tag }}"
