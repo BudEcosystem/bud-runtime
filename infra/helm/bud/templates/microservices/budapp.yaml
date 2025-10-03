@@ -110,11 +110,14 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-bud-static-dir
 spec:
+{{ if .Values.storage.budappStaticDir.className }}
+  storageClassName: {{ .Values.storage.budappStaticDir.className }}
+{{ end }}
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi
+      storage: {{ .Values.storage.budappStaticDir.size }}
 ---
 apiVersion: dapr.io/v2alpha1
 kind: Subscription
