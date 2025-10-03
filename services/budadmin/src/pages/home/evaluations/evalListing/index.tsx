@@ -73,32 +73,28 @@ const EvaluationList = () => {
     );
   }, []);
 
-  const filteredEvaluations = useMemo(() => {
-    const searchLower = searchValue.toLowerCase();
-    return evaluationsList?.filter((evaluation) => {
-      const matchesSearch =
-        evaluation.name.toLowerCase().includes(searchLower) ||
-        evaluation.description.toLowerCase().includes(searchLower);
-      const matchesFilter =
-        selectedFilters.length === 0 ||
-        evaluation.traits?.some((trait) =>
-          selectedFilters.includes(trait.name),
-        );
-      return matchesSearch && matchesFilter;
-    });
-  }, [searchValue, selectedFilters, evaluationsList]);
+  // No longer need local filtering - use evaluationsList directly
+  const filteredEvaluations = evaluationsList;
 
   useEffect(() => {
     const fetchEvaluations = async () => {
+      // Find trait IDs for selected filter names
+      const selectedTraitIds = selectedFilters.length > 0
+        ? traitsList
+            .filter(trait => selectedFilters.includes(trait.name))
+            .map(trait => trait.id)
+        : [];
+
       const payload: GetEvaluationsPayload = {
         page: 1,
         limit: 500,
         name: searchValue,
+        trait_ids: selectedTraitIds.length > 0 ? selectedTraitIds : undefined,
       };
       await getEvaluations(payload);
     };
     fetchEvaluations();
-  }, [searchValue, getEvaluations]);
+  }, [searchValue, selectedFilters, traitsList, getEvaluations]);
 
   useEffect(() => {
     getTraits();
