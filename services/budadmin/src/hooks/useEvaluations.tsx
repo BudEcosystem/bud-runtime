@@ -175,7 +175,7 @@ export const useEvaluations = create<{
       if (payload?.language) params.append('language', payload.language);
       if (payload?.domains) params.append('domains', payload.domains);
       if (payload?.trait_ids && payload.trait_ids.length > 0) {
-        payload.trait_ids.forEach(id => params.append('trait_ids', id));
+        params.append('trait_ids', payload.trait_ids.join(','));
       }
 
       const queryString = params.toString();
