@@ -1,6 +1,6 @@
 {{- if not (empty $.Values.postgresqlExtra.autoCreateDB) }}
 apiVersion: v1
-kind: Secret
+kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-postgres-db-create-script
 data:
@@ -29,8 +29,6 @@ spec:
     spec:
       volumes:
         - name: {{ .Release.Name }}-postgres-db-create-script
-          secret:
-            secretName: {{ .Release.Name }}-postgres-db-create-script
           configMap:
             name: {{ .Release.Name }}-postgres-db-create-script
       containers:
