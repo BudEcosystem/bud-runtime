@@ -8,6 +8,7 @@ import { Image } from "antd";
 import { errorToast } from "@/components/toast";
 import { Text_12_400_757575, Text_14_600_EEEEEE } from "@/components/ui/text";
 import { useAddAgent } from "@/stores/useAddAgent";
+import { useAgentStore } from "@/stores/useAgentStore";
 import { AppRequest } from "src/pages/api/requests";
 import { tempApiBaseUrl } from "@/components/environment";
 
@@ -22,6 +23,7 @@ interface AgentTypeOption {
 
 export default function SelectAgentType() {
   const { openDrawerWithStep, closeDrawer } = useDrawer();
+  const { openAgentDrawer } = useAgentStore();
   const [selectedType, setSelectedType] = useState<AgentType | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -115,6 +117,9 @@ export default function SelectAgentType() {
       if (response?.data) {
         // Update the workflow in the store
         await getWorkflow(currentWorkflow.workflow_id);
+
+        // Open the agent drawer
+        openAgentDrawer();
 
         // Navigate to the next step (Select Model)
         openDrawerWithStep("add-agent-select-model");

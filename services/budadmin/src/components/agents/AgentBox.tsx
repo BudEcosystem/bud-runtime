@@ -13,6 +13,7 @@ import { Editor } from "../flowgramEditorDemo/editor";
 import { SessionProvider } from "../flowgramEditorDemo/contexts/SessionContext";
 import { SettingsSidebar, SettingsType } from "./settings/SettingsSidebar";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
+import { PrimaryButton } from "../ui/bud/form/Buttons";
 
 interface AgentBoxProps {
   session: AgentSession;
@@ -129,6 +130,7 @@ function AgentBoxInner({
         {/* Left Section - Session Info and Load Model */}
         <div className="flex items-center gap-3">
           <span className="text-[#808080] text-xs font-medium">V{index + 1}</span>
+          <PrimaryButton>Save</PrimaryButton>
         </div>
 
         {/* Center Section - Load Model */}

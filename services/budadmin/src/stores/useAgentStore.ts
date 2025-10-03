@@ -9,6 +9,8 @@ export interface AgentVariable {
   description?: string;
   dataType?: "string" | "number" | "boolean" | "array" | "object";
   defaultValue?: string;
+  required?: boolean;
+  validation?: string;
 }
 
 export interface AgentSession {
