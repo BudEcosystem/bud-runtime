@@ -16,7 +16,7 @@ storage:
     size: 20Gi
   budevalDataset:
     className: ""
-    size: 20Gi
+    size: 32Gi
   budappStaticDir:
     className: ""
     size: 20Gi
