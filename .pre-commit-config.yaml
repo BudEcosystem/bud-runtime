@@ -37,6 +37,7 @@ repos:
               services/budgateway/CLAUDE\.md|
               services/budgateway/ci/dummy-gcp-credentials\.json|
               infra/helm/bud/charts/novu/values\.yaml|
+              infra/helm/bud/example.secrets.yaml|
               services/budgateway/tensorzero-internal/src/inference/providers/gcp_vertex_gemini\.rs|
               \.env\.sample
           )$
@@ -160,16 +161,15 @@ repos:
     hooks:
       - id: commitlint
         stages: [commit-msg]
-        additional_dependencies: ['@commitlint/config-conventional']
-        args: ['--config', '.commitlintrc.js']
+        additional_dependencies: ["@commitlint/config-conventional"]
+        args: ["--config", ".commitlintrc.js"]
 
   # Python security scanning
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.10
     hooks:
       - id: bandit
-        args: [-r, -ll, --skip, "B608,B113,B104,B310,B103"]  # Temporarily skip SQL injection, timeout, bind, and file permission checks
+        args: [-r, -ll, --skip, "B608,B113,B104,B310,B103"] # Temporarily skip SQL injection, timeout, bind, and file permission checks
         files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud|buddoc)/.*\.py$
-
 
 default_stages: [pre-commit]

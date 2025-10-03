@@ -4,7 +4,14 @@ ingress:
 
 microservices:
     budmodel:
-        storageSize: "1024Gi"
+        storageSize: "1Ti"
 minio:
     persistence:
         size: "1Ti"
+
+imagePullPolicy: "Always"
+deploymentAnnotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+    keel.sh/match-tag: true
+    keel.sh/pollSchedule: "@every 1m"
