@@ -3750,21 +3750,30 @@ class ModelService(SessionMixin):
             Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
         )
 
-        # For cloud models, get the cloud model details for supported endpoints
-        if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
-            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel,
-                fields={
-                    "status": CloudModelStatusEnum.ACTIVE,
-                    "source": db_model.source,
-                    "uri": db_model.uri,
-                    "provider_id": db_model.provider_id,
-                },
-            )
-            supported_endpoints = db_cloud_model.supported_endpoints if db_cloud_model else []
-        else:
-            # This should not happen as this method is only for cloud models
+        # Skipping cloud model check.
+        # # For cloud models, get the cloud model details for supported endpoints
+        # if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+        #     db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+        #         CloudModel,
+        #         fields={
+        #             "status": CloudModelStatusEnum.ACTIVE,
+        #             "source": db_model.source,
+        #             "uri": db_model.uri,
+        #             "provider_id": db_model.provider_id,
+        #         },
+        #     )
+        #     supported_endpoints = db_cloud_model.supported_endpoints if db_cloud_model else []
+        # else:
+        #     # This should not happen as this method is only for cloud models
+        #     raise ClientException("Direct endpoint creation is only supported for cloud models")
+
+        if not db_model:
+            raise ClientException(f"Active model with id {model_id} not found.")
+
+        if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
             raise ClientException("Direct endpoint creation is only supported for cloud models")
+
+        supported_endpoints = db_model.supported_endpoints
 
         # Generate namespace and deployment URL
         # Use model.uri as namespace for cloud models

@@ -73,6 +73,20 @@ export interface TraitSimple {
 
 export interface MetaLinks {
   manifest_id: string;
+  github?: string;
+  paper?: string;
+  papers?: string[];
+  website?: string;
+  author?: string;
+  author_url?: string;
+  website_url?: string;
+  create_date?: string;
+  creator?: {
+    avatar?: string;
+    name?: string;
+    nickname?: string;
+    uid?: string;
+  }
 }
 
 export interface SampleQuestionsAnswers {
@@ -161,7 +175,7 @@ export const useEvaluations = create<{
       if (payload?.language) params.append('language', payload.language);
       if (payload?.domains) params.append('domains', payload.domains);
       if (payload?.trait_ids && payload.trait_ids.length > 0) {
-        payload.trait_ids.forEach(id => params.append('trait_ids', id));
+        params.append('trait_ids', payload.trait_ids.join(','));
       }
 
       const queryString = params.toString();

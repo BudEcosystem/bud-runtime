@@ -1,4 +1,3 @@
-import base64
 import json
 import re
 import time
@@ -82,20 +81,6 @@ class KubernetesHandler(BaseClusterHandler):
             return node["status"]["message"]
         return "Unknown"
 
-    def get_image_pull_secret(self) -> Dict[str, Any]:
-        """Generate and return the image pull secret for the Kubernetes cluster."""
-        return {
-            "auths": {
-                app_settings.registry_server: {
-                    "username": app_settings.registry_username,
-                    "password": app_settings.registry_password,
-                    "auth": base64.b64encode(
-                        f"{app_settings.registry_username}:{app_settings.registry_password}".encode()
-                    ).decode(),
-                }
-            }
-        }
-
     # TODO: Traefik installation
     def initial_setup(self, cluster_id: UUID) -> None:
         """Execute the initial setup for the Kubernetes cluster using Ansible playbook.
@@ -114,7 +99,6 @@ class KubernetesHandler(BaseClusterHandler):
             playbook="SETUP_CLUSTER",  # Uses comprehensive cluster setup
             extra_vars={
                 "kubeconfig_content": self.config,
-                "image_pull_secrets": self.get_image_pull_secret(),
                 "platform": self.platform,
                 "prometheus_url": f"{app_settings.prometheus_url}/api/v1/write",
                 "prometheus_namespace": "bud-system",
@@ -483,6 +467,7 @@ class KubernetesHandler(BaseClusterHandler):
 
     def transfer_model(self, values: dict) -> None:
         """Transfer the model to the Kubernetes cluster."""
+
         # Set NFS server IP if volume type is NFS
         if values.get("volume_type") == "nfs":
             nfs_server = self.get_nfs_service_ip()
@@ -499,6 +484,7 @@ class KubernetesHandler(BaseClusterHandler):
             values["nfs_server"] = ""
 
         values["image_pull_secrets"] = self.get_image_pull_secret()
+        
         result = self.ansible_executor.run_playbook(
             playbook="MODEL_TRANSFER", extra_vars={"kubeconfig_content": self.config, **values}
         )
@@ -607,7 +593,6 @@ class KubernetesHandler(BaseClusterHandler):
 
     def deploy_runtime(self, values: dict, playbook: str, delete_on_failure: bool = True) -> None:
         """Deploy the runtime on the Kubernetes cluster."""
-        values["image_pull_secrets"] = self.get_image_pull_secret()
         values["platform"] = self.platform
         values["nfs_server"] = self.get_nfs_service_ip()
         values["ingress_host"], _ = self._parse_hostname(values["ingress_host"])
@@ -1415,7 +1400,6 @@ class KubernetesHandler(BaseClusterHandler):
 
     def deploy_quantization_job(self, values: dict):
         """Deploy quantization job."""
-        values["image_pull_secrets"] = self.get_image_pull_secret()
         values["nfs_server"] = self.get_nfs_service_ip()
         print(values)
         result = self.ansible_executor.run_playbook(

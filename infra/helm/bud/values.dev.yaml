@@ -2,9 +2,20 @@ ingress:
     hosts:
         root: "dev.bud.studio"
 
-microservices:
-    budmodel:
-        storageSize: "1024Gi"
+storage:
+    budmodelRegistry:
+        size: "1Ti"
+        className: nfs-csi
+    budevalDataset:
+        className: nfs-csi
+
 minio:
     persistence:
         size: "1Ti"
+
+imagePullPolicy: "Always"
+deploymentAnnotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+    keel.sh/match-tag: true
+    keel.sh/pollSchedule: "@every 1m"

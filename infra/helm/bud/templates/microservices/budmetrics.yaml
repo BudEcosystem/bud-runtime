@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budmetrics.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -38,10 +39,10 @@ spec:
               name: {{ .Release.Name}}-bud-global
         resources:
           limits:
-            memory: 32768Mi
+            memory: 256Mi
             cpu: 2
           requests:
-            memory: 256Mi
+            memory: 128Mi
             cpu: 250m
 ---
 apiVersion: v1
@@ -55,3 +56,24 @@ spec:
   selector:
     app: {{ .Release.Name }}-budmetrics
   type: ClusterIP
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .Release.Name }}-budmetrics-pubsub-subscription
+spec:
+  topic: budMetricsMessages
+  routes:
+    rules:
+    - match: event.type == "add_observability_metrics"
+      path: /observability/add
+    default: /notifications
+  pubsubname: {{ .Release.Name }}-pubsub
+  deadLetterTopic: poisonMessages
+  bulkSubscribe:
+    enabled: true
+    maxMessagesCount: 1
+    maxAwaitDurationMs: 50
+scopes:
+  - budmetrics
+{{ end }}

@@ -241,14 +241,18 @@ class Evaluation(BaseModel):
     """Represents an evaluation record."""
 
     id: UUID4 = Field(..., description="The UUID of the evaluation.")
-    experiment_id: UUID4 = Field(..., description="The UUID of the experiment this evaluation belongs to.")
+    experiment_id: UUID4 = Field(
+        ...,
+        description="The UUID of the experiment this evaluation belongs to.",
+    )
     name: str = Field(..., description="The name of the evaluation.")
     description: Optional[str] = Field(None, description="The description of the evaluation.")
     workflow_id: Optional[UUID4] = Field(None, description="The workflow ID that created this evaluation.")
     created_by: UUID4 = Field(..., description="The UUID of the user who created this evaluation.")
     status: str = Field(..., description="The status of the evaluation.")
     trait_ids: Optional[List[str]] = Field(
-        None, description="List of trait UUIDs (as strings) selected for this evaluation."
+        None,
+        description="List of trait UUIDs (as strings) selected for this evaluation.",
     )
     created_at: Optional[datetime] = Field(None, description="Timestamp when the evaluation was created.")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp.")
@@ -330,6 +334,41 @@ class RunWithResults(BaseModel):
     config: Optional[dict] = Field(None, description="Run-specific configuration.")
     metrics: List[dict] = Field([], description="List of metrics for this run.")
     raw_results: Optional[dict] = Field(None, description="Raw results for this run.")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class RunDetailedWithMetrics(BaseModel):
+    """Run with complete dataset details, model details, and metrics."""
+
+    id: UUID4 = Field(..., description="The UUID of the run.")
+    experiment_id: UUID4 = Field(..., description="The UUID of the parent experiment.")
+    run_index: int = Field(..., description="Auto-incrementing index within the experiment.")
+    status: RunStatusEnum = Field(..., description="Current status of the run.")
+    config: Optional[dict] = Field(None, description="Run-specific configuration.")
+
+    # Model details
+    model: Optional[dict] = Field(
+        None,
+        description="Complete model information including id, name, and deployment details.",
+    )
+
+    # Dataset details
+    dataset: Optional[dict] = Field(None, description="Complete dataset information with version details.")
+
+    # Metrics
+    metrics: List[dict] = Field(
+        [],
+        description="List of metrics for this run with metric_name, mode, and metric_value.",
+    )
+    raw_results: Optional[dict] = Field(None, description="Raw results preview for this run.")
+
+    # Timestamps
+    created_at: Optional[datetime] = Field(None, description="Timestamp when the run was created.")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp.")
 
     class Config:
         """Pydantic model configuration."""
@@ -748,9 +787,13 @@ class EvaluationListItem(BaseModel):
     evaluation_id: UUID4 = Field(..., description="UUID of the evaluation")
     model_name: str = Field(..., description="Name of the model used")
     started_date: datetime = Field(..., description="Date when the evaluation was started")
-    duration_minutes: int = Field(..., description="Duration of the evaluation in minutes (30-40 min hardcoded)")
+    duration_minutes: int = Field(..., description="Duration of the evaluation in minutes")
     trait_name: str = Field(..., description="Name of the trait")
-    trait_score: float = Field(..., description="Score for this trait (random value for now)")
+    trait_score: float = Field(..., description="Score for this trait")
+    status: str = Field(
+        ...,
+        description="Status of the evaluation (pending/running/completed/failed)",
+    )
 
 
 class ListEvaluationsResponse(SuccessResponse):

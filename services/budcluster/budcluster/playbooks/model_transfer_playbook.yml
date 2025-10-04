@@ -37,8 +37,8 @@
         validate_certs: "{{ validate_certs }}"
       register: ns_status
       until: ns_status.resources is defined and
-             ns_status.resources | length > 0 and
-             ns_status.resources[0].status.phase == "Active"
+        ns_status.resources | length > 0 and
+        ns_status.resources[0].status.phase == "Active"
       retries: 10
       delay: 5
       when: ns_result is not failed
@@ -69,8 +69,6 @@
           volumeType: "{{ volume_type }}"
           nfs:
             server: "{{ nfs_server }}"
-          imagePullSecrets:
-            auth: "{{ image_pull_secrets }}"
 
     - name: Debug - List all pods in namespace
       kubernetes.core.k8s_info:
@@ -90,15 +88,15 @@
         validate_certs: "{{ validate_certs }}"
       register: pod_info
       until: pod_info.resources is defined and
-             ((pod_info.resources | type_debug == "list" and
-              pod_info.resources | length > 0 and
-              pod_info.resources[0].status is defined and
-              (pod_info.resources[0].status.phase == "Running" or
-               pod_info.resources[0].status.phase == "Succeeded")) or
-              (pod_info.resources | type_debug == "dict" and
-              pod_info.resources.status is defined and
-              (pod_info.resources.status.phase == "Running" or
-               pod_info.resources.status.phase == "Succeeded")))
+        ((pod_info.resources | type_debug == "list" and
+        pod_info.resources | length > 0 and
+        pod_info.resources[0].status is defined and
+        (pod_info.resources[0].status.phase == "Running" or
+        pod_info.resources[0].status.phase == "Succeeded")) or
+        (pod_info.resources | type_debug == "dict" and
+        pod_info.resources.status is defined and
+        (pod_info.resources.status.phase == "Running" or
+        pod_info.resources.status.phase == "Succeeded")))
       retries: 30
       delay: 10
 

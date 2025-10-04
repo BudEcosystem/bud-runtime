@@ -293,14 +293,16 @@ class ResultsProcessor:
         job_id: str,
         model_name: str,
         experiment_id: Optional[str] = None,
+        evaluation_id: Optional[str] = None,
     ) -> ProcessedEvaluationResults:
         """Process OpenCompass results from extracted path.
 
         Args:
             extracted_path: Path where results were extracted
-            job_id: Job ID
+            job_id: Kubernetes job ID
             model_name: Model name
             experiment_id: Optional experiment ID for tracking
+            evaluation_id: Original evaluation request UUID
 
         Returns:
             ProcessedEvaluationResults object
@@ -386,6 +388,7 @@ class ResultsProcessor:
         # Create final results
         processed_results = ProcessedEvaluationResults(
             job_id=job_id,
+            evaluation_id=evaluation_id,
             model_name=model_name,
             engine="opencompass",
             datasets=datasets,
@@ -409,15 +412,17 @@ class ResultsProcessor:
         namespace: str = "budeval",
         kubeconfig: Optional[str] = None,
         experiment_id: Optional[str] = None,
+        evaluation_id: Optional[str] = None,
     ) -> ProcessedEvaluationResults:
         """Extract results from PVC and process them.
 
         Args:
-            job_id: Job ID to extract results for
+            job_id: Kubernetes job ID to extract results for
             model_name: Model name
             namespace: Kubernetes namespace
             kubeconfig: Optional kubeconfig content
             experiment_id: Optional experiment ID for tracking
+            evaluation_id: Original evaluation request UUID from StartEvaluationRequest
 
         Returns:
             ProcessedEvaluationResults object
@@ -433,7 +438,9 @@ class ResultsProcessor:
             extracted_path = self.extract_from_pvc(job_id, namespace, kubeconfig)
 
             # Process results
-            results = await self.process_opencompass_results(extracted_path, job_id, model_name, experiment_id)
+            results = await self.process_opencompass_results(
+                extracted_path, job_id, model_name, experiment_id, evaluation_id
+            )
 
             # Store results with error handling
             try:
