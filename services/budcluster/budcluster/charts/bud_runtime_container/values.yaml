@@ -8,6 +8,7 @@ ingressHost: "bud-runtime-inference.apps.partner.lab.com" # will be replaced by 
 
 volumeType: "local" # nfs, local
 pvcName: "models-pvc"
+accessMode: ReadWriteOnce
 nfs:
   server: ""
   path: "/exports"

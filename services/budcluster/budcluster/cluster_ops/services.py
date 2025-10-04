@@ -1733,3 +1733,37 @@ class ClusterService(SessionMixin):
         return SuccessResponse(
             param={"cluster_details": cluster_details}, message="Cluster details fetched successfully"
         )
+
+    async def get_cluster_storage_classes(self, cluster_id: UUID) -> Union[SuccessResponse, ErrorResponse]:
+        """Get all storage classes available in the cluster.
+
+        Args:
+            cluster_id: The ID of the cluster to get storage classes from.
+
+        Returns:
+            SuccessResponse: A response object containing the list of storage classes.
+            ErrorResponse: A response object containing the error message.
+        """
+        try:
+            # Get cluster details from database
+            db_cluster = await ClusterDataManager(self.session).retrieve_cluster_by_fields(
+                {"id": cluster_id, "status": ClusterStatusEnum.AVAILABLE}
+            )
+            if db_cluster is None:
+                return ErrorResponse(message="Cluster not found or not available")
+
+            # Get storage classes from the cluster using KubernetesHandler
+            from .kubernetes import KubernetesHandler
+
+            k8s_handler = KubernetesHandler(db_cluster.config_file_dict, db_cluster.ingress_url)
+            storage_classes = k8s_handler.get_storage_classes()
+
+            logger.info(f"Found {len(storage_classes)} storage classes for cluster {cluster_id}")
+
+            return SuccessResponse(
+                param={"storage_classes": storage_classes}, message="Storage classes fetched successfully"
+            )
+
+        except Exception as e:
+            logger.error(f"Error fetching storage classes for cluster {cluster_id}: {e}")
+            return ErrorResponse(message=f"Failed to fetch storage classes: {str(e)}")

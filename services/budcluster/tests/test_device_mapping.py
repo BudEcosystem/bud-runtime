@@ -16,10 +16,9 @@
 
 """Tests for device mapping and node selection functionality."""
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
-from budcluster.device_mapping import DeviceMappingRegistry, ClusterDeviceValidator
+from budcluster.device_mapping import ClusterDeviceValidator, DeviceMappingRegistry
 
 
 class TestDeviceMappingRegistry:
@@ -28,47 +27,97 @@ class TestDeviceMappingRegistry:
     def test_get_node_selector_for_a100_gpu(self):
         """Test node selector generation for A100 GPU."""
         selector = DeviceMappingRegistry.get_node_selector_for_device(
-            device_name="A100",
-            device_type="cuda",
-            device_model="NVIDIA-A100-SXM4-80GB"
+            device_name="A100", device_type="cuda", device_model="NVIDIA-A100-SXM4-80GB"
         )
 
         assert selector == {"nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB"}
 
     def test_get_node_selector_for_v100_gpu(self):
-        """Test node selector generation for V100 GPU."""
+        """Test node selector generation for V100 GPU without raw_name (fallback to static mapping)."""
+        selector = DeviceMappingRegistry.get_node_selector_for_device(device_name="V100", device_type="cuda")
+
+        # Without raw_name, falls back to static mapping (first variant)
+        assert selector == {"nvidia.com/gpu.product": "NVIDIA-Tesla-V100-SXM2-32GB"}
+
+    def test_get_node_selector_with_raw_name_exact_match(self):
+        """Test node selector uses raw_name from NFD when provided - exact match case."""
+        # This is the actual value from NFD labels
         selector = DeviceMappingRegistry.get_node_selector_for_device(
-            device_name="V100",
-            device_type="cuda"
+            device_name="V100", device_type="cuda", raw_name="Tesla-V100-PCIE-16GB"
         )
 
-        assert selector == {"nvidia.com/gpu.product": "NVIDIA-Tesla-V100-SXM2-32GB"}
+        # Should use the exact raw_name, not static mapping
+        assert selector == {"nvidia.com/gpu.product": "Tesla-V100-PCIE-16GB"}
+
+    def test_get_node_selector_with_raw_name_nvidia_prefix(self):
+        """Test node selector uses raw_name exactly as-is with NVIDIA prefix."""
+        selector = DeviceMappingRegistry.get_node_selector_for_device(
+            device_name="A100", device_type="cuda", raw_name="NVIDIA-A100-SXM4-80GB"
+        )
+
+        # Should use exact raw_name value
+        assert selector == {"nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB"}
+
+    def test_get_node_selector_with_raw_name_l40(self):
+        """Test node selector uses raw_name exactly for L40 GPU."""
+        selector = DeviceMappingRegistry.get_node_selector_for_device(
+            device_name="L40", device_type="cuda", raw_name="NVIDIA-L40"
+        )
+
+        # Should use exact raw_name value from NFD
+        assert selector == {"nvidia.com/gpu.product": "NVIDIA-L40"}
+
+    def test_get_node_selector_raw_name_takes_precedence(self):
+        """Test that raw_name takes precedence over device_model and static mapping."""
+        selector = DeviceMappingRegistry.get_node_selector_for_device(
+            device_name="V100",
+            device_type="cuda",
+            device_model="NVIDIA-Tesla-V100-SXM2-32GB",  # Different from raw_name
+            raw_name="Tesla-V100-PCIE-16GB",  # This should be used
+        )
+
+        # raw_name should take precedence
+        assert selector == {"nvidia.com/gpu.product": "Tesla-V100-PCIE-16GB"}
+
+    def test_get_node_selector_empty_raw_name_fallback(self):
+        """Test fallback to static mapping when raw_name is empty."""
+        selector = DeviceMappingRegistry.get_node_selector_for_device(
+            device_name="H100",
+            device_type="cuda",
+            raw_name="",  # Empty raw_name
+        )
+
+        # Should fallback to static mapping
+        assert selector == {"nvidia.com/gpu.product": "NVIDIA-H100-PCIE-80GB"}
+
+    def test_get_node_selector_unknown_raw_name_fallback(self):
+        """Test fallback when raw_name is 'Unknown NVIDIA GPU'."""
+        selector = DeviceMappingRegistry.get_node_selector_for_device(
+            device_name="A100",
+            device_type="cuda",
+            raw_name="Unknown NVIDIA GPU",  # Placeholder raw_name
+        )
+
+        # Should fallback to static mapping
+        assert selector == {"nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB"}
 
     def test_get_node_selector_for_hpu_device(self):
         """Test node selector generation for Intel HPU."""
-        selector = DeviceMappingRegistry.get_node_selector_for_device(
-            device_name="Gaudi2",
-            device_type="hpu"
-        )
+        selector = DeviceMappingRegistry.get_node_selector_for_device(device_name="Gaudi2", device_type="hpu")
 
         assert selector == {"feature.node.kubernetes.io/pci-8086.device-1020": "true"}
 
     def test_get_node_selector_for_cpu_device(self):
         """Test node selector generation for CPU device."""
         selector = DeviceMappingRegistry.get_node_selector_for_device(
-            device_name="Xeon",
-            device_type="cpu",
-            device_model="Intel Xeon Gold 6248R"
+            device_name="Xeon", device_type="cpu", device_model="Intel Xeon Gold 6248R"
         )
 
         assert selector == {"feature.node.kubernetes.io/cpu-cpuid.vendor_id": "GenuineIntel"}
 
     def test_get_node_selector_fallback_for_unknown_gpu(self):
         """Test fallback node selector for unknown GPU."""
-        selector = DeviceMappingRegistry.get_node_selector_for_device(
-            device_name="UnknownGPU",
-            device_type="cuda"
-        )
+        selector = DeviceMappingRegistry.get_node_selector_for_device(device_name="UnknownGPU", device_type="cuda")
 
         assert selector == {"nvidia.com/gpu.present": "true"}
 
@@ -98,10 +147,7 @@ class TestDeviceMappingRegistry:
 
     def test_validate_device_compatibility_valid(self):
         """Test validation of compatible device configuration."""
-        is_valid, error = DeviceMappingRegistry.validate_device_compatibility(
-            device_name="A100",
-            device_type="cuda"
-        )
+        is_valid, error = DeviceMappingRegistry.validate_device_compatibility(device_name="A100", device_type="cuda")
 
         assert is_valid is True
         assert error == ""
@@ -109,8 +155,7 @@ class TestDeviceMappingRegistry:
     def test_validate_device_compatibility_invalid_type(self):
         """Test validation of invalid device type."""
         is_valid, error = DeviceMappingRegistry.validate_device_compatibility(
-            device_name="A100",
-            device_type="unknown"
+            device_name="A100", device_type="unknown"
         )
 
         assert is_valid is False
@@ -119,8 +164,7 @@ class TestDeviceMappingRegistry:
     def test_validate_device_compatibility_invalid_device(self):
         """Test validation of invalid device for type."""
         is_valid, error = DeviceMappingRegistry.validate_device_compatibility(
-            device_name="NonExistentGPU",
-            device_type="cuda"
+            device_name="NonExistentGPU", device_type="cuda"
         )
 
         assert is_valid is False
@@ -131,7 +175,7 @@ class TestDeviceMappingRegistry:
         node_labels = {
             "nvidia.com/gpu.present": "true",
             "nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB",
-            "nvidia.com/gpu.count": "2"
+            "nvidia.com/gpu.count": "2",
         }
 
         device_info = DeviceMappingRegistry.get_device_info_from_node_labels(node_labels)
@@ -143,9 +187,7 @@ class TestDeviceMappingRegistry:
 
     def test_get_device_info_from_node_labels_hpu(self):
         """Test extracting device info from HPU node labels."""
-        node_labels = {
-            "feature.node.kubernetes.io/pci-8086.device-1020": "true"
-        }
+        node_labels = {"feature.node.kubernetes.io/pci-8086.device-1020": "true"}
 
         device_info = DeviceMappingRegistry.get_device_info_from_node_labels(node_labels)
 
@@ -157,7 +199,7 @@ class TestDeviceMappingRegistry:
         """Test extracting device info from CPU node labels."""
         node_labels = {
             "feature.node.kubernetes.io/local-cpu.model": "Intel Xeon Gold 6248R",
-            "feature.node.kubernetes.io/cpu-cpuid.vendor_id": "GenuineIntel"
+            "feature.node.kubernetes.io/cpu-cpuid.vendor_id": "GenuineIntel",
         }
 
         device_info = DeviceMappingRegistry.get_device_info_from_node_labels(node_labels)
@@ -170,8 +212,8 @@ class TestDeviceMappingRegistry:
 class TestClusterDeviceValidator:
     """Test cases for ClusterDeviceValidator."""
 
-    @patch('kubernetes.client')
-    @patch('kubernetes.config')
+    @patch("kubernetes.client")
+    @patch("kubernetes.config")
     def test_validate_device_availability_success(self, mock_config, mock_client):
         """Test successful device availability validation."""
         # Mock kubeconfig loading
@@ -186,23 +228,19 @@ class TestClusterDeviceValidator:
         mock_node1.metadata.name = "node-1"
         mock_node1.metadata.labels = {
             "nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB",
-            "nvidia.com/gpu.present": "true"
+            "nvidia.com/gpu.present": "true",
         }
         mock_node1.spec.unschedulable = None
-        mock_node1.status.conditions = [
-            Mock(type="Ready", status="True")
-        ]
+        mock_node1.status.conditions = [Mock(type="Ready", status="True")]
 
         mock_node2 = Mock()
         mock_node2.metadata.name = "node-2"
         mock_node2.metadata.labels = {
             "nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB",
-            "nvidia.com/gpu.present": "true"
+            "nvidia.com/gpu.present": "true",
         }
         mock_node2.spec.unschedulable = None
-        mock_node2.status.conditions = [
-            Mock(type="Ready", status="True")
-        ]
+        mock_node2.status.conditions = [Mock(type="Ready", status="True")]
 
         mock_nodes_list = Mock()
         mock_nodes_list.items = [mock_node1, mock_node2]
@@ -211,9 +249,7 @@ class TestClusterDeviceValidator:
         # Test validation
         validator = ClusterDeviceValidator("/path/to/kubeconfig")
         is_available, error_msg, available_nodes = validator.validate_device_availability(
-            device_name="A100",
-            device_type="cuda",
-            required_count=2
+            device_name="A100", device_type="cuda", required_count=2
         )
 
         assert is_available is True
@@ -222,8 +258,8 @@ class TestClusterDeviceValidator:
         assert "node-1" in available_nodes
         assert "node-2" in available_nodes
 
-    @patch('kubernetes.client')
-    @patch('kubernetes.config')
+    @patch("kubernetes.client")
+    @patch("kubernetes.config")
     def test_validate_device_availability_insufficient(self, mock_config, mock_client):
         """Test device availability validation with insufficient nodes."""
         # Mock kubeconfig loading
@@ -238,12 +274,10 @@ class TestClusterDeviceValidator:
         mock_node.metadata.name = "node-1"
         mock_node.metadata.labels = {
             "nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB",
-            "nvidia.com/gpu.present": "true"
+            "nvidia.com/gpu.present": "true",
         }
         mock_node.spec.unschedulable = None
-        mock_node.status.conditions = [
-            Mock(type="Ready", status="True")
-        ]
+        mock_node.status.conditions = [Mock(type="Ready", status="True")]
 
         mock_nodes_list = Mock()
         mock_nodes_list.items = [mock_node]
@@ -252,9 +286,7 @@ class TestClusterDeviceValidator:
         # Test validation
         validator = ClusterDeviceValidator("/path/to/kubeconfig")
         is_available, error_msg, available_nodes = validator.validate_device_availability(
-            device_name="A100",
-            device_type="cuda",
-            required_count=2
+            device_name="A100", device_type="cuda", required_count=2
         )
 
         assert is_available is False
@@ -262,8 +294,8 @@ class TestClusterDeviceValidator:
         assert "only 1 available" in error_msg
         assert len(available_nodes) == 1
 
-    @patch('kubernetes.client')
-    @patch('kubernetes.config')
+    @patch("kubernetes.client")
+    @patch("kubernetes.config")
     def test_validate_device_availability_no_matching_nodes(self, mock_config, mock_client):
         """Test device availability validation with no matching nodes."""
         # Mock kubeconfig loading
@@ -278,12 +310,10 @@ class TestClusterDeviceValidator:
         mock_node.metadata.name = "node-1"
         mock_node.metadata.labels = {
             "nvidia.com/gpu.product": "NVIDIA-V100-SXM2-32GB",  # Different GPU
-            "nvidia.com/gpu.present": "true"
+            "nvidia.com/gpu.present": "true",
         }
         mock_node.spec.unschedulable = None
-        mock_node.status.conditions = [
-            Mock(type="Ready", status="True")
-        ]
+        mock_node.status.conditions = [Mock(type="Ready", status="True")]
 
         mock_nodes_list = Mock()
         mock_nodes_list.items = [mock_node]
@@ -292,9 +322,7 @@ class TestClusterDeviceValidator:
         # Test validation
         validator = ClusterDeviceValidator("/path/to/kubeconfig")
         is_available, error_msg, available_nodes = validator.validate_device_availability(
-            device_name="A100",
-            device_type="cuda",
-            required_count=1
+            device_name="A100", device_type="cuda", required_count=1
         )
 
         assert is_available is False
@@ -317,9 +345,7 @@ class TestClusterDeviceValidator:
 
         mock_node = Mock()
         mock_node.spec.unschedulable = None
-        mock_node.status.conditions = [
-            Mock(type="Ready", status="False")
-        ]
+        mock_node.status.conditions = [Mock(type="Ready", status="False")]
 
         assert validator._is_node_schedulable(mock_node) is False
 
@@ -329,9 +355,7 @@ class TestClusterDeviceValidator:
 
         mock_node = Mock()
         mock_node.spec.unschedulable = None
-        mock_node.status.conditions = [
-            Mock(type="Ready", status="True")
-        ]
+        mock_node.status.conditions = [Mock(type="Ready", status="True")]
 
         assert validator._is_node_schedulable(mock_node) is True
 
@@ -349,10 +373,9 @@ class TestDeviceMappingIntegration:
             ("T4", "cuda", "NVIDIA-Tesla-T4"),
         ]
 
-        for device_name, device_type, expected_product in test_cases:
+        for device_name, device_type, _expected_product in test_cases:
             selector = DeviceMappingRegistry.get_node_selector_for_device(
-                device_name=device_name,
-                device_type=device_type
+                device_name=device_name, device_type=device_type
             )
             assert "nvidia.com/gpu.product" in selector
             # Should map to one of the known products for the device
@@ -361,19 +384,14 @@ class TestDeviceMappingIntegration:
     def test_partial_device_name_matching(self):
         """Test partial device name matching functionality."""
         # Test partial matching for device names
-        selector = DeviceMappingRegistry.get_node_selector_for_device(
-            device_name="RTX4090",
-            device_type="cuda"
-        )
+        selector = DeviceMappingRegistry.get_node_selector_for_device(device_name="RTX4090", device_type="cuda")
 
         assert selector == {"nvidia.com/gpu.product": "NVIDIA-GeForce-RTX-4090"}
 
     def test_device_model_fallback(self):
         """Test device model fallback when device name is not recognized."""
         selector = DeviceMappingRegistry.get_node_selector_for_device(
-            device_name="UnknownGPU",
-            device_type="cuda",
-            device_model="NVIDIA-A100-SXM4-80GB"
+            device_name="UnknownGPU", device_type="cuda", device_model="NVIDIA-A100-SXM4-80GB"
         )
 
         # Should extract A100 from the model string
@@ -384,28 +402,20 @@ class TestDeviceMappingIntegration:
         # Test NVIDIA GPU families
         gpu_families = ["A100", "A40", "V100", "T4", "H100", "RTX3090", "L40"]
         for gpu in gpu_families:
-            selector = DeviceMappingRegistry.get_node_selector_for_device(
-                device_name=gpu,
-                device_type="cuda"
-            )
+            selector = DeviceMappingRegistry.get_node_selector_for_device(device_name=gpu, device_type="cuda")
             assert "nvidia.com/gpu.product" in selector or "nvidia.com/gpu.present" in selector
 
         # Test Intel HPU families
         hpu_families = ["Gaudi2", "Gaudi"]
         for hpu in hpu_families:
-            selector = DeviceMappingRegistry.get_node_selector_for_device(
-                device_name=hpu,
-                device_type="hpu"
-            )
+            selector = DeviceMappingRegistry.get_node_selector_for_device(device_name=hpu, device_type="hpu")
             assert "feature.node.kubernetes.io/pci-8086.device-1020" in selector
 
         # Test CPU families
         cpu_families = ["Xeon", "EPYC", "Core"]
         for cpu in cpu_families:
             selector = DeviceMappingRegistry.get_node_selector_for_device(
-                device_name=cpu,
-                device_type="cpu",
-                device_model=f"Intel {cpu} processor"
+                device_name=cpu, device_type="cpu", device_model=f"Intel {cpu} processor"
             )
             # CPU selector should have vendor info or be empty (valid for generic CPU)
             assert isinstance(selector, dict)

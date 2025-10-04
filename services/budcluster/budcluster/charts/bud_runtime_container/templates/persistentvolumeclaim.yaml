@@ -1,13 +1,21 @@
+# NOTE: PVC creation is handled by the model-transfer Helm chart
+# The bud-runtime-container chart uses the existing PVC created during model transfer
+# This prevents Helm ownership conflicts between the two releases
+# The PVC has a "keep" annotation to persist it across helm uninstalls
+#
+# Commented out to avoid ownership conflict error:
+# "PersistentVolumeClaim exists and cannot be imported into the current release"
+#
 # apiVersion: v1
 # kind: PersistentVolumeClaim
 # metadata:
-#   name: {{ .Values.chartName }}
+#   name: {{ .Values.pvcName }}
 #   namespace: {{ .Values.namespace }}
 # spec:
 #   accessModes:
-#   - ReadWriteOnce
+#   - {{ .Values.accessMode | default "ReadWriteOnce" }}
 #   resources:
 #     requests:
 #       storage: 50Gi
-#   storageClassName: default
+#   storageClassName: {{ .Values.storageClass | default "default" }}
 #   volumeMode: Filesystem

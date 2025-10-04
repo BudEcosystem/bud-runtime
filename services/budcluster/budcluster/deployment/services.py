@@ -208,6 +208,7 @@ class DeploymentService(SessionMixin):
             f"Credential ID: {deployment.credential_id}, "
             f"Cloud deployment: {is_cloud_deployment}"
         )
+        logger.info(f"Deployment request: {deployment}")
 
         if is_cloud_deployment:
             logger.info("Routing to cloud deployment workflow")

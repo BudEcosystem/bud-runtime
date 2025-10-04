@@ -1174,6 +1174,8 @@ class ModelDeploymentRequest(BaseModel):
     # User preferences for parser features
     enable_tool_calling: bool | None = None
     enable_reasoning: bool | None = None
+    default_storage_class: str | None = None
+    default_access_mode: str | None = None
 
 
 class TopLeaderboardRequest(BaseModel):

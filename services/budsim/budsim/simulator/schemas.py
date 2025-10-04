@@ -42,6 +42,9 @@ class Device(BaseModel):
     type: str
     available_count: int
     mem_per_GPU_in_GB: float
+    # Device identification fields (for exact hardware matching)
+    device_model: Optional[str] = None
+    raw_name: Optional[str] = None
     # Performance fields with defaults (to be removed in future)
     hbm_bandwidth_in_GB_per_sec: float = 100.0
     intra_node_bandwidth_in_GB_per_sec: float = 50.0

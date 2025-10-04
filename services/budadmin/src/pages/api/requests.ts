@@ -227,6 +227,18 @@ const handleErrorResponse = (err) => {
     err.response.request.responseURL.includes("/login")
   ) {
     return Promise.reject(err.response.data);
+  } else if (err.response && err.response.status === 404) {
+    // Handle 404 errors - don't show toast for cluster settings endpoints
+    if (err.config?.url?.includes('/clusters/') && err.config?.url?.includes('/settings')) {
+      // Cluster settings not found is expected behavior for new clusters
+      return Promise.reject(err);
+    } else {
+      // Show toast for other 404 errors
+      if (err && localStorage.getItem("access_token")) {
+        errorToast(err.response?.data?.message || "Resource not found");
+      }
+    }
+    return false;
   } else {
     console.log(err);
     if (err && localStorage.getItem("access_token")) {

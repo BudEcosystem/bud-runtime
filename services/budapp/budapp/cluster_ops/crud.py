@@ -21,7 +21,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, asc, case, desc, distinct, func, select
 
-from budapp.cluster_ops.models import Cluster
+from budapp.cluster_ops.models import Cluster, ClusterSettings
 from budapp.commons import logging
 from budapp.commons.db_utils import DataManagerUtils
 
@@ -249,6 +249,77 @@ class ClusterDataManager(DataManagerUtils):
         result = self.session.execute(stmt)
 
         return result, count
+
+
+class ClusterSettingsDataManager(DataManagerUtils):
+    """Data manager for the ClusterSettings model."""
+
+    async def get_cluster_settings(self, cluster_id: UUID) -> ClusterSettings | None:
+        """Get cluster settings by cluster ID."""
+        stmt = select(ClusterSettings).filter(ClusterSettings.cluster_id == cluster_id)
+        return self.scalar_one_or_none(stmt)
+
+    async def create_cluster_settings(
+        self,
+        cluster_id: UUID,
+        created_by: UUID,
+        default_storage_class: str | None = None,
+        default_access_mode: str | None = None,
+    ) -> ClusterSettings:
+        """Create new cluster settings."""
+        cluster_settings = ClusterSettings(
+            cluster_id=cluster_id,
+            created_by=created_by,
+            default_storage_class=default_storage_class,
+            default_access_mode=default_access_mode,
+        )
+        return self.add_one(cluster_settings)
+
+    async def update_cluster_settings(
+        self,
+        cluster_id: UUID,
+        default_storage_class: str | None = None,
+        default_access_mode: str | None = None,
+    ) -> ClusterSettings | None:
+        """Update cluster settings."""
+        cluster_settings = await self.get_cluster_settings(cluster_id)
+        if not cluster_settings:
+            return None
+
+        cluster_settings.default_storage_class = default_storage_class
+        cluster_settings.default_access_mode = default_access_mode
+        return self.update_one(cluster_settings)
+
+    async def delete_cluster_settings(self, cluster_id: UUID) -> bool:
+        """Delete cluster settings."""
+        cluster_settings = await self.get_cluster_settings(cluster_id)
+        if not cluster_settings:
+            return False
+
+        await self.delete_model(cluster_settings)
+        return True
+
+    async def upsert_cluster_settings(
+        self,
+        cluster_id: UUID,
+        created_by: UUID,
+        default_storage_class: str | None = None,
+        default_access_mode: str | None = None,
+    ) -> ClusterSettings:
+        """Create or update cluster settings."""
+        existing_settings = await self.get_cluster_settings(cluster_id)
+
+        if existing_settings:
+            existing_settings.default_storage_class = default_storage_class
+            existing_settings.default_access_mode = default_access_mode
+            return self.update_one(existing_settings)
+        else:
+            return await self.create_cluster_settings(
+                cluster_id=cluster_id,
+                created_by=created_by,
+                default_storage_class=default_storage_class,
+                default_access_mode=default_access_mode,
+            )
 
 
 class ModelClusterRecommendedDataManager(DataManagerUtils):

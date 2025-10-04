@@ -32,7 +32,7 @@ from budapp.commons import logging
 from budapp.commons.async_utils import check_file_extension, get_range_label
 from budapp.commons.config import app_settings
 from budapp.commons.db_utils import SessionMixin
-from budapp.commons.exceptions import ClientException
+from budapp.commons.exceptions import ClientException, DatabaseException
 from budapp.core.schemas import NotificationPayload
 from budapp.credential_ops.crud import CloudProviderCredentialDataManager
 from budapp.credential_ops.models import CloudCredentials
@@ -69,7 +69,7 @@ from ..project_ops.schemas import Project as ProjectSchema
 from ..shared.dapr_service import DaprService
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..workflow_ops.schemas import WorkflowUtilCreate
-from .crud import ClusterDataManager, ModelClusterRecommendedDataManager
+from .crud import ClusterDataManager, ClusterSettingsDataManager, ModelClusterRecommendedDataManager
 from .models import Cluster as ClusterModel
 from .models import ModelClusterRecommended as ModelClusterRecommendedModel
 from .schemas import (
@@ -79,6 +79,7 @@ from .schemas import (
     ClusterPaginatedResponse,
     ClusterResourcesInfo,
     ClusterResponse,
+    ClusterSettingsResponse,
     CreateClusterWorkflowRequest,
     CreateClusterWorkflowSteps,
     MetricTypeEnum,
@@ -1969,3 +1970,196 @@ class ClusterService(SessionMixin):
             )
 
         return data
+
+    # Cluster Settings Methods
+    async def get_cluster_settings(self, cluster_id: UUID) -> ClusterSettingsResponse | None:
+        """Get cluster settings by cluster ID."""
+        cluster_settings_manager = ClusterSettingsDataManager(self.session)
+        db_settings = await cluster_settings_manager.get_cluster_settings(cluster_id)
+
+        if not db_settings:
+            return None
+
+        return ClusterSettingsResponse.model_validate(db_settings)
+
+    async def create_cluster_settings(
+        self,
+        cluster_id: UUID,
+        created_by: UUID,
+        default_storage_class: str | None = None,
+        default_access_mode: str | None = None,
+    ) -> ClusterSettingsResponse:
+        """Create cluster settings."""
+        # First check if cluster exists
+        cluster_manager = ClusterDataManager(self.session)
+        db_cluster = await cluster_manager.retrieve_by_fields(ClusterModel, fields={"id": cluster_id}, missing_ok=True)
+
+        if not db_cluster:
+            raise ClientException("Cluster not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        resolved_access_mode = await self._resolve_default_access_mode(
+            cluster_id=cluster_id,
+            default_storage_class=default_storage_class,
+            requested_access_mode=default_access_mode,
+        )
+
+        cluster_settings_manager = ClusterSettingsDataManager(self.session)
+        db_settings = await cluster_settings_manager.create_cluster_settings(
+            cluster_id=cluster_id,
+            created_by=created_by,
+            default_storage_class=default_storage_class,
+            default_access_mode=resolved_access_mode,
+        )
+
+        return ClusterSettingsResponse.model_validate(db_settings)
+
+    async def update_cluster_settings(
+        self,
+        cluster_id: UUID,
+        default_storage_class: str | None = None,
+        default_access_mode: str | None = None,
+    ) -> ClusterSettingsResponse:
+        """Update cluster settings."""
+        resolved_access_mode = await self._resolve_default_access_mode(
+            cluster_id=cluster_id,
+            default_storage_class=default_storage_class,
+            requested_access_mode=default_access_mode,
+        )
+
+        cluster_settings_manager = ClusterSettingsDataManager(self.session)
+        db_settings = await cluster_settings_manager.update_cluster_settings(
+            cluster_id=cluster_id,
+            default_storage_class=default_storage_class,
+            default_access_mode=resolved_access_mode,
+        )
+
+        if not db_settings:
+            raise ClientException("Cluster settings not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        return ClusterSettingsResponse.model_validate(db_settings)
+
+    async def upsert_cluster_settings(
+        self,
+        cluster_id: UUID,
+        created_by: UUID,
+        default_storage_class: str | None = None,
+        default_access_mode: str | None = None,
+    ) -> ClusterSettingsResponse:
+        """Create or update cluster settings."""
+        resolved_access_mode = await self._resolve_default_access_mode(
+            cluster_id=cluster_id,
+            default_storage_class=default_storage_class,
+            requested_access_mode=default_access_mode,
+        )
+
+        # First check if cluster exists
+        cluster_manager = ClusterDataManager(self.session)
+        db_cluster = await cluster_manager.retrieve_by_fields(ClusterModel, fields={"id": cluster_id}, missing_ok=True)
+
+        if not db_cluster:
+            raise ClientException("Cluster not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        cluster_settings_manager = ClusterSettingsDataManager(self.session)
+        db_settings = await cluster_settings_manager.upsert_cluster_settings(
+            cluster_id=cluster_id,
+            created_by=created_by,
+            default_storage_class=default_storage_class,
+            default_access_mode=resolved_access_mode,
+        )
+
+        return ClusterSettingsResponse.model_validate(db_settings)
+
+    async def delete_cluster_settings(self, cluster_id: UUID) -> bool:
+        """Delete cluster settings."""
+        cluster_settings_manager = ClusterSettingsDataManager(self.session)
+        return await cluster_settings_manager.delete_cluster_settings(cluster_id)
+
+    async def get_cluster_storage_classes(self, cluster_id: UUID) -> Dict[str, Any]:
+        """Get storage classes from a cluster via budcluster service.
+
+        Args:
+            cluster_id: The ID of the cluster to get storage classes from.
+
+        Returns:
+            Dict containing storage classes data.
+
+        Raises:
+            ClientException: If the request fails or cluster is not found.
+        """
+        # First verify cluster exists
+        cluster_manager = ClusterDataManager(self.session)
+        db_cluster = await cluster_manager.retrieve_by_fields(ClusterModel, fields={"id": cluster_id}, missing_ok=True)
+
+        if not db_cluster:
+            raise ClientException("Cluster not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Make request to budcluster service
+        get_storage_classes_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}"
+            f"/method/cluster/{db_cluster.cluster_id}/storage-classes"
+        )
+
+        try:
+            logger.debug(f"Fetching storage classes from budcluster: {get_storage_classes_endpoint}")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(get_storage_classes_endpoint) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200 or response_data.get("object") == "error":
+                        error_message = response_data.get("message", "Failed to fetch storage classes")
+                        logger.error(f"Failed to fetch storage classes from budcluster: {error_message}")
+                        raise ClientException(error_message, status_code=response.status)
+
+                    logger.debug("Successfully fetched storage classes from budcluster")
+                    return response_data
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to make request to budcluster service for storage classes: {e}")
+            raise ClientException(
+                "Unable to fetch storage classes from cluster", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
+    async def _resolve_default_access_mode(
+        self,
+        cluster_id: UUID,
+        default_storage_class: str | None,
+        requested_access_mode: str | None,
+    ) -> str | None:
+        """Determine which access mode should be stored for a cluster.
+
+        Preference order:
+        1. Explicit value provided by the caller.
+        2. Recommended access mode returned by budcluster for the selected storage class.
+        3. Fallback to ``ReadWriteOnce`` when nothing else is available.
+        """
+        if requested_access_mode:
+            return requested_access_mode
+
+        if not default_storage_class:
+            # No storage class means we can't infer a specific access mode
+            return None
+
+        try:
+            storage_class_payload = await self.get_cluster_storage_classes(cluster_id)
+        except ClientException as exc:
+            logger.warning("Unable to resolve access mode from cluster %s: %s", cluster_id, exc)
+            return None
+        except Exception as exc:  # pragma: no cover - defensive guard
+            logger.warning("Unexpected error resolving access mode for cluster %s: %s", cluster_id, exc)
+            return None
+
+        storage_classes: list[dict[str, Any]] = []
+        if isinstance(storage_class_payload, dict):
+            storage_classes = storage_class_payload.get("storage_classes") or storage_class_payload.get(
+                "param", {}
+            ).get("storage_classes", [])
+
+        for sc in storage_classes:
+            if sc.get("name") == default_storage_class:
+                recommended = sc.get("recommended_access_mode")
+                if recommended:
+                    return recommended
+
+        # If we made it this far we could not determine anything better
+        return None

@@ -1,0 +1,20 @@
+{{- if eq $.Values.volumeType "local" }}
+---
+# PVC for model storage - created if it doesn't exist
+# This PVC is shared between model transfer, runtime container, and quantization jobs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.pvcName }}
+  namespace: {{ .Values.namespace }}
+  annotations:
+    "helm.sh/resource-policy": keep
+spec:
+  accessModes:
+  - {{ .Values.accessMode | default "ReadWriteOnce" }}
+  resources:
+    requests:
+      storage: {{ .Values.pvcSize }}Gi
+  storageClassName: {{ .Values.storageClass | default "default" }}
+  volumeMode: Filesystem
+{{- end }}
