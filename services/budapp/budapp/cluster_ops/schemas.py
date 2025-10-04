@@ -654,7 +654,7 @@ class ClusterSettingsBase(BaseModel):
         if not cleaned_value:
             return None
 
-        if not all(c.isalnum() or c in ["-", "."] for c in cleaned_value):
+        if not re.match(r"^[a-zA-Z0-9.-]*$", cleaned_value):
             raise ValueError("Storage class name can only contain alphanumeric characters, hyphens, and dots")
         if cleaned_value.startswith("-") or cleaned_value.endswith("-"):
             raise ValueError("Storage class name cannot start or end with a hyphen")
