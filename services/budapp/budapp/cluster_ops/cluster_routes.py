@@ -49,6 +49,8 @@ from .schemas import (
     ClusterListResponse,
     ClusterMetricsResponse,
     ClusterNodeWiseEventsResponse,
+    ClusterSettingsDetailResponse,
+    CreateClusterSettingsRequest,
     CreateClusterWorkflowRequest,
     EditClusterRequest,
     GrafanaDashboardResponse,
@@ -56,6 +58,7 @@ from .schemas import (
     NodeMetricsResponse,
     RecommendedClusterResponse,
     SingleClusterResponse,
+    UpdateClusterSettingsRequest,
 )
 from .services import ClusterService
 from .workflows import ClusterRecommendedSchedulerWorkflows
@@ -750,3 +753,61 @@ async def list_clusters_internal(
         object="cluster.list",
         code=status.HTTP_200_OK,
     ).to_http_response()
+
+
+@cluster_router.get(
+    "/{cluster_id}/storage-classes",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully retrieved storage classes",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Cluster not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Get all storage classes available in the cluster",
+)
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
+async def get_cluster_storage_classes(
+    cluster_id: UUID,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Get all storage classes available in the cluster."""
+    try:
+        storage_classes_data = await ClusterService(session).get_cluster_storage_classes(cluster_id)
+
+        # Extract storage classes from the budcluster response
+        param_data = storage_classes_data.get("param", {})
+        storage_classes = param_data.get("storage_classes", [])
+
+        # Return the data directly as JSON response since SuccessResponse doesn't support param
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "storage_classes": storage_classes,
+                "message": storage_classes_data.get("message", "Storage classes retrieved successfully"),
+                "object": "cluster.storage-classes",
+                "code": status.HTTP_200_OK,
+            },
+        )
+    except ClientException as e:
+        logger.error(f"Client error retrieving storage classes for cluster {cluster_id}: {e}")
+        return ErrorResponse(
+            code=e.status_code,
+            message=str(e),
+        ).to_http_response()
+    except Exception as e:
+        logger.exception(f"Error retrieving storage classes for cluster {cluster_id}: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving storage classes",
+        ).to_http_response()
