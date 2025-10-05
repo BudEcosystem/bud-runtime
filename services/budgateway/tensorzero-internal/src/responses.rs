@@ -26,9 +26,9 @@ pub struct OpenAIResponseCreateParams {
     /// The input to the model. Can be a string or array of content items
     pub input: Value,
 
-    /// Developer-provided instructions for the model
+    /// Developer-provided instructions for the model (can be string or array)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub instructions: Option<String>,
+    pub instructions: Option<Value>,
 
     /// List of tools available to the model
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -131,6 +131,10 @@ pub struct OpenAIResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<bool>,
 
+    /// Billing information
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub billing: Option<Value>,
+
     /// Error information if the response failed
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ResponseError>,
@@ -139,9 +143,9 @@ pub struct OpenAIResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub incomplete_details: Option<Value>,
 
-    /// Instructions used
+    /// Instructions used (can be string or array of message objects)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub instructions: Option<String>,
+    pub instructions: Option<Value>,
 
     /// Max output tokens
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -165,9 +169,21 @@ pub struct OpenAIResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub previous_response_id: Option<String>,
 
+    /// Prompt reference used for this response
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<PromptReference>,
+
+    /// Prompt cache key for optimization
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_key: Option<String>,
+
     /// Reasoning information
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<Value>,
+
+    /// Safety identifier for abuse detection
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub safety_identifier: Option<String>,
 
     /// Service tier
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -230,6 +246,8 @@ pub enum ResponseStatus {
     Failed,
     InProgress,
     Incomplete,
+    Queued,
+    Cancelled,
 }
 
 /// Token usage statistics
