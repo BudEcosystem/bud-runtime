@@ -807,7 +807,7 @@ spec:
         # Model configuration is now handled via bud-model.py config file
 
         # Create OpenCompass CLI arguments - use config file mode with bud-model
-        opencompass_cmd = f"cd /workspace && python /opt/opencompass/run.py --models bud-model --datasets {datasets_arg} --work-dir /workspace/outputs --debug"
+        opencompass_cmd = f"cd /workspace && python /opt/opencompass/run.py --models bud-model --datasets {datasets_arg} --work-dir /workspace/outputs --max-num-workers 8 --debug"
 
         # Create bash script that copies config and runs OpenCompass
         bash_script = f"""#!/bin/bash
