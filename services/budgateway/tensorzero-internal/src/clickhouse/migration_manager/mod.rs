@@ -37,7 +37,6 @@ use migrations::migration_0035::Migration0035;
 /// This must match the number of migrations returned by `make_all_migrations` - the tests
 /// will panic if they don't match.
 /// Note: We have 36 total migrations (0-35), but 7 are banned (0001, 0007, 0010, 0012, 0013, 0014, 0023)
-
 pub const NUM_MIGRATIONS: usize = 29;
 
 /// Constructs (but does not run) a vector of all our database migrations.

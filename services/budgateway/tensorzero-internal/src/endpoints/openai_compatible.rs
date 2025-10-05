@@ -89,6 +89,25 @@ fn merge_credentials_from_store(
     credentials
 }
 
+/// Helper function to merge credentials from headers (for dynamic authorization)
+fn merge_credentials_from_headers(
+    headers: &HeaderMap,
+    credentials: &mut InferenceCredentials,
+) {
+    // Extract authorization header if present
+    if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            // Strip "Bearer " prefix if present
+            let token = auth_str.strip_prefix("Bearer ").unwrap_or(auth_str);
+            // Use "authorization" as the key so dynamic::authorization lookup can find it
+            credentials.insert(
+                "authorization".to_string(),
+                secrecy::SecretString::from(token.to_string()),
+            );
+        }
+    }
+}
+
 /// Helper function to create OpenAI-compatible error response for guardrail violations
 fn create_guardrail_error_response(
     message: &str,
@@ -5217,7 +5236,10 @@ pub async fn response_create_handler(
         })?;
 
     // Merge credentials from the credential store
-    let credentials = merge_credentials_from_store(&model_credential_store);
+    let mut credentials = merge_credentials_from_store(&model_credential_store);
+
+    // Merge credentials from headers for dynamic authorization (responses API only)
+    merge_credentials_from_headers(&headers, &mut credentials);
 
     // Create inference clients
     let cache_options = crate::cache::CacheOptions {
@@ -5250,11 +5272,17 @@ pub async fn response_create_handler(
 
         // Convert to SSE stream
         let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
-            Ok(event) => Event::default().json_data(event).map_err(|e| {
-                Error::new(ErrorDetails::Inference {
-                    message: format!("Failed to serialize SSE event: {e}"),
-                })
-            }),
+            Ok(event) => {
+                // For ResponseStreamEvent, use event field as SSE event type and data field as data
+                Event::default()
+                    .event(event.event)
+                    .json_data(event.data)
+                    .map_err(|e| {
+                        Error::new(ErrorDetails::Inference {
+                            message: format!("Failed to serialize SSE event: {e}"),
+                        })
+                    })
+            },
             Err(e) => Err(e),
         });
 
@@ -5323,9 +5351,13 @@ pub async fn response_retrieve_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
@@ -5404,9 +5436,13 @@ pub async fn response_delete_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
@@ -5485,9 +5521,13 @@ pub async fn response_cancel_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
@@ -5566,9 +5606,13 @@ pub async fn response_input_items_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
