@@ -536,6 +536,7 @@ class ExperimentService:
             in [
                 EvaluationStatusEnum.RUNNING.value,
                 EvaluationStatusEnum.PENDING.value,
+                EvaluationStatusEnum.COMPLETED.value,
             ]
         ]
 
