@@ -3755,16 +3755,114 @@ class EvaluationWorkflowService:
 
                 logger.warning(f"::EvalResult:: Found {len(runs)} runs for evaluation {evaluation.id}")
 
-                # Update Evaluation Status
-                evaluation.status = EvaluationStatusEnum.COMPLETED.value
+                # Extract dataset results from the notification payload
+                dataset_results = {}
+                try:
+                    summary = payload.content.result.get("summary", {})
+                    dataset_results = summary.get("dataset_results", {})
+                    logger.info(f"::EvalResult:: Extracted dataset_results: {dataset_results}")
+                except (AttributeError, TypeError) as e:
+                    logger.warning(f"::EvalResult:: Could not extract dataset_results: {e}")
 
-                # Update all runs status
+                # Update Evaluation Status based on job status
+                job_status = payload.content.result.get("status", "unknown")
+                if job_status == "succeeded":
+                    evaluation.status = EvaluationStatusEnum.COMPLETED.value
+                elif job_status == "failed":
+                    evaluation.status = EvaluationStatusEnum.FAILED.value
+                else:
+                    evaluation.status = EvaluationStatusEnum.COMPLETED.value  # Default to completed
+
+                # Update all runs and create metrics
                 for run in runs:
-                    run.status = RunStatusEnum.COMPLETED.value
+                    # Match run with its dataset result by comparing dataset config
+                    dataset_config = None
+                    accuracy_score = None
+
+                    try:
+                        if run.dataset_version and run.dataset_version.dataset:
+                            dataset = run.dataset_version.dataset
+                            eval_types = dataset.eval_types
+
+                            if eval_types and isinstance(eval_types, dict):
+                                # Extract the "gen" evaluation type configuration
+                                if "gen" in eval_types:
+                                    dataset_config = eval_types["gen"]
+                                    logger.info(f"::EvalResult:: Run {run.id} - Dataset config: {dataset_config}")
+
+                                    # Find matching result in dataset_results
+                                    if dataset_config and dataset_config in dataset_results:
+                                        accuracy_score = dataset_results[dataset_config]
+                                        logger.info(
+                                            f"::EvalResult:: Run {run.id} - Matched accuracy: {accuracy_score}%"
+                                        )
+                                    else:
+                                        logger.warning(
+                                            f"::EvalResult:: Run {run.id} - No matching result found for dataset config '{dataset_config}'"
+                                        )
+                                else:
+                                    logger.warning(
+                                        f"::EvalResult:: Run {run.id} - Dataset '{dataset.name}' has no 'gen' eval_type"
+                                    )
+                            else:
+                                logger.warning(f"::EvalResult:: Run {run.id} - Dataset has no eval_types configured")
+                    except Exception as e:
+                        logger.error(
+                            f"::EvalResult:: Could not retrieve dataset config for run {run.id}: {e}",
+                            exc_info=True,
+                        )
+
+                    # Update run status
+                    if job_status == "succeeded":
+                        run.status = RunStatusEnum.COMPLETED.value
+                    elif job_status == "failed":
+                        run.status = RunStatusEnum.FAILED.value
+                    else:
+                        run.status = RunStatusEnum.COMPLETED.value
+
+                    # Create metric entry if we have a score
+                    if accuracy_score is not None:
+                        try:
+                            # Check if metric already exists
+                            existing_metric = (
+                                self.session.query(MetricModel)
+                                .filter(
+                                    MetricModel.run_id == run.id,
+                                    MetricModel.metric_name == "accuracy",
+                                    MetricModel.mode == "gen",
+                                )
+                                .first()
+                            )
+
+                            if existing_metric:
+                                # Update existing metric
+                                existing_metric.metric_value = float(accuracy_score)
+                                logger.info(
+                                    f"::EvalResult:: Updated existing metric for run {run.id}: accuracy={accuracy_score}%"
+                                )
+                            else:
+                                # Create new metric
+                                metric = MetricModel(
+                                    run_id=run.id,
+                                    metric_name="accuracy",
+                                    mode="gen",
+                                    metric_value=float(accuracy_score),
+                                )
+                                self.session.add(metric)
+                                logger.info(
+                                    f"::EvalResult:: Created new metric for run {run.id}: accuracy={accuracy_score}%"
+                                )
+                        except Exception as metric_error:
+                            logger.error(
+                                f"::EvalResult:: Failed to create/update metric for run {run.id}: {metric_error}",
+                                exc_info=True,
+                            )
 
                 # Single commit for all changes to ensure atomicity
                 self.session.commit()
-                logger.warning(f"::EvalResult:: Successfully updated evaluation {evaluation.id} and {len(runs)} runs")
+                logger.warning(
+                    f"::EvalResult:: Successfully updated evaluation {evaluation.id} and {len(runs)} runs with metrics"
+                )
 
             except Exception as db_error:
                 self.session.rollback()
