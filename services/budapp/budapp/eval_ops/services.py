@@ -1,4 +1,5 @@
 import random
+import re
 import uuid
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
@@ -574,6 +575,12 @@ class ExperimentService:
             models = self.session.query(ModelTable).filter(ModelTable.id.in_(list(model_ids))).all()
             models_dict = {model.id: model for model in models}
 
+        # Claculate The Averge Score Across All Datasete based on runs
+        overall_score = 0.0
+        if exp_data.current_metrics:
+            total_score = sum(metric["score_value"] for metric in exp_data.current_metrics)
+            overall_score = round(total_score / len(exp_data.current_metrics), 2)
+
         # Build progress overview with cached model data
         progress_overview = []
         for evaluation in evaluations_running:
@@ -599,7 +606,7 @@ class ExperimentService:
                     current_evaluation="",
                     current_model=current_model_name,
                     processing_rate_per_min=0,
-                    average_score_pct=0,
+                    average_score_pct=overall_score,
                     eta_minutes=25,
                     status=evaluation.status,
                     actions=None,
@@ -3791,15 +3798,37 @@ class EvaluationWorkflowService:
                                     dataset_config = eval_types["gen"]
                                     logger.info(f"::EvalResult:: Run {run.id} - Dataset config: {dataset_config}")
 
-                                    # Find matching result in dataset_results
-                                    if dataset_config and dataset_config in dataset_results:
-                                        accuracy_score = dataset_results[dataset_config]
+                                    # Extract base dataset name using regex to remove suffix patterns
+                                    # Matches: dataset_name_gen, dataset_name_ppl, dataset_name_chat_gen, etc.
+                                    base_dataset_name = re.sub(r"_(gen|ppl|chat_gen)$", "", dataset_config)
+
+                                    # Convert to lowercase for matching
+                                    base_dataset_name = base_dataset_name.lower()
+                                    logger.info(
+                                        f"::EvalResult:: Run {run.id} - Base dataset name: {base_dataset_name}"
+                                    )
+
+                                    # Find matching result in dataset_results using base name
+                                    if base_dataset_name in dataset_results:
+                                        accuracy_score = dataset_results[base_dataset_name]
                                         logger.info(
-                                            f"::EvalResult:: Run {run.id} - Matched accuracy: {accuracy_score}%"
+                                            f"::EvalResult:: Run {run.id} - Matched accuracy: {accuracy_score}% (config: {dataset_config}, matched: {base_dataset_name})"
+                                        )
+                                    elif dataset.name.lower() in dataset_results:
+                                        # Fallback to dataset.name
+                                        accuracy_score = dataset_results[dataset.name.lower()]
+                                        base_dataset_name = dataset.name.lower()
+                                        logger.info(
+                                            f"::EvalResult:: Run {run.id} - Matched using dataset.name: {dataset.name}"
+                                        )
+
+                                    if accuracy_score is not None:
+                                        logger.info(
+                                            f"::EvalResult:: Run {run.id} - Matched accuracy: {accuracy_score}% (matched: {base_dataset_name})"
                                         )
                                     else:
                                         logger.warning(
-                                            f"::EvalResult:: Run {run.id} - No matching result found for dataset config '{dataset_config}'"
+                                            f"::EvalResult:: Run {run.id} - No matching result found. Config: '{dataset_config}', Dataset name: '{dataset.name}', Available keys: {list(dataset_results.keys())}"
                                         )
                                 else:
                                     logger.warning(
