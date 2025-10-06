@@ -46,6 +46,7 @@ from ..commons.constants import (
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
 from ..core.schemas import NotificationPayload
+from ..credential_ops.services import CredentialService
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..endpoint_ops.schemas import ProxyModelConfig, ProxyModelPricing
@@ -219,6 +220,15 @@ class PromptService(SessionMixin):
             logger.debug(f"Deleted prompt {db_prompt.name} from proxy cache")
         except Exception as e:
             logger.error(f"Failed to delete prompt from proxy cache: {e}")
+            # Continue - cache cleanup is non-critical
+
+        # Update credential proxy cache to remove deleted prompt
+        try:
+            credential_service = CredentialService(self.session)
+            await credential_service.update_proxy_cache(db_prompt.project_id)
+            logger.debug(f"Updated credential proxy cache for project {db_prompt.project_id}")
+        except Exception as e:
+            logger.error(f"Failed to update credential proxy cache: {e}")
             # Continue - cache cleanup is non-critical
 
         # Update prompt status to DELETED
@@ -900,6 +910,15 @@ class PromptWorkflowService(SessionMixin):
                 logger.debug(f"Added prompt {db_prompt.name} to proxy cache")
             except Exception as e:
                 logger.error(f"Failed to add prompt to proxy cache: {e}")
+                # Continue - cache update is non-critical
+
+            # Update credential proxy cache to include new prompt
+            try:
+                credential_service = CredentialService(self.session)
+                await credential_service.update_proxy_cache(db_prompt.project_id)
+                logger.debug(f"Updated credential proxy cache for project {db_prompt.project_id}")
+            except Exception as e:
+                logger.error(f"Failed to update credential proxy cache: {e}")
                 # Continue - cache update is non-critical
 
             # Store final result in workflow step
