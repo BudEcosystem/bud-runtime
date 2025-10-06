@@ -50,7 +50,8 @@ export function PrimaryButton({
                 className={`font-[600] text-[#EEEEEE] ${props.textClass} ${props.children == "Next" || props.text == "Next" ? "ml-[.4rem] mr-[0]" : ""}`}
                 style={{
                   fontSize: "0.75rem",
-                  lineHeight: "100%"
+                  lineHeight: "100%",
+                  background: "transparent",
                 }}
               >
                 {props.children || props.text || "Next"}

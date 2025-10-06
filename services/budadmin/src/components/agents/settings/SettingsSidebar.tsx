@@ -29,6 +29,9 @@ interface SettingsSidebarProps {
   onPromptMessagesChange: (value: string) => void;
   localSystemPrompt: string;
   localPromptMessages: string;
+  // Save props
+  onSavePromptSchema?: () => void;
+  isSaving?: boolean;
 }
 
 export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
@@ -43,7 +46,9 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   onSystemPromptChange,
   onPromptMessagesChange,
   localSystemPrompt,
-  localPromptMessages
+  localPromptMessages,
+  onSavePromptSchema,
+  isSaving
 }) => {
   const renderSettings = () => {
     switch (activeSettings) {

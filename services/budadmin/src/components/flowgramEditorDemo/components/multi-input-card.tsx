@@ -1,9 +1,10 @@
 import { Field } from '@flowgram.ai/fixed-layout-editor';
 import { AgentVariable } from '@/stores/useAgentStore';
 import { useSession } from '../contexts/SessionContext';
+import { PrimaryButton } from '../../ui/bud/form/Buttons';
 
 export const MultiInputCard = () => {
-  const { session } = useSession();
+  const { session, onSavePromptSchema, isSaving } = useSession();
 
   // Get input variables from the session, with default if empty
   const sessionVariables = session?.inputVariables || [];
@@ -105,6 +106,38 @@ export const MultiInputCard = () => {
       }}>
         {inputVariables.length} input variable{inputVariables.length !== 1 ? 's' : ''}
       </div>
+
+      {/* Save Button */}
+      {onSavePromptSchema && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginTop: '16px',
+          paddingTop: '16px',
+          borderTop: '1px solid #333333',
+          background: 'transparent',
+        }}>
+          <PrimaryButton
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onSavePromptSchema();
+            }}
+            loading={isSaving}
+            disabled={isSaving}
+            style={{
+              background: '#965CDE',
+              border: 'none',
+              color: 'white',
+              padding: '8px 24px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              cursor: isSaving ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isSaving ? 'Saving...' : 'Save'}
+          </PrimaryButton>
+        </div>
+      )}
     </div>
   );
 };

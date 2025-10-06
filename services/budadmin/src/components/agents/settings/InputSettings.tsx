@@ -109,6 +109,7 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
                         {/* Variable Name */}
                         <div className="flex flex-col gap-1">
                           <TextInput
+                            name={`variable-name-${variable.id}`}
                             className="!w-full !max-w-full !h-[2rem] placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem]"
                             value={variable.name || ''}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>

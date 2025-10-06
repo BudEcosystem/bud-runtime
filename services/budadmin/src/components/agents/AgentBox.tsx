@@ -159,9 +159,9 @@ function AgentBoxInner({
         }
 
         // Close the agent drawer after successful save
-        setTimeout(() => {
-          closeAgentDrawer();
-        }, 500); // Small delay to show the success message
+        // setTimeout(() => {
+        //   closeAgentDrawer();
+        // }, 500);
       }
     } catch (error: any) {
       console.error("Error saving prompt schema:", error);
@@ -203,16 +203,9 @@ function AgentBoxInner({
     >
       {/* Navigation Bar */}
       <div className="topBg text-white p-4 flex justify-between items-center h-[3.625rem] relative sticky top-0 z-10 bg-[#101010] border-b border-[#1F1F1F]">
-        {/* Left Section - Session Info and Load Model */}
+        {/* Left Section - Session Info */}
         <div className="flex items-center gap-3">
           <span className="text-[#808080] text-xs font-medium">V{index + 1}</span>
-          <PrimaryButton
-            onClick={handleSavePromptSchema}
-            loading={isSaving}
-            disabled={isSaving}
-          >
-            {isSaving ? "Saving..." : "Save"}
-          </PrimaryButton>
         </div>
 
         {/* Center Section - Load Model */}
@@ -320,7 +313,11 @@ function AgentBoxInner({
         >
           {/* Main content area */}
           <div className="flex-1 p-4 flow-editor-container">
-            <SessionProvider session={session}>
+            <SessionProvider
+              session={session}
+              onSavePromptSchema={handleSavePromptSchema}
+              isSaving={isSaving}
+            >
               <Editor onNodeClick={handleNodeClick} />
             </SessionProvider>
           </div>
@@ -339,6 +336,8 @@ function AgentBoxInner({
             onPromptMessagesChange={handlePromptMessagesChange}
             localSystemPrompt={localSystemPrompt}
             localPromptMessages={localPromptMessages}
+            onSavePromptSchema={handleSavePromptSchema}
+            isSaving={isSaving}
           />
         </div>
       </div>

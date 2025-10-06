@@ -3,6 +3,8 @@ import { AgentSession } from '@/stores/useAgentStore';
 
 interface SessionContextType {
   session: AgentSession | null;
+  onSavePromptSchema?: () => void;
+  isSaving?: boolean;
 }
 
 const SessionContext = createContext<SessionContextType>({
@@ -12,9 +14,11 @@ const SessionContext = createContext<SessionContextType>({
 export const SessionProvider: React.FC<{
   session: AgentSession;
   children: React.ReactNode;
-}> = ({ session, children }) => {
+  onSavePromptSchema?: () => void;
+  isSaving?: boolean;
+}> = ({ session, children, onSavePromptSchema, isSaving }) => {
   return (
-    <SessionContext.Provider value={{ session }}>
+    <SessionContext.Provider value={{ session, onSavePromptSchema, isSaving }}>
       {children}
     </SessionContext.Provider>
   );

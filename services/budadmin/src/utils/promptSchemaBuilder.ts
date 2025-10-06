@@ -29,18 +29,26 @@ const mapDataTypeToJsonSchema = (dataType?: string): string => {
 };
 
 const buildPropertiesFromVariables = (
-  variables: AgentVariable[]
+  variables: AgentVariable[],
 ): Record<string, PropertyDefinition> => {
   const properties: Record<string, PropertyDefinition> = {};
 
   variables.forEach((variable) => {
+    // Skip variables with empty names
+    if (!variable.name || !variable.name.trim()) {
+      return;
+    }
+
     const property: PropertyDefinition = {
       type: mapDataTypeToJsonSchema(variable.dataType),
       title: variable.description || variable.name,
     };
 
     // Add email format for email fields
-    if (variable.validation?.includes("email") || variable.name.toLowerCase().includes("email")) {
+    if (
+      variable.validation?.includes("email") ||
+      variable.name.toLowerCase().includes("email")
+    ) {
       property.format = "email";
     }
 
@@ -54,23 +62,34 @@ const buildPropertiesFromVariables = (
 
 const buildRequiredFields = (variables: AgentVariable[]): string[] => {
   return variables
-    .filter((variable) => variable.required)
+    .filter(
+      (variable) => variable.required && variable.name && variable.name.trim(),
+    )
     .map((variable) => variable.name);
 };
 
 const buildValidations = (
   variables: AgentVariable[],
-  variableType: "input" | "output"
-): Record<string, Record<string, string>> => {
-  const validations: Record<string, Record<string, string>> = {};
+  variableType: "input" | "output",
+): Record<string, Record<string, any>> => {
+  const validations: Record<string, Record<string, any>> = {};
   const typeKey = variableType === "input" ? "InputSchema" : "OutputSchema";
 
   validations[typeKey] = {};
 
   variables.forEach((variable) => {
-    if (variable.validation) {
-      validations[typeKey][variable.name] = variable.validation;
+    // Skip variables with empty names or no validation
+    if (!variable.name || !variable.name.trim() || !variable.validation) {
+      return;
     }
+
+    // Parse the validation string to create a proper validation object
+    // For now, we'll create a simple validation object with a pattern property
+    // You can extend this logic based on your validation requirements
+    validations[typeKey][variable.name] = {
+      pattern: variable.validation,
+      message: `Invalid value for ${variable.name}`,
+    };
   });
 
   return validations;
@@ -87,7 +106,7 @@ export const buildPromptSchemaPayload = (
   stepNumber: number = 1,
   workflowTotalSteps: number = 0,
   triggerWorkflow: boolean = false,
-  promptId?: string
+  promptId?: string,
 ) => {
   const variables = type === "input" ? inputVariables : outputVariables;
   const schemaTitle = type === "input" ? "InputSchema" : "OutputSchema";
@@ -153,7 +172,7 @@ export const buildPromptSchemaFromSession = (
   type: "input" | "output" = "output",
   stepNumber: number = 1,
   workflowTotalSteps: number = 0,
-  triggerWorkflow: boolean = false
+  triggerWorkflow: boolean = false,
 ) => {
   const deploymentName = session.selectedDeployment?.name;
   const workflowId = session.workflowId;
@@ -170,6 +189,6 @@ export const buildPromptSchemaFromSession = (
     stepNumber,
     workflowTotalSteps,
     triggerWorkflow,
-    promptId
+    promptId,
   );
 };
