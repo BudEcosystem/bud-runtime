@@ -17,13 +17,12 @@
 """API routes for responses module - OpenAI-compatible API."""
 
 import logging
-from typing import Union
+from typing import Any, Dict, Union
 
-from budmicroframe.commons.schemas import ErrorResponse
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from ..prompt.schemas import PromptExecuteResponse
+from ..prompt.openai_response_formatter import OpenAIResponseSchema
 from .schemas import ResponseCreateRequest
 from .services import ResponsesService
 
@@ -42,13 +41,12 @@ responses_router = APIRouter(
 
 @responses_router.post(
     "/",
-    response_model=Union[PromptExecuteResponse, ErrorResponse],
+    response_model=Union[OpenAIResponseSchema, Dict[str, Any]],
     summary="Create response using prompt template",
     description="Execute a prompt template with variables (OpenAI-compatible)",
     responses={
         200: {
-            "description": "Prompt executed successfully",
-            "model": PromptExecuteResponse,
+            "description": "Prompt executed successfully - returns OpenAI-compatible response format",
         },
         400: {"description": "Bad request - invalid parameters"},
         404: {"description": "Prompt template not found"},
@@ -58,7 +56,7 @@ responses_router = APIRouter(
 async def create_response(
     request: ResponseCreateRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security),  # noqa: B008
-) -> Union[PromptExecuteResponse, ErrorResponse]:
+) -> Union[OpenAIResponseSchema, Dict[str, Any]]:
     """Create a response using a prompt template.
 
     This endpoint is compatible with OpenAI's responses API format.

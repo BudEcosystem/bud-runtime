@@ -21,13 +21,13 @@ import logging
 from typing import Any, Dict, Optional
 
 from budmicroframe.commons.schemas import ErrorResponse
-from fastapi import status
 from fastapi.responses import StreamingResponse
 
 from budprompt.commons.exceptions import ClientException
 from budprompt.shared.redis_service import RedisService
 
-from ..prompt.schemas import PromptExecuteData, PromptExecuteResponse
+from ..prompt.openai_response_formatter import OpenAIPromptInfo
+from ..prompt.schemas import PromptExecuteData
 from ..prompt.services import PromptExecutorService
 from .schemas import ResponsePromptParam
 
@@ -126,11 +126,13 @@ class ResponsesService:
                     },
                 )
             else:
-                return PromptExecuteResponse(
-                    code=status.HTTP_200_OK,
-                    message="Prompt executed successfully",
-                    data=result,
-                ).to_http_response()
+                # Add prompt info to non-streaming OpenAI-formatted response
+                result.prompt = OpenAIPromptInfo(
+                    id=prompt_id,
+                    variables=prompt_params.variables,
+                    version=version,
+                )
+                return result
 
         except ClientException as e:
             logger.warning(f"Client error during response creation: {e.message}")

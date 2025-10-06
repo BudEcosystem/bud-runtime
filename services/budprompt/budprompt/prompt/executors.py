@@ -43,6 +43,7 @@ from budprompt.commons.exceptions import (
 )
 from budprompt.shared.providers import BudServeProvider
 
+from .openai_response_formatter import OpenAIResponseFormatter
 from .revised_code.field_validation import ModelValidationEnhancer
 from .schema_builder import CustomModelGenerator, DataModelGenerator
 from .schemas import Message, ModelSettings
@@ -551,6 +552,7 @@ class SimplePromptExecutor:
     def __init__(self):
         """Initialize the SimplePromptExecutor."""
         self.model_generator = CustomModelGenerator()
+        self.response_formatter = OpenAIResponseFormatter()
 
     async def execute(
         self,
@@ -663,7 +665,20 @@ class SimplePromptExecutor:
                     return self._run_agent_stream(agent, user_prompt, message_history, output_schema)
             else:
                 # Execute the agent with both history and current prompt
-                return await self._run_agent(agent, user_prompt, message_history, output_schema)
+                result = await self._run_agent(
+                    agent,
+                    user_prompt,
+                    message_history,
+                    output_schema,
+                )
+
+                # Format to OpenAI response for non-streaming
+                return self.response_formatter.format_response(
+                    pydantic_result=result,
+                    model_settings=model_settings,
+                    messages=messages,
+                    deployment_name=deployment_name,
+                )
 
         except (SchemaGenerationException, ValidationError, PromptExecutionException, TemplateRenderingException):
             raise
@@ -943,7 +958,7 @@ class SimplePromptExecutor:
             output_schema: Output schema to determine result processing
 
         Returns:
-            Agent execution result (dict for structured, string for unstructured)
+            Tuple of (result object, raw output) for further processing
 
         Raises:
             PromptExecutionException: If execution fails
@@ -959,13 +974,7 @@ class SimplePromptExecutor:
             logger.debug("Pydantic AI execution result: %s", result.all_messages())
             logger.debug("================================================")
 
-            # Process and return result based on output schema
-            if output_schema is not None:
-                # Structured output: return as dict
-                return result.output.model_dump() if hasattr(result.output, "model_dump") else result.output
-            else:
-                # Unstructured output: return as string
-                return result.output
+            return result
         except UnexpectedModelBehavior as e:
             # Handle validation retry exhaustion with specific message
             error_msg = str(e)
