@@ -20,16 +20,20 @@ import json
 import logging
 from typing import Any, Dict, Optional
 
-from budmicroframe.commons.schemas import ErrorResponse
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
 
 from budprompt.commons.exceptions import ClientException
 from budprompt.shared.redis_service import RedisService
 
-from ..prompt.openai_response_formatter import OpenAIPromptInfo
+from ..prompt.openai_response_formatter import (
+    OpenAIPromptInfo,
+    extract_validation_error_details,
+    map_status_to_error_type,
+)
 from ..prompt.schemas import PromptExecuteData
 from ..prompt.services import PromptExecutorService
-from .schemas import ResponsePromptParam
+from .schemas import OpenAIError, OpenAIResponsesError, ResponsePromptParam
 
 
 logger = logging.getLogger(__name__)
@@ -134,16 +138,43 @@ class ResponsesService:
                 )
                 return result
 
+        except ValidationError as e:
+            logger.warning(f"Validation error during response creation: {str(e)}")
+            message, param, code = extract_validation_error_details(e)
+            return OpenAIResponsesError(
+                error=OpenAIError(
+                    message=message,
+                    type="bad_request",
+                    param=param,
+                    code=code,
+                )
+            ).model_dump(mode="json")
         except ClientException as e:
             logger.warning(f"Client error during response creation: {e.message}")
-            return ErrorResponse(
-                code=e.status_code,
-                message=e.message,
-                param=e.params,
-            ).to_http_response()
+            # Extract param and code from ClientException params if available
+            param = None
+            code = None
+            if e.params:
+                if isinstance(e.params, dict):
+                    param = e.params.get("param")
+                    code = e.params.get("code")
+                elif isinstance(e.params, str):
+                    param = e.params
+
+            return OpenAIResponsesError(
+                error=OpenAIError(
+                    message=e.message,
+                    type=map_status_to_error_type(e.status_code),
+                    param=param,
+                    code=code or ("not_found" if e.status_code == 404 else "invalid_request"),
+                )
+            ).model_dump(mode="json")
         except Exception as e:
             logger.error(f"Unexpected error during prompt execution: {str(e)}")
-            return ErrorResponse(
-                code=500,
-                message="An unexpected error occurred during prompt execution",
-            ).to_http_response()
+            return OpenAIResponsesError(
+                error=OpenAIError(
+                    message="An unexpected error occurred during prompt execution",
+                    type="internal_server_error",
+                    code="internal_error",
+                )
+            ).model_dump(mode="json")

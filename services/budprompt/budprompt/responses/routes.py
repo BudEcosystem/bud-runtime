@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from ..prompt.openai_response_formatter import OpenAIResponseSchema
-from .schemas import ResponseCreateRequest
+from .schemas import OpenAIResponsesError, ResponseCreateRequest
 from .services import ResponsesService
 
 
@@ -41,7 +41,7 @@ responses_router = APIRouter(
 
 @responses_router.post(
     "/",
-    response_model=Union[OpenAIResponseSchema, Dict[str, Any]],
+    response_model=Union[OpenAIResponseSchema, OpenAIResponsesError, Dict[str, Any]],
     summary="Create response using prompt template",
     description="Execute a prompt template with variables (OpenAI-compatible)",
     responses={
@@ -56,7 +56,7 @@ responses_router = APIRouter(
 async def create_response(
     request: ResponseCreateRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security),  # noqa: B008
-) -> Union[OpenAIResponseSchema, Dict[str, Any]]:
+) -> Union[OpenAIResponseSchema, OpenAIResponsesError, Dict[str, Any]]:
     """Create a response using a prompt template.
 
     This endpoint is compatible with OpenAI's responses API format.
@@ -68,7 +68,7 @@ async def create_response(
         credentials: Optional bearer token credentials for API authentication
 
     Returns:
-        PromptExecuteResponse with execution result or ErrorResponse on failure
+        OpenAIResponseSchema on success or OpenAIResponsesError on failure
     """
     logger.info(f"Received response creation request for prompt: {request.prompt.id}")
 

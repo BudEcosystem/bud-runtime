@@ -22,14 +22,103 @@ import time
 import uuid
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from .schemas import Message, ModelSettings
 
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["OpenAIResponseSchema", "OpenAIPromptInfo", "OpenAIResponseFormatter"]
+__all__ = [
+    "OpenAIResponseSchema",
+    "OpenAIPromptInfo",
+    "OpenAIResponseFormatter",
+    "map_status_to_error_type",
+    "extract_validation_error_details",
+]
+
+
+# Error Mapping Utilities
+def map_status_to_error_type(status_code: int) -> str:
+    """Map HTTP status codes to OpenAI-compatible error types.
+
+    Args:
+        status_code: HTTP status code
+
+    Returns:
+        Error type string (e.g., 'bad_request', 'not_found')
+    """
+    error_map = {
+        400: "bad_request",
+        401: "unauthorized",
+        403: "forbidden",
+        404: "not_found",
+        422: "unprocessable_entity",
+        429: "too_many_requests",
+        500: "internal_server_error",
+        502: "bad_gateway",
+        503: "service_unavailable",
+    }
+    # Default to internal_server_error for unknown 5xx codes
+    if status_code >= 500:
+        return error_map.get(status_code, "internal_server_error")
+    # Default to bad_request for unknown 4xx codes
+    elif 400 <= status_code < 500:
+        return error_map.get(status_code, "bad_request")
+    # Default fallback
+    return "internal_server_error"
+
+
+def extract_validation_error_details(e: ValidationError) -> Tuple[str, Optional[str], Optional[str]]:
+    """Extract error details from Pydantic ValidationError.
+
+    Args:
+        e: Pydantic ValidationError
+
+    Returns:
+        Tuple of (message, param, code)
+    """
+    # Get the first error for simplicity (could be enhanced to handle multiple)
+    if e.errors():
+        first_error = e.errors()[0]
+
+        # Build parameter path (e.g., 'prompt.variables.amount')
+        param_parts = []
+        for loc_item in first_error.get("loc", []):
+            if loc_item != "__root__":  # Skip root markers
+                param_parts.append(str(loc_item))
+        param = ".".join(param_parts) if param_parts else None
+
+        # Get error message
+        message = first_error.get("msg", str(e))
+
+        # Map Pydantic error type to our error codes
+        error_type = first_error.get("type", "")
+        code_map = {
+            "missing": "required",
+            "value_error": "invalid_value",
+            "type_error": "invalid_type",
+            "string_too_short": "invalid_length",
+            "string_too_long": "invalid_length",
+            "string_pattern_mismatch": "invalid_format",
+            "enum": "invalid_choice",
+        }
+
+        # Try to find matching code
+        code = None
+        for pattern, mapped_code in code_map.items():
+            if pattern in error_type:
+                code = mapped_code
+                break
+
+        # Default to invalid_type if no match
+        if not code:
+            code = "invalid_type" if "type" in error_type else "invalid_value"
+
+        return message, param, code
+
+    # Fallback if no errors found
+    return str(e), None, "validation_error"
 
 
 # OpenAI Response Models
