@@ -625,6 +625,20 @@ class PromptService(SessionMixin):
                 message="Failed to copy prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
+    async def delete_prompt_from_proxy_cache(self, prompt_id: UUID) -> None:
+        """Delete prompt from proxy cache.
+
+        Args:
+            prompt_id: The prompt UUID to remove from cache
+        """
+        try:
+            redis_service = RedisService()
+            await redis_service.delete_keys_by_pattern(f"model_table:{prompt_id}*")
+            logger.debug(f"Deleted prompt {prompt_id} from proxy cache")
+        except Exception as e:
+            logger.error(f"Failed to delete prompt from proxy cache: {e}")
+            # Don't raise - cache cleanup is non-critical
+
 
 class PromptWorkflowService(SessionMixin):
     """Service for managing prompt workflows."""
@@ -1213,6 +1227,45 @@ class PromptWorkflowService(SessionMixin):
             db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
         )
 
+    async def add_prompt_to_proxy_cache(self, prompt_id: UUID, prompt_name: str) -> None:
+        """Add prompt to proxy cache for routing through budgateway.
+
+        Args:
+            prompt_id: The prompt UUID
+            prompt_name: The prompt name to use as model_name
+        """
+        try:
+            # Create BudPromptConfig for the provider
+            prompt_config = BudPromptConfig(
+                type="budprompt",
+                api_base=app_settings.bud_prompt_service_url,
+                model_name=prompt_name,
+                api_key_location=BUD_PROMPT_API_KEY_LOCATION,
+            )
+
+            # Get endpoint name using enum's name property
+            endpoint_name = ModelEndpointEnum.RESPONSES.name.lower()  # "responses"
+
+            # Create the proxy model configuration using ProxyModelConfig
+            model_config = ProxyModelConfig(
+                routing=[ProxyProviderEnum.BUDPROMPT],
+                providers={ProxyProviderEnum.BUDPROMPT: prompt_config.model_dump(exclude_none=True)},
+                endpoints=[endpoint_name],
+                api_key=None,
+                pricing=None,  # No pricing for prompts
+            )
+
+            # Store in Redis with key pattern matching endpoints
+            redis_service = RedisService()
+            await redis_service.set(
+                f"model_table:{prompt_id}", json.dumps({str(prompt_id): model_config.model_dump(exclude_none=True)})
+            )
+            logger.debug(f"Added prompt {prompt_name} to proxy cache with key model_table:{prompt_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to add prompt to proxy cache: {e}")
+            # Don't raise - cache update is non-critical
+
 
 class PromptVersionService(SessionMixin):
     """Service for managing prompt versions."""
@@ -1489,56 +1542,3 @@ class PromptVersionService(SessionMixin):
             config_data = PromptConfigurationData()
 
         return version_response, config_data
-
-    async def add_prompt_to_proxy_cache(self, prompt_id: UUID, prompt_name: str) -> None:
-        """Add prompt to proxy cache for routing through budgateway.
-
-        Args:
-            prompt_id: The prompt UUID
-            prompt_name: The prompt name to use as model_name
-        """
-        try:
-            # Create BudPromptConfig for the provider
-            prompt_config = BudPromptConfig(
-                type="budprompt",
-                api_base=app_settings.bud_prompt_service_url,
-                model_name=prompt_name,
-                api_key_location=BUD_PROMPT_API_KEY_LOCATION,
-            )
-
-            # Get endpoint name using enum's name property
-            endpoint_name = ModelEndpointEnum.RESPONSES.name.lower()  # "responses"
-
-            # Create the proxy model configuration using ProxyModelConfig
-            model_config = ProxyModelConfig(
-                routing=[ProxyProviderEnum.BUDPROMPT],
-                providers={ProxyProviderEnum.BUDPROMPT: prompt_config.model_dump(exclude_none=True)},
-                endpoints=[endpoint_name],
-                api_key=None,
-                pricing=None,  # No pricing for prompts
-            )
-
-            # Store in Redis with key pattern matching endpoints
-            redis_service = RedisService()
-            await redis_service.set(
-                f"model_table:{prompt_id}", json.dumps({str(prompt_id): model_config.model_dump(exclude_none=True)})
-            )
-            logger.debug(f"Added prompt {prompt_name} to proxy cache with key model_table:{prompt_id}")
-
-        except Exception as e:
-            logger.error(f"Failed to add prompt to proxy cache: {e}")
-            # Don't raise - cache update is non-critical
-
-    async def delete_prompt_from_proxy_cache(self, prompt_id: UUID) -> None:
-        """Delete prompt from proxy cache.
-
-        Args:
-            prompt_id: The prompt UUID to remove from cache
-        """
-        try:
-            redis_service = RedisService()
-            await redis_service.delete_keys_by_pattern(f"model_table:{prompt_id}*")
-            logger.debug(f"Deleted prompt {prompt_id} from proxy cache")
-        except Exception as e:
-            logger.error(f"Failed to delete prompt from proxy cache: {e}")
-            # Don't raise - cache cleanup is non-critical
