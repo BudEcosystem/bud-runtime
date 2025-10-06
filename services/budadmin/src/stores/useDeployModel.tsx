@@ -471,7 +471,7 @@ export const useDeployModel = create<{
           get().currentWorkflow?.workflow_steps?.provider?.type ===
           "huggingface"
             ? ""
-            : "😍",
+            : "🌐",
         tags: [],
         uri: "",
         author: "",

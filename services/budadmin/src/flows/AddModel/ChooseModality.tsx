@@ -40,7 +40,7 @@ export default function ChooseModality() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍",
+        icon: "🌐",
       }}
       nextText="Next"
       disableNext={!modalityType?.id}
