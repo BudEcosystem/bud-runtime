@@ -30,8 +30,14 @@ RUN pip install --no-cache-dir ansible-core==2.15.* ansible-runner \
 #     torch==2.2.0+cpu torchvision==0.17.0+cpu \
 #     -f https://download.pytorch.org/whl/torch_stable.html
 
-# Install llm-benchmark directly from git (not editable mode, saves space)
-RUN pip install --no-cache-dir git+https://github.com/BudEcosystem/llm-benchmark.git
+# Install llm-benchmark with build dependencies (required for madoka C++ compilation)
+# Install build tools, compile llm-benchmark, then remove build tools to keep image slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && pip install --no-cache-dir git+https://github.com/BudEcosystem/llm-benchmark.git \
+    && apt-get remove -y build-essential \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install bud-microframe
 RUN pip install --no-cache-dir git+https://github.com/BudEcosystem/bud-microframe.git
