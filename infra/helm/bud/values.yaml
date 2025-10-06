@@ -84,7 +84,7 @@ microservices:
             CLOUD_MODEL_SEEDER_ENGINE: tensorzero
             BUD_CONNECT_BASE_URL: https://budconnect.bud.studio
             BUD_DOC_SERVICE_URL: "http://{{ $.Release.Name }}-buddoc:9081"
-            BUD_PROMPT_SERVICE_URL: "http://{{ $.Release.Name }}-budprompt:3015"
+            BUD_PROMPT_SERVICE_URL: "http://{{ $.Release.Name }}-budprompt:3015/v1"
 
     # backend internal services
     budcluster:
