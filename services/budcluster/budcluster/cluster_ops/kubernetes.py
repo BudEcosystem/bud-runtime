@@ -467,7 +467,6 @@ class KubernetesHandler(BaseClusterHandler):
 
     def transfer_model(self, values: dict) -> None:
         """Transfer the model to the Kubernetes cluster."""
-
         # Set NFS server IP if volume type is NFS
         if values.get("volume_type") == "nfs":
             nfs_server = self.get_nfs_service_ip()
@@ -484,7 +483,7 @@ class KubernetesHandler(BaseClusterHandler):
             values["nfs_server"] = ""
 
         values["image_pull_secrets"] = self.get_image_pull_secret()
-        
+
         result = self.ansible_executor.run_playbook(
             playbook="MODEL_TRANSFER", extra_vars={"kubeconfig_content": self.config, **values}
         )
