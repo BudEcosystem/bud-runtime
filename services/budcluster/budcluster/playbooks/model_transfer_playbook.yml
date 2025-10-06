@@ -58,6 +58,8 @@
           modelPath: "{{ source_model_path }}"
           pvcSize: "{{model_size}}"
           nodes: "{{ nodes }}"
+          storageClass: "{{ storageClass | default('default') }}"
+          accessMode: "{{ accessMode | default('ReadWriteOnce') }}"
           minio:
             endpoint: "{{ minio_endpoint }}"
             accessKey: "{{ minio_access_key }}"

@@ -47,7 +47,7 @@ export default function NewProject() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍"
+        icon: "🌐"
       }}
       drawerLoading={isCreating}
       // disableNext={!submittable}

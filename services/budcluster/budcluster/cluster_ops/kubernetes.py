@@ -190,13 +190,26 @@ class KubernetesHandler(BaseClusterHandler):
         Returns:
             str: The IP address of the NFS service if found, None otherwise.
         """
-        v1 = client.CoreV1Api()
-        for _ in range(30):  # Retry up to 30 times with a 2-second interval
-            svc = v1.read_namespaced_service(service_name, namespace)
-            if svc.spec.cluster_ip:
-                return svc.spec.cluster_ip
-            time.sleep(2)
-        logger.error(f"Failed to get IP for service {service_name}")
+        try:
+            v1 = client.CoreV1Api()
+            for attempt in range(30):  # Retry up to 30 times with a 2-second interval
+                try:
+                    svc = v1.read_namespaced_service(service_name, namespace)
+                    if svc.spec.cluster_ip and svc.spec.cluster_ip != "None":
+                        logger.info(f"Found NFS service at {svc.spec.cluster_ip}")
+                        return svc.spec.cluster_ip
+                    if attempt == 0:
+                        logger.debug(f"NFS service {service_name} exists but no cluster IP yet, waiting...")
+                except client.exceptions.ApiException as e:
+                    if e.status == 404:
+                        logger.debug(f"NFS service {service_name} not found in namespace {namespace}")
+                        return None
+                    else:
+                        logger.warning(f"Error checking NFS service: {e}")
+                time.sleep(2)
+            logger.warning(f"NFS service {service_name} found but no cluster IP after 30 attempts")
+        except Exception as e:
+            logger.error(f"Failed to get IP for service {service_name}: {e}")
         return None
 
     def _parse_hostname(self, url: str) -> str:
@@ -454,7 +467,23 @@ class KubernetesHandler(BaseClusterHandler):
 
     def transfer_model(self, values: dict) -> None:
         """Transfer the model to the Kubernetes cluster."""
-        values["nfs_server"] = self.get_nfs_service_ip()
+        # Set NFS server IP if volume type is NFS
+        if values.get("volume_type") == "nfs":
+            nfs_server = self.get_nfs_service_ip()
+            if nfs_server:
+                values["nfs_server"] = nfs_server
+                logger.info(f"Using NFS server: {nfs_server}")
+            else:
+                # If NFS service is not available, fallback to local volume
+                logger.warning("NFS service not found, falling back to local volume type")
+                values["volume_type"] = "local"
+                values["nfs_server"] = ""  # Set empty string to avoid undefined variable
+        else:
+            # For non-NFS volume types, ensure nfs_server is defined but empty
+            values["nfs_server"] = ""
+
+        values["image_pull_secrets"] = self.get_image_pull_secret()
+
         result = self.ansible_executor.run_playbook(
             playbook="MODEL_TRANSFER", extra_vars={"kubeconfig_content": self.config, **values}
         )
@@ -1427,3 +1456,83 @@ class KubernetesHandler(BaseClusterHandler):
     def get_adapter_status(self, adapter_name: str):
         """Get the status of a adapter."""
         return self.verify_ingress_health(adapter_name)
+
+    def get_storage_classes(self) -> List[Dict[str, Any]]:
+        """Get all storage classes available in the Kubernetes cluster.
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing storage class information.
+                Each dictionary includes:
+                - name: Storage class name
+                - provisioner: Storage class provisioner
+                - parameters: Storage class parameters
+                - reclaim_policy: Volume reclaim policy
+                - volume_binding_mode: Volume binding mode
+                - default: Whether this is the default storage class
+                - recommended_access_mode: Recommended access mode based on provisioner
+
+        Raises:
+            KubernetesException: If there is an error while fetching storage classes.
+        """
+        try:
+            # Mapping of storage provisioners to their optimal access modes
+            PROVISIONER_ACCESS_MODES = {
+                # ReadWriteMany capable (shared storage)
+                "file.csi.azure.com": "ReadWriteMany",  # Azure Files CSI
+                "kubernetes.io/azure-file": "ReadWriteMany",  # Azure Files (legacy)
+                "nfs.csi.k8s.io": "ReadWriteMany",  # NFS CSI
+                "efs.csi.aws.com": "ReadWriteMany",  # AWS EFS
+                "csi.tigera.io/nfs": "ReadWriteMany",  # Tigera NFS
+                # ReadWriteOnce only (block storage)
+                "disk.csi.azure.com": "ReadWriteOnce",  # Azure Disk CSI
+                "kubernetes.io/azure-disk": "ReadWriteOnce",  # Azure Disk (legacy)
+                "ebs.csi.aws.com": "ReadWriteOnce",  # AWS EBS CSI
+                "kubernetes.io/aws-ebs": "ReadWriteOnce",  # AWS EBS (legacy)
+                "pd.csi.storage.gke.io": "ReadWriteOnce",  # Google Persistent Disk
+                "kubernetes.io/gce-pd": "ReadWriteOnce",  # GCE PD (legacy)
+                "csi.vsphere.vmware.com": "ReadWriteOnce",  # vSphere CSI
+                "kubernetes.io/vsphere-volume": "ReadWriteOnce",  # vSphere (legacy)
+                "local-path": "ReadWriteOnce",  # Local path provisioner
+                "rancher.io/local-path": "ReadWriteOnce",  # Rancher local path
+                # Default fallback
+                "default": "ReadWriteOnce",
+            }
+
+            storage_v1 = client.StorageV1Api()
+            storage_classes = storage_v1.list_storage_class()
+
+            storage_class_list = []
+            for sc in storage_classes.items:
+                # Check if this is the default storage class
+                is_default = False
+                if sc.metadata.annotations:
+                    # Check for default annotation
+                    is_default = (
+                        sc.metadata.annotations.get("storageclass.kubernetes.io/is-default-class") == "true"
+                        or sc.metadata.annotations.get("storageclass.beta.kubernetes.io/is-default-class") == "true"
+                    )
+
+                # Determine recommended access mode based on provisioner
+                provisioner = sc.provisioner
+                recommended_access_mode = PROVISIONER_ACCESS_MODES.get(provisioner, "ReadWriteOnce")
+
+                storage_class_info = {
+                    "name": sc.metadata.name,
+                    "provisioner": sc.provisioner,
+                    "parameters": sc.parameters or {},
+                    "reclaim_policy": sc.reclaim_policy,
+                    "volume_binding_mode": sc.volume_binding_mode,
+                    "default": is_default,
+                    "recommended_access_mode": recommended_access_mode,
+                }
+                storage_class_list.append(storage_class_info)
+
+            logger.debug(f"Found {len(storage_class_list)} storage classes")
+            return storage_class_list
+
+        except client.ApiException as err:
+            logger.error(f"Kubernetes API error while fetching storage classes: {err.reason}")
+            raise KubernetesException("Failed to fetch storage classes") from err
+        except Exception as err:
+            logger.error(f"Error while fetching storage classes: {err}")
+            raise KubernetesException("Failed to fetch storage classes") from err

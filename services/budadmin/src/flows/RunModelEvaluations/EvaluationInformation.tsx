@@ -70,7 +70,7 @@ export default function EvaluationInformation() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍",
+        icon: "🌐",
       }}
       onNext={() => {
         openDrawerWithStep("evaluation-results");

@@ -33,6 +33,8 @@ class SimulationResultsSchema(PSQLBase):
     device_id = Column(String(255), nullable=False)
     device_name = Column(String(255), nullable=False)
     device_type = Column(String(10), nullable=False)
+    device_model = Column(String(255), nullable=True)
+    raw_name = Column(String(255), nullable=True)
     available_count = Column(Integer, nullable=False)
     mem_per_gpu_in_gb = Column(Float, nullable=False)
     hbm_bandwidth_in_gb_per_sec = Column(Float, nullable=False)

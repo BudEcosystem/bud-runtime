@@ -33,7 +33,7 @@ export default function ModelSource() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍",
+        icon: "🌐",
       });
       openDrawerWithStep("cloud-providers");
     } else {
@@ -67,7 +67,7 @@ export default function ModelSource() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍",
+        icon: "🌐",
       }}
       nextText="Next"
       disableNext={!providerType?.id}

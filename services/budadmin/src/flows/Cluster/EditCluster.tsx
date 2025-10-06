@@ -57,7 +57,7 @@ export default function EditCluster() {
       nextText="Save"
       data={{
         ...selectedCluster,
-        icon: selectedCluster.icon?.length > 1 ? "😍" : selectedCluster.icon,
+        icon: selectedCluster.icon?.length > 1 ? "🌐" : selectedCluster.icon,
       }}
       disableNext={!isValidClusterName(values?.name) || !values?.ingress_url || !urlPattern.test(values?.ingress_url)}
       onNext={async (values) => {
