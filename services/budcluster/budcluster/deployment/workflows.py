@@ -485,7 +485,6 @@ class CreateDeploymentWorkflow:
         namespace = workflow_run_benchmark_request_json.namespace
         # NOTE: For performance benchmark, we need to cleanup the namespace after the benchmark is done
         cleanup_namespace = workflow_run_benchmark_request_json.cleanup_namespace
-        logger.info(f"Workflow run benchmark request: {workflow_run_benchmark_request_json.benchmark_request}")
         run_benchmark_request_json = workflow_run_benchmark_request_json.benchmark_request
         logger.info(f"Run benchmark for endpoint: {run_benchmark_request_json.deployment_url}")
         exception_occurred = False

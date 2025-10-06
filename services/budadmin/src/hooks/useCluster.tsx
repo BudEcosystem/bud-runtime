@@ -259,6 +259,18 @@ export const useCluster = create<{
   cloudCredentialID: string;
   setCloudCredentialID: (id: string) => void;
   getClusterAnalytics: (id: string) => Promise<any>;
+  // Cluster Settings methods
+  getClusterSettings: (id: string) => Promise<any>;
+  createClusterSettings: (
+    id: string,
+    data: { default_storage_class?: string | null; default_access_mode?: string | null },
+  ) => Promise<any>;
+  updateClusterSettings: (
+    id: string,
+    data: { default_storage_class?: string | null; default_access_mode?: string | null },
+  ) => Promise<any>;
+  deleteClusterSettings: (id: string) => Promise<any>;
+  getClusterStorageClasses: (id: string) => Promise<any[]>;
 }>((set, get) => ({
   getClusterAnalytics: async (id: string) => {
     const url = `${tempApiBaseUrl}/clusters/${id}/grafana-dashboard`;

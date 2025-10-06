@@ -17,6 +17,12 @@ from budapp.cluster_ops.schemas import (
 )
 from budapp.user_ops.models import User
 
+# Import test helpers after the models to avoid circular imports
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'test_helpers'))
+from cluster_settings_helpers import MockFactory, TestDataBuilder, AssertionHelpers
+
 
 class TestClusterSettingsDataManager:
     """Test ClusterSettingsDataManager methods."""
@@ -32,19 +38,21 @@ class TestClusterSettingsDataManager:
         from budapp.cluster_ops.crud import ClusterSettingsDataManager
         return ClusterSettingsDataManager(mock_session)
 
-    def test_get_cluster_settings_by_cluster_id_found(self, data_manager):
+    @pytest.fixture
+    def mock_factory(self):
+        """Create a mock factory instance."""
+        return MockFactory()
+
+    def test_get_cluster_settings_by_cluster_id_found(self, data_manager, mock_factory):
         """Test getting cluster settings by cluster ID when found."""
         cluster_id = uuid4()
-        settings_id = uuid4()
-        user_id = uuid4()
 
-        mock_settings = Mock(spec=ClusterSettings)
-        mock_settings.id = settings_id
-        mock_settings.cluster_id = cluster_id
-        mock_settings.default_storage_class = "gp2"
-        mock_settings.created_by = user_id
-        mock_settings.created_at = datetime.now(timezone.utc)
-        mock_settings.updated_at = datetime.now(timezone.utc)
+        # Add spec for type checking
+        mock_settings = mock_factory.create_mock_cluster_settings(
+            cluster_id=cluster_id,
+            default_storage_class="gp2"
+        )
+        mock_settings.configure_mock(spec=ClusterSettings)
 
         data_manager.scalar_one_or_none = Mock(return_value=mock_settings)
 
@@ -64,17 +72,17 @@ class TestClusterSettingsDataManager:
         assert result is None
         data_manager.scalar_one_or_none.assert_called_once()
 
-    def test_create_cluster_settings(self, data_manager):
+    def test_create_cluster_settings(self, data_manager, mock_factory):
         """Test creating cluster settings."""
         cluster_id = uuid4()
         user_id = uuid4()
         default_storage_class = "fast-ssd"
 
-        mock_settings = Mock(spec=ClusterSettings)
-        mock_settings.id = uuid4()
-        mock_settings.cluster_id = cluster_id
-        mock_settings.default_storage_class = default_storage_class
-        mock_settings.created_by = user_id
+        mock_settings = mock_factory.create_mock_cluster_settings(
+            cluster_id=cluster_id,
+            default_storage_class=default_storage_class,
+            created_by=user_id
+        )
 
         with patch('budapp.cluster_ops.crud.ClusterSettings') as mock_cluster_settings_class:
             mock_cluster_settings_class.return_value = mock_settings

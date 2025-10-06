@@ -14,14 +14,17 @@ from budapp.cluster_ops.models import ClusterSettings
 from budapp.cluster_ops.schemas import ClusterSettingsResponse
 from budapp.user_ops.models import User
 
+# Import test helpers after the models to avoid circular imports
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'test_helpers'))
+from cluster_settings_helpers import MockFactory, TestDataBuilder, AssertionHelpers
+
 
 @pytest.fixture
 def mock_user():
     """Create a mock user."""
-    user = Mock(spec=User)
-    user.id = uuid4()
-    user.email = "test@example.com"
-    return user
+    return MockFactory.create_mock_user()
 
 
 @pytest.fixture
@@ -37,11 +40,12 @@ class TestClusterSettingsAPI:
     def test_get_cluster_settings_success(self, test_client, mock_user):
         """Test GET /clusters/{cluster_id}/settings success."""
         cluster_id = uuid4()
-        settings_id = uuid4()
-        now = datetime.now(timezone.utc)
 
+        # Create mock response directly since we can't import ClusterSettingsResponse
+        from budapp.cluster_ops.schemas import ClusterSettingsResponse
+        now = datetime.now(timezone.utc)
         mock_response = ClusterSettingsResponse(
-            id=settings_id,
+            id=uuid4(),
             cluster_id=cluster_id,
             default_storage_class="gp2",
             created_by=mock_user.id,
@@ -56,8 +60,8 @@ class TestClusterSettingsAPI:
 
                 assert response.status_code == status.HTTP_200_OK
                 data = response.json()
-                assert data["success"] is True
-                assert data["data"]["settings"]["id"] == str(settings_id)
+                AssertionHelpers.assert_api_response_success(data, status.HTTP_200_OK)
+                assert data["data"]["settings"]["id"] == str(mock_response.id)
                 assert data["data"]["settings"]["cluster_id"] == str(cluster_id)
                 assert data["data"]["settings"]["default_storage_class"] == "gp2"
 
@@ -79,15 +83,16 @@ class TestClusterSettingsAPI:
     def test_create_cluster_settings_success(self, test_client, mock_user):
         """Test POST /clusters/{cluster_id}/settings success."""
         cluster_id = uuid4()
-        settings_id = uuid4()
-        now = datetime.now(timezone.utc)
 
         request_data = {
             "default_storage_class": "premium-ssd"
         }
 
+        # Create mock response directly since we can't import ClusterSettingsResponse
+        from budapp.cluster_ops.schemas import ClusterSettingsResponse
+        now = datetime.now(timezone.utc)
         mock_response = ClusterSettingsResponse(
-            id=settings_id,
+            id=uuid4(),
             cluster_id=cluster_id,
             default_storage_class="premium-ssd",
             created_by=mock_user.id,
