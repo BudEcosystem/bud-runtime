@@ -14,5 +14,7 @@ microservices:
             LOG_LEVEL: DEBUG
     budapp:
         image: vsrvarun/budapp:vsr
+        env:
+            LOG_LEVEL: DEBUG
     budgateway:
         image: vsrvarun/budgateway:vsr
