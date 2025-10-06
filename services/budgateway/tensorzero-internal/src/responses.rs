@@ -2,6 +2,21 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+/// Reference to a prompt template and its variables
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptReference {
+    /// The unique identifier of the prompt template to use
+    pub id: String,
+
+    /// Optional map of values to substitute in for variables in your prompt
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub variables: Option<HashMap<String, Value>>,
+
+    /// Optional version of the prompt template
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+}
+
 /// OpenAI-compatible request parameters for creating a response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenAIResponseCreateParams {
@@ -11,9 +26,9 @@ pub struct OpenAIResponseCreateParams {
     /// The input to the model. Can be a string or array of content items
     pub input: Value,
 
-    /// Developer-provided instructions for the model
+    /// Developer-provided instructions for the model (can be string or array)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub instructions: Option<String>,
+    pub instructions: Option<Value>,
 
     /// List of tools available to the model
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -58,6 +73,10 @@ pub struct OpenAIResponseCreateParams {
     /// Custom metadata for the response
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, Value>>,
+
+    /// Reference to a prompt template and its variables
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<PromptReference>,
 
     /// Whether to stream the response
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -112,6 +131,10 @@ pub struct OpenAIResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<bool>,
 
+    /// Billing information
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub billing: Option<Value>,
+
     /// Error information if the response failed
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ResponseError>,
@@ -120,9 +143,9 @@ pub struct OpenAIResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub incomplete_details: Option<Value>,
 
-    /// Instructions used
+    /// Instructions used (can be string or array of message objects)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub instructions: Option<String>,
+    pub instructions: Option<Value>,
 
     /// Max output tokens
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -146,9 +169,21 @@ pub struct OpenAIResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub previous_response_id: Option<String>,
 
+    /// Prompt reference used for this response
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<PromptReference>,
+
+    /// Prompt cache key for optimization
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_key: Option<String>,
+
     /// Reasoning information
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<Value>,
+
+    /// Safety identifier for abuse detection
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub safety_identifier: Option<String>,
 
     /// Service tier
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -211,6 +246,8 @@ pub enum ResponseStatus {
     Failed,
     InProgress,
     Incomplete,
+    Queued,
+    Cancelled,
 }
 
 /// Token usage statistics
@@ -350,6 +387,11 @@ mod tests {
             reasoning: None,
             include: Some(vec!["usage".to_string()]),
             metadata: Some(HashMap::from([("key".to_string(), json!("value"))])),
+            prompt: Some(PromptReference {
+                id: "template_123".to_string(),
+                variables: Some(HashMap::from([("name".to_string(), json!("World"))])),
+                version: Some("v1".to_string()),
+            }),
             stream: Some(false),
             stream_options: None,
             store: Some(true),
@@ -367,6 +409,7 @@ mod tests {
         assert_eq!(params.input, deserialized.input);
         assert_eq!(params.instructions, deserialized.instructions);
         assert_eq!(params.temperature, deserialized.temperature);
+        assert_eq!(params.prompt.as_ref().map(|p| &p.id), deserialized.prompt.as_ref().map(|p| &p.id));
     }
 
     #[test]
@@ -377,11 +420,12 @@ mod tests {
         }"#;
 
         let params: OpenAIResponseCreateParams = serde_json::from_str(json_str).unwrap();
-        assert_eq!(params.model, "gpt-4");
+        assert_eq!(params.model, "gpt-4".to_string());
         assert_eq!(params.input, json!("Hello"));
         assert!(params.instructions.is_none());
         assert!(params.tools.is_none());
         assert!(params.temperature.is_none());
+        assert!(params.prompt.is_none());
     }
 
     #[test]
@@ -394,7 +438,7 @@ mod tests {
         }"#;
 
         let params: OpenAIResponseCreateParams = serde_json::from_str(json_str).unwrap();
-        assert_eq!(params.model, "gpt-4");
+        assert_eq!(params.model, "gpt-4".to_string());
         assert_eq!(
             params.unknown_fields.get("custom_field").unwrap(),
             &json!("custom_value")
@@ -403,6 +447,55 @@ mod tests {
             params.unknown_fields.get("another_field").unwrap(),
             &json!(123)
         );
+    }
+
+    #[test]
+    fn test_prompt_reference_serialization() {
+        let prompt = PromptReference {
+            id: "prompt_123".to_string(),
+            variables: Some(HashMap::from([
+                ("user_name".to_string(), json!("Alice")),
+                ("topic".to_string(), json!("weather")),
+            ])),
+            version: Some("v2.1".to_string()),
+        };
+
+        let json = serde_json::to_value(&prompt).unwrap();
+        assert_eq!(json["id"], "prompt_123");
+        assert_eq!(json["variables"]["user_name"], "Alice");
+        assert_eq!(json["variables"]["topic"], "weather");
+        assert_eq!(json["version"], "v2.1");
+
+        // Test deserialization
+        let deserialized: PromptReference = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(deserialized.id, "prompt_123");
+        assert_eq!(deserialized.version, Some("v2.1".to_string()));
+    }
+
+    #[test]
+    fn test_response_create_params_with_prompt() {
+        let json_str = r#"{
+            "model": "gpt-4",
+            "input": "Test input",
+            "prompt": {
+                "id": "template_abc",
+                "variables": {"name": "Bob", "age": 30},
+                "version": "1.0"
+            }
+        }"#;
+
+        let params: OpenAIResponseCreateParams = serde_json::from_str(json_str).unwrap();
+        assert_eq!(params.model, "gpt-4".to_string());
+        assert!(params.prompt.is_some());
+
+        let prompt = params.prompt.unwrap();
+        assert_eq!(prompt.id, "template_abc");
+        assert_eq!(prompt.version, Some("1.0".to_string()));
+        assert!(prompt.variables.is_some());
+
+        let vars = prompt.variables.unwrap();
+        assert_eq!(vars.get("name").unwrap(), &json!("Bob"));
+        assert_eq!(vars.get("age").unwrap(), &json!(30));
     }
 
     #[test]
