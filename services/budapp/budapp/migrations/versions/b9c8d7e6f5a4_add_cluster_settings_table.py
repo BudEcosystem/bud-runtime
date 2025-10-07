@@ -1,7 +1,7 @@
 """Add cluster_settings table for default storage class configuration
 
 Revision ID: b9c8d7e6f5a4
-Revises: aea48f780385
+Revises: 897495e31393
 Create Date: 2025-09-08 12:00:00.000000
 
 """
@@ -15,7 +15,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "b9c8d7e6f5a4"
-down_revision: Union[str, None] = "aea48f780385"
+down_revision: Union[str, None] = "897495e31393"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
