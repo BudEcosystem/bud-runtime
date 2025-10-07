@@ -1156,8 +1156,20 @@ impl IntoResponse for Error {
             provider_status: Option<StatusCode>,
         ) -> (StatusCode, Value) {
             let status = provider_status.unwrap_or_else(|| error.status_code());
+
+            // Extract clean error message from provider_error if it's an object with "message"
+            let clean_error = if let Some(error_obj) = provider_error.as_object() {
+                error_obj
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .map(|s| json!(s))
+                    .unwrap_or_else(|| json!(error.to_string()))
+            } else {
+                json!(error.to_string())
+            };
+
             let body = json!({
-                "error": error.to_string(),
+                "error": clean_error,
                 "provider_error": provider_error
             });
             (status, body)
