@@ -71,8 +71,8 @@ const buildRequiredFields = (variables: AgentVariable[]): string[] => {
 const buildValidations = (
   variables: AgentVariable[],
   variableType: "input" | "output",
-): Record<string, Record<string, any>> => {
-  const validations: Record<string, Record<string, any>> = {};
+): Record<string, Record<string, string>> => {
+  const validations: Record<string, Record<string, string>> = {};
   const typeKey = variableType === "input" ? "InputSchema" : "OutputSchema";
 
   validations[typeKey] = {};
@@ -83,13 +83,8 @@ const buildValidations = (
       return;
     }
 
-    // Parse the validation string to create a proper validation object
-    // For now, we'll create a simple validation object with a pattern property
-    // You can extend this logic based on your validation requirements
-    validations[typeKey][variable.name] = {
-      pattern: variable.validation,
-      message: `Invalid value for ${variable.name}`,
-    };
+    // Use the validation string directly as the validation message (matching API sample)
+    validations[typeKey][variable.name] = variable.validation;
   });
 
   return validations;
@@ -101,7 +96,7 @@ export const buildPromptSchemaPayload = (
   type: "input" | "output",
   deploymentName?: string,
   workflowId?: string,
-  version: number = 0,
+  version: number = 1,
   setDefault: boolean = true,
   stepNumber: number = 1,
   workflowTotalSteps: number = 0,
@@ -119,19 +114,19 @@ export const buildPromptSchemaPayload = (
     properties: buildPropertiesFromVariables(variables),
   };
 
-  // Build the full schema with $defs
+  // Build the full schema with $defs (matching API sample structure)
   const schema = {
-    type: "object",
     $defs: {
       [schemaTitle]: schemaDefinition,
     },
-    title: "Schema",
-    required: ["content"],
     properties: {
       content: {
         $ref: `#/$defs/${schemaTitle}`,
       },
     },
+    required: ["content"],
+    title: schemaTitle,
+    type: "object",
   };
 
   // Build validations
@@ -140,13 +135,13 @@ export const buildPromptSchemaPayload = (
   // Build the complete payload
   const payload: any = {
     step_number: stepNumber,
-    trigger_workflow: triggerWorkflow,
     workflow_total_steps: workflowTotalSteps,
+    trigger_workflow: triggerWorkflow,
     version,
     set_default: setDefault,
     schema: {
       schema,
-      validations: validations[schemaTitle] || {},
+      validations,
     },
     type,
   };
@@ -184,7 +179,7 @@ export const buildPromptSchemaFromSession = (
     type,
     deploymentName,
     workflowId,
-    0, // version
+    1, // version
     true, // set_default
     stepNumber,
     workflowTotalSteps,

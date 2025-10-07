@@ -53,22 +53,42 @@ function AgentBoxInner({
   );
   const [openLoadModel, setOpenLoadModel] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingOutput, setIsSavingOutput] = useState(false);
 
-  // Use the prompt schema workflow hook for socket handling
+  // Use the prompt schema workflow hook for socket handling (Input)
   const { status: workflowStatus, startWorkflow, resetStatus } = usePromptSchemaWorkflow({
     workflowId: session?.workflowId,
     onCompleted: () => {
-      console.log('Workflow completed successfully');
+      console.log('Input workflow completed successfully');
       // Auto-reset status after a delay
       setTimeout(() => {
         resetStatus();
       }, 3000);
     },
     onFailed: () => {
-      console.error('Workflow failed');
-      errorToast('Workflow execution failed');
+      console.error('Input workflow failed');
+      errorToast('Input workflow execution failed');
       setTimeout(() => {
         resetStatus();
+      }, 3000);
+    },
+  });
+
+  // Use the prompt schema workflow hook for socket handling (Output)
+  const { status: outputWorkflowStatus, startWorkflow: startOutputWorkflow, resetStatus: resetOutputStatus } = usePromptSchemaWorkflow({
+    workflowId: session?.workflowId,
+    onCompleted: () => {
+      console.log('Output workflow completed successfully');
+      // Auto-reset status after a delay
+      setTimeout(() => {
+        resetOutputStatus();
+      }, 3000);
+    },
+    onFailed: () => {
+      console.error('Output workflow failed');
+      errorToast('Output workflow execution failed');
+      setTimeout(() => {
+        resetOutputStatus();
       }, 3000);
     },
   });
@@ -197,6 +217,70 @@ function AgentBoxInner({
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveOutputSchema = async () => {
+    if (!session) {
+      errorToast("No session data available");
+      return;
+    }
+
+    // Check if deployment is selected
+    if (!session.selectedDeployment?.name) {
+      errorToast("Please select a deployment model first");
+      return;
+    }
+
+    // Check if workflow_id exists
+    if (!session.workflowId) {
+      errorToast("Workflow ID is not available. Please create the agent workflow first.");
+      return;
+    }
+
+    setIsSavingOutput(true);
+
+    try {
+      // Build the payload with output type
+      const payload = buildPromptSchemaFromSession(
+        session,
+        "output",  // Explicitly use output type
+        1,         // step_number
+        0,         // workflow_total_steps (0 for single step save)
+        true       // trigger_workflow
+      );
+
+      // Start workflow status tracking for output
+      startOutputWorkflow();
+
+      // Make the API call
+      const response = await AppRequest.Post(
+        `${tempApiBaseUrl}/prompts/prompt-schema`,
+        payload
+      );
+
+      if (response && response.data) {
+        successToast("Output schema saved successfully");
+
+        // Update the session with the response data if needed
+        if (response.data.id || response.data.schema_id || response.data.prompt_id) {
+          updateSession(session.id, {
+            workflowId: session.workflowId, // Keep existing workflow_id
+            promptId: response.data.prompt_id || response.data.id // Store prompt_id if returned
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error("Error saving output schema:", error);
+      // Handle validation errors better
+      if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
+        const firstError = error.response.data.detail[0];
+        errorToast(firstError.msg || "Failed to save output schema");
+      } else {
+        errorToast(error?.response?.data?.detail || "Failed to save output schema");
+      }
+    } finally {
+      setIsSavingOutput(false);
     }
   };
 
@@ -339,8 +423,11 @@ function AgentBoxInner({
             <SessionProvider
               session={session}
               onSavePromptSchema={handleSavePromptSchema}
+              onSaveOutputSchema={handleSaveOutputSchema}
               isSaving={isSaving}
+              isSavingOutput={isSavingOutput}
               workflowStatus={workflowStatus}
+              outputWorkflowStatus={outputWorkflowStatus}
             >
               <Editor onNodeClick={handleNodeClick} />
             </SessionProvider>

@@ -184,6 +184,7 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
                     {validationEnabled[variable.id] && (
                       <div className="flex flex-col gap-1 mt-2">
                         <TextInput
+                          name={`variable-validation-${variable.id}`}
                           className="!w-full !max-w-full !h-[2rem] !text-[#EEEEEE] !text-xs !placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem]"
                           value={variable.validation || ''}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>

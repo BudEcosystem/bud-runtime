@@ -5,8 +5,11 @@ import { WorkflowStatus } from '@/hooks/usePromptSchemaWorkflow';
 interface SessionContextType {
   session: AgentSession | null;
   onSavePromptSchema?: () => void;
+  onSaveOutputSchema?: () => void;
   isSaving?: boolean;
+  isSavingOutput?: boolean;
   workflowStatus?: WorkflowStatus;
+  outputWorkflowStatus?: WorkflowStatus;
 }
 
 const SessionContext = createContext<SessionContextType>({
@@ -17,11 +20,14 @@ export const SessionProvider: React.FC<{
   session: AgentSession;
   children: React.ReactNode;
   onSavePromptSchema?: () => void;
+  onSaveOutputSchema?: () => void;
   isSaving?: boolean;
+  isSavingOutput?: boolean;
   workflowStatus?: WorkflowStatus;
-}> = ({ session, children, onSavePromptSchema, isSaving, workflowStatus }) => {
+  outputWorkflowStatus?: WorkflowStatus;
+}> = ({ session, children, onSavePromptSchema, onSaveOutputSchema, isSaving, isSavingOutput, workflowStatus, outputWorkflowStatus }) => {
   return (
-    <SessionContext.Provider value={{ session, onSavePromptSchema, isSaving, workflowStatus }}>
+    <SessionContext.Provider value={{ session, onSavePromptSchema, onSaveOutputSchema, isSaving, isSavingOutput, workflowStatus, outputWorkflowStatus }}>
       {children}
     </SessionContext.Provider>
   );
