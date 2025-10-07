@@ -86,12 +86,30 @@ class Cluster(Base, TimestampMixin):
         "ModelClusterRecommended",
         back_populates="cluster",
     )
+    cluster_settings: Mapped["ClusterSettings"] = relationship(
+        "ClusterSettings", back_populates="cluster", uselist=False
+    )
 
     @hybrid_property
     def kubernetes_info_dict(self):
         if not self.kubernetes_metadata:
             return {}
         return json.loads(self.kubernetes_metadata)
+
+
+class ClusterSettings(Base, TimestampMixin):
+    """Cluster settings model."""
+
+    __tablename__ = "cluster_settings"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=False)
+    default_storage_class: Mapped[str] = mapped_column(String, nullable=True)
+    default_access_mode: Mapped[str] = mapped_column(String, nullable=True)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
+
+    cluster: Mapped["Cluster"] = relationship("Cluster", back_populates="cluster_settings")
+    created_user: Mapped["User"] = relationship("User", foreign_keys=[created_by])
 
 
 class ModelClusterRecommended(Base):

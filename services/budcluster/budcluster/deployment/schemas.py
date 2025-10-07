@@ -59,6 +59,8 @@ class TransferModelRequest(BaseModel):
     simulator_config: List[Dict[str, Any]] | None = None
     platform: Optional[ClusterPlatformEnum] = None
     existing_deployment_namespace: Optional[str] = None
+    default_storage_class: Optional[str] = None
+    default_access_mode: Optional[str] = None
     operation: Literal["download", "upload"] = "download"
 
 
@@ -102,6 +104,8 @@ class DeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchma
     # User preferences for parser features
     enable_tool_calling: Optional[bool] = None
     enable_reasoning: Optional[bool] = None
+    default_storage_class: Optional[str] = None  # Added for cluster settings support
+    default_access_mode: Optional[str] = None
 
 
 class LocalDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchmarkParams):
@@ -114,6 +118,8 @@ class LocalDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBe
     credential_id: Optional[UUID] = None
     namespace: Optional[str] = None
     provider: Optional[str] = None
+    default_storage_class: Optional[str] = None  # Added for cluster settings support
+    default_access_mode: Optional[str] = None
 
 
 class CloudDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchmarkParams):
@@ -121,6 +127,8 @@ class CloudDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBe
 
     credential_id: UUID
     namespace: Optional[str] = None
+    default_storage_class: Optional[str] = None  # Added for cluster settings support
+    default_access_mode: Optional[str] = None
 
 
 class DeploymentInfo(BaseModel):
@@ -150,6 +158,8 @@ class DeploymentWorkflowRequest(DeploymentCreateRequest):
     tool_calling_parser_type: Optional[str] = None
     reasoning_parser_type: Optional[str] = None
     chat_template: Optional[str] = None
+    default_storage_class: Optional[str] = None  # Added for cluster settings support
+    default_access_mode: Optional[str] = None
 
 
 class UpdateModelTransferStatusRequest(DeploymentWorkflowRequest):

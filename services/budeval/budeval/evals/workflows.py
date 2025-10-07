@@ -230,14 +230,13 @@ class EvaluationWorkflow:
             request_data = json.loads(monitor_request)
             job_id = request_data["job_id"]
             _parent_workflow_id = request_data["parent_workflow_id"]
-            max_attempts = request_data.get("max_attempts", 360)
-            poll_interval = request_data.get("poll_interval", 5)
+            poll_interval = request_data.get("poll_interval", 30)
             attempt = request_data.get("attempt", 1)  # Track current attempt
         except Exception as e:
             logger.error(f"Error parsing monitor request: {e}", exc_info=True)
             return {"status": "error", "message": str(e)}
 
-        logger.debug(f"Monitoring job {job_id}, attempt {attempt}/{max_attempts}")
+        logger.debug(f"Monitoring job {job_id}, attempt {attempt}")
 
         # Monitor job once per workflow execution
         monitor_result = yield ctx.call_activity(
@@ -247,15 +246,7 @@ class EvaluationWorkflow:
 
         # Handle monitoring failure
         if not monitor_result.get("success"):
-            logger.warning(f"Monitoring attempt {attempt} failed")
-
-            # Check if we should continue trying
-            if attempt >= max_attempts:
-                return {
-                    "status": "timeout",
-                    "job_id": job_id,
-                    "message": f"Monitoring failed after {max_attempts} attempts",
-                }
+            logger.warning(f"Monitoring attempt {attempt} failed, will retry")
 
             # Continue with next attempt using continue_as_new to reset timer history
             request_data["attempt"] = attempt + 1
@@ -311,13 +302,8 @@ class EvaluationWorkflow:
                 else None,
             }
 
-        # Job still running - check if we should timeout
-        if attempt >= max_attempts:
-            return {
-                "status": "timeout",
-                "job_id": job_id,
-                "message": f"Timed out after {max_attempts} attempts",
-            }
+        # Job still running - continue monitoring indefinitely
+        logger.debug(f"Job {job_id} still running, will check again in {poll_interval} seconds")
 
         # Continue monitoring with next attempt using continue_as_new
         # This prevents replay storm by resetting workflow history
@@ -1061,8 +1047,7 @@ class EvaluationWorkflow:
             "parent_workflow_id": instance_id,
             "kubeconfig": evaluate_model_request_json.kubeconfig,
             "namespace": StorageConfig.get_current_namespace(),
-            "max_attempts": 360,  # 30 minutes with 5-second intervals
-            "poll_interval": 5,
+            "poll_interval": 30,
             "notification_data": {
                 "instance_id": instance_id,
                 "source_topic": evaluate_model_request_json.source_topic,
