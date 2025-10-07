@@ -80,18 +80,18 @@ export default function ViewModel() {
         label: "Evaluations",
         children: <Evaluations model={selectedModel} />,
       },
+      // {
+      //   key: "3",
+      //   label: "Performance",
+      //   children: <PerformanceDetailed data={selectedModel} />,
+      // },
       {
         key: "3",
-        label: "Performance",
-        children: <PerformanceDetailed data={selectedModel} />,
-      },
-      {
-        key: "4",
         label: "Advanced",
         children: <Advanced data={selectedModel} />,
       },
       {
-        key: "5",
+        key: "4",
         label: "Adapters",
         children: (
           <General

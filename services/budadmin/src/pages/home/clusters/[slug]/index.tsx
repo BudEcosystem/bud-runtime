@@ -268,30 +268,30 @@ const ClusterDetailsPage = () => {
                 key: "2",
                 children: <DeploymentListTable />,
               },
-              {
-                label: (
-                  <div className="flex items-center gap-[0.375rem]">
-                    <div className="w-[.975rem] pt-[.15rem]">
-                      <Image
-                        preview={false}
-                        src="/images/icons/nodes.png"
-                        alt="home"
-                        style={{
-                          width: ".875rem",
-                          height: ".875rem",
-                        }}
-                      />
-                    </div>
-                    {activeTab === "3" ? (
-                      <Text_14_600_EEEEEE>Nodes</Text_14_600_EEEEEE>
-                    ) : (
-                      <Text_14_600_B3B3B3>Nodes</Text_14_600_B3B3B3>
-                    )}
-                  </div>
-                ),
-                key: "3",
-                children: <ClusterNodes data={selectedCluster} />,
-              },
+              // {
+              //   label: (
+              //     <div className="flex items-center gap-[0.375rem]">
+              //       <div className="w-[.975rem] pt-[.15rem]">
+              //         <Image
+              //           preview={false}
+              //           src="/images/icons/nodes.png"
+              //           alt="home"
+              //           style={{
+              //             width: ".875rem",
+              //             height: ".875rem",
+              //           }}
+              //         />
+              //       </div>
+              //       {activeTab === "3" ? (
+              //         <Text_14_600_EEEEEE>Nodes</Text_14_600_EEEEEE>
+              //       ) : (
+              //         <Text_14_600_B3B3B3>Nodes</Text_14_600_B3B3B3>
+              //       )}
+              //     </div>
+              //   ),
+              //   key: "3",
+              //   children: <ClusterNodes data={selectedCluster} />,
+              // },
               // {
               //   label: <div className="flex items-center gap-[0.375rem]">
               //     <div className="w-[.975rem] pt-[.15rem]">
@@ -338,30 +338,30 @@ const ClusterDetailsPage = () => {
               //   key: '5',
               //   children: <CostAnalysis data={selectedCluster} />
               // },
-              {
-                label: (
-                  <div className="flex items-center gap-[0.375rem]">
-                    <div className="w-[.975rem] pt-[.15rem]">
-                      <Image
-                        preview={false}
-                        src="/images/icons/runBenchmarkIcnWhite.png"
-                        alt="home"
-                        style={{
-                          width: ".875rem",
-                          height: ".875rem",
-                        }}
-                      />
-                    </div>
-                    {activeTab === "6" ? (
-                      <Text_14_600_EEEEEE>Analytics</Text_14_600_EEEEEE>
-                    ) : (
-                      <Text_14_600_B3B3B3>Analytics</Text_14_600_B3B3B3>
-                    )}
-                  </div>
-                ),
-                key: "6",
-                children: <Analytics cluster_id={selectedCluster.id} />,
-              },
+              // {
+              //   label: (
+              //     <div className="flex items-center gap-[0.375rem]">
+              //       <div className="w-[.975rem] pt-[.15rem]">
+              //         <Image
+              //           preview={false}
+              //           src="/images/icons/runBenchmarkIcnWhite.png"
+              //           alt="home"
+              //           style={{
+              //             width: ".875rem",
+              //             height: ".875rem",
+              //           }}
+              //         />
+              //       </div>
+              //       {activeTab === "6" ? (
+              //         <Text_14_600_EEEEEE>Analytics</Text_14_600_EEEEEE>
+              //       ) : (
+              //         <Text_14_600_B3B3B3>Analytics</Text_14_600_B3B3B3>
+              //       )}
+              //     </div>
+              //   ),
+              //   key: "6",
+              //   children: <Analytics cluster_id={selectedCluster.id} />,
+              // },
             ]}
           />
         </div>
