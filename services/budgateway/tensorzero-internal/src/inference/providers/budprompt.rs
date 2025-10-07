@@ -1,6 +1,7 @@
 use crate::endpoints::inference::InferenceCredentials;
 use crate::error::{DisplayOrDebugGateway, Error, ErrorDetails};
 use crate::model::{Credential, CredentialLocation};
+use reqwest::StatusCode;
 use crate::responses::{
     OpenAIResponse, OpenAIResponseCreateParams, ResponseInputItemsList, ResponseProvider,
     ResponseStreamEvent,
@@ -95,20 +96,21 @@ fn get_responses_url(base_url: &Url) -> Result<Url, Error> {
 }
 
 // Helper function to handle API errors
-async fn handle_budprompt_error(
+fn handle_budprompt_error(
     raw_request: &str,
-    status: reqwest::StatusCode,
-    response_text: &str,
+    status: StatusCode,
+    response_body: &str,
 ) -> Error {
-    Error::new(ErrorDetails::InferenceServer {
-        message: format!(
-            "{} API returned error status {}: {}",
-            PROVIDER_NAME, status, response_text
-        ),
-        provider_type: PROVIDER_TYPE.to_string(),
+    // Always use InferenceClient to preserve the backend status code
+    // No filtering - pass through all status codes as-is
+    ErrorDetails::InferenceClient {
+        status_code: Some(status),
+        message: response_body.to_string(),
         raw_request: Some(raw_request.to_string()),
-        raw_response: Some(response_text.to_string()),
-    })
+        raw_response: Some(response_body.to_string()),
+        provider_type: PROVIDER_TYPE.to_string(),
+    }
+    .into()
 }
 
 // Helper function to convert stream errors
@@ -190,14 +192,11 @@ impl ResponseProvider for BudPromptProvider {
 
             Ok(response)
         } else {
-            Err(
-                handle_budprompt_error(
-                    &serde_json::to_string(&request).unwrap_or_default(),
-                    res.status(),
-                    &res.text().await.unwrap_or_default(),
-                )
-                .await,
-            )
+            Err(handle_budprompt_error(
+                &serde_json::to_string(&request).unwrap_or_default(),
+                res.status(),
+                &res.text().await.unwrap_or_default(),
+            ))
         }
     }
 
@@ -382,10 +381,11 @@ impl ResponseProvider for BudPromptProvider {
 
             Ok(response)
         } else {
-            Err(
-                handle_budprompt_error("", res.status(), &res.text().await.unwrap_or_default())
-                    .await,
-            )
+            Err(handle_budprompt_error(
+                "",
+                res.status(),
+                &res.text().await.unwrap_or_default(),
+            ))
         }
     }
 
@@ -452,10 +452,11 @@ impl ResponseProvider for BudPromptProvider {
 
             Ok(response)
         } else {
-            Err(
-                handle_budprompt_error("", res.status(), &res.text().await.unwrap_or_default())
-                    .await,
-            )
+            Err(handle_budprompt_error(
+                "",
+                res.status(),
+                &res.text().await.unwrap_or_default(),
+            ))
         }
     }
 
@@ -524,10 +525,11 @@ impl ResponseProvider for BudPromptProvider {
 
             Ok(response)
         } else {
-            Err(
-                handle_budprompt_error("", res.status(), &res.text().await.unwrap_or_default())
-                    .await,
-            )
+            Err(handle_budprompt_error(
+                "",
+                res.status(),
+                &res.text().await.unwrap_or_default(),
+            ))
         }
     }
 
@@ -597,10 +599,11 @@ impl ResponseProvider for BudPromptProvider {
 
             Ok(response)
         } else {
-            Err(
-                handle_budprompt_error("", res.status(), &res.text().await.unwrap_or_default())
-                    .await,
-            )
+            Err(handle_budprompt_error(
+                "",
+                res.status(),
+                &res.text().await.unwrap_or_default(),
+            ))
         }
     }
 }
