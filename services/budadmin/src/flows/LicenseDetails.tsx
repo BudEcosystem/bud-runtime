@@ -43,7 +43,7 @@ export default function LicenseDetails() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍",
+        icon: "🌐",
       }}
       backText={previousStep ? "Back" : undefined}
       onBack={

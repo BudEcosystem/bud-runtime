@@ -342,8 +342,8 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                 <Image
                   preview={false}
                   className="mainLogo"
-                  style={{ width: 'auto', height: '1.4rem' }}
-                  src="/images/logo.svg"
+                  style={{ width: 'auto', height: '3rem' }}
+                  src="/images/new-logo.png"
                   // src="/images/BudLogo.png"
                   alt="Logo"
                 />

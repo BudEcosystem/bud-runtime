@@ -96,7 +96,7 @@ export default function SelectModelEvaluations() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍",
+        icon: "🌐",
       }}
       onBack={() => {
         closeDrawer();

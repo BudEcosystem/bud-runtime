@@ -61,7 +61,7 @@ function AddLocalModelForm() {
           />
           : <NameIconInput
             placeholder="Enter Model Name"
-            icon={icon || '😍'}
+            icon={icon || '🌐'}
             onChangeIcon={(icon) => {
               form.setFieldsValue({ icon })
             }}

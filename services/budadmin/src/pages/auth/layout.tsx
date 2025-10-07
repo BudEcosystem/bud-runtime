@@ -22,9 +22,9 @@ const AuthLayout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex flex-col justify-between w-[100%] 2xl:max-w-[500px] 1680px:max-w-[650px] h-full px-[3.5rem] pt-[3rem] pb-[2.9rem]">
               <Image
                 alt=""
-                src="/images/BudLogo.png"
+                src="/images/new-logo.png"
                 preview={false}
-                className="w-[6.6em] h-auto"
+                className="w-[10em] h-auto"
               />
               <div className="logo-text text-[2.25em] 2xl:text-[2.5rem] 1680px:text-[2.4rem] text-white open-sans tracking-[.0rem] leading-[3.1rem] w-[400px] 1680px:w-[500px] 2560px:w-[700px]">
                 Useful. Private. Real time. Offline. Safe Intelligence in your
