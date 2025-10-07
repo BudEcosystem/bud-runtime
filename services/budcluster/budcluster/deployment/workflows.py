@@ -254,6 +254,8 @@ class CreateDeploymentWorkflow:
                 node_list=node_list,
                 platform=platform,
                 namespace=existing_deployment_namespace,
+                default_storage_class=transfer_model_request_json.default_storage_class,
+                default_access_mode=transfer_model_request_json.default_access_mode,
             )
             if status is not None:
                 workflow_status = check_workflow_status_in_statestore(workflow_id)
@@ -328,6 +330,8 @@ class CreateDeploymentWorkflow:
                 enable_tool_calling=deploy_engine_request_json.enable_tool_calling,
                 enable_reasoning=deploy_engine_request_json.enable_reasoning,
                 chat_template=chat_template,
+                default_storage_class=getattr(deploy_engine_request_json, "default_storage_class", None),
+                default_access_mode=getattr(deploy_engine_request_json, "default_access_mode", None),
             )
             update_workflow_data_in_statestore(
                 str(workflow_id),
@@ -481,7 +485,6 @@ class CreateDeploymentWorkflow:
         namespace = workflow_run_benchmark_request_json.namespace
         # NOTE: For performance benchmark, we need to cleanup the namespace after the benchmark is done
         cleanup_namespace = workflow_run_benchmark_request_json.cleanup_namespace
-        logger.info(f"Workflow run benchmark request: {workflow_run_benchmark_request_json.benchmark_request}")
         run_benchmark_request_json = workflow_run_benchmark_request_json.benchmark_request
         logger.info(f"Run benchmark for endpoint: {run_benchmark_request_json.deployment_url}")
         exception_occurred = False
@@ -785,6 +788,8 @@ class CreateDeploymentWorkflow:
             endpoint_name=deployment_request_json.endpoint_name,
             platform=deployment_request_json.platform,
             existing_deployment_namespace=deployment_request_json.existing_deployment_namespace,
+            default_storage_class=getattr(deployment_request_json, "default_storage_class", None),
+            default_access_mode=getattr(deployment_request_json, "default_access_mode", None),
         )
         transfer_model_result = yield ctx.call_activity(
             CreateDeploymentWorkflow.transfer_model, input=transfer_model_request.model_dump_json()
@@ -1190,6 +1195,8 @@ class CreateCloudDeploymentWorkflow:
                 add_worker=add_worker,
                 use_tensorzero=True,
                 provider=deploy_engine_request_json.provider,
+                default_storage_class=getattr(deploy_engine_request_json, "default_storage_class", None),
+                default_access_mode=getattr(deploy_engine_request_json, "default_access_mode", None),
             )
             update_workflow_data_in_statestore(
                 str(workflow_id),

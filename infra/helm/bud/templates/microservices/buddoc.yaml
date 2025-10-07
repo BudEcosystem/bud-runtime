@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.buddoc.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -61,3 +62,4 @@ spec:
   selector:
     app: {{ .Release.Name }}-buddoc
   type: ClusterIP
+{{ end }}

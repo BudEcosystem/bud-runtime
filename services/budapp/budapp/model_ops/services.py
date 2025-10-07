@@ -3612,6 +3612,53 @@ class ModelService(SessionMixin):
             deploy_model_uri = db_model.local_path
             # deploy_model_uri = db_model.uri # Uncomment this for model uri
 
+        default_storage_class = None
+        default_access_mode = None
+        cluster_settings = None
+        try:
+            from ..cluster_ops.services import ClusterService  # local import to avoid circular dependency
+
+            cluster_service = ClusterService(self.session)
+            cluster_manager = ClusterDataManager(self.session)
+
+            # Resolve BudCluster's external identifier to the internal primary key expected by settings
+            db_cluster = await cluster_manager.retrieve_by_fields(
+                ClusterModel,
+                fields={"cluster_id": cluster_id},
+                missing_ok=True,
+            )
+            if not db_cluster:
+                db_cluster = await cluster_manager.retrieve_by_fields(
+                    ClusterModel,
+                    fields={"id": cluster_id},
+                    missing_ok=True,
+                )
+
+            if not db_cluster:
+                logger.warning("Cluster %s not found when fetching settings", cluster_id)
+            else:
+                internal_cluster_id = db_cluster.id
+                if internal_cluster_id != cluster_id:
+                    logger.debug(
+                        "Resolved BudCluster ID %s to internal cluster ID %s for settings lookup",
+                        cluster_id,
+                        internal_cluster_id,
+                    )
+                cluster_settings = await cluster_service.get_cluster_settings(internal_cluster_id)
+        except Exception as exc:  # pragma: no cover - best-effort enrichment
+            logger.warning("Failed to fetch cluster settings for cluster %s: %s", cluster_id, exc)
+            cluster_settings = None
+        logger.info(f"Cluster settings: {cluster_settings}")
+        if cluster_settings:
+            default_storage_class = cluster_settings.default_storage_class
+            default_access_mode = cluster_settings.default_access_mode
+            logger.debug(
+                "Using cluster defaults for %s -> storage_class=%s access_mode=%s",
+                cluster_id,
+                default_storage_class,
+                default_access_mode,
+            )
+
         # Perform model deployment
         model_deployment_request = ModelDeploymentRequest(
             cluster_id=cluster_id,
@@ -3632,6 +3679,8 @@ class ModelService(SessionMixin):
             provider=db_model.source,
             enable_tool_calling=enable_tool_calling,
             enable_reasoning=enable_reasoning,
+            default_storage_class=default_storage_class,
+            default_access_mode=default_access_mode,
         )
         model_deployment_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
@@ -3701,21 +3750,30 @@ class ModelService(SessionMixin):
             Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
         )
 
-        # For cloud models, get the cloud model details for supported endpoints
-        if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
-            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel,
-                fields={
-                    "status": CloudModelStatusEnum.ACTIVE,
-                    "source": db_model.source,
-                    "uri": db_model.uri,
-                    "provider_id": db_model.provider_id,
-                },
-            )
-            supported_endpoints = db_cloud_model.supported_endpoints if db_cloud_model else []
-        else:
-            # This should not happen as this method is only for cloud models
+        # Skipping cloud model check.
+        # # For cloud models, get the cloud model details for supported endpoints
+        # if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+        #     db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+        #         CloudModel,
+        #         fields={
+        #             "status": CloudModelStatusEnum.ACTIVE,
+        #             "source": db_model.source,
+        #             "uri": db_model.uri,
+        #             "provider_id": db_model.provider_id,
+        #         },
+        #     )
+        #     supported_endpoints = db_cloud_model.supported_endpoints if db_cloud_model else []
+        # else:
+        #     # This should not happen as this method is only for cloud models
+        #     raise ClientException("Direct endpoint creation is only supported for cloud models")
+
+        if not db_model:
+            raise ClientException(f"Active model with id {model_id} not found.")
+
+        if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
             raise ClientException("Direct endpoint creation is only supported for cloud models")
+
+        supported_endpoints = db_model.supported_endpoints
 
         # Generate namespace and deployment URL
         # Use model.uri as namespace for cloud models

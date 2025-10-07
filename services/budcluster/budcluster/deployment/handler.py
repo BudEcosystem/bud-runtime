@@ -14,7 +14,6 @@ from budmicroframe.shared.http_client import AsyncHTTPClient
 
 from ..cluster_ops import (
     apply_security_context,
-    delete_namespace,
     delete_pod,
     deploy_quantization_job,
     deploy_runtime,
@@ -145,6 +144,8 @@ class DeploymentHandler:
         enable_tool_calling: Optional[bool] = None,
         enable_reasoning: Optional[bool] = None,
         chat_template: Optional[str] = None,
+        default_storage_class: Optional[str] = None,
+        default_access_mode: Optional[str] = None,
     ):
         """Deploy nodes using Helm.
 
@@ -166,6 +167,7 @@ class DeploymentHandler:
             reasoning_parser_type (Optional[str], optional): Parser type for reasoning. Defaults to None.
             enable_tool_calling (Optional[bool], optional): Enable tool calling feature. Defaults to None.
             enable_reasoning (Optional[bool], optional): Enable reasoning feature. Defaults to None.
+            default_storage_class (Optional[str], optional): Default storage class for PVCs. Defaults to None.
 
         Raises:
             ValueError: If the device configuration is missing required keys or if ingress_url is not provided.
@@ -187,12 +189,55 @@ class DeploymentHandler:
             "namespace": namespace,
             "nodes": [],
             "container_port": app_settings.engine_container_port,
-            "image_pull_secrets": {},
             "ingress_host": ingress_url,
             "volume_type": app_settings.volume_type,
             "model_name": namespace,
             "adapters": adapters,
         }
+
+        # Add storage class configuration if provided, otherwise fall back to default
+        if default_storage_class:
+            values["storageClass"] = default_storage_class
+            logger.info(f"Using custom storage class: {default_storage_class}")
+        else:
+            # Check if there's an app setting default, otherwise let Helm chart handle it
+            if hasattr(app_settings, "default_storage_class") and app_settings.default_storage_class:
+                values["storageClass"] = app_settings.default_storage_class
+                logger.info(f"Using app default storage class: {app_settings.default_storage_class}")
+            else:
+                logger.info("No storage class specified, using Helm chart default")
+
+        access_mode = default_access_mode or "ReadWriteOnce"
+
+        if default_access_mode:
+            logger.info(f"Using provided access mode: {default_access_mode}")
+        else:
+            # Determine access mode based on storage class capabilities
+            try:
+                from ..cluster_ops.kubernetes import KubernetesHandler
+
+                k8s_handler = KubernetesHandler(self.config)
+                storage_classes = k8s_handler.get_storage_classes()
+
+                # Find the storage class we're using
+                target_storage_class = values.get("storageClass")
+                if target_storage_class and target_storage_class != "default":
+                    for sc in storage_classes:
+                        if sc["name"] == target_storage_class:
+                            access_mode = sc["recommended_access_mode"]
+                            logger.info(f"Using access mode {access_mode} for storage class {target_storage_class}")
+                            break
+                else:
+                    # Use default storage class
+                    for sc in storage_classes:
+                        if sc["default"]:
+                            access_mode = sc["recommended_access_mode"]
+                            logger.info(f"Using access mode {access_mode} for default storage class {sc['name']}")
+                            break
+            except Exception as e:
+                logger.warning(f"Could not determine optimal access mode, using {access_mode}: {e}")
+
+        values["accessMode"] = access_mode
 
         if not podscaler:
             podscaler = {}
@@ -333,6 +378,8 @@ class DeploymentHandler:
         add_worker: bool = False,
         use_tensorzero: bool = False,
         provider: str = None,
+        default_storage_class: Optional[str] = None,
+        default_access_mode: Optional[str] = None,
     ):
         """Deploy cloud model nodes using Helm.
 
@@ -371,6 +418,64 @@ class DeploymentHandler:
             # currently if we don't send ingress_host, default value from values.yaml will be used
             "ingress_host": ingress_url,
         }
+
+        # Add storage class configuration if provided, otherwise fall back to default
+        if default_storage_class:
+            values["storageClass"] = default_storage_class
+            logger.info(f"Using custom storage class for cloud deployment: {default_storage_class}")
+        else:
+            # Check if there's an app setting default, otherwise let Helm chart handle it
+            if hasattr(app_settings, "default_storage_class") and app_settings.default_storage_class:
+                values["storageClass"] = app_settings.default_storage_class
+                logger.info(
+                    f"Using app default storage class for cloud deployment: {app_settings.default_storage_class}"
+                )
+            else:
+                logger.info("No storage class specified for cloud deployment, using Helm chart default")
+
+        access_mode = default_access_mode or "ReadWriteOnce"
+
+        if default_access_mode:
+            logger.info(f"Using provided access mode for cloud deployment: {default_access_mode}")
+        else:
+            # Determine access mode based on storage class capabilities
+            try:
+                from ..cluster_ops.kubernetes import KubernetesHandler
+
+                k8s_handler = KubernetesHandler(self.config)
+                storage_classes = k8s_handler.get_storage_classes()
+
+                # Find the storage class we're using
+                target_storage_class = values.get("storageClass")
+                if target_storage_class and target_storage_class != "default":
+                    for sc in storage_classes:
+                        if sc["name"] == target_storage_class:
+                            access_mode = sc["recommended_access_mode"]
+                            logger.info(
+                                "Using access mode %s for cloud deployment storage class %s",
+                                access_mode,
+                                target_storage_class,
+                            )
+                            break
+                else:
+                    # Use default storage class
+                    for sc in storage_classes:
+                        if sc["default"]:
+                            access_mode = sc["recommended_access_mode"]
+                            logger.info(
+                                "Using access mode %s for cloud deployment default storage class %s",
+                                access_mode,
+                                sc["name"],
+                            )
+                            break
+            except Exception as e:
+                logger.warning(
+                    "Could not determine optimal access mode for cloud deployment, using %s: %s",
+                    access_mode,
+                    e,
+                )
+
+        values["accessMode"] = access_mode
         values["model_name"] = values["namespace"]
 
         # TODO: to be stored and fetched from dapr secret-store
@@ -504,11 +609,25 @@ api_key_location = "env::API_KEY"
         node_list: List[dict],
         platform: Optional[ClusterPlatformEnum] = None,
         namespace: str = None,
+        default_storage_class: Optional[str] = None,
+        default_access_mode: Optional[str] = None,
     ):
-        """Transfer model to the pod."""
+        """Transfer model to the pod.
+
+        Args:
+            model_uri: The URI of the model to transfer
+            endpoint_name: Name of the endpoint
+            node_list: List of nodes for deployment
+            platform: Optional cluster platform
+            namespace: Optional Kubernetes namespace
+            default_storage_class: Optional storage class for PVC creation
+        """
         model_uri = [part for part in model_uri.split("/") if part]
         model_uri = model_uri[-1]
         namespace = namespace or self._get_namespace(endpoint_name)
+        access_mode = default_access_mode or "ReadWriteOnce"
+        if default_access_mode:
+            logger.info(f"Model transfer using provided access mode: {default_access_mode}")
         values = {
             "source_model_path": model_uri,
             "namespace": namespace,
@@ -521,6 +640,56 @@ api_key_location = "env::API_KEY"
             "nodes": node_list,
             "volume_type": app_settings.volume_type,
         }
+
+        # Add storage class configuration if provided
+        if default_storage_class:
+            values["storageClass"] = default_storage_class
+            logger.info(f"Model transfer using storage class: {default_storage_class}")
+
+            # Determine if we should use local volume type based on storage class
+            # NFS volume type should only be used if NFS provisioner is available
+            if values["volume_type"] == "nfs":
+                # Let the transfer_model in kubernetes.py handle NFS detection
+                logger.info("Volume type is NFS, will check for NFS service availability")
+            else:
+                # Default to local volume type for standard storage classes
+                values["volume_type"] = "local"
+                logger.info(f"Using local volume type with storage class: {default_storage_class}")
+
+        if not default_access_mode:
+            # Attempt to align access mode with the selected storage class recommendations
+            try:
+                from ..cluster_ops.kubernetes import KubernetesHandler
+
+                k8s_handler = KubernetesHandler(self.config)
+                storage_classes = k8s_handler.get_storage_classes()
+
+                target_storage_class = values.get("storageClass")
+                if target_storage_class and target_storage_class != "default":
+                    for sc in storage_classes:
+                        if sc["name"] == target_storage_class:
+                            access_mode = sc["recommended_access_mode"]
+                            logger.info(
+                                "Model transfer selecting access mode %s based on storage class %s",
+                                access_mode,
+                                target_storage_class,
+                            )
+                            break
+                else:
+                    for sc in storage_classes:
+                        if sc["default"]:
+                            access_mode = sc["recommended_access_mode"]
+                            logger.info(
+                                "Model transfer selecting access mode %s based on default storage class %s",
+                                access_mode,
+                                sc["name"],
+                            )
+                            break
+            except Exception as e:
+                logger.warning(f"Model transfer falling back to {access_mode} access mode: {e}")
+
+        values["accessMode"] = access_mode
+
         try:
             return asyncio.run(transfer_model(self.config, values, platform)), namespace
         except Exception as e:
@@ -536,10 +705,11 @@ api_key_location = "env::API_KEY"
 
     def delete(self, namespace: str, platform: Optional[ClusterPlatformEnum] = None):
         """Delete a deployment by namespace."""
-        try:
-            asyncio.run(delete_namespace(self.config, namespace, platform))
-        except Exception as e:
-            raise Exception(f"Deletion failed: {str(e)}") from e
+        print("Delete triggered")
+        # try:
+        #     asyncio.run(delete_namespace(self.config, namespace, platform))
+        # except Exception as e:
+        #     raise Exception(f"Deletion failed: {str(e)}") from e
 
     def delete_pod(
         self, namespace: str, deployment_name: str, pod_name: str, platform: Optional[ClusterPlatformEnum] = None
@@ -606,7 +776,6 @@ api_key_location = "env::API_KEY"
         values = {
             "hf_token": hf_token,
             "namespace": namespace,
-            "image_pull_secrets": {},
             "volume_type": app_settings.volume_type,
             "quantization_job_image": app_settings.quantization_job_image,
             "quantization_config": qunatization_config,

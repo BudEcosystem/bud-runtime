@@ -493,20 +493,20 @@ class BudConnectMapper:
         """
         try:
             # Convert modality list to string - join with comma if multiple
-            modality_list = cloud_data.get("modality", [])
+            modality_list = cloud_data.get("modality") or []
             modality_str = ", ".join(modality_list) if modality_list else "text_input,text_output"
 
             model_info_data = {
                 "uri": cloud_data.get("uri", ""),
-                "author": cloud_data.get("provider_name", "Unknown"),
-                "description": cloud_data.get("description", ""),
+                "author": cloud_data.get("provider_name") or "Unknown",
+                "description": cloud_data.get("description") or "",
                 "modality": modality_str,
-                "tags": cloud_data.get("tags", []),
-                "tasks": cloud_data.get("tasks", []),
-                "use_cases": cloud_data.get("use_cases", []),
-                "strengths": cloud_data.get("advantages", []),
-                "limitations": cloud_data.get("disadvantages", []),
-                "languages": cloud_data.get("languages", []),
+                "tags": cloud_data.get("tags") or [],
+                "tasks": cloud_data.get("tasks") or [],
+                "use_cases": cloud_data.get("use_cases") or [],
+                "strengths": cloud_data.get("advantages") or [],
+                "limitations": cloud_data.get("disadvantages") or [],
+                "languages": cloud_data.get("languages") or [],
                 "github_url": cloud_data.get("github_url"),
                 "website_url": cloud_data.get("website_url"),
                 "logo_url": cloud_data.get("logo_url"),
@@ -566,7 +566,7 @@ class BudConnectMapper:
         Returns:
             List of formatted evaluation data dictionaries.
         """
-        evaluations = cloud_data.get("evaluations", [])
+        evaluations = cloud_data.get("evaluations") or []
         formatted_evals = []
 
         for eval_item in evaluations:

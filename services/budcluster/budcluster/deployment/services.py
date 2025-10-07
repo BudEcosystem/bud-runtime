@@ -209,6 +209,20 @@ class DeploymentService(SessionMixin):
             f"Cloud deployment: {is_cloud_deployment}"
         )
 
+        # Create sanitized version for logging - exclude sensitive fields
+        sanitized_fields = {
+            "cluster_id": str(deployment.cluster_id) if deployment.cluster_id else None,
+            "endpoint_name": deployment.endpoint_name,
+            "model": deployment.model,
+            "concurrency": deployment.concurrency,
+            "provider": deployment.provider,
+            "default_storage_class": deployment.default_storage_class,
+            "default_access_mode": deployment.default_access_mode,
+            "has_hf_token": bool(deployment.hf_token) if hasattr(deployment, "hf_token") else False,
+            "has_credential_id": bool(deployment.credential_id) if hasattr(deployment, "credential_id") else False,
+        }
+        logger.info(f"Deployment request (sanitized): {sanitized_fields}")
+
         if is_cloud_deployment:
             logger.info("Routing to cloud deployment workflow")
             response = await CreateCloudDeploymentWorkflow().__call__(deployment)

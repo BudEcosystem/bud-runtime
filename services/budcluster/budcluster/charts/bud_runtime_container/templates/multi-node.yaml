@@ -38,7 +38,7 @@ spec:
               # kubernetes.io/hostname: {{ .node.name }}
               {{- if .node.node_selector }}
               {{- range $key, $value := .node.node_selector }}
-              {{ $key }}: {{ $value }}
+              {{ $key }}: "{{ $value }}"
               {{- end }}
               {{- else }}
               # Fallback for legacy deployments without node_selector
@@ -46,6 +46,18 @@ spec:
               nvidia.com/gpu.present: "true"
               {{- end }}
               {{- end }}
+            {{- if eq ($.Values.accessMode | default "ReadWriteOnce") "ReadWriteOnce" }}
+            {{- if gt (.node.replicas | int) 1 }}
+            # Pod affinity to ensure all replicas are scheduled on the same node for ReadWriteOnce volumes
+            affinity:
+              podAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      model.aibrix.ai/name: {{ $.Values.modelName }}
+                  topologyKey: kubernetes.io/hostname
+            {{- end }}
+            {{- end }}
             imagePullSecrets:
             - name: {{ $.Values.imagePullSecrets.name }}
             {{- if eq .node.type "cuda" }}
@@ -139,7 +151,7 @@ spec:
                 # kubernetes.io/hostname: {{ .node.name }}
                 {{- if .node.node_selector }}
                 {{- range $key, $value := .node.node_selector }}
-                {{ $key }}: {{ $value }}
+                {{ $key }}: "{{ $value }}"
                 {{- end }}
                 {{- else }}
                 # Fallback for legacy deployments without node_selector
@@ -147,6 +159,13 @@ spec:
                 nvidia.com/gpu.present: "true"
                 {{- end }}
                 {{- end }}
+              affinity:
+                podAffinity:
+                  requiredDuringSchedulingIgnoredDuringExecution:
+                  - labelSelector:
+                      matchLabels:
+                        model.aibrix.ai/name: {{ $.Values.modelName }}
+                    topologyKey: kubernetes.io/hostname
               imagePullSecrets:
               - name: {{ $.Values.imagePullSecrets.name }}
               {{- if eq .node.type "cuda" }}
