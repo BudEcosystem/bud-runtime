@@ -54,6 +54,8 @@ function AgentBoxInner({
   const [openLoadModel, setOpenLoadModel] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingOutput, setIsSavingOutput] = useState(false);
+  const [isSavingSystemPrompt, setIsSavingSystemPrompt] = useState(false);
+  const [isSavingPromptMessages, setIsSavingPromptMessages] = useState(false);
 
   // Use the prompt schema workflow hook for socket handling (Input)
   const { status: workflowStatus, startWorkflow, resetStatus } = usePromptSchemaWorkflow({
@@ -89,6 +91,44 @@ function AgentBoxInner({
       errorToast('Output workflow execution failed');
       setTimeout(() => {
         resetOutputStatus();
+      }, 3000);
+    },
+  });
+
+  // Use the prompt schema workflow hook for socket handling (System Prompt)
+  const { status: systemPromptWorkflowStatus, startWorkflow: startSystemPromptWorkflow, resetStatus: resetSystemPromptStatus } = usePromptSchemaWorkflow({
+    workflowId: session?.workflowId,
+    onCompleted: () => {
+      console.log('System prompt workflow completed successfully');
+      // Auto-reset status after a delay
+      setTimeout(() => {
+        resetSystemPromptStatus();
+      }, 3000);
+    },
+    onFailed: () => {
+      console.error('System prompt workflow failed');
+      errorToast('System prompt workflow execution failed');
+      setTimeout(() => {
+        resetSystemPromptStatus();
+      }, 3000);
+    },
+  });
+
+  // Use the prompt schema workflow hook for socket handling (Prompt Messages)
+  const { status: promptMessagesWorkflowStatus, startWorkflow: startPromptMessagesWorkflow, resetStatus: resetPromptMessagesStatus } = usePromptSchemaWorkflow({
+    workflowId: session?.workflowId,
+    onCompleted: () => {
+      console.log('Prompt messages workflow completed successfully');
+      // Auto-reset status after a delay
+      setTimeout(() => {
+        resetPromptMessagesStatus();
+      }, 3000);
+    },
+    onFailed: () => {
+      console.error('Prompt messages workflow failed');
+      errorToast('Prompt messages workflow execution failed');
+      setTimeout(() => {
+        resetPromptMessagesStatus();
       }, 3000);
     },
   });
@@ -284,6 +324,215 @@ function AgentBoxInner({
     }
   };
 
+  const handleSaveSystemPrompt = async () => {
+    if (!session) {
+      errorToast("No session data available");
+      return;
+    }
+
+    // Check if deployment is selected
+    if (!session.selectedDeployment?.name) {
+      errorToast("Please select a deployment model first");
+      return;
+    }
+
+    // Check if prompt_id exists
+    if (!session.promptId) {
+      errorToast("Prompt ID is not available. Please save input/output schema first.");
+      return;
+    }
+
+    // Check if system prompt is not empty
+    if (!session.systemPrompt || session.systemPrompt.trim() === "") {
+      errorToast("System prompt cannot be empty");
+      return;
+    }
+
+    setIsSavingSystemPrompt(true);
+
+    try {
+      // Build the payload for prompt-config endpoint
+      const payload = {
+        prompt_id: session.promptId,
+        version: 1,
+        set_default: false,
+        deployment_name: session.selectedDeployment.name,
+        model_settings: {
+          temperature: session.settings?.temperature ?? 0.7,
+          max_tokens: session.settings?.maxTokens ?? 2000,
+          top_p: session.settings?.topP ?? 0.9,
+          frequency_penalty: 0,
+          presence_penalty: 0,
+          stop_sequences: [],
+          seed: 0,
+          timeout: 0,
+          parallel_tool_calls: true,
+          logprobs: true,
+          logit_bias: {},
+          extra_headers: {},
+          max_completion_tokens: 0,
+          stream_options: {},
+          response_format: {},
+          tool_choice: "string",
+          chat_template: "string",
+          chat_template_kwargs: {},
+          mm_processor_kwargs: {},
+          guided_json: {},
+          guided_regex: "string",
+          guided_choice: [],
+          guided_grammar: "string",
+          structural_tag: "string",
+          guided_decoding_backend: "string",
+          guided_whitespace_pattern: "string"
+        },
+        stream: true,
+        messages: [
+          {
+            role: "system",
+            content: session.systemPrompt
+          }
+        ],
+        llm_retry_limit: 0,
+        enable_tools: true,
+        allow_multiple_calls: true,
+        system_prompt_role: "system"
+      };
+
+      // Start workflow status tracking
+      startSystemPromptWorkflow();
+
+      // Make the API call
+      const response = await AppRequest.Post(
+        `${tempApiBaseUrl}/prompts/prompt-config`,
+        payload
+      );
+
+      if (response && response.data) {
+        successToast("System prompt saved successfully");
+      }
+    } catch (error: any) {
+      console.error("Error saving system prompt:", error);
+      // Handle validation errors better
+      if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
+        const firstError = error.response.data.detail[0];
+        errorToast(firstError.msg || "Failed to save system prompt");
+      } else {
+        errorToast(error?.response?.data?.detail || "Failed to save system prompt");
+      }
+    } finally {
+      setIsSavingSystemPrompt(false);
+    }
+  };
+
+  const handleSavePromptMessages = async () => {
+    if (!session) {
+      errorToast("No session data available");
+      return;
+    }
+
+    // Check if deployment is selected
+    if (!session.selectedDeployment?.name) {
+      errorToast("Please select a deployment model first");
+      return;
+    }
+
+    // Check if prompt_id exists
+    if (!session.promptId) {
+      errorToast("Prompt ID is not available. Please save input/output schema first.");
+      return;
+    }
+
+    // Parse prompt messages
+    let messages: any[] = [];
+    try {
+      if (session.promptMessages && typeof session.promptMessages === 'string') {
+        messages = JSON.parse(session.promptMessages);
+      }
+    } catch (e) {
+      errorToast("Invalid prompt messages format");
+      return;
+    }
+
+    // Check if there are any messages
+    if (!messages || messages.length === 0) {
+      errorToast("Prompt messages cannot be empty");
+      return;
+    }
+
+    setIsSavingPromptMessages(true);
+
+    try {
+      // Build the payload for prompt-config endpoint
+      const payload = {
+        prompt_id: session.promptId,
+        version: 1,
+        set_default: false,
+        deployment_name: session.selectedDeployment.name,
+        model_settings: {
+          temperature: session.settings?.temperature ?? 0.7,
+          max_tokens: session.settings?.maxTokens ?? 2000,
+          top_p: session.settings?.topP ?? 0.9,
+          frequency_penalty: 0,
+          presence_penalty: 0,
+          stop_sequences: [],
+          seed: 0,
+          timeout: 0,
+          parallel_tool_calls: true,
+          logprobs: true,
+          logit_bias: {},
+          extra_headers: {},
+          max_completion_tokens: 0,
+          stream_options: {},
+          response_format: {},
+          tool_choice: "string",
+          chat_template: "string",
+          chat_template_kwargs: {},
+          mm_processor_kwargs: {},
+          guided_json: {},
+          guided_regex: "string",
+          guided_choice: [],
+          guided_grammar: "string",
+          structural_tag: "string",
+          guided_decoding_backend: "string",
+          guided_whitespace_pattern: "string"
+        },
+        stream: true,
+        messages: messages.map((msg: any) => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        llm_retry_limit: 0,
+        enable_tools: true,
+        allow_multiple_calls: true,
+        system_prompt_role: "system"
+      };
+
+      // Start workflow status tracking
+      startPromptMessagesWorkflow();
+
+      // Make the API call
+      const response = await AppRequest.Post(
+        `${tempApiBaseUrl}/prompts/prompt-config`,
+        payload
+      );
+
+      if (response && response.data) {
+        successToast("Prompt messages saved successfully");
+      }
+    } catch (error: any) {
+      console.error("Error saving prompt messages:", error);
+      // Handle validation errors better
+      if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
+        const firstError = error.response.data.detail[0];
+        errorToast(firstError.msg || "Failed to save prompt messages");
+      } else {
+        errorToast(error?.response?.data?.detail || "Failed to save prompt messages");
+      }
+    } finally {
+      setIsSavingPromptMessages(false);
+    }
+  };
+
   const menuItems = [
     {
       key: 'duplicate',
@@ -424,10 +673,16 @@ function AgentBoxInner({
               session={session}
               onSavePromptSchema={handleSavePromptSchema}
               onSaveOutputSchema={handleSaveOutputSchema}
+              onSaveSystemPrompt={handleSaveSystemPrompt}
+              onSavePromptMessages={handleSavePromptMessages}
               isSaving={isSaving}
               isSavingOutput={isSavingOutput}
+              isSavingSystemPrompt={isSavingSystemPrompt}
+              isSavingPromptMessages={isSavingPromptMessages}
               workflowStatus={workflowStatus}
               outputWorkflowStatus={outputWorkflowStatus}
+              systemPromptWorkflowStatus={systemPromptWorkflowStatus}
+              promptMessagesWorkflowStatus={promptMessagesWorkflowStatus}
             >
               <Editor onNodeClick={handleNodeClick} />
             </SessionProvider>

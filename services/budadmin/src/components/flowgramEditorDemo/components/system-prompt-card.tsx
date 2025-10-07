@@ -1,8 +1,10 @@
 import { Field } from '@flowgram.ai/fixed-layout-editor';
 import { useSession } from '../contexts/SessionContext';
+import { PrimaryButton } from '../../ui/bud/form/Buttons';
+import { LoadingOutlined, CheckCircleFilled } from '@ant-design/icons';
 
 export const SystemPromptCard = () => {
-  const { session } = useSession();
+  const { session, onSaveSystemPrompt, isSavingSystemPrompt, systemPromptWorkflowStatus } = useSession();
 
   // Get system prompt from the session, with default if empty
   const systemPrompt = session?.systemPrompt || '';
@@ -15,7 +17,50 @@ export const SystemPromptCard = () => {
       border: '1px solid #333333',
       minWidth: '320px',
       maxWidth: '400px',
+      position: 'relative',
     }}>
+      {/* Workflow Status Indicator - Top Right */}
+      {systemPromptWorkflowStatus && systemPromptWorkflowStatus !== 'idle' && (
+        <div style={{
+          position: 'absolute',
+          top: '12px',
+          right: '12px',
+          zIndex: 10,
+        }}>
+          {systemPromptWorkflowStatus === 'loading' && (
+            <LoadingOutlined
+              style={{
+                fontSize: '16px',
+                color: '#965CDE',
+                animation: 'spin 1s linear infinite',
+              }}
+              spin
+            />
+          )}
+          {systemPromptWorkflowStatus === 'success' && (
+            <CheckCircleFilled
+              style={{
+                fontSize: '16px',
+                color: '#52C41A',
+              }}
+            />
+          )}
+          {systemPromptWorkflowStatus === 'failed' && (
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              style={{
+                color: '#FF4D4F',
+              }}
+            >
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="2" fill="none"/>
+              <path d="M5 5L11 11M11 5L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          )}
+        </div>
+      )}
       {/* Card Header */}
       <div style={{
         borderBottom: '1px solid #333333',
@@ -75,6 +120,38 @@ export const SystemPromptCard = () => {
       }}>
         {systemPrompt ? 'System prompt configured' : 'No system prompt set'}
       </div>
+
+      {/* Save Button */}
+      {onSaveSystemPrompt && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginTop: '16px',
+          paddingTop: '16px',
+          borderTop: '1px solid #333333',
+          background: 'transparent',
+        }}>
+          <PrimaryButton
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onSaveSystemPrompt();
+            }}
+            loading={isSavingSystemPrompt}
+            disabled={isSavingSystemPrompt}
+            style={{
+              background: '#965CDE',
+              border: 'none',
+              color: 'white',
+              padding: '8px 24px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              cursor: isSavingSystemPrompt ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isSavingSystemPrompt ? 'Saving...' : 'Save'}
+          </PrimaryButton>
+        </div>
+      )}
     </div>
   );
 };

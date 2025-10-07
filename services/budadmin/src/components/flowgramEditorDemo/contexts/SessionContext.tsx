@@ -6,10 +6,16 @@ interface SessionContextType {
   session: AgentSession | null;
   onSavePromptSchema?: () => void;
   onSaveOutputSchema?: () => void;
+  onSaveSystemPrompt?: () => void;
+  onSavePromptMessages?: () => void;
   isSaving?: boolean;
   isSavingOutput?: boolean;
+  isSavingSystemPrompt?: boolean;
+  isSavingPromptMessages?: boolean;
   workflowStatus?: WorkflowStatus;
   outputWorkflowStatus?: WorkflowStatus;
+  systemPromptWorkflowStatus?: WorkflowStatus;
+  promptMessagesWorkflowStatus?: WorkflowStatus;
 }
 
 const SessionContext = createContext<SessionContextType>({
@@ -21,13 +27,48 @@ export const SessionProvider: React.FC<{
   children: React.ReactNode;
   onSavePromptSchema?: () => void;
   onSaveOutputSchema?: () => void;
+  onSaveSystemPrompt?: () => void;
+  onSavePromptMessages?: () => void;
   isSaving?: boolean;
   isSavingOutput?: boolean;
+  isSavingSystemPrompt?: boolean;
+  isSavingPromptMessages?: boolean;
   workflowStatus?: WorkflowStatus;
   outputWorkflowStatus?: WorkflowStatus;
-}> = ({ session, children, onSavePromptSchema, onSaveOutputSchema, isSaving, isSavingOutput, workflowStatus, outputWorkflowStatus }) => {
+  systemPromptWorkflowStatus?: WorkflowStatus;
+  promptMessagesWorkflowStatus?: WorkflowStatus;
+}> = ({
+  session,
+  children,
+  onSavePromptSchema,
+  onSaveOutputSchema,
+  onSaveSystemPrompt,
+  onSavePromptMessages,
+  isSaving,
+  isSavingOutput,
+  isSavingSystemPrompt,
+  isSavingPromptMessages,
+  workflowStatus,
+  outputWorkflowStatus,
+  systemPromptWorkflowStatus,
+  promptMessagesWorkflowStatus
+}) => {
   return (
-    <SessionContext.Provider value={{ session, onSavePromptSchema, onSaveOutputSchema, isSaving, isSavingOutput, workflowStatus, outputWorkflowStatus }}>
+    <SessionContext.Provider value={{
+      session,
+      onSavePromptSchema,
+      onSaveOutputSchema,
+      onSaveSystemPrompt,
+      onSavePromptMessages,
+      isSaving,
+      isSavingOutput,
+      isSavingSystemPrompt,
+      isSavingPromptMessages,
+      workflowStatus,
+      outputWorkflowStatus,
+      systemPromptWorkflowStatus,
+      promptMessagesWorkflowStatus
+    }}>
       {children}
     </SessionContext.Provider>
   );
