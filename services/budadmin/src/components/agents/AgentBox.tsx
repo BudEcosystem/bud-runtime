@@ -18,6 +18,7 @@ import { buildPromptSchemaFromSession } from "@/utils/promptSchemaBuilder";
 import { successToast, errorToast } from "@/components/toast";
 import { tempApiBaseUrl } from "@/components/environment";
 import { AppRequest } from "src/pages/api/requests";
+import { usePromptSchemaWorkflow } from "@/hooks/usePromptSchemaWorkflow";
 
 interface AgentBoxProps {
   session: AgentSession;
@@ -52,6 +53,25 @@ function AgentBoxInner({
   );
   const [openLoadModel, setOpenLoadModel] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Use the prompt schema workflow hook for socket handling
+  const { status: workflowStatus, startWorkflow, resetStatus } = usePromptSchemaWorkflow({
+    workflowId: session?.workflowId,
+    onCompleted: () => {
+      console.log('Workflow completed successfully');
+      // Auto-reset status after a delay
+      setTimeout(() => {
+        resetStatus();
+      }, 3000);
+    },
+    onFailed: () => {
+      console.error('Workflow failed');
+      errorToast('Workflow execution failed');
+      setTimeout(() => {
+        resetStatus();
+      }, 3000);
+    },
+  });
 
   // Use the settings context
   const { isOpen: isRightSidebarOpen, activeSettings, openSettings, closeSettings, toggleSettings } = useSettings();
@@ -137,8 +157,11 @@ function AgentBoxInner({
         type,
         1,     // step_number
         0,     // workflow_total_steps (0 for single step save)
-        false  // trigger_workflow
+        true   // trigger_workflow
       );
+
+      // Start workflow status tracking
+      startWorkflow();
 
       // Make the API call
       const response = await AppRequest.Post(
@@ -317,6 +340,7 @@ function AgentBoxInner({
               session={session}
               onSavePromptSchema={handleSavePromptSchema}
               isSaving={isSaving}
+              workflowStatus={workflowStatus}
             >
               <Editor onNodeClick={handleNodeClick} />
             </SessionProvider>

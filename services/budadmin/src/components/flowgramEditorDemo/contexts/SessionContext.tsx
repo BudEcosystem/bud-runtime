@@ -1,10 +1,12 @@
 import React, { createContext, useContext } from 'react';
 import { AgentSession } from '@/stores/useAgentStore';
+import { WorkflowStatus } from '@/hooks/usePromptSchemaWorkflow';
 
 interface SessionContextType {
   session: AgentSession | null;
   onSavePromptSchema?: () => void;
   isSaving?: boolean;
+  workflowStatus?: WorkflowStatus;
 }
 
 const SessionContext = createContext<SessionContextType>({
@@ -16,9 +18,10 @@ export const SessionProvider: React.FC<{
   children: React.ReactNode;
   onSavePromptSchema?: () => void;
   isSaving?: boolean;
-}> = ({ session, children, onSavePromptSchema, isSaving }) => {
+  workflowStatus?: WorkflowStatus;
+}> = ({ session, children, onSavePromptSchema, isSaving, workflowStatus }) => {
   return (
-    <SessionContext.Provider value={{ session, onSavePromptSchema, isSaving }}>
+    <SessionContext.Provider value={{ session, onSavePromptSchema, isSaving, workflowStatus }}>
       {children}
     </SessionContext.Provider>
   );
