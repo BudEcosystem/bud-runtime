@@ -20,10 +20,13 @@ import logging
 from typing import Any, Dict, Union
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from budprompt.commons.exceptions import OpenAIResponseException
+
 from ..prompt.openai_response_formatter import OpenAIResponseSchema
-from .schemas import OpenAIResponsesError, ResponseCreateRequest
+from .schemas import OpenAIError, OpenAIResponsesError, ResponseCreateRequest
 from .services import ResponsesService
 
 
@@ -68,7 +71,8 @@ async def create_response(
         credentials: Optional bearer token credentials for API authentication
 
     Returns:
-        OpenAIResponseSchema on success or OpenAIResponsesError on failure
+        OpenAIResponseSchema on success or JSONResponse with error status code and
+        OpenAI-compatible error format on failure
     """
     logger.info(f"Received response creation request for prompt: {request.prompt.id}")
 
@@ -78,11 +82,23 @@ async def create_response(
     # Create service instance
     service = ResponsesService()
 
-    # Execute the prompt with optional authorization
-    result = await service.execute_prompt(
-        prompt_params=request.prompt,
-        input=request.input,
-        api_key=api_key,
-    )
+    try:
+        # Execute the prompt with optional authorization
+        result = await service.execute_prompt(
+            prompt_params=request.prompt,
+            input=request.input,
+            api_key=api_key,
+        )
+        return result
 
-    return result
+    except OpenAIResponseException as e:
+        # Build OpenAI-compatible error response
+        error_response = OpenAIResponsesError(
+            error=OpenAIError(
+                message=e.message,
+                type=e.type,
+                param=e.param,
+                code=e.code,
+            )
+        )
+        return JSONResponse(status_code=e.status_code, content=error_response.model_dump(mode="json"))

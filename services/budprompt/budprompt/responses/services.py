@@ -23,17 +23,16 @@ from typing import Any, Dict, Optional
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
-from budprompt.commons.exceptions import ClientException
+from budprompt.commons.exceptions import ClientException, OpenAIResponseException
 from budprompt.shared.redis_service import RedisService
 
 from ..prompt.openai_response_formatter import (
     OpenAIPromptInfo,
     extract_validation_error_details,
-    map_status_to_error_type,
 )
 from ..prompt.schemas import PromptExecuteData
 from ..prompt.services import PromptExecutorService
-from .schemas import OpenAIError, OpenAIResponsesError, ResponsePromptParam
+from .schemas import ResponsePromptParam
 
 
 logger = logging.getLogger(__name__)
@@ -64,13 +63,14 @@ class ResponsesService:
             Dictionary containing the execution result
 
         Raises:
-            ClientException: If prompt template not found or execution fails
+            OpenAIResponseException: OpenAI-compatible exception with status code and error details
         """
         try:
             if prompt_params.variables and input:
-                raise ClientException(
+                raise OpenAIResponseException(
                     status_code=400,
                     message="Please provide either variables or input.",
+                    code="invalid_request",
                 )
 
             # Extract parameters
@@ -88,16 +88,21 @@ class ResponsesService:
 
                 if not redis_key:
                     logger.debug(f"Default version not found for prompt_id: {prompt_id}")
-                    raise ClientException(status_code=404, message=f"Prompt template not found: {prompt_id}")
+                    raise OpenAIResponseException(
+                        status_code=404,
+                        message=f"Prompt template not found: {prompt_id}",
+                        code="not_found",
+                    )
 
             # Fetch prompt configuration from Redis
             config_json = await self.redis_service.get(redis_key)
 
             if not config_json:
                 logger.debug(f"Prompt configuration not found for key: {redis_key}")
-                raise ClientException(
+                raise OpenAIResponseException(
                     status_code=404,
                     message=f"Prompt template not found: {prompt_id}" + (f" version {version}" if version else ""),
+                    code="not_found",
                 )
 
             # Parse the configuration
@@ -105,7 +110,11 @@ class ResponsesService:
                 config_data = json.loads(config_json)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse prompt configuration: {str(e)}")
-                raise ClientException(status_code=500, message="Invalid prompt configuration format") from e
+                raise OpenAIResponseException(
+                    status_code=500,
+                    message="Invalid prompt configuration format",
+                    code="internal_error",
+                ) from e
 
             # Execute the prompt
             prompt_execute_data = PromptExecuteData.model_validate(config_data)
@@ -141,14 +150,13 @@ class ResponsesService:
         except ValidationError as e:
             logger.warning(f"Validation error during response creation: {str(e)}")
             message, param, code = extract_validation_error_details(e)
-            return OpenAIResponsesError(
-                error=OpenAIError(
-                    message=message,
-                    type="bad_request",
-                    param=param,
-                    code=code,
-                )
-            ).model_dump(mode="json")
+            raise OpenAIResponseException(
+                status_code=400,
+                message=message,
+                param=param,
+                code=code,
+            ) from e
+
         except ClientException as e:
             logger.warning(f"Client error during response creation: {e.message}")
             # Extract param and code from ClientException params if available
@@ -161,20 +169,21 @@ class ResponsesService:
                 elif isinstance(e.params, str):
                     param = e.params
 
-            return OpenAIResponsesError(
-                error=OpenAIError(
-                    message=e.message,
-                    type=map_status_to_error_type(e.status_code),
-                    param=param,
-                    code=code or ("not_found" if e.status_code == 404 else "invalid_request"),
-                )
-            ).model_dump(mode="json")
+            raise OpenAIResponseException(
+                status_code=e.status_code,
+                message=e.message,
+                param=param,
+                code=code,
+            ) from e
+
+        except OpenAIResponseException:
+            # Re-raise OpenAIResponseException as-is (from our own code above)
+            raise
+
         except Exception as e:
             logger.error(f"Unexpected error during prompt execution: {str(e)}")
-            return OpenAIResponsesError(
-                error=OpenAIError(
-                    message="An unexpected error occurred during prompt execution",
-                    type="internal_server_error",
-                    code="internal_error",
-                )
-            ).model_dump(mode="json")
+            raise OpenAIResponseException(
+                status_code=500,
+                message="An unexpected error occurred during prompt execution",
+                code="internal_error",
+            ) from e

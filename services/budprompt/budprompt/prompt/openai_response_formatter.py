@@ -33,42 +33,11 @@ __all__ = [
     "OpenAIResponseSchema",
     "OpenAIPromptInfo",
     "OpenAIResponseFormatter",
-    "map_status_to_error_type",
     "extract_validation_error_details",
 ]
 
 
 # Error Mapping Utilities
-def map_status_to_error_type(status_code: int) -> str:
-    """Map HTTP status codes to OpenAI-compatible error types.
-
-    Args:
-        status_code: HTTP status code
-
-    Returns:
-        Error type string (e.g., 'bad_request', 'not_found')
-    """
-    error_map = {
-        400: "bad_request",
-        401: "unauthorized",
-        403: "forbidden",
-        404: "not_found",
-        422: "unprocessable_entity",
-        429: "too_many_requests",
-        500: "internal_server_error",
-        502: "bad_gateway",
-        503: "service_unavailable",
-    }
-    # Default to internal_server_error for unknown 5xx codes
-    if status_code >= 500:
-        return error_map.get(status_code, "internal_server_error")
-    # Default to bad_request for unknown 4xx codes
-    elif 400 <= status_code < 500:
-        return error_map.get(status_code, "bad_request")
-    # Default fallback
-    return "internal_server_error"
-
-
 def extract_validation_error_details(e: ValidationError) -> Tuple[str, Optional[str], Optional[str]]:
     """Extract error details from Pydantic ValidationError.
 
