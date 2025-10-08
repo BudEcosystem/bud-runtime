@@ -1,7 +1,7 @@
 """Fix user_billing unique constraint to allow multiple billing records per user
 
 Revision ID: c1b2c3d4e5e6
-Revises: b9c8d7e6f5a4
+Revises: 44ad5600310c
 Create Date: 2025-09-11 08:45:00.000000
 
 """

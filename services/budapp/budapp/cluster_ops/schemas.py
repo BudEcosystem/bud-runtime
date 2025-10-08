@@ -17,6 +17,7 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the cluster ops services."""
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
