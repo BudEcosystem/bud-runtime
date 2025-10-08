@@ -323,7 +323,7 @@ class TestClusterService:
             mock_cluster_mgr.retrieve_by_fields = AsyncMock(return_value=None)
             mock_cluster_mgr_class.return_value = mock_cluster_mgr
 
-            from budapp.utils.exception import ClientException
+            from budapp.commons.exceptions import ClientException
 
             with pytest.raises(ClientException) as exc_info:
                 await cluster_service.create_cluster_settings(
@@ -375,7 +375,7 @@ class TestClusterService:
             mock_manager.update_cluster_settings = AsyncMock(return_value=None)
             mock_manager_class.return_value = mock_manager
 
-            from budapp.utils.exception import ClientException
+            from budapp.commons.exceptions import ClientException
 
             with pytest.raises(ClientException) as exc_info:
                 await cluster_service.update_cluster_settings(
