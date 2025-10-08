@@ -246,7 +246,7 @@ class TestClusterService:
         mock_settings.default_access_mode = None
         mock_settings.created_by = user_id
         mock_settings.created_at = datetime.now(timezone.utc)
-        mock_settings.updated_at = datetime.now(timezone.utc)
+        mock_settings.modified_at = datetime.now(timezone.utc)
 
         with patch('budapp.cluster_ops.services.ClusterSettingsDataManager') as mock_manager_class:
             mock_manager = mock_manager_class.return_value
@@ -287,7 +287,7 @@ class TestClusterService:
         mock_settings.default_access_mode = None
         mock_settings.created_by = user_id
         mock_settings.created_at = datetime.now(timezone.utc)
-        mock_settings.updated_at = datetime.now(timezone.utc)
+        mock_settings.modified_at = datetime.now(timezone.utc)
 
         with patch('budapp.cluster_ops.services.ClusterDataManager') as mock_cluster_manager_class, \
              patch('budapp.cluster_ops.services.ClusterSettingsDataManager') as mock_settings_manager_class:
@@ -339,7 +339,7 @@ class TestClusterService:
         mock_settings.default_access_mode = None
         mock_settings.created_by = uuid4()
         mock_settings.created_at = datetime.now(timezone.utc)
-        mock_settings.updated_at = datetime.now(timezone.utc)
+        mock_settings.modified_at = datetime.now(timezone.utc)
 
         with patch('budapp.cluster_ops.services.ClusterSettingsDataManager') as mock_manager_class:
             mock_manager = mock_manager_class.return_value
@@ -439,7 +439,7 @@ class TestClusterSettingsSchemas:
             default_storage_class="gp3",
             created_by=user_id,
             created_at=now,
-            updated_at=now
+            modified_at=now
         )
 
         assert response.id == settings_id
@@ -447,4 +447,4 @@ class TestClusterSettingsSchemas:
         assert response.default_storage_class == "gp3"
         assert response.created_by == user_id
         assert response.created_at == now
-        assert response.updated_at == now
+        assert response.modified_at == now
