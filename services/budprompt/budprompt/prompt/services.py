@@ -1149,11 +1149,15 @@ class PromptService:
                 f"to {request.target_prompt_id}:v{request.target_version}"
             )
 
+            # Parse final_data as PromptConfigurationData for response
+            final_config_data = PromptConfigurationData.model_validate(final_data)
+
             return PromptConfigCopyResponse(
                 source_prompt_id=request.source_prompt_id,
                 source_version=request.source_version,
                 target_prompt_id=request.target_prompt_id,
                 target_version=request.target_version,
+                data=final_config_data,
             )
 
         except ClientException:

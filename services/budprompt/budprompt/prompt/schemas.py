@@ -466,6 +466,7 @@ class PromptConfigCopyResponse(SuccessResponse):
     source_version: int = Field(..., description="Source version number copied")
     target_prompt_id: str = Field(..., description="Target prompt ID copied to")
     target_version: int = Field(..., description="Target version number saved as")
+    data: PromptConfigurationData = Field(..., description="The final configuration data saved to Redis")
     message: str = Field(default="Prompt configuration copied successfully")
 
 
