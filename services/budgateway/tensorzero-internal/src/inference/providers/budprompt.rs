@@ -20,12 +20,15 @@ const PROVIDER_TYPE: &str = "budprompt";
 pub struct BudPromptProvider {
     pub api_base: Url,
     pub credentials: BudPromptCredentials,
+    /// Whether prompts should stream by default (when stream is not explicitly specified in request)
+    pub prompt_stream: Option<bool>,
 }
 
 impl BudPromptProvider {
     pub fn new(
         api_base: Url,
         api_key_location: Option<CredentialLocation>,
+        prompt_stream: Option<bool>,
     ) -> Result<Self, Error> {
         let credentials = if let Some(location) = api_key_location {
             BudPromptCredentials::try_from(Credential::try_from((location, PROVIDER_NAME))?)
@@ -36,6 +39,7 @@ impl BudPromptProvider {
         Ok(Self {
             api_base,
             credentials,
+            prompt_stream,
         })
     }
 }
@@ -252,6 +256,9 @@ impl ResponseProvider for BudPromptProvider {
             while let Some(ev) = event_source.next().await {
                 match ev {
                     Err(e) => {
+                        if matches!(e, reqwest_eventsource::Error::StreamEnded) {
+                            break;
+                        }
                         yield Err(convert_stream_error(e).await);
                     }
                     Ok(event) => match event {

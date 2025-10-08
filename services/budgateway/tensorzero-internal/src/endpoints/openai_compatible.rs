@@ -5263,8 +5263,31 @@ pub async fn response_create_handler(
         );
     }
 
-    // Check if streaming is requested
-    if params.stream.unwrap_or(false) {
+    // Determine if we should expect streaming response based on:
+    // 1. Explicit stream parameter (highest priority)
+    // 2. prompt_stream config (if request has prompt reference and provider is BudPrompt)
+    // 3. Default to false
+    let should_stream = if let Some(explicit_stream) = params.stream {
+        // Explicit stream parameter always takes precedence
+        explicit_stream
+    } else if params.prompt.is_some() {
+        // For prompt requests without explicit stream, check if BudPrompt provider has prompt_stream=true
+        model.providers
+            .values()
+            .next()
+            .and_then(|p| {
+                if let crate::model::ProviderConfig::BudPrompt(provider) = &p.config {
+                    provider.prompt_stream
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(false)
+    } else {
+        false
+    };
+
+    if should_stream {
         // Handle streaming response
         let stream = model
             .stream_response(&params, &model_resolution.original_model_name, &clients)
