@@ -333,7 +333,7 @@ class TestClusterService:
                 )
 
             assert exc_info.value.status_code == 404
-            assert "Cluster not found" in str(exc_info.value.detail)
+            assert "Cluster not found" in exc_info.value.message
 
     @pytest.mark.asyncio
     async def test_update_cluster_settings_success(self, cluster_service):
@@ -384,7 +384,7 @@ class TestClusterService:
                 )
 
             assert exc_info.value.status_code == 404
-            assert "Cluster settings not found" in str(exc_info.value.detail)
+            assert "Cluster settings not found" in exc_info.value.message
 
     @pytest.mark.asyncio
     async def test_delete_cluster_settings_success(self, cluster_service):
