@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from budapp.initializers.provider_seeder import PROVIDERS_SEEDER_FILE_PATH
 
 from ..commons.config import app_settings
+from ..commons.constants import ModelEndpointEnum
 from ..commons.database import engine
 from ..endpoint_ops.crud import EndpointDataManager
 from ..model_ops.crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
@@ -138,6 +139,9 @@ class CloudModelSyncScheduler:
             json.dump(providers_data, f, indent=4)
         logger.debug("Saved providers to %s", PROVIDERS_SEEDER_FILE_PATH)
 
+        # Get all valid endpoint values from the enum
+        valid_endpoint_values = {endpoint.value for endpoint in ModelEndpointEnum}
+
         # Get all cloud model uris
         cloud_model_uris = []
         cloud_model_data = []
@@ -148,6 +152,18 @@ class CloudModelSyncScheduler:
                 max_input_tokens = (
                     cloud_model["tokens"].get("max_input_tokens", None) if cloud_model["tokens"] is not None else None
                 )
+
+                # Filter out unsupported endpoints from external source
+                raw_endpoints = cloud_model["endpoints"]
+                supported_endpoints = [ep for ep in raw_endpoints if ep in valid_endpoint_values]
+
+                # Log if any endpoints were filtered out
+                if len(supported_endpoints) < len(raw_endpoints):
+                    filtered_out = [ep for ep in raw_endpoints if ep not in valid_endpoint_values]
+                    logger.warning(
+                        "Filtered out unsupported endpoints for model %s: %s", cloud_model["uri"], filtered_out
+                    )
+
                 cloud_model_data.append(
                     CloudModelCreate(
                         provider_id=provider_type_id_mapper[provider["provider_type"]],
@@ -158,7 +174,7 @@ class CloudModelSyncScheduler:
                         max_input_tokens=max_input_tokens,
                         input_cost=cloud_model["input_cost"],
                         output_cost=cloud_model["output_cost"],
-                        supported_endpoints=cloud_model["endpoints"],
+                        supported_endpoints=supported_endpoints,
                         deprecation_date=cloud_model["deprecation_date"],
                     )
                 )
