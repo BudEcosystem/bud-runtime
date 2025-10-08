@@ -248,14 +248,16 @@ class TestClusterService:
         """Test getting cluster settings successfully."""
         cluster_id = uuid4()
         user_id = uuid4()
+        now = datetime.now(timezone.utc)
 
         mock_settings = Mock(spec=ClusterSettings)
         mock_settings.id = uuid4()
         mock_settings.cluster_id = cluster_id
         mock_settings.default_storage_class = "gp3"
+        mock_settings.default_access_mode = None
         mock_settings.created_by = user_id
-        mock_settings.created_at = datetime.now(timezone.utc)
-        mock_settings.updated_at = datetime.now(timezone.utc)
+        mock_settings.created_at = now
+        mock_settings.modified_at = now
 
         with patch('budapp.cluster_ops.services.ClusterSettingsDataManager') as mock_manager_class:
             mock_manager = mock_manager_class.return_value
@@ -287,6 +289,7 @@ class TestClusterService:
         cluster_id = uuid4()
         user_id = uuid4()
         default_storage_class = "premium-storage"
+        now = datetime.now(timezone.utc)
 
         mock_cluster = Mock(spec=Cluster)
         mock_cluster.id = cluster_id
@@ -297,8 +300,8 @@ class TestClusterService:
         mock_settings.default_storage_class = default_storage_class
         mock_settings.default_access_mode = None
         mock_settings.created_by = user_id
-        mock_settings.created_at = datetime.now(timezone.utc)
-        mock_settings.updated_at = datetime.now(timezone.utc)
+        mock_settings.created_at = now
+        mock_settings.modified_at = now
 
         with patch('budapp.cluster_ops.services.ClusterDataManager') as mock_cluster_manager_class, \
              patch('budapp.cluster_ops.services.ClusterSettingsDataManager') as mock_settings_manager_class:
@@ -344,6 +347,7 @@ class TestClusterService:
         """Test updating cluster settings successfully."""
         cluster_id = uuid4()
         default_storage_class = "updated-storage"
+        now = datetime.now(timezone.utc)
 
         mock_settings = Mock(spec=ClusterSettings)
         mock_settings.id = uuid4()
@@ -351,8 +355,8 @@ class TestClusterService:
         mock_settings.default_storage_class = default_storage_class
         mock_settings.default_access_mode = None
         mock_settings.created_by = uuid4()
-        mock_settings.created_at = datetime.now(timezone.utc)
-        mock_settings.updated_at = datetime.now(timezone.utc)
+        mock_settings.created_at = now
+        mock_settings.modified_at = now
 
         with patch('budapp.cluster_ops.services.ClusterSettingsDataManager') as mock_manager_class:
             mock_manager = mock_manager_class.return_value
