@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from budapp.cluster_ops.models import Cluster, ClusterSettings
+from budapp.commons.exceptions import ClientException
 from budapp.cluster_ops.schemas import (
     ClusterSettingsResponse,
     CreateClusterSettingsRequest,
