@@ -456,7 +456,7 @@ class TestClusterSettingsSchemas:
             default_storage_class="gp3",
             created_by=user_id,
             created_at=now,
-            updated_at=now
+            modified_at=now
         )
 
         assert response.id == settings_id
@@ -464,4 +464,4 @@ class TestClusterSettingsSchemas:
         assert response.default_storage_class == "gp3"
         assert response.created_by == user_id
         assert response.created_at == now
-        assert response.updated_at == now
+        assert response.modified_at == now
