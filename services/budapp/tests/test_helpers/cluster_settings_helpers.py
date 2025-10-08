@@ -13,12 +13,14 @@ class MockFactory:
     @staticmethod
     def create_mock_user(
         user_id: Optional[UUID] = None,
-        email: str = "test@example.com"
+        email: str = "test@example.com",
+        is_superuser: bool = True
     ) -> Mock:
         """Create a mock user object."""
         user = Mock()
         user.id = user_id or uuid.uuid4()
         user.email = email
+        user.is_superuser = is_superuser
         return user
 
     @staticmethod
