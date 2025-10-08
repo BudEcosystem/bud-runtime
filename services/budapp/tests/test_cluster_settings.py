@@ -43,7 +43,8 @@ class TestClusterSettingsDataManager:
         """Create a mock factory instance."""
         return MockFactory()
 
-    def test_get_cluster_settings_by_cluster_id_found(self, data_manager, mock_factory):
+    @pytest.mark.asyncio
+    async def test_get_cluster_settings_by_cluster_id_found(self, data_manager, mock_factory):
         """Test getting cluster settings by cluster ID when found."""
         cluster_id = uuid4()
 
@@ -56,23 +57,25 @@ class TestClusterSettingsDataManager:
 
         data_manager.scalar_one_or_none = Mock(return_value=mock_settings)
 
-        result = data_manager.get_cluster_settings_by_cluster_id(cluster_id)
+        result = await data_manager.get_cluster_settings(cluster_id)
 
         assert result == mock_settings
         data_manager.scalar_one_or_none.assert_called_once()
 
-    def test_get_cluster_settings_by_cluster_id_not_found(self, data_manager):
+    @pytest.mark.asyncio
+    async def test_get_cluster_settings_by_cluster_id_not_found(self, data_manager):
         """Test getting cluster settings by cluster ID when not found."""
         cluster_id = uuid4()
 
         data_manager.scalar_one_or_none = Mock(return_value=None)
 
-        result = data_manager.get_cluster_settings_by_cluster_id(cluster_id)
+        result = await data_manager.get_cluster_settings(cluster_id)
 
         assert result is None
         data_manager.scalar_one_or_none.assert_called_once()
 
-    def test_create_cluster_settings(self, data_manager, mock_factory):
+    @pytest.mark.asyncio
+    async def test_create_cluster_settings(self, data_manager, mock_factory):
         """Test creating cluster settings."""
         cluster_id = uuid4()
         user_id = uuid4()
@@ -84,90 +87,80 @@ class TestClusterSettingsDataManager:
             created_by=user_id
         )
 
-        with patch('budapp.cluster_ops.crud.ClusterSettings') as mock_cluster_settings_class:
-            mock_cluster_settings_class.return_value = mock_settings
-            data_manager.session.add = Mock()
-            data_manager.session.commit = Mock()
-            data_manager.session.refresh = Mock()
+        data_manager.add_one = Mock(return_value=mock_settings)
 
-            result = data_manager.create_cluster_settings(
-                cluster_id=cluster_id,
-                default_storage_class=default_storage_class,
-                created_by=user_id
-            )
+        result = await data_manager.create_cluster_settings(
+            cluster_id=cluster_id,
+            default_storage_class=default_storage_class,
+            created_by=user_id
+        )
 
-            assert result == mock_settings
-            mock_cluster_settings_class.assert_called_once_with(
-                cluster_id=cluster_id,
-                default_storage_class=default_storage_class,
-                created_by=user_id
-            )
-            data_manager.session.add.assert_called_once_with(mock_settings)
-            data_manager.session.commit.assert_called_once()
-            data_manager.session.refresh.assert_called_once_with(mock_settings)
+        assert result == mock_settings
+        data_manager.add_one.assert_called_once()
 
-    def test_update_cluster_settings(self, data_manager):
+    @pytest.mark.asyncio
+    async def test_update_cluster_settings(self, data_manager):
         """Test updating cluster settings."""
-        settings_id = uuid4()
+        cluster_id = uuid4()
         new_storage_class = "nfs-storage"
 
         mock_settings = Mock(spec=ClusterSettings)
-        mock_settings.id = settings_id
+        mock_settings.cluster_id = cluster_id
         mock_settings.default_storage_class = "old-storage"
 
-        data_manager.scalar_one_or_none = Mock(return_value=mock_settings)
-        data_manager.session.commit = Mock()
-        data_manager.session.refresh = Mock()
+        data_manager.get_cluster_settings = AsyncMock(return_value=mock_settings)
+        data_manager.update_one = Mock(return_value=mock_settings)
 
-        result = data_manager.update_cluster_settings(
-            settings_id=settings_id,
+        result = await data_manager.update_cluster_settings(
+            cluster_id=cluster_id,
             default_storage_class=new_storage_class
         )
 
         assert result == mock_settings
         assert mock_settings.default_storage_class == new_storage_class
-        data_manager.session.commit.assert_called_once()
-        data_manager.session.refresh.assert_called_once_with(mock_settings)
+        data_manager.update_one.assert_called_once_with(mock_settings)
 
-    def test_update_cluster_settings_not_found(self, data_manager):
+    @pytest.mark.asyncio
+    async def test_update_cluster_settings_not_found(self, data_manager):
         """Test updating cluster settings when not found."""
-        settings_id = uuid4()
+        cluster_id = uuid4()
 
-        data_manager.scalar_one_or_none = Mock(return_value=None)
+        data_manager.get_cluster_settings = AsyncMock(return_value=None)
 
-        result = data_manager.update_cluster_settings(
-            settings_id=settings_id,
+        result = await data_manager.update_cluster_settings(
+            cluster_id=cluster_id,
             default_storage_class="new-storage"
         )
 
         assert result is None
 
-    def test_delete_cluster_settings(self, data_manager):
+    @pytest.mark.asyncio
+    async def test_delete_cluster_settings(self, data_manager):
         """Test deleting cluster settings."""
         cluster_id = uuid4()
 
         mock_settings = Mock(spec=ClusterSettings)
-        data_manager.scalar_one_or_none = Mock(return_value=mock_settings)
-        data_manager.session.delete = Mock()
-        data_manager.session.commit = Mock()
+        data_manager.get_cluster_settings = AsyncMock(return_value=mock_settings)
+        data_manager.delete_model = AsyncMock()
 
-        result = data_manager.delete_cluster_settings(cluster_id)
+        result = await data_manager.delete_cluster_settings(cluster_id)
 
         assert result is True
-        data_manager.session.delete.assert_called_once_with(mock_settings)
-        data_manager.session.commit.assert_called_once()
+        data_manager.delete_model.assert_called_once_with(mock_settings)
 
-    def test_delete_cluster_settings_not_found(self, data_manager):
+    @pytest.mark.asyncio
+    async def test_delete_cluster_settings_not_found(self, data_manager):
         """Test deleting cluster settings when not found."""
         cluster_id = uuid4()
 
-        data_manager.scalar_one_or_none = Mock(return_value=None)
+        data_manager.get_cluster_settings = AsyncMock(return_value=None)
 
-        result = data_manager.delete_cluster_settings(cluster_id)
+        result = await data_manager.delete_cluster_settings(cluster_id)
 
         assert result is False
 
-    def test_upsert_cluster_settings_create_new(self, data_manager):
+    @pytest.mark.asyncio
+    async def test_upsert_cluster_settings_create_new(self, data_manager):
         """Test upsert when settings don't exist (create new)."""
         cluster_id = uuid4()
         user_id = uuid4()
@@ -179,10 +172,10 @@ class TestClusterSettingsDataManager:
         mock_new_settings.id = uuid4()
         mock_new_settings.cluster_id = cluster_id
 
-        data_manager.get_cluster_settings_by_cluster_id = Mock(return_value=None)
-        data_manager.create_cluster_settings = Mock(return_value=mock_new_settings)
+        data_manager.get_cluster_settings = AsyncMock(return_value=None)
+        data_manager.create_cluster_settings = AsyncMock(return_value=mock_new_settings)
 
-        result = data_manager.upsert_cluster_settings(
+        result = await data_manager.upsert_cluster_settings(
             cluster_id=cluster_id,
             default_storage_class=default_storage_class,
             created_by=user_id
@@ -192,10 +185,12 @@ class TestClusterSettingsDataManager:
         data_manager.create_cluster_settings.assert_called_once_with(
             cluster_id=cluster_id,
             default_storage_class=default_storage_class,
-            created_by=user_id
+            created_by=user_id,
+            default_access_mode=None
         )
 
-    def test_upsert_cluster_settings_update_existing(self, data_manager):
+    @pytest.mark.asyncio
+    async def test_upsert_cluster_settings_update_existing(self, data_manager):
         """Test upsert when settings exist (update)."""
         cluster_id = uuid4()
         user_id = uuid4()
@@ -205,20 +200,18 @@ class TestClusterSettingsDataManager:
         mock_existing_settings.id = uuid4()
         mock_existing_settings.cluster_id = cluster_id
 
-        data_manager.get_cluster_settings_by_cluster_id = Mock(return_value=mock_existing_settings)
-        data_manager.update_cluster_settings = Mock(return_value=mock_existing_settings)
+        data_manager.get_cluster_settings = AsyncMock(return_value=mock_existing_settings)
+        data_manager.update_one = Mock(return_value=mock_existing_settings)
 
-        result = data_manager.upsert_cluster_settings(
+        result = await data_manager.upsert_cluster_settings(
             cluster_id=cluster_id,
             default_storage_class=default_storage_class,
             created_by=user_id
         )
 
         assert result == mock_existing_settings
-        data_manager.update_cluster_settings.assert_called_once_with(
-            settings_id=mock_existing_settings.id,
-            default_storage_class=default_storage_class
-        )
+        assert mock_existing_settings.default_storage_class == default_storage_class
+        data_manager.update_one.assert_called_once_with(mock_existing_settings)
 
 
 class TestClusterService:
@@ -255,7 +248,7 @@ class TestClusterService:
         mock_settings.updated_at = datetime.now(timezone.utc)
 
         cluster_service.cluster_data_manager.get_cluster_by_id = Mock(return_value=mock_cluster)
-        cluster_service.cluster_settings_data_manager.get_cluster_settings_by_cluster_id = Mock(
+        cluster_service.cluster_settings_data_manager.get_cluster_settings = AsyncMock(
             return_value=mock_settings
         )
 
@@ -287,7 +280,7 @@ class TestClusterService:
         mock_cluster.id = cluster_id
 
         cluster_service.cluster_data_manager.get_cluster_by_id = Mock(return_value=mock_cluster)
-        cluster_service.cluster_settings_data_manager.get_cluster_settings_by_cluster_id = Mock(
+        cluster_service.cluster_settings_data_manager.get_cluster_settings = AsyncMock(
             return_value=None
         )
 
@@ -319,7 +312,7 @@ class TestClusterService:
         mock_settings.updated_at = datetime.now(timezone.utc)
 
         cluster_service.cluster_data_manager.get_cluster_by_id = Mock(return_value=mock_cluster)
-        cluster_service.cluster_settings_data_manager.get_cluster_settings_by_cluster_id = Mock(
+        cluster_service.cluster_settings_data_manager.get_cluster_settings = AsyncMock(
             return_value=None
         )
         cluster_service.cluster_settings_data_manager.create_cluster_settings = Mock(
@@ -348,7 +341,7 @@ class TestClusterService:
         mock_existing_settings = Mock(spec=ClusterSettings)
 
         cluster_service.cluster_data_manager.get_cluster_by_id = Mock(return_value=mock_cluster)
-        cluster_service.cluster_settings_data_manager.get_cluster_settings_by_cluster_id = Mock(
+        cluster_service.cluster_settings_data_manager.get_cluster_settings = AsyncMock(
             return_value=mock_existing_settings
         )
 
@@ -379,7 +372,7 @@ class TestClusterService:
         mock_settings.updated_at = datetime.now(timezone.utc)
 
         cluster_service.cluster_data_manager.get_cluster_by_id = Mock(return_value=mock_cluster)
-        cluster_service.cluster_settings_data_manager.get_cluster_settings_by_cluster_id = Mock(
+        cluster_service.cluster_settings_data_manager.get_cluster_settings = AsyncMock(
             return_value=mock_settings
         )
         cluster_service.cluster_settings_data_manager.update_cluster_settings = Mock(
