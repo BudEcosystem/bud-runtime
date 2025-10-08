@@ -24,6 +24,7 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
   onDeleteVariable
 }) => {
   const [isOpen, setIsOpen] = React.useState(true);
+  const [structuredOutputEnabled, setStructuredOutputEnabled] = React.useState(false);
   const [variableOpenStates, setVariableOpenStates] = React.useState<Record<string, boolean>>({});
 
   return (
@@ -51,17 +52,21 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
         </div>
         <div
           className="flex flex-row items-center gap-[1rem] px-[.3rem] justify-start cursor-pointer"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => setStructuredOutputEnabled(!structuredOutputEnabled)}
         >
           <div className="flex flex-row items-center gap-[.4rem] py-[.5rem]">
             <Text_12_400_B3B3B3>Structured output</Text_12_400_B3B3B3>
           </div>
-          <Switch className="" />
+          <Switch
+            checked={structuredOutputEnabled}
+            onChange={(checked) => setStructuredOutputEnabled(checked)}
+          />
         </div>
       </div>
-      {/* Output Variables Section */}
-      <div className="">
-        {(outputVariables || []).map((variable, index) => (
+      {/* Output Variables Section - Only show if structured output is enabled */}
+      {structuredOutputEnabled && (
+        <div className="">
+          {(outputVariables || []).map((variable, index) => (
           <div key={variable.id} className="border-b border-[#1F1F1F]">
             <div className='py-[1rem]'>
               <div className='flex justify-between items-center px-[.5rem] cursor-pointer' onClick={() => {
@@ -155,7 +160,8 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -9,6 +9,42 @@ export const PromptMessagesCard = () => {
   // Get prompt messages from the session, with default if empty
   const promptMessages = session?.promptMessages || '';
 
+  // Parse and format the messages for display
+  const getDisplayContent = () => {
+    if (!promptMessages) {
+      return 'Enter prompt messages';
+    }
+
+    try {
+      const parsed = JSON.parse(promptMessages);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Display all message contents, one per line
+        return parsed.map((msg: any) => msg.content || '').filter(Boolean).join('\n\n');
+      }
+      return promptMessages;
+    } catch (e) {
+      // If it's not valid JSON, display as-is
+      return promptMessages;
+    }
+  };
+
+  // Get count of messages for footer
+  const getMessageCount = () => {
+    if (!promptMessages) return 0;
+    try {
+      const parsed = JSON.parse(promptMessages);
+      if (Array.isArray(parsed)) {
+        return parsed.length;
+      }
+      return 1;
+    } catch (e) {
+      return promptMessages ? 1 : 0;
+    }
+  };
+
+  const displayContent = getDisplayContent();
+  const messageCount = getMessageCount();
+
   return (
     <div className="prompt-messages-card" style={{
       background: '#0E0E0E',
@@ -99,12 +135,12 @@ export const PromptMessagesCard = () => {
         }}>
           <div style={{
             fontSize: '12px',
-            color: promptMessages ? '#EEEEEE' : '#808080',
+            color: displayContent === 'Enter prompt messages' ? '#808080' : '#EEEEEE',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
             background: 'transparent',
           }}>
-            {promptMessages || 'Enter prompt messages'}
+            {displayContent}
           </div>
         </div>
       </div>
@@ -118,7 +154,7 @@ export const PromptMessagesCard = () => {
         textAlign: 'center',
         background: 'transparent',
       }}>
-        {promptMessages ? 'Prompt messages configured' : 'No prompt messages set'}
+        {messageCount > 0 ? `${messageCount} message${messageCount !== 1 ? 's' : ''} configured` : 'No prompt messages set'}
       </div>
 
       {/* Save Button */}

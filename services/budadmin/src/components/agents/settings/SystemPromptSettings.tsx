@@ -3,7 +3,6 @@
 import React from 'react';
 import { Checkbox } from "antd";
 import { Text_16_400_EEEEEE, Text_10_400_757575 } from "../../ui/text";
-import { TextAreaInput } from "../../ui/input";
 
 interface SystemPromptSettingsProps {
   sessionId: string;
@@ -27,14 +26,16 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
 
       {/* Text Area */}
       <div className="mb-4">
-        <TextAreaInput
-          className="!w-full !max-w-full !min-h-[7.5rem] text-[#EEEEEE] text-sm placeholder:text-[#757575] bg-[#0F0F0F] border-[#2A2A2A] hover:border-[#965CDE] focus:border-[#965CDE] !rounded-lg"
+        <textarea
+          className="w-full max-w-full min-h-[7.5rem] text-[#EEEEEE] text-sm bg-[#0F0F0F] border border-[#2A2A2A] hover:border-[#965CDE] focus:border-[#965CDE] rounded-lg p-3 outline-none resize-y placeholder:text-[#757575] placeholder:opacity-100 placeholder:text-[.75rem]"
           value={systemPrompt}
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
             onSystemPromptChange(e.target.value);
           }}
           placeholder="Enter system prompt..."
-          style={{ color: '#EEEEEE' }}
+          style={{
+            color: '#EEEEEE',
+          }}
         />
       </div>
 

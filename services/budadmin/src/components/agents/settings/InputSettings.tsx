@@ -24,6 +24,7 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
   onDeleteVariable
 }) => {
   const [isOpen, setIsOpen] = React.useState(true);
+  const [structuredInputEnabled, setStructuredInputEnabled] = React.useState(false);
   const [variableOpenStates, setVariableOpenStates] = React.useState<Record<string, boolean>>({});
   const [validationEnabled, setValidationEnabled] = React.useState<Record<string, boolean>>({});
 
@@ -63,17 +64,21 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
         </div>
         <div
           className="flex flex-row items-center gap-[1rem] px-[.3rem] justify-start cursor-pointer"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => setStructuredInputEnabled(!structuredInputEnabled)}
         >
           <div className="flex flex-row items-center gap-[.4rem] py-[.5rem]">
             <Text_12_400_B3B3B3>Structured input</Text_12_400_B3B3B3>
           </div>
-          <Switch className="" />
+          <Switch
+            checked={structuredInputEnabled}
+            onChange={(checked) => setStructuredInputEnabled(checked)}
+          />
         </div>
       </div>
-      {/* Input Variables Section */}
-      <div className="">
-        {(inputVariables || []).map((variable, index) => (
+      {/* Input Variables Section - Only show if structured input is enabled */}
+      {structuredInputEnabled && (
+        <div className="">
+          {(inputVariables || []).map((variable, index) => (
           <div key={variable.id} className="border-b border-[#1F1F1F]">
             <div className='py-[1rem]'>
               <div className='flex justify-between items-center px-[.5rem] cursor-pointer' onClick={() => {
@@ -110,7 +115,7 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
                         <div className="flex flex-col gap-1">
                           <TextInput
                             name={`variable-name-${variable.id}`}
-                            className="!w-full !max-w-full !h-[2rem] placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem]"
+                            className="!w-full !max-w-full !h-[2rem] placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem] text-[#EEEEEE]"
                             value={variable.name || ''}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                               onVariableChange(variable.id, "name", e.target.value)
@@ -154,7 +159,7 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
                         {/* Default Value */}
                         <div className="flex flex-col gap-1">
                           <TextInput
-                            className="!w-full !max-w-full !h-[2rem] !text-[#EEEEEE] !text-xs !placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem]"
+                            className="!w-full !max-w-full !h-[2rem] !text-[#EEEEEE] !text-xs !placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem]  text-[#EEEEEE]"
                             value={variable.defaultValue || ''}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                               onVariableChange(variable.id, "defaultValue", e.target.value)
@@ -200,7 +205,8 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -147,9 +147,7 @@ export const buildPromptSchemaPayload = (
   };
 
   // Add optional fields if provided
-  if (workflowId) {
-    payload.workflow_id = workflowId;
-  }
+  // Note: workflow_id is not sent for prompt-schema endpoint
 
   if (deploymentName) {
     payload.deployment_name = deploymentName;

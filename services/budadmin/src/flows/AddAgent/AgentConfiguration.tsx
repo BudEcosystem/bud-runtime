@@ -12,6 +12,7 @@ import InfoLabel from "@/components/ui/bud/dataEntry/InfoLabel";
 import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 import TagsInput, { Tag } from "@/components/ui/bud/dataEntry/TagsInput";
 import { useAddAgent } from "@/stores/useAddAgent";
+import { useAgentStore } from "@/stores/useAgentStore";
 import { AppRequest } from "src/pages/api/requests";
 import { tempApiBaseUrl } from "@/components/environment";
 
@@ -27,6 +28,9 @@ export default function AgentConfiguration() {
     setAgentConfiguration,
     getWorkflow
   } = useAddAgent();
+
+  // Get the active agent session to retrieve promptId
+  const { sessions, activeSessionIds } = useAgentStore();
 
   // State for form values
   const [deploymentName, setDeploymentName] = useState("");
@@ -133,12 +137,30 @@ export default function AgentConfiguration() {
           trigger_workflow: triggerWorkflow
         };
 
-        // Include bud_prompt_id if it exists in the workflow
-        if (currentWorkflow.workflow_steps?.bud_prompt_id) {
-          payload.bud_prompt_id = currentWorkflow.workflow_steps.bud_prompt_id;
-        } else if ((currentWorkflow as any).bud_prompt_id) {
-          payload.bud_prompt_id = (currentWorkflow as any).bud_prompt_id;
+        // Get bud_prompt_id from the active agent session
+        console.log("=== AgentConfiguration Debug ===");
+        console.log("Active sessions:", sessions);
+        console.log("Active session IDs:", activeSessionIds);
+
+        // Find the session associated with this workflow
+        const activeSession = sessions.find(
+          s => s.workflowId === currentWorkflow.workflow_id
+        ) || sessions.find(s => activeSessionIds.includes(s.id));
+
+        console.log("Active session for workflow:", activeSession);
+        console.log("Session promptId:", activeSession?.promptId);
+
+        // Use the session's promptId as bud_prompt_id
+        const budPromptId = activeSession?.promptId || currentWorkflow.workflow_steps?.bud_prompt_id;
+
+        if (budPromptId) {
+          payload.bud_prompt_id = budPromptId;
+          console.log("✓ bud_prompt_id included in payload:", payload.bud_prompt_id);
+        } else {
+          console.warn("⚠ bud_prompt_id is missing! No active session or workflow_steps.bud_prompt_id found");
         }
+
+        console.log("Final payload for step 4:", payload);
 
         // Call the workflow API for step 4
         const response = await AppRequest.Post(

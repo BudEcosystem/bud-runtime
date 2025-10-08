@@ -82,10 +82,15 @@ const generateVariableId = () => {
   return `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
+const generatePromptId = () => {
+  return `prompt_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+};
+
 const createDefaultSession = (): AgentSession => ({
   id: generateId(),
   name: `Agent ${new Date().toLocaleTimeString()}`,
   active: true,
+  promptId: generatePromptId(), // Generate promptId when session is created
   systemPrompt: "",
   promptMessages: "",  // Explicitly set as empty string
   inputVariables: [
@@ -99,7 +104,17 @@ const createDefaultSession = (): AgentSession => ({
       defaultValue: ""
     }
   ],
-  outputVariables: [],
+  outputVariables: [
+    {
+      id: generateVariableId(),
+      name: "Output Variable 1",
+      value: "",
+      type: "output",
+      description: "",
+      dataType: "string",
+      defaultValue: ""
+    }
+  ],
   createdAt: new Date(),
   updatedAt: new Date(),
   position: 0,
@@ -334,20 +349,35 @@ export const useAgentStore = create<AgentStore>()(
         sessions: state.sessions,
         activeSessionIds: state.activeSessionIds
       }),
-      // Migration to fix promptMessages if it's an array
+      // Migration to fix promptMessages if it's an array and add default output variable
       migrate: (persistedState: any, _version: number) => {
         // Clean up any corrupted promptMessages data
         if (persistedState && persistedState.sessions) {
           persistedState.sessions = persistedState.sessions.map((session: any) => {
+            const updatedSession = { ...session };
+
             // If promptMessages is an array or object, convert it to empty string
             if (typeof session.promptMessages !== 'string') {
-              return {
-                ...session,
-                promptMessages: "",
-                systemPrompt: session.systemPrompt || ""
-              };
+              updatedSession.promptMessages = "";
+              updatedSession.systemPrompt = session.systemPrompt || "";
             }
-            return session;
+
+            // Add default output variable if none exist
+            if (!updatedSession.outputVariables || updatedSession.outputVariables.length === 0) {
+              updatedSession.outputVariables = [
+                {
+                  id: generateVariableId(),
+                  name: "Output Variable 1",
+                  value: "",
+                  type: "output",
+                  description: "",
+                  dataType: "string",
+                  defaultValue: ""
+                }
+              ];
+            }
+
+            return updatedSession;
           });
         }
         return persistedState;

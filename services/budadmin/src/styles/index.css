@@ -77,6 +77,32 @@ input {
   background-color: #060606;
 }
 
+/* Reduce flowgram canvas dot pattern brightness to 30% */
+.demo-fixed-container svg[data-background="true"] circle,
+.demo-fixed-container [data-background="true"] circle,
+.gedit-playground svg[data-background="true"] circle,
+.gedit-playground [data-background="true"] circle {
+  opacity: 0.3 !important;
+  fill-opacity: 0.3 !important;
+}
+
+/* Alternative: target the background layer itself */
+.demo-fixed-container [class*="background"],
+.gedit-playground [class*="background"] {
+  opacity: 0.3;
+}
+
+/* Hide incoming connection line above the first input node */
+/* Use clip-path to hide only the top portion of the connection line */
+
+.gedit-flow-lines-layer,
+.demo-fixed-container .gedit-flow-lines-layer,
+.gedit-playground .gedit-flow-lines-layer {
+  /* Clip the top 100px to hide the line above the first node */
+  clip-path: inset(100px 0 0 0);
+  -webkit-clip-path: inset(100px 0 0 0);
+}
+
 /* Custom Select Styles for Dark Theme */
 .custom-select .ant-select-selector {
   background-color: #0A0A0A !important;
@@ -119,4 +145,30 @@ input {
 
 .ant-select-item-option-selected {
   background-color: #965CDE20 !important;
+}
+
+/* System Prompt Settings TextArea placeholder visibility */
+textarea::placeholder {
+  color: #757575 !important;
+  opacity: 1 !important;
+}
+
+textarea::-webkit-input-placeholder {
+  color: #757575 !important;
+  opacity: 1 !important;
+}
+
+textarea::-moz-placeholder {
+  color: #757575 !important;
+  opacity: 1 !important;
+}
+
+textarea:-ms-input-placeholder {
+  color: #757575 !important;
+  opacity: 1 !important;
+}
+
+textarea:-moz-placeholder {
+  color: #757575 !important;
+  opacity: 1 !important;
 }

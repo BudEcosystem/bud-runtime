@@ -85,7 +85,9 @@ export const nodeRegistries: FlowNodeRegistry[] = [
   },
   {
     type: 'multiInputs',
-    meta: {},
+    meta: {
+      isStart: true, // Mark as start node to prevent incoming connections
+    },
     onAdd() {
       return {
         id: `multiInputs_${nanoid(5)}`,

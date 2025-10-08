@@ -33,6 +33,7 @@ function AgentBoxInner({
 }: AgentBoxProps) {
   // All hooks must be called before any conditional returns
   const {
+    sessions,
     updateSession,
     deleteSession,
     duplicateSession,
@@ -43,6 +44,15 @@ function AgentBoxInner({
     createSession,
     closeAgentDrawer,
   } = useAgentStore();
+
+  // Ensure session has a promptId (migration for old sessions)
+  React.useEffect(() => {
+    if (session && !session.promptId) {
+      const newPromptId = `prompt_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      console.log("Session missing promptId, generating new one:", newPromptId);
+      updateSession(session.id, { promptId: newPromptId });
+    }
+  }, [session, updateSession]);
 
   const [localSystemPrompt, setLocalSystemPrompt] = useState(session?.systemPrompt || "");
   // Ensure promptMessages is always a string, even if it comes as an array from corrupted data
@@ -56,6 +66,7 @@ function AgentBoxInner({
   const [isSavingOutput, setIsSavingOutput] = useState(false);
   const [isSavingSystemPrompt, setIsSavingSystemPrompt] = useState(false);
   const [isSavingPromptMessages, setIsSavingPromptMessages] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
 
   // Use the prompt schema workflow hook for socket handling (Input)
   const { status: workflowStatus, startWorkflow, resetStatus } = usePromptSchemaWorkflow({
@@ -199,12 +210,7 @@ function AgentBoxInner({
       return;
     }
 
-    // Check if workflow_id exists, if not we need to get it from add agent workflow
-    if (!session.workflowId) {
-      errorToast("Workflow ID is not available. Please create the agent workflow first.");
-      return;
-    }
-
+    // Note: workflow_id is not required for input schema
     setIsSaving(true);
 
     try {
@@ -220,6 +226,11 @@ function AgentBoxInner({
         true   // trigger_workflow
       );
 
+      console.log("=== Input Schema Save Debug ===");
+      console.log("Session promptId:", session.promptId);
+      console.log("Built payload:", payload);
+      console.log("Payload includes prompt_id:", payload.prompt_id);
+
       // Start workflow status tracking
       startWorkflow();
 
@@ -230,21 +241,33 @@ function AgentBoxInner({
       );
 
       if (response && response.data) {
-        successToast("Prompt schema saved successfully");
+        console.log("Input schema save response:", response.data);
+        console.log("Using promptId from session:", session.promptId);
 
-        // Optionally update the session with the response data if needed
-        // For example, if the API returns an ID or updated workflow info
-        if (response.data.id || response.data.schema_id || response.data.prompt_id) {
-          updateSession(session.id, {
-            workflowId: session.workflowId, // Keep existing workflow_id
-            promptId: response.data.prompt_id || response.data.id // Store prompt_id if returned
-          });
+        // Extract workflow_id from response
+        const workflowId = response.data.workflow_id;
+
+        if (workflowId) {
+          console.log("Got workflow_id from response:", workflowId);
+
+          // Make GET call to /workflows/{workflow_id}
+          try {
+            const workflowResponse = await AppRequest.Get(
+              `${tempApiBaseUrl}/workflows/${workflowId}`
+            );
+            console.log("Workflow status response:", workflowResponse.data);
+          } catch (workflowError) {
+            console.error("Error fetching workflow status:", workflowError);
+          }
         }
 
-        // Close the agent drawer after successful save
-        // setTimeout(() => {
-        //   closeAgentDrawer();
-        // }, 500);
+        successToast("Input schema saved successfully");
+
+        // promptId is already set when session was created, no need to extract from response
+        // Just verify it exists
+        if (!session.promptId) {
+          console.error("WARNING: Session does not have a promptId!");
+        }
       }
     } catch (error: any) {
       console.error("Error saving prompt schema:", error);
@@ -272,12 +295,7 @@ function AgentBoxInner({
       return;
     }
 
-    // Check if workflow_id exists
-    if (!session.workflowId) {
-      errorToast("Workflow ID is not available. Please create the agent workflow first.");
-      return;
-    }
-
+    // Note: workflow_id is not required for output schema
     setIsSavingOutput(true);
 
     try {
@@ -300,14 +318,32 @@ function AgentBoxInner({
       );
 
       if (response && response.data) {
+        console.log("Output schema save response:", response.data);
+        console.log("Using promptId from session:", session.promptId);
+
+        // Extract workflow_id from response
+        const workflowId = response.data.workflow_id;
+
+        if (workflowId) {
+          console.log("Got workflow_id from response:", workflowId);
+
+          // Make GET call to /workflows/{workflow_id}
+          try {
+            const workflowResponse = await AppRequest.Get(
+              `${tempApiBaseUrl}/workflows/${workflowId}`
+            );
+            console.log("Workflow status response:", workflowResponse.data);
+          } catch (workflowError) {
+            console.error("Error fetching workflow status:", workflowError);
+          }
+        }
+
         successToast("Output schema saved successfully");
 
-        // Update the session with the response data if needed
-        if (response.data.id || response.data.schema_id || response.data.prompt_id) {
-          updateSession(session.id, {
-            workflowId: session.workflowId, // Keep existing workflow_id
-            promptId: response.data.prompt_id || response.data.id // Store prompt_id if returned
-          });
+        // promptId is already set when session was created, no need to extract from response
+        // Just verify it exists
+        if (!session.promptId) {
+          console.error("WARNING: Session does not have a promptId!");
         }
       }
     } catch (error: any) {
@@ -330,15 +366,15 @@ function AgentBoxInner({
       return;
     }
 
+    console.log("=== handleSaveSystemPrompt Debug ===");
+    console.log("Full session object:", session);
+    console.log("session.promptId:", session.promptId);
+    console.log("session.workflowId:", session.workflowId);
+    console.log("session.selectedDeployment:", session.selectedDeployment);
+
     // Check if deployment is selected
     if (!session.selectedDeployment?.name) {
       errorToast("Please select a deployment model first");
-      return;
-    }
-
-    // Check if prompt_id exists
-    if (!session.promptId) {
-      errorToast("Prompt ID is not available. Please save input/output schema first.");
       return;
     }
 
@@ -347,6 +383,15 @@ function AgentBoxInner({
       errorToast("System prompt cannot be empty");
       return;
     }
+
+    // Check if prompt_id exists (it should be auto-generated)
+    if (!session.promptId) {
+      console.error("promptId is missing from session! This should not happen.");
+      errorToast("Session error: promptId is missing. Please try creating a new agent.");
+      return;
+    }
+
+    console.log("Using promptId:", session.promptId);
 
     setIsSavingSystemPrompt(true);
 
@@ -408,6 +453,25 @@ function AgentBoxInner({
       );
 
       if (response && response.data) {
+        console.log("System prompt save response:", response.data);
+
+        // Extract workflow_id from response
+        const workflowId = response.data.workflow_id;
+
+        if (workflowId) {
+          console.log("Got workflow_id from response:", workflowId);
+
+          // Make GET call to /workflows/{workflow_id}
+          try {
+            const workflowResponse = await AppRequest.Get(
+              `${tempApiBaseUrl}/workflows/${workflowId}`
+            );
+            console.log("Workflow status response:", workflowResponse.data);
+          } catch (workflowError) {
+            console.error("Error fetching workflow status:", workflowError);
+          }
+        }
+
         successToast("System prompt saved successfully");
       }
     } catch (error: any) {
@@ -436,9 +500,10 @@ function AgentBoxInner({
       return;
     }
 
-    // Check if prompt_id exists
+    // Check if prompt_id exists (it should be auto-generated)
     if (!session.promptId) {
-      errorToast("Prompt ID is not available. Please save input/output schema first.");
+      console.error("promptId is missing from session! This should not happen.");
+      errorToast("Session error: promptId is missing. Please try creating a new agent.");
       return;
     }
 
@@ -517,6 +582,25 @@ function AgentBoxInner({
       );
 
       if (response && response.data) {
+        console.log("Prompt messages save response:", response.data);
+
+        // Extract workflow_id from response
+        const workflowId = response.data.workflow_id;
+
+        if (workflowId) {
+          console.log("Got workflow_id from response:", workflowId);
+
+          // Make GET call to /workflows/{workflow_id}
+          try {
+            const workflowResponse = await AppRequest.Get(
+              `${tempApiBaseUrl}/workflows/${workflowId}`
+            );
+            console.log("Workflow status response:", workflowResponse.data);
+          } catch (workflowError) {
+            console.error("Error fetching workflow status:", workflowError);
+          }
+        }
+
         successToast("Prompt messages saved successfully");
       }
     } catch (error: any) {
@@ -556,12 +640,19 @@ function AgentBoxInner({
     <div
       className="agent-box flex flex-col bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg min-w-[400px] h-full overflow-hidden"
       style={{ width: boxWidth, transition: "width 0.3s ease" }}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
     >
       {/* Navigation Bar */}
       <div className="topBg text-white p-4 flex justify-between items-center h-[3.625rem] relative sticky top-0 z-10 bg-[#101010] border-b border-[#1F1F1F]">
         {/* Left Section - Session Info */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-[100px]">
           <span className="text-[#808080] text-xs font-medium">V{index + 1}</span>
+          {isHovering && (
+            <PrimaryButton onClick={closeAgentDrawer}>
+              Save
+            </PrimaryButton>
+          )}
         </div>
 
         {/* Center Section - Load Model */}
