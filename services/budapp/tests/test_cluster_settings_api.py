@@ -53,8 +53,7 @@ class TestClusterSettingsAPI:
             modified_at=now
         )
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             with patch('budapp.cluster_ops.services.ClusterService.get_cluster_settings',
                       return_value=mock_response) as mock_get:
                 response = test_client.get(f"/clusters/{cluster_id}/settings")
@@ -74,8 +73,7 @@ class TestClusterSettingsAPI:
 
         from fastapi import HTTPException
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             with patch('budapp.cluster_ops.services.ClusterService.get_cluster_settings',
                       side_effect=HTTPException(status_code=404, detail="Cluster settings not found")):
                 response = test_client.get(f"/clusters/{cluster_id}/settings")
@@ -102,8 +100,7 @@ class TestClusterSettingsAPI:
             modified_at=now
         )
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             with patch('budapp.cluster_ops.services.ClusterService.create_cluster_settings',
                       return_value=mock_response) as mock_create:
                 response = test_client.post(
@@ -127,8 +124,7 @@ class TestClusterSettingsAPI:
             "default_storage_class": "invalid@storage"
         }
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             response = test_client.post(
                 f"/clusters/{cluster_id}/settings",
                 json=request_data
@@ -146,8 +142,7 @@ class TestClusterSettingsAPI:
 
         from fastapi import HTTPException
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             with patch('budapp.cluster_ops.services.ClusterService.create_cluster_settings',
                       side_effect=HTTPException(status_code=409, detail="Settings already exist")):
                 response = test_client.post(
@@ -176,8 +171,7 @@ class TestClusterSettingsAPI:
             modified_at=now
         )
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             with patch('budapp.cluster_ops.services.ClusterService.update_cluster_settings',
                       return_value=mock_response) as mock_update:
                 response = test_client.put(
@@ -202,8 +196,7 @@ class TestClusterSettingsAPI:
 
         from fastapi import HTTPException
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             with patch('budapp.cluster_ops.services.ClusterService.update_cluster_settings',
                       side_effect=HTTPException(status_code=404, detail="Settings not found")):
                 response = test_client.put(
@@ -217,8 +210,7 @@ class TestClusterSettingsAPI:
         """Test DELETE /clusters/{cluster_id}/settings success."""
         cluster_id = uuid4()
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             with patch('budapp.cluster_ops.services.ClusterService.delete_cluster_settings',
                       return_value=True) as mock_delete:
                 response = test_client.delete(f"/clusters/{cluster_id}/settings")
@@ -236,8 +228,7 @@ class TestClusterSettingsAPI:
 
         from fastapi import HTTPException
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             with patch('budapp.cluster_ops.services.ClusterService.delete_cluster_settings',
                       side_effect=HTTPException(status_code=404, detail="Settings not found")):
                 response = test_client.delete(f"/clusters/{cluster_id}/settings")
@@ -274,8 +265,7 @@ class TestClusterSettingsAPI:
         """Test endpoints with invalid UUID format."""
         invalid_cluster_id = "not-a-valid-uuid"
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             # Test GET with invalid UUID
             response = test_client.get(f"/clusters/{invalid_cluster_id}/settings")
             assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -304,8 +294,7 @@ class TestClusterSettingsAPI:
 
         from fastapi import HTTPException
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             # Test GET when cluster not found
             with patch('budapp.cluster_ops.services.ClusterService.get_cluster_settings',
                       side_effect=HTTPException(status_code=404, detail="Cluster not found")):
@@ -340,8 +329,7 @@ class TestClusterSettingsAPI:
         """Test POST and PUT with empty or missing request body."""
         cluster_id = uuid4()
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             # Test POST with empty body
             response = test_client.post(f"/clusters/{cluster_id}/settings", json={})
             # Should be valid since default_storage_class is optional
@@ -371,8 +359,7 @@ class TestClusterSettingsAPI:
             modified_at=now
         )
 
-        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user), \
-             patch('budapp.commons.permission_handler.check_permissions', return_value=True):
+        with patch('budapp.commons.dependencies.get_current_active_user', return_value=mock_user):
             with patch('budapp.cluster_ops.services.ClusterService.create_cluster_settings',
                       return_value=mock_response) as mock_create:
                 response = test_client.post(
