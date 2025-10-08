@@ -35,7 +35,7 @@ class MockFactory:
         cluster.platform = platform
         cluster.created_by = created_by or uuid.uuid4()
         cluster.created_at = datetime.now(timezone.utc)
-        cluster.updated_at = datetime.now(timezone.utc)
+        cluster.modified_at = datetime.now(timezone.utc)
         return cluster
 
     @staticmethod
@@ -54,7 +54,7 @@ class MockFactory:
         settings.default_access_mode = default_access_mode
         settings.created_by = created_by or uuid.uuid4()
         settings.created_at = datetime.now(timezone.utc)
-        settings.updated_at = datetime.now(timezone.utc)
+        settings.modified_at = datetime.now(timezone.utc)
         return settings
 
     @staticmethod
@@ -74,7 +74,7 @@ class MockFactory:
             "default_access_mode": default_access_mode,
             "created_by": created_by or uuid.uuid4(),
             "created_at": now,
-            "updated_at": now
+            "modified_at": now
         }
 
 
