@@ -320,25 +320,35 @@ class OpenAIStreamingFormatter:
                 "total_tokens": usage_dict.get("total_tokens", 0),
             }
 
-        # Build complete response with final output
-        response = self._build_base_response(
-            status="completed",
-            output=[
-                {
-                    "id": self.item_id,
-                    "type": "message",
-                    "status": "completed",
-                    "content": [
-                        {"type": "output_text", "annotations": [], "logprobs": [], "text": self.accumulated_text}
-                    ],
-                    "role": "assistant",
-                }
-            ],
-        )
+        # Build output array - reasoning item first (if exists), then message item
+        output_items = []
 
-        # Add reasoning summary if we collected thinking parts
-        if self.accumulated_thinking:
-            response["reasoning"]["summary"] = "\n".join(self.accumulated_thinking)
+        # Add reasoning output item if we had thinking/reasoning content
+        if self.reasoning_started and self.accumulated_reasoning:
+            reasoning_item = {
+                "type": "reasoning",
+                "id": self.reasoning_item_id,
+                "status": "completed",
+                "content": [{"type": "reasoning_text", "text": self.accumulated_reasoning}],
+                "summary": [{"type": "summary_text", "text": self.accumulated_reasoning}],
+            }
+            output_items.append(reasoning_item)
+
+        # Add message output item
+        message_item = {
+            "id": self.item_id,
+            "type": "message",
+            "status": "completed",
+            "content": [{"type": "output_text", "annotations": [], "logprobs": [], "text": self.accumulated_text}],
+            "role": "assistant",
+        }
+        output_items.append(message_item)
+
+        # Build complete response with proper output
+        response = self._build_base_response(status="completed", output=output_items)
+
+        # reasoning field stays null (request-level config, not output)
+        # Already handled in _build_base_response as {"effort": null, "summary": null}
 
         event_data = {"type": "response.completed", "sequence_number": self._next_sequence(), "response": response}
         return self._format_sse("response.completed", event_data)

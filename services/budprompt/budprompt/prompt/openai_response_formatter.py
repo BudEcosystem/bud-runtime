@@ -230,8 +230,8 @@ class OpenAIResponseFormatter:
             # Extract instructions from input messages
             instructions = self._format_instructions(messages or [], all_messages)
 
-            # Extract output and reasoning from response
-            output, reasoning_summary = self._format_output_with_reasoning(all_messages, response_id)
+            # Extract output items (includes reasoning and message items)
+            output = self._format_output_with_reasoning(all_messages, response_id)
 
             # Get usage information
             usage = self._format_usage(pydantic_result.usage())
@@ -245,8 +245,8 @@ class OpenAIResponseFormatter:
                         model_name = msg["model_name"]
                         break
 
-            # Build reasoning object with extracted summary
-            reasoning = OpenAIReasoning(summary=reasoning_summary)
+            # Build reasoning object (request-level config, always null for us)
+            reasoning = OpenAIReasoning(effort=None, summary=None)
 
             # Build response
             response = OpenAIResponseSchema(
@@ -313,32 +313,37 @@ class OpenAIResponseFormatter:
 
         return instructions
 
-    def _format_output_with_reasoning(
-        self, all_messages: List[Dict], response_id: str
-    ) -> Tuple[List[Dict], Optional[str]]:
-        """Format output messages and extract reasoning from response.
+    def _format_output_with_reasoning(self, all_messages: List[Dict], response_id: str) -> List[Dict]:
+        """Format output items including reasoning and message items.
+
+        Per OpenAI spec, reasoning output goes in the output array as a separate item
+        with type "reasoning", not in the response.reasoning field (which is for request config).
+
+        Args:
+            all_messages: All messages from pydantic-ai result
+            response_id: The response ID
 
         Returns:
-            Tuple of (output_messages, reasoning_summary)
+            List of output items (reasoning item first if exists, then message items)
         """
-        output = []
+        output_items = []
         thinking_parts = []
+        message_content = []
 
         for msg in all_messages:
             if msg.get("kind") == "response":
                 parts = msg.get("parts", [])
-                content_parts = []
 
                 for part in parts:
                     part_kind = part.get("part_kind", "")
                     content = part.get("content", "")
 
                     if part_kind == "thinking":
-                        # Collect thinking content for reasoning summary
+                        # Collect thinking content for reasoning output item
                         if content:
                             thinking_parts.append(content)
                     elif part_kind in ["text", "tool-call-part"]:
-                        content_parts.append(
+                        message_content.append(
                             {
                                 "type": "output_text",
                                 "text": content,
@@ -347,21 +352,29 @@ class OpenAIResponseFormatter:
                             }
                         )
 
-                if content_parts:
-                    output.append(
-                        {
-                            "id": f"msg_{uuid.uuid4().hex}",
-                            "type": "message",
-                            "status": "completed",
-                            "content": content_parts,
-                            "role": "assistant",
-                        }
-                    )
+        # Build reasoning output item if we have thinking content
+        if thinking_parts:
+            reasoning_item = {
+                "type": "reasoning",
+                "id": f"rs_{uuid.uuid4().hex}",
+                "status": "completed",
+                "content": [{"type": "reasoning_text", "text": "\n".join(thinking_parts)}],
+                "summary": [{"type": "summary_text", "text": "\n".join(thinking_parts)}],
+            }
+            output_items.append(reasoning_item)
 
-        # Combine thinking parts into reasoning summary
-        reasoning_summary = "\n".join(thinking_parts) if thinking_parts else None
+        # Build message output item if we have content
+        if message_content:
+            message_item = {
+                "id": f"msg_{uuid.uuid4().hex}",
+                "type": "message",
+                "status": "completed",
+                "content": message_content,
+                "role": "assistant",
+            }
+            output_items.append(message_item)
 
-        return output, reasoning_summary
+        return output_items
 
     def _format_usage(self, usage_info: Any) -> Dict:
         """Format usage information."""
