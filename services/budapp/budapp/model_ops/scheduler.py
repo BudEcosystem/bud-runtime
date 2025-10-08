@@ -154,14 +154,22 @@ class CloudModelSyncScheduler:
                 )
 
                 # Filter out unsupported endpoints from external source
-                raw_endpoints = cloud_model["endpoints"]
-                supported_endpoints = [ep for ep in raw_endpoints if ep in valid_endpoint_values]
+                # Partition endpoints into supported and unsupported
+                raw_endpoints = cloud_model.get("endpoints") or []
+                supported_endpoints = []
+                unsupported_endpoints = []
+                for ep in raw_endpoints:
+                    if ep in valid_endpoint_values:
+                        supported_endpoints.append(ep)
+                    else:
+                        unsupported_endpoints.append(ep)
 
                 # Log if any endpoints were filtered out
-                if len(supported_endpoints) < len(raw_endpoints):
-                    filtered_out = [ep for ep in raw_endpoints if ep not in valid_endpoint_values]
+                if unsupported_endpoints:
                     logger.warning(
-                        "Filtered out unsupported endpoints for model %s: %s", cloud_model["uri"], filtered_out
+                        "Filtered out unsupported endpoints for model %s: %s",
+                        cloud_model["uri"],
+                        unsupported_endpoints,
                     )
 
                 cloud_model_data.append(
