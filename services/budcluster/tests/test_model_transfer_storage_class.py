@@ -1,7 +1,7 @@
 """Tests for model transfer with storage class support."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock, PropertyMock
+from unittest.mock import Mock, patch
 from budcluster.cluster_ops.kubernetes import KubernetesHandler
 from budcluster.deployment.handler import DeploymentHandler
 
@@ -19,27 +19,26 @@ class TestModelTransferWithStorageClass:
 
         # Mock the get_nfs_service_ip to return an IP
         with patch.object(k8s_handler, 'get_nfs_service_ip', return_value="10.0.0.100"):
-            with patch.object(k8s_handler, 'get_image_pull_secret', return_value={}):
-                k8s_handler.ansible_executor.run_playbook = Mock(return_value={"status": "success"})
-                values = {
-                    "volume_type": "nfs",
-                    "namespace": "test-namespace",
-                    "source_model_path": "model123",
-                    "model_size": 10,
-                    "nodes": [{"name": "node1"}],
-                    "minio_endpoint": "minio.local",
-                    "minio_secure": False,
-                    "minio_access_key": "access",
-                    "minio_secret_key": "secret",
-                    "minio_bucket": "models",
-                }
+            k8s_handler.ansible_executor.run_playbook = Mock(return_value={"status": "success"})
+            values = {
+                "volume_type": "nfs",
+                "namespace": "test-namespace",
+                "source_model_path": "model123",
+                "model_size": 10,
+                "nodes": [{"name": "node1"}],
+                "minio_endpoint": "minio.local",
+                "minio_secure": False,
+                "minio_access_key": "access",
+                "minio_secret_key": "secret",
+                "minio_bucket": "models",
+            }
 
-                result = k8s_handler.transfer_model(values)
+            result = k8s_handler.transfer_model(values)
 
-                # Verify NFS server was set
-                assert values["nfs_server"] == "10.0.0.100"
-                assert values["volume_type"] == "nfs"
-                assert result == "success"
+            # Verify NFS server was set
+            assert values["nfs_server"] == "10.0.0.100"
+            assert values["volume_type"] == "nfs"
+            assert result == "success"
 
     @patch('budcluster.cluster_ops.kubernetes.KubernetesHandler._load_kube_config')
     def test_transfer_model_with_nfs_fallback_to_local(self, mock_load_config):
@@ -51,22 +50,21 @@ class TestModelTransferWithStorageClass:
 
         # Mock the get_nfs_service_ip to return None (NFS not available)
         with patch.object(k8s_handler, 'get_nfs_service_ip', return_value=None):
-            with patch.object(k8s_handler, 'get_image_pull_secret', return_value={}):
-                k8s_handler.ansible_executor.run_playbook = Mock(return_value={"status": "success"})
-                values = {
-                    "volume_type": "nfs",
-                    "namespace": "test-namespace",
-                    "source_model_path": "model123",
-                    "model_size": 10,
-                    "nodes": [{"name": "node1"}],
-                }
+            k8s_handler.ansible_executor.run_playbook = Mock(return_value={"status": "success"})
+            values = {
+                "volume_type": "nfs",
+                "namespace": "test-namespace",
+                "source_model_path": "model123",
+                "model_size": 10,
+                "nodes": [{"name": "node1"}],
+            }
 
-                result = k8s_handler.transfer_model(values)
+            result = k8s_handler.transfer_model(values)
 
-                # Verify fallback to local volume
-                assert values["nfs_server"] == ""
-                assert values["volume_type"] == "local"
-                assert result == "success"
+            # Verify fallback to local volume
+            assert values["nfs_server"] == ""
+            assert values["volume_type"] == "local"
+            assert result == "success"
 
     @patch('budcluster.cluster_ops.kubernetes.KubernetesHandler._load_kube_config')
     def test_transfer_model_with_local_volume_type(self, mock_load_config):
@@ -76,24 +74,23 @@ class TestModelTransferWithStorageClass:
         k8s_handler = KubernetesHandler(mock_config)
         k8s_handler.ansible_executor = Mock()
 
-        with patch.object(k8s_handler, 'get_image_pull_secret', return_value={}):
-            k8s_handler.ansible_executor.run_playbook = Mock(return_value={"status": "success"})
-            values = {
-                "volume_type": "local",
-                "namespace": "test-namespace",
-                "source_model_path": "model123",
-                "model_size": 10,
-                "nodes": [{"name": "node1"}],
-                "storageClass": "fast-ssd",
-            }
+        k8s_handler.ansible_executor.run_playbook = Mock(return_value={"status": "success"})
+        values = {
+            "volume_type": "local",
+            "namespace": "test-namespace",
+            "source_model_path": "model123",
+            "model_size": 10,
+            "nodes": [{"name": "node1"}],
+            "storageClass": "fast-ssd",
+        }
 
-            result = k8s_handler.transfer_model(values)
+        result = k8s_handler.transfer_model(values)
 
-            # Verify NFS server is empty for local volume
-            assert values["nfs_server"] == ""
-            assert values["volume_type"] == "local"
-            assert values["storageClass"] == "fast-ssd"
-            assert result == "success"
+        # Verify NFS server is empty for local volume
+        assert values["nfs_server"] == ""
+        assert values["volume_type"] == "local"
+        assert values["storageClass"] == "fast-ssd"
+        assert result == "success"
 
     @patch('budcluster.deployment.handler.asyncio.run')
     def test_deployment_handler_passes_storage_class(self, mock_asyncio_run):

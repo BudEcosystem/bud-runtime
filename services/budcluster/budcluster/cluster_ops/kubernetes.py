@@ -482,8 +482,6 @@ class KubernetesHandler(BaseClusterHandler):
             # For non-NFS volume types, ensure nfs_server is defined but empty
             values["nfs_server"] = ""
 
-        values["image_pull_secrets"] = self.get_image_pull_secret()
-
         result = self.ansible_executor.run_playbook(
             playbook="MODEL_TRANSFER", extra_vars={"kubeconfig_content": self.config, **values}
         )
