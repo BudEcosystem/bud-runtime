@@ -50,7 +50,7 @@ class TestClusterSettingsAPI:
             default_storage_class="gp2",
             created_by=mock_user.id,
             created_at=now,
-            updated_at=now
+            modified_at=now
         )
 
         with patch('budapp.cluster_ops.cluster_settings_routes.get_current_user', return_value=mock_user):
@@ -97,7 +97,7 @@ class TestClusterSettingsAPI:
             default_storage_class="premium-ssd",
             created_by=mock_user.id,
             created_at=now,
-            updated_at=now
+            modified_at=now
         )
 
         with patch('budapp.cluster_ops.cluster_settings_routes.get_current_user', return_value=mock_user):
@@ -111,7 +111,7 @@ class TestClusterSettingsAPI:
                 assert response.status_code == status.HTTP_201_CREATED
                 data = response.json()
                 assert data["success"] is True
-                assert data["data"]["settings"]["id"] == str(settings_id)
+                assert data["data"]["settings"]["id"] == str(mock_response.id)
                 assert data["data"]["settings"]["default_storage_class"] == "premium-ssd"
 
                 mock_create.assert_called_once()
@@ -168,7 +168,7 @@ class TestClusterSettingsAPI:
             default_storage_class="updated-storage",
             created_by=mock_user.id,
             created_at=now,
-            updated_at=now
+            modified_at=now
         )
 
         with patch('budapp.cluster_ops.cluster_settings_routes.get_current_user', return_value=mock_user):
@@ -356,7 +356,7 @@ class TestClusterSettingsAPI:
             default_storage_class=None,
             created_by=mock_user.id,
             created_at=now,
-            updated_at=now
+            modified_at=now
         )
 
         with patch('budapp.cluster_ops.cluster_settings_routes.get_current_user', return_value=mock_user):
