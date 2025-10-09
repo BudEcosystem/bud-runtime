@@ -5263,65 +5263,98 @@ pub async fn response_create_handler(
         );
     }
 
-    // Determine if we should expect streaming response based on:
-    // 1. Explicit stream parameter (highest priority)
-    // 2. prompt_stream config (if request has prompt reference and provider is BudPrompt)
-    // 3. Default to false
-    let should_stream = if let Some(explicit_stream) = params.stream {
-        // Explicit stream parameter always takes precedence
-        explicit_stream
-    } else if params.prompt.is_some() {
-        // For prompt requests without explicit stream, check if BudPrompt provider has prompt_stream=true
-        model.providers
-            .values()
-            .next()
-            .and_then(|p| {
-                if let crate::model::ProviderConfig::BudPrompt(provider) = &p.config {
-                    provider.prompt_stream
-                } else {
-                    None
-                }
+    // Check if this is a BudPrompt request with prompt parameter
+    // BudPrompt determines streaming based on internal prompt config, not the stream parameter
+    let is_budprompt_with_prompt = {
+        let models = config.models.read().await;
+        let model_info = models.get(&model_name).await?.ok_or_else(|| {
+            Error::new(ErrorDetails::Config {
+                message: format!("Model '{}' not found", model_name),
             })
-            .unwrap_or(false)
-    } else {
-        false
-    };
+        })?;
 
-    if should_stream {
-        // Handle streaming response
-        let stream = model
-            .stream_response(&params, &model_resolution.original_model_name, &clients)
-            .await?;
-
-        // Convert to SSE stream
-        let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
-            Ok(event) => {
-                // For ResponseStreamEvent, use event field as SSE event type and data field as data
-                Event::default()
-                    .event(event.event)
-                    .json_data(event.data)
-                    .map_err(|e| {
-                        Error::new(ErrorDetails::Inference {
-                            message: format!("Failed to serialize SSE event: {e}"),
-                        })
-                    })
-            },
-            Err(e) => Err(e),
+        // Check if any provider is BudPrompt
+        let has_budprompt = model_info.providers.values().any(|p| {
+            matches!(p.config, crate::model::ProviderConfig::BudPrompt(_))
         });
 
-        Ok(Sse::new(sse_stream).into_response())
-    } else {
-        // Handle non-streaming response
-        let response = model
-            .create_response(&params, &model_resolution.original_model_name, &clients)
+        has_budprompt && params.prompt.is_some()
+    };
+
+    if is_budprompt_with_prompt {
+        // Use automatic format detection for BudPrompt with prompt parameter
+        use crate::responses::ResponseResult;
+
+        let result = model
+            .execute_response_with_detection(&params, &model_resolution.original_model_name, &clients)
             .await?;
 
-        // Log the response size for debugging
-        if let Ok(response_json) = serde_json::to_string(&response) {
-            tracing::debug!("Response size: {} bytes", response_json.len());
-        }
+        match result {
+            ResponseResult::Streaming(stream) => {
+                // Convert to SSE stream
+                let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
+                    Ok(event) => {
+                        Event::default()
+                            .event(event.event)
+                            .json_data(event.data)
+                            .map_err(|e| {
+                                Error::new(ErrorDetails::Inference {
+                                    message: format!("Failed to serialize SSE event: {e}"),
+                                })
+                            })
+                    },
+                    Err(e) => Err(e),
+                });
 
-        Ok(Json(response).into_response())
+                Ok(Sse::new(sse_stream).into_response())
+            }
+            ResponseResult::NonStreaming(response) => {
+                // Log the response size for debugging
+                if let Ok(response_json) = serde_json::to_string(&response) {
+                    tracing::debug!("Response size: {} bytes", response_json.len());
+                }
+
+                Ok(Json(response).into_response())
+            }
+        }
+    } else {
+        // Standard behavior: check stream parameter
+        if params.stream.unwrap_or(false) {
+            // Handle streaming response
+            let stream = model
+                .stream_response(&params, &model_resolution.original_model_name, &clients)
+                .await?;
+
+            // Convert to SSE stream
+            let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
+                Ok(event) => {
+                    // For ResponseStreamEvent, use event field as SSE event type and data field as data
+                    Event::default()
+                        .event(event.event)
+                        .json_data(event.data)
+                        .map_err(|e| {
+                            Error::new(ErrorDetails::Inference {
+                                message: format!("Failed to serialize SSE event: {e}"),
+                            })
+                        })
+                },
+                Err(e) => Err(e),
+            });
+
+            Ok(Sse::new(sse_stream).into_response())
+        } else {
+            // Handle non-streaming response
+            let response = model
+                .create_response(&params, &model_resolution.original_model_name, &clients)
+                .await?;
+
+            // Log the response size for debugging
+            if let Ok(response_json) = serde_json::to_string(&response) {
+                tracing::debug!("Response size: {} bytes", response_json.len());
+            }
+
+            Ok(Json(response).into_response())
+        }
     }
 }
 

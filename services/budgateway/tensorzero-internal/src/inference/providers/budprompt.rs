@@ -4,7 +4,7 @@ use crate::model::{Credential, CredentialLocation};
 use reqwest::StatusCode;
 use crate::responses::{
     OpenAIResponse, OpenAIResponseCreateParams, ResponseInputItemsList, ResponseProvider,
-    ResponseStreamEvent,
+    ResponseResult, ResponseStreamEvent,
 };
 use futures::{Stream, StreamExt};
 use reqwest::Client;
@@ -20,15 +20,12 @@ const PROVIDER_TYPE: &str = "budprompt";
 pub struct BudPromptProvider {
     pub api_base: Url,
     pub credentials: BudPromptCredentials,
-    /// Whether prompts should stream by default (when stream is not explicitly specified in request)
-    pub prompt_stream: Option<bool>,
 }
 
 impl BudPromptProvider {
     pub fn new(
         api_base: Url,
         api_key_location: Option<CredentialLocation>,
-        prompt_stream: Option<bool>,
     ) -> Result<Self, Error> {
         let credentials = if let Some(location) = api_key_location {
             BudPromptCredentials::try_from(Credential::try_from((location, PROVIDER_NAME))?)
@@ -39,7 +36,6 @@ impl BudPromptProvider {
         Ok(Self {
             api_base,
             credentials,
-            prompt_stream,
         })
     }
 }
@@ -256,9 +252,6 @@ impl ResponseProvider for BudPromptProvider {
             while let Some(ev) = event_source.next().await {
                 match ev {
                     Err(e) => {
-                        if matches!(e, reqwest_eventsource::Error::StreamEnded) {
-                            break;
-                        }
                         yield Err(convert_stream_error(e).await);
                     }
                     Ok(event) => match event {
@@ -611,6 +604,203 @@ impl ResponseProvider for BudPromptProvider {
                 res.status(),
                 &res.text().await.unwrap_or_default(),
             ))
+        }
+    }
+
+    /// Execute response with automatic format detection based on Content-Type header
+    /// BudPrompt determines streaming based on internal prompt config, not the stream parameter
+    async fn execute_response_with_detection(
+        &self,
+        request: &OpenAIResponseCreateParams,
+        _model_name: &str,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<ResponseResult, Error> {
+        let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
+        let request_url = get_responses_url(&self.api_base)?;
+        let _start_time = Instant::now();
+
+        let mut request_builder = client
+            .post(request_url.clone())
+            .header("Content-Type", "application/json");
+
+        // Add authorization header if API key is available
+        if let Some(api_key) = api_key {
+            request_builder = request_builder.bearer_auth(api_key.expose_secret());
+        } else if let Some(static_key) = self.credentials.get_static_api_key() {
+            request_builder = request_builder.bearer_auth(static_key.expose_secret());
+        }
+
+        // Send request WITHOUT modifying the stream parameter
+        // BudPrompt will determine response format based on internal prompt config
+        let res = request_builder.json(&request).send().await.map_err(|e| {
+            Error::new(ErrorDetails::InferenceClient {
+                status_code: e.status(),
+                message: format!(
+                    "Error sending request to {} Responses API: {}",
+                    PROVIDER_NAME,
+                    DisplayOrDebugGateway::new(e)
+                ),
+                provider_type: PROVIDER_TYPE.to_string(),
+                raw_request: Some(serde_json::to_string(&request).unwrap_or_default()),
+                raw_response: None,
+            })
+        })?;
+
+        // Check if response is successful
+        if !res.status().is_success() {
+            return Err(handle_budprompt_error(
+                &serde_json::to_string(&request).unwrap_or_default(),
+                res.status(),
+                &res.text().await.unwrap_or_default(),
+            ));
+        }
+
+        // Detect response format from Content-Type header
+        let content_type = res
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+
+        if content_type.contains("text/event-stream") {
+            // Streaming response - need to create a new request with eventsource
+            let mut streaming_request_builder = client
+                .post(request_url)
+                .header("Content-Type", "application/json");
+
+            // Add authorization header
+            if let Some(api_key) = self.credentials.get_api_key(dynamic_api_keys)? {
+                streaming_request_builder =
+                    streaming_request_builder.bearer_auth(api_key.expose_secret());
+            } else if let Some(static_key) = self.credentials.get_static_api_key() {
+                streaming_request_builder =
+                    streaming_request_builder.bearer_auth(static_key.expose_secret());
+            }
+
+            let event_source = streaming_request_builder
+                .json(&request)
+                .eventsource()
+                .map_err(|e| {
+                    Error::new(ErrorDetails::InferenceClient {
+                        status_code: None,
+                        message: format!(
+                            "Error creating event source for {} Responses API: {}",
+                            PROVIDER_NAME,
+                            DisplayOrDebugGateway::new(e)
+                        ),
+                        provider_type: PROVIDER_TYPE.to_string(),
+                        raw_request: Some(serde_json::to_string(&request).unwrap_or_default()),
+                        raw_response: None,
+                    })
+                })?;
+
+            let inner_stream = async_stream::stream! {
+                futures::pin_mut!(event_source);
+                while let Some(ev) = event_source.next().await {
+                    match ev {
+                        Err(e) => {
+                            if matches!(e, reqwest_eventsource::Error::StreamEnded) {
+                                break;
+                            }
+                            yield Err(convert_stream_error(e).await);
+                        }
+                        Ok(event) => match event {
+                            Event::Open => continue,
+                            Event::Message(message) => {
+                                if message.data == "[DONE]" {
+                                    break;
+                                }
+
+                                // OpenAI responses API uses event field in SSE and data contains JSON
+                                let event_name = message.event;
+
+                                // Parse the data as generic JSON
+                                let data: Result<serde_json::Value, _> = serde_json::from_str(&message.data);
+
+                                match data {
+                                    Ok(json_data) => {
+                                        let stream_event = ResponseStreamEvent {
+                                            event: event_name,
+                                            data: json_data,
+                                        };
+                                        yield Ok(stream_event);
+                                    },
+                                    Err(e) => {
+                                        yield Err(Error::new(ErrorDetails::InferenceServer {
+                                            message: format!("Error parsing stream data: {e}"),
+                                            raw_request: None,
+                                            raw_response: Some(message.data.clone()),
+                                            provider_type: PROVIDER_TYPE.to_string(),
+                                        }));
+                                    }
+                                }
+                            }
+                        },
+                    }
+                }
+            };
+
+            // Use Box::pin to create a pinned box that implements Stream + Send
+            let pinned_stream = Box::pin(inner_stream);
+
+            // Convert to a type that implements Unpin
+            struct UnpinStream<S>(std::pin::Pin<Box<S>>);
+
+            impl<S: Stream> Stream for UnpinStream<S> {
+                type Item = S::Item;
+
+                fn poll_next(
+                    mut self: std::pin::Pin<&mut Self>,
+                    cx: &mut std::task::Context<'_>,
+                ) -> std::task::Poll<Option<Self::Item>> {
+                    self.0.as_mut().poll_next(cx)
+                }
+            }
+
+            // UnpinStream implements Unpin regardless of whether S does
+            impl<S> Unpin for UnpinStream<S> {}
+
+            let unpin_stream = UnpinStream(pinned_stream);
+
+            Ok(ResponseResult::Streaming(Box::new(unpin_stream)))
+        } else if content_type.contains("application/json") {
+            // Non-streaming JSON response
+            let raw_response = res.text().await.map_err(|e| {
+                Error::new(ErrorDetails::InferenceServer {
+                    message: format!(
+                        "Error parsing text response: {}",
+                        DisplayOrDebugGateway::new(e)
+                    ),
+                    raw_request: Some(serde_json::to_string(&request).unwrap_or_default()),
+                    raw_response: None,
+                    provider_type: PROVIDER_TYPE.to_string(),
+                })
+            })?;
+
+            let response: OpenAIResponse = serde_json::from_str(&raw_response).map_err(|e| {
+                Error::new(ErrorDetails::InferenceServer {
+                    message: format!(
+                        "Error parsing JSON response: {}",
+                        DisplayOrDebugGateway::new(e)
+                    ),
+                    raw_request: Some(serde_json::to_string(&request).unwrap_or_default()),
+                    raw_response: Some(raw_response.clone()),
+                    provider_type: PROVIDER_TYPE.to_string(),
+                })
+            })?;
+
+            Ok(ResponseResult::NonStreaming(response))
+        } else {
+            Err(Error::new(ErrorDetails::InferenceServer {
+                message: format!(
+                    "Unexpected Content-Type from {}: {}",
+                    PROVIDER_NAME, content_type
+                ),
+                raw_request: Some(serde_json::to_string(&request).unwrap_or_default()),
+                raw_response: None,
+                provider_type: PROVIDER_TYPE.to_string(),
+            }))
         }
     }
 }
