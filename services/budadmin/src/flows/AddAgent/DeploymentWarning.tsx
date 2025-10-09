@@ -1,40 +1,31 @@
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { Text_12_400_757575, Text_14_400_EEEEEE, Text_14_600_EEEEEE } from "@/components/ui/text";
 import { errorToast } from "@/components/toast";
 import { Alert } from "antd";
+import { useAddAgent } from "@/stores/useAddAgent";
 
 export default function DeploymentWarning() {
   const { openDrawerWithStep } = useDrawer();
   const [loading, setLoading] = useState(false);
 
-  // Get stored configuration data
-  const [configData, setConfigData] = useState<any>(null);
-  const [modelData, setModelData] = useState<any>(null);
-  const [projectData, setProjectData] = useState<any>(null);
-  const [warningData, setWarningData] = useState<any>(null);
-
-  useEffect(() => {
-    // Retrieve stored data from localStorage
-    const config = localStorage.getItem("addAgent_configuration");
-    const model = localStorage.getItem("addAgent_selectedModel");
-    const project = localStorage.getItem("addAgent_selectedProject");
-    const warnings = localStorage.getItem("addAgent_warnings");
-
-    if (config) setConfigData(JSON.parse(config));
-    if (model) setModelData(JSON.parse(model));
-    if (project) setProjectData(JSON.parse(project));
-    if (warnings) setWarningData(JSON.parse(warnings));
-  }, []);
+  // Get data from the Add Agent store
+  const {
+    selectedProject,
+    selectedModel,
+    deploymentConfiguration,
+    warningData,
+    setWarningData,
+  } = useAddAgent();
 
   const handleNext = async () => {
     setLoading(true);
     try {
       // Clear the warning data as user has acknowledged it
-      localStorage.removeItem("addAgent_warnings");
+      setWarningData(null);
 
       // Navigate to success screen
       openDrawerWithStep("add-agent-success");
@@ -63,8 +54,8 @@ export default function DeploymentWarning() {
     }
 
     // Fallback to default warning message if no specific warnings
-    const concurrentRequests = configData?.maxConcurrency || 10;
-    const deploymentName = modelData?.name || "the model";
+    const concurrentRequests = deploymentConfiguration?.maxConcurrency || 10;
+    const deploymentName = selectedModel?.name || "the model";
     return `The deployment is configured with ${concurrentRequests} concurrent requests and auto-scale settings which may not be sufficient to support the given concurrency for the prompt. Consider adjusting the max replica settings for ${deploymentName} deployment auto-scaling.`;
   };
 

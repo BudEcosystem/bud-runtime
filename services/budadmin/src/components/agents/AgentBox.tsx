@@ -68,81 +68,39 @@ function AgentBoxInner({
   const [isSavingPromptMessages, setIsSavingPromptMessages] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
 
-  // Use the prompt schema workflow hook for socket handling (Input)
-  const { status: workflowStatus, startWorkflow, resetStatus } = usePromptSchemaWorkflow({
-    workflowId: session?.workflowId,
-    onCompleted: () => {
-      console.log('Input workflow completed successfully');
-      // Auto-reset status after a delay
-      setTimeout(() => {
-        resetStatus();
-      }, 3000);
-    },
-    onFailed: () => {
-      console.error('Input workflow failed');
-      errorToast('Input workflow execution failed');
-      setTimeout(() => {
-        resetStatus();
-      }, 3000);
-    },
-  });
+  // Custom hook to create workflow handlers with consistent behavior
+  const useWorkflowHandler = (name: string, workflowId?: string) => {
+    const resetStatusRef = React.useRef<(() => void) | null>(null);
 
-  // Use the prompt schema workflow hook for socket handling (Output)
-  const { status: outputWorkflowStatus, startWorkflow: startOutputWorkflow, resetStatus: resetOutputStatus } = usePromptSchemaWorkflow({
-    workflowId: session?.workflowId,
-    onCompleted: () => {
-      console.log('Output workflow completed successfully');
-      // Auto-reset status after a delay
-      setTimeout(() => {
-        resetOutputStatus();
-      }, 3000);
-    },
-    onFailed: () => {
-      console.error('Output workflow failed');
-      errorToast('Output workflow execution failed');
-      setTimeout(() => {
-        resetOutputStatus();
-      }, 3000);
-    },
-  });
+    const workflow = usePromptSchemaWorkflow({
+      workflowId,
+      onCompleted: () => {
+        console.log(`${name} workflow completed successfully`);
+        setTimeout(() => resetStatusRef.current?.(), 3000);
+      },
+      onFailed: () => {
+        console.error(`${name} workflow failed`);
+        errorToast(`${name} workflow execution failed`);
+        setTimeout(() => resetStatusRef.current?.(), 3000);
+      },
+    });
 
-  // Use the prompt schema workflow hook for socket handling (System Prompt)
-  const { status: systemPromptWorkflowStatus, startWorkflow: startSystemPromptWorkflow, resetStatus: resetSystemPromptStatus } = usePromptSchemaWorkflow({
-    workflowId: session?.workflowId,
-    onCompleted: () => {
-      console.log('System prompt workflow completed successfully');
-      // Auto-reset status after a delay
-      setTimeout(() => {
-        resetSystemPromptStatus();
-      }, 3000);
-    },
-    onFailed: () => {
-      console.error('System prompt workflow failed');
-      errorToast('System prompt workflow execution failed');
-      setTimeout(() => {
-        resetSystemPromptStatus();
-      }, 3000);
-    },
-  });
+    resetStatusRef.current = workflow.resetStatus;
 
-  // Use the prompt schema workflow hook for socket handling (Prompt Messages)
-  const { status: promptMessagesWorkflowStatus, startWorkflow: startPromptMessagesWorkflow, resetStatus: resetPromptMessagesStatus } = usePromptSchemaWorkflow({
-    workflowId: session?.workflowId,
-    onCompleted: () => {
-      console.log('Prompt messages workflow completed successfully');
-      // Auto-reset status after a delay
-      setTimeout(() => {
-        resetPromptMessagesStatus();
-      }, 3000);
-    },
-    onFailed: () => {
-      console.error('Prompt messages workflow failed');
-      errorToast('Prompt messages workflow execution failed');
-      setTimeout(() => {
-        resetPromptMessagesStatus();
-      }, 3000);
-    },
-  });
+    return workflow;
+  };
+
+  // Initialize all workflow handlers
+  const inputWorkflow = useWorkflowHandler('Input', session?.workflowId);
+  const outputWorkflow = useWorkflowHandler('Output', session?.workflowId);
+  const systemPromptWorkflow = useWorkflowHandler('System prompt', session?.workflowId);
+  const promptMessagesWorkflow = useWorkflowHandler('Prompt messages', session?.workflowId);
+
+  // Destructure for backward compatibility (resetStatus handled internally by useWorkflowHandler)
+  const { status: workflowStatus, startWorkflow } = inputWorkflow;
+  const { status: outputWorkflowStatus, startWorkflow: startOutputWorkflow } = outputWorkflow;
+  const { status: systemPromptWorkflowStatus, startWorkflow: startSystemPromptWorkflow } = systemPromptWorkflow;
+  const { status: promptMessagesWorkflowStatus, startWorkflow: startPromptMessagesWorkflow } = promptMessagesWorkflow;
 
   // Use the settings context
   const { isOpen: isRightSidebarOpen, activeSettings, openSettings, closeSettings, toggleSettings } = useSettings();
@@ -197,6 +155,36 @@ function AgentBoxInner({
     // The openSettings function in context already handles the mapping
     openSettings(nodeType, nodeId, nodeData);
   };
+
+  // Helper function to generate default model settings from session
+  const getDefaultModelSettings = (session: AgentSession) => ({
+    temperature: session.settings?.temperature ?? 0.7,
+    max_tokens: session.settings?.maxTokens ?? 2000,
+    top_p: session.settings?.topP ?? 0.9,
+    frequency_penalty: 0,
+    presence_penalty: 0,
+    stop_sequences: [],
+    seed: 0,
+    timeout: 0,
+    parallel_tool_calls: true,
+    logprobs: true,
+    logit_bias: {},
+    extra_headers: {},
+    max_completion_tokens: 0,
+    stream_options: {},
+    response_format: {},
+    tool_choice: "string",
+    chat_template: "string",
+    chat_template_kwargs: {},
+    mm_processor_kwargs: {},
+    guided_json: {},
+    guided_regex: "string",
+    guided_choice: [],
+    guided_grammar: "string",
+    structural_tag: "string",
+    guided_decoding_backend: "string",
+    guided_whitespace_pattern: "string"
+  });
 
   const handleSavePromptSchema = async () => {
     if (!session) {
@@ -402,34 +390,7 @@ function AgentBoxInner({
         version: 1,
         set_default: false,
         deployment_name: session.selectedDeployment.name,
-        model_settings: {
-          temperature: session.settings?.temperature ?? 0.7,
-          max_tokens: session.settings?.maxTokens ?? 2000,
-          top_p: session.settings?.topP ?? 0.9,
-          frequency_penalty: 0,
-          presence_penalty: 0,
-          stop_sequences: [],
-          seed: 0,
-          timeout: 0,
-          parallel_tool_calls: true,
-          logprobs: true,
-          logit_bias: {},
-          extra_headers: {},
-          max_completion_tokens: 0,
-          stream_options: {},
-          response_format: {},
-          tool_choice: "string",
-          chat_template: "string",
-          chat_template_kwargs: {},
-          mm_processor_kwargs: {},
-          guided_json: {},
-          guided_regex: "string",
-          guided_choice: [],
-          guided_grammar: "string",
-          structural_tag: "string",
-          guided_decoding_backend: "string",
-          guided_whitespace_pattern: "string"
-        },
+        model_settings: getDefaultModelSettings(session),
         stream: true,
         messages: [
           {
@@ -533,34 +494,7 @@ function AgentBoxInner({
         version: 1,
         set_default: false,
         deployment_name: session.selectedDeployment.name,
-        model_settings: {
-          temperature: session.settings?.temperature ?? 0.7,
-          max_tokens: session.settings?.maxTokens ?? 2000,
-          top_p: session.settings?.topP ?? 0.9,
-          frequency_penalty: 0,
-          presence_penalty: 0,
-          stop_sequences: [],
-          seed: 0,
-          timeout: 0,
-          parallel_tool_calls: true,
-          logprobs: true,
-          logit_bias: {},
-          extra_headers: {},
-          max_completion_tokens: 0,
-          stream_options: {},
-          response_format: {},
-          tool_choice: "string",
-          chat_template: "string",
-          chat_template_kwargs: {},
-          mm_processor_kwargs: {},
-          guided_json: {},
-          guided_regex: "string",
-          guided_choice: [],
-          guided_grammar: "string",
-          structural_tag: "string",
-          guided_decoding_backend: "string",
-          guided_whitespace_pattern: "string"
-        },
+        model_settings: getDefaultModelSettings(session),
         stream: true,
         messages: messages.map((msg: any) => ({
           role: msg.role,
@@ -650,7 +584,7 @@ function AgentBoxInner({
           <span className="text-[#808080] text-xs font-medium">V{index + 1}</span>
           {isHovering && (
             <PrimaryButton onClick={closeAgentDrawer}>
-              Save
+              Close
             </PrimaryButton>
           )}
         </div>

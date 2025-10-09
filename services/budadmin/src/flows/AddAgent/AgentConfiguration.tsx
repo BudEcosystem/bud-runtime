@@ -25,7 +25,10 @@ export default function AgentConfiguration() {
   const {
     currentWorkflow,
     selectedProject,
+    selectedModel,
     setAgentConfiguration,
+    setDeploymentConfiguration,
+    setWarningData,
     getWorkflow
   } = useAddAgent();
 
@@ -85,10 +88,6 @@ export default function AgentConfiguration() {
       setIsSubmitting(true);
 
       try {
-        // Get previously stored data
-        const projectData = localStorage.getItem("addAgent_selectedProject");
-        const modelData = localStorage.getItem("addAgent_selectedModel");
-
         // Store configuration data in the Add Agent store
         const configData = {
           name: deploymentName,
@@ -104,8 +103,8 @@ export default function AgentConfiguration() {
         };
         setAgentConfiguration(configData);
 
-        // Store full configuration data in localStorage
-        const fullConfigData = {
+        // Store deployment configuration in the store
+        const deploymentConfig = {
           deploymentName,
           tags,
           description,
@@ -117,10 +116,8 @@ export default function AgentConfiguration() {
           rateLimit,
           rateLimitValue,
           triggerWorkflow,
-          project: projectData ? JSON.parse(projectData) : null,
-          model: modelData ? JSON.parse(modelData) : null,
         };
-        localStorage.setItem("addAgent_configuration", JSON.stringify(fullConfigData));
+        setDeploymentConfiguration(deploymentConfig);
 
         // Prepare the workflow API payload
         const payload: any = {
@@ -191,12 +188,13 @@ export default function AgentConfiguration() {
               validation_issues: response.data.validation_issues || [],
               recommendations: response.data.recommendations || {}
             };
-            localStorage.setItem("addAgent_warnings", JSON.stringify(warningData));
+            setWarningData(warningData);
 
             // Navigate to the deployment warning screen
             openDrawerWithStep("add-agent-deployment-warning");
           } else {
-            // No warnings or errors, go directly to success screen
+            // No warnings or errors, clear warning data and go directly to success screen
+            setWarningData(null);
             openDrawerWithStep("add-agent-success");
           }
         } else {

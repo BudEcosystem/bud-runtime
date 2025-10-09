@@ -26,6 +26,27 @@ export type AgentConfiguration = {
   knowledge_base?: any[];
 };
 
+export type DeploymentConfiguration = {
+  deploymentName: string;
+  tags: any[];
+  description: string;
+  minConcurrency: number;
+  maxConcurrency: number;
+  autoScale: boolean;
+  autoCaching: boolean;
+  autoLogging: boolean;
+  rateLimit: boolean;
+  rateLimitValue: number;
+  triggerWorkflow: boolean;
+};
+
+export type WarningData = {
+  warnings: string[];
+  errors: string[];
+  validation_issues: string[];
+  recommendations: Record<string, any>;
+};
+
 export const useAddAgent = create<{
   loading: boolean;
   requestCount: number;
@@ -34,6 +55,8 @@ export const useAddAgent = create<{
   selectedAgentType: AgentType | null;
   selectedModel: Model | null;
   agentConfiguration: AgentConfiguration;
+  deploymentConfiguration: DeploymentConfiguration | null;
+  warningData: WarningData | null;
   promptMessages: any[];
 
   setLoading: (loading: boolean) => void;
@@ -42,6 +65,8 @@ export const useAddAgent = create<{
   setSelectedAgentType: (agentType: AgentType) => void;
   setSelectedModel: (model: Model) => void;
   setAgentConfiguration: (config: Partial<AgentConfiguration>) => void;
+  setDeploymentConfiguration: (config: DeploymentConfiguration) => void;
+  setWarningData: (warnings: WarningData | null) => void;
   setPromptMessages: (messages: any[]) => void;
 
   startRequest: () => void;
@@ -74,6 +99,8 @@ export const useAddAgent = create<{
     tools: [],
     knowledge_base: [],
   },
+  deploymentConfiguration: null,
+  warningData: null,
   promptMessages: [],
 
   setLoading: (loading: boolean) => {
@@ -103,6 +130,14 @@ export const useAddAgent = create<{
         ...config,
       },
     }));
+  },
+
+  setDeploymentConfiguration: (config: DeploymentConfiguration) => {
+    set({ deploymentConfiguration: config });
+  },
+
+  setWarningData: (warnings: WarningData | null) => {
+    set({ warningData: warnings });
   },
 
   setPromptMessages: (messages: any[]) => {
@@ -140,6 +175,8 @@ export const useAddAgent = create<{
         tools: [],
         knowledge_base: [],
       },
+      deploymentConfiguration: null,
+      warningData: null,
       promptMessages: [],
       loading: false,
       requestCount: 0,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Image, Tag } from "antd";
 import { useDrawer } from "src/hooks/useDrawer";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -8,52 +8,45 @@ import { Text_12_400_B3B3B3, Text_16_600_FFFFFF, Text_14_400_EEEEEE } from "@/co
 import { getChromeColor } from "@/components/ui/bud/dataEntry/TagsInputData";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { ModelFlowInfoCard } from "@/components/ui/bud/deploymentDrawer/DeployModelSpecificationInfo";
+import { useAddAgent } from "@/stores/useAddAgent";
 
 export default function AgentSuccess() {
   const { closeDrawer } = useDrawer();
 
-  // Get stored data to display in success screen
-  const [configData, setConfigData] = useState<any>(null);
-  const [modelData, setModelData] = useState<any>(null);
-  const [projectData, setProjectData] = useState<any>(null);
+  // Get data from the Add Agent store
+  const {
+    selectedProject,
+    selectedModel,
+    deploymentConfiguration,
+    reset
+  } = useAddAgent();
 
   useEffect(() => {
-    // Retrieve stored data from localStorage (will be cleared after this)
-    const config = localStorage.getItem("addAgent_configuration");
-    const model = localStorage.getItem("addAgent_selectedModel");
-    const project = localStorage.getItem("addAgent_selectedProject");
-
-    if (config) setConfigData(JSON.parse(config));
-    if (model) setModelData(JSON.parse(model));
-    if (project) setProjectData(JSON.parse(project));
-
-    // Clear localStorage after displaying success
-    localStorage.removeItem("addAgent_selectedProject");
-    localStorage.removeItem("addAgent_selectedModel");
-    localStorage.removeItem("addAgent_selectedType");
-    localStorage.removeItem("addAgent_configuration");
-    localStorage.removeItem("addAgent_warnings");
-  }, []);
+    // Clean up the store when component unmounts (drawer closes)
+    return () => {
+      reset();
+    };
+  }, [reset]);
 
   // Get model tags to display
   const getModelTags = () => {
     const tags = [];
 
-    // Add LLM tag if it's a language model
-    if (modelData?.modality?.includes("text") || modelData?.modality?.includes("llm")) {
+    // Add LLM tag if it's a language model (text modality)
+    if (selectedModel?.modality?.text?.input || selectedModel?.modality?.text?.output) {
       tags.push({ name: "LLM", color: "#965CDE" });
     }
 
     // Add model size tag (e.g., "7B")
-    if (modelData?.model_size) {
-      const sizeStr = typeof modelData.model_size === 'number'
-        ? `${Math.round(modelData.model_size)}B`
-        : modelData.model_size;
+    if (selectedModel?.model_size) {
+      const sizeStr = typeof selectedModel.model_size === 'number'
+        ? `${Math.round(selectedModel.model_size)}B`
+        : selectedModel.model_size;
       tags.push({ name: sizeStr, color: "#FF9F00" });
     }
 
     // Add reasoning tag if applicable
-    if (modelData?.tags?.some((tag: any) => tag.name?.toLowerCase().includes("reasoning"))) {
+    if (selectedModel?.tags?.some((tag: any) => tag.name?.toLowerCase().includes("reasoning"))) {
       tags.push({ name: "Reasoning", color: "#4CAF50" });
     }
 
@@ -72,14 +65,14 @@ export default function AgentSuccess() {
         <BudDrawerLayout>
           <DrawerTitleCard
               title={"Prompt Deployed"}
-              description={`${configData?.deploymentName} prompt have been deployed`}
+              description={`${deploymentConfiguration?.deploymentName} prompt has been deployed`}
             />
             <ModelFlowInfoCard
-              selectedModel={modelData}
+              selectedModel={selectedModel}
               informationSpecs={[
                 {
                   name: "URI",
-                  value: modelData?.uri,
+                  value: selectedModel?.uri,
                   full: true,
                   icon: "/images/drawer/tag.png",
                 },
