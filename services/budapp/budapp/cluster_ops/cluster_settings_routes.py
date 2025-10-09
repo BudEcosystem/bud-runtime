@@ -83,6 +83,7 @@ async def get_cluster_settings(
 
 @cluster_settings_router.post(
     "/{cluster_id}/settings",
+    status_code=status.HTTP_201_CREATED,
     responses={
         status.HTTP_201_CREATED: {
             "model": ClusterSettingsDetailResponse,

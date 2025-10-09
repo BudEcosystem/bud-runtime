@@ -10,7 +10,6 @@ import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 
-from budapp.cluster_ops.models import ClusterSettings
 from budapp.cluster_ops.schemas import ClusterSettingsResponse
 from budapp.commons.dependencies import get_current_active_user
 from budapp.main import app
@@ -81,15 +80,13 @@ class TestClusterSettingsAPI:
         """Test GET /clusters/{cluster_id}/settings when not found."""
         cluster_id = uuid4()
 
-        from fastapi import HTTPException
-
         # Override dependencies
         app.dependency_overrides[get_current_active_user] = lambda: mock_user
 
         try:
             with patch(
                 "budapp.cluster_ops.services.ClusterService.get_cluster_settings",
-                side_effect=HTTPException(status_code=404, detail="Cluster settings not found"),
+                return_value=None,
             ):
                 response = test_client.get(f"/clusters/{cluster_id}/settings")
 
@@ -155,12 +152,12 @@ class TestClusterSettingsAPI:
             app.dependency_overrides.clear()
 
     def test_create_cluster_settings_already_exists(self, test_client, mock_user):
-        """Test POST /clusters/{cluster_id}/settings when settings already exist."""
+        """Test POST /clusters/{cluster_id}/settings when cluster not found."""
         cluster_id = uuid4()
 
         request_data = {"default_storage_class": "gp2"}
 
-        from fastapi import HTTPException
+        from budapp.commons.exceptions import ClientException
 
         # Override dependencies
         app.dependency_overrides[get_current_active_user] = lambda: mock_user
@@ -168,11 +165,11 @@ class TestClusterSettingsAPI:
         try:
             with patch(
                 "budapp.cluster_ops.services.ClusterService.create_cluster_settings",
-                side_effect=HTTPException(status_code=409, detail="Settings already exist"),
+                side_effect=ClientException("Cluster not found", status_code=status.HTTP_404_NOT_FOUND),
             ):
                 response = test_client.post(f"/clusters/{cluster_id}/settings", json=request_data)
 
-                assert response.status_code == status.HTTP_409_CONFLICT
+                assert response.status_code == status.HTTP_404_NOT_FOUND
 
         finally:
             app.dependency_overrides.clear()
@@ -199,7 +196,7 @@ class TestClusterSettingsAPI:
 
         try:
             with patch(
-                "budapp.cluster_ops.services.ClusterService.update_cluster_settings", return_value=mock_response
+                "budapp.cluster_ops.services.ClusterService.upsert_cluster_settings", return_value=mock_response
             ) as mock_update:
                 response = test_client.put(f"/clusters/{cluster_id}/settings", json=request_data)
 
@@ -219,15 +216,15 @@ class TestClusterSettingsAPI:
 
         request_data = {"default_storage_class": "updated-storage"}
 
-        from fastapi import HTTPException
+        from budapp.commons.exceptions import ClientException
 
         # Override dependencies
         app.dependency_overrides[get_current_active_user] = lambda: mock_user
 
         try:
             with patch(
-                "budapp.cluster_ops.services.ClusterService.update_cluster_settings",
-                side_effect=HTTPException(status_code=404, detail="Settings not found"),
+                "budapp.cluster_ops.services.ClusterService.upsert_cluster_settings",
+                side_effect=ClientException("Cluster settings not found", status_code=status.HTTP_404_NOT_FOUND),
             ):
                 response = test_client.put(f"/clusters/{cluster_id}/settings", json=request_data)
 
@@ -263,15 +260,13 @@ class TestClusterSettingsAPI:
         """Test DELETE /clusters/{cluster_id}/settings when settings not found."""
         cluster_id = uuid4()
 
-        from fastapi import HTTPException
-
         # Override dependencies
         app.dependency_overrides[get_current_active_user] = lambda: mock_user
 
         try:
             with patch(
                 "budapp.cluster_ops.services.ClusterService.delete_cluster_settings",
-                side_effect=HTTPException(status_code=404, detail="Settings not found"),
+                return_value=False,
             ):
                 response = test_client.delete(f"/clusters/{cluster_id}/settings")
 
@@ -335,40 +330,40 @@ class TestClusterSettingsAPI:
         """Test endpoints when cluster doesn't exist."""
         cluster_id = uuid4()
 
-        from fastapi import HTTPException
+        from budapp.commons.exceptions import ClientException
 
         # Override dependencies
         app.dependency_overrides[get_current_active_user] = lambda: mock_user
 
         try:
-            # Test GET when cluster not found
+            # Test GET when cluster not found - returns None
             with patch(
                 "budapp.cluster_ops.services.ClusterService.get_cluster_settings",
-                side_effect=HTTPException(status_code=404, detail="Cluster not found"),
+                return_value=None,
             ):
                 response = test_client.get(f"/clusters/{cluster_id}/settings")
                 assert response.status_code == status.HTTP_404_NOT_FOUND
 
-            # Test POST when cluster not found
+            # Test POST when cluster not found - raises ClientException
             with patch(
                 "budapp.cluster_ops.services.ClusterService.create_cluster_settings",
-                side_effect=HTTPException(status_code=404, detail="Cluster not found"),
+                side_effect=ClientException("Cluster not found", status_code=status.HTTP_404_NOT_FOUND),
             ):
                 response = test_client.post(f"/clusters/{cluster_id}/settings", json={"default_storage_class": "test"})
                 assert response.status_code == status.HTTP_404_NOT_FOUND
 
-            # Test PUT when cluster not found
+            # Test PUT when cluster not found - raises ClientException
             with patch(
-                "budapp.cluster_ops.services.ClusterService.update_cluster_settings",
-                side_effect=HTTPException(status_code=404, detail="Cluster not found"),
+                "budapp.cluster_ops.services.ClusterService.upsert_cluster_settings",
+                side_effect=ClientException("Cluster not found", status_code=status.HTTP_404_NOT_FOUND),
             ):
                 response = test_client.put(f"/clusters/{cluster_id}/settings", json={"default_storage_class": "test"})
                 assert response.status_code == status.HTTP_404_NOT_FOUND
 
-            # Test DELETE when cluster not found
+            # Test DELETE when cluster not found - returns False
             with patch(
                 "budapp.cluster_ops.services.ClusterService.delete_cluster_settings",
-                side_effect=HTTPException(status_code=404, detail="Cluster not found"),
+                return_value=False,
             ):
                 response = test_client.delete(f"/clusters/{cluster_id}/settings")
                 assert response.status_code == status.HTTP_404_NOT_FOUND
