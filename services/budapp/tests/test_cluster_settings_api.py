@@ -67,10 +67,10 @@ class TestClusterSettingsAPI:
 
                 assert response.status_code == status.HTTP_200_OK
                 data = response.json()
-                AssertionHelpers.assert_api_response_success(data, status.HTTP_200_OK)
-                assert data["data"]["settings"]["id"] == str(mock_response.id)
-                assert data["data"]["settings"]["cluster_id"] == str(cluster_id)
-                assert data["data"]["settings"]["default_storage_class"] == "gp2"
+                AssertionHelpers.assert_api_response_success(data, "cluster.settings.get")
+                assert data["settings"]["id"] == str(mock_response.id)
+                assert data["settings"]["cluster_id"] == str(cluster_id)
+                assert data["settings"]["default_storage_class"] == "gp2"
 
                 mock_get.assert_called_once_with(cluster_id)
 
@@ -128,9 +128,9 @@ class TestClusterSettingsAPI:
 
                 assert response.status_code == status.HTTP_201_CREATED
                 data = response.json()
-                assert data["success"] is True
-                assert data["data"]["settings"]["id"] == str(mock_response.id)
-                assert data["data"]["settings"]["default_storage_class"] == "premium-ssd"
+                AssertionHelpers.assert_api_response_success(data, "cluster.settings.create")
+                assert data["settings"]["id"] == str(mock_response.id)
+                assert data["settings"]["default_storage_class"] == "premium-ssd"
 
                 mock_create.assert_called_once()
 
@@ -205,8 +205,8 @@ class TestClusterSettingsAPI:
 
                 assert response.status_code == status.HTTP_200_OK
                 data = response.json()
-                assert data["success"] is True
-                assert data["data"]["settings"]["default_storage_class"] == "updated-storage"
+                AssertionHelpers.assert_api_response_success(data, "cluster.settings.update")
+                assert data["settings"]["default_storage_class"] == "updated-storage"
 
                 mock_update.assert_called_once()
 
@@ -251,7 +251,7 @@ class TestClusterSettingsAPI:
 
                 assert response.status_code == status.HTTP_200_OK
                 data = response.json()
-                assert data["success"] is True
+                AssertionHelpers.assert_api_response_success(data, "cluster.settings.delete")
                 assert data["message"] == "Cluster settings deleted successfully"
 
                 mock_delete.assert_called_once_with(cluster_id)
@@ -431,6 +431,6 @@ class TestClusterSettingsAPI:
 
                 assert response.status_code == status.HTTP_201_CREATED
                 data = response.json()
-                assert data["data"]["settings"]["default_storage_class"] is None
+                assert data["settings"]["default_storage_class"] is None
         finally:
             app.dependency_overrides.clear()
