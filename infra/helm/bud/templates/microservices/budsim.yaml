@@ -33,6 +33,16 @@ spec:
         ports:
         - containerPort: 3002
         env:
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budsim.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budsim.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budsim.name }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budsim.env }}
           - name: {{ $key }}

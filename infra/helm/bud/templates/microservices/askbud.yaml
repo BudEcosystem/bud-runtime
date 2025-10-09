@@ -41,6 +41,16 @@ spec:
             value: {{ .Values.microservices.budcluster.daprid }}
           - name: BUD_APP_ID
             value: {{ .Values.microservices.budapp.daprid }}
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budask.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budask.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budask.name }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.askbud.env }}
           - name: {{ $key }}

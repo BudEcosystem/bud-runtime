@@ -126,3 +126,21 @@
 {{- printf "http://%s" (include "bud.ingress.hosts.s3" $) }}
 {{- end }}
 {{- end }}
+
+
+{{- define "bud.externalServices.minio.endpoint" -}}
+{{- if .Values.externalServices.minio.endpoint }}
+{{- print .Values.externalServices.minio.endpoint  }}
+{{- else }}
+{{- printf "%s-minio.%s:9000" .Release.Name .Release.Namespace }}
+{{- end }}
+{{- end }}
+
+-
+{{- define "bud.externalServices.postgresql.host" -}}
+{{- if .Values.externalServices.postgresql.endpoint }}
+{{- print .Values.externalServices.postgresql.endpoint  }}
+{{- else }}
+{{- printf "%s-postgresql.%s" .Release.Name .Release.Namespace }}
+{{- end }}
+{{- end }}
