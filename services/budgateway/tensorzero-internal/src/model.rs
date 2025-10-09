@@ -1437,6 +1437,44 @@ impl ModelConfig {
             provider_errors,
         }))
     }
+
+    /// Execute response with automatic format detection (for providers like BudPrompt)
+    #[tracing::instrument(skip_all, fields(model_name = model_name, otel.name = "model_execute_response_with_detection"))]
+    pub async fn execute_response_with_detection(
+        &self,
+        request: &crate::responses::OpenAIResponseCreateParams,
+        model_name: &str,
+        clients: &InferenceClients<'_>,
+    ) -> Result<crate::responses::ResponseResult, Error> {
+        let mut provider_errors = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::InvalidModelProvider {
+                    model_name: model_name.to_string(),
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+            let response = provider
+                .execute_response_with_detection(
+                    request,
+                    model_name,
+                    clients.http_client,
+                    clients.credentials,
+                )
+                .await;
+            match response {
+                Ok(response) => {
+                    return Ok(response);
+                }
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+        Err(Error::new(ErrorDetails::ModelProvidersExhausted {
+            provider_errors,
+        }))
+    }
 }
 
 async fn stream_with_cache_write(
@@ -2843,6 +2881,41 @@ impl ModelProvider {
             ProviderConfig::Dummy(provider) => {
                 provider
                     .list_response_input_items(response_id, client, dynamic_api_keys)
+                    .await
+            }
+            // Other providers don't support responses yet
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Responses.as_str().to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
+
+    /// Execute response with automatic format detection (for providers like BudPrompt)
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_execute_response_with_detection"))]
+    pub async fn execute_response_with_detection(
+        &self,
+        request: &crate::responses::OpenAIResponseCreateParams,
+        model_name: &str,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<crate::responses::ResponseResult, Error> {
+        use crate::responses::ResponseProvider;
+        match &self.config {
+            ProviderConfig::BudPrompt(provider) => {
+                provider
+                    .execute_response_with_detection(request, model_name, client, dynamic_api_keys)
+                    .await
+            }
+            ProviderConfig::OpenAI(provider) => {
+                provider
+                    .execute_response_with_detection(request, model_name, client, dynamic_api_keys)
+                    .await
+            }
+            #[cfg(any(test, feature = "e2e_tests"))]
+            ProviderConfig::Dummy(provider) => {
+                provider
+                    .execute_response_with_detection(request, model_name, client, dynamic_api_keys)
                     .await
             }
             // Other providers don't support responses yet

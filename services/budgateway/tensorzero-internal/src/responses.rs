@@ -286,6 +286,21 @@ pub struct ResponseStreamEvent {
     pub data: Value,
 }
 
+/// Result type for responses that can be either streaming or non-streaming
+/// Used by providers that need to auto-detect response format (e.g., BudPrompt)
+pub enum ResponseResult {
+    /// Streaming response (SSE)
+    Streaming(
+        Box<
+            dyn futures::Stream<Item = Result<ResponseStreamEvent, crate::error::Error>>
+                + Send
+                + Unpin,
+        >,
+    ),
+    /// Non-streaming JSON response
+    NonStreaming(OpenAIResponse),
+}
+
 /// Types of streaming events
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -361,6 +376,27 @@ pub trait ResponseProvider {
         client: &reqwest::Client,
         api_keys: &crate::endpoints::inference::InferenceCredentials,
     ) -> Result<ResponseInputItemsList, crate::error::Error>;
+
+    /// Execute response with automatic format detection (for providers like BudPrompt)
+    /// Default implementation falls back to stream parameter
+    async fn execute_response_with_detection(
+        &self,
+        request: &OpenAIResponseCreateParams,
+        _model_name: &str,
+        client: &reqwest::Client,
+        api_keys: &crate::endpoints::inference::InferenceCredentials,
+    ) -> Result<ResponseResult, crate::error::Error> {
+        // Default implementation: check stream parameter and call appropriate method
+        if request.stream.unwrap_or(false) {
+            Ok(ResponseResult::Streaming(
+                self.stream_response(request, client, api_keys).await?,
+            ))
+        } else {
+            Ok(ResponseResult::NonStreaming(
+                self.create_response(request, client, api_keys).await?,
+            ))
+        }
+    }
 }
 
 #[cfg(test)]
