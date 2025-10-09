@@ -44,9 +44,9 @@ const EvaluationSumary = () => {
 
   // Mock data for charts - replace with real data when available
   const deployments = [
-    { id: 1, name: "Deployment 1", status: "active", color: "#22C55E" },
-    { id: 2, name: "Deployment 2", status: "inactive", color: "#A855F7" },
-    { id: 3, name: "Deployment 3", status: "active", color: "#3B82F6" },
+    { id: 1, name: "Deployment 1", status: "active", color: "#22C55E", icon: "/icons/huggingFace.png" },
+    { id: 2, name: "Deployment 2", status: "inactive", color: "#A855F7", icon: "/images/icons/zephyr.png" },
+    { id: 3, name: "Deployment 3", status: "active", color: "#3B82F6", icon: "/icons/huggingFace.png" },
   ];
 
   const traits = ["Trait 1", "Trait 2", "Trait 3", "Trait 4"];
@@ -103,7 +103,7 @@ const EvaluationSumary = () => {
       "MMLU",
       "MMLU",
     ],
-    yAxis: ["Model 5", "Model 4", "Model 3", "Model 2", "Model 1"],
+    yAxis: ["Model 1", "Model 2", "Model 3", "Model 4", "Model 5"],
     data: [
       // Model 5
       [0, 0, 19.8] as [number, number, number],
@@ -271,14 +271,21 @@ const EvaluationSumary = () => {
                     return (
                       <div
                         key={deployment.id}
-                        className={`flex items-center gap-2 py-[8px] px-[10px] rounded-[8px] cursor-pointer transition-all ${
-                          isSelected
+                        className={`flex items-center gap-2 py-[8px] px-[10px] rounded-[8px] cursor-pointer transition-all ${isSelected
                             ? "bg-[rgba(255,255,255,0.03)]"
                             : "hover:bg-[rgba(255,255,255,0.02)]"
-                        }`}
+                          }`}
                         onClick={() => handleDeploymentToggle(deployment.id)}
                       >
-                        <div className="w-5 h-5 rounded-[6px] bg-cover bg-center bg-[#1F1F1F]" />
+                        <div className="w-[1.25rem] h-[1.25rem] rounded-[6px] bg-cover bg-center bg-[#1F1F1F]">
+                          <Image
+                            preview={false}
+                            className=""
+                            style={{ width: "auto", height: "1.25rem" }}
+                            src={deployment.icon}
+                            alt={deployment.name}
+                          />
+                        </div>
                         <div className="flex-1">
                           <Text_14_400_EEEEEE className="text-[14px] leading-[19px]">
                             {deployment.name}
@@ -317,11 +324,10 @@ const EvaluationSumary = () => {
                   {traits.map((trait) => (
                     <div
                       key={trait}
-                      className={`flex items-center gap-2 py-[8px] px-[10px] rounded-[8px] cursor-pointer transition-all ${
-                        selectedTrait === trait
+                      className={`flex items-center gap-2 py-[8px] px-[10px] rounded-[8px] cursor-pointer transition-all ${selectedTrait === trait
                           ? "bg-[rgba(255,255,255,0.03)]"
                           : "hover:bg-[rgba(255,255,255,0.02)]"
-                      }`}
+                        }`}
                       onClick={() => handleTraitClick(trait)}
                     >
                       <div className="w-5 h-5 rounded-[6px] bg-[rgba(255,255,255,0.1)]" />
