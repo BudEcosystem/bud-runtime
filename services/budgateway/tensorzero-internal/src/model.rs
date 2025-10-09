@@ -1672,9 +1672,6 @@ pub(super) enum UninitializedProviderConfig {
         model_name: String,
         api_base: Url,
         api_key_location: Option<CredentialLocation>,
-        /// Whether prompts should stream by default (when stream is not explicitly specified in request)
-        #[serde(default)]
-        prompt_stream: Option<bool>,
     },
     #[strum(serialize = "gcp_vertex_anthropic")]
     #[serde(rename = "gcp_vertex_anthropic")]
@@ -1856,11 +1853,9 @@ impl UninitializedProviderConfig {
                 model_name: _,
                 api_base,
                 api_key_location,
-                prompt_stream,
             } => ProviderConfig::BudPrompt(BudPromptProvider::new(
                 api_base.clone(),
                 api_key_location,
-                prompt_stream,
             )?),
             UninitializedProviderConfig::Fireworks {
                 model_name,
