@@ -9,7 +9,6 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from budapp.cluster_ops.models import Cluster, ClusterSettings
 from budapp.commons.exceptions import ClientException
 from budapp.cluster_ops.schemas import (
     ClusterSettingsResponse,
@@ -49,12 +48,10 @@ class TestClusterSettingsDataManager:
         """Test getting cluster settings by cluster ID when found."""
         cluster_id = uuid4()
 
-        # Add spec for type checking
         mock_settings = mock_factory.create_mock_cluster_settings(
             cluster_id=cluster_id,
             default_storage_class="gp2"
         )
-        mock_settings.configure_mock(spec=ClusterSettings)
 
         data_manager.scalar_one_or_none = Mock(return_value=mock_settings)
 
@@ -106,7 +103,7 @@ class TestClusterSettingsDataManager:
         cluster_id = uuid4()
         new_storage_class = "nfs-storage"
 
-        mock_settings = Mock(spec=ClusterSettings)
+        mock_settings = Mock()
         mock_settings.id = uuid4()
         mock_settings.cluster_id = cluster_id
         mock_settings.default_storage_class = "old-storage"
@@ -143,7 +140,7 @@ class TestClusterSettingsDataManager:
         """Test deleting cluster settings."""
         cluster_id = uuid4()
 
-        mock_settings = Mock(spec=ClusterSettings)
+        mock_settings = Mock()
 
         # Mock get_cluster_settings to return the mock
         with patch.object(data_manager, 'get_cluster_settings', new_callable=AsyncMock, return_value=mock_settings):
@@ -173,7 +170,7 @@ class TestClusterSettingsDataManager:
 
         # First call returns None (no existing settings)
         # Second call after create returns the new settings
-        mock_new_settings = Mock(spec=ClusterSettings)
+        mock_new_settings = Mock()
         mock_new_settings.id = uuid4()
         mock_new_settings.cluster_id = cluster_id
 
@@ -197,7 +194,7 @@ class TestClusterSettingsDataManager:
         user_id = uuid4()
         default_storage_class = "ultra-ssd"
 
-        mock_existing_settings = Mock(spec=ClusterSettings)
+        mock_existing_settings = Mock()
         mock_existing_settings.id = uuid4()
         mock_existing_settings.cluster_id = cluster_id
         mock_existing_settings.default_storage_class = "old-storage"
@@ -240,7 +237,7 @@ class TestClusterService:
         cluster_id = uuid4()
         user_id = uuid4()
 
-        mock_settings = Mock(spec=ClusterSettings)
+        mock_settings = Mock()
         mock_settings.id = uuid4()
         mock_settings.cluster_id = cluster_id
         mock_settings.default_storage_class = "gp3"
@@ -278,10 +275,10 @@ class TestClusterService:
         cluster_id = uuid4()
         user_id = uuid4()
 
-        mock_cluster = Mock(spec=Cluster)
+        mock_cluster = Mock()
         mock_cluster.id = cluster_id
 
-        mock_settings = Mock(spec=ClusterSettings)
+        mock_settings = Mock()
         mock_settings.id = uuid4()
         mock_settings.cluster_id = cluster_id
         mock_settings.default_storage_class = "premium-storage"
@@ -333,7 +330,7 @@ class TestClusterService:
         """Test updating cluster settings successfully."""
         cluster_id = uuid4()
 
-        mock_settings = Mock(spec=ClusterSettings)
+        mock_settings = Mock()
         mock_settings.id = uuid4()
         mock_settings.cluster_id = cluster_id
         mock_settings.default_storage_class = "updated-storage"

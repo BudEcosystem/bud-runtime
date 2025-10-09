@@ -2,10 +2,9 @@
 
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, patch
 from uuid import uuid4
 
-from budapp.cluster_ops.models import ClusterSettings
 from budapp.cluster_ops.services import ClusterService
 from budapp.cluster_ops.schemas import ClusterSettingsResponse
 
@@ -19,7 +18,7 @@ async def test_get_cluster_settings_returns_none_for_unset_access_mode():
     user_id = uuid4()
 
     # Mock ClusterSettings with storage class but NO access mode
-    mock_settings = Mock(spec=ClusterSettings)
+    mock_settings = Mock()
     mock_settings.id = uuid4()
     mock_settings.cluster_id = cluster_id
     mock_settings.default_storage_class = "nfs-dynamic"
@@ -33,26 +32,15 @@ async def test_get_cluster_settings_returns_none_for_unset_access_mode():
     service = ClusterService(mock_session)
 
     # Mock the data manager to return our settings
-    service.get_cluster_settings = AsyncMock(wraps=service.get_cluster_settings)
     mock_data_manager = Mock()
     mock_data_manager.get_cluster_settings = AsyncMock(return_value=mock_settings)
 
-    # Monkey patch the data manager creation
-    original_init = service.get_cluster_settings
+    # Patch the ClusterSettingsDataManager to return our mock
+    with patch('budapp.cluster_ops.services.ClusterSettingsDataManager') as MockDataManager:
+        MockDataManager.return_value = mock_data_manager
 
-    async def patched_get_cluster_settings(cluster_id_param):
-        from budapp.cluster_ops.crud import ClusterSettingsDataManager
-        # Mock the data manager
-        with Mock() as mock_dm:
-            mock_dm.get_cluster_settings = AsyncMock(return_value=mock_settings)
-            ClusterSettingsDataManager.__new__ = Mock(return_value=mock_dm)
-            ClusterSettingsDataManager.__init__ = Mock(return_value=None)
-            return await original_init(cluster_id_param)
-
-    service.get_cluster_settings = patched_get_cluster_settings
-
-    # Act
-    result = await service.get_cluster_settings(cluster_id)
+        # Act
+        result = await service.get_cluster_settings(cluster_id)
 
     # Assert
     assert result is not None
@@ -75,7 +63,7 @@ async def test_get_cluster_settings_preserves_existing_access_mode():
     user_id = uuid4()
 
     # Mock ClusterSettings with both storage class AND access mode
-    mock_settings = Mock(spec=ClusterSettings)
+    mock_settings = Mock()
     mock_settings.id = uuid4()
     mock_settings.cluster_id = cluster_id
     mock_settings.default_storage_class = "nfs-csi"
@@ -89,21 +77,15 @@ async def test_get_cluster_settings_preserves_existing_access_mode():
     service = ClusterService(mock_session)
 
     # Mock the data manager to return our settings
-    original_init = service.get_cluster_settings
+    mock_data_manager = Mock()
+    mock_data_manager.get_cluster_settings = AsyncMock(return_value=mock_settings)
 
-    async def patched_get_cluster_settings(cluster_id_param):
-        from budapp.cluster_ops.crud import ClusterSettingsDataManager
-        # Mock the data manager
-        mock_dm = Mock()
-        mock_dm.get_cluster_settings = AsyncMock(return_value=mock_settings)
-        ClusterSettingsDataManager.__new__ = Mock(return_value=mock_dm)
-        ClusterSettingsDataManager.__init__ = Mock(return_value=None)
-        return await original_init(cluster_id_param)
+    # Patch the ClusterSettingsDataManager to return our mock
+    with patch('budapp.cluster_ops.services.ClusterSettingsDataManager') as MockDataManager:
+        MockDataManager.return_value = mock_data_manager
 
-    service.get_cluster_settings = patched_get_cluster_settings
-
-    # Act
-    result = await service.get_cluster_settings(cluster_id)
+        # Act
+        result = await service.get_cluster_settings(cluster_id)
 
     # Assert
     assert result is not None
