@@ -20,9 +20,7 @@ def test_get_cluster_settings_code():
 
     # Find the get_cluster_settings method
     method_start = content.find('async def get_cluster_settings(self, cluster_id: UUID) -> ClusterSettingsResponse | None:')
-    if method_start == -1:
-        print("❌ Could not find get_cluster_settings method")
-        return False
+    assert method_start != -1, "Could not find get_cluster_settings method"
 
     # Find the next method (to determine where get_cluster_settings ends)
     next_method = content.find('async def create_cluster_settings', method_start)
@@ -69,13 +67,12 @@ def test_get_cluster_settings_code():
     if issues_found:
         print(f"\n❌ Test FAILED: Found auto-resolution code in get_cluster_settings")
         print(f"   Issues: {', '.join(issues_found)}")
-        return False
+        assert False, f"Found auto-resolution code in get_cluster_settings: {', '.join(issues_found)}"
     else:
         print("\n✅ Test PASSED: get_cluster_settings is now a simple getter")
         print("   - No auto-resolution of access_mode")
         print("   - Returns data from DB as-is")
         print("   - Returns None for access_mode if not set by user")
-        return True
 
 
 def verify_create_update_methods_still_have_resolution():

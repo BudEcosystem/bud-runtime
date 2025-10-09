@@ -3,6 +3,8 @@ global:
   security:
     allowInsecureImages: true
 
+imagePullSecrets: []
+
 # NOTE: support for https://keel.sh/
 imagePullPolicy: "IfNotPresent"
 deploymentAnnotations: {}
