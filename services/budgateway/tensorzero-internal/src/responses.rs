@@ -131,10 +131,6 @@ pub struct OpenAIResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<bool>,
 
-    /// Billing information
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub billing: Option<Value>,
-
     /// Error information if the response failed
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ResponseError>,
@@ -173,17 +169,9 @@ pub struct OpenAIResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt: Option<PromptReference>,
 
-    /// Prompt cache key for optimization
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt_cache_key: Option<String>,
-
     /// Reasoning information
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<Value>,
-
-    /// Safety identifier for abuse detection
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub safety_identifier: Option<String>,
 
     /// Service tier
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -409,7 +397,7 @@ mod tests {
         let params = OpenAIResponseCreateParams {
             model: "gpt-4".to_string(),
             input: json!("Hello, world!"),
-            instructions: Some("Be helpful".to_string()),
+            instructions: Some(json!("Be helpful")),
             tools: Some(vec![
                 json!({"type": "function", "function": {"name": "test"}}),
             ]),
@@ -544,13 +532,14 @@ mod tests {
             background: Some(false),
             error: None,
             incomplete_details: None,
-            instructions: Some("Be helpful".to_string()),
+            instructions: Some(json!("Be helpful")),
             max_output_tokens: Some(1000),
             max_tool_calls: None,
             model: "gpt-4".to_string(),
             output: vec![json!({"type": "text", "text": "Hello!"})],
             parallel_tool_calls: Some(true),
             previous_response_id: None,
+            prompt: None,
             reasoning: None,
             service_tier: Some("default".to_string()),
             store: Some(true),

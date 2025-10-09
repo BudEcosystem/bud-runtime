@@ -817,7 +817,7 @@ mod tests {
         let request = OpenAIResponseCreateParams {
             model: "gpt-4".to_string(),
             input: json!("Hello, how can I help you?"),
-            instructions: Some("Be helpful and concise".to_string()),
+            instructions: Some(json!("Be helpful and concise")),
             temperature: Some(0.7),
             max_output_tokens: Some(500),
             stream: Some(false),
@@ -880,7 +880,20 @@ mod tests {
             background: None,
             error: None,
             instructions: None,
-            input_items: None,
+            prompt: None,
+            max_output_tokens: None,
+            max_tool_calls: None,
+            parallel_tool_calls: None,
+            previous_response_id: None,
+            store: None,
+            temperature: None,
+            text: None,
+            tool_choice: None,
+            tools: None,
+            top_logprobs: None,
+            top_p: None,
+            truncation: None,
+            user: None,
         };
 
         // Test serialization and deserialization roundtrip
