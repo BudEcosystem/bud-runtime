@@ -25,8 +25,8 @@ storage:
 
 ingress:
   enabled: true
-  # NOTE: used to derive public urls for frontend services
-  httpsEnabled: true
+  # NOTE: used to derive public urls for client side services: (external|internal|disabled)
+  https: disabled
   hosts:
     root: "bud.example.com"
     # NOTE: rest is derived from root by ./templates/_helpers.tpl
