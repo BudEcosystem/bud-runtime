@@ -40,6 +40,7 @@ spec:
             value: "{{ .Values.microservices.budnotify.daprid }}"
           - name: NOTIFY_SERVICE_TOPIC
             value: "{{ .Values.microservices.budnotify.pubsubTopic }}"
+          # postgresql
           - name: PSQL_HOST
             value: {{ include "bud.externalServices.postgresql.host" . }}
           - name: PSQL_PORT
@@ -50,6 +51,17 @@ spec:
             value: {{ .Values.externalServices.postgresql.databases.budcluster.password }}
           - name: PSQL_DB_NAME
             value: {{ .Values.externalServices.postgresql.databases.budcluster.name }}
+          # minio
+          - name: MINIO_ENDPOINT
+            value: {{ include "bud.ingress.url.minio" $ }}
+          - name: MINIO_ACCESS_KEY
+            value: {{ include "bud.externalServices.minio.auth.accessKey" . }}
+          - name: MINIO_SECRET_KEY
+            value: {{ include "bud.externalServices.minio.auth.secretKey" . }}
+          - name: MINIO_BUCKET
+            value: {{ .Values.externalServices.minio.buckets.modelRegistry }}
+          - name: MINIO_SECURE
+            value: {{ ternary (eq .Values.ingress.https "disabled") "false" "true" }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcluster.env }}
           - name: {{ $key }}

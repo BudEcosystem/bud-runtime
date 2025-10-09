@@ -33,6 +33,7 @@ spec:
         ports:
         - containerPort: 3004
         env:
+          # postgresql
           - name: PSQL_HOST
             value: {{ include "bud.externalServices.postgresql.host" . }}
           - name: PSQL_PORT
@@ -43,6 +44,19 @@ spec:
             value: {{ .Values.externalServices.postgresql.databases.budmodel.password }}
           - name: PSQL_DB_NAME
             value: {{ .Values.externalServices.postgresql.databases.budmodel.name }}
+          # minio
+          - name: MINIO_ENDPOINT
+            value: {{ include "bud.externalServices.minio.endpoint" . }}
+          - name: MINIO_ACCESS_KEY
+            value: {{ include "bud.externalServices.minio.auth.accessKey" . }}
+          - name: MINIO_SECRET_KEY
+            value: {{ include "bud.externalServices.minio.auth.secretKey" . }}
+          - name: MINIO_BUCKET
+            value: {{ .Values.externalServices.minio.buckets.modelRegistry }}
+          - name: MINIO_MODEL_BUCKET
+            value: {{ .Values.externalServices.minio.buckets.modelInfo }}
+          - name: MINIO_SECURE
+            value: "false"
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budmodel.env }}
           - name: {{ $key }}

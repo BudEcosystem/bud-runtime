@@ -135,6 +135,20 @@
 {{- printf "%s-minio.%s:9000" .Release.Name .Release.Namespace }}
 {{- end }}
 {{- end }}
+{{- define "bud.externalServices.minio.auth.accessKey" -}}
+{{- if .Values.externalServices.minio.auth.accessKey }}
+{{- print .Values.externalServices.minio.auth.accessKey  }}
+{{- else }}
+{{- print .Values.minio.auth.rootUser  }}
+{{- end }}
+{{- end }}
+{{- define "bud.externalServices.minio.auth.secretKey" -}}
+{{- if .Values.externalServices.minio.auth.accessKey }}
+{{- print .Values.externalServices.minio.auth.secretKey  }}
+{{- else }}
+{{- print .Values.minio.auth.rootPassword  }}
+{{- end }}
+{{- end }}
 
 -
 {{- define "bud.externalServices.postgresql.host" -}}

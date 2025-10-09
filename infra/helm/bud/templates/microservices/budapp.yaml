@@ -62,6 +62,9 @@ spec:
             value: {{ include "bud.ingress.url.budadmin" . }}
           - name: CORS_ORIGINS
             value: "{{ join "," .Values.microservices.budapp.corsOrigins }},{{ include "bud.ingress.url.budadmin" $ }},{{ include "bud.ingress.url.budplayground" $ }},{{ include "bud.ingress.url.budcustomer" $ }}"
+          - name: STATIC_DIR
+            value: "/data/static-dir"
+          # postgresql
           - name: PSQL_HOST
             value: {{ include "bud.externalServices.postgresql.host" . }}
           - name: PSQL_PORT
@@ -72,8 +75,19 @@ spec:
             value: {{ .Values.externalServices.postgresql.databases.budapp.password }}
           - name: PSQL_DB_NAME
             value: {{ .Values.externalServices.postgresql.databases.budapp.name }}
-          - name: STATIC_DIR
-            value: "/data/static-dir"
+          # minio
+          - name: MINIO_ENDPOINT
+            value: {{ include "bud.externalServices.minio.endpoint" . }}
+          - name: MINIO_ACCESS_KEY
+            value: {{ include "bud.externalServices.minio.auth.accessKey" . }}
+          - name: MINIO_SECRET_KEY
+            value: {{ include "bud.externalServices.minio.auth.secretKey" . }}
+          - name: MINIO_BUCKET
+            value: {{ .Values.externalServices.minio.buckets.modelRegistry }}
+          - name: MINIO_MODEL_BUCKET
+            value: {{ .Values.externalServices.minio.buckets.modelInfo }}
+          - name: MINIO_SECURE
+            value: "false"
         {{- $root := . }}
         {{- range $key, $value := .Values.microservices.budapp.env }}
           - name: {{ $key }}
