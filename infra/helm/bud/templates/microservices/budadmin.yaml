@@ -17,6 +17,10 @@ spec:
       labels:
         app: {{ .Release.Name }}-budadmin
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budadmin
         image: {{ .Values.microservices.budadmin.image }}
@@ -41,7 +45,7 @@ spec:
           - name: NEXT_PUBLIC_NOVU_BASE_URL
             value: {{ include "bud.ingress.url.novuapi" $ }}
           - name: NEXT_PUBLIC_COPY_CODE_API_BASE_URL
-            value: {{ include "bud.ingress.url.budgateway" $ }}
+            value: {{ include "bud.ingress.url.budgateway" $ }}/
           - name: NEXT_PUBLIC_PLAYGROUND_URL
             value: {{ include "bud.ingress.url.budplayground" $ }}
           - name: NEXT_PUBLIC_ASK_BUD_URL

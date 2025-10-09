@@ -21,6 +21,10 @@ spec:
         dapr.io/app-id: {{ .Values.microservices.budapp.daprid }}
         dapr.io/app-port: "9082"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name}}-budapp
         image: {{ .Values.microservices.budapp.image }}

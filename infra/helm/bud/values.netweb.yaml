@@ -5,7 +5,6 @@ ingress:
 storage:
     budmodelRegistry:
         size: "128Gi"
-    budevalDataset:
 minio:
     persistence:
         size: "128Gi"
