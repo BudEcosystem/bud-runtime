@@ -21,6 +21,10 @@ spec:
         dapr.io/app-id: {{ .Values.microservices.budprompt.daprid }}
         dapr.io/app-port: "3015"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name}}-budprompt
         image: {{ .Values.microservices.budprompt.image }}

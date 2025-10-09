@@ -21,6 +21,10 @@ spec:
         dapr.io/app-id: {{ .Values.microservices.budnotify.daprid }}
         dapr.io/app-port: "3000"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: budnotify
         image: {{ .Values.microservices.budnotify.image }}
