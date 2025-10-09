@@ -48,7 +48,7 @@ export default function AddCluster() {
   return (
     <BudForm
       data={{
-        icon: "😍",
+        icon: "🌐",
         ...clusterValues,
       }}
       disableNext={!isValidClusterName(values?.name) || !values.ingress_url || !isValidUrl(values.ingress_url) || !clusterValues.configuration_file}

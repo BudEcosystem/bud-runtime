@@ -82,7 +82,7 @@ export default function EditProject() {
           name: currentProject.name || "",
           description: currentProject.description || "",
           tags: existingTags,
-          icon: currentProject.icon || "😍",
+          icon: currentProject.icon || "🌐",
         });
         // Trigger form validation to update UI
         form.validateFields({ validateOnly: true });
@@ -98,7 +98,7 @@ export default function EditProject() {
           name: "",
           description: "",
           tags: [],
-          icon: "😍",
+          icon: "🌐",
         }}
         onNext={() => closeDrawer()}
         nextText="Close"
@@ -135,7 +135,7 @@ export default function EditProject() {
         name: currentProject?.name || "",
         description: currentProject?.description || "",
         tags: existingTags,
-        icon: currentProject?.icon || "😍",
+        icon: currentProject?.icon || "🌐",
       }}
       onNext={(values) => {
         if (!submittable) {
@@ -180,7 +180,7 @@ export default function EditProject() {
           name: values.name,
           description: values.description,
           tags: formattedTags,
-          icon: values.icon || "😍",
+          icon: values.icon || "🌐",
         };
 
         // Set loading state to true before API call

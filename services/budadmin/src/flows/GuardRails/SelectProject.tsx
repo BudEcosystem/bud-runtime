@@ -10,6 +10,7 @@ import { errorToast } from "@/components/toast";
 import { useProjects } from "src/hooks/useProjects";
 import useGuardrails from "src/hooks/useGuardrails";
 import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
+import Tags from "../components/DrawerTags";
 
 export default function SelectProject() {
   const { openDrawerWithStep } = useDrawer();
@@ -169,6 +170,17 @@ export default function SelectProject() {
                             <Text_14_400_EEEEEE className="mb-[0.25rem]">
                               {project.project.name}
                             </Text_14_400_EEEEEE>
+                            {project.tags.length > 0 && (
+                              <div className="flex gap-[0.3rem] mb-[0.25rem]">
+                                {project.tags.map((tag: any, index) => (
+                                  <Tags
+                                    key={index}
+                                    name={tag.name}
+                                    color={tag.color || "#757575"}
+                                  />
+                                ))}
+                              </div>
+                            )}
                             {project.project.description && (
                               <Text_12_400_757575 className="line-clamp-1">
                                 {project.project.description}
