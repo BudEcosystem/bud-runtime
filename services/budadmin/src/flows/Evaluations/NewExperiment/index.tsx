@@ -50,6 +50,7 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
       />
       <TagsInput
         label="Tags"
+        required
         options={options}
         info="Add keywords to help organize and find your experiment later. Max 10 tags, 20 characters each."
         name="tags"
@@ -84,7 +85,7 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
             },
           },
         ]}
-        ClassNames="mb-[0px]"
+        ClassNames="mb-[1rem]"
         SelectClassNames="mb-[.5rem]"
         menuplacement="top"
       />
