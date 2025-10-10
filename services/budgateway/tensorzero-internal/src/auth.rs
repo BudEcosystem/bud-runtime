@@ -11,8 +11,12 @@ use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiKeyMetadata {
-    pub endpoint_id: String,
-    pub model_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub endpoint_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
     pub project_id: String,
 }
 
@@ -179,11 +183,12 @@ pub async fn require_api_key(
     let path = parts.uri.path();
     let is_batch_or_file_endpoint =
         path.starts_with("/v1/batches") || path.starts_with("/v1/files");
+    let is_responses_endpoint = path.starts_with("/v1/responses");
 
     let mut request = Request::from_parts(parts, Body::from(bytes.clone()));
 
     if !is_batch_or_file_endpoint {
-        // Parse the JSON body to validate and extract model name
+        // Parse the JSON body to validate and extract model name or prompt.id
         let val: Value = match serde_json::from_slice(&bytes) {
             Ok(v) => v,
             Err(_) => {
@@ -194,34 +199,79 @@ pub async fn require_api_key(
             }
         };
 
-        let model = match val.get("model").and_then(|v| v.as_str()) {
-            Some(m) => m,
-            None => {
+        // Determine lookup key: either model OR prompt.id with :prompt suffix
+        let (lookup_key, is_prompt_based, _original_prompt_id) = if let Some(model) = val.get("model").and_then(|v| v.as_str()) {
+            // Traditional model-based request
+            (model.to_string(), false, None)
+        } else if let Some(prompt_id) = val.get("prompt")
+            .and_then(|p| p.get("id"))
+            .and_then(|id| id.as_str()) {
+            // Prompt-based request: validate that either input or variables is present
+            let has_input = val.get("input").is_some();
+            let has_variables = val.get("prompt")
+                .and_then(|p| p.get("variables"))
+                .is_some();
+
+            if !has_input && !has_variables {
                 return Err(auth_error_response(
                     StatusCode::BAD_REQUEST,
-                    "Missing model name in request body",
-                ))
+                    "Either 'input' or 'variables' is required.",
+                ));
             }
+
+            // Add :prompt suffix for authorization lookup
+            (format!("{}:prompt", prompt_id), true, Some(prompt_id.to_string()))
+        } else {
+            // Provide endpoint-specific error message
+            let error_message = if is_responses_endpoint {
+                "Model name or prompt.id required in request body"
+            } else {
+                "Missing model name in request body"
+            };
+            return Err(auth_error_response(
+                StatusCode::BAD_REQUEST,
+                error_message,
+            ));
         };
 
         // We already checked that api_config is Ok in the if statement above
         #[expect(clippy::unwrap_used)]
         let api_config = api_config.unwrap();
-        let metadata = match api_config.get(model) {
+        let metadata = match api_config.get(&lookup_key) {
             Some(v) => v,
             None => {
                 return Err(auth_error_response(
                     StatusCode::NOT_FOUND,
-                    &format!("Model not found: {model}"),
+                    &format!("Access denied for: {lookup_key}"),
                 ))
             }
         };
 
-        // Add the model name as a custom header for downstream handlers
-        if let Ok(header_value) = model.parse() {
-            request
-                .headers_mut()
-                .insert("x-tensorzero-model-name", header_value);
+        // Add headers based on request type
+        if is_prompt_based {
+            // For prompt-based requests, use prompt_id from config for routing
+            if let Some(ref prompt_id) = metadata.prompt_id {
+                if let Ok(header_value) = prompt_id.parse() {
+                    request
+                        .headers_mut()
+                        .insert("x-tensorzero-prompt-id", header_value);
+                }
+            }
+        } else {
+            // For model-based requests, add the model name header
+            if let Ok(header_value) = lookup_key.parse() {
+                request
+                    .headers_mut()
+                    .insert("x-tensorzero-model-name", header_value);
+            }
+            // For model-based requests, set endpoint_id for routing
+            if let Some(ref endpoint_id) = metadata.endpoint_id {
+                if let Ok(header_value) = endpoint_id.parse() {
+                    request
+                        .headers_mut()
+                        .insert("x-tensorzero-endpoint-id", header_value);
+                }
+            }
         }
 
         // Add metadata headers for observability
@@ -230,15 +280,14 @@ pub async fn require_api_key(
                 .headers_mut()
                 .insert("x-tensorzero-project-id", header_value);
         }
-        if let Ok(header_value) = metadata.endpoint_id.parse() {
-            request
-                .headers_mut()
-                .insert("x-tensorzero-endpoint-id", header_value);
-        }
-        if let Ok(header_value) = metadata.model_id.parse() {
-            request
-                .headers_mut()
-                .insert("x-tensorzero-model-id", header_value);
+
+        // Add model_id header if present (optional for prompt-based requests)
+        if let Some(ref model_id) = metadata.model_id {
+            if let Ok(header_value) = model_id.parse() {
+                request
+                    .headers_mut()
+                    .insert("x-tensorzero-model-id", header_value);
+            }
         }
 
         // Add auth metadata headers if available

@@ -210,7 +210,7 @@ pub async fn inference_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &openai_compatible_params.model,
+        Some(&openai_compatible_params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -2425,7 +2425,7 @@ pub async fn embedding_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &openai_compatible_params.model,
+        Some(&openai_compatible_params.model),
         &headers,
         true, // for embedding
     )?;
@@ -2748,7 +2748,7 @@ pub async fn moderation_handler(
         .unwrap_or_else(|| "omni-moderation-latest".to_string());
 
     // Resolve the model name based on authentication state
-    let model_resolution = model_resolution::resolve_model_name(&model_name, &headers, false)?;
+    let model_resolution = model_resolution::resolve_model_name(Some(&model_name), &headers, false)?;
 
     let resolved_model_name = model_resolution
         .model_name
@@ -3385,7 +3385,7 @@ pub async fn audio_transcription_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -3614,7 +3614,7 @@ pub async fn audio_translation_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -3778,7 +3778,7 @@ pub async fn text_to_speech_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -3936,7 +3936,7 @@ pub async fn realtime_session_handler(
 ) -> Result<Response<Body>, Error> {
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4021,7 +4021,7 @@ pub async fn realtime_transcription_session_handler(
 ) -> Result<Response<Body>, Error> {
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4269,7 +4269,7 @@ pub async fn image_generation_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4598,7 +4598,7 @@ pub async fn image_edit_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4767,7 +4767,7 @@ pub async fn image_variation_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -5204,16 +5204,16 @@ pub async fn response_create_handler(
         );
     }
 
-    // Resolve the model name based on authentication state
+    // Resolve the model name based on authentication state (optional for prompt-based requests)
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        params.model.as_deref(),
         &headers,
         false, // not for embedding
     )?;
 
     let model_name = model_resolution.model_name.ok_or_else(|| {
         Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
-            message: "Response requests must specify a model, not a function".to_string(),
+            message: "Response requests must specify a model or prompt.id".to_string(),
         })
     })?;
 
@@ -7191,8 +7191,8 @@ mod tests {
 
         // Test that the handler properly resolves model names
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4-responses".to_string(),
-            input: json!("Test input"),
+            model: Some("gpt-4-responses".to_string()),
+            input: Some(json!("Test input")),
             instructions: None,
             tools: None,
             tool_choice: None,
@@ -7236,8 +7236,8 @@ mod tests {
 
         // Test that streaming parameters are properly handled
         let params_streaming = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test")),
             stream: Some(true),
             stream_options: Some(json!({"include_usage": true})),
             instructions: None,
@@ -7266,8 +7266,8 @@ mod tests {
 
         // Test non-streaming
         let params_non_streaming = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test")),
             stream: Some(false),
             stream_options: None,
             instructions: None,
@@ -7306,8 +7306,8 @@ mod tests {
         metadata.insert("custom_data".to_string(), json!({"key": "value"}));
 
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test")),
             metadata: Some(metadata.clone()),
             stream: None,
             stream_options: None,
@@ -7348,8 +7348,8 @@ mod tests {
 
         // Test text-only modality
         let params_text = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Text input"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Text input")),
             modalities: Some(vec!["text".to_string()]),
             stream: None,
             stream_options: None,
@@ -7377,11 +7377,11 @@ mod tests {
 
         // Test multimodal with text and audio
         let params_multimodal = OpenAIResponseCreateParams {
-            model: "gpt-4o-audio".to_string(),
-            input: json!([
+            model: Some("gpt-4o-audio".to_string()),
+            input: Some(json!([
                 {"type": "text", "text": "Describe this image"},
                 {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
-            ]),
+            ])),
             modalities: Some(vec!["text".to_string(), "audio".to_string()]),
             stream: None,
             stream_options: None,
@@ -7440,8 +7440,8 @@ mod tests {
         ];
 
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("What's the weather in New York?"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("What's the weather in New York?")),
             tools: Some(tools.clone()),
             tool_choice: Some(json!("auto")),
             parallel_tool_calls: Some(true),
@@ -8044,7 +8044,7 @@ pub async fn document_processing_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &openai_compatible_params.model,
+        Some(&openai_compatible_params.model),
         &headers,
         false, // not for embeddings
     )?;

@@ -1079,7 +1079,7 @@ impl ResponseProvider for DummyProvider {
             instructions: request.instructions.clone(),
             max_output_tokens: request.max_output_tokens,
             max_tool_calls: request.max_tool_calls,
-            model: request.model.clone(),
+            model: request.model.clone().unwrap_or_else(|| "dummy-model".to_string()),
             output: vec![json!({
                 "id": format!("msg_{}", Uuid::now_v7()),
                 "type": "message",

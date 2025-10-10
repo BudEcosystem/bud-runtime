@@ -20,11 +20,13 @@ pub struct PromptReference {
 /// OpenAI-compatible request parameters for creating a response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenAIResponseCreateParams {
-    /// ID of the model to use
-    pub model: String,
+    /// ID of the model to use (optional for prompt-based requests)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 
-    /// The input to the model. Can be a string or array of content items
-    pub input: Value,
+    /// The input to the model. Can be a string or array of content items (optional for prompt-based requests)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input: Option<Value>,
 
     /// Developer-provided instructions for the model (can be string or array)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -395,8 +397,8 @@ mod tests {
     #[test]
     fn test_response_create_params_serialization() {
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Hello, world!"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Hello, world!")),
             instructions: Some(json!("Be helpful")),
             tools: Some(vec![
                 json!({"type": "function", "function": {"name": "test"}}),
@@ -444,8 +446,8 @@ mod tests {
         }"#;
 
         let params: OpenAIResponseCreateParams = serde_json::from_str(json_str).unwrap();
-        assert_eq!(params.model, "gpt-4".to_string());
-        assert_eq!(params.input, json!("Hello"));
+        assert_eq!(params.model, Some("gpt-4".to_string()));
+        assert_eq!(params.input, Some(json!("Hello")));
         assert!(params.instructions.is_none());
         assert!(params.tools.is_none());
         assert!(params.temperature.is_none());
@@ -462,7 +464,7 @@ mod tests {
         }"#;
 
         let params: OpenAIResponseCreateParams = serde_json::from_str(json_str).unwrap();
-        assert_eq!(params.model, "gpt-4".to_string());
+        assert_eq!(params.model, Some("gpt-4".to_string()));
         assert_eq!(
             params.unknown_fields.get("custom_field").unwrap(),
             &json!("custom_value")
@@ -509,7 +511,7 @@ mod tests {
         }"#;
 
         let params: OpenAIResponseCreateParams = serde_json::from_str(json_str).unwrap();
-        assert_eq!(params.model, "gpt-4".to_string());
+        assert_eq!(params.model, Some("gpt-4".to_string()));
         assert!(params.prompt.is_some());
 
         let prompt = params.prompt.unwrap();
