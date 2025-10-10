@@ -133,6 +133,10 @@ class AppConfig(BaseAppConfig):
         description="API key location for BudDoc provider (e.g., 'dynamic::authorization', 'env::BUDDOC_API_KEY', 'none')",
         alias="BUD_DOC_API_KEY_LOCATION",
     )
+    bud_prompt_service_url: str = Field(
+        description="BudPrompt service URL for prompt execution",
+        alias="BUD_PROMPT_SERVICE_URL",
+    )
     bud_eval_app_id: str = Field(alias="BUD_EVAL_APP_ID", default="budeval")
     bud_prompt_app_id: str = Field(alias="BUD_PROMPT_APP_ID")
     source_topic: str = Field(alias="SOURCE_TOPIC", default="budAppMessages")

@@ -800,6 +800,7 @@ class ProxyProviderEnum(StrEnum):
     XAI = "xai"
     BUD_SENTINEL = "bud-sentinel"
     BUDDOC = "buddoc"
+    BUDPROMPT = "budprompt"
     AZURE_CONTENT_SAFETY = "azure-content-safety"
     AWS_COMPREHEND = "aws-comprehend"
 
@@ -974,6 +975,9 @@ BUD_NOTIFICATION_WORKFLOW = "bud-notification"
 BUD_INTERNAL_WORKFLOW = "bud-internal"
 PROJECT_INVITATION_WORKFLOW = "bud-project-invite"
 BUD_RESET_PASSWORD_WORKFLOW = "bud-reset-password"
+
+# BudPrompt API key location for proxy cache
+BUD_PROMPT_API_KEY_LOCATION = "dynamic::authorization"
 
 
 class NotificationStatus(Enum):

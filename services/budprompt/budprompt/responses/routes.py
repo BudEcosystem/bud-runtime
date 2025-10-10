@@ -17,17 +17,23 @@
 """API routes for responses module - OpenAI-compatible API."""
 
 import logging
-from typing import Union
+from typing import Any, Dict, Union
 
-from budmicroframe.commons.schemas import ErrorResponse
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from ..prompt.schemas import PromptExecuteResponse
-from .schemas import ResponseCreateRequest
+from budprompt.commons.exceptions import OpenAIResponseException
+
+from ..prompt.openai_response_formatter import OpenAIResponseSchema
+from .schemas import OpenAIError, OpenAIResponsesError, ResponseCreateRequest
 from .services import ResponsesService
 
 
 logger = logging.getLogger(__name__)
+
+# NOTE: Optional Bearer token security (auto_error=False makes it optional)
+security = HTTPBearer()
 
 # Responses Router
 responses_router = APIRouter(
@@ -38,13 +44,12 @@ responses_router = APIRouter(
 
 @responses_router.post(
     "/",
-    response_model=Union[PromptExecuteResponse, ErrorResponse],
+    response_model=Union[OpenAIResponseSchema, OpenAIResponsesError, Dict[str, Any]],
     summary="Create response using prompt template",
     description="Execute a prompt template with variables (OpenAI-compatible)",
     responses={
         200: {
-            "description": "Prompt executed successfully",
-            "model": PromptExecuteResponse,
+            "description": "Prompt executed successfully - returns OpenAI-compatible response format",
         },
         400: {"description": "Bad request - invalid parameters"},
         404: {"description": "Prompt template not found"},
@@ -53,7 +58,8 @@ responses_router = APIRouter(
 )
 async def create_response(
     request: ResponseCreateRequest,
-) -> Union[PromptExecuteResponse, ErrorResponse]:
+    credentials: HTTPAuthorizationCredentials = Depends(security),  # noqa: B008
+) -> Union[OpenAIResponseSchema, OpenAIResponsesError, Dict[str, Any]]:
     """Create a response using a prompt template.
 
     This endpoint is compatible with OpenAI's responses API format.
@@ -62,19 +68,37 @@ async def create_response(
 
     Args:
         request: The prompt request containing id, variables, and optional version
+        credentials: Optional bearer token credentials for API authentication
 
     Returns:
-        PromptExecuteResponse with execution result or ErrorResponse on failure
+        OpenAIResponseSchema on success or JSONResponse with error status code and
+        OpenAI-compatible error format on failure
     """
     logger.info(f"Received response creation request for prompt: {request.prompt.id}")
+
+    # Extract bearer token from credentials if present
+    api_key = credentials.credentials if credentials else None
 
     # Create service instance
     service = ResponsesService()
 
-    # Execute the prompt
-    result = await service.execute_prompt(
-        prompt_params=request.prompt,
-        input=request.input,
-    )
+    try:
+        # Execute the prompt with optional authorization
+        result = await service.execute_prompt(
+            prompt_params=request.prompt,
+            input=request.input,
+            api_key=api_key,
+        )
+        return result
 
-    return result
+    except OpenAIResponseException as e:
+        # Build OpenAI-compatible error response
+        error_response = OpenAIResponsesError(
+            error=OpenAIError(
+                message=e.message,
+                type=e.type,
+                param=e.param,
+                code=e.code,
+            )
+        )
+        return JSONResponse(status_code=e.status_code, content=error_response.model_dump(mode="json"))
