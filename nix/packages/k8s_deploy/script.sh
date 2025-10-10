@@ -12,7 +12,7 @@ die() {
 	exit "${2:-1}"
 }
 
-dir_ensure(){
+dir_ensure() {
 	git clone "$bud_repo" "$bud_repo_local" || exit 1
 
 	mkdir -p "$bud_config_dir"
@@ -20,11 +20,11 @@ dir_ensure(){
 }
 
 k8s_is_installed() {
-	if kubectl get ns > /dev/null 2>&1; then
+	if kubectl get ns >/dev/null 2>&1; then
 		return 0
 	fi
 
-	if KUBECONFIG="$k3s_kubeconfig_path" kubectl get ns > /dev/null 2>&1; then
+	if KUBECONFIG="$k3s_kubeconfig_path" kubectl get ns >/dev/null 2>&1; then
 		export KUBECONFIG="$k3s_kubeconfig_path"
 		return 0
 	fi
@@ -46,9 +46,9 @@ helm_install() {
 	chart_path="$bud_repo_local/infra/helm/$name"
 	scid_path="$chart_path/scid.toml"
 
-	namespace="$(tq -f "$scid_path"  -r '.namespace')"
+	namespace="$(tq -f "$scid_path" -r '.namespace')"
 	release_name="$(tq -f "$scid_path" -r '.release_name')"
-	if tq -f "$scid_path" -r '.chart_path_override' > /dev/null 2>&1; then
+	if tq -f "$scid_path" -r '.chart_path_override' >/dev/null 2>&1; then
 		chart_path="$(tq -f "$scid_path" -r '.chart_path_override')"
 	fi
 
@@ -68,11 +68,10 @@ helm_ensure() {
 
 	nvim "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
 	helm_install bud -f "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
-	helm_install bud -f "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
 }
 
 is_nixos() {
-	if grep -q 'DISTRIB_ID=nixos' /etc/lsb-release > /dev/null 2>&1 ; then
+	if grep -q 'DISTRIB_ID=nixos' /etc/lsb-release >/dev/null 2>&1; then
 		return 0
 	fi
 }
@@ -81,7 +80,7 @@ is_nixos() {
 ## MAIN ##
 ##########
 
-if is_nixos ; then
+if is_nixos; then
 	die "NixOS: Use the modules instead"
 fi
 

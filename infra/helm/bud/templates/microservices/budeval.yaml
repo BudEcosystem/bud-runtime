@@ -93,7 +93,7 @@ spec:
           - name: CLICKHOUSE_HOST
             value: "{{ .Release.Name }}-clickhouse"
           - name: CLICKHOUSE_PORT
-            value: "{{ .Values.clickhouse.containerPorts.tcp }}"
+            value: {{ .Values.clickhouse.containerPorts.tcp | quote }}
           - name: CLICKHOUSE_DATABASE
             value: "budeval"
           - name: CLICKHOUSE_USER
@@ -121,7 +121,7 @@ spec:
           - name: PSQL_HOST
             value: {{ include "bud.externalServices.postgresql.host" . }}
           - name: PSQL_PORT
-            value: {{ .Values.externalServices.postgresql.port }}
+            value: {{ .Values.externalServices.postgresql.port | quote }}
           - name: PSQL_USER
             value: {{ .Values.externalServices.postgresql.databases.budeval.username }}
           - name: PSQL_PASSWORD
@@ -156,7 +156,7 @@ spec:
 apiVersion: dapr.io/v2alpha1
 kind: Subscription
 metadata:
-  name: {{ .Release.Name }}-askbud-pubsub-subscription
+  name: {{ .Release.Name }}-budeval-pubsub-subscription
 spec:
   topic: budEvalMessages
   routes:
