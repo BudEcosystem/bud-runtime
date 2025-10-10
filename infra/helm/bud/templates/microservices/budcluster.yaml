@@ -53,7 +53,7 @@ spec:
             value: {{ .Values.externalServices.postgresql.databases.budcluster.name }}
           # minio
           - name: MINIO_ENDPOINT
-            value: {{ include "bud.ingress.url.minio" $ }}
+            value: {{ include "bud.ingress.url.s3" $ }}
           - name: MINIO_ACCESS_KEY
             value: {{ include "bud.externalServices.minio.auth.accessKey" . }}
           - name: MINIO_SECRET_KEY
@@ -61,7 +61,7 @@ spec:
           - name: MINIO_BUCKET
             value: {{ .Values.externalServices.minio.buckets.modelRegistry }}
           - name: MINIO_SECURE
-            value: {{ ternary (eq .Values.ingress.https "disabled") "false" "true" }}
+            value: {{ ternary "false" "true" (eq .Values.ingress.https "disabled")}}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcluster.env }}
           - name: {{ $key }}
