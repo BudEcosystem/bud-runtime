@@ -99,3 +99,20 @@ export const formatTimestampWithTZ = (
     return "";
   }
 };
+
+// Format date as "MMM, yyyy" (e.g., "Jan, 2025")
+export const formatMonthYear = (dateString: string | Date | number): string => {
+  if (!dateString) return "";
+  if (typeof dateString === "string" && !dateString.trim()) return "";
+  if (typeof dateString === "string" && isNaN(Date.parse(dateString)))
+    return "";
+  if (dateString instanceof Date && isNaN(dateString.getTime())) return "";
+
+  try {
+    const date = new Date(dateString);
+    return format(date, "MMM, yyyy");
+  } catch (error) {
+    console.error("Error formatting month-year:", dateString, error);
+    return "";
+  }
+};
