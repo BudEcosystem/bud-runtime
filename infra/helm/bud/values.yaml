@@ -23,10 +23,79 @@ storage:
     className: ""
     size: 20Gi
 
+externalServices:
+  minio:
+    endpoint: ""
+    auth:
+      secretKey: ""
+      accessKey: ""
+    buckets:
+      modelRegistry: "models-registry"
+      modelInfo: "model-info"
+  postgresql:
+    host: ""
+    port: 5432
+    databases:
+      keycloak:
+        name: "keycloak"
+        username: "keycloak"
+        password: "keycloak"
+      budask:
+        name: "budask"
+        username: "budask"
+        password: "budask"
+      budapp:
+        name: "budapp"
+        username: "budapp"
+        password: "budapp"
+      budcluster:
+        name: "budcluster"
+        username: "budcluster"
+        password: "budcluster"
+      budmetrics:
+        name: "budmetrics"
+        username: "budmetrics"
+        password: "budmetrics"
+      budmodel:
+        name: "budmodel"
+        username: "budmodel"
+        password: "budmodel"
+      budsim:
+        name: "budsim"
+        username: "budsim"
+        password: "budsim"
+      budeval:
+        name: "budeval"
+        username: "budeval"
+        password: "budeval"
+      buddoc:
+        name: "buddoc"
+        username: "buddoc"
+        password: "buddoc"
+      budprompt:
+        name: "budprompt"
+        username: "budprompt"
+        password: "budprompt"
+  # TODO: map all external service through here
+  # monogodb:
+  #   endpoint: ""
+  #   database:
+  #   auth:
+  #     username:
+  #     password:
+  # keycloak:
+  #   endpoint: ""
+  # valkey:
+  #   endpoint: ""
+  # clickhouse:
+  #   endpoint: ""
+  # kafka:
+  #   endpoint: ""
+
 ingress:
   enabled: true
-  # NOTE: used to derive public urls for frontend services
-  httpsEnabled: true
+  # NOTE: used to derive public urls for client side services: (external|internal|disabled)
+  https: disabled
   hosts:
     root: "bud.example.com"
     # NOTE: rest is derived from root by ./templates/_helpers.tpl
@@ -66,11 +135,6 @@ microservices:
     daprid: askbud
     model: qwen3-32b
     env:
-      PSQL_HOST: "{{ $.Release.Name }}-postgresql"
-      PSQL_PORT: "5432"
-      PSQL_USER: budask
-      PSQL_PASSWORD: budask
-      PSQL_DB_NAME: budask
       INFERENCE_API_KEY: "test"
       INFERENCE_URL: http://20.66.97.208/v1/
   budapp:
@@ -81,14 +145,6 @@ microservices:
       - "http://localhost:3000"
       - "http://localhost:3001"
     env:
-      STATIC_DIR: /data/static-dir
-
-      PSQL_HOST: "{{ $.Release.Name }}-postgresql"
-      PSQL_PORT: "5432"
-      PSQL_USER: budapp
-      PSQL_PASSWORD: budapp
-      PSQL_DB_NAME: budapp
-
       GRAFANA_SCHEME: http
       GRAFANA_URL: "{{ $.Release.Name }}-grafana"
 
@@ -117,12 +173,6 @@ microservices:
       SECRETSTORE_SECRET_NAME: "{{ .Release.Name }}-secretstore"
       STATESTORE_NAME: "{{ .Release.Name }}-dapr-statestore"
 
-      PSQL_HOST: "{{ $.Release.Name }}-postgresql"
-      PSQL_PORT: "5432"
-      PSQL_USER: budcluster
-      PSQL_PASSWORD: budcluster
-      PSQL_DB_NAME: budcluster
-
       VALIDATE_CERTS: "false"
       NODE_INFO_COLLECTOR_IMAGE_CPU: budstudio/node-info-collector-cpu:0.1.0
       NODE_INFO_COLLECTOR_IMAGE_CUDA: budimages.azurecr.io/budecosystem/node-info-collector-cuda:latest
@@ -132,10 +182,6 @@ microservices:
       ENGINE_CONTAINER_PORT: "8000"
       REGISTRY_SERVER: https://budimages.azurecr.io
       LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
-
-      MINIO_BUCKET: models-registry
-      MINIO_ENDPOINT: '{{ include "bud.ingress.hosts.s3" $ }}'
-      MINIO_SECURE: "{{ .Values.ingress.httpsEnabled }}"
   budmetrics:
     enabled: true
     daprid: budmetrics
@@ -143,12 +189,6 @@ microservices:
     env:
       #deadlink
       INFERENCE_URL: http://172.184.137.177:8502/classify
-
-      PSQL_HOST: "{{ $.Release.Name }}-postgresql"
-      PSQL_PORT: "5432"
-      PSQL_USER: budmetrics
-      PSQL_PASSWORD: budmetrics
-      PSQL_DB_NAME: budmetrics
 
       CLICKHOUSE_HOST: "{{ .Release.Name }}-clickhouse"
       CLICKHOUSE_PORT: "9000"
@@ -161,45 +201,23 @@ microservices:
     daprid: budmodel
     env:
       LOG_LEVEL: INFO
-
-      PSQL_HOST: "{{ $.Release.Name }}-postgresql"
-      PSQL_PORT: "5432"
-      PSQL_USER: budmodel
-      PSQL_PASSWORD: budmodel
-      PSQL_DB_NAME: budmodel
   budeval:
     enabled: true
     image: budstudio/budeval:nightly
     daprid: budeval
-    env:
-      PSQL_HOST: "{{ $.Release.Name }}-postgresql"
-      PSQL_PORT: "5432"
-      PSQL_USER: budeval
-      PSQL_PASSWORD: budeval
-      PSQL_DB_NAME: budeval
+    env: {}
   budsim:
     enabled: true
     image: budstudio/budsim:nightly
     daprid: budsim
     env:
       LOG_LEVEL: INFO
-
-      PSQL_HOST: "{{ $.Release.Name }}-postgresql"
-      PSQL_PORT: "5432"
-      PSQL_USER: budsim
-      PSQL_PASSWORD: budsim
-      PSQL_DB_NAME: budsim
   buddoc:
     enabled: true
     image: budstudio/buddoc:nightly
     daprid: buddoc
     env:
       LOG_LEVEL: INFO
-      PSQL_HOST: "{{ $.Release.Name }}-postgresql"
-      PSQL_PORT: "5432"
-      PSQL_USER: buddoc
-      PSQL_PASSWORD: buddoc
-      PSQL_DB_NAME: buddoc
       VLM_API_URL: "http://{{ $.Release.Name }}-budgateway:3000/v1/chat/completions"
       VLM_API_TIMEOUT: "300"
       MAX_FILE_SIZE_MB: "50"
@@ -218,12 +236,6 @@ microservices:
       BUD_GATEWAY_BASE_URL: http://20.66.97.208/v1
       BUD_DEFAULT_MODEL_NAME: qwen3-32b
 
-      PSQL_HOST: "{{ $.Release.Name }}-postgresql"
-      PSQL_PORT: "5432"
-      PSQL_USER: budprompt
-      PSQL_PASSWORD: budprompt
-      PSQL_DB_NAME: budprompt
-
       REDIS_HOST: "{{ .Release.Name }}-valkey-primary"
       REDIS_PORT: "6379"
       REDIS_DB_INDEX: "10"
@@ -236,7 +248,6 @@ microservices:
       #deadlink
       EVAL_MANIFEST_URL: https://eval-datasets.bud.eco/v2/manifest.json
       #deadlink
-      S3_LOCAL_STACK: http://localhost:4566
       DAPR_BASE_URL: http://localhost:3500
       DAPR_HOST_IP: 127.0.0.1
       WIDGET_EMBED_PATH: http://{{ .Release.Name }}-embed:4701/embed.umd.min.js
@@ -274,17 +285,9 @@ microservices:
       IS_TOPIC_NOTIFICATION_ENABLED: "true"
       LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
       LOG_LEVEL: INFO
-      MINIO_ACCESS_KEY: "{{ .Values.minio.auth.rootUser }}"
-      MINIO_BUCKET: models-registry
-      MINIO_ENDPOINT: '{{ include "bud.ingress.hosts.s3" $ }}'
-      MINIO_MODEL_BUCKET: model-info
-      MINIO_SECRET_KEY: "{{ .Values.minio.auth.rootPassword }}"
-      MINIO_SECURE: "{{ .Values.ingress.httpsEnabled }}"
       MODEL_DOWNLOAD_DIR: /data/models-registry
       MODEL_DOWNLOAD_DIR_MAX_SIZE: "500"
       MODEL_REGISTRY_DIR: /data/models-registry
-      MONGO_MAX_POOL_SIZE: "200"
-      MONGO_MIN_POOL_SIZE: "100"
       NEW_RELIC_APP_NAME: budnotify
       NEW_RELIC_NO_CONFIG_FILE: "true"
       NODE_ENV: production
@@ -310,8 +313,6 @@ microservices:
       REDIS_PORT: "6379"
       REDIS_URI: "{{ .Release.Name }}-valkey-primary:6379"
       REGISTRY_SERVER: https://budimages.azurecr.io
-      S3_BUCKET_NAME: novu-local
-      S3_REGION: us-east-1
       # TODO
       SECRETSTORE_NAME: "{{ .Release.Name}}-secretstore"
       SECRETSTORE_SECRET_NAME: "{{ .Release.Name }}-secretstore"
@@ -450,6 +451,7 @@ novu:
     existingSecret: "{{ $.Release.Name }}-novu-externalredis"
   externalS3:
     existingSecret: "{{ $.Release.Name }}-novu-externals3"
+    bucketName: novu-local
 minio:
   defaultInitContainers:
     volumePermissions:

@@ -118,6 +118,16 @@ spec:
             value: {{ .Values.microservices.budnotify.daprid }}
           - name: NOTIFY_SERVICE_TOPIC
             value: {{ .Values.microservices.budnotify.pubsubTopic }}
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budeval.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budeval.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budeval.name }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budeval.env }}
           - name: {{ $key }}
