@@ -6166,8 +6166,8 @@ mod tests {
         use serde_json::json;
 
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test input"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test input")),
             instructions: Some(json!("Be helpful")),
             tools: None,
             tool_choice: None,
@@ -6215,8 +6215,8 @@ mod tests {
         use serde_json::json;
 
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test")),
             stream: Some(true),
             stream_options: Some(json!({
                 "include_usage": true
@@ -6254,8 +6254,8 @@ mod tests {
 
         // Test text input
         let text_params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Simple text input"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Simple text input")),
             instructions: None,
             tools: None,
             tool_choice: None,
@@ -6284,8 +6284,8 @@ mod tests {
 
         // Test array input with multimodal content
         let multimodal_params = OpenAIResponseCreateParams {
-            model: "gpt-4o".to_string(),
-            input: json!([
+            model: Some("gpt-4o".to_string()),
+            input: Some(json!([
                 {
                     "type": "text",
                     "text": "What's in this image?"
@@ -6296,7 +6296,7 @@ mod tests {
                         "url": "data:image/png;base64,iVBORw0KGgoAAAANS..."
                     }
                 }
-            ]),
+            ])),
             modalities: Some(vec!["text".to_string(), "image".to_string()]),
             instructions: None,
             tools: None,

@@ -815,8 +815,8 @@ mod tests {
     fn test_budprompt_request_serialization() {
         // Create a request object similar to what BudPrompt would send
         let request = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Hello, how can I help you?"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Hello, how can I help you?")),
             instructions: Some(json!("Be helpful and concise")),
             temperature: Some(0.7),
             max_output_tokens: Some(500),
