@@ -65,7 +65,10 @@ helm_install() {
 helm_ensure() {
 	helm_install keel -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
 	helm_install dapr
-	helm_install bud; helm_install bud # a bug in chart
+
+	nvim "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
+	helm_install bud -f "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
+	helm_install bud -f "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
 }
 
 is_nixos() {

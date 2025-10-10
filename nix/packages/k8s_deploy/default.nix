@@ -7,6 +7,7 @@
   git,
   curl,
   tomlq,
+  vim,
 }:
 writeShellApplication {
   name = "k8s_deploy";
@@ -18,6 +19,7 @@ writeShellApplication {
     git
     curl
     tomlq
+    vim
   ];
 
   text = builtins.readFile ./script.sh;
