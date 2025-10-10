@@ -143,17 +143,16 @@
 {{- end }}
 {{- end }}
 {{- define "bud.externalServices.minio.auth.secretKey" -}}
-{{- if .Values.externalServices.minio.auth.accessKey }}
+{{- if .Values.externalServices.minio.auth.secretKey }}
 {{- print .Values.externalServices.minio.auth.secretKey  }}
 {{- else }}
 {{- print .Values.minio.auth.rootPassword  }}
 {{- end }}
 {{- end }}
 
--
 {{- define "bud.externalServices.postgresql.host" -}}
-{{- if .Values.externalServices.postgresql.endpoint }}
-{{- print .Values.externalServices.postgresql.endpoint  }}
+{{- if .Values.externalServices.postgresql.host }}
+{{- print .Values.externalServices.postgresql.host  }}
 {{- else }}
 {{- printf "%s-postgresql.%s" .Release.Name .Release.Namespace }}
 {{- end }}
