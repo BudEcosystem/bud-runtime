@@ -164,22 +164,31 @@ class PromptDataManager(DataManagerUtils):
 
         return result, count
 
-    async def get_all_active_prompts_for_project(self, project_id: UUID) -> Tuple[List[PromptModel], int]:
-        """Get all active prompts for a specific project.
+    async def get_all_active_prompts_for_projects(
+        self, project_ids: Optional[List[UUID]] = None
+    ) -> Tuple[List[PromptModel], int]:
+        """Get active prompts with optional project filtering.
 
         Args:
-            project_id: The ID of the project
+            project_ids: Optional list of project IDs to filter by.
+                         If None, returns all active prompts.
+                         If provided, returns prompts from those projects only.
 
         Returns:
             Tuple of (list of active prompts, count)
         """
-        stmt = select(PromptModel).filter(
-            and_(PromptModel.project_id == project_id, PromptModel.status == PromptStatusEnum.ACTIVE)
-        )
-
-        count_stmt = select(func.count(PromptModel.id)).filter(
-            and_(PromptModel.project_id == project_id, PromptModel.status == PromptStatusEnum.ACTIVE)
-        )
+        if project_ids is not None:
+            # Filter by specific projects
+            stmt = select(PromptModel).filter(
+                and_(PromptModel.project_id.in_(project_ids), PromptModel.status == PromptStatusEnum.ACTIVE)
+            )
+            count_stmt = select(func.count(PromptModel.id)).filter(
+                and_(PromptModel.project_id.in_(project_ids), PromptModel.status == PromptStatusEnum.ACTIVE)
+            )
+        else:
+            # Get all active prompts (no project filter)
+            stmt = select(PromptModel).filter(PromptModel.status == PromptStatusEnum.ACTIVE)
+            count_stmt = select(func.count(PromptModel.id)).filter(PromptModel.status == PromptStatusEnum.ACTIVE)
 
         count = self.execute_scalar(count_stmt)
         result = self.scalars_all(stmt)

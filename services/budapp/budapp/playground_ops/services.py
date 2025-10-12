@@ -31,7 +31,7 @@ from budapp.shared.redis_service import RedisService
 from ..auth.schemas import RefreshTokenRequest
 from ..commons import logging
 from ..commons.config import app_settings
-from ..commons.constants import EndpointStatusEnum, ProjectStatusEnum, ProjectTypeEnum, UserTypeEnum
+from ..commons.constants import EndpointStatusEnum, ProjectStatusEnum, ProjectTypeEnum, PromptStatusEnum, UserTypeEnum
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
 from ..commons.keycloak import KeycloakManager
@@ -44,6 +44,8 @@ from ..model_ops.services import ModelService
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from ..project_ops.services import ProjectService
+from ..prompt_ops.crud import PromptDataManager
+from ..prompt_ops.models import Prompt as PromptModel
 from ..user_ops.crud import UserDataManager
 from ..user_ops.models import Tenant, TenantClient
 from ..user_ops.models import User as UserModel
@@ -343,6 +345,11 @@ class PlaygroundService(SessionMixin):
                 search=False,
             )
 
+            # Get active prompts for playground - matching endpoint filtering pattern
+            db_prompts, _ = await PromptDataManager(self.session).get_all_active_prompts_for_projects(
+                project_ids=project_ids  # None for CLIENT (all prompts), list of IDs for ADMIN
+            )
+
             # Step 7: Prepare cache data (same structure as API keys)
             cache_data = {}
 
@@ -354,6 +361,16 @@ class PlaygroundService(SessionMixin):
                     "endpoint_id": str(endpoint.id),
                     "model_id": str(endpoint.model.id),
                     "project_id": str(endpoint.project_id),
+                }
+
+            # Add prompts to cache data with :prompt suffix
+            for db_prompt in db_prompts:
+                # Use same naming pattern as proxy cache: {prompt_name}:prompt
+                prompt_cache_key = f"{db_prompt.name}:prompt"
+
+                cache_data[prompt_cache_key] = {
+                    "prompt_id": str(db_prompt.id),
+                    "project_id": str(db_prompt.project_id),
                 }
 
             # Add metadata to cache
@@ -389,7 +406,8 @@ class PlaygroundService(SessionMixin):
             )
 
             logger.info(
-                f"Initialized playground session for user {db_user.id} with {len(db_endpoints)} endpoints cached"
+                f"Initialized playground session for user {db_user.id} with "
+                f"{len(db_endpoints)} endpoints and {len(db_prompts)} prompts cached"
             )
 
             # Step 10: Return response with new tokens

@@ -341,7 +341,7 @@ class CredentialService(SessionMixin):
             }
 
         # Get active prompts for the project
-        prompts, _ = await PromptDataManager(self.session).get_all_active_prompts_for_project(project_id)
+        prompts, _ = await PromptDataManager(self.session).get_all_active_prompts_for_projects([project_id])
         for prompt in prompts:
             # For prompts, endpoint_id is the prompt id itself
             # We don't have a direct model_id for prompts, so we'll use prompt_id as both
