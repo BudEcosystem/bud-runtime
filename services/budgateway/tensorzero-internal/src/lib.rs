@@ -11,6 +11,7 @@ pub mod blocking_middleware; // blocking rules enforcement middleware
 pub mod blocking_rules; // blocking rules management
 pub mod cache;
 pub mod clickhouse;
+pub mod completions; // text completion inference
 pub mod config_parser; // TensorZero config file
 pub mod documents; // document processing and OCR
 pub mod embeddings; // embedding inference
