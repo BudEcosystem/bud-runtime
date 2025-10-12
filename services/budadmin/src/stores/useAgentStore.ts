@@ -6,6 +6,11 @@ export interface AgentVariable {
   name: string;
   value: string;
   type: "input" | "output";
+  description?: string;
+  dataType?: "string" | "number" | "boolean" | "array" | "object";
+  defaultValue?: string;
+  required?: boolean;
+  validation?: string;
 }
 
 export interface AgentSession {
@@ -14,6 +19,8 @@ export interface AgentSession {
   active: boolean;
   modelId?: string;
   modelName?: string;
+  workflowId?: string;
+  promptId?: string;
   selectedDeployment?: {
     id: string;
     name: string;
@@ -56,7 +63,7 @@ interface AgentStore {
   deleteVariable: (sessionId: string, variableId: string) => void;
 
   // UI Actions
-  openAgentDrawer: () => void;
+  openAgentDrawer: (workflowId?: string) => void;
   closeAgentDrawer: () => void;
   setSelectedSession: (id: string | null) => void;
   openModelSelector: () => void;
@@ -68,26 +75,46 @@ interface AgentStore {
 }
 
 const generateId = () => {
-  return `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `agent_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
 const generateVariableId = () => {
-  return `var_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+};
+
+const generatePromptId = () => {
+  return `prompt_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
 const createDefaultSession = (): AgentSession => ({
   id: generateId(),
   name: `Agent ${new Date().toLocaleTimeString()}`,
   active: true,
+  promptId: generatePromptId(), // Generate promptId when session is created
+  systemPrompt: "",
+  promptMessages: "",  // Explicitly set as empty string
   inputVariables: [
     {
       id: generateVariableId(),
       name: "Input Variable 1",
       value: "",
-      type: "input"
+      type: "input",
+      description: "",
+      dataType: "string",
+      defaultValue: ""
     }
   ],
-  outputVariables: [],
+  outputVariables: [
+    {
+      id: generateVariableId(),
+      name: "Output Variable 1",
+      value: "",
+      type: "output",
+      description: "",
+      dataType: "string",
+      defaultValue: ""
+    }
+  ],
   createdAt: new Date(),
   updatedAt: new Date(),
   position: 0,
@@ -162,6 +189,9 @@ export const useAgentStore = create<AgentStore>()(
           ...sessionToDuplicate,
           id: generateId(),
           name: `${sessionToDuplicate.name} (Copy)`,
+          promptMessages: typeof sessionToDuplicate.promptMessages === 'string'
+            ? sessionToDuplicate.promptMessages
+            : "",  // Ensure promptMessages is always a string
           createdAt: new Date(),
           updatedAt: new Date(),
           position: get().sessions.length
@@ -183,7 +213,10 @@ export const useAgentStore = create<AgentStore>()(
           id: generateVariableId(),
           name: `Input Variable ${session.inputVariables.length + 1}`,
           value: "",
-          type: "input"
+          type: "input",
+          description: "",
+          dataType: "string",
+          defaultValue: ""
         };
 
         set({
@@ -207,7 +240,10 @@ export const useAgentStore = create<AgentStore>()(
           id: generateVariableId(),
           name: `Output Variable ${session.outputVariables.length + 1}`,
           value: "",
-          type: "output"
+          type: "output",
+          description: "",
+          dataType: "string",
+          defaultValue: ""
         };
 
         set({
@@ -258,10 +294,20 @@ export const useAgentStore = create<AgentStore>()(
       },
 
       // UI Actions
-      openAgentDrawer: () => {
+      openAgentDrawer: (workflowId?: string) => {
         const sessions = get().sessions;
         if (sessions.length === 0) {
-          get().createSession();
+          const sessionId = get().createSession();
+          // If workflow_id is provided, update the created session with it
+          if (workflowId && sessionId) {
+            get().updateSession(sessionId, { workflowId });
+          }
+        } else if (workflowId) {
+          // Update the current active session with the workflow_id
+          const activeSessionId = get().selectedSessionId || get().activeSessionIds[0];
+          if (activeSessionId) {
+            get().updateSession(activeSessionId, { workflowId });
+          }
         }
         set({ isAgentDrawerOpen: true });
       },
@@ -298,10 +344,44 @@ export const useAgentStore = create<AgentStore>()(
     }),
     {
       name: "agent-store",
+      version: 1, // Adding version to force migration
       partialize: (state) => ({
         sessions: state.sessions,
         activeSessionIds: state.activeSessionIds
-      })
+      }),
+      // Migration to fix promptMessages if it's an array and add default output variable
+      migrate: (persistedState: any, _version: number) => {
+        // Clean up any corrupted promptMessages data
+        if (persistedState && persistedState.sessions) {
+          persistedState.sessions = persistedState.sessions.map((session: any) => {
+            const updatedSession = { ...session };
+
+            // If promptMessages is an array or object, convert it to empty string
+            if (typeof session.promptMessages !== 'string') {
+              updatedSession.promptMessages = "";
+              updatedSession.systemPrompt = session.systemPrompt || "";
+            }
+
+            // Add default output variable if none exist
+            if (!updatedSession.outputVariables || updatedSession.outputVariables.length === 0) {
+              updatedSession.outputVariables = [
+                {
+                  id: generateVariableId(),
+                  name: "Output Variable 1",
+                  value: "",
+                  type: "output",
+                  description: "",
+                  dataType: "string",
+                  defaultValue: ""
+                }
+              ];
+            }
+
+            return updatedSession;
+          });
+        }
+        return persistedState;
+      }
     }
   )
 );

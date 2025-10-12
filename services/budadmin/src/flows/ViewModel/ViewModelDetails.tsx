@@ -8,7 +8,7 @@ import {
   Text_14_400_EEEEEE,
   Text_8_300_FFFFFF,
 } from "@/components/ui/text";
-import React, { use, useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { ConfigProvider, Image } from "antd"; // Added Checkbox import
 import Tags from "src/flows/components/DrawerTags";

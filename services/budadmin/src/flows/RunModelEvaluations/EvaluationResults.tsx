@@ -71,7 +71,7 @@ export default function EvaluationResults() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍",
+        icon: "🌐",
       }}
       onBack={() => {
         closeDrawer();

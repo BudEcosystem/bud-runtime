@@ -1,4 +1,5 @@
 ingress:
+    https: internal
     hosts:
         root: "dev.bud.studio"
 

@@ -22,6 +22,10 @@ spec:
         dapr.io/app-port: "3003"
         dapr.io/volume-mounts: "crypto-keys:/mnt/crypto-keys"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budcluster
         image: {{ .Values.microservices.budcluster.image }}
@@ -36,6 +40,28 @@ spec:
             value: "{{ .Values.microservices.budnotify.daprid }}"
           - name: NOTIFY_SERVICE_TOPIC
             value: "{{ .Values.microservices.budnotify.pubsubTopic }}"
+          # postgresql
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port | quote }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budcluster.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budcluster.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budcluster.name }}
+          # minio
+          - name: MINIO_ENDPOINT
+            value: {{ include "bud.ingress.url.s3" $ }}
+          - name: MINIO_ACCESS_KEY
+            value: {{ include "bud.externalServices.minio.auth.accessKey" . }}
+          - name: MINIO_SECRET_KEY
+            value: {{ include "bud.externalServices.minio.auth.secretKey" . }}
+          - name: MINIO_BUCKET
+            value: {{ .Values.externalServices.minio.buckets.modelRegistry }}
+          - name: MINIO_SECURE
+            value: {{ ternary false true (eq .Values.ingress.https "disabled") | quote }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcluster.env }}
           - name: {{ $key }}

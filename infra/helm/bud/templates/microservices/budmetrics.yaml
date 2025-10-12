@@ -21,6 +21,10 @@ spec:
         dapr.io/app-id: {{ .Values.microservices.budmetrics.daprid }}
         dapr.io/app-port: "3005"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budmetrics
         image: {{ .Values.microservices.budmetrics.image }}
@@ -29,6 +33,16 @@ spec:
         ports:
         - containerPort: 3005
         env:
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port | quote }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budmetrics.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budmetrics.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budmetrics.name }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budmetrics.env }}
           - name: {{ $key }}
