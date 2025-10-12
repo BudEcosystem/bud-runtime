@@ -373,6 +373,33 @@ class PlaygroundService(SessionMixin):
                     "project_id": str(db_prompt.project_id),
                 }
 
+            # Add draft/tryout prompts from Redis
+            draft_prompt_count = 0
+            try:
+                redis_service = RedisService()
+                draft_pattern = f"draft_prompt:{db_user.id}:*"
+                draft_keys = await redis_service.keys(draft_pattern)
+
+                for draft_key in draft_keys:
+                    # Decode key if it's bytes
+                    key_str = draft_key.decode() if isinstance(draft_key, bytes) else draft_key
+                    draft_data_str = await redis_service.get(key_str)
+
+                    if draft_data_str:
+                        draft_data = json.loads(draft_data_str)
+                        draft_prompt_id = draft_data.get("prompt_id")
+
+                        if draft_prompt_id:
+                            # Use prompt_id as the cache key (with :prompt suffix)
+                            draft_cache_key = f"{draft_prompt_id}:prompt"
+                            cache_data[draft_cache_key] = {"prompt_id": draft_prompt_id}
+                            draft_prompt_count += 1
+
+                logger.debug(f"Added {draft_prompt_count} draft prompts to cache for user {db_user.id}")
+            except Exception as e:
+                logger.error(f"Failed to fetch draft prompts: {e}")
+                # Continue - draft prompts are optional
+
             # Add metadata to cache
             cache_data["__metadata__"] = {
                 "api_key_id": None,  # Not applicable for JWT
@@ -407,7 +434,7 @@ class PlaygroundService(SessionMixin):
 
             logger.info(
                 f"Initialized playground session for user {db_user.id} with "
-                f"{len(db_endpoints)} endpoints and {len(db_prompts)} prompts cached"
+                f"{len(db_endpoints)} endpoints, {len(db_prompts)} prompts, and {draft_prompt_count} draft prompts cached"
             )
 
             # Step 10: Return response with new tokens

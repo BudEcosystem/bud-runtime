@@ -618,7 +618,7 @@ async def save_prompt_config(
     try:
         # Create service instance and save prompt config
         prompt_service = PromptService(session)
-        response = await prompt_service.save_prompt_config(request)
+        response = await prompt_service.save_prompt_config(request, current_user.id)
 
         return response.to_http_response()
 

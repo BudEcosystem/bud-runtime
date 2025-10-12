@@ -18,7 +18,7 @@
 
 import json
 from ast import Dict
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 from uuid import UUID
 
 import aiohttp
@@ -302,11 +302,12 @@ class PromptService(SessionMixin):
 
         return prompt_response
 
-    async def save_prompt_config(self, request: PromptConfigRequest) -> PromptConfigResponse:
+    async def save_prompt_config(self, request: PromptConfigRequest, current_user_id: UUID) -> PromptConfigResponse:
         """Save prompt configuration by forwarding request to budprompt service.
 
         Args:
             request: The prompt configuration request
+            current_user_id: The ID of the current user creating the draft prompt
 
         Returns:
             PromptConfigResponse containing the bud_prompt_id and bud_prompt_version
@@ -317,6 +318,21 @@ class PromptService(SessionMixin):
         # Extract prompt_id and version from the response
         prompt_id = response_data.get("prompt_id")
         version = response_data.get("version")
+
+        # Save draft prompt reference for playground access
+        try:
+            redis_service = RedisService()
+            draft_key = f"draft_prompt:{current_user_id}:{prompt_id}"
+            draft_value = json.dumps({"prompt_id": prompt_id, "user_id": str(current_user_id)})
+            # Set TTL to 24 hours (86400 seconds) - matching budprompt temporary storage
+            await redis_service.set(draft_key, draft_value, ex=86400)
+
+            # Add to proxy cache for routing (prompt_name = prompt_id for draft prompts)
+            await PromptWorkflowService(self.session).add_prompt_to_proxy_cache(prompt_id, prompt_id)
+            logger.debug(f"Added draft prompt {prompt_id} to cache for user {current_user_id}")
+        except Exception as e:
+            logger.error(f"Failed to cache draft prompt: {e}")
+            # Don't fail the request if caching fails
 
         # Create and return response
         return PromptConfigResponse(
@@ -1211,6 +1227,34 @@ class PromptWorkflowService(SessionMixin):
             "bud_prompt_version": prompt_version,
         }
 
+        # Save draft prompt reference for playground access
+        try:
+            # Get user_id from workflow's created_by field
+            user_id = db_workflow.created_by
+
+            if user_id and prompt_id:
+                redis_service = RedisService()
+                draft_key = f"draft_prompt:{user_id}:{prompt_id}"
+                draft_value = json.dumps(
+                    {
+                        "prompt_id": prompt_id,
+                        "user_id": str(user_id),
+                    }
+                )
+                # Set TTL to 24 hours (86400 seconds) - matching budprompt temporary storage
+                await redis_service.set(draft_key, draft_value, ex=86400)
+        except Exception as e:
+            logger.error(f"Failed to cache draft prompt: {e}")
+            # Don't fail the notification handler
+
+        # Add prompt to proxy cache for routing
+        try:
+            await self.add_prompt_to_proxy_cache(prompt_id, prompt_id)
+            logger.debug(f"Added prompt {prompt_id} to proxy cache")
+        except Exception as e:
+            logger.error(f"Failed to add prompt to proxy cache: {e}")
+            # Continue - cache update is non-critical
+
         # Update prompt_id as next step
         # Update current step number
         current_step_number = db_workflow.current_step + 1
@@ -1227,12 +1271,12 @@ class PromptWorkflowService(SessionMixin):
             db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
         )
 
-    async def add_prompt_to_proxy_cache(self, prompt_id: UUID, prompt_name: str) -> None:
+    async def add_prompt_to_proxy_cache(self, prompt_id: Union[UUID, str], prompt_name: str) -> None:
         """Add prompt to proxy cache for routing through budgateway.
 
         Args:
-            prompt_id: The prompt UUID
-            prompt_name: The prompt name to use as model_name
+            prompt_id: The prompt UUID (can be UUID object or string)
+            prompt_name: The prompt name to use as model_name (for draft prompts, same as prompt_id)
         """
         try:
             prompt_key_name = f"{prompt_name}:prompt"
