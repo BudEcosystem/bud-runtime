@@ -17,7 +17,8 @@ pub struct ApiKeyMetadata {
     pub prompt_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_id: Option<String>,
-    pub project_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
 }
 
 // Auth metadata from Redis __metadata__ field
@@ -274,11 +275,13 @@ pub async fn require_api_key(
             }
         }
 
-        // Add metadata headers for observability
-        if let Ok(header_value) = metadata.project_id.parse() {
-            request
-                .headers_mut()
-                .insert("x-tensorzero-project-id", header_value);
+        // Add metadata headers for observability (if present)
+        if let Some(ref project_id) = metadata.project_id {
+            if let Ok(header_value) = project_id.parse() {
+                request
+                    .headers_mut()
+                    .insert("x-tensorzero-project-id", header_value);
+            }
         }
 
         // Add model_id header if present (optional for prompt-based requests)
