@@ -1235,11 +1235,12 @@ class PromptWorkflowService(SessionMixin):
             prompt_name: The prompt name to use as model_name
         """
         try:
+            prompt_key_name = f"{prompt_name}:prompt"
             # Create BudPromptConfig for the provider
             prompt_config = BudPromptConfig(
                 type="budprompt",
                 api_base=app_settings.bud_prompt_service_url,
-                model_name=prompt_name,
+                model_name=prompt_key_name,
                 api_key_location=BUD_PROMPT_API_KEY_LOCATION,
             )
 
