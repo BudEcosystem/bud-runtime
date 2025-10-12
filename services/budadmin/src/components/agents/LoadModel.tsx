@@ -57,45 +57,37 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
       const params: any = {
         page,
         limit: pageSize,
-        table_source: "model",
-        search: Boolean(search),
-        order_by: sortOrder === "asc" ? "created_at" : "-created_at"
+        search: Boolean(search)
       };
 
-      // Add search parameter if exists
-      if (search) {
-        params.name = search;
-        params.tag = search;
-      }
-
-      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/models/`, {
+      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/playground/deployments`, {
         params
       });
 
       if (response?.data) {
-        const models = response.data.models || [];
+        const endpoints = response.data.endpoints || [];
         setTotalPages(response.data.total_pages || 1);
         setTotalModels(response.data.total_record || 0);
 
         if (isLoadMore) {
           // Append to existing models
-          setAvailableModels(prev => [...prev, ...models]);
+          setAvailableModels(prev => [...prev, ...endpoints]);
         } else {
           // Replace models
-          setAvailableModels(models);
+          setAvailableModels(endpoints);
         }
 
         // Set currently loaded model if it exists
         if (session?.selectedDeployment?.id) {
-          const current = models.find(
-            (model: ModelWrapper) => model.model?.id === session.selectedDeployment?.id || model.id === session.selectedDeployment?.id
+          const current = endpoints.find(
+            (endpoint: ModelWrapper) => endpoint.model?.id === session.selectedDeployment?.id || endpoint.id === session.selectedDeployment?.id
           );
           if (current) {
             setCurrentlyLoaded([current]);
             // Remove from available models
             setAvailableModels(prev =>
-              prev.filter((model: ModelWrapper) => {
-                const modelId = model.model?.id || model.id;
+              prev.filter((endpoint: ModelWrapper) => {
+                const modelId = endpoint.model?.id || endpoint.id;
                 return modelId !== session.selectedDeployment?.id;
               })
             );
@@ -103,8 +95,8 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
         }
       }
     } catch (error) {
-      console.error("Error fetching models:", error);
-      errorToast("Failed to load models");
+      console.error("Error fetching deployments:", error);
+      errorToast("Failed to load deployments");
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
