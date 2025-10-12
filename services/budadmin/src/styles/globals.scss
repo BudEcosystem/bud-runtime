@@ -3357,7 +3357,47 @@ svg.ant-progress-circle {
   padding-bottom: 0 !important;
   // overflow: hidden !important;
 }
+.observability {
+  .ant-table-wrapper .ant-table{
+    scrollbar-color: unset;
+  }
+  &::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
 
+  &::-webkit-scrollbar-track {
+    background: #161616;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: #757575;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: #b3b3b3;
+  }
+  ::-webkit-scrollbar-track {
+    background: #161616;
+  }
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: #757575;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #b3b3b3;
+  }
+}
 .CommonCustomPagination {
   .ant-pagination {
 
