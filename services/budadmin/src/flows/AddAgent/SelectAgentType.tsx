@@ -120,8 +120,8 @@ export default function SelectAgentType() {
         // Open the agent drawer with workflow_id
         openAgentDrawer(currentWorkflow.workflow_id);
 
-        // Navigate to the next step (Select Model)
-        openDrawerWithStep("add-agent-select-model");
+        // Navigate to the next step (Configuration, skipping Select Model)
+        openDrawerWithStep("add-agent-configuration");
       } else {
         errorToast("Failed to update agent type");
       }

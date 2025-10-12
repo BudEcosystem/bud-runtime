@@ -146,6 +146,7 @@ export default function AgentConfiguration() {
 
         console.log("Active session for workflow:", activeSession);
         console.log("Session promptId:", activeSession?.promptId);
+        console.log("Session selectedDeployment:", activeSession?.selectedDeployment);
 
         // Use the session's promptId as bud_prompt_id
         const budPromptId = activeSession?.promptId || currentWorkflow.workflow_steps?.bud_prompt_id;
@@ -155,6 +156,15 @@ export default function AgentConfiguration() {
           console.log("✓ bud_prompt_id included in payload:", payload.bud_prompt_id);
         } else {
           console.warn("⚠ bud_prompt_id is missing! No active session or workflow_steps.bud_prompt_id found");
+        }
+
+        // Include endpoint_id from the selected model in LoadModel
+        const endpointId = activeSession?.selectedDeployment?.id || activeSession?.modelId;
+        if (endpointId) {
+          payload.endpoint_id = endpointId;
+          console.log("✓ endpoint_id included in payload:", payload.endpoint_id);
+        } else {
+          console.warn("⚠ endpoint_id is missing! No model selected in LoadModel component");
         }
 
         console.log("Final payload for step 4:", payload);
@@ -212,7 +222,7 @@ export default function AgentConfiguration() {
   };
 
   const handleBack = () => {
-    openDrawerWithStep("add-agent-select-model");
+    openDrawerWithStep("add-agent-select-type");
   };
 
   return (
