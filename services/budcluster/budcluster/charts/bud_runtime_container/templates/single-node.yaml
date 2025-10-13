@@ -109,6 +109,12 @@ spec:
           medium: "Memory"
           sizeLimit: "2Gi"
       - name: model-registry
+      {{- if eq $.Values.volumeType "nfs" }}
+        nfs:
+          server: "{{ $.Values.nfs.server }}"
+          path: "{{ $.Values.nfs.path }}"
+      {{- else if eq $.Values.volumeType "local" }}
         persistentVolumeClaim:
           claimName: "{{ $.Values.pvcName }}"
+      {{- end }}
 {{- end }}
