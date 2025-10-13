@@ -82,8 +82,26 @@ class PlaygroundService(SessionMixin):
         filters = filters or {}
         order_by = order_by or []
 
+        # Extract project_id filter if provided
+        filtered_project_id = filters.pop("project_id", None)
+
         project_ids, filter_published_only = await self._get_authorized_project_ids(current_user_id, api_key)
         logger.debug("authorized project_ids: %s, filter_published_only: %s", project_ids, filter_published_only)
+
+        # If a specific project_id is requested, validate and override project_ids
+        if filtered_project_id:
+            # For CLIENT users with no project restriction (project_ids=None), allow any project since they only see published
+            # For users with specific project_ids, validate they have access
+            if project_ids is not None and filtered_project_id not in project_ids:
+                logger.debug(
+                    f"User/API key attempted to access unauthorized project {filtered_project_id}. Authorized projects: {project_ids}"
+                )
+                raise ClientException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message=f"Access denied to project {filtered_project_id}",
+                )
+            # Override to filter by specific project
+            project_ids = [filtered_project_id]
 
         # Add published filter if needed for CLIENT users
         if filter_published_only:
