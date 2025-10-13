@@ -207,19 +207,6 @@ pub async fn require_api_key(
         } else if let Some(prompt_id) = val.get("prompt")
             .and_then(|p| p.get("id"))
             .and_then(|id| id.as_str()) {
-            // Prompt-based request: validate that either input or variables is present
-            let has_input = val.get("input").is_some();
-            let has_variables = val.get("prompt")
-                .and_then(|p| p.get("variables"))
-                .is_some();
-
-            if !has_input && !has_variables {
-                return Err(auth_error_response(
-                    StatusCode::BAD_REQUEST,
-                    "Either 'input' or 'variables' is required.",
-                ));
-            }
-
             // Add :prompt suffix for authorization lookup
             (format!("{}:prompt", prompt_id), true, Some(prompt_id.to_string()))
         } else {
