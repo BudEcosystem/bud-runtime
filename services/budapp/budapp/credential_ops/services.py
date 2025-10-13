@@ -345,8 +345,8 @@ class CredentialService(SessionMixin):
         for prompt in prompts:
             # For prompts, endpoint_id is the prompt id itself
             # We don't have a direct model_id for prompts, so we'll use prompt_id as both
-            # NOTE: To allow prompt name same as other resources, Added a suffix ':prompt'
-            prompt_key_name = f"{prompt.name}:prompt"
+            # NOTE: To allow prompt name same as other resources, Added a prefix 'prompt:'
+            prompt_key_name = f"prompt:{prompt.name}"
             models[prompt_key_name] = {
                 "prompt_id": str(prompt.id),
                 "project_id": str(project_id),

@@ -1279,7 +1279,7 @@ class PromptWorkflowService(SessionMixin):
             prompt_name: The prompt name to use as model_name (for draft prompts, same as prompt_id)
         """
         try:
-            prompt_key_name = f"{prompt_name}:prompt"
+            prompt_key_name = f"prompt:{prompt_name}"
             # Create BudPromptConfig for the provider
             prompt_config = BudPromptConfig(
                 type="budprompt",

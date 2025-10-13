@@ -363,10 +363,10 @@ class PlaygroundService(SessionMixin):
                     "project_id": str(endpoint.project_id),
                 }
 
-            # Add prompts to cache data with :prompt suffix
+            # Add prompts to cache data with prompt: prefix
             for db_prompt in db_prompts:
-                # Use same naming pattern as proxy cache: {prompt_name}:prompt
-                prompt_cache_key = f"{db_prompt.name}:prompt"
+                # Use same naming pattern as proxy cache: prompt:{prompt_name}
+                prompt_cache_key = f"prompt:{db_prompt.name}"
 
                 cache_data[prompt_cache_key] = {
                     "prompt_id": str(db_prompt.id),
@@ -390,8 +390,8 @@ class PlaygroundService(SessionMixin):
                         draft_prompt_id = draft_data.get("prompt_id")
 
                         if draft_prompt_id:
-                            # Use prompt_id as the cache key (with :prompt suffix)
-                            draft_cache_key = f"{draft_prompt_id}:prompt"
+                            # Use prompt_id as the cache key (with prompt: prefix)
+                            draft_cache_key = f"prompt:{draft_prompt_id}"
                             cache_data[draft_cache_key] = {"prompt_id": draft_prompt_id}
                             draft_prompt_count += 1
 
