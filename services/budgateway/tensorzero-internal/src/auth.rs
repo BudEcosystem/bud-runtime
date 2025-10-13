@@ -200,15 +200,15 @@ pub async fn require_api_key(
             }
         };
 
-        // Determine lookup key: either model OR prompt.id with :prompt suffix
+        // Determine lookup key: either model OR prompt.id with prompt: prefix
         let (lookup_key, is_prompt_based, _original_prompt_id) = if let Some(model) = val.get("model").and_then(|v| v.as_str()) {
             // Traditional model-based request
             (model.to_string(), false, None)
         } else if let Some(prompt_id) = val.get("prompt")
             .and_then(|p| p.get("id"))
             .and_then(|id| id.as_str()) {
-            // Add :prompt suffix for authorization lookup
-            (format!("{}:prompt", prompt_id), true, Some(prompt_id.to_string()))
+            // Add prompt: prefix for authorization lookup
+            (format!("prompt:{}", prompt_id), true, Some(prompt_id.to_string()))
         } else {
             // Provide endpoint-specific error message
             let error_message = if is_responses_endpoint {
