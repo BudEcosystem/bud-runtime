@@ -101,7 +101,7 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
                       {/* Variable Name */}
                       <div className="flex flex-col gap-1">
                         <TextInput
-                          className="!w-full !max-w-full !h-[2rem] placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem]"
+                          className="!w-full !max-w-full !h-[2rem] text-[#EEEEEE] placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem]"
                           value={variable.name || ''}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                             onVariableChange(variable.id, "name", e.target.value)
@@ -113,7 +113,7 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
                       {/* Description */}
                       <div className="flex flex-col gap-1">
                         <TextAreaInput
-                          className="!w-full !max-w-full !min-h-[3rem] !text-[#EEEEEE] !text-xs !placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem]"
+                          className="!w-full !max-w-full !min-h-[3rem] !text-[#EEEEEE] !text-xs !placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem] bg-[transparent]"
                           value={variable.description || ''}
                           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                             onVariableChange(variable.id, "description", e.target.value)

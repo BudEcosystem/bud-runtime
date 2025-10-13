@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button, Image, Empty, Spin } from "antd";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useAgentStore } from "@/stores/useAgentStore";
+import { useAddAgent } from "@/stores/useAddAgent";
 import BlurModal from "./BlurModal";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import { AppRequest } from "src/pages/api/requests";
@@ -26,6 +27,7 @@ interface ModelWrapper {
 
 export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) {
   const { updateSession, sessions } = useAgentStore();
+  const { selectedProject } = useAddAgent();
   const session = sessions.find(s => s.id === sessionId);
 
   const [sortBy] = useState("recency");
@@ -59,6 +61,16 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
         limit: pageSize,
         search: Boolean(search)
       };
+
+      // Add search parameter if exists
+      if (search) {
+        params.name = search;
+      }
+
+      // Add project_id filter if selected project exists
+      if (selectedProject?.id) {
+        params.project_id = selectedProject.id;
+      }
 
       const response: any = await AppRequest.Get(`${tempApiBaseUrl}/playground/deployments`, {
         params
@@ -101,7 +113,7 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [session?.selectedDeployment?.id, sortOrder, pageSize]);
+  }, [session?.selectedDeployment?.id, sortOrder, pageSize, selectedProject?.id]);
 
   // Initial load when modal opens
   useEffect(() => {
@@ -151,12 +163,14 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
   const handleSelectModel = (endpoint: ModelWrapper | Model) => {
     // Handle both direct model object and wrapped model object
     const modelData = 'model' in endpoint ? endpoint.model : endpoint;
+    // Get the endpoint ID from the root level (for wrapped objects)
+    const endpointId = 'model' in endpoint ? endpoint.id : endpoint.id;
 
     updateSession(sessionId, {
       modelId: modelData.id,
       modelName: modelData.name,
       selectedDeployment: {
-        id: modelData.id,
+        id: endpointId, // Store endpoint ID, not model ID
         name: modelData.name,
         model: {
           icon: modelData.icon || modelData.uri,

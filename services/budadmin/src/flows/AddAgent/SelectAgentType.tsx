@@ -35,6 +35,20 @@ export default function SelectAgentType() {
     loading
   } = useAddAgent();
 
+  // Ensure agent drawer is closed when this component mounts
+  // This prevents the issue where the agent drawer from a previous workflow is still open
+  useEffect(() => {
+    // Close any leftover agent drawer from previous workflow attempts
+    // This runs immediately on mount to clean up state
+    useAgentStore.setState({
+      isAgentDrawerOpen: false,
+      workflowContext: {
+        isInWorkflow: false,
+        nextStep: null,
+      }
+    });
+  }, []); // Only run on mount
+
   const agentTypes: AgentTypeOption[] = [
     {
       value: 'simple_prompt',
@@ -117,11 +131,12 @@ export default function SelectAgentType() {
         // Update the workflow in the store
         await getWorkflow(currentWorkflow.workflow_id);
 
-        // Open the agent drawer with workflow_id
-        openAgentDrawer(currentWorkflow.workflow_id);
+        // Close the main drawer first
+        closeDrawer();
 
-        // Navigate to the next step (Select Model)
-        openDrawerWithStep("add-agent-select-model");
+        // Then open the agent drawer with workflow_id and nextStep
+        // User will interact with agent box, and when closed, it will automatically navigate to configuration
+        openAgentDrawer(currentWorkflow.workflow_id, "add-agent-configuration");
       } else {
         errorToast("Failed to update agent type");
       }

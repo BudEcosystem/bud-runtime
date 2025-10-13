@@ -1,6 +1,10 @@
 /* Agent UI Styles - Isolated to prevent interference with existing layouts */
 
 /* Agent Drawer Specific Styles */
+// .ant-drawer {
+//   z-index: 1500 !important;
+// }
+
 .agent-drawer {
   .ant-drawer-wrapper-body {
     background: #050505;
@@ -226,6 +230,7 @@
     transform: translateY(20px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -237,6 +242,7 @@
     opacity: 0;
     transform: translateY(-4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -279,11 +285,13 @@
 }
 
 .agent-drawer {
-  z-index: 1050; /* Higher than BudDrawer but lower than modals */
+  z-index: 1050;
+  /* Higher than BudDrawer but lower than modals */
 }
 
 .agent-selector-modal {
-  z-index: 1060; /* Higher than agent drawer */
+  z-index: 1060;
+  /* Higher than agent drawer */
 }
 
 /* Responsive adjustments */
@@ -364,12 +372,13 @@ $text-placeholder: #606060;
 }
 
 .ant-btn-primary {
-    font-size: .75rem;
-    font-weight: 400;
-    color: #eee !important;
-    background-color: #1e0c34 !important;
-    border: 1px solid #965cde !important;
+  font-size: .75rem;
+  font-weight: 400;
+  color: #eee !important;
+  background-color: #1e0c34 !important;
+  border: 1px solid #965cde !important;
 }
+
 .prompt-settings {
   background-image: url(./../../public/agents/bg.png);
   background-size: cover;
