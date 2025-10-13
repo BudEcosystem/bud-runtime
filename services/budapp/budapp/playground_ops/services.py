@@ -93,8 +93,11 @@ class PlaygroundService(SessionMixin):
             # For CLIENT users with no project restriction (project_ids=None), allow any project since they only see published
             # For users with specific project_ids, validate they have access
             if project_ids is not None and filtered_project_id not in project_ids:
-                logger.debug(
-                    f"User/API key attempted to access unauthorized project {filtered_project_id}. Authorized projects: {project_ids}"
+                logger.warning(
+                    "Unauthorized project access attempt for user '%s' to project '%s'. Authorized projects: %s",
+                    current_user_id,
+                    filtered_project_id,
+                    project_ids,
                 )
                 raise ClientException(
                     status_code=status.HTTP_403_FORBIDDEN,
