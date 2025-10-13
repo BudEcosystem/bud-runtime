@@ -159,6 +159,7 @@ export default function AgentConfiguration() {
         }
 
         // Include endpoint_id from the selected model in LoadModel
+        console.log("activeSession?.selectedDeployment", activeSession?.selectedDeployment)
         const endpointId = activeSession?.selectedDeployment?.id || activeSession?.modelId;
         if (endpointId) {
           payload.endpoint_id = endpointId;
@@ -262,20 +263,17 @@ export default function AgentConfiguration() {
 
             {/* Tags */}
             <div className="mb-[1.5rem]">
-              <Form.Item
+              <TagsInput
+                label="Tags"
+                options={tagOptions}
+                defaultValue={tags}
+                onChange={setTags}
+                info="Add keywords to help organize and find your agent later"
                 name="tags"
+                required={true}
+                placeholder=""
                 rules={[{ required: true, message: "Please add at least one tag" }]}
-                className="mb-[1rem]"
-              >
-                <TagsInput
-                  label="Tags"
-                  options={tagOptions}
-                  defaultValue={tags}
-                  onChange={setTags}
-                  info="Add keywords to help organize and find your agent later"
-                  name="tags"
-                  required={true} placeholder={""} rules={[]}                />
-              </Form.Item>
+              />
             </div>
 
             {/* Description */}
