@@ -64,6 +64,7 @@ class PlaygroundDeploymentFilter(BaseModel):
     model_name: str | None = None
     model_size: str | None = None
     tool_enabled: bool | None = None
+    project_id: UUID4 | None = None
 
     @field_validator("model_size")
     def parse_model_size(cls, v: Optional[str]) -> Optional[int]:
