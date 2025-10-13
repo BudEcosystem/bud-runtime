@@ -436,7 +436,7 @@ const ObservabilityDetailPage: React.FC = () => {
           </div>
 
           {/* Gateway Metadata */}
-          {inferenceData.gateway_metadata && (
+          {inferenceData.gateway_metadata && inferenceData.gateway_metadata?.client_ip && (
             <div className="flex items-center flex-col border border-[#1F1F1F] rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-[#101010] mb-[1.6rem]">
               <div className="w-full">
                 <Text_14_600_EEEEEE className="text-[#EEEEEE] mb-4">
@@ -824,7 +824,7 @@ const ObservabilityDetailPage: React.FC = () => {
 
           {/* Conversation - Only show for chat endpoint type */}
           {(!inferenceData.endpoint_type ||
-            inferenceData.endpoint_type === "chat") && (
+            inferenceData.endpoint_type === "chat") && (inferenceData.messages && inferenceData?.messages?.length > 0) && (
             <div className="flex items-center flex-col border border-[#1F1F1F] rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-[#101010] mb-[1.6rem]">
               <div className="w-full">
                 <div className="flex justify-between items-center mb-4">

@@ -44,7 +44,7 @@ spec:
           - name: PSQL_HOST
             value: {{ include "bud.externalServices.postgresql.host" . }}
           - name: PSQL_PORT
-            value: {{ .Values.externalServices.postgresql.port }}
+            value: {{ .Values.externalServices.postgresql.port | quote }}
           - name: PSQL_USER
             value: {{ .Values.externalServices.postgresql.databases.budcluster.username }}
           - name: PSQL_PASSWORD
@@ -61,7 +61,7 @@ spec:
           - name: MINIO_BUCKET
             value: {{ .Values.externalServices.minio.buckets.modelRegistry }}
           - name: MINIO_SECURE
-            value: {{ ternary "false" "true" (eq .Values.ingress.https "disabled")}}
+            value: {{ ternary false true (eq .Values.ingress.https "disabled") | quote }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcluster.env }}
           - name: {{ $key }}

@@ -44,7 +44,7 @@ spec:
           - name: PSQL_HOST
             value: {{ include "bud.externalServices.postgresql.host" . }}
           - name: PSQL_PORT
-            value: {{ .Values.externalServices.postgresql.port }}
+            value: {{ .Values.externalServices.postgresql.port | quote }}
           - name: PSQL_USER
             value: {{ .Values.externalServices.postgresql.databases.budask.username }}
           - name: PSQL_PASSWORD

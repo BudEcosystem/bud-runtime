@@ -34,7 +34,7 @@ externalServices:
       modelInfo: "model-info"
   postgresql:
     host: ""
-    port: 5432
+    port: "5432"
     databases:
       keycloak:
         name: "keycloak"
