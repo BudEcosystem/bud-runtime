@@ -200,28 +200,15 @@ pub async fn require_api_key(
             }
         };
 
-        // Determine lookup key: either model OR prompt.id with :prompt suffix
+        // Determine lookup key: either model OR prompt.id with prompt: prefix
         let (lookup_key, is_prompt_based, _original_prompt_id) = if let Some(model) = val.get("model").and_then(|v| v.as_str()) {
             // Traditional model-based request
             (model.to_string(), false, None)
         } else if let Some(prompt_id) = val.get("prompt")
             .and_then(|p| p.get("id"))
             .and_then(|id| id.as_str()) {
-            // Prompt-based request: validate that either input or variables is present
-            let has_input = val.get("input").is_some();
-            let has_variables = val.get("prompt")
-                .and_then(|p| p.get("variables"))
-                .is_some();
-
-            if !has_input && !has_variables {
-                return Err(auth_error_response(
-                    StatusCode::BAD_REQUEST,
-                    "Either 'input' or 'variables' is required.",
-                ));
-            }
-
-            // Add :prompt suffix for authorization lookup
-            (format!("{}:prompt", prompt_id), true, Some(prompt_id.to_string()))
+            // Add prompt: prefix for authorization lookup
+            (format!("prompt:{}", prompt_id), true, Some(prompt_id.to_string()))
         } else {
             // Provide endpoint-specific error message
             let error_message = if is_responses_endpoint {
@@ -241,9 +228,16 @@ pub async fn require_api_key(
         let metadata = match api_config.get(&lookup_key) {
             Some(v) => v,
             None => {
+                let error_message = if is_prompt_based {
+                    // Strip "prompt:" prefix for clearer error message
+                    let prompt_id = lookup_key.strip_prefix("prompt:").unwrap_or(&lookup_key);
+                    format!("Prompt not found: {}", prompt_id)
+                } else {
+                    format!("Model not found: {}", lookup_key)
+                };
                 return Err(auth_error_response(
                     StatusCode::NOT_FOUND,
-                    &format!("Access denied for: {lookup_key}"),
+                    &error_message,
                 ))
             }
         };
