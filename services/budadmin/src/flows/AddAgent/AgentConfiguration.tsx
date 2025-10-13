@@ -46,7 +46,8 @@ export default function AgentConfiguration() {
   const [autoLogging, setAutoLogging] = useState(true);
   const [rateLimit, setRateLimit] = useState(false);
   const [rateLimitValue, setRateLimitValue] = useState(10);
-  const [triggerWorkflow, setTriggerWorkflow] = useState(false);
+  // Trigger workflow is always true for agent deployments
+  const triggerWorkflow = true;
 
   // Load workflow on component mount if it exists
   useEffect(() => {
@@ -407,20 +408,6 @@ export default function AgentConfiguration() {
                   />
                 </div>
               )}
-
-              {/* Trigger Workflow */}
-              <div className="flex justify-between items-center py-[.5rem]">
-                <div className="flex items-center gap-[.5rem]">
-                  <Text_14_400_EEEEEE>Trigger Workflow</Text_14_400_EEEEEE>
-                </div>
-                <Switch
-                  checked={triggerWorkflow}
-                  onChange={setTriggerWorkflow}
-                  style={{
-                    backgroundColor: triggerWorkflow ? "#965CDE" : "#757575",
-                  }}
-                />
-              </div>
             </div>
           </div>
         </BudDrawerLayout>

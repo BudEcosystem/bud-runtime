@@ -9,14 +9,15 @@ import { getChromeColor } from "@/components/ui/bud/dataEntry/TagsInputData";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { ModelFlowInfoCard } from "@/components/ui/bud/deploymentDrawer/DeployModelSpecificationInfo";
 import { useAddAgent } from "@/stores/useAddAgent";
+import { usePromptsAgents } from "@/stores/usePromptsAgents";
 
 export default function AgentSuccess() {
   const { closeDrawer } = useDrawer();
+  const { fetchPrompts } = usePromptsAgents();
 
   // Get data from the Add Agent store
   const {
-    selectedProject,
-    selectedModel,
+    currentWorkflow,
     deploymentConfiguration,
     reset
   } = useAddAgent();
@@ -28,38 +29,21 @@ export default function AgentSuccess() {
     };
   }, [reset]);
 
-  // Get model tags to display
-  const getModelTags = () => {
-    const tags = [];
+  // Get model from workflow steps
+  const model = currentWorkflow?.workflow_steps?.model;
 
-    // Add LLM tag if it's a language model (text modality)
-    if (selectedModel?.modality?.text?.input || selectedModel?.modality?.text?.output) {
-      tags.push({ name: "LLM", color: "#965CDE" });
-    }
-
-    // Add model size tag (e.g., "7B")
-    if (selectedModel?.model_size) {
-      const sizeStr = typeof selectedModel.model_size === 'number'
-        ? `${Math.round(selectedModel.model_size)}B`
-        : selectedModel.model_size;
-      tags.push({ name: sizeStr, color: "#FF9F00" });
-    }
-
-    // Add reasoning tag if applicable
-    if (selectedModel?.tags?.some((tag: any) => tag.name?.toLowerCase().includes("reasoning"))) {
-      tags.push({ name: "Reasoning", color: "#4CAF50" });
-    }
-
-    return tags;
+  const handleClose = () => {
+    // Refresh the prompts list
+    fetchPrompts();
+    // Close the drawer
+    closeDrawer();
   };
 
   return (
     <BudForm
       data={{}}
       backText="Close"
-      onBack={() => {
-        closeDrawer();
-      }}
+      onBack={handleClose}
     >
       <BudWraperBox >
         <BudDrawerLayout>
@@ -68,11 +52,11 @@ export default function AgentSuccess() {
               description={`${deploymentConfiguration?.deploymentName} prompt has been deployed`}
             />
             <ModelFlowInfoCard
-              selectedModel={selectedModel}
+              selectedModel={model}
               informationSpecs={[
                 {
                   name: "URI",
-                  value: selectedModel?.uri,
+                  value: model?.uri,
                   full: true,
                   icon: "/images/drawer/tag.png",
                 },
