@@ -97,6 +97,12 @@ class PromptVersionListResponse(PaginatedSuccessResponse):
     versions: list[PromptVersionListItem] = []
 
 
+class PaginatedTagsResponse(PaginatedSuccessResponse):
+    """Paginated tags response schema for prompts."""
+
+    tags: list[Tag] = []
+
+
 class ModelSettings(BaseModel):
     """Model settings for LLM configuration.
 

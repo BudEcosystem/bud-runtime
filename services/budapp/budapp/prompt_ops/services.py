@@ -17,7 +17,7 @@
 """Business logic services for the prompt ops module."""
 
 from ast import Dict
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 import aiohttp
@@ -276,6 +276,11 @@ class PromptService(SessionMixin):
         prompt_response = PromptResponse.model_validate(db_prompt)
 
         return prompt_response
+
+    async def search_prompt_tags(self, search_term: str, offset: int = 0, limit: int = 10) -> Tuple[List[Dict], int]:
+        """Search prompt tags by name."""
+        db_tags, count = await PromptDataManager(self.session).search_tags_by_name(search_term, offset, limit)
+        return db_tags, count
 
     async def save_prompt_config(self, request: PromptConfigRequest) -> PromptConfigResponse:
         """Save prompt configuration by forwarding request to budprompt service.

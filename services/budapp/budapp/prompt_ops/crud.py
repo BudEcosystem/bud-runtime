@@ -19,7 +19,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, asc, case, desc, func, or_, select, update
+from sqlalchemy import and_, asc, case, desc, distinct, func, or_, select, update
 from sqlalchemy.orm import joinedload
 
 from budapp.commons.constants import EndpointStatusEnum, PromptStatusEnum, PromptVersionStatusEnum
@@ -163,6 +163,41 @@ class PromptDataManager(DataManagerUtils):
         result = self.scalars_all(stmt)
 
         return result, count
+
+    async def search_tags_by_name(self, search_value: str, offset: int, limit: int) -> Tuple[List[dict], int]:
+        """Search tags in the database filtered by the tag name with pagination."""
+        # Subquery to extract individual tags
+        subquery = (
+            select(func.jsonb_array_elements(PromptModel.tags).label("tag"))
+            .where(PromptModel.status == PromptStatusEnum.ACTIVE)
+            .where(PromptModel.tags.isnot(None))
+        ).subquery()
+
+        # Group by 'name' to ensure only one instance of each tag (e.g., first occurrence)
+        final_query = (
+            select(
+                func.jsonb_extract_path_text(subquery.c.tag, "name").label("name"),
+                func.min(func.jsonb_extract_path_text(subquery.c.tag, "color")).label("color"),
+            )
+            .where(func.jsonb_extract_path_text(subquery.c.tag, "name").ilike(f"{search_value}%"))
+            .group_by("name")
+            .order_by("name")
+            .offset(offset)
+            .limit(limit)
+        )
+
+        # Count query for pagination
+        count_query = (
+            select(func.count(distinct(func.jsonb_extract_path_text(subquery.c.tag, "name"))))
+            .select_from(subquery)
+            .where(func.jsonb_extract_path_text(subquery.c.tag, "name").ilike(f"{search_value}%"))
+        )
+
+        count = self.execute_scalar(count_query)
+        result = self.session.execute(final_query)
+
+        tags = [{"name": row.name, "color": row.color} for row in result]
+        return tags, count
 
 
 class PromptVersionDataManager(DataManagerUtils):
