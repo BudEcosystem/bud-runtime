@@ -1809,6 +1809,8 @@ pub struct ChatCompletionInferenceParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frequency_penalty: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub repetition_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub chat_template: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chat_template_kwargs: Option<Value>,

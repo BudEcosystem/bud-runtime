@@ -40,6 +40,8 @@ pub struct CompletionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frequency_penalty: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub repetition_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub best_of: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub logit_bias: Option<HashMap<String, f32>>,
@@ -123,6 +125,8 @@ pub struct CompletionChunk {
     pub created: u64,
     pub model: String,
     pub choices: Vec<CompletionChoiceChunk>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<Usage>,
 }
 
 /// Choice chunk for streaming
@@ -251,6 +255,15 @@ impl CompletionRequest {
             }
         }
 
+        // Validate repetition_penalty range (must be > 0.0, matching vLLM validation)
+        if let Some(rep_penalty) = self.repetition_penalty {
+            if rep_penalty <= 0.0 {
+                return Err(Error::new(ErrorDetails::InvalidRequest {
+                    message: "repetition_penalty must be greater than 0.0".to_string(),
+                }));
+            }
+        }
+
         // Validate stop sequences (max 4 for OpenAI)
         if let Some(ref stop) = self.stop {
             if let Some(arr) = stop.as_string_array() {
@@ -346,6 +359,7 @@ mod tests {
             stop: None,
             presence_penalty: None,
             frequency_penalty: None,
+            repetition_penalty: None,
             best_of: None,
             logit_bias: None,
             user: None,
@@ -491,6 +505,49 @@ mod tests {
             "stop3".to_string(),
             "stop4".to_string(),
         ]));
+        assert!(request.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validation_repetition_penalty_zero() {
+        let mut request = create_test_request();
+        request.repetition_penalty = Some(0.0);
+        let result = request.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("repetition_penalty must be greater than 0.0"));
+    }
+
+    #[test]
+    fn test_validation_repetition_penalty_negative() {
+        let mut request = create_test_request();
+        request.repetition_penalty = Some(-1.0);
+        let result = request.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("repetition_penalty must be greater than 0.0"));
+    }
+
+    #[test]
+    fn test_validation_repetition_penalty_valid() {
+        let mut request = create_test_request();
+
+        // Test small positive value
+        request.repetition_penalty = Some(0.1);
+        assert!(request.validate().is_ok());
+
+        // Test typical value around 1.0
+        request.repetition_penalty = Some(1.0);
+        assert!(request.validate().is_ok());
+
+        // Test value slightly above 1.0
+        request.repetition_penalty = Some(1.5);
+        assert!(request.validate().is_ok());
+
+        // Test larger value (no upper bound in vLLM)
+        request.repetition_penalty = Some(5.0);
+        assert!(request.validate().is_ok());
+
+        // Test very large value
+        request.repetition_penalty = Some(100.0);
         assert!(request.validate().is_ok());
     }
 }
