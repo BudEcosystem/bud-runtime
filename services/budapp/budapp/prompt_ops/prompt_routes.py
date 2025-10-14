@@ -119,6 +119,55 @@ async def search_prompt_tags(
 
 
 @router.get(
+    "/tags",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": PaginatedTagsResponse,
+            "description": "Successfully listed tags",
+        },
+    },
+    description="List all prompt tags",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_prompt_tags(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[PaginatedTagsResponse, ErrorResponse]:
+    """List all prompt tags."""
+    page = 1
+
+    try:
+        db_tags, count = await PromptService(session).get_prompt_tags()
+        limit = count
+    except ClientException as e:
+        logger.exception(f"Failed to retrieve prompt tags: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve prompt tags: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve prompt tags"
+        ).to_http_response()
+
+    return PaginatedTagsResponse(
+        message="Tags listed successfully",
+        tags=db_tags,
+        object="prompt.tag.list",
+        code=status.HTTP_200_OK,
+        total_record=count,
+        page=page,
+        limit=limit,
+    ).to_http_response()
+
+
+@router.get(
     "",
     responses={
         status.HTTP_200_OK: {

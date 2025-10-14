@@ -282,6 +282,11 @@ class PromptService(SessionMixin):
         db_tags, count = await PromptDataManager(self.session).search_tags_by_name(search_term, offset, limit)
         return db_tags, count
 
+    async def get_prompt_tags(self) -> Tuple[List[Dict], int]:
+        """Get all prompt tags."""
+        db_tags, count = await PromptDataManager(self.session).get_all_tags()
+        return db_tags, count
+
     async def save_prompt_config(self, request: PromptConfigRequest) -> PromptConfigResponse:
         """Save prompt configuration by forwarding request to budprompt service.
 

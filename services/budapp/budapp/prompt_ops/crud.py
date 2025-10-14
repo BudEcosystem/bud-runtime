@@ -21,6 +21,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, asc, case, desc, distinct, func, or_, select, update
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql import literal_column
 
 from budapp.commons.constants import EndpointStatusEnum, PromptStatusEnum, PromptVersionStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
@@ -197,6 +198,31 @@ class PromptDataManager(DataManagerUtils):
         result = self.session.execute(final_query)
 
         tags = [{"name": row.name, "color": row.color} for row in result]
+        return tags, count
+
+    async def get_all_tags(self) -> Tuple[List, int]:
+        """Get all distinct tags from active prompts."""
+        distinct_tags_stmt = (
+            select(distinct(func.jsonb_array_elements(PromptModel.tags)))
+            .filter(PromptModel.status == PromptStatusEnum.ACTIVE)
+            .filter(PromptModel.tags.isnot(None))
+            .alias("distinct_tags")
+        )
+        count_stmt = select(func.count()).select_from(distinct_tags_stmt)
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        subquery = (
+            select(distinct(func.jsonb_array_elements(PromptModel.tags)).label("tag"))
+            .where(PromptModel.status == PromptStatusEnum.ACTIVE)
+            .where(PromptModel.tags.isnot(None))
+        ).subquery()
+
+        # Final query to select from the subquery and order by the 'name' key in the JSONB
+        final_query = select(subquery).order_by(literal_column("tag->>'name'"))
+
+        results = self.execute_all(final_query)
+        tags = [res[0] for res in results] if results else []
         return tags, count
 
 
