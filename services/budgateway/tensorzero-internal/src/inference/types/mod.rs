@@ -454,6 +454,8 @@ pub struct ModelInferenceRequest<'a> {
     pub logit_bias: Option<HashMap<String, f32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ignore_eos: Option<bool>,
     /// The original request received by the gateway from the client
     #[serde(skip)]
     pub gateway_request: Option<String>,
