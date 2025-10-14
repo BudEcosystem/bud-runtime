@@ -53,7 +53,7 @@ spec:
             value: {{ .Values.externalServices.postgresql.databases.budcluster.name }}
           # minio
           - name: MINIO_ENDPOINT
-            value: {{ include "bud.ingress.url.s3" $ }}
+            value: {{ include "bud.ingress.hosts.s3" $ }}
           - name: MINIO_ACCESS_KEY
             value: {{ include "bud.externalServices.minio.auth.accessKey" . }}
           - name: MINIO_SECRET_KEY

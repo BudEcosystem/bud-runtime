@@ -389,7 +389,7 @@ function AgentBoxInner({
         prompt_id: session.promptId,
         version: 1,
         set_default: false,
-        deployment_name: session.selectedDeployment.name,
+        deployment_name: session.selectedDeployment.model.name,
         model_settings: getDefaultModelSettings(session),
         stream: true,
         messages: [
@@ -493,7 +493,7 @@ function AgentBoxInner({
         prompt_id: session.promptId,
         version: 1,
         set_default: false,
-        deployment_name: session.selectedDeployment.name,
+        deployment_name: session.selectedDeployment.model.name,
         model_settings: getDefaultModelSettings(session),
         stream: true,
         messages: messages.map((msg: any) => ({

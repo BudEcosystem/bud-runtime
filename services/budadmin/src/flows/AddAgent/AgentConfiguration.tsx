@@ -46,7 +46,8 @@ export default function AgentConfiguration() {
   const [autoLogging, setAutoLogging] = useState(true);
   const [rateLimit, setRateLimit] = useState(false);
   const [rateLimitValue, setRateLimitValue] = useState(10);
-  const [triggerWorkflow, setTriggerWorkflow] = useState(false);
+  // Trigger workflow is always true for agent deployments
+  const triggerWorkflow = true;
 
   // Load workflow on component mount if it exists
   useEffect(() => {
@@ -146,6 +147,7 @@ export default function AgentConfiguration() {
 
         console.log("Active session for workflow:", activeSession);
         console.log("Session promptId:", activeSession?.promptId);
+        console.log("Session selectedDeployment:", activeSession?.selectedDeployment);
 
         // Use the session's promptId as bud_prompt_id
         const budPromptId = activeSession?.promptId || currentWorkflow.workflow_steps?.bud_prompt_id;
@@ -155,6 +157,16 @@ export default function AgentConfiguration() {
           console.log("✓ bud_prompt_id included in payload:", payload.bud_prompt_id);
         } else {
           console.warn("⚠ bud_prompt_id is missing! No active session or workflow_steps.bud_prompt_id found");
+        }
+
+        // Include endpoint_id from the selected model in LoadModel
+        console.log("activeSession?.selectedDeployment", activeSession?.selectedDeployment)
+        const endpointId = activeSession?.selectedDeployment?.id || activeSession?.modelId;
+        if (endpointId) {
+          payload.endpoint_id = endpointId;
+          console.log("✓ endpoint_id included in payload:", payload.endpoint_id);
+        } else {
+          console.warn("⚠ endpoint_id is missing! No model selected in LoadModel component");
         }
 
         console.log("Final payload for step 4:", payload);
@@ -212,7 +224,7 @@ export default function AgentConfiguration() {
   };
 
   const handleBack = () => {
-    openDrawerWithStep("add-agent-select-model");
+    openDrawerWithStep("add-agent-select-type");
   };
 
   return (
@@ -252,20 +264,17 @@ export default function AgentConfiguration() {
 
             {/* Tags */}
             <div className="mb-[1.5rem]">
-              <Form.Item
+              <TagsInput
+                label="Tags"
+                options={tagOptions}
+                defaultValue={tags}
+                onChange={setTags}
+                info="Add keywords to help organize and find your agent later"
                 name="tags"
+                required={true}
+                placeholder=""
                 rules={[{ required: true, message: "Please add at least one tag" }]}
-                className="mb-[1rem]"
-              >
-                <TagsInput
-                  label="Tags"
-                  options={tagOptions}
-                  defaultValue={tags}
-                  onChange={setTags}
-                  info="Add keywords to help organize and find your agent later"
-                  name="tags"
-                  required={true} placeholder={""} rules={[]}                />
-              </Form.Item>
+              />
             </div>
 
             {/* Description */}
@@ -399,20 +408,6 @@ export default function AgentConfiguration() {
                   />
                 </div>
               )}
-
-              {/* Trigger Workflow */}
-              <div className="flex justify-between items-center py-[.5rem]">
-                <div className="flex items-center gap-[.5rem]">
-                  <Text_14_400_EEEEEE>Trigger Workflow</Text_14_400_EEEEEE>
-                </div>
-                <Switch
-                  checked={triggerWorkflow}
-                  onChange={setTriggerWorkflow}
-                  style={{
-                    backgroundColor: triggerWorkflow ? "#965CDE" : "#757575",
-                  }}
-                />
-              </div>
             </div>
           </div>
         </BudDrawerLayout>

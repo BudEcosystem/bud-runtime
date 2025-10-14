@@ -49,6 +49,10 @@ interface AgentStore {
   isAgentDrawerOpen: boolean;
   selectedSessionId: string | null;
   isModelSelectorOpen: boolean;
+  workflowContext: {
+    isInWorkflow: boolean;
+    nextStep: string | null;
+  };
 
   // Session Management
   createSession: () => string;
@@ -63,7 +67,7 @@ interface AgentStore {
   deleteVariable: (sessionId: string, variableId: string) => void;
 
   // UI Actions
-  openAgentDrawer: (workflowId?: string) => void;
+  openAgentDrawer: (workflowId?: string, nextStep?: string) => void;
   closeAgentDrawer: () => void;
   setSelectedSession: (id: string | null) => void;
   openModelSelector: () => void;
@@ -134,6 +138,10 @@ export const useAgentStore = create<AgentStore>()(
       isAgentDrawerOpen: false,
       selectedSessionId: null,
       isModelSelectorOpen: false,
+      workflowContext: {
+        isInWorkflow: false,
+        nextStep: null,
+      },
 
       // Session Management
       createSession: () => {
@@ -294,7 +302,7 @@ export const useAgentStore = create<AgentStore>()(
       },
 
       // UI Actions
-      openAgentDrawer: (workflowId?: string) => {
+      openAgentDrawer: (workflowId?: string, nextStep?: string) => {
         const sessions = get().sessions;
         if (sessions.length === 0) {
           const sessionId = get().createSession();
@@ -309,11 +317,45 @@ export const useAgentStore = create<AgentStore>()(
             get().updateSession(activeSessionId, { workflowId });
           }
         }
-        set({ isAgentDrawerOpen: true });
+
+        // Set workflow context if nextStep is provided
+        if (nextStep) {
+          set({
+            isAgentDrawerOpen: true,
+            workflowContext: {
+              isInWorkflow: true,
+              nextStep: nextStep,
+            }
+          });
+        } else {
+          set({ isAgentDrawerOpen: true });
+        }
       },
 
       closeAgentDrawer: () => {
-        set({ isAgentDrawerOpen: false });
+        const { workflowContext } = get();
+        const nextStep = workflowContext.nextStep;
+
+        // Close the drawer first
+        set({
+          isAgentDrawerOpen: false,
+          workflowContext: {
+            isInWorkflow: false,
+            nextStep: null,
+          }
+        });
+
+        // If we're in a workflow and have a next step, trigger it after closing
+        if (workflowContext.isInWorkflow && nextStep) {
+          // Use setTimeout to ensure the drawer closes before opening the next step
+          setTimeout(() => {
+            // Import useDrawer dynamically to avoid circular dependencies
+            import('../hooks/useDrawer').then(({ useDrawer }) => {
+              const { openDrawerWithStep } = useDrawer.getState();
+              openDrawerWithStep(nextStep);
+            });
+          }, 100);
+        }
       },
 
       setSelectedSession: (id) => {

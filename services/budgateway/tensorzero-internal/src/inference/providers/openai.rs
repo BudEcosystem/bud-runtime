@@ -6371,6 +6371,7 @@ mod tests {
             guided_decoding_backend: None,
             guided_whitespace_pattern: None,
             gateway_request: None,
+            ignore_eos: None,
         };
 
         let openai_request = OpenAIRequest::new("gpt-4", &request_with_new_params).unwrap();

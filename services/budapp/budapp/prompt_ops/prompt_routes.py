@@ -43,6 +43,7 @@ from .schemas import (
     EditPromptRequest,
     EditPromptVersionRequest,
     GetPromptVersionResponse,
+    PaginatedTagsResponse,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -65,6 +66,109 @@ logger = logging.get_logger(__name__)
 
 router = APIRouter(prefix="/prompts", tags=["prompt"])
 security = HTTPBearer()
+
+
+@router.get(
+    "/tags/search",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": PaginatedTagsResponse,
+            "description": "Successfully listed tags",
+        },
+    },
+    description="Search prompt tags by name",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def search_prompt_tags(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    search_term: str = Query(..., description="Tag name to search for"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+) -> Union[PaginatedTagsResponse, ErrorResponse]:
+    """Search prompt tags by name."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    try:
+        db_tags, count = await PromptService(session).search_prompt_tags(search_term, offset, limit)
+    except ClientException as e:
+        logger.exception(f"Failed to search prompt tags: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to search prompt tags: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to search prompt tags"
+        ).to_http_response()
+
+    return PaginatedTagsResponse(
+        message="Tags listed successfully",
+        tags=db_tags,
+        object="prompt.tag.list",
+        code=status.HTTP_200_OK,
+        total_record=count,
+        page=page,
+        limit=limit,
+    ).to_http_response()
+
+
+@router.get(
+    "/tags",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": PaginatedTagsResponse,
+            "description": "Successfully listed tags",
+        },
+    },
+    description="List all prompt tags with pagination",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_prompt_tags(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+) -> Union[PaginatedTagsResponse, ErrorResponse]:
+    """List all prompt tags with pagination."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    try:
+        db_tags, count = await PromptService(session).get_prompt_tags(offset, limit)
+    except ClientException as e:
+        logger.exception(f"Failed to retrieve prompt tags: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve prompt tags: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve prompt tags"
+        ).to_http_response()
+
+    return PaginatedTagsResponse(
+        message="Tags listed successfully",
+        tags=db_tags,
+        object="prompt.tag.list",
+        code=status.HTTP_200_OK,
+        total_record=count,
+        page=page,
+        limit=limit,
+    ).to_http_response()
 
 
 @router.get(
