@@ -302,10 +302,12 @@ export default function AddModel() {
     currentWorkflow,
     updateCloudModelDetails,
     cloudModelDetails,
+    setCloudModelDetails,
   } = useDeployModel();
   const { openDrawerWithStep } = useDrawer();
   const { getGlobalModels } = useModels();
   const { showLoader, hideLoader } = useLoader();
+  const { form } = useContext(BudFormContext);
   const imageUrl = assetBaseUrl + selectedProvider?.icon;
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -349,6 +351,24 @@ export default function AddModel() {
     [currentPage, pageSize, getGlobalModels],
   );
 
+  // Clear form fields when component mounts to prevent cross-form pollution from Local form
+  useEffect(() => {
+    // Reset form fields immediately to clear any residual data from other forms
+    form.resetFields();
+    // Also ensure cloudModelDetails is in clean state
+    if (!cloudModelDetails.name && !cloudModelDetails.uri) {
+      // Already clean, do nothing
+    } else if (!currentWorkflow) {
+      // If no workflow, ensure clean state
+      setCloudModelDetails({
+        name: "",
+        tags: [],
+        modality: [],
+        uri: "",
+      });
+    }
+  }, []);
+
   return (
     <BudForm
       data={{}}
@@ -367,6 +387,15 @@ export default function AddModel() {
         }
       }}
       onBack={() => {
+        // Reset form fields
+        form.resetFields();
+        // Reset cloud model details to initial state
+        setCloudModelDetails({
+          name: "",
+          tags: [],
+          modality: [],
+          uri: "",
+        });
         openDrawerWithStep("model-list");
       }}
     >

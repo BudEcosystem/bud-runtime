@@ -97,7 +97,7 @@ function AddLocalModelForm() {
 
 export default function AddLocalModel() {
   const { openDrawerWithStep } = useDrawer()
-  const { currentWorkflow, updateModelDetailsLocal, updateCredentialsLocal, localModelDetails, deleteWorkflow, setLoading, cameFromDocumentList, setCameFromDocumentList } = useDeployModel();
+  const { currentWorkflow, updateModelDetailsLocal, updateCredentialsLocal, localModelDetails, deleteWorkflow, setLoading, cameFromDocumentList, setCameFromDocumentList, setLocalModelDetails } = useDeployModel();
   const { values, form } = useContext(BudFormContext);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -116,14 +116,27 @@ export default function AddLocalModel() {
       }
     }
   }
-  // https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct
+  // Clear form fields when component mounts to prevent cross-form pollution from Cloud form
   useEffect(() => {
+    // Reset form fields immediately to clear any residual data from other forms
+    form.resetFields();
     setIsMounted(true)
   }, []);
   return (
     <BudForm
       data={localModelDetails}
       onBack={async () => {
+        // Reset form fields
+        form.resetFields();
+        // Reset local model details to initial state
+        setLocalModelDetails({
+          name: "",
+          icon: currentWorkflow?.workflow_steps?.provider?.type === "huggingface" ? "" : "🌐",
+          tags: [],
+          uri: "",
+          author: "",
+        });
+
         if (cameFromDocumentList) {
           // Reset the flag for future use
           setCameFromDocumentList(false);
