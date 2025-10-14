@@ -200,8 +200,8 @@ class PromptDataManager(DataManagerUtils):
         tags = [{"name": row.name, "color": row.color} for row in result]
         return tags, count
 
-    async def get_all_tags(self) -> Tuple[List, int]:
-        """Get all distinct tags from active prompts."""
+    async def get_all_tags(self, offset: int = 0, limit: int = 10) -> Tuple[List, int]:
+        """Get all distinct tags from active prompts with pagination."""
         distinct_tags_stmt = (
             select(distinct(func.jsonb_array_elements(PromptModel.tags)))
             .filter(PromptModel.status == PromptStatusEnum.ACTIVE)
@@ -219,7 +219,7 @@ class PromptDataManager(DataManagerUtils):
         ).subquery()
 
         # Final query to select from the subquery and order by the 'name' key in the JSONB
-        final_query = select(subquery).order_by(literal_column("tag->>'name'"))
+        final_query = select(subquery).order_by(literal_column("tag->>'name'")).offset(offset).limit(limit)
 
         results = self.execute_all(final_query)
         tags = [res[0] for res in results] if results else []

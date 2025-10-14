@@ -134,19 +134,21 @@ async def search_prompt_tags(
             "description": "Successfully listed tags",
         },
     },
-    description="List all prompt tags",
+    description="List all prompt tags with pagination",
 )
 @require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def get_prompt_tags(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
 ) -> Union[PaginatedTagsResponse, ErrorResponse]:
-    """List all prompt tags."""
-    page = 1
+    """List all prompt tags with pagination."""
+    # Calculate offset
+    offset = (page - 1) * limit
 
     try:
-        db_tags, count = await PromptService(session).get_prompt_tags()
-        limit = count
+        db_tags, count = await PromptService(session).get_prompt_tags(offset, limit)
     except ClientException as e:
         logger.exception(f"Failed to retrieve prompt tags: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
