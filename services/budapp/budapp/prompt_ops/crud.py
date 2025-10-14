@@ -19,8 +19,9 @@
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import and_, asc, case, desc, func, or_, select, update
+from sqlalchemy import and_, asc, case, desc, distinct, func, or_, select, update
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql import literal_column
 
 from budapp.commons.constants import EndpointStatusEnum, PromptStatusEnum, PromptVersionStatusEnum
 from budapp.commons.db_utils import DataManagerUtils
@@ -163,6 +164,66 @@ class PromptDataManager(DataManagerUtils):
         result = self.scalars_all(stmt)
 
         return result, count
+
+    async def search_tags_by_name(self, search_value: str, offset: int, limit: int) -> Tuple[List[dict], int]:
+        """Search tags in the database filtered by the tag name with pagination."""
+        # Subquery to extract individual tags
+        subquery = (
+            select(func.jsonb_array_elements(PromptModel.tags).label("tag"))
+            .where(PromptModel.status == PromptStatusEnum.ACTIVE)
+            .where(PromptModel.tags.isnot(None))
+        ).subquery()
+
+        # Group by 'name' to ensure only one instance of each tag (e.g., first occurrence)
+        final_query = (
+            select(
+                func.jsonb_extract_path_text(subquery.c.tag, "name").label("name"),
+                func.min(func.jsonb_extract_path_text(subquery.c.tag, "color")).label("color"),
+            )
+            .where(func.jsonb_extract_path_text(subquery.c.tag, "name").ilike(f"{search_value}%"))
+            .group_by("name")
+            .order_by("name")
+            .offset(offset)
+            .limit(limit)
+        )
+
+        # Count query for pagination
+        count_query = (
+            select(func.count(distinct(func.jsonb_extract_path_text(subquery.c.tag, "name"))))
+            .select_from(subquery)
+            .where(func.jsonb_extract_path_text(subquery.c.tag, "name").ilike(f"{search_value}%"))
+        )
+
+        count = self.execute_scalar(count_query)
+        result = self.session.execute(final_query)
+
+        tags = [{"name": row.name, "color": row.color} for row in result]
+        return tags, count
+
+    async def get_all_tags(self, offset: int = 0, limit: int = 10) -> Tuple[List, int]:
+        """Get all distinct tags from active prompts with pagination."""
+        distinct_tags_stmt = (
+            select(distinct(func.jsonb_array_elements(PromptModel.tags)))
+            .filter(PromptModel.status == PromptStatusEnum.ACTIVE)
+            .filter(PromptModel.tags.isnot(None))
+            .alias("distinct_tags")
+        )
+        count_stmt = select(func.count()).select_from(distinct_tags_stmt)
+        # Calculate count before applying limit and offset
+        count = self.execute_scalar(count_stmt)
+
+        subquery = (
+            select(distinct(func.jsonb_array_elements(PromptModel.tags)).label("tag"))
+            .where(PromptModel.status == PromptStatusEnum.ACTIVE)
+            .where(PromptModel.tags.isnot(None))
+        ).subquery()
+
+        # Final query to select from the subquery and order by the 'name' key in the JSONB
+        final_query = select(subquery).order_by(literal_column("tag->>'name'")).offset(offset).limit(limit)
+
+        results = self.execute_all(final_query)
+        tags = [res[0] for res in results] if results else []
+        return tags, count
 
 
 class PromptVersionDataManager(DataManagerUtils):
