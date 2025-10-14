@@ -6343,6 +6343,7 @@ mod tests {
             top_p: Some(0.95),
             presence_penalty: Some(0.0),
             frequency_penalty: Some(0.0),
+            repetition_penalty: Some(1.0),
             stream: false,
             json_mode: ModelInferenceRequestJsonMode::Off,
             function_type: FunctionType::Chat,
