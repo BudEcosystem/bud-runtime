@@ -359,15 +359,23 @@ class EndpointDataManager(DataManagerUtils):
         # Add tool_enabled filter condition if specified
         if explicit_filters["tool_enabled"] is not None:
             if explicit_filters["tool_enabled"]:
-                # Filter for endpoints where enable_tool_calling is true
-                explicit_conditions.append(EndpointModel.deployment_config["enable_tool_calling"].astext == "true")
+                # Filter for endpoints where engine_configs.enable_tool_calling is true
+                # Must handle cases where engine_configs or enable_tool_calling don't exist
+                explicit_conditions.append(
+                    and_(
+                        EndpointModel.deployment_config["engine_configs"].isnot(None),
+                        EndpointModel.deployment_config["engine_configs"]["enable_tool_calling"].astext == "true",
+                    )
+                )
             else:
-                # Filter for endpoints where enable_tool_calling is false, null, or doesn't exist
+                # Filter for endpoints where enable_tool_calling is NOT true
+                # Includes: deployment_config is null, engine_configs missing, enable_tool_calling missing/false
                 explicit_conditions.append(
                     or_(
-                        EndpointModel.deployment_config["enable_tool_calling"].astext == "false",
-                        EndpointModel.deployment_config["enable_tool_calling"].is_(None),
                         EndpointModel.deployment_config.is_(None),
+                        EndpointModel.deployment_config["engine_configs"].is_(None),
+                        EndpointModel.deployment_config["engine_configs"]["enable_tool_calling"].is_(None),
+                        EndpointModel.deployment_config["engine_configs"]["enable_tool_calling"].astext == "false",
                     )
                 )
 
