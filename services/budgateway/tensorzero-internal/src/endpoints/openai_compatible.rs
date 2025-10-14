@@ -1208,6 +1208,7 @@ pub struct OpenAICompatibleParams {
     messages: Vec<OpenAICompatibleMessage>,
     model: String,
     frequency_penalty: Option<f32>,
+    repetition_penalty: Option<f32>,
     max_tokens: Option<u32>,
     max_completion_tokens: Option<u32>,
     presence_penalty: Option<f32>,
@@ -1511,6 +1512,7 @@ impl Params {
             top_p: openai_compatible_params.top_p,
             presence_penalty: openai_compatible_params.presence_penalty,
             frequency_penalty: openai_compatible_params.frequency_penalty,
+            repetition_penalty: openai_compatible_params.repetition_penalty,
             chat_template: openai_compatible_params.chat_template,
             chat_template_kwargs: openai_compatible_params.chat_template_kwargs,
             mm_processor_kwargs: openai_compatible_params.mm_processor_kwargs,
@@ -2393,6 +2395,11 @@ impl CompletionStreamProcessor {
                             "created": chunk.created,
                             "model": chunk.model,
                             "choices": chunk.choices,
+                            "usage": chunk.usage.map(|u| OpenAICompatibleUsage {
+                                prompt_tokens: u.input_tokens,
+                                completion_tokens: u.output_tokens,
+                                total_tokens: u.input_tokens + u.output_tokens,
+                            }),
                         });
 
                         yield Ok(Event::default().json_data(openai_chunk).map_err(|e| {
@@ -2486,6 +2493,8 @@ pub struct OpenAICompatibleCompletionParams {
     presence_penalty: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     frequency_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repetition_penalty: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     best_of: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2620,6 +2629,7 @@ pub async fn completion_handler(
         stop: params.stop,
         presence_penalty: params.presence_penalty,
         frequency_penalty: params.frequency_penalty,
+        repetition_penalty: params.repetition_penalty,
         best_of: params.best_of,
         logit_bias: params.logit_bias,
         user: params.user,

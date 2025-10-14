@@ -340,6 +340,8 @@ struct VLLMRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     frequency_penalty: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    repetition_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     max_tokens: Option<u32>,
     stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -413,6 +415,7 @@ impl<'a> VLLMRequest<'a> {
             top_p: request.top_p,
             presence_penalty: request.presence_penalty,
             frequency_penalty: request.frequency_penalty,
+            repetition_penalty: request.repetition_penalty,
             max_tokens: request.max_tokens,
             stream: request.stream,
             stream_options,
@@ -755,6 +758,8 @@ struct VLLMCompletionRequest<'a> {
     n: Option<u32>,
     stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    stream_options: Option<StreamOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     logprobs: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     echo: Option<bool>,
@@ -764,6 +769,8 @@ struct VLLMCompletionRequest<'a> {
     presence_penalty: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     frequency_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repetition_penalty: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     best_of: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -857,17 +864,29 @@ impl CompletionProvider for VLLMProvider {
             top_p: request.top_p,
             n: request.n,
             stream: false,
+            stream_options: None,
             logprobs: request.logprobs,
             echo: request.echo,
             stop,
             presence_penalty: request.presence_penalty,
             frequency_penalty: request.frequency_penalty,
+            repetition_penalty: request.repetition_penalty,
             best_of: request.best_of,
             logit_bias: request.logit_bias.as_ref(),
             user: request.user.as_deref(),
             seed: request.seed,
             ignore_eos: request.ignore_eos,
         };
+
+        // Log request parameters for debugging
+        tracing::debug!(
+            "vLLM completions request: model={}, max_tokens={:?}, temperature={:?}, ignore_eos={:?}, request_body={}",
+            &self.model_name,
+            request.max_tokens,
+            request.temperature,
+            request.ignore_eos,
+            serde_json::to_string(&request_body).unwrap_or_else(|_| "failed to serialize".to_string())
+        );
 
         let request_url = get_completions_url(&self.api_base)?;
         let start_time = Instant::now();
@@ -1006,17 +1025,31 @@ impl CompletionProvider for VLLMProvider {
             top_p: request.top_p,
             n: request.n,
             stream: true,
+            stream_options: Some(StreamOptions {
+                include_usage: true,
+            }),
             logprobs: request.logprobs,
             echo: request.echo,
             stop,
             presence_penalty: request.presence_penalty,
             frequency_penalty: request.frequency_penalty,
+            repetition_penalty: request.repetition_penalty,
             best_of: request.best_of,
             logit_bias: request.logit_bias.as_ref(),
             user: request.user.as_deref(),
             seed: request.seed,
             ignore_eos: request.ignore_eos,
         };
+
+        // Log request parameters for debugging
+        tracing::debug!(
+            "vLLM completions stream request: model={}, max_tokens={:?}, temperature={:?}, ignore_eos={:?}, stream=true, request_body={}",
+            &self.model_name,
+            request.max_tokens,
+            request.temperature,
+            request.ignore_eos,
+            serde_json::to_string(&request_body).unwrap_or_else(|_| "failed to serialize".to_string())
+        );
 
         let raw_request = serde_json::to_string(&request_body).map_err(|e| {
             Error::new(ErrorDetails::Serialization {
