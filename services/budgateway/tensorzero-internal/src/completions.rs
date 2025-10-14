@@ -197,6 +197,75 @@ impl CompletionStop {
     }
 }
 
+impl CompletionRequest {
+    /// Validate completion request parameters
+    ///
+    /// Ensures parameters are within reasonable bounds to prevent provider errors
+    pub fn validate(&self) -> Result<(), Error> {
+        use crate::error::ErrorDetails;
+
+        // Validate n (number of completions)
+        if let Some(n) = self.n {
+            if n == 0 {
+                return Err(Error::new(ErrorDetails::InvalidRequest {
+                    message: "n must be >= 1".to_string(),
+                }));
+            }
+            if n > 128 {
+                return Err(Error::new(ErrorDetails::InvalidRequest {
+                    message: "n must be <= 128".to_string(),
+                }));
+            }
+        }
+
+        // Validate best_of must be >= n
+        if let Some(best_of) = self.best_of {
+            let n = self.n.unwrap_or(1);
+            if best_of < n {
+                return Err(Error::new(ErrorDetails::InvalidRequest {
+                    message: format!("best_of ({}) must be >= n ({})", best_of, n),
+                }));
+            }
+            if best_of > 128 {
+                return Err(Error::new(ErrorDetails::InvalidRequest {
+                    message: "best_of must be <= 128".to_string(),
+                }));
+            }
+        }
+
+        // Validate temperature range
+        if let Some(temp) = self.temperature {
+            if temp < 0.0 || temp > 2.0 {
+                return Err(Error::new(ErrorDetails::InvalidRequest {
+                    message: "temperature must be between 0.0 and 2.0".to_string(),
+                }));
+            }
+        }
+
+        // Validate top_p range
+        if let Some(top_p) = self.top_p {
+            if top_p < 0.0 || top_p > 1.0 {
+                return Err(Error::new(ErrorDetails::InvalidRequest {
+                    message: "top_p must be between 0.0 and 1.0".to_string(),
+                }));
+            }
+        }
+
+        // Validate stop sequences (max 4 for OpenAI)
+        if let Some(ref stop) = self.stop {
+            if let Some(arr) = stop.as_string_array() {
+                if arr.len() > 4 {
+                    return Err(Error::new(ErrorDetails::InvalidRequest {
+                        message: "stop array must contain at most 4 sequences".to_string(),
+                    }));
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,5 +327,170 @@ mod tests {
         assert_eq!(deserialized.text, "Hello, world!");
         assert_eq!(deserialized.index, 0);
         assert_eq!(deserialized.finish_reason, "stop");
+    }
+
+    // Validation tests
+    fn create_test_request() -> CompletionRequest {
+        CompletionRequest {
+            id: Uuid::now_v7(),
+            model: Arc::from("test-model"),
+            prompt: Some(CompletionPrompt::String("test".to_string())),
+            suffix: None,
+            max_tokens: Some(100),
+            temperature: Some(0.7),
+            top_p: Some(0.9),
+            n: Some(1),
+            stream: Some(false),
+            logprobs: None,
+            echo: None,
+            stop: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            best_of: None,
+            logit_bias: None,
+            user: None,
+            seed: None,
+            ignore_eos: None,
+        }
+    }
+
+    #[test]
+    fn test_validation_valid_request() {
+        let request = create_test_request();
+        assert!(request.validate().is_ok());
+    }
+
+
+    #[test]
+    fn test_validation_n_zero() {
+        let mut request = create_test_request();
+        request.n = Some(0);
+        let result = request.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("n must be >= 1"));
+    }
+
+    #[test]
+    fn test_validation_n_too_large() {
+        let mut request = create_test_request();
+        request.n = Some(129);
+        let result = request.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("n must be <= 128"));
+    }
+
+    #[test]
+    fn test_validation_best_of_less_than_n() {
+        let mut request = create_test_request();
+        request.n = Some(5);
+        request.best_of = Some(3);
+        let result = request.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("best_of (3) must be >= n (5)"));
+    }
+
+    #[test]
+    fn test_validation_best_of_valid() {
+        let mut request = create_test_request();
+        request.n = Some(3);
+        request.best_of = Some(5);
+        assert!(request.validate().is_ok());
+
+        request.n = Some(5);
+        request.best_of = Some(5);
+        assert!(request.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validation_best_of_too_large() {
+        let mut request = create_test_request();
+        request.best_of = Some(129);
+        let result = request.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("best_of must be <= 128"));
+    }
+
+    #[test]
+    fn test_validation_temperature_out_of_range() {
+        let mut request = create_test_request();
+        request.temperature = Some(-0.1);
+        let result = request.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("temperature must be between 0.0 and 2.0"));
+
+        request.temperature = Some(2.1);
+        let result = request.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("temperature must be between 0.0 and 2.0"));
+    }
+
+    #[test]
+    fn test_validation_temperature_valid() {
+        let mut request = create_test_request();
+        request.temperature = Some(0.0);
+        assert!(request.validate().is_ok());
+
+        request.temperature = Some(1.0);
+        assert!(request.validate().is_ok());
+
+        request.temperature = Some(2.0);
+        assert!(request.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validation_top_p_out_of_range() {
+        let mut request = create_test_request();
+        request.top_p = Some(-0.1);
+        let result = request.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("top_p must be between 0.0 and 1.0"));
+
+        request.top_p = Some(1.1);
+        let result = request.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("top_p must be between 0.0 and 1.0"));
+    }
+
+    #[test]
+    fn test_validation_top_p_valid() {
+        let mut request = create_test_request();
+        request.top_p = Some(0.0);
+        assert!(request.validate().is_ok());
+
+        request.top_p = Some(0.5);
+        assert!(request.validate().is_ok());
+
+        request.top_p = Some(1.0);
+        assert!(request.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validation_stop_sequences_too_many() {
+        let mut request = create_test_request();
+        request.stop = Some(CompletionStop::StringArray(vec![
+            "stop1".to_string(),
+            "stop2".to_string(),
+            "stop3".to_string(),
+            "stop4".to_string(),
+            "stop5".to_string(),
+        ]));
+        let result = request.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("stop array must contain at most 4 sequences"));
+    }
+
+    #[test]
+    fn test_validation_stop_sequences_valid() {
+        let mut request = create_test_request();
+        request.stop = Some(CompletionStop::String("STOP".to_string()));
+        assert!(request.validate().is_ok());
+
+        request.stop = Some(CompletionStop::StringArray(vec![
+            "stop1".to_string(),
+            "stop2".to_string(),
+            "stop3".to_string(),
+            "stop4".to_string(),
+        ]));
+        assert!(request.validate().is_ok());
     }
 }

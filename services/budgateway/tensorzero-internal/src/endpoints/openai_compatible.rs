@@ -2403,8 +2403,19 @@ impl CompletionStreamProcessor {
                     }
                     Err(e) => {
                         tracing::error!("Error in completion stream: {}", e);
-                        // Continue processing other chunks
-                        continue;
+                        // Send error event to client and terminate stream
+                        let error_event = serde_json::json!({
+                            "error": {
+                                "message": e.to_string(),
+                                "type": "provider_error"
+                            }
+                        });
+                        yield Ok(Event::default().json_data(error_event).map_err(|e| {
+                            Error::new(ErrorDetails::Inference {
+                                message: format!("Failed to convert error to Event: {e}"),
+                            })
+                        })?);
+                        break; // Stop processing on error
                     }
                 }
             }
@@ -2570,8 +2581,9 @@ pub async fn completion_handler(
         )
         .await?
         .ok_or_else(|| {
-            Error::new(ErrorDetails::InvalidModel {
+            Error::new(ErrorDetails::ModelNotConfiguredForCapability {
                 model_name: model_id.to_string(),
+                capability: "completions".to_string(),
             })
         })?;
 
@@ -2614,6 +2626,9 @@ pub async fn completion_handler(
         seed: params.seed,
         ignore_eos: params.ignore_eos,
     };
+
+    // Validate request parameters
+    request.validate()?;
 
     let stream = params.stream.unwrap_or(false);
     let stream_options = params.stream_options.clone();
