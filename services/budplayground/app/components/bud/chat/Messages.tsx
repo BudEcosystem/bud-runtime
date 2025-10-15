@@ -42,7 +42,7 @@ function UserMessage(props: MessageProps & { onEdit: (message: string) => void }
 
   return (
     <div className="w-[100%]">
-      {!isEditing && <div className="flex flex-row items-center justify-end gap-[.5rem]">
+      {!isEditing && <div className="flex flex-row items-center justify-end gap-[.5rem] break-words">
       <div className="flex items-center justify-end gap-[.5rem] ">
         <button>
           <CopyText text={props.content} />
