@@ -106,7 +106,7 @@ export default function LoadModel(props: LoadModelProps) {
                             <div className="text-[#757575] text-[0.75rem] font-[400]">
                                 Models Available
                                 <span className="text-[#FFF] text-[0.75rem] font-[400] ml-[0.25rem]">
-                                    {availableModels?.length}
+                                    {endpoints?.length}
                                 </span>
                             </div>
                             <div className="flex items-center gap-x-[0.25rem] justify-between hover:text-[#FFF] cursor-pointer">
