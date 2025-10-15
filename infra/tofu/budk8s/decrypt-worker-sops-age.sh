@@ -5,5 +5,5 @@ sops_key_path="var/lib/sops-nix/key.txt"
 
 mkdir -p "$(dirname "$sops_key_path")"
 umask 0177
-sops --extract '["sops_age"]["ingress"]' --decrypt "$script_dir/secrets.yaml" > "$sops_key_path"
+sops --extract '["sops_age"]["worker"]' --decrypt "$script_dir/secrets.yaml" >"$sops_key_path"
 umask 0022
