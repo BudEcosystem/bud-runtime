@@ -103,6 +103,10 @@ class StreamingValidationExecutor:
         self.last_attempted_data: Optional[Dict] = None
         self.final_usage: Optional[Any] = None
 
+        # Track validation state for retry prompt
+        self.validated_fields: Dict[str, Any] = {}  # Fields that passed validation
+        self.failed_fields: Dict[str, Any] = {}  # Fields that failed validation
+
         # Create provider
         self.provider = BudServeProvider(api_key=api_key)
 
@@ -161,6 +165,7 @@ class StreamingValidationExecutor:
                     # Reset formatter text accumulation for retry
                     self.formatter.accumulated_text = ""
                     self.formatter.accumulated_reasoning = ""
+                    # Note: Don't reset validated_fields/failed_fields - they're used in retry prompt
                     continue
                 else:
                     # Max retries exhausted
@@ -176,6 +181,7 @@ class StreamingValidationExecutor:
                 if attempt < self.retry_limit - 1:
                     self.formatter.accumulated_text = ""
                     self.formatter.accumulated_reasoning = ""
+                    # Note: Don't reset validated_fields/failed_fields - they're used in retry prompt
                     continue
                 else:
                     break
@@ -226,31 +232,39 @@ class StreamingValidationExecutor:
 
                 # For non-final chunks: validate and stream if valid
                 if not is_last:
-                    # Validate incrementally
-                    async for validation_result in validator.process_streaming_message(message):
-                        if validation_result["valid"]:
-                            # Valid - extract and emit text deltas (same as _run_agent_stream)
-                            for part in message.parts:
-                                if isinstance(part, TextPart) and part.content:
-                                    delta_event = self.formatter.format_output_text_delta(part.content)
-                                    if delta_event:
-                                        yield delta_event
+                    # Validate incrementally - capture state on failure
+                    try:
+                        async for validation_result in validator.process_streaming_message(message):
+                            if validation_result["valid"]:
+                                # Valid - extract and emit text deltas (same as _run_agent_stream)
+                                for part in message.parts:
+                                    if isinstance(part, TextPart) and part.content:
+                                        delta_event = self.formatter.format_output_text_delta(part.content)
+                                        if delta_event:
+                                            yield delta_event
 
-                                elif isinstance(part, ThinkingPart) and part.content:
-                                    # Handle reasoning
-                                    if not self.formatter.reasoning_started:
-                                        yield self.formatter.format_reasoning_summary_part_added()
-                                        self.formatter.reasoning_started = True
+                                    elif isinstance(part, ThinkingPart) and part.content:
+                                        # Handle reasoning
+                                        if not self.formatter.reasoning_started:
+                                            yield self.formatter.format_reasoning_summary_part_added()
+                                            self.formatter.reasoning_started = True
 
-                                    delta_event = self.formatter.format_reasoning_summary_text_delta(part.content)
-                                    if delta_event:
-                                        yield delta_event
+                                        delta_event = self.formatter.format_reasoning_summary_text_delta(part.content)
+                                        if delta_event:
+                                            yield delta_event
 
-                                    self.formatter.add_thinking_content(part.content)
+                                        self.formatter.add_thinking_content(part.content)
 
-                                elif isinstance(part, ToolCallPart):
-                                    logger.debug(f"Tool call: {part.tool_name}")
-                        # If not valid, ValidationError will be raised by process_streaming_message
+                                    elif isinstance(part, ToolCallPart):
+                                        logger.debug(f"Tool call: {part.tool_name}")
+                            # If not valid, ValidationError will be raised by process_streaming_message
+                    except (ValueError, ValidationError):
+                        # Capture validation state before re-raising
+                        self.validated_fields = validator.validated_data.copy()
+                        self.failed_fields = {
+                            k: v for k, v in validator.attempted_data.items() if k not in validator.validated_data
+                        }
+                        raise
 
                 else:
                     # Final chunk - validate completely
@@ -281,6 +295,9 @@ class StreamingValidationExecutor:
                     # Store attempted data for retry context
                     if hasattr(validated_result, "model_dump"):
                         self.last_attempted_data = validated_result.model_dump()
+                        # All fields passed validation on success
+                        self.validated_fields = validated_result.model_dump()
+                        self.failed_fields = {}
 
                     # Capture usage
                     if message.usage:
@@ -308,11 +325,18 @@ class StreamingValidationExecutor:
         model_name = self.output_model.__name__ if hasattr(self.output_model, "__name__") else "Model"
         validation_rules = self._format_validation_rules()
 
-        # Simple universal retry prompt
-        retry_prompt = f"""Your previous attempt to generate {model_name} failed validation.
+        # Format field status information
+        fields_passed = json.dumps(self.validated_fields, indent=2) if self.validated_fields else "None"
+        fields_failed = json.dumps(self.failed_fields, indent=2) if self.failed_fields else "None"
 
-Previous attempt:
-{json.dumps(self.last_attempted_data, indent=2) if self.last_attempted_data else "N/A"}
+        # Improved retry prompt with explicit field status
+        retry_prompt = f"""Your previous attempt failed validation. Fix only what's broken.
+
+Fields that PASSED validation (keep these exactly):
+{fields_passed}
+
+Fields that FAILED validation (fix these):
+{fields_failed}
 
 Validation error:
 {last_error}
@@ -320,13 +344,11 @@ Validation error:
 Validation requirements:
 {validation_rules}
 
-Schema (for reference):
-{json.dumps(self.output_model.model_json_schema(), indent=2)}
-
 Original request:
 {self.original_prompt}
 
-Please generate a complete, valid {model_name} object that satisfies all validation requirements and the original request."""
+IMPORTANT: Keep the fields that passed validation exactly as they are. Only regenerate the fields that failed validation.
+Generate the complete corrected {model_name} object with all fields."""
 
         return retry_prompt
 
