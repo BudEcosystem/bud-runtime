@@ -1,4 +1,3 @@
-
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
@@ -12,11 +11,19 @@ import { useProjects } from "src/hooks/useProjects";
 import { useEndPoints } from "src/hooks/useEndPoint";
 
 export default function DeployModelSuccess() {
-  const { currentWorkflow, updateCredentials, selectedCredentials, selectedModel, deploymentCluster, getWorkflow, getWorkflowCloud } = useDeployModel();
-  const { getEndPoints} = useEndPoints();
-  const [searchValue, setSearchValue] = useState('');
-  const [order, setOrder] = useState<'-' | ''>('');
-      const [orderBy, setOrderBy] = useState<string>('created_at');
+  const {
+    currentWorkflow,
+    updateCredentials,
+    selectedCredentials,
+    selectedModel,
+    deploymentCluster,
+    getWorkflow,
+    getWorkflowCloud,
+  } = useDeployModel();
+  const { getEndPoints } = useEndPoints();
+  const [searchValue, setSearchValue] = useState("");
+  const [order, setOrder] = useState<"-" | "">("");
+  const [orderBy, setOrderBy] = useState<string>("created_at");
   const { selectedProject, getProject } = useProjects();
   const { openDrawer, closeDrawer } = useDrawer();
   const router = useRouter();
@@ -24,15 +31,15 @@ export default function DeployModelSuccess() {
   const page = 1;
   const limit = 1000;
   const getData = async () => {
-      await getProject(projectId as string)
-      await getEndPoints({
-          id: projectId,
-          page: page,
-          limit: limit,
-          name: searchValue,
-          order_by: `${order}${orderBy}`,
-      })
-  }
+    await getProject(projectId as string);
+    await getEndPoints({
+      id: projectId,
+      page: page,
+      limit: limit,
+      name: searchValue,
+      order_by: `${order}${orderBy}`,
+    });
+  };
 
   useEffect(() => {
     if (currentWorkflow.workflow_steps.model.provider_type === "cloud_model") {
@@ -52,7 +59,6 @@ export default function DeployModelSuccess() {
         closeDrawer();
       }}
     >
-
       <BudWraperBox>
         <BudDrawerLayout>
           <BudStepAlert
@@ -64,7 +70,6 @@ export default function DeployModelSuccess() {
         <BudDrawerLayout>
           <DeployModelSpecificationInfo />
         </BudDrawerLayout>
-
       </BudWraperBox>
     </BudForm>
   );

@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budcluster.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -21,6 +22,10 @@ spec:
         dapr.io/app-port: "3003"
         dapr.io/volume-mounts: "crypto-keys:/mnt/crypto-keys"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budcluster
         image: {{ .Values.microservices.budcluster.image }}
@@ -31,6 +36,32 @@ spec:
         env:
           - name: BUD_SERVE_URL
             value: {{ include "bud.ingress.url.budapp" $ }}
+          - name: NOTIFY_SERVICE_NAME
+            value: "{{ .Values.microservices.budnotify.daprid }}"
+          - name: NOTIFY_SERVICE_TOPIC
+            value: "{{ .Values.microservices.budnotify.pubsubTopic }}"
+          # postgresql
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port | quote }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budcluster.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budcluster.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budcluster.name }}
+          # minio
+          - name: MINIO_ENDPOINT
+            value: {{ include "bud.ingress.hosts.s3" $ }}
+          - name: MINIO_ACCESS_KEY
+            value: {{ include "bud.externalServices.minio.auth.accessKey" . }}
+          - name: MINIO_SECRET_KEY
+            value: {{ include "bud.externalServices.minio.auth.secretKey" . }}
+          - name: MINIO_BUCKET
+            value: {{ .Values.externalServices.minio.buckets.modelRegistry }}
+          - name: MINIO_SECURE
+            value: {{ ternary false true (eq .Values.ingress.https "disabled") | quote }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcluster.env }}
           - name: {{ $key }}
@@ -41,10 +72,10 @@ spec:
               name: {{ .Release.Name}}-bud-global
         resources:
           limits:
-            memory: 32768Mi
+            memory: 4096Mi
             cpu: 1
           requests:
-            memory: 256Mi
+            memory: 2048Mi
             cpu: 250m
         volumeMounts:
         - name: crypto-keys
@@ -70,3 +101,17 @@ spec:
   selector:
     app: {{ .Release.Name }}-budcluster
   type: ClusterIP
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .Release.Name }}-budcluster-pubsub-subscription
+spec:
+  topic: budClusterMessages
+  routes:
+    default: /notifications
+  pubsubname: {{ .Release.Name }}-pubsub
+  deadLetterTopic: poisonMessages
+scopes:
+  - budcluster
+{{ end }}

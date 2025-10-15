@@ -11,8 +11,9 @@ import { useDeployModel } from "src/stores/useDeployModel";
 
 export default function DeployModelChooseCluster() {
   const { openDrawerWithStep } = useDrawer();
-  const { deploymentCluster, updateCluster, } = useDeployModel();
-  const { recommendedCluster, getRecommendedClusterById, currentProcessId } = useCluster();
+  const { deploymentCluster, updateCluster } = useDeployModel();
+  const { recommendedCluster, getRecommendedClusterById, currentProcessId } =
+    useCluster();
 
   return (
     <BudForm
@@ -23,7 +24,7 @@ export default function DeployModelChooseCluster() {
       onNext={async (values) => {
         const result = await updateCluster();
         if (result) {
-          openDrawerWithStep("deploy-model-auto-scaling");
+          openDrawerWithStep("deploy-model-configuration", { direction: "forward" });
         }
       }}
       nextText="Next"

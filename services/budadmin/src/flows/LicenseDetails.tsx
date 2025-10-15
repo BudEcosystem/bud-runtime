@@ -1,4 +1,3 @@
-
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -19,18 +18,20 @@ import TagsInput from "@/components/ui/bud/dataEntry/TagsInput";
 import { MessageContent, MessageTop } from "./components/DrawerTags";
 import { Model, useModels } from "src/hooks/useModels";
 import { assetBaseUrl } from "@/components/environment";
-import { useRef } from 'react';
+import { useRef } from "react";
 
 export default function LicenseDetails() {
-  const { createProject, getProjects, getProject, projectValues } = useProjects();
+  const { createProject, getProjects, getProject, projectValues } =
+    useProjects();
   const { form, submittable } = useContext(BudFormContext);
   const [data, setdata] = useState<GeneralProps["data"]>();
-  const { openDrawerWithStep, closeDrawer, previousStep, setPreviousStep } = useDrawer()
+  const { openDrawerWithStep, closeDrawer, previousStep, setPreviousStep } =
+    useDrawer();
   const { selectedModel } = useModels();
   const messageContentRef = useRef<HTMLDivElement>(null);
 
   interface GeneralProps {
-    data?: Model
+    data?: Model;
   }
   useEffect(() => {
     setdata(selectedModel);
@@ -42,16 +43,19 @@ export default function LicenseDetails() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍"
+        icon: "🌐",
       }}
-      backText={previousStep ? 'Back' : undefined}
-      onBack={previousStep ? () => {
-        if (previousStep) {
-          openDrawerWithStep(previousStep)
-          setPreviousStep(null)
-        }
-      } : undefined}
-
+      backText={previousStep ? "Back" : undefined}
+      onBack={
+        previousStep
+          ? () => {
+              if (previousStep) {
+                openDrawerWithStep(previousStep);
+                setPreviousStep(null);
+              }
+            }
+          : undefined
+      }
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -63,11 +67,16 @@ export default function LicenseDetails() {
             <MessageTop
               actionLabel="View LICENSE file"
               onClick={() => {
-                if (data?.model_licenses?.data_type == 'url') {
-                  window.open(`${assetBaseUrl}${data?.model_licenses?.url}`, '_blank');
+                if (data?.model_licenses?.data_type == "url") {
+                  window.open(
+                    `${assetBaseUrl}${data?.model_licenses?.url}`,
+                    "_blank",
+                  );
                 } else {
-                  messageContentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-
+                  messageContentRef.current?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "end",
+                  });
                 }
               }}
               classNames="w-full bg-[transparent]"

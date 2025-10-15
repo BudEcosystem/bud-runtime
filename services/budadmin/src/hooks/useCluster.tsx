@@ -149,6 +149,10 @@ export type Cluster = {
   cost_per_token?: number;
   total_resources?: number;
   resources_used?: number;
+  // Parser metadata from simulator
+  tool_calling_parser_type?: string | null;
+  reasoning_parser_type?: string | null;
+  chat_template?: string | null;
   required_devices?: {
     device_type: string;
     num_replicas: number;
@@ -255,6 +259,18 @@ export const useCluster = create<{
   cloudCredentialID: string;
   setCloudCredentialID: (id: string) => void;
   getClusterAnalytics: (id: string) => Promise<any>;
+  // Cluster Settings methods
+  getClusterSettings: (id: string) => Promise<any>;
+  createClusterSettings: (
+    id: string,
+    data: { default_storage_class?: string | null; default_access_mode?: string | null },
+  ) => Promise<any>;
+  updateClusterSettings: (
+    id: string,
+    data: { default_storage_class?: string | null; default_access_mode?: string | null },
+  ) => Promise<any>;
+  deleteClusterSettings: (id: string) => Promise<any>;
+  getClusterStorageClasses: (id: string) => Promise<any[]>;
 }>((set, get) => ({
   getClusterAnalytics: async (id: string) => {
     const url = `${tempApiBaseUrl}/clusters/${id}/grafana-dashboard`;
@@ -442,6 +458,75 @@ export const useCluster = create<{
       return response.data;
     } catch (error) {
       console.error("Error getting cluster events:", error);
+    }
+  },
+
+  // Cluster Settings API Methods
+  getClusterSettings: async (id: string) => {
+    const url = `${tempApiBaseUrl}/clusters/${id}/settings`;
+    try {
+      const response: any = await AppRequest.Get(url);
+      return response.data.settings;
+    } catch (error) {
+      if (error?.response?.status === 404) {
+        // Settings don't exist yet, return null
+        return null;
+      }
+      console.error("Error getting cluster settings:", error);
+      throw error;
+    }
+  },
+
+  createClusterSettings: async (
+    id: string,
+    data: { default_storage_class?: string | null; default_access_mode?: string | null },
+  ) => {
+    const url = `${tempApiBaseUrl}/clusters/${id}/settings`;
+    try {
+      const response: any = await AppRequest.Post(url, data);
+      successToast("Cluster settings created successfully");
+      return response.data.settings;
+    } catch (error) {
+      console.error("Error creating cluster settings:", error);
+      throw error;
+    }
+  },
+
+  updateClusterSettings: async (
+    id: string,
+    data: { default_storage_class?: string | null; default_access_mode?: string | null },
+  ) => {
+    const url = `${tempApiBaseUrl}/clusters/${id}/settings`;
+    try {
+      const response: any = await AppRequest.Put(url, data);
+      successToast("Cluster settings updated successfully");
+      return response.data.settings;
+    } catch (error) {
+      console.error("Error updating cluster settings:", error);
+      throw error;
+    }
+  },
+
+  deleteClusterSettings: async (id: string) => {
+    const url = `${tempApiBaseUrl}/clusters/${id}/settings`;
+    try {
+      const response: any = await AppRequest.Delete(url);
+      successToast("Cluster settings deleted successfully");
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting cluster settings:", error);
+      throw error;
+    }
+  },
+
+  getClusterStorageClasses: async (id: string) => {
+    const url = `${tempApiBaseUrl}/clusters/${id}/storage-classes`;
+    try {
+      const response: any = await AppRequest.Get(url);
+      return response.data.storage_classes || [];
+    } catch (error) {
+      console.error("Error getting cluster storage classes:", error);
+      throw error;
     }
   },
 }));

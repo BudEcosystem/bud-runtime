@@ -40,6 +40,7 @@ from .auth import (
 from .benchmark_ops import benchmark_routes
 from .billing_ops import billing_router
 from .cluster_ops import cluster_routes
+from .cluster_ops.cluster_settings_routes import cluster_settings_router
 from .cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
 from .commons import logging
 from .commons.config import app_settings, secrets_settings
@@ -59,6 +60,7 @@ from .model_ops.workflows import CloudModelSyncWorkflows
 from .permissions import permission_routes
 from .playground_ops import playground_routes
 from .project_ops import project_routes
+from .prompt_ops import prompt_routes
 from .router_ops import router_routes
 from .user_ops import user_routes
 from .workflow_ops import workflow_routes
@@ -302,6 +304,7 @@ internal_router.include_router(oauth_admin_routes.oauth_admin_router)
 internal_router.include_router(oauth_internal_proxy.internal_oauth_router)
 internal_router.include_router(benchmark_routes.benchmark_router)
 internal_router.include_router(cluster_routes.cluster_router)
+internal_router.include_router(cluster_settings_router)
 internal_router.include_router(common_routes.common_router)
 internal_router.include_router(credential_routes.credential_router)
 internal_router.include_router(credential_routes.proprietary_credential_router)
@@ -316,6 +319,7 @@ internal_router.include_router(user_routes.user_router)
 internal_router.include_router(workflow_routes.workflow_router)
 internal_router.include_router(playground_routes.playground_router)
 internal_router.include_router(project_routes.project_router)
+internal_router.include_router(prompt_routes.router)
 internal_router.include_router(router_routes.router_router)
 internal_router.include_router(eval_routes.router)
 internal_router.include_router(billing_router)

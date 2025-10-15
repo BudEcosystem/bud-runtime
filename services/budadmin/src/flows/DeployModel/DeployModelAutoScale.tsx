@@ -15,23 +15,27 @@ import { useState } from "react";
 
 export default function DeployModelAutoScale() {
   const { openDrawerWithStep } = useDrawer();
-  const { scalingSpecifcation, setScalingSpecification, updateScalingSpecification } = useDeployModel();
+  const {
+    scalingSpecifcation,
+    setScalingSpecification,
+    updateScalingSpecification,
+  } = useDeployModel();
 
   const [advancedSettings, setAdvancedSettings] = useState(false);
   const typeItems = [
     { label: "Metric", value: "metric" },
-    { label: "Optimizer", value: "optimizer" }
-  ]
+    { label: "Optimizer", value: "optimizer" },
+  ];
   const metricItems = [
     { label: "TTFT", value: "bud:time_to_first_token_seconds_average" },
     { label: "E2E Latency", value: "bud:e2e_request_latency_seconds_average" },
     { label: "TPOT", value: "bud:time_per_output_token_seconds_average" },
-    { label: "GPU Cache Usage", value: "bud:gpu_cache_usage_perc_average" }
-  ]
+    { label: "GPU Cache Usage", value: "bud:gpu_cache_usage_perc_average" },
+  ];
 
   const handleChange = (key: string, value: string) => {
     setScalingSpecification({ ...scalingSpecifcation, [key]: value });
-  }
+  };
   return (
     <BudForm
       data={{
@@ -45,7 +49,7 @@ export default function DeployModelAutoScale() {
         window: scalingSpecifcation.window,
       }}
       onBack={() => {
-        openDrawerWithStep("deploy-model-choose-cluster");
+        openDrawerWithStep("deploy-model-configuration", { direction: "backward" });
       }}
       onNext={async (values) => {
         const result = await updateScalingSpecification();
@@ -55,7 +59,7 @@ export default function DeployModelAutoScale() {
       }}
       nextText="Deploy"
       backText="Back"
-    //   disableNext={!deploymentCluster?.id}
+      //   disableNext={!deploymentCluster?.id}
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -84,21 +88,23 @@ export default function DeployModelAutoScale() {
               items={metricItems}
               onChange={(e) => handleChange("scalingMetric", e)}
             />
-              <TextInput
-                name="scalingValue"
-                label="SLO Value"
-                placeholder="Enter SLO Value"
-                rules={[{ required: true, message: "Please enter SLO Value" }]}
-                ClassNames="mt-[.4rem]"
-                infoText="Enter the value of the SLO to scale on"
-                onChange={(e) => handleChange("scalingValue", e)}
-              />
+            <TextInput
+              name="scalingValue"
+              label="SLO Value"
+              placeholder="Enter SLO Value"
+              rules={[{ required: true, message: "Please enter SLO Value" }]}
+              ClassNames="mt-[.4rem]"
+              infoText="Enter the value of the SLO to scale on"
+              onChange={(e) => handleChange("scalingValue", e)}
+            />
             <div className="flex flex-row gap-[1rem] justify-between w-full">
               <TextInput
                 name="minReplicas"
                 label="Min Replicas"
                 placeholder="Enter Min Replicas"
-                rules={[{ required: true, message: "Please enter Min Replicas" }]}
+                rules={[
+                  { required: true, message: "Please enter Min Replicas" },
+                ]}
                 ClassNames="mt-[.4rem]"
                 formItemClassnames="w-full"
                 infoText="Enter the minimum number of replicas your inference can scale down to"
@@ -108,16 +114,21 @@ export default function DeployModelAutoScale() {
                 name="maxReplicas"
                 label="Max Replicas"
                 placeholder="Enter Max Replicas"
-                rules={[{ required: true, message: "Please enter Max Replicas" }]}
+                rules={[
+                  { required: true, message: "Please enter Max Replicas" },
+                ]}
                 ClassNames="mt-[.4rem]"
                 formItemClassnames="w-full"
                 infoText="Enter the maximum number of replicas your inference can scale up to"
                 onChange={(e) => handleChange("maxReplicas", e)}
               />
             </div>
-            <div className="flex items-center mb-[1rem] cursor-pointer opacity-70 hover:opacity-100" onClick={() => {
-              setAdvancedSettings(!advancedSettings);
-            }}>
+            <div
+              className="flex items-center mb-[1rem] cursor-pointer opacity-70 hover:opacity-100"
+              onClick={() => {
+                setAdvancedSettings(!advancedSettings);
+              }}
+            >
               <Text_12_400_EEEEEE className="p-0 py-[.4rem] m-0 mr-[0.5rem]">
                 Advanced Settings
               </Text_12_400_EEEEEE>
@@ -126,22 +137,30 @@ export default function DeployModelAutoScale() {
                 preview={false}
                 alt="info"
                 style={{
-                  width: '0.65rem',
-                  height: 'auto',
-                  marginTop: '0.1rem',
-                  transform: advancedSettings ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.5s ease'
+                  width: "0.65rem",
+                  height: "auto",
+                  marginTop: "0.1rem",
+                  transform: advancedSettings
+                    ? "rotate(180deg)"
+                    : "rotate(0deg)",
+                  transition: "transform 0.5s ease",
                 }}
               />
             </div>
           </DrawerCard>
 
-          {advancedSettings && <DrawerCard>
-            <TextInput
+          {advancedSettings && (
+            <DrawerCard>
+              <TextInput
                 name="scaleUpTolerance"
                 label="Scale Up Tolerance"
                 placeholder="Enter Scale Up Tolerance"
-                rules={[{ required: true, message: "Please enter Scale Up Tolerance" }]}
+                rules={[
+                  {
+                    required: true,
+                    message: "Please enter Scale Up Tolerance",
+                  },
+                ]}
                 ClassNames="mt-[.4rem]"
                 infoText="Enter the tolerance for scaling up"
                 onChange={(e) => handleChange("scaleUpTolerance", e)}
@@ -150,7 +169,12 @@ export default function DeployModelAutoScale() {
                 name="scaleDownTolerance"
                 label="Scale Down Tolerance"
                 placeholder="Enter Scale Down Tolerance"
-                rules={[{ required: true, message: "Please enter Scale Down Tolerance" }]}
+                rules={[
+                  {
+                    required: true,
+                    message: "Please enter Scale Down Tolerance",
+                  },
+                ]}
                 ClassNames="mt-[.4rem]"
                 infoText="Enter the tolerance for scaling down"
                 onChange={(e) => handleChange("scaleDownTolerance", e)}
@@ -165,8 +189,7 @@ export default function DeployModelAutoScale() {
                 onChange={(e) => handleChange("window", e)}
               />
             </DrawerCard>
-          }
-
+          )}
         </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>

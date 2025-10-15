@@ -1,4 +1,3 @@
-
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 
@@ -11,35 +10,32 @@ import TextInput from "src/flows/components/TextInput";
 import TagsInput from "@/components/ui/bud/dataEntry/TagsInput";
 import { axiosInstance } from "src/pages/api/requests";
 import { tempApiBaseUrl } from "@/components/environment";
-import { ModelNameInput, NameIconInput } from "@/components/ui/bud/dataEntry/ProjectNameInput";
+import {
+  ModelNameInput,
+  NameIconInput,
+} from "@/components/ui/bud/dataEntry/ProjectNameInput";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
-import { useDeployModel } from "src/stores/useDeployModel";
 import { isValidModelName } from "@/lib/utils";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 import { useRouter } from "next/router";
 import { useEvaluations } from "src/hooks/useEvaluations";
 import { successToast, errorToast } from "@/components/toast";
 
-
 export default function NewEvaluation() {
-  const { openDrawerWithStep, drawerProps } = useDrawer()
-  const { currentWorkflow, updateModelDetailsLocal, updateCredentialsLocal, localModelDetails, deleteWorkflow } = useDeployModel();
+  const { openDrawerWithStep, drawerProps } = useDrawer();
   const { values, form } = useContext(BudFormContext);
   const router = useRouter();
-  const { createEvaluationWorkflow } = useEvaluations();
+  const { createWorkflow } = useEvaluations();
 
   // Get experiment ID from drawer props
   const experimentId = drawerProps?.experimentId as string;
 
-
-
   return (
     <BudForm
-      data={localModelDetails}
+      data={""}
       onBack={async () => {
-        openDrawerWithStep('select-use-case')
+        openDrawerWithStep("select-use-case");
       }}
-
       onNext={async (values) => {
         try {
           // Check if experimentId is available
@@ -53,17 +49,18 @@ export default function NewEvaluation() {
             step_number: 1,
             stage_data: {
               name: values.EvaluationName,
-              description: values.Description
-            }
+              description: values.Description,
+            },
           };
 
           // Call the API
-          const response = await createEvaluationWorkflow(experimentId, payload);
-
-          successToast("Evaluation workflow created successfully");
+          const response = await createWorkflow(
+            experimentId,
+            payload,
+          );
 
           // Navigate to next step
-          openDrawerWithStep('select-model-new-evaluation');
+          openDrawerWithStep("select-model-new-evaluation");
         } catch (error) {
           console.error("Failed to create evaluation workflow:", error);
           errorToast("Failed to create evaluation workflow");
@@ -73,20 +70,21 @@ export default function NewEvaluation() {
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
-            title={'New Evaluation'}
+            title={"New Evaluation"}
             description="Description for New Evaluation"
           />
           <DrawerCard classNames="">
-
             <TextInput
               name="EvaluationName"
-              label={'Evaluation Name'}
-              placeholder={'Enter evaluation name'}
-              rules={[{ required: true, message: 'Please enter evaluation name' }]}
+              label={"Evaluation Name"}
+              placeholder={"Enter evaluation name"}
+              rules={[
+                { required: true, message: "Please enter evaluation name" },
+              ]}
               ClassNames="mt-[.55rem]"
               InputClasses="pt-[.6rem] pb-[.4rem]"
               formItemClassnames="mb-[.45rem]"
-              infoText={'Enter Requests count'}
+              infoText={"Enter Requests count"}
             />
             <TextAreaInput
               name="Description"

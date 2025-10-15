@@ -17,6 +17,10 @@ spec:
       labels:
         app: {{ .Release.Name }}-budcustomer
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budcustomer
         image: {{ .Values.microservices.budcustomer.image }}

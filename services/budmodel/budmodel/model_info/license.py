@@ -29,6 +29,7 @@ import requests
 from bs4 import BeautifulSoup
 from budmicroframe.commons import logging
 from huggingface_hub import ModelCard, hf_hub_download, list_repo_files
+from huggingface_hub import errors as hf_hub_errors
 from json_repair import repair_json
 from sqlalchemy import select
 
@@ -557,7 +558,18 @@ class HuggingFaceLicenseExtractor(LicenseExtractor):
 
     def get_hf_license_data(self, uri: str, hf_token: str | None = None) -> Dict[str, Any]:
         """Get license data from huggingface."""
-        model_card = ModelCard.load(uri, token=hf_token)
+        # Handle missing README.md gracefully
+        try:
+            model_card = ModelCard.load(uri, token=hf_token)
+        except hf_hub_errors.EntryNotFoundError as e:
+            logger.warning("README.md not found for %s when extracting license, using defaults: %s", uri, str(e))
+            # Return default values when README is missing
+            return "unknown", "Unknown"
+        except Exception as e:
+            logger.error("Failed to load ModelCard for license extraction from %s: %s", uri, str(e))
+            # Return default values on any error
+            return "unknown", "Unknown"
+
         license_name = model_card.data.get("license_name", "Unknown")
         license_id = model_card.data.get("license", "Unknown")
         if isinstance(license_id, str):

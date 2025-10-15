@@ -63,10 +63,25 @@ class HuggingFaceModelInfo(BaseModelInfo):
         """Load a model from Hugging Face Hub."""
         hf_repo_readme = get_hf_repo_readme(pretrained_model_name_or_path, token)
         model_analysis = get_model_analysis(hf_repo_readme)
-        model_card = ModelCard.load(
-            pretrained_model_name_or_path,
-            token=token,
-        )
+
+        # Handle missing README.md gracefully
+        model_card = None
+        try:
+            model_card = ModelCard.load(
+                pretrained_model_name_or_path,
+                token=token,
+            )
+        except hf_hub_errors.EntryNotFoundError as e:
+            logger.warning(
+                "README.md not found for %s, creating minimal ModelCard: %s", pretrained_model_name_or_path, str(e)
+            )
+        except Exception as e:
+            logger.error("Failed to load ModelCard for %s: %s", pretrained_model_name_or_path, str(e))
+
+        if model_card is None:
+            # Create a minimal ModelCard if loading failed
+            model_card = ModelCard("")
+
         language = model_card.data.get("language") or []
 
         if language and not isinstance(language, list):
@@ -899,7 +914,7 @@ class HuggingfaceUtils:
             # Parse the HTML content
             tree = lxml_html.fromstring(response.content)
             # Try to get the image using the XPath
-            xpath_selector = "/html/body/div/main/header/div/div[1]/div[1]/img"
+            xpath_selector = "/html/body/div/main/header/div/div[1]/div[1]/a/img"
             img_elements = tree.xpath(xpath_selector)
             # If XPath didn't work, try the CSS selector
             if not img_elements:

@@ -1,0 +1,174 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+.demo-fixed-node {
+  align-items: flex-start;
+  background-color: transparent;
+  border: 1px solid rgba(6, 7, 9, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.04), 0 4px 12px 0 rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  /* width: 240px; */
+  width: 100%;
+  transition: all 0.3s ease;
+}
+
+.demo-fixed-node-title {
+  background-color: #93bfe2;
+  width: 100%;
+  border-radius: 8px 8px 0 0;
+  padding: 4px 12px;
+}
+
+.demo-fixed-node-content {
+  padding: 16px;
+  flex-grow: 1;
+  width: 100%;
+}
+
+input {
+  color: black;
+  background-color: white;
+}
+
+.demo-fixed-adder {
+  width: 28px;
+  height: 18px;
+  background: rgb(187, 191, 196);
+  display: flex;
+  border-radius: 9px;
+  justify-content: space-evenly;
+  align-items: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+
+  div {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    svg {
+      width: 12px;
+      height: 12px;
+    }
+  }
+}
+
+.demo-fixed-adder.activated {
+  background: #82A7FC
+}
+
+.demo-fixed-adder.isHorizontal {
+  transform: rotate(90deg);
+}
+
+
+.gedit-playground * {
+  box-sizing: border-box;
+}
+
+.gedit-playground {
+  background-color: #060606;
+}
+
+/* Reduce flowgram canvas dot pattern brightness to 30% */
+.demo-fixed-container svg[data-background="true"] circle,
+.demo-fixed-container [data-background="true"] circle,
+.gedit-playground svg[data-background="true"] circle,
+.gedit-playground [data-background="true"] circle {
+  opacity: 0.3 !important;
+  fill-opacity: 0.3 !important;
+}
+
+/* Alternative: target the background layer itself */
+.demo-fixed-container [class*="background"],
+.gedit-playground [class*="background"] {
+  opacity: 0.3;
+}
+
+/* Hide incoming connection line above the first input node */
+/* Use clip-path to hide only the top portion of the connection line */
+
+.gedit-flow-lines-layer,
+.demo-fixed-container .gedit-flow-lines-layer,
+.gedit-playground .gedit-flow-lines-layer {
+  /* Clip the top 100px to hide the line above the first node */
+  clip-path: inset(100px 0 0 0);
+  -webkit-clip-path: inset(100px 0 0 0);
+}
+
+/* Custom Select Styles for Dark Theme */
+.custom-select .ant-select-selector {
+  background-color: #0A0A0A !important;
+  border: 1px solid #2A2A2A !important;
+  color: #EEEEEE !important;
+  height: 32px !important;
+  font-size: 12px !important;
+}
+
+.custom-select .ant-select-selector:hover {
+  border-color: #965CDE !important;
+}
+
+.custom-select.ant-select-focused .ant-select-selector {
+  border-color: #965CDE !important;
+  box-shadow: none !important;
+}
+
+.custom-select .ant-select-arrow {
+  color: #808080 !important;
+}
+
+.custom-select .ant-select-selection-placeholder {
+  color: #606060 !important;
+}
+
+.ant-select-dropdown {
+  background-color: #0A0A0A !important;
+  border: 1px solid #2A2A2A !important;
+}
+
+.ant-select-item {
+  color: #EEEEEE !important;
+  font-size: 12px !important;
+}
+
+.ant-select-item-option-active {
+  background-color: #1A1A1A !important;
+}
+
+.ant-select-item-option-selected {
+  background-color: #965CDE20 !important;
+}
+
+/* System Prompt Settings TextArea placeholder visibility */
+textarea::placeholder {
+  color: #757575 !important;
+  opacity: 1 !important;
+}
+
+textarea::-webkit-input-placeholder {
+  color: #757575 !important;
+  opacity: 1 !important;
+}
+
+textarea::-moz-placeholder {
+  color: #757575 !important;
+  opacity: 1 !important;
+}
+
+textarea:-ms-input-placeholder {
+  color: #757575 !important;
+  opacity: 1 !important;
+}
+
+textarea:-moz-placeholder {
+  color: #757575 !important;
+  opacity: 1 !important;
+}

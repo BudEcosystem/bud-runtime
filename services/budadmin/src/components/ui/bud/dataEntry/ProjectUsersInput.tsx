@@ -24,12 +24,13 @@ interface SelectProps {
   classNames?: string;
   rules: FormRule[];
   onChangeScope?: (selectedScope: string) => void;
+  userType?: string;
 }
 
 export default function ProjectUsersInput(props: SelectProps) {
   // Usage of DebounceSelect
   const { users, getUsers } = useUsers();
-  const { name: fieldName } = props;
+  const { name: fieldName, userType } = props;
   const { form } = useContext(BudFormContext);
   const [options, setOptions] = useState([]);
   const [scopes, setScopes] = useState("endpoint:view");
@@ -65,12 +66,12 @@ export default function ProjectUsersInput(props: SelectProps) {
 
   const [search, setSearch] = useState("");
 
-
   const load = useCallback(async () => {
     await getUsers({
       page: 1,
       limit: 10000,
       search: false,
+      user_type: userType || ''
     });
   }, []);
 
@@ -259,7 +260,7 @@ export default function ProjectUsersInput(props: SelectProps) {
                         e.stopPropagation();
                         form.setFieldsValue({
                           [fieldName]: selected.filter(
-                            (item) => item.label !== props.data.label
+                            (item) => item.label !== props.data.label,
                           ),
                         });
                       }}
@@ -292,7 +293,7 @@ export default function ProjectUsersInput(props: SelectProps) {
               colourOptions.find((option) => option.value === props.data.value)
                 ?.value || "#FFF";
             const selectedTag = selected?.find(
-              (tag) => tag.label === props.data.label
+              (tag) => tag.label === props.data.label,
             );
             return (
               <div
@@ -314,7 +315,7 @@ export default function ProjectUsersInput(props: SelectProps) {
                       e.stopPropagation();
                       form.setFieldsValue({
                         [fieldName]: selected.filter(
-                          (item) => item.label !== props.data.label
+                          (item) => item.label !== props.data.label,
                         ),
                       });
                     }

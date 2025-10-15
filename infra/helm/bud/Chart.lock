@@ -1,7 +1,4 @@
 dependencies:
-- name: keel
-  repository: https://charts.keel.sh
-  version: 1.0.5
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 16.7.18
@@ -17,14 +14,11 @@ dependencies:
 - name: keycloak
   repository: https://charts.bitnami.com/bitnami
   version: 24.7.7
-- name: dapr
-  repository: https://dapr.github.io/helm-charts/
-  version: 1.15.8
 - name: kafka
   repository: https://charts.bitnami.com/bitnami
   version: 32.3.5
 - name: mongodb
   repository: https://charts.bitnami.com/bitnami
   version: 16.5.31
-digest: sha256:a6340b361f5acec8a99ca4124be53b22577c87a1c1e30b5a48127d60c27aa151
-generated: "2025-08-13T11:26:21.367260593+05:30"
+digest: sha256:3f1090951186dc94096cfe9e876883a8a06153136dddfa69b035e1f1d0d06974
+generated: "2025-10-01T15:11:39.352317008+05:30"

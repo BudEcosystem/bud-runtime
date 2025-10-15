@@ -21,11 +21,7 @@ import Tags from "src/flows/components/DrawerTags";
 import GuageChart from "@/components/charts/GuageChart";
 import BarChart from "@/components/charts/barChart";
 import LineChart from "@/components/charts/lineChart";
-import {
-  formatStorageSize,
-  getCategories,
-  getChartData,
-} from "@/lib/utils";
+import { formatStorageSize, getCategories, getChartData } from "@/lib/utils";
 import { useRouter } from "next/router";
 import ComingSoon from "@/components/ui/comingSoon";
 import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
@@ -91,7 +87,7 @@ const ChartUsageCard = ({
       getClusterMetrics(
         clustersId as string,
         selectedSegment,
-        data?.metricType
+        data?.metricType,
       ).then((res) => {
         onChange(res, selectedSegment);
       });
@@ -174,8 +170,9 @@ function NetworkInUsage() {
       data={{
         title: "Network In",
         description: "Amount of data over time",
-        value: `${data?.cluster_summary?.network_in?.inbound_mbps?.toFixed(2) || 0
-          } Mbps`,
+        value: `${
+          data?.cluster_summary?.network_in?.inbound_mbps?.toFixed(2) || 0
+        } Mbps`,
         percentage: 0,
         chartData: (
           <LineChart
@@ -183,11 +180,11 @@ function NetworkInUsage() {
               color: "#FFC442",
               categories: getCategories(
                 selectedSegment,
-                data?.cluster_summary?.network_in?.time_series
+                data?.cluster_summary?.network_in?.time_series,
               ),
               data: getChartData(
                 selectedSegment,
-                data?.cluster_summary?.network_in?.time_series
+                data?.cluster_summary?.network_in?.time_series,
               ),
               label1: "",
               label2: "",
@@ -215,8 +212,9 @@ function NetworkOutUsage() {
       data={{
         title: "Network Out",
         description: "Amount of data over time",
-        value: `${data?.cluster_summary?.network_out?.outbound_mbps?.toFixed(2) || 0
-          } Mbps`,
+        value: `${
+          data?.cluster_summary?.network_out?.outbound_mbps?.toFixed(2) || 0
+        } Mbps`,
         percentage: 0,
         chartData: (
           <LineChart
@@ -224,11 +222,11 @@ function NetworkOutUsage() {
               color: "#FFC442",
               categories: getCategories(
                 selectedSegment,
-                data?.cluster_summary?.network_out?.time_series
+                data?.cluster_summary?.network_out?.time_series,
               ),
               data: getChartData(
                 selectedSegment,
-                data?.cluster_summary?.network_out?.time_series
+                data?.cluster_summary?.network_out?.time_series,
               ),
               label1: "",
               label2: "",
@@ -257,8 +255,9 @@ function NetworkBandwidthUsage() {
       data={{
         title: "Network Bandwidth",
         description: "% Bandwidth used vs total bandwidth",
-        value: `${data?.cluster_summary?.network_bandwidth?.total_mbps?.toFixed(2) || 0
-          } Mbps`,
+        value: `${
+          data?.cluster_summary?.network_bandwidth?.total_mbps?.toFixed(2) || 0
+        } Mbps`,
         percentage: 0,
         chartData: (
           <LineChart
@@ -266,11 +265,11 @@ function NetworkBandwidthUsage() {
               color: "#FFC442",
               categories: getCategories(
                 selectedSegment,
-                data?.cluster_summary?.network_bandwidth?.time_series
+                data?.cluster_summary?.network_bandwidth?.time_series,
               ),
               data: getChartData(
                 selectedSegment,
-                data?.cluster_summary?.network_bandwidth?.time_series
+                data?.cluster_summary?.network_bandwidth?.time_series,
               ),
               label1: "",
               label2: "",
@@ -337,7 +336,7 @@ const GuageCharts = ({
       getClusterMetrics(clustersId as string, selectedSegment, metricType).then(
         (res) => {
           setMetrics(res);
-        }
+        },
       );
     }
   }, [selectedSegment, clustersId]);
@@ -373,10 +372,10 @@ const GuageCharts = ({
         <GuageChart
           data={{
             percentage: Number(
-              metrics?.cluster_summary?.[field]?.[percentage]?.toFixed(2)
+              metrics?.cluster_summary?.[field]?.[percentage]?.toFixed(2),
             ),
             average: Number(
-              metrics?.cluster_summary?.[field]?.[average]?.toFixed(2)
+              metrics?.cluster_summary?.[field]?.[average]?.toFixed(2),
             ),
           }}
         />
@@ -447,12 +446,12 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
       bg: "/images/cluster/bg-disk.png",
       value: formatStorageSize(
         metrics?.cluster_summary?.storage.total_gib || 0,
-        "GB"
+        "GB",
       ), //
       tag: {
         value: `${formatStorageSize(
           metrics?.cluster_summary?.storage?.available_gib || 0,
-          "GB"
+          "GB",
         )} Available`,
         tagColor: "#4077E6",
       },
@@ -462,7 +461,7 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
       bg: "/images/cluster/bg-vram.png",
       value: formatStorageSize(
         metrics?.cluster_summary?.memory?.total_gib || 0,
-        "GB"
+        "GB",
       ),
     },
     {
@@ -470,7 +469,7 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
       bg: "/images/cluster/bg-ram.png",
       value: formatStorageSize(
         metrics?.cluster_summary?.memory?.total_gib || 0,
-        "GB"
+        "GB",
       ),
     },
     { name: "TFLOPs", bg: "/images/cluster/bg-flop.png", value: "0" }, // TODO: Change the value to actual data
@@ -596,7 +595,6 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
           </div>
         </div>
       )}
-
     </div>
   );
 };

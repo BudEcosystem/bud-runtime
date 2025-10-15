@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budplayground.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,6 +17,10 @@ spec:
       labels:
         app: {{ .Release.Name }}-budplayground
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budplayground
         image: {{ .Values.microservices.budplayground.image }}
@@ -28,6 +33,8 @@ spec:
           - name: NEXT_PUBLIC_PRIVATE_KEY
             value: {{ .Values.microservices.rsaKeys.privateKey | b64enc }}
           - name: NEXT_PUBLIC_TEMP_API_BASE_URL
+            value: {{ include "bud.ingress.url.budapp" $ }}
+          - name: NEXT_PUBLIC_BASE_URL
             value: {{ include "bud.ingress.url.budapp" $ }}
           - name: NEXT_PUBLIC_COPY_CODE_API_BASE_URL
             value: {{ include "bud.ingress.url.budgateway" $ }}/v1/
@@ -58,3 +65,4 @@ spec:
   selector:
     app: {{ .Release.Name }}-budplayground
   type: ClusterIP
+{{ end }}

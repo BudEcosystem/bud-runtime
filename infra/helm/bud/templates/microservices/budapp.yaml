@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budapp.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,6 +21,10 @@ spec:
         dapr.io/app-id: {{ .Values.microservices.budapp.daprid }}
         dapr.io/app-port: "9082"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name}}-budapp
         image: {{ .Values.microservices.budapp.image }}
@@ -49,10 +54,40 @@ spec:
             value: {{ .Values.microservices.budsim.daprid }}
           - name: BUD_EVAL_APP_ID
             value: {{ .Values.microservices.budeval.daprid }}
+          - name: BUD_PROMPT_APP_ID
+            value: {{ .Values.microservices.budprompt.daprid }}
           - name: FRONTEND_URL
             value: {{ include "bud.ingress.url.budcustomer" . }}
+          - name: ADMIN_FRONTEND_URL
+            value: {{ include "bud.ingress.url.budadmin" . }}
           - name: CORS_ORIGINS
-            value: {{ join "," .Values.microservices.budapp.corsOrigins }},{{ include "bud.ingress.url.budadmin" $ }},{{ include "bud.ingress.url.budplayground" $ }},{{ include "bud.ingress.url.budcustomer" $ }}
+            value: "{{ join "," .Values.microservices.budapp.corsOrigins }},{{ include "bud.ingress.url.budadmin" $ }},{{ include "bud.ingress.url.budplayground" $ }},{{ include "bud.ingress.url.budcustomer" $ }}"
+          - name: STATIC_DIR
+            value: "/data/static-dir"
+          # postgresql
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port | quote }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budapp.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budapp.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budapp.name }}
+          # minio
+          - name: MINIO_ENDPOINT
+            value: {{ include "bud.externalServices.minio.endpoint" . }}
+          - name: MINIO_ACCESS_KEY
+            value: {{ include "bud.externalServices.minio.auth.accessKey" . }}
+          - name: MINIO_SECRET_KEY
+            value: {{ include "bud.externalServices.minio.auth.secretKey" . }}
+          - name: MINIO_BUCKET
+            value: {{ .Values.externalServices.minio.buckets.modelRegistry }}
+          - name: MINIO_MODEL_BUCKET
+            value: {{ .Values.externalServices.minio.buckets.modelInfo }}
+          - name: MINIO_SECURE
+            value: "false"
         {{- $root := . }}
         {{- range $key, $value := .Values.microservices.budapp.env }}
           - name: {{ $key }}
@@ -63,7 +98,7 @@ spec:
               name: {{ .Release.Name}}-bud-global
         resources:
           limits:
-            memory: 32768Mi
+            memory: 512Mi
             cpu: 2
           requests:
             memory: 256Mi
@@ -105,8 +140,28 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-bud-static-dir
 spec:
+{{ if .Values.storage.budappStaticDir.className }}
+  storageClassName: {{ .Values.storage.budappStaticDir.className }}
+{{ end }}
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi
+      storage: {{ .Values.storage.budappStaticDir.size }}
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .Release.Name }}-budapp-pubsub-subscription
+spec:
+  topic: budAppMessages
+  routes:
+    rules:
+      - match: event.type == "credential_update"
+        path: /credentials/update
+    default: /notifications
+  pubsubname: {{ .Release.Name }}-pubsub
+  deadLetterTopic: poisonMessages
+scopes:
+  - budapp
+{{ end }}

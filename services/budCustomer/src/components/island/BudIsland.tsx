@@ -117,7 +117,10 @@ const BudIsland: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     refetch();
-    getWorkflowList();
+    // Only fetch workflow list when the island is actually opened
+    if (isOpen) {
+      getWorkflowList();
+    }
   }, [isOpen, user]);
 
   // Log session initialization status for debugging
@@ -365,20 +368,20 @@ const BudIsland: React.FC = () => {
         </div>
         <div className="flex justify-end items-top gap-[1rem] w-full h-[100%]">
           <div className="w-[100%] overflow-y-auto noScrollbar">
-            <div className={`grid grid-cols-3 gap-x-[1.5rem] gap-y-[1.5rem] `}>
+            <div className={`grid grid-cols-2 gap-x-[1.5rem] gap-y-[1.5rem] `}>
               <NotificationsWidget
                 notifications={inAppNotifications}
                 loadNotifications={loadNotifications}
                 loading={isLoading || isRefetching}
               />
-              {workflowList
+              {/* {workflowList
                 .map((workflow, index) => ({
                   workflow,
                   index,
                 }))
                 ?.map(({ workflow, index }) => (
                   <BudWidget data={workflow} index={index} key={index} />
-                ))}
+                ))} */}
             </div>
           </div>
         </div>

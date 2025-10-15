@@ -30,11 +30,13 @@ import {
   Text_11_400_808080,
   Text_12_400_B3B3B3,
   Text_12_600_EEEEEE,
+  Text_14_400_EEEEEE,
   Text_14_600_EEEEEE,
 } from "@/components/ui/text";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import ProjectTags from "@/flows/components/ProjectTags";
+import { errorToast } from "@/components/toast";
 
 const { Paragraph } = Typography;
 
@@ -128,6 +130,12 @@ interface InferenceDetail {
   cached: boolean;
   finish_reason?: string;
   cost?: number;
+  error_code?: string;
+  error_message?: string;
+  error_type?: string;
+  status_code?: number;
+  raw_request?: string;
+  raw_response?: string;
   gateway_request?: any;
   gateway_response?: any;
   gateway_metadata?: GatewayMetadata;
@@ -431,7 +439,7 @@ export default function ObservabilityDetailPage({
         </div>
 
         {/* Gateway Metadata */}
-        {inferenceData.gateway_metadata && (
+        {inferenceData.gateway_metadata && inferenceData.gateway_metadata.client_ip && (
           <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] dark:bg-[#101010] mb-6">
             <div className="w-full">
               <Text_14_600_EEEEEE className="text-[var(--text-primary)] mb-4">
@@ -739,9 +747,88 @@ export default function ObservabilityDetailPage({
           </div>
         </div>
 
+        {/* Error Details - Only show for failed requests */}
+        {inferenceData.is_success === false && (
+          <div className="flex items-center flex-col border border-red-500 rounded-lg p-6 w-full bg-red-50 dark:bg-red-950/20 mb-6">
+            <div className="w-full">
+              <Text_14_600_EEEEEE className="text-red-600 dark:text-red-400 mb-4">
+                Error Details
+              </Text_14_600_EEEEEE>
+
+              <div className="space-y-4">
+                {inferenceData.error_code && (
+                  <div>
+                    <Text_12_400_B3B3B3 className="text-[var(--text-muted)] mb-1">
+                      Error Code
+                    </Text_12_400_B3B3B3>
+                    <Text_14_400_EEEEEE className="text-red-600 dark:text-red-400 font-semibold text-lg">
+                      {inferenceData.error_code}
+                    </Text_14_400_EEEEEE>
+                  </div>
+                )}
+
+                {inferenceData.error_type && (
+                  <div>
+                    <Text_12_400_B3B3B3 className="text-[var(--text-muted)] mb-1">
+                      Error Type
+                    </Text_12_400_B3B3B3>
+                    <Text_14_400_EEEEEE className="text-red-600 dark:text-red-400">
+                      {inferenceData.error_type}
+                    </Text_14_400_EEEEEE>
+                  </div>
+                )}
+
+                {inferenceData.error_message && (
+                  <div>
+                    <Text_12_400_B3B3B3 className="text-[var(--text-muted)] mb-1">
+                      Error Message
+                    </Text_12_400_B3B3B3>
+                    <div className="bg-red-100 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-md p-3 mt-1">
+                      <Text_14_400_EEEEEE className="text-red-700 dark:text-red-300 font-mono text-[0.85rem] whitespace-pre-wrap">
+                        {inferenceData.error_message}
+                      </Text_14_400_EEEEEE>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <Text_12_400_B3B3B3 className="text-[var(--text-muted)] mb-1">
+                    Failed Request ID
+                  </Text_12_400_B3B3B3>
+                  <Text_14_400_EEEEEE className="text-[var(--text-primary)] font-mono text-[0.8rem]">
+                    {inferenceData.inference_id}
+                  </Text_14_400_EEEEEE>
+                </div>
+
+                <div>
+                  <Text_12_400_B3B3B3 className="text-[var(--text-muted)] mb-1">
+                    Failed At
+                  </Text_12_400_B3B3B3>
+                  <Text_14_400_EEEEEE className="text-[var(--text-primary)]">
+                    {formatTimestampWithTZ(inferenceData.timestamp)}
+                  </Text_14_400_EEEEEE>
+                </div>
+
+                {inferenceData.raw_response && (
+                  <div>
+                    <Text_12_400_B3B3B3 className="text-[var(--text-muted)] mb-1">
+                      Error Response Details
+                    </Text_12_400_B3B3B3>
+                    <div className="bg-red-100 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-md p-3 mt-1 max-h-64 overflow-auto">
+                      <Text_14_400_EEEEEE className="text-red-700 dark:text-red-300 font-mono text-[0.75rem] whitespace-pre-wrap">
+                        {inferenceData.raw_response}
+                      </Text_14_400_EEEEEE>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Conversation - Only show for chat endpoint type */}
         {(!inferenceData.endpoint_type ||
-          inferenceData.endpoint_type === "chat") && (
+          inferenceData.endpoint_type === "chat") && (inferenceData.messages && inferenceData?.messages?.length > 0) && (
           <div className="flex items-center flex-col border border-[var(--border-color)] rounded-lg p-6 w-full bg-[var(--bg-tertiary)] dark:bg-[#101010] mb-6">
             <div className="w-full">
               <div className="flex justify-between items-center mb-4">
@@ -751,9 +838,14 @@ export default function ObservabilityDetailPage({
                 <Button
                   size="small"
                   icon={<DownloadOutlined />}
-                  onClick={() =>
-                    downloadJson(inferenceData.messages, "conversation")
-                  }
+                  onClick={() =>{
+                    if(inferenceData.messages && inferenceData?.messages?.length > 0){
+                      downloadJson(inferenceData.messages, "conversation")
+                    }
+                    else {
+                      errorToast("No conversation data to download")
+                    }
+                  }}
                   className="!bg-[var(--bg-secondary)] !border-[var(--border-color)] text-[var(--text-primary)] hover:!bg-[var(--bg-hover)]"
                 >
                   Download

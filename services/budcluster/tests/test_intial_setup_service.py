@@ -81,7 +81,6 @@ async def test_initial_setup():
     #         playbook="DEPLOY_NFD",  # Updated to use NFD
     #         extra_vars={
     #             "kubeconfig_content": config_dict,
-    #             "image_pull_secrets": handler.get_image_pull_secret(),
     #             "platform": handler.platform,
     #             "prometheus_url": handler.config + "/api/v1/write",
     #             "prometheus_namespace": "bud-system",

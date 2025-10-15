@@ -55,6 +55,10 @@ spec:
       annotations:
         date: "{{ now }}"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: budgateway
           image: {{ .Values.microservices.budgateway.image }}
@@ -76,6 +80,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-rsa-keys
                   key: private-key-password
+          {{ $root := . }}
+          {{- range $key, $value := .Values.microservices.budgateway.env }}
+            - name: {{ $key }}
+              value: {{ tpl $value $root | quote }}
+          {{- end }}
           volumeMounts:
             - name: {{ .Release.Name }}-budgateway-config
               mountPath: /app/config

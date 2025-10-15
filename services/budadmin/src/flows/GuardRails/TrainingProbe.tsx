@@ -93,7 +93,9 @@ export default function TrainingProbe() {
           </div>
         );
       default:
-        return <div className="w-[16px] h-[16px] rounded-full border border-[#757575]" />;
+        return (
+          <div className="w-[16px] h-[16px] rounded-full border border-[#757575]" />
+        );
     }
   };
 
@@ -147,8 +149,8 @@ export default function TrainingProbe() {
                         step.status === "completed"
                           ? "text-[#EEEEEE] line-through"
                           : step.status === "in-progress"
-                          ? "text-[#EEEEEE]"
-                          : "text-[#757575]"
+                            ? "text-[#EEEEEE]"
+                            : "text-[#757575]"
                       }
                     >
                       {step.label}

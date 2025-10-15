@@ -6,7 +6,7 @@ import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 import TagsInput from "@/components/ui/bud/dataEntry/TagsInput";
-import { successToast } from "@/components/toast";
+import { successToast, errorToast } from "@/components/toast";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useEvaluations } from "src/hooks/useEvaluations";
 import { useProjects } from "src/hooks/useProjects";
@@ -25,25 +25,32 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
         rules={[
           { required: true, message: "Experiment name is required" },
           { min: 3, message: "Experiment name must be at least 3 characters" },
-          { max: 100, message: "Experiment name must not exceed 100 characters" },
+          {
+            max: 100,
+            message: "Experiment name must not exceed 100 characters",
+          },
           {
             pattern: /^[a-zA-Z0-9\s\-_]+$/,
-            message: "Experiment name can only contain letters, numbers, spaces, hyphens, and underscores"
+            message:
+              "Experiment name can only contain letters, numbers, spaces, hyphens, and underscores",
           },
           {
             validator: (_, value) => {
               if (value && value.trim().length === 0) {
-                return Promise.reject("Experiment name cannot be only whitespace");
+                return Promise.reject(
+                  "Experiment name cannot be only whitespace",
+                );
               }
               return Promise.resolve();
-            }
-          }
+            },
+          },
         ]}
         ClassNames="mt-[.4rem]"
         InputClasses="py-[.5rem]"
       />
       <TagsInput
         label="Tags"
+        required
         options={options}
         info="Add keywords to help organize and find your experiment later. Max 10 tags, 20 characters each."
         name="tags"
@@ -54,23 +61,31 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
               if (value && value.length > 10) {
                 return Promise.reject("Maximum 10 tags allowed");
               }
-              if (value && value.some((tag: any) => {
-                const tagName = typeof tag === 'string' ? tag : tag.name;
-                return tagName && tagName.length > 20;
-              })) {
+              if (
+                value &&
+                value.some((tag: any) => {
+                  const tagName = typeof tag === "string" ? tag : tag.name;
+                  return tagName && tagName.length > 20;
+                })
+              ) {
                 return Promise.reject("Each tag must be 20 characters or less");
               }
-              if (value && value.some((tag: any) => {
-                const tagName = typeof tag === 'string' ? tag : tag.name;
-                return tagName && !/^[a-zA-Z0-9\-_]+$/.test(tagName);
-              })) {
-                return Promise.reject("Tags can only contain letters, numbers, hyphens, and underscores");
+              if (
+                value &&
+                value.some((tag: any) => {
+                  const tagName = typeof tag === "string" ? tag : tag.name;
+                  return tagName && !/^[a-zA-Z0-9\-_]+$/.test(tagName);
+                })
+              ) {
+                return Promise.reject(
+                  "Tags can only contain letters, numbers, hyphens, and underscores",
+                );
               }
               return Promise.resolve();
-            }
-          }
+            },
+          },
         ]}
-        ClassNames="mb-[0px]"
+        ClassNames="mb-[1rem]"
         SelectClassNames="mb-[.5rem]"
         menuplacement="top"
       />
@@ -82,7 +97,6 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
         placeholder="Provide a brief description about the experiment."
         rules={[
           { required: true, message: "Description is required" },
-          { min: 10, message: "Description must be at least 10 characters" },
           { max: 500, message: "Description must not exceed 500 characters" },
           {
             validator: (_, value) => {
@@ -90,11 +104,13 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
                 return Promise.reject("Description cannot be only whitespace");
               }
               if (value && value.trim().length < 10) {
-                return Promise.reject("Description must be at least 10 characters (excluding leading/trailing spaces)");
+                return Promise.reject(
+                  "Description must be at least 10 characters (excluding leading/trailing spaces)",
+                );
               }
               return Promise.resolve();
-            }
-          }
+            },
+          },
         ]}
       />
     </DrawerCard>
@@ -112,16 +128,18 @@ export default function NewExperimentDrawer() {
       const cleanedName = values.experimentName?.trim();
       const cleanedDescription = values.description?.trim();
       // Tags are objects with {name, color}, extract just the names
-      const cleanedTags = (values.tags || []).map((tag: any) =>
-        typeof tag === 'string' ? tag.trim() : tag.name?.trim()
-      ).filter(Boolean);
+      const cleanedTags = (values.tags || [])
+        .map((tag: any) =>
+          typeof tag === "string" ? tag.trim() : tag.name?.trim(),
+        )
+        .filter(Boolean);
 
       // Additional validation before API call
       if (!cleanedName || cleanedName.length < 3) {
-        throw new Error("Invalid experiment name");
+        return;
       }
       if (!cleanedDescription || cleanedDescription.length < 10) {
-        throw new Error("Invalid description");
+        return;
       }
 
       // Map form values to API payload format matching the expected input
@@ -129,25 +147,31 @@ export default function NewExperimentDrawer() {
         name: cleanedName,
         description: cleanedDescription,
         // project_id: selectedProject?.id || "92ba4cb7-6ab8-49be-b211-a69a1b78feb4",
-        tags: cleanedTags
+        tags: cleanedTags,
       };
 
       // Call the API to create experiment
       const response = await createExperiment(payload);
+      console.log('createExperiment response', response)
+      // Check if the response indicates success
+      if (response && (response.id || response.experiment?.id || response.data?.id)) {
+        // Show success message only when API returns success
+        successToast("Experiment created successfully");
 
-      // Refresh the experiments list
-      await getExperiments({
-        page: 1,
-        limit: 10
-      });
+        // Refresh the experiments list
+        await getExperiments({
+          page: 1,
+          limit: 10,
+        });
 
-      successToast("Experiment created successfully");
-
-      // Pass the experiment ID to the success screen
-      openDrawerWithStep("new-experiment-success", {
-        experimentId: response.id || response.experiment?.id || response.data?.id
-      });
-    } catch (error) {
+        // Pass the experiment ID to the success screen
+        openDrawerWithStep("new-experiment-success", {
+          experimentId:
+            response.id || response.experiment?.id || response.data?.id,
+        });
+      }
+    } catch (error: any) {
+      console.log('error', error)
       console.error("Failed to create experiment:", error);
     }
   };
@@ -157,7 +181,7 @@ export default function NewExperimentDrawer() {
       data={{
         experimentName: "",
         tags: [],
-        description: ""
+        description: "",
       }}
       onNext={handleSubmit}
       nextText="Create"

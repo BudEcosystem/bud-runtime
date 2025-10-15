@@ -1,6 +1,19 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Button, Card, Row, Col, Statistic, Select, Tooltip, message, Modal, Tag, Space, ConfigProvider } from 'antd';
-import { useDrawer } from '@/hooks/useDrawer';
+import React, { useEffect, useState, useMemo } from "react";
+import {
+  Button,
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Select,
+  Tooltip,
+  message,
+  Modal,
+  Tag,
+  Space,
+  ConfigProvider,
+} from "antd";
+import { useDrawer } from "@/hooks/useDrawer";
 import {
   PlusOutlined,
   SecurityScanOutlined,
@@ -8,17 +21,28 @@ import {
   GlobalOutlined,
   UserOutlined,
   ClockCircleOutlined,
-  ThunderboltOutlined
-} from '@ant-design/icons';
-import { useBlockingRules, BlockingRuleType, BlockingRuleStatus, BlockingRule } from '@/stores/useBlockingRules';
-import { BlockingRulesList } from '@/components/blocking/BlockingRulesList';
-import { RULE_TYPE_VALUES, RULE_TYPE_LABELS } from '@/constants/blockingRules';
-import { Text_12_400_808080, Text_14_600_EEEEEE, Text_12_400_EEEEEE, Text_12_500_FFFFFF, Text_22_700_EEEEEE } from '@/components/ui/text';
-import { useEndPoints } from '@/hooks/useEndPoint';
-import { useLoader } from '../../../context/appContext';
-import { PrimaryButton } from '@/components/ui/bud/form/Buttons';
-import { useConfirmAction } from 'src/hooks/useConfirmAction';
-import dayjs from 'dayjs';
+  ThunderboltOutlined,
+} from "@ant-design/icons";
+import {
+  useBlockingRules,
+  BlockingRuleType,
+  BlockingRuleStatus,
+  BlockingRule,
+} from "@/stores/useBlockingRules";
+import { BlockingRulesList } from "@/components/blocking/BlockingRulesList";
+import { RULE_TYPE_VALUES, RULE_TYPE_LABELS } from "@/constants/blockingRules";
+import {
+  Text_12_400_808080,
+  Text_14_600_EEEEEE,
+  Text_12_400_EEEEEE,
+  Text_12_500_FFFFFF,
+  Text_22_700_EEEEEE,
+} from "@/components/ui/text";
+import { useEndPoints } from "@/hooks/useEndPoint";
+import { useLoader } from "../../../context/appContext";
+import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
+import { useConfirmAction } from "src/hooks/useConfirmAction";
+import dayjs from "dayjs";
 
 interface RulesTabProps {
   timeRange: [dayjs.Dayjs, dayjs.Dayjs];
@@ -75,7 +99,7 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
           await fetchRules();
           await fetchStats(
             timeRange[0].toISOString(),
-            timeRange[1].toISOString()
+            timeRange[1].toISOString(),
           );
         } finally {
           hideLoader();
@@ -91,12 +115,14 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
 
     // Filter by rule type
     if (localFilters.rule_type) {
-      result = result.filter(rule => rule.rule_type === localFilters.rule_type);
+      result = result.filter(
+        (rule) => rule.rule_type === localFilters.rule_type,
+      );
     }
 
     // Filter by status
     if (localFilters.status) {
-      result = result.filter(rule => rule.status === localFilters.status);
+      result = result.filter((rule) => rule.status === localFilters.status);
     }
 
     return result;
@@ -125,11 +151,11 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
   const { openDrawer } = useDrawer();
 
   const handleCreateRule = () => {
-    openDrawer('create-blocking-rule', {});
+    openDrawer("create-blocking-rule", {});
   };
 
   const handleViewRule = (rule: any) => {
-    openDrawer('view-blocking-rule', { rule });
+    openDrawer("view-blocking-rule", { rule });
   };
 
   const handleEditRule = (rule: any) => {
@@ -138,16 +164,17 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
   };
 
   const handleDeleteRule = (ruleId: string) => {
-    const rule = rules.find(r => r.id === ruleId);
-    const ruleName = rule?.name || 'this rule';
+    const rule = rules.find((r) => r.id === ruleId);
+    const ruleName = rule?.name || "this rule";
 
     openConfirm({
       message: `You're about to delete the ${ruleName} blocking rule`,
-      description: 'Once you delete the rule, it will not be recovered. Are you sure?',
+      description:
+        "Once you delete the rule, it will not be recovered. Are you sure?",
       cancelAction: () => {
         setDeletingRuleId(null);
       },
-      cancelText: 'Cancel',
+      cancelText: "Cancel",
       okAction: async () => {
         try {
           setDeletingRuleId(ruleId);
@@ -159,13 +186,12 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
           setDeletingRuleId(null);
         }
       },
-      okText: 'Delete Rule',
-      type: 'warining',
+      okText: "Delete Rule",
+      type: "warining",
       loading: deletingRuleId === ruleId,
-      key: 'delete-rule'
+      key: "delete-rule",
     });
   };
-
 
   const handleFormSubmit = async (values: any) => {
     showLoader();
@@ -188,13 +214,13 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
 
   const getRuleTypeIcon = (type: BlockingRuleType) => {
     switch (type) {
-      case 'ip_blocking':
+      case "ip_blocking":
         return <StopOutlined />;
-      case 'country_blocking':
+      case "country_blocking":
         return <GlobalOutlined />;
-      case 'user_agent_blocking':
+      case "user_agent_blocking":
         return <UserOutlined />;
-      case 'rate_based_blocking':
+      case "rate_based_blocking":
         return <ThunderboltOutlined />;
       default:
         return <SecurityScanOutlined />;
@@ -203,16 +229,16 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
 
   const getRuleTypeColor = (type: BlockingRuleType) => {
     switch (type) {
-      case 'ip_blocking':
-        return '#ef4444';
-      case 'country_blocking':
-        return '#3b82f6';
-      case 'user_agent_blocking':
-        return '#f59e0b';
-      case 'rate_based_blocking':
-        return '#10b981';
+      case "ip_blocking":
+        return "#ef4444";
+      case "country_blocking":
+        return "#3b82f6";
+      case "user_agent_blocking":
+        return "#f59e0b";
+      case "rate_based_blocking":
+        return "#10b981";
       default:
-        return '#6b7280';
+        return "#6b7280";
     }
   };
 
@@ -224,11 +250,13 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
         <Col span={6}>
           <div className="bg-[#101010] p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] min-h-[7.8125rem] flex flex-col items-start justify-between">
             <div className="flex items-center gap-2 mb-3">
-              <SecurityScanOutlined style={{ fontSize: '1.25rem', color: '#3F8EF7' }} />
+              <SecurityScanOutlined
+                style={{ fontSize: "1.25rem", color: "#3F8EF7" }}
+              />
               <Text_12_500_FFFFFF>Total Rules</Text_12_500_FFFFFF>
             </div>
             <div className="flex flex-col w-full">
-              <Text_22_700_EEEEEE style={{ color: '#EEEEEE' }}>
+              <Text_22_700_EEEEEE style={{ color: "#EEEEEE" }}>
                 {stats?.total_rules || 0}
               </Text_22_700_EEEEEE>
             </div>
@@ -237,11 +265,13 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
         <Col span={6}>
           <div className="bg-[#101010] p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] min-h-[7.8125rem] flex flex-col items-start justify-between">
             <div className="flex items-center gap-2 mb-3">
-              <ThunderboltOutlined style={{ fontSize: '1.25rem', color: '#22c55e' }} />
+              <ThunderboltOutlined
+                style={{ fontSize: "1.25rem", color: "#22c55e" }}
+              />
               <Text_12_500_FFFFFF>Active Rules</Text_12_500_FFFFFF>
             </div>
             <div className="flex flex-col w-full">
-              <Text_22_700_EEEEEE style={{ color: '#52c41a' }}>
+              <Text_22_700_EEEEEE style={{ color: "#52c41a" }}>
                 {stats?.active_rules || 0}
               </Text_22_700_EEEEEE>
             </div>
@@ -250,11 +280,11 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
         <Col span={6}>
           <div className="bg-[#101010] p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] min-h-[7.8125rem] flex flex-col items-start justify-between">
             <div className="flex items-center gap-2 mb-3">
-              <StopOutlined style={{ fontSize: '1.25rem', color: '#ef4444' }} />
+              <StopOutlined style={{ fontSize: "1.25rem", color: "#ef4444" }} />
               <Text_12_500_FFFFFF>Blocks Today</Text_12_500_FFFFFF>
             </div>
             <div className="flex flex-col w-full">
-              <Text_22_700_EEEEEE style={{ color: '#ff4d4f' }}>
+              <Text_22_700_EEEEEE style={{ color: "#ff4d4f" }}>
                 {stats?.total_blocks_today || 0}
               </Text_22_700_EEEEEE>
             </div>
@@ -263,11 +293,13 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
         <Col span={6}>
           <div className="bg-[#101010] p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] min-h-[7.8125rem] flex flex-col items-start justify-between">
             <div className="flex items-center gap-2 mb-3">
-              <ClockCircleOutlined style={{ fontSize: '1.25rem', color: '#FFC442' }} />
+              <ClockCircleOutlined
+                style={{ fontSize: "1.25rem", color: "#FFC442" }}
+              />
               <Text_12_500_FFFFFF>Blocks This Week</Text_12_500_FFFFFF>
             </div>
             <div className="flex flex-col w-full">
-              <Text_22_700_EEEEEE style={{ color: '#EEEEEE' }}>
+              <Text_22_700_EEEEEE style={{ color: "#EEEEEE" }}>
                 {stats?.total_blocks_week || 0}
               </Text_22_700_EEEEEE>
             </div>
@@ -285,13 +317,13 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
             theme={{
               components: {
                 Select: {
-                  colorBgContainer: '#1A1A1A',
-                  colorBorder: '#1F1F1F',
-                  colorText: '#EEEEEE',
-                  colorTextPlaceholder: '#666666',
-                  colorBgElevated: '#1A1A1A',
-                  controlItemBgHover: '#2F2F2F',
-                  optionSelectedBg: '#2A1F3D',
+                  colorBgContainer: "#1A1A1A",
+                  colorBorder: "#1F1F1F",
+                  colorText: "#EEEEEE",
+                  colorTextPlaceholder: "#666666",
+                  colorBgElevated: "#1A1A1A",
+                  controlItemBgHover: "#2F2F2F",
+                  optionSelectedBg: "#2A1F3D",
                 },
               },
             }}
@@ -303,7 +335,7 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
               value={localFilters.rule_type}
               onChange={handleRuleTypeChange}
               className="bg-[#1A1A1A]"
-              dropdownStyle={{ backgroundColor: '#1A1A1A' }}
+              dropdownStyle={{ backgroundColor: "#1A1A1A" }}
             >
               {Object.entries(RULE_TYPE_VALUES).map(([key, value]) => (
                 <Select.Option key={value} value={value}>
@@ -318,7 +350,7 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
               value={localFilters.status}
               onChange={handleStatusChange}
               className="bg-[#1A1A1A]"
-              dropdownStyle={{ backgroundColor: '#1A1A1A' }}
+              dropdownStyle={{ backgroundColor: "#1A1A1A" }}
             >
               <Select.Option value="ACTIVE">Active</Select.Option>
               <Select.Option value="INACTIVE">Inactive</Select.Option>

@@ -233,6 +233,29 @@ class RegisterClusterWorkflow:
                         param={"configuration_status": configuration_status, "cluster_id": str(cluster_id)},
                     )
                 else:
+                    # Update cluster status to NOT_AVAILABLE when configuration fails
+                    try:
+                        from ..commons.constants import ClusterStatusEnum
+                        from ..db.crud import ClusterDataManager
+                        from ..db.session import DBSession
+
+                        if cluster_id:
+                            with DBSession() as session:
+                                db_cluster = asyncio.run(
+                                    ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+                                )
+                                if db_cluster:
+                                    asyncio.run(
+                                        ClusterDataManager(session).update_cluster_by_fields(
+                                            db_cluster, {"status": ClusterStatusEnum.NOT_AVAILABLE}
+                                        )
+                                    )
+                                    logger.info(
+                                        f"Marked cluster {cluster_id} as NOT_AVAILABLE due to configuration failure"
+                                    )
+                    except Exception as db_e:
+                        logger.error(f"Failed to update cluster status on configuration failure: {db_e}")
+
                     response = ErrorResponse(message="Cluster configuration failed", code=HTTPStatus.BAD_REQUEST.value)
             workflow_status = check_workflow_status_in_statestore(workflow_id)
             if workflow_status:
@@ -250,6 +273,33 @@ class RegisterClusterWorkflow:
         except Exception as e:
             error_msg = f"Error configuring cluster for workflow_id: {workflow_id} and task_id: {task_id}, error: {e}"
             logger.error(error_msg)
+
+            # Update cluster status to NOT_AVAILABLE on configuration failure
+            try:
+                from ..commons.constants import ClusterStatusEnum
+                from ..db.crud import ClusterDataManager
+                from ..db.session import DBSession
+
+                workflow_data = get_workflow_data_from_statestore(str(workflow_id))
+                cluster_id = workflow_data.get("cluster_id") if workflow_data else None
+
+                if cluster_id:
+                    with DBSession() as session:
+                        db_cluster = asyncio.run(
+                            ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+                        )
+                        if db_cluster:
+                            asyncio.run(
+                                ClusterDataManager(session).update_cluster_by_fields(
+                                    db_cluster, {"status": ClusterStatusEnum.NOT_AVAILABLE}
+                                )
+                            )
+                            logger.info(
+                                f"Marked cluster {cluster_id} as NOT_AVAILABLE due to configure_cluster failure"
+                            )
+            except Exception as db_e:
+                logger.error(f"Failed to update cluster status on configure_cluster failure: {db_e}")
+
             response = ErrorResponse(message="Cluster configuration failed", code=HTTPStatus.BAD_REQUEST.value)
         return response.model_dump(mode="json")
 
@@ -939,6 +989,36 @@ class RegisterClusterWorkflow:
 
         # if configure cluster is not successful
         if configure_cluster_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
+            # Update cluster status to NOT_AVAILABLE if cluster was created
+            try:
+                from ..commons.constants import ClusterStatusEnum
+                from ..db.crud import ClusterDataManager
+                from ..db.session import DBSession
+
+                # Try to get cluster_id from the configure_cluster_result or workflow data
+                cluster_id = configure_cluster_result.get("param", {}).get("cluster_id")
+                if not cluster_id:
+                    # Fallback to workflow data
+                    workflow_data = get_workflow_data_from_statestore(str(instance_id))
+                    cluster_id = workflow_data.get("cluster_id") if workflow_data else None
+
+                if cluster_id:
+                    with DBSession() as session:
+                        db_cluster = asyncio.run(
+                            ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+                        )
+                        if db_cluster:
+                            asyncio.run(
+                                ClusterDataManager(session).update_cluster_by_fields(
+                                    db_cluster, {"status": ClusterStatusEnum.NOT_AVAILABLE}
+                                )
+                            )
+                            logger.info(
+                                f"Marked cluster {cluster_id} as NOT_AVAILABLE due to workflow configure_cluster failure"
+                            )
+            except Exception as e:
+                logger.error(f"Failed to update cluster status on workflow configure_cluster failure: {e}")
+
             # notify activity that cluster configuration failed
             notification_req.payload.event = "configure_cluster"
             notification_req.payload.content = NotificationContent(
@@ -1743,6 +1823,60 @@ class DeleteClusterWorkflow:
 
 
 class UpdateClusterStatusWorkflow:
+    @dapr_workflows.register_activity
+    @staticmethod
+    def compute_cluster_status(ctx: wf.WorkflowActivityContext, cluster_id: str) -> dict:
+        """Compute cluster status and node info in an activity thread.
+
+        Returns a JSON-serializable dict with keys:
+        - status: ClusterStatusEnum value
+        - nodes_info_present: bool
+        - node_info: list
+        - node_status_change: bool
+        - cluster_id: str
+        """
+        logger = logging.get_logger("ComputeClusterStatus")
+        try:
+            with DBSession() as session:
+                db_cluster = asyncio.run(ClusterService(session)._get_cluster(cluster_id, missing_ok=True))
+                if db_cluster is None:
+                    logger.info(f"Cluster {cluster_id} not found in the database")
+                    return {"skipped": True, "cluster_id": cluster_id, "reason": "cluster_not_found"}
+
+            # Decrypt config
+            config_dict = {}
+            if db_cluster.configuration:
+                try:
+                    with DaprServiceCrypto() as dapr_service:
+                        configuration_decrypted = dapr_service.decrypt_data(db_cluster.configuration)
+                        config_dict = json.loads(configuration_decrypted)
+                    logger.debug(f"Successfully decrypted config for cluster {cluster_id}")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt config for cluster {cluster_id}: {e}")
+                    return {
+                        "skipped": True,
+                        "cluster_id": cluster_id,
+                        "reason": "crypto_unavailable",
+                    }
+
+            # Compute node status
+            cluster_status, nodes_info_present, node_info, node_status_change = asyncio.run(
+                ClusterOpsService.update_node_status(db_cluster.id, config_dict)
+            )
+
+            return {
+                "status": cluster_status,
+                "prev_status": db_cluster.status,
+                "nodes_info_present": nodes_info_present,
+                "node_info": node_info,
+                "node_status_change": node_status_change,
+                "cluster_id": str(db_cluster.id),
+                "skipped": False,
+            }
+        except Exception as e:
+            logger.exception(f"Failed to compute cluster status for {cluster_id}: {e}")
+            return {"skipped": True, "cluster_id": cluster_id, "reason": str(e)}
+
     @dapr_workflows.register_workflow
     @staticmethod
     def update_cluster_status(ctx: wf.DaprWorkflowContext, cluster_id: str):
@@ -1751,33 +1885,21 @@ class UpdateClusterStatusWorkflow:
         instance_id = str(ctx.instance_id)
         logger.info(f"Updating cluster status for workflow_id: {instance_id}")
 
-        with DBSession() as session:
-            db_cluster = asyncio.run(ClusterService(session)._get_cluster(cluster_id, missing_ok=True))
-            if db_cluster is None:
-                logger.info(f"Cluster {cluster_id} not found in the database")
-                # condition for update cluster status job completed
-                # will happen when cluster is deleted
-                return
-
-        # Decrypt config inside the workflow, like deployment workflows do
-        config_dict = {}
-        if db_cluster.configuration:
-            try:
-                with DaprServiceCrypto() as dapr_service:
-                    configuration_decrypted = dapr_service.decrypt_data(db_cluster.configuration)
-                    config_dict = json.loads(configuration_decrypted)
-                logger.debug(f"Successfully decrypted config for cluster {cluster_id}")
-            except Exception as e:
-                logger.error(f"Failed to decrypt config for cluster {cluster_id}: {e}")
-                # Can't proceed without config - return early
-                logger.warning(f"Skipping node status update for cluster {cluster_id} due to crypto error")
-                return {"status": "skipped", "cluster_id": cluster_id, "reason": "crypto_unavailable"}
-
-        # Pass the decrypted config to update_node_status
-        cluster_status, nodes_info_present, node_info, node_status_change = asyncio.run(
-            ClusterOpsService.update_node_status(db_cluster.id, config_dict)
+        # Delegate heavy lifting to an activity to avoid blocking workflow thread
+        result = yield ctx.call_activity(
+            UpdateClusterStatusWorkflow.compute_cluster_status,
+            input=cluster_id,
         )
-        if cluster_status != db_cluster.status or not nodes_info_present or node_status_change:
+        if result.get("skipped"):
+            logger.info(f"Skipping update for cluster {cluster_id}: {result.get('reason')}")
+            return result
+
+        cluster_status = result["status"]
+        prev_status = result.get("prev_status")
+        nodes_info_present = result["nodes_info_present"]
+        node_info = result["node_info"]
+        node_status_change = result["node_status_change"]
+        if cluster_status != prev_status or not nodes_info_present or node_status_change:
             logger.info(f"Sending cluster status notification: {cluster_status}")
             event_name = "cluster-status-update"
             event_type = "results"

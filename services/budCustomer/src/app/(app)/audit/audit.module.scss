@@ -168,3 +168,25 @@ $primary-color: var(--color-purple);
     box-shadow: 0 4px 12px rgba(150, 92, 222, 0.1);
   }
 }
+.loadingWrapper {
+  min-height: 70px;
+}
+.loadingContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--bg-tertiary);
+  overflow: hidden;
+
+  .loadingBar {
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-purple),
+      transparent
+    );
+  }
+}

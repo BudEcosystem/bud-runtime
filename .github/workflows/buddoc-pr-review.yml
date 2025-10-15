@@ -1,0 +1,193 @@
+name: "BudDoc: PR Review"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'services/buddoc/**'
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/buddoc
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit[toml]
+
+      - name: Run bandit security scan
+        run: |
+          echo "::group::Running bandit security scan"
+          bandit -r buddoc/ -ll --skip B608 -f json -o bandit-report.json || true
+          bandit -r buddoc/ -ll --skip B608
+          echo "::endgroup::"
+
+      - name: Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: services/buddoc/bandit-report.json
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/buddoc
+
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-test-${{ hashFiles('**/requirements.txt', '**/requirements-test.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-test-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+          pip install pytest-cov  # For coverage reporting
+          pip install -e .  # Install buddoc package in editable mode
+
+      - name: Set up environment
+        run: |
+          cp .env.sample .env
+
+          # Update Redis connection for CI
+          sed -i 's/SECRETS_REDIS_URI=.*/SECRETS_REDIS_URI=redis:\/\/localhost:6379/' .env
+
+          # Set test VLM configuration (tests use mock server)
+          sed -i 's|VLM_API_URL=.*|VLM_API_URL=http://localhost:1234/v1/chat/completions|' .env
+          sed -i 's/VLM_MODEL_NAME=.*/VLM_MODEL_NAME=test-model/' .env
+          sed -i 's/SECRETS_VLM_API_TOKEN=.*/SECRETS_VLM_API_TOKEN=test-token/' .env
+
+          # Set other required configurations
+          sed -i 's/MAX_FILE_SIZE_MB=.*/MAX_FILE_SIZE_MB=50/' .env
+          sed -i 's|TEMP_UPLOAD_DIR=.*|TEMP_UPLOAD_DIR=/tmp/buddoc_test_uploads|' .env
+
+          # Create temp directory for uploads
+          mkdir -p /tmp/buddoc_test_uploads
+
+          # Show environment file for debugging (without sensitive data)
+          echo "Environment file setup complete"
+          grep -v "SECRET\|TOKEN\|PASSWORD" .env || true
+
+      - name: Run tests with coverage
+        run: |
+          echo "::group::Running pytest with coverage"
+          # Run all tests with coverage
+          pytest tests/ \
+            --cov=buddoc \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term-missing \
+            -v \
+            -x \
+            --tb=short
+          echo "::endgroup::"
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            services/buddoc/coverage.xml
+            services/buddoc/htmlcov/
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./services/buddoc/coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  dependency-check:
+    name: Check Dependencies
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/buddoc
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      - name: Run dependency vulnerability scan
+        run: |
+          echo "::group::Checking for vulnerable dependencies"
+          pip-audit -r requirements.txt -r requirements-test.txt -r requirements-lint.txt
+          echo "::endgroup::"
+
+  pr-status:
+    name: PR Review Status
+    runs-on: ubuntu-latest
+    needs: [security, test, dependency-check]
+    if: always()
+
+    steps:
+      - name: Check job results
+        run: |
+          if [[ "${{ needs.security.result }}" == "failure" ]]; then
+            echo "❌ Security scan failed"
+            exit 1
+          fi
+          if [[ "${{ needs.test.result }}" == "failure" ]]; then
+            echo "❌ Tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.dependency-check.result }}" == "failure" ]]; then
+            echo "❌ Dependency check failed"
+            exit 1
+          fi
+          echo "✅ All checks passed!"

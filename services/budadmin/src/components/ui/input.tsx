@@ -46,7 +46,7 @@ const CheckBoxInput: React.FC<CheckBoxInputProps> = ({
           {
             "border-[#965CDE] !bg-[#965CDE]": isChecked, // Apply class when checked
             [className || ""]: className, // Apply any additional className passed as a prop
-          }
+          },
         )}
         onCheckedChange={handleCheckedChange}
         checked={isChecked}
@@ -86,7 +86,7 @@ const SliderInput: React.FC<SliderInputProps> = ({
 }) => (
   <Slider.Root
     className={classNames(
-      `budSlider relative block flex items-center select-none touch-none w-full border border-[#212225] !h-[0.725rem] max-h-[0.725rem] py-[.8rem] px-[.5rem] rounded-md ${className}`
+      `budSlider relative block flex items-center select-none touch-none w-full border border-[#212225] !h-[0.725rem] max-h-[0.725rem] py-[.8rem] px-[.5rem] rounded-md ${className}`,
     )}
     {...props}
     defaultValue={defaultValue}
@@ -127,7 +127,9 @@ const SwitchInput: React.FC<SwitchInputProps> = ({
     className={`w-[1.4375rem] h-[0.725rem] bg-[#212225] rounded-full relative shadow-none p-[0rem] data-[state=checked]:bg-[#965CDE] outline-none cursor-default border border-[#181925] ${classNameRoot}`}
     {...props}
   >
-    <Switch.Thumb className={`block w-[0.55rem] h-[0.55rem] bg-white rounded-full transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[0.75rem] ${classNameThump}`} />
+    <Switch.Thumb
+      className={`block w-[0.55rem] h-[0.55rem] bg-white rounded-full transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[0.75rem] ${classNameThump}`}
+    />
   </Switch.Root>
 );
 
@@ -144,8 +146,12 @@ const TextInput: React.FC<TextInputProps> = ({
 }) => (
   <TextField.Root
     maxLength={100}
-    className={`w-full place max-w-[350px] text-[0.740625rem] font-light text-[#44474D] h-[1.75rem] content-center	 bg-[#0f0f0f] outline-[.5px] outline-[white] rounded-md border border-[#212225] shadow-none bg-transparent leading-[100%] pt-[.2em] hover:border-[#63656c] ${className}`}
+    className={`w-full place max-w-[350px] text-[0.740625rem] font-light text-[#44474D] content-center outline-[.5px] outline-[white] rounded-md border border-[#212225] shadow-none leading-[100%] pt-[.2em] hover:border-[#63656c] ${className}`}
     {...props}
+    style={{
+      height: '1.75rem',
+      background: 'transparent',
+    }}
   >
     {textFieldSlot && textFieldSlot}
   </TextField.Root>
@@ -162,8 +168,22 @@ const TextAreaInput: React.FC<TextAreaInputProps> = ({
 }) => (
   <TextArea
     size="1"
-    style={{ fontSize: "0.740625rem !important" }}
-    className={`w-full max-w-[350px] min-h-[50px] text-[0.740625rem] font-light text-[#44474D] h-[1.75rem] bg-[#0f0f0f] outline-[.5px] outline-[white] rounded-md border border-[#212225] shadow-none bg-transparent placeholder:text-xs placeholder:font-light hover:border-[#63656c] ${className}`}
+    style={{
+      fontSize: "0.740625rem",
+      fontWeight: 400,
+      color: '#44474D',
+      maxWidth: '350px',
+      minHeight: '50px',
+      height: '1.75rem',
+      backgroundColor: '#0f0f0f',
+      outlineWidth: '.5px',
+      outlineColor: 'white',
+      borderWidth: '1px',
+      borderColor: '#212225',
+      paddingLeft: '0',
+      paddingRight: '0',
+     }}
+    className={`w-full textArea rounded-md shadow-none hover:border-[#63656c] ${className}`}
     {...props}
   />
 );
@@ -205,8 +225,10 @@ const SelectInput: React.FC<SelectInputProps> = ({
     setSearchTerm(value);
     setFilteredItems(
       selectItems.filter((item) =>
-        (renderItem ? renderItem(item) : item.label || item)?.toLowerCase()?.includes(value)
-      )
+        (renderItem ? renderItem(item) : item.label || item)
+          ?.toLowerCase()
+          ?.includes(value),
+      ),
     );
   };
 
@@ -249,7 +271,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
           `w-full max-w-[350px] h-[1.75rem] px-[.3rem] outline-[.5px] outline-[white] rounded-md border border-[#212225] bg-transparent text-[#FFFFFF] data-[placeholder]:text-[#6A6E76] text-nowrap text-xs font-light outline-[white] cursor-pointer hover:border-[#63656c] ${className}`,
           {
             "border-[white]": state === "open",
-          }
+          },
         )}
         // className={`w-full max-w-[350px] h-[1.75rem] px-[.3rem] outline-[.5px] outline-[white] rounded-md border border-[#212225] bg-transparent text-[white] data-[placeholder]:text-[#6A6E76] text-nowrap text-xs font-light cursor-pointer hover:border-[#63656c] ${className}`}
         disabled={selectItems?.length === 0}
@@ -332,8 +354,8 @@ const SelectCustomInput: React.FC<SelectInputProps> = ({
       selectItems.filter((item) =>
         (renderItem ? renderItem(item) : item.label || item)
           ?.toLowerCase()
-          ?.includes(value)
-      )
+          ?.includes(value),
+      ),
     );
   };
 
@@ -376,7 +398,7 @@ const SelectCustomInput: React.FC<SelectInputProps> = ({
           `w-full max-w-[350px] h-[1.75rem] px-[.3rem] outline-[.5px] outline-[white] rounded-md border border-[#212225] bg-transparent text-[white] data-[placeholder]:text-[#6A6E76] text-nowrap text-xs font-light outline-[white] cursor-pointer hover:border-[#63656c] ${className}`,
           {
             "border-[white]": state === "open",
-          }
+          },
         )}
         // className={`w-full max-w-[350px] h-[1.75rem] px-[.3rem] outline-[.5px] outline-[white] rounded-md border border-[#212225] bg-transparent text-[white] data-[placeholder]:text-[#6A6E76] text-nowrap text-xs font-light outline-[white] Active:border-[white] ${className}`}
         disabled={selectItems.length === 0}
@@ -466,7 +488,7 @@ const FileInput: React.FC<FileInputProps> = ({
 
   const handleRemoveFile = (
     index: number,
-    e: React.MouseEvent<HTMLButtonElement>
+    e: React.MouseEvent<HTMLButtonElement>,
   ) => {
     e.stopPropagation(); // Prevent event bubbling
     e.preventDefault(); // Prevent default button action

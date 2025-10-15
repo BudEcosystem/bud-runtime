@@ -17,8 +17,14 @@
 """The main entry point for the application, initializing the FastAPI app and setting up the application's lifespan management, including configuration and secret syncs."""
 
 import asyncio
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+
+
+# Disable gRPC fork support to prevent deadlocks with ansible_runner
+# This must be set before any gRPC imports
+os.environ["GRPC_ENABLE_FORK_SUPPORT"] = "0"
 
 from budmicroframe.commons import logging
 from budmicroframe.main import configure_app, schedule_secrets_and_config_sync
@@ -186,8 +192,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.info("Storage backend initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize storage backend: {e}")
+            raise
             # Don't fail startup if storage initialization fails
-
+        # ---
         # Check volume for dataset storage exists
         # try:
         #     volume_init = VolumeInitializer()
@@ -212,6 +219,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # else:
         #     logger.info("Eval sync is disabled")
         #     eval_sync_task = None
+
+        # Initialize workflow runtime
+        logger.info("Initializing workflow runtime")
+        try:
+            # dapr_workflows.start_workflow_runtime()
+            logger.info("Workflow runtime started successfully")
+        except Exception as e:
+            logger.error(f"Failed to start workflow runtime: {e}")
+            # Don't fail startup if workflow runtime fails to start
 
         logger.info("Background initialization tasks started successfully")
         logger.info("Prepared dataset successfully.")

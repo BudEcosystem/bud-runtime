@@ -115,6 +115,11 @@ class InferenceListItem(BaseModel):
     is_success: bool
     cached: bool
     endpoint_type: str = "chat"  # Default to chat for backward compatibility
+    # Error fields for failed inferences
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    error_type: Optional[str] = None
+    status_code: Optional[int] = None
 
 
 class InferenceListResponse(SuccessResponse):
@@ -240,6 +245,12 @@ class InferenceDetailResponse(SuccessResponse):
     finish_reason: Optional[str] = None
     cost: Optional[float] = None
     endpoint_type: Optional[str] = None
+
+    # Error details for failed inferences
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    error_type: Optional[str] = None
+    status_code: Optional[int] = None
 
     # Raw data (optional)
     raw_request: Optional[str] = None

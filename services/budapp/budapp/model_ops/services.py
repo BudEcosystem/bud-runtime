@@ -3082,6 +3082,11 @@ class ModelService(SessionMixin):
         trigger_workflow: bool = False,
         credential_id: Optional[UUID] = None,
         scaling_specification: Optional[ScalingSpecification] = None,
+        enable_tool_calling: Optional[bool] = None,
+        enable_reasoning: Optional[bool] = None,
+        tool_calling_parser_type: Optional[str] = None,
+        reasoning_parser_type: Optional[str] = None,
+        chat_template: Optional[str] = None,
     ) -> EndpointModel:
         """Create workflow steps and execute deployment workflow.
 
@@ -3171,6 +3176,11 @@ class ModelService(SessionMixin):
             template_id=template_id,
             credential_id=credential_id,
             scaling_specification=scaling_specification,
+            enable_tool_calling=enable_tool_calling,
+            enable_reasoning=enable_reasoning,
+            tool_calling_parser_type=tool_calling_parser_type,
+            reasoning_parser_type=reasoning_parser_type,
+            chat_template=chat_template,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
@@ -3328,6 +3338,11 @@ class ModelService(SessionMixin):
                 "deploy_config",
                 "credential_id",
                 "scaling_specification",
+                "enable_tool_calling",
+                "enable_reasoning",
+                "tool_calling_parser_type",
+                "reasoning_parser_type",
+                "chat_template",
             ]
 
             # from workflow steps extract necessary information
@@ -3401,6 +3416,11 @@ class ModelService(SessionMixin):
                     workflow_id=db_workflow.id,
                     current_user_id=current_user_id,
                     credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
+                    enable_tool_calling=required_data.get("enable_tool_calling"),
+                    enable_reasoning=required_data.get("enable_reasoning"),
+                    tool_calling_parser_type=required_data.get("tool_calling_parser_type"),
+                    reasoning_parser_type=required_data.get("reasoning_parser_type"),
+                    chat_template=required_data.get("chat_template"),
                 )
 
                 # Create deployment events for workflow tracking
@@ -3440,7 +3460,9 @@ class ModelService(SessionMixin):
                     workflow_id=db_workflow.id,
                     subscriber_id=current_user_id,
                     credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
-                    scaling_specification=required_data["scaling_specification"],
+                    scaling_specification=required_data.get("scaling_specification"),
+                    enable_tool_calling=required_data.get("enable_tool_calling"),
+                    enable_reasoning=required_data.get("enable_reasoning"),
                 )
                 model_deployment_events = {
                     "budserve_cluster_events": model_deployment_response,
@@ -3556,6 +3578,8 @@ class ModelService(SessionMixin):
         subscriber_id: UUID,
         credential_id: UUID | None = None,
         scaling_specification: Optional[ScalingSpecification] = None,
+        enable_tool_calling: Optional[bool] = None,
+        enable_reasoning: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Trigger model deployment by step."""
         logger.debug("Triggering model deployment")
@@ -3588,12 +3612,60 @@ class ModelService(SessionMixin):
             deploy_model_uri = db_model.local_path
             # deploy_model_uri = db_model.uri # Uncomment this for model uri
 
+        default_storage_class = None
+        default_access_mode = None
+        cluster_settings = None
+        try:
+            from ..cluster_ops.services import ClusterService  # local import to avoid circular dependency
+
+            cluster_service = ClusterService(self.session)
+            cluster_manager = ClusterDataManager(self.session)
+
+            # Resolve BudCluster's external identifier to the internal primary key expected by settings
+            db_cluster = await cluster_manager.retrieve_by_fields(
+                ClusterModel,
+                fields={"cluster_id": cluster_id},
+                missing_ok=True,
+            )
+            if not db_cluster:
+                db_cluster = await cluster_manager.retrieve_by_fields(
+                    ClusterModel,
+                    fields={"id": cluster_id},
+                    missing_ok=True,
+                )
+
+            if not db_cluster:
+                logger.warning("Cluster %s not found when fetching settings", cluster_id)
+            else:
+                internal_cluster_id = db_cluster.id
+                if internal_cluster_id != cluster_id:
+                    logger.debug(
+                        "Resolved BudCluster ID %s to internal cluster ID %s for settings lookup",
+                        cluster_id,
+                        internal_cluster_id,
+                    )
+                cluster_settings = await cluster_service.get_cluster_settings(internal_cluster_id)
+        except Exception as exc:  # pragma: no cover - best-effort enrichment
+            logger.warning("Failed to fetch cluster settings for cluster %s: %s", cluster_id, exc)
+            cluster_settings = None
+        logger.info(f"Cluster settings: {cluster_settings}")
+        if cluster_settings:
+            default_storage_class = cluster_settings.default_storage_class
+            default_access_mode = cluster_settings.default_access_mode
+            logger.debug(
+                "Using cluster defaults for %s -> storage_class=%s access_mode=%s",
+                cluster_id,
+                default_storage_class,
+                default_access_mode,
+            )
+
         # Perform model deployment
         model_deployment_request = ModelDeploymentRequest(
             cluster_id=cluster_id,
             simulator_id=simulator_id,
             endpoint_name=endpoint_name,
             model=deploy_model_uri,
+            model_size=db_model.model_size,
             target_ttft=ttft_min,
             target_e2e_latency=e2e_latency_min,
             target_throughput_per_user=target_throughput_per_user_max,
@@ -3605,6 +3677,10 @@ class ModelService(SessionMixin):
             credential_id=credential_id,
             podscaler=scaling_specification,
             provider=db_model.source,
+            enable_tool_calling=enable_tool_calling,
+            enable_reasoning=enable_reasoning,
+            default_storage_class=default_storage_class,
+            default_access_mode=default_access_mode,
         )
         model_deployment_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
@@ -3646,6 +3722,11 @@ class ModelService(SessionMixin):
         workflow_id: UUID,
         current_user_id: UUID,
         credential_id: Optional[UUID] = None,
+        enable_tool_calling: Optional[bool] = None,
+        enable_reasoning: Optional[bool] = None,
+        tool_calling_parser_type: Optional[str] = None,
+        reasoning_parser_type: Optional[str] = None,
+        chat_template: Optional[str] = None,
     ) -> EndpointModel:
         """Create endpoint directly for cloud/proprietary models without calling budcluster.
 
@@ -3669,21 +3750,30 @@ class ModelService(SessionMixin):
             Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
         )
 
-        # For cloud models, get the cloud model details for supported endpoints
-        if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
-            db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
-                CloudModel,
-                fields={
-                    "status": CloudModelStatusEnum.ACTIVE,
-                    "source": db_model.source,
-                    "uri": db_model.uri,
-                    "provider_id": db_model.provider_id,
-                },
-            )
-            supported_endpoints = db_cloud_model.supported_endpoints if db_cloud_model else []
-        else:
-            # This should not happen as this method is only for cloud models
+        # Skipping cloud model check.
+        # # For cloud models, get the cloud model details for supported endpoints
+        # if db_model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+        #     db_cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+        #         CloudModel,
+        #         fields={
+        #             "status": CloudModelStatusEnum.ACTIVE,
+        #             "source": db_model.source,
+        #             "uri": db_model.uri,
+        #             "provider_id": db_model.provider_id,
+        #         },
+        #     )
+        #     supported_endpoints = db_cloud_model.supported_endpoints if db_cloud_model else []
+        # else:
+        #     # This should not happen as this method is only for cloud models
+        #     raise ClientException("Direct endpoint creation is only supported for cloud models")
+
+        if not db_model:
+            raise ClientException(f"Active model with id {model_id} not found.")
+
+        if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
             raise ClientException("Direct endpoint creation is only supported for cloud models")
+
+        supported_endpoints = db_model.supported_endpoints
 
         # Generate namespace and deployment URL
         # Use model.uri as namespace for cloud models
@@ -3701,6 +3791,26 @@ class ModelService(SessionMixin):
         # For cloud models without a cluster, use None for both cluster_id and bud_cluster_id
 
         # Prepare endpoint data
+        # Ensure deployment_config includes engine_configs (defaults + provided values)
+        deployment_config_dict = deploy_config.model_dump()
+        engine_cfg = deployment_config_dict.get("engine_configs") or {}
+        engine_cfg.setdefault("tool_calling_parser_type", "")
+        engine_cfg.setdefault("reasoning_parser_type", "")
+        engine_cfg.setdefault("chat_template", "")
+        engine_cfg.setdefault("enable_tool_calling", False)
+        engine_cfg.setdefault("enable_reasoning", False)
+
+        if tool_calling_parser_type is not None:
+            engine_cfg["tool_calling_parser_type"] = tool_calling_parser_type
+        if reasoning_parser_type is not None:
+            engine_cfg["reasoning_parser_type"] = reasoning_parser_type
+        if chat_template is not None:
+            engine_cfg["chat_template"] = chat_template
+        if enable_tool_calling is not None:
+            engine_cfg["enable_tool_calling"] = enable_tool_calling
+        if enable_reasoning is not None:
+            engine_cfg["enable_reasoning"] = enable_reasoning
+        deployment_config_dict["engine_configs"] = engine_cfg
         endpoint_data = EndpointCreate(
             project_id=project_id,
             model_id=model_id,
@@ -3716,7 +3826,7 @@ class ModelService(SessionMixin):
             active_replicas=replicas,
             total_replicas=replicas,
             number_of_nodes=1,  # Cloud models run on 1 virtual node
-            deployment_config=deploy_config.model_dump(),
+            deployment_config=deployment_config_dict,
             node_list=[],  # Empty for cloud models
             supported_endpoints=supported_endpoints,
         )

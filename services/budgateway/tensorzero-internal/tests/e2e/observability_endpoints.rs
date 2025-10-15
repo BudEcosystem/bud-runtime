@@ -31,7 +31,10 @@ async fn select_audio_inference_clickhouse(
     inference_id: Uuid,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
-    let query = format!("SELECT * FROM AudioInference WHERE id = '{}' FORMAT JSONEachRow", inference_id);
+    let query = format!(
+        "SELECT * FROM AudioInference WHERE id = '{}' FORMAT JSONEachRow",
+        inference_id
+    );
     let result = clickhouse.run_query_synchronous(query, None).await?;
     if result.trim().is_empty() {
         return Ok(None);
@@ -44,7 +47,10 @@ async fn select_image_inference_clickhouse(
     inference_id: Uuid,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
-    let query = format!("SELECT * FROM ImageInference WHERE id = '{}' FORMAT JSONEachRow", inference_id);
+    let query = format!(
+        "SELECT * FROM ImageInference WHERE id = '{}' FORMAT JSONEachRow",
+        inference_id
+    );
     let result = clickhouse.run_query_synchronous(query, None).await?;
     if result.trim().is_empty() {
         return Ok(None);
@@ -121,7 +127,10 @@ async fn test_dummy_only_embedding_observability_clickhouse_write() {
     let model_inference = select_model_inference_by_endpoint_type("embedding")
         .await
         .unwrap();
-    assert!(model_inference.is_some(), "No ModelInference record found for embedding");
+    assert!(
+        model_inference.is_some(),
+        "No ModelInference record found for embedding"
+    );
     let model_record = model_inference.unwrap();
     assert_eq!(model_record["endpoint_type"], "embedding");
     assert_eq!(model_record["model_name"], "text-embedding-test");
@@ -134,14 +143,20 @@ async fn test_dummy_only_embedding_observability_clickhouse_write() {
     let embedding_inference = select_embedding_inference_clickhouse(inference_id)
         .await
         .unwrap();
-    assert!(embedding_inference.is_some(), "No EmbeddingInference record found");
+    assert!(
+        embedding_inference.is_some(),
+        "No EmbeddingInference record found"
+    );
     let embedding_record = embedding_inference.unwrap();
     assert_eq!(embedding_record["id"], inference_id_str);
     assert_eq!(embedding_record["function_name"], "tensorzero::embedding");
     assert!(embedding_record["embeddings"].as_str().unwrap().len() > 0);
     // Note: The dummy provider might return different counts based on implementation
     // We just check that input_count exists and is > 0
-    assert!(embedding_record["input_count"].as_u64().unwrap() > 0, "input_count should be greater than 0");
+    assert!(
+        embedding_record["input_count"].as_u64().unwrap() > 0,
+        "input_count should be greater than 0"
+    );
 
     println!("✅ Embedding observability test passed - data written to ClickHouse");
 }
@@ -177,7 +192,10 @@ async fn test_dummy_only_moderation_observability_clickhouse_write() {
     let model_inference = select_model_inference_by_endpoint_type("moderation")
         .await
         .unwrap();
-    assert!(model_inference.is_some(), "No ModelInference record found for moderation");
+    assert!(
+        model_inference.is_some(),
+        "No ModelInference record found for moderation"
+    );
     let model_record = model_inference.unwrap();
     assert_eq!(model_record["endpoint_type"], "moderation");
 
@@ -189,17 +207,23 @@ async fn test_dummy_only_moderation_observability_clickhouse_write() {
     let moderation_inference = select_moderation_inference_clickhouse(inference_id)
         .await
         .unwrap();
-    assert!(moderation_inference.is_some(), "No ModerationInference record found");
+    assert!(
+        moderation_inference.is_some(),
+        "No ModerationInference record found"
+    );
     let moderation_record = moderation_inference.unwrap();
     assert_eq!(moderation_record["id"], inference_id_str);
     assert_eq!(moderation_record["function_name"], "tensorzero::moderation");
     // Debug print the actual input value to see what's stored
     let actual_input = moderation_record["input"].as_str().unwrap();
     println!("DEBUG: Actual input stored: '{}'", actual_input);
-    assert!(
-        actual_input.contains("test message"),
-        "Input '{}' does not contain 'test message'",
-        actual_input
+
+    // The input should match what was sent in the request
+    let expected_input = "This is a test message for moderation observability";
+    assert_eq!(
+        actual_input, expected_input,
+        "Input mismatch: stored '{}' but expected '{}'",
+        actual_input, expected_input
     );
     assert!(moderation_record["flagged"].is_boolean());
 
@@ -232,7 +256,10 @@ async fn test_dummy_only_image_generation_observability_clickhouse_write() {
     if response.status() != 200 {
         let status = response.status();
         let error_text = response.text().await.unwrap();
-        panic!("Image generation request failed with status {}: {}", status, error_text);
+        panic!(
+            "Image generation request failed with status {}: {}",
+            status, error_text
+        );
     }
     let _response_body: Value = response.json().await.unwrap();
 
@@ -242,8 +269,14 @@ async fn test_dummy_only_image_generation_observability_clickhouse_write() {
     // Check ModelInference table - add more debugging
     let clickhouse = get_clickhouse().await;
     let count_query = "SELECT COUNT(*) FROM ModelInference WHERE endpoint_type = 'image_generation' FORMAT JSONEachRow";
-    let count_result = clickhouse.run_query_synchronous(count_query.to_string(), None).await.unwrap();
-    println!("Image generation records in ModelInference: {}", count_result);
+    let count_result = clickhouse
+        .run_query_synchronous(count_query.to_string(), None)
+        .await
+        .unwrap();
+    println!(
+        "Image generation records in ModelInference: {}",
+        count_result
+    );
 
     let model_inference = select_model_inference_by_endpoint_type("image_generation")
         .await
@@ -251,8 +284,14 @@ async fn test_dummy_only_image_generation_observability_clickhouse_write() {
     if model_inference.is_none() {
         // Try to get any records to debug
         let all_query = "SELECT endpoint_type, model_name, COUNT(*) as cnt FROM ModelInference GROUP BY endpoint_type, model_name FORMAT JSONEachRow";
-        let all_result = clickhouse.run_query_synchronous(all_query.to_string(), None).await.unwrap();
-        panic!("No ModelInference record found for image generation. All records: {}", all_result);
+        let all_result = clickhouse
+            .run_query_synchronous(all_query.to_string(), None)
+            .await
+            .unwrap();
+        panic!(
+            "No ModelInference record found for image generation. All records: {}",
+            all_result
+        );
     }
     let model_record = model_inference.unwrap();
     assert_eq!(model_record["endpoint_type"], "image_generation");
@@ -268,7 +307,10 @@ async fn test_dummy_only_image_generation_observability_clickhouse_write() {
     assert!(image_inference.is_some(), "No ImageInference record found");
     let image_record = image_inference.unwrap();
     assert_eq!(image_record["id"], inference_id_str);
-    assert_eq!(image_record["function_name"], "tensorzero::image_generation");
+    assert_eq!(
+        image_record["function_name"],
+        "tensorzero::image_generation"
+    );
     assert!(image_record["prompt"].as_str().unwrap().contains("sunset"));
     assert_eq!(image_record["size"], "1024x1024");
     assert_eq!(image_record["image_count"], 1);
@@ -314,13 +356,19 @@ async fn test_dummy_only_endpoint_type_differentiation_in_model_inference() {
     if embedding_response.status() != 200 {
         let status = embedding_response.status();
         let error_text = embedding_response.text().await.unwrap();
-        panic!("Embedding request failed with status {}: {}", status, error_text);
+        panic!(
+            "Embedding request failed with status {}: {}",
+            status, error_text
+        );
     }
 
     if moderation_response.status() != 200 {
         let status = moderation_response.status();
         let error_text = moderation_response.text().await.unwrap();
-        panic!("Moderation request failed with status {}: {}", status, error_text);
+        panic!(
+            "Moderation request failed with status {}: {}",
+            status, error_text
+        );
     }
 
     // Wait longer for async writes to complete
@@ -363,7 +411,10 @@ async fn test_dummy_only_endpoint_type_differentiation_in_model_inference() {
     // The moderation check might fail if the write hasn't completed
     // or if there was an error, so make it a warning instead
     if !endpoint_types.contains("moderation") {
-        println!("⚠️ Warning: moderation endpoint type not found in {:?}", endpoint_types);
+        println!(
+            "⚠️ Warning: moderation endpoint type not found in {:?}",
+            endpoint_types
+        );
     }
 
     println!("✅ Endpoint type differentiation test passed - ModelInference correctly tracks endpoint types: {:?}", endpoint_types);
@@ -400,7 +451,10 @@ async fn test_dummy_only_embedding_batch_observability() {
     let model_inference = select_model_inference_by_endpoint_type("embedding")
         .await
         .unwrap();
-    assert!(model_inference.is_some(), "No ModelInference record found for batch embedding");
+    assert!(
+        model_inference.is_some(),
+        "No ModelInference record found for batch embedding"
+    );
     let model_record = model_inference.unwrap();
     let inference_id_str = model_record["inference_id"].as_str().unwrap();
     let inference_id = Uuid::parse_str(inference_id_str).unwrap();
@@ -409,7 +463,10 @@ async fn test_dummy_only_embedding_batch_observability() {
     let embedding_inference = select_embedding_inference_clickhouse(inference_id)
         .await
         .unwrap();
-    assert!(embedding_inference.is_some(), "No EmbeddingInference record found for batch");
+    assert!(
+        embedding_inference.is_some(),
+        "No EmbeddingInference record found for batch"
+    );
     let embedding_record = embedding_inference.unwrap();
     assert_eq!(embedding_record["input_count"], 3); // Should reflect batch size
 
@@ -506,10 +563,7 @@ async fn test_dummy_only_observability_data_consistency() {
 
     // Verify data consistency between tables
     assert_eq!(model_record["inference_id"], embedding_record["id"]);
-    assert_eq!(
-        model_record["model_name"],
-        embedding_record["variant_name"]
-    );
+    assert_eq!(model_record["model_name"], embedding_record["variant_name"]);
     assert_eq!(model_record["endpoint_type"], "embedding");
 
     println!("✅ Data consistency test passed - related records match across tables");

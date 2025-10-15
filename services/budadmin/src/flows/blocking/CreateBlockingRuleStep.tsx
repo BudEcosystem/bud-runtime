@@ -1,16 +1,35 @@
-import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { Form, Input, Select, InputNumber, Space, Tag, message, Button, Image, ConfigProvider } from 'antd';
-import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
-import { useBlockingRules, BlockingRuleType, BlockingRuleStatus } from '@/stores/useBlockingRules';
-import { RULE_TYPE_VALUES, RULE_TYPE_LABELS, COUNTRY_CODES } from '@/constants/blockingRules';
-import { useDrawer } from '@/hooks/useDrawer';
-import { useLoader } from '../../context/appContext';
+import React, { useState, useEffect, useContext, useMemo } from "react";
+import {
+  Form,
+  Input,
+  Select,
+  InputNumber,
+  Space,
+  Tag,
+  message,
+  Button,
+  Image,
+  ConfigProvider,
+} from "antd";
+import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  useBlockingRules,
+  BlockingRuleType,
+  BlockingRuleStatus,
+} from "@/stores/useBlockingRules";
+import {
+  RULE_TYPE_VALUES,
+  RULE_TYPE_LABELS,
+  COUNTRY_CODES,
+} from "@/constants/blockingRules";
+import { useDrawer } from "@/hooks/useDrawer";
+import { useLoader } from "../../context/appContext";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
-import { Text_12_300_EEEEEE, Text_12_400_B3B3B3 } from '@/components/ui/text';
+import { Text_12_300_EEEEEE, Text_12_400_B3B3B3 } from "@/components/ui/text";
 import CustomPopover from "src/flows/components/customPopover";
 
 const { TextArea } = Input;
@@ -29,12 +48,12 @@ function RuleForm({ setDisableNext }) {
   const { showLoader, hideLoader } = useLoader();
 
   // Watch specific form fields to ensure they're displayed
-  const nameValue = Form.useWatch('name', form);
-  const reasonValue = Form.useWatch('reason', form);
-  const priorityValue = Form.useWatch('priority', form);
+  const nameValue = Form.useWatch("name", form);
+  const reasonValue = Form.useWatch("reason", form);
+  const priorityValue = Form.useWatch("priority", form);
 
   const [ruleType, setRuleType] = useState<BlockingRuleType>(
-    isEditMode && editRule ? editRule.rule_type : RULE_TYPE_VALUES.IP_BLOCKING
+    isEditMode && editRule ? editRule.rule_type : RULE_TYPE_VALUES.IP_BLOCKING,
   );
 
   // Force re-render when form values change
@@ -72,8 +91,10 @@ function RuleForm({ setDisableNext }) {
                 formData.patterns = editRule.rule_config.patterns || [];
                 break;
               case RULE_TYPE_VALUES.RATE_BASED_BLOCKING:
-                formData.threshold = editRule.rule_config.threshold?.toString() || '';
-                formData.window_seconds = editRule.rule_config.window_seconds?.toString() || '';
+                formData.threshold =
+                  editRule.rule_config.threshold?.toString() || "";
+                formData.window_seconds =
+                  editRule.rule_config.window_seconds?.toString() || "";
                 break;
             }
           }
@@ -96,26 +117,41 @@ function RuleForm({ setDisableNext }) {
 
   const handleFieldsChange = () => {
     const fieldsValue = form.getFieldsValue(true);
-    const hasErrors = form.getFieldsError().some(({ errors }) => errors.length > 0);
+    const hasErrors = form
+      .getFieldsError()
+      .some(({ errors }) => errors.length > 0);
 
     // Check required fields for global rules
-    let requiredFieldsFilled = fieldsValue.name && fieldsValue.reason && fieldsValue.rule_type;
+    let requiredFieldsFilled =
+      fieldsValue.name && fieldsValue.reason && fieldsValue.rule_type;
 
     // Check rule-specific fields
     switch (fieldsValue.rule_type || ruleType) {
       case RULE_TYPE_VALUES.IP_BLOCKING:
-        requiredFieldsFilled = requiredFieldsFilled && fieldsValue.ip_addresses && fieldsValue.ip_addresses.length > 0;
+        requiredFieldsFilled =
+          requiredFieldsFilled &&
+          fieldsValue.ip_addresses &&
+          fieldsValue.ip_addresses.length > 0;
         break;
       case RULE_TYPE_VALUES.COUNTRY_BLOCKING:
-        requiredFieldsFilled = requiredFieldsFilled && fieldsValue.countries && fieldsValue.countries.length > 0;
+        requiredFieldsFilled =
+          requiredFieldsFilled &&
+          fieldsValue.countries &&
+          fieldsValue.countries.length > 0;
         break;
       case RULE_TYPE_VALUES.USER_AGENT_BLOCKING:
-        requiredFieldsFilled = requiredFieldsFilled && fieldsValue.patterns && fieldsValue.patterns.length > 0;
+        requiredFieldsFilled =
+          requiredFieldsFilled &&
+          fieldsValue.patterns &&
+          fieldsValue.patterns.length > 0;
         break;
       case RULE_TYPE_VALUES.RATE_BASED_BLOCKING:
-        requiredFieldsFilled = requiredFieldsFilled &&
-          fieldsValue.threshold && fieldsValue.threshold.toString().trim() !== '' &&
-          fieldsValue.window_seconds && fieldsValue.window_seconds.toString().trim() !== '';
+        requiredFieldsFilled =
+          requiredFieldsFilled &&
+          fieldsValue.threshold &&
+          fieldsValue.threshold.toString().trim() !== "" &&
+          fieldsValue.window_seconds &&
+          fieldsValue.window_seconds.toString().trim() !== "";
         break;
     }
 
@@ -126,19 +162,29 @@ function RuleForm({ setDisableNext }) {
     switch (ruleType) {
       case RULE_TYPE_VALUES.IP_BLOCKING:
         return (
-          <Form.Item
-            className="flex items-start rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]"
-          >
+          <Form.Item className="flex items-start rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]">
             <div className="w-full">
               <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
                 IP Addresses to Block
                 <CustomPopover title="Add IP addresses to block">
-                  <Image src="/images/info.png" preview={false} alt="info" style={{ width: '.75rem', height: '.75rem' }} />
+                  <Image
+                    src="/images/info.png"
+                    preview={false}
+                    alt="info"
+                    style={{ width: ".75rem", height: ".75rem" }}
+                  />
                 </CustomPopover>
               </Text_12_300_EEEEEE>
             </div>
             <div className="w-full pt-2">
-              <Form.List name="ip_addresses" initialValue={isEditMode && editRule?.rule_config?.ip_addresses ? editRule.rule_config.ip_addresses : []}>
+              <Form.List
+                name="ip_addresses"
+                initialValue={
+                  isEditMode && editRule?.rule_config?.ip_addresses
+                    ? editRule.rule_config.ip_addresses
+                    : []
+                }
+              >
                 {(fields, { add, remove }) => (
                   <>
                     {fields.map(({ key, name, ...restField }) => (
@@ -147,31 +193,42 @@ function RuleForm({ setDisableNext }) {
                           {...restField}
                           name={[name]}
                           rules={[
-                            { required: true, message: 'Please enter IP address' },
                             {
-                              pattern: /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/,
-                              message: 'Please enter a valid IP address'
-                            }
+                              required: true,
+                              message: "Please enter IP address",
+                            },
+                            {
+                              pattern:
+                                /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/,
+                              message: "Please enter a valid IP address",
+                            },
                           ]}
                           className="mb-0 flex-1"
                         >
                           <Input
                             placeholder="192.168.1.1"
                             className="drawerInp py-[.65rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none indent-[1.1rem]"
-                            style={{ backgroundColor: "transparent", color: "#EEEEEE", border: "0.5px solid #757575" }}
+                            style={{
+                              backgroundColor: "transparent",
+                              color: "#EEEEEE",
+                              border: "0.5px solid #757575",
+                            }}
                             size="large"
                             onChange={() => {
                               setTimeout(() => {
-                                form.validateFields(['ip_addresses']);
+                                form.validateFields(["ip_addresses"]);
                                 handleFieldsChange();
                               }, 100);
                             }}
                           />
                         </Form.Item>
-                        <MinusCircleOutlined onClick={() => {
-                          remove(name);
-                          setTimeout(() => handleFieldsChange(), 100);
-                        }} className="text-[#B3B3B3] cursor-pointer hover:text-[#ef4444]" />
+                        <MinusCircleOutlined
+                          onClick={() => {
+                            remove(name);
+                            setTimeout(() => handleFieldsChange(), 100);
+                          }}
+                          className="text-[#B3B3B3] cursor-pointer hover:text-[#ef4444]"
+                        />
                       </div>
                     ))}
                     <Form.Item className="mb-0">
@@ -199,35 +256,52 @@ function RuleForm({ setDisableNext }) {
         return (
           <Form.Item
             name="countries"
-            rules={[{ required: true, message: 'Please select at least one country' }]}
+            rules={[
+              { required: true, message: "Please select at least one country" },
+            ]}
             className="flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]"
-            initialValue={isEditMode && editRule?.rule_config?.countries ? editRule.rule_config.countries : []}
+            initialValue={
+              isEditMode && editRule?.rule_config?.countries
+                ? editRule.rule_config.countries
+                : []
+            }
           >
             <div className="w-full">
               <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
                 Countries to Block
                 <CustomPopover title="Select countries to block access from">
-                  <Image src="/images/info.png" preview={false} alt="info" style={{ width: '.75rem', height: '.75rem' }} />
+                  <Image
+                    src="/images/info.png"
+                    preview={false}
+                    alt="info"
+                    style={{ width: ".75rem", height: ".75rem" }}
+                  />
                 </CustomPopover>
               </Text_12_300_EEEEEE>
             </div>
             <div className="custom-select-two w-full rounded-[6px] relative">
-              <ConfigProvider theme={{ token: { colorTextPlaceholder: '#808080' } }}>
+              <ConfigProvider
+                theme={{ token: { colorTextPlaceholder: "#808080" } }}
+              >
                 <Select
                   mode="multiple"
                   placeholder="Select countries"
                   className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full indent-[1.1rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE]"
-                  style={{ backgroundColor: "transparent", color: "#EEEEEE", border: "0.5px solid #757575" }}
+                  style={{
+                    backgroundColor: "transparent",
+                    color: "#EEEEEE",
+                    border: "0.5px solid #757575",
+                  }}
                   size="large"
                   onChange={(value) => {
-                    form.setFieldValue('countries', value);
+                    form.setFieldValue("countries", value);
                     setTimeout(() => {
-                      form.validateFields(['countries']);
+                      form.validateFields(["countries"]);
                       handleFieldsChange();
                     }, 100);
                   }}
                 >
-                  {COUNTRY_CODES.map(country => (
+                  {COUNTRY_CODES.map((country) => (
                     <Option key={country.code} value={country.code}>
                       {country.name} ({country.code})
                     </Option>
@@ -240,19 +314,29 @@ function RuleForm({ setDisableNext }) {
 
       case RULE_TYPE_VALUES.USER_AGENT_BLOCKING:
         return (
-          <Form.Item
-            className="flex items-start rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]"
-          >
+          <Form.Item className="flex items-start rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]">
             <div className="w-full">
               <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
                 User Agent Patterns
                 <CustomPopover title="Add regex patterns to match user agents">
-                  <Image src="/images/info.png" preview={false} alt="info" style={{ width: '.75rem', height: '.75rem' }} />
+                  <Image
+                    src="/images/info.png"
+                    preview={false}
+                    alt="info"
+                    style={{ width: ".75rem", height: ".75rem" }}
+                  />
                 </CustomPopover>
               </Text_12_300_EEEEEE>
             </div>
             <div className="w-full pt-2">
-              <Form.List name="patterns" initialValue={isEditMode && editRule?.rule_config?.patterns ? editRule.rule_config.patterns : []}>
+              <Form.List
+                name="patterns"
+                initialValue={
+                  isEditMode && editRule?.rule_config?.patterns
+                    ? editRule.rule_config.patterns
+                    : []
+                }
+              >
                 {(fields, { add, remove }) => (
                   <>
                     {fields.map(({ key, name, ...restField }) => (
@@ -260,26 +344,35 @@ function RuleForm({ setDisableNext }) {
                         <Form.Item
                           {...restField}
                           name={[name]}
-                          rules={[{ required: true, message: 'Please enter pattern' }]}
+                          rules={[
+                            { required: true, message: "Please enter pattern" },
+                          ]}
                           className="mb-0 flex-1"
                         >
                           <Input
                             placeholder=".*bot.*"
                             className="drawerInp py-[.65rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none indent-[1.1rem]"
-                            style={{ backgroundColor: "transparent", color: "#EEEEEE", border: "0.5px solid #757575" }}
+                            style={{
+                              backgroundColor: "transparent",
+                              color: "#EEEEEE",
+                              border: "0.5px solid #757575",
+                            }}
                             size="large"
                             onChange={() => {
                               setTimeout(() => {
-                                form.validateFields(['patterns']);
+                                form.validateFields(["patterns"]);
                                 handleFieldsChange();
                               }, 100);
                             }}
                           />
                         </Form.Item>
-                        <MinusCircleOutlined onClick={() => {
-                          remove(name);
-                          setTimeout(() => handleFieldsChange(), 100);
-                        }} className="text-[#B3B3B3] cursor-pointer hover:text-[#ef4444]" />
+                        <MinusCircleOutlined
+                          onClick={() => {
+                            remove(name);
+                            setTimeout(() => handleFieldsChange(), 100);
+                          }}
+                          className="text-[#B3B3B3] cursor-pointer hover:text-[#ef4444]"
+                        />
                       </div>
                     ))}
                     <Form.Item className="mb-0">
@@ -311,7 +404,12 @@ function RuleForm({ setDisableNext }) {
                 <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
                   Request Threshold
                   <CustomPopover title="Maximum number of requests allowed within the time window">
-                    <Image src="/images/info.png" preview={false} alt="info" style={{ width: '.75rem', height: '.75rem' }} />
+                    <Image
+                      src="/images/info.png"
+                      preview={false}
+                      alt="info"
+                      style={{ width: ".75rem", height: ".75rem" }}
+                    />
                   </CustomPopover>
                 </Text_12_300_EEEEEE>
               </div>
@@ -319,11 +417,21 @@ function RuleForm({ setDisableNext }) {
                 hasFeedback
                 name="threshold"
                 rules={[
-                  { required: true, message: 'Please enter threshold' },
-                  { type: 'number', min: 1, max: 10000, message: 'Threshold must be between 1 and 10000', transform: value => parseInt(value) }
+                  { required: true, message: "Please enter threshold" },
+                  {
+                    type: "number",
+                    min: 1,
+                    max: 10000,
+                    message: "Threshold must be between 1 and 10000",
+                    transform: (value) => parseInt(value),
+                  },
                 ]}
                 className="flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]"
-                initialValue={isEditMode && editRule?.rule_config?.threshold ? editRule.rule_config.threshold.toString() : ''}
+                initialValue={
+                  isEditMode && editRule?.rule_config?.threshold
+                    ? editRule.rule_config.threshold.toString()
+                    : ""
+                }
               >
                 <Input
                   type="number"
@@ -331,7 +439,11 @@ function RuleForm({ setDisableNext }) {
                   max={10000}
                   placeholder="100"
                   className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full px-[1.1rem]"
-                  style={{ backgroundColor: "transparent", color: "#EEEEEE", border: "0.5px solid #757575" }}
+                  style={{
+                    backgroundColor: "transparent",
+                    color: "#EEEEEE",
+                    border: "0.5px solid #757575",
+                  }}
                   size="large"
                   onChange={() => {
                     handleFieldsChange();
@@ -344,7 +456,12 @@ function RuleForm({ setDisableNext }) {
                 <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
                   Time Window (seconds)
                   <CustomPopover title="Time period in which to count requests">
-                    <Image src="/images/info.png" preview={false} alt="info" style={{ width: '.75rem', height: '.75rem' }} />
+                    <Image
+                      src="/images/info.png"
+                      preview={false}
+                      alt="info"
+                      style={{ width: ".75rem", height: ".75rem" }}
+                    />
                   </CustomPopover>
                 </Text_12_300_EEEEEE>
               </div>
@@ -352,11 +469,21 @@ function RuleForm({ setDisableNext }) {
                 hasFeedback
                 name="window_seconds"
                 rules={[
-                  { required: true, message: 'Please enter time window' },
-                  { type: 'number', min: 1, max: 3600, message: 'Time window must be between 1 and 3600 seconds', transform: value => parseInt(value) }
+                  { required: true, message: "Please enter time window" },
+                  {
+                    type: "number",
+                    min: 1,
+                    max: 3600,
+                    message: "Time window must be between 1 and 3600 seconds",
+                    transform: (value) => parseInt(value),
+                  },
                 ]}
                 className="flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]"
-                initialValue={isEditMode && editRule?.rule_config?.window_seconds ? editRule.rule_config.window_seconds.toString() : ''}
+                initialValue={
+                  isEditMode && editRule?.rule_config?.window_seconds
+                    ? editRule.rule_config.window_seconds.toString()
+                    : ""
+                }
               >
                 <Input
                   type="number"
@@ -364,7 +491,11 @@ function RuleForm({ setDisableNext }) {
                   max={3600}
                   placeholder="60"
                   className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full px-[1.1rem]"
-                  style={{ backgroundColor: "transparent", color: "#EEEEEE", border: "0.5px solid #757575" }}
+                  style={{
+                    backgroundColor: "transparent",
+                    color: "#EEEEEE",
+                    border: "0.5px solid #757575",
+                  }}
                   size="large"
                   onChange={() => {
                     handleFieldsChange();
@@ -381,31 +512,43 @@ function RuleForm({ setDisableNext }) {
   };
 
   // Force re-render when switching between create and edit mode
-  const formKey = `${isEditMode ? 'edit' : 'create'}-${editRule?.id || 'new'}`;
+  const formKey = `${isEditMode ? "edit" : "create"}-${editRule?.id || "new"}`;
 
   return (
-    <div key={formKey} className="px-[1.4rem] py-[2.1rem] flex flex-col gap-[1.6rem]">
+    <div
+      key={formKey}
+      className="px-[1.4rem] py-[2.1rem] flex flex-col gap-[1.6rem]"
+    >
       {/* Rule Name */}
       <div className="relative">
         <div className="w-full">
           <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
             Rule Name
             <CustomPopover title="Enter a descriptive name for this blocking rule">
-              <Image src="/images/info.png" preview={false} alt="info" style={{ width: '.75rem', height: '.75rem' }} />
+              <Image
+                src="/images/info.png"
+                preview={false}
+                alt="info"
+                style={{ width: ".75rem", height: ".75rem" }}
+              />
             </CustomPopover>
           </Text_12_300_EEEEEE>
         </div>
         <Form.Item
           hasFeedback
           name="name"
-          rules={[{ required: true, message: 'Please enter rule name' }]}
+          rules={[{ required: true, message: "Please enter rule name" }]}
           className="flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]"
           initialValue={isEditMode ? editRule?.name : undefined}
         >
           <Input
             placeholder="e.g., Block suspicious IPs"
             className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full px-[1.1rem]"
-            style={{ backgroundColor: "transparent", color: "#EEEEEE", border: "0.5px solid #757575" }}
+            style={{
+              backgroundColor: "transparent",
+              color: "#EEEEEE",
+              border: "0.5px solid #757575",
+            }}
             size="large"
             onChange={() => {
               handleFieldsChange();
@@ -414,45 +557,55 @@ function RuleForm({ setDisableNext }) {
         </Form.Item>
       </div>
 
-
       {/* Rule Type */}
       <Form.Item
         hasFeedback
         name="rule_type"
-        rules={[{ required: true, message: 'Please select rule type' }]}
+        rules={[{ required: true, message: "Please select rule type" }]}
         className="flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]"
       >
         <div className="w-full">
           <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
             Rule Type
             <CustomPopover title="Select the type of blocking rule">
-              <Image src="/images/info.png" preview={false} alt="info" style={{ width: '.75rem', height: '.75rem' }} />
+              <Image
+                src="/images/info.png"
+                preview={false}
+                alt="info"
+                style={{ width: ".75rem", height: ".75rem" }}
+              />
             </CustomPopover>
           </Text_12_300_EEEEEE>
         </div>
         <div className="custom-select-two w-full rounded-[6px] relative">
-          <ConfigProvider theme={{ token: { colorTextPlaceholder: '#808080' } }}>
+          <ConfigProvider
+            theme={{ token: { colorTextPlaceholder: "#808080" } }}
+          >
             <Select
               value={ruleType}
               onChange={(value) => {
                 setRuleType(value);
-                form.setFieldValue('rule_type', value);
+                form.setFieldValue("rule_type", value);
                 // Reset rule-specific fields when type changes
                 if (value === RULE_TYPE_VALUES.IP_BLOCKING) {
-                  form.setFieldValue('ip_addresses', []);
+                  form.setFieldValue("ip_addresses", []);
                 } else if (value === RULE_TYPE_VALUES.COUNTRY_BLOCKING) {
-                  form.setFieldValue('countries', []);
+                  form.setFieldValue("countries", []);
                 } else if (value === RULE_TYPE_VALUES.USER_AGENT_BLOCKING) {
-                  form.setFieldValue('patterns', []);
+                  form.setFieldValue("patterns", []);
                 } else if (value === RULE_TYPE_VALUES.RATE_BASED_BLOCKING) {
-                  form.setFieldValue('threshold', '');
-                  form.setFieldValue('window_seconds', '');
+                  form.setFieldValue("threshold", "");
+                  form.setFieldValue("window_seconds", "");
                 }
-                form.validateFields(['rule_type']);
+                form.validateFields(["rule_type"]);
                 setTimeout(() => handleFieldsChange(), 100);
               }}
               className="drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] py-[1rem] px-[0.3rem]"
-              style={{ backgroundColor: "transparent", color: "#EEEEEE", border: "0.5px solid #757575" }}
+              style={{
+                backgroundColor: "transparent",
+                color: "#EEEEEE",
+                border: "0.5px solid #757575",
+              }}
               size="large"
             >
               {Object.entries(RULE_TYPE_VALUES).map(([key, value]) => (
@@ -474,13 +627,18 @@ function RuleForm({ setDisableNext }) {
           <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
             Reason for Blocking
             <CustomPopover title="Explain why this rule is being created">
-              <Image src="/images/info.png" preview={false} alt="info" style={{ width: '.75rem', height: '.75rem' }} />
+              <Image
+                src="/images/info.png"
+                preview={false}
+                alt="info"
+                style={{ width: ".75rem", height: ".75rem" }}
+              />
             </CustomPopover>
           </Text_12_300_EEEEEE>
         </div>
         <Form.Item
           name="reason"
-          rules={[{ required: true, message: 'Please enter reason' }]}
+          rules={[{ required: true, message: "Please enter reason" }]}
           className="flex items-start rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]"
           initialValue={isEditMode ? editRule?.reason : undefined}
         >
@@ -488,7 +646,12 @@ function RuleForm({ setDisableNext }) {
             rows={2}
             placeholder="e.g., Security threat, Abuse prevention"
             className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full px-[1.1rem]"
-            style={{ backgroundColor: "transparent", color: "#EEEEEE", border: "0.5px solid #757575", resize: 'none' }}
+            style={{
+              backgroundColor: "transparent",
+              color: "#EEEEEE",
+              border: "0.5px solid #757575",
+              resize: "none",
+            }}
             onChange={() => {
               handleFieldsChange();
             }}
@@ -502,14 +665,19 @@ function RuleForm({ setDisableNext }) {
           <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
             Priority
             <CustomPopover title="Lower numbers have higher priority">
-              <Image src="/images/info.png" preview={false} alt="info" style={{ width: '.75rem', height: '.75rem' }} />
+              <Image
+                src="/images/info.png"
+                preview={false}
+                alt="info"
+                style={{ width: ".75rem", height: ".75rem" }}
+              />
             </CustomPopover>
           </Text_12_300_EEEEEE>
         </div>
         <Form.Item
           name="priority"
           className="flex items-center rounded-[6px] relative !bg-[transparent] w-[100%] mb-[0]"
-          initialValue={isEditMode ? (editRule?.priority || 100) : 100}
+          initialValue={isEditMode ? editRule?.priority || 100 : 100}
         >
           <Input
             type="number"
@@ -517,7 +685,11 @@ function RuleForm({ setDisableNext }) {
             max={1000}
             placeholder="100"
             className="drawerInp py-[.65rem] pt-[.8rem] pb-[.45rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full px-[1.1rem]"
-            style={{ backgroundColor: "transparent", color: "#EEEEEE", border: "0.5px solid #757575" }}
+            style={{
+              backgroundColor: "transparent",
+              color: "#EEEEEE",
+              border: "0.5px solid #757575",
+            }}
             size="large"
             onChange={() => {
               handleFieldsChange();
@@ -548,7 +720,7 @@ const CreateBlockingRuleStep: React.FC<CreateBlockingRuleStepProps> = () => {
       return {
         priority: 100,
         rule_type: RULE_TYPE_VALUES.IP_BLOCKING,
-        ip_addresses: []
+        ip_addresses: [],
       };
     }
 
@@ -572,8 +744,9 @@ const CreateBlockingRuleStep: React.FC<CreateBlockingRuleStepProps> = () => {
           data.patterns = editRule.rule_config.patterns || [];
           break;
         case RULE_TYPE_VALUES.RATE_BASED_BLOCKING:
-          data.threshold = editRule.rule_config.threshold?.toString() || '';
-          data.window_seconds = editRule.rule_config.window_seconds?.toString() || '';
+          data.threshold = editRule.rule_config.threshold?.toString() || "";
+          data.window_seconds =
+            editRule.rule_config.window_seconds?.toString() || "";
           break;
       }
     }
@@ -625,7 +798,7 @@ const CreateBlockingRuleStep: React.FC<CreateBlockingRuleStepProps> = () => {
           closeDrawer();
         } else {
           // For create mode, move to success step
-          openDrawerWithStep('blocking-rule-success', {
+          openDrawerWithStep("blocking-rule-success", {
             ruleName: values.name,
             ruleType: values.rule_type,
             isEdit: false,
@@ -633,8 +806,8 @@ const CreateBlockingRuleStep: React.FC<CreateBlockingRuleStepProps> = () => {
         }
       }
     } catch (error) {
-      console.error('Failed to create rule:', error);
-      message.error('Failed to create blocking rule');
+      console.error("Failed to create rule:", error);
+      message.error("Failed to create blocking rule");
     } finally {
       setIsSubmitting(false);
       hideLoader();
@@ -659,7 +832,11 @@ const CreateBlockingRuleStep: React.FC<CreateBlockingRuleStepProps> = () => {
         <BudDrawerLayout>
           <DrawerTitleCard
             title={isEditMode ? "Edit Blocking Rule" : "Create Blocking Rule"}
-            description={isEditMode ? "Modify the rule to control access to your gateway" : "Set up a new rule to control access to your gateway"}
+            description={
+              isEditMode
+                ? "Modify the rule to control access to your gateway"
+                : "Set up a new rule to control access to your gateway"
+            }
           />
           <RuleForm setDisableNext={setDisableNext} />
         </BudDrawerLayout>

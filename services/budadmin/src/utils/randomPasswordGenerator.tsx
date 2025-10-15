@@ -21,7 +21,7 @@ const PasswordGenerator: React.FC<PasswordGeneratorProps> = ({
 
     for (let i = 0; i < length; i++) {
       const char = characters.charAt(
-        Math.floor(Math.random() * charactersLength)
+        Math.floor(Math.random() * charactersLength),
       );
       result += char;
 
@@ -41,7 +41,7 @@ const PasswordGenerator: React.FC<PasswordGeneratorProps> = ({
     }
     if (!hasSpecialChar && symbol) {
       result += specialChars.charAt(
-        Math.floor(Math.random() * specialChars.length)
+        Math.floor(Math.random() * specialChars.length),
       );
     }
     return result;

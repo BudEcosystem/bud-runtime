@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from budapp.initializers.provider_seeder import PROVIDERS_SEEDER_FILE_PATH
 
 from ..commons.config import app_settings
+from ..commons.constants import ModelEndpointEnum
 from ..commons.database import engine
 from ..endpoint_ops.crud import EndpointDataManager
 from ..model_ops.crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
@@ -51,7 +52,7 @@ class CloudModelSyncScheduler:
         api_endpoint = f"{app_settings.bud_connect_base_url}model/get-compatible-models"
         params = {
             "limit": PAGE_LIMIT,
-            "engine": app_settings.cloud_model_seeder_engine,
+            # "engine": app_settings.cloud_model_seeder_engine,
         }
 
         try:
@@ -138,6 +139,9 @@ class CloudModelSyncScheduler:
             json.dump(providers_data, f, indent=4)
         logger.debug("Saved providers to %s", PROVIDERS_SEEDER_FILE_PATH)
 
+        # Get all valid endpoint values from the enum
+        valid_endpoint_values = {endpoint.value for endpoint in ModelEndpointEnum}
+
         # Get all cloud model uris
         cloud_model_uris = []
         cloud_model_data = []
@@ -148,6 +152,26 @@ class CloudModelSyncScheduler:
                 max_input_tokens = (
                     cloud_model["tokens"].get("max_input_tokens", None) if cloud_model["tokens"] is not None else None
                 )
+
+                # Filter out unsupported endpoints from external source
+                # Partition endpoints into supported and unsupported
+                raw_endpoints = cloud_model.get("endpoints") or []
+                supported_endpoints = []
+                unsupported_endpoints = []
+                for ep in raw_endpoints:
+                    if ep in valid_endpoint_values:
+                        supported_endpoints.append(ep)
+                    else:
+                        unsupported_endpoints.append(ep)
+
+                # Log if any endpoints were filtered out
+                if unsupported_endpoints:
+                    logger.warning(
+                        "Filtered out unsupported endpoints for model %s: %s",
+                        cloud_model["uri"],
+                        unsupported_endpoints,
+                    )
+
                 cloud_model_data.append(
                     CloudModelCreate(
                         provider_id=provider_type_id_mapper[provider["provider_type"]],
@@ -158,7 +182,7 @@ class CloudModelSyncScheduler:
                         max_input_tokens=max_input_tokens,
                         input_cost=cloud_model["input_cost"],
                         output_cost=cloud_model["output_cost"],
-                        supported_endpoints=cloud_model["endpoints"],
+                        supported_endpoints=supported_endpoints,
                         deprecation_date=cloud_model["deprecation_date"],
                     )
                 )

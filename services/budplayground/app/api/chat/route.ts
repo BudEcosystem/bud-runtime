@@ -15,12 +15,34 @@ export async function POST(req: Request) {
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
 
+  // Extract client IP from headers
+  const xForwardedFor = req.headers.get('x-forwarded-for');
+  const xRealIp = req.headers.get('x-real-ip');
+  const cfConnectingIp = req.headers.get('cf-connecting-ip'); // Cloudflare
+  const trueClientIp = req.headers.get('true-client-ip'); // Cloudflare Enterprise
+
+  // In Kubernetes/production, pass the entire X-Forwarded-For chain
+  // Let budgateway handle the logic of extracting the public IP
+  let clientIp = 'unknown';
+  let forwardedChain = '';
+
+  if (xForwardedFor) {
+    // Pass the entire chain, budgateway will extract the public IP
+    forwardedChain = xForwardedFor;
+    clientIp = xForwardedFor; // Still use full chain for forwarding
+  } else if (cfConnectingIp) {
+    clientIp = cfConnectingIp;
+  } else if (trueClientIp) {
+    clientIp = trueClientIp;
+  } else if (xRealIp) {
+    clientIp = xRealIp;
+  }
+
   // Accept either JWT (Bearer token) or API key
   if (!authorization && !apiKey) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  console.log(metadata.base_url || copyCodeApiBaseUrl)
   const proxyOpenAI = createOpenAI({
     // custom settings, e.g.
     baseURL: metadata.base_url || copyCodeApiBaseUrl,
@@ -34,7 +56,15 @@ export async function POST(req: Request) {
           // Pass through the authorization header (JWT Bearer token)
           ...(authorization && { 'Authorization': authorization }),
           // Pass through the API key header if present
-          ...(apiKey && { 'api-key': apiKey })
+          ...(apiKey && { 'api-key': apiKey }),
+          // Forward the client IP to budgateway for accurate geolocation
+          // Pass the entire chain for X-Forwarded-For so budgateway can find the public IP
+          'X-Forwarded-For': clientIp,
+          // For X-Real-IP, prefer the original value if present, otherwise use clientIp
+          'X-Real-IP': xRealIp || clientIp,
+          // Add custom headers that won't be modified by intermediate proxies
+          'X-Original-Client-IP': clientIp,
+          'X-Playground-Client-IP': xForwardedFor || xRealIp || cfConnectingIp || trueClientIp || 'unknown'
         },
         body: JSON.stringify({
           id,
@@ -51,14 +81,13 @@ export async function POST(req: Request) {
           frequency_penalty: settings?.repeat_penalty ? settings.repeat_penalty : undefined,
           stop: settings?.stop_strings ? settings.stop_strings : undefined,
           temperature: settings?.temperature ? settings.temperature : undefined,
-          top_p: settings?.top_p_sampling ? settings.top_p_sampling : undefined,
+          // top_p: settings?.top_p_sampling ? settings.top_p_sampling : undefined,
           extra_body:{
             "guided_json": settings?.enable_structured_json_schema && settings?.is_valid_json_schema ? settings?.structured_json_schema : undefined,
             "guided_decoding_backend": "outlines"
           }
         })
       }
-      console.log('fetch', request);
       return fetch(input, request);
     }
   });

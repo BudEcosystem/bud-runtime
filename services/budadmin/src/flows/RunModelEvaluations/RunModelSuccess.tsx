@@ -1,4 +1,3 @@
-
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
@@ -8,7 +7,7 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { Image } from "antd"; // Added Checkbox import
 
 export default function RunModelSuccess() {
-  const { closeDrawer, openDrawer } = useDrawer()
+  const { closeDrawer, openDrawer } = useDrawer();
 
   return (
     <BudForm
@@ -16,7 +15,7 @@ export default function RunModelSuccess() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍"
+        icon: "🌐",
       }}
       onBack={() => {
         closeDrawer();
@@ -44,7 +43,8 @@ export default function RunModelSuccess() {
                 Model Successfully Added To Repository
               </Text_24_600_EEEEEE>
               <Text_12_400_B3B3B3 className="text-center leading-[1.125rem] max-w-[85%]">
-              Your model Evaluation are still running, we will send you a notification when it’s done and you can see the results later.
+                Your model Evaluation are still running, we will send you a
+                notification when it’s done and you can see the results later.
               </Text_12_400_B3B3B3>
             </div>
           </div>

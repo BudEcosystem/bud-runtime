@@ -1589,6 +1589,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
         let templates = TemplateConfig::default();
         let inference_config = InferenceConfig {
@@ -1659,6 +1660,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
         let response = function_config
             .prepare_response(
@@ -1715,6 +1717,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
         let response = function_config
             .prepare_response(
@@ -1773,6 +1776,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
         let response = function_config
             .prepare_response(
@@ -1829,6 +1833,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
         let response = function_config
             .prepare_response(
@@ -1885,6 +1890,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
         let response = function_config
             .prepare_response(
@@ -1960,6 +1966,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
         let response = function_config
             .prepare_response(
@@ -2010,6 +2017,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
         let response = function_config
             .prepare_response(
@@ -2067,6 +2075,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
         let response = function_config
             .prepare_response(
@@ -2122,6 +2131,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
         let response = function_config
             .prepare_response(
@@ -2184,6 +2194,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         };
         let response = function_config
             .prepare_response(

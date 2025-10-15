@@ -60,6 +60,7 @@ from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model as ModelsModel
 from ..model_ops.models import Provider as ProviderModel
 from ..model_ops.services import ModelServiceUtil
+from ..prompt_ops.crud import PromptVersionDataManager
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from ..shared.redis_service import RedisService
 from ..user_ops.models import User as UserModel
@@ -81,6 +82,7 @@ from .schemas import (
     AWSBedrockConfig,
     AWSSageMakerConfig,
     AzureConfig,
+    BudDocConfig,
     DeepSeekConfig,
     DeploymentPricingResponse,
     EndpointCreate,
@@ -102,9 +104,36 @@ from .schemas import (
 
 logger = logging.get_logger(__name__)
 
+# Build mapping from endpoint paths to names for efficient lookup
+ENDPOINT_PATH_TO_NAME = {member.value: member.name.lower() for member in ModelEndpointEnum}
+
 
 class EndpointService(SessionMixin):
     """Endpoint service."""
+
+    # Default engine configuration injected into deployment_config on success
+    _ENGINE_CONFIG_DEFAULTS: Dict[str, Any] = {
+        "tool_calling_parser_type": "",
+        "reasoning_parser_type": "",
+        "chat_template": "",
+        "enable_tool_calling": False,
+        "enable_reasoning": False,
+    }
+
+    @classmethod
+    def _with_engine_configs(
+        cls, deploy_config: Optional[Dict[str, Any]], engine_configs: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Ensure deployment_config contains engine_configs with default keys.
+
+        Existing values in deploy_config["engine_configs"] or provided engine_configs take precedence over defaults.
+        """
+        base: Dict[str, Any] = dict(deploy_config or {})
+        existing: Dict[str, Any] = dict((base.get("engine_configs") or {}))
+        provided: Dict[str, Any] = dict(engine_configs or {})
+        merged_engine = {**cls._ENGINE_CONFIG_DEFAULTS, **existing, **provided}
+        base["engine_configs"] = merged_engine
+        return base
 
     async def get_all_endpoints(
         self,
@@ -137,6 +166,15 @@ class EndpointService(SessionMixin):
 
         if db_endpoint.status == EndpointStatusEnum.DELETING:
             raise ClientException("Deployment is already deleting")
+
+        # Check if any active prompts are using this endpoint
+        prompt_versions = await PromptVersionDataManager(self.session).get_prompt_versions_by_endpoint_id(endpoint_id)
+        if prompt_versions:
+            prompt_names = [f"{pv.prompt.name}" for pv in prompt_versions]
+            raise ClientException(
+                f"Cannot delete deployment. It is being used by prompt '{prompt_names[0]}'",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         if db_endpoint.model.provider_type in [ModelProviderTypeEnum.HUGGING_FACE, ModelProviderTypeEnum.CLOUD_MODEL]:
             db_provider = await ProviderDataManager(self.session).retrieve_by_fields(
@@ -427,6 +465,12 @@ class EndpointService(SessionMixin):
             "cluster_id",  # bud_cluster_id
             "endpoint_name",
             "deploy_config",
+            # Engine configs passed via earlier steps
+            "tool_calling_parser_type",
+            "reasoning_parser_type",
+            "chat_template",
+            "enable_tool_calling",
+            "enable_reasoning",
         ]
 
         # from workflow steps extract necessary information
@@ -463,7 +507,51 @@ class EndpointService(SessionMixin):
             logger.error(f"An endpoint with name {required_data['endpoint_name']} already exists.")
             return
 
+        # Get the model to check its capabilities
+        from budapp.model_ops.crud import ModelDataManager
+        from budapp.model_ops.models import Model as ModelsModel
+
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(
+            ModelsModel, {"id": required_data["model_id"]}
+        )
+
+        # Merge deployment endpoints with model capabilities
+        # The deployment tells us what the actual deployed model supports
+        # The model tells us what additional capabilities (like document processing) are available
+        merged_endpoints = set(enabled_endpoints)
+
+        # Add model capabilities (convert to values if enum objects)
+        if db_model and db_model.supported_endpoints:
+            for model_ep in db_model.supported_endpoints:
+                if isinstance(model_ep, ModelEndpointEnum):
+                    merged_endpoints.add(model_ep.value)
+                    if model_ep == ModelEndpointEnum.DOCUMENT:
+                        logger.info(f"Added document endpoint support for model {db_model.name}")
+                else:
+                    merged_endpoints.add(model_ep)
+                    if model_ep == ModelEndpointEnum.DOCUMENT.value:
+                        logger.info(f"Added document endpoint support for model {db_model.name}")
+
+        # Convert back to list
+        enabled_endpoints = list(merged_endpoints)
+        logger.debug(f"Final supported endpoints for endpoint: {enabled_endpoints}")
+
         # Create endpoint in database
+        # Normalize deployment config with engine configs (merge defaults with provided values)
+        engine_cfg_input = {}
+        for k in (
+            "tool_calling_parser_type",
+            "reasoning_parser_type",
+            "chat_template",
+            "enable_tool_calling",
+            "enable_reasoning",
+        ):
+            if k in required_data:
+                engine_cfg_input[k] = required_data[k]
+        normalized_deploy_config = self._with_engine_configs(
+            required_data["deploy_config"], engine_configs=engine_cfg_input
+        )
+
         endpoint_data = EndpointCreate(
             model_id=required_data["model_id"],
             project_id=required_data["project_id"],
@@ -479,7 +567,7 @@ class EndpointService(SessionMixin):
             number_of_nodes=number_of_nodes,
             active_replicas=active_replicas,
             total_replicas=total_replicas,
-            deployment_config=required_data["deploy_config"],
+            deployment_config=normalized_deploy_config,
             node_list=[node["name"] for node in node_list],
             supported_endpoints=enabled_endpoints,
         )
@@ -2312,13 +2400,20 @@ class EndpointService(SessionMixin):
         endpoints = []
 
         for support_endpoint in supported_endpoints:
-            try:
-                enum_member = ModelEndpointEnum(support_endpoint)
-                # Use the enum name in lowercase (e.g., "chat", "embedding", etc.)
-                endpoints.append(enum_member.name.lower() if enum_member.name else enum_member.name)
-            except ValueError:
-                logger.debug(f"Support endpoint {support_endpoint} is not a valid ModelEndpointEnum")
-        logger.debug(f"Supported Endpoints: {endpoints}")
+            # Handle both enum objects and string values
+            if isinstance(support_endpoint, ModelEndpointEnum):
+                endpoint_value = support_endpoint.value
+            else:
+                endpoint_value = support_endpoint
+
+            # Use direct mapping for O(1) lookup
+            endpoint_name = ENDPOINT_PATH_TO_NAME.get(endpoint_value)
+            if endpoint_name:
+                endpoints.append(endpoint_name)
+            else:
+                logger.debug(f"Support endpoint {endpoint_value} is not a valid ModelEndpointEnum")
+
+        logger.debug(f"Converted supported_endpoints to names: {endpoints}")
 
         # Get the provider enum, default to VLLM if not found
         provider_enum = self.PROVIDER_MAPPING.get(
@@ -2329,6 +2424,21 @@ class EndpointService(SessionMixin):
         provider_config, encrypted_model_api_key = self._create_provider_config(
             provider_enum, model_name, endpoint_id, api_base, encrypted_credential_data
         )
+
+        # Initialize providers and routing
+        providers = {provider_enum: provider_config}
+        routing = [provider_enum]
+
+        # Add BudDoc provider if document endpoint is supported
+        if "document" in endpoints:
+            buddoc_config = BudDocConfig(
+                type="buddoc",
+                api_base=app_settings.bud_doc_service_url,
+                model_name=model_name,
+                api_key_location=app_settings.bud_doc_api_key_location,
+            )
+            providers[ProxyProviderEnum.BUDDOC] = buddoc_config
+            routing.append(ProxyProviderEnum.BUDDOC)
 
         # Get pricing information if requested
         pricing = None
@@ -2344,8 +2454,8 @@ class EndpointService(SessionMixin):
 
         # Create the proxy model configuration using the schema
         model_config = ProxyModelConfig(
-            routing=[provider_enum],
-            providers={provider_enum: provider_config},
+            routing=routing,
+            providers=providers,
             endpoints=endpoints,
             api_key=encrypted_model_api_key,
             pricing=pricing,
@@ -2877,6 +2987,35 @@ class EndpointService(SessionMixin):
         if endpoint.credential and hasattr(endpoint.credential, "other_provider_creds"):
             encrypted_credential_data = endpoint.credential.other_provider_creds
 
+        # Merge endpoint's supported_endpoints with model's capabilities
+        # Ensure we only work with string values, not enum objects
+        merged_endpoints = set()
+
+        # Add endpoint's existing supported endpoints (convert to values if enum objects)
+        if endpoint.supported_endpoints:
+            for ep in endpoint.supported_endpoints:
+                if isinstance(ep, ModelEndpointEnum):
+                    merged_endpoints.add(ep.value)
+                else:
+                    merged_endpoints.add(ep)
+            logger.debug(f"Endpoint {endpoint.id} has supported_endpoints: {endpoint.supported_endpoints}")
+
+        # Add model capabilities (convert to values if enum objects)
+        if endpoint.model and endpoint.model.supported_endpoints:
+            logger.debug(f"Model {endpoint.model.name} has supported_endpoints: {endpoint.model.supported_endpoints}")
+            for model_ep in endpoint.model.supported_endpoints:
+                if isinstance(model_ep, ModelEndpointEnum):
+                    merged_endpoints.add(model_ep.value)
+                    if model_ep == ModelEndpointEnum.DOCUMENT:
+                        logger.info(f"Added document endpoint support for model {endpoint.model.name} when publishing")
+                else:
+                    merged_endpoints.add(model_ep)
+                    if model_ep == ModelEndpointEnum.DOCUMENT.value:
+                        logger.info(f"Added document endpoint support for model {endpoint.model.name} when publishing")
+
+        final_endpoints = list(merged_endpoints)
+        logger.info(f"Final supported endpoints for publishing: {final_endpoints}")
+
         # Call add_model_to_proxy_cache with endpoint information
         # Use model.source for provider type (openai, anthropic, etc.), not model_type (which is architecture info)
         model_provider_type = endpoint.model.source.lower() if endpoint.model.source else "vllm"
@@ -2885,7 +3024,7 @@ class EndpointService(SessionMixin):
             model_name=endpoint.namespace,
             model_type=model_provider_type,  # Use source field for provider type
             api_base=endpoint.url,
-            supported_endpoints=endpoint.supported_endpoints,
+            supported_endpoints=final_endpoints,  # Use merged endpoints
             encrypted_credential_data=encrypted_credential_data,
             include_pricing=True,  # Always include pricing when publishing
         )

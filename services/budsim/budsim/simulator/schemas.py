@@ -42,6 +42,9 @@ class Device(BaseModel):
     type: str
     available_count: int
     mem_per_GPU_in_GB: float
+    # Device identification fields (for exact hardware matching)
+    device_model: Optional[str] = None
+    raw_name: Optional[str] = None
     # Performance fields with defaults (to be removed in future)
     hbm_bandwidth_in_GB_per_sec: float = 100.0
     intra_node_bandwidth_in_GB_per_sec: float = 50.0
@@ -73,6 +76,7 @@ class ClusterRecommendationRequest(CloudEventBase):
     """Request schema for cluster recommendations."""
 
     pretrained_model_uri: str
+    model_uri: Optional[str] = Field(None, description="Original cloud/HuggingFace URI of the model")
     is_proprietary_model: bool
     input_tokens: int
     output_tokens: int
@@ -148,6 +152,12 @@ class ClusterMetrics(BaseModel):
     cluster_id: str
     metrics: SimulationMetrics
     quantized_metrics: Optional[SimulationMetrics] = None
+    # Engine-specific metadata from BudConnect API
+    engine_version: Optional[str] = None
+    tool_calling_parser_type: Optional[str] = None
+    reasoning_parser_type: Optional[str] = None
+    architecture_family: Optional[str] = None
+    chat_template: Optional[str] = None
 
     def reset(self):
         """Reset cluster metrics."""
@@ -195,6 +205,12 @@ class DeviceConfiguration(BaseModel):
     e2e_latency: float
     error_rate: float
     cost_per_million_tokens: float
+    # Engine-specific metadata (optional for backward compatibility)
+    engine_version: Optional[str] = None
+    tool_calling_parser_type: Optional[str] = None
+    reasoning_parser_type: Optional[str] = None
+    architecture_family: Optional[str] = None
+    chat_template: Optional[str] = None
     # Legacy schema - kept for backward compatibility
 
 
@@ -222,6 +238,12 @@ class NodeGroupConfiguration(BaseModel):
     device_name: Optional[str] = None
     device_model: Optional[str] = None
     raw_name: Optional[str] = None
+    # Engine-specific metadata from BudConnect API
+    engine_version: Optional[str] = None
+    tool_calling_parser_type: Optional[str] = None
+    reasoning_parser_type: Optional[str] = None
+    architecture_family: Optional[str] = None
+    chat_template: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_parallelism_config(self):
@@ -254,6 +276,12 @@ class DeploymentConfigurationResponse(ResponseBase):
     e2e_latency: float
     error_rate: float
     cost_per_million_tokens: float
+    # Engine-specific metadata from BudConnect API (top-level for easy access)
+    engine_version: Optional[str] = None
+    tool_calling_parser_type: Optional[str] = None
+    reasoning_parser_type: Optional[str] = None
+    architecture_family: Optional[str] = None
+    chat_template: Optional[str] = None
 
     def reset(self):
         """Reset the simulation state by clearing nodes and replica count."""

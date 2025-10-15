@@ -1,0 +1,88 @@
+{{- if (default .Values.microservices.budprompt.enabled false) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name}}-budprompt
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name}}-budprompt
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name}}-budprompt
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: {{ .Values.microservices.budprompt.daprid }}
+        dapr.io/app-port: "3015"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: {{ .Release.Name}}-budprompt
+        image: {{ .Values.microservices.budprompt.image }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        command: ["sh", "-c", "alembic -c ./alembic.ini upgrade head && uvicorn budprompt.main:app --host 0.0.0.0 --port 3015"]
+        ports:
+        - containerPort: 3015
+        env:
+          # - name: BUD_GATEWAY_BASE_URL
+            # value: {{ include "bud.ingress.url.budgateway" $ }}
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port | quote }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budprompt.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budprompt.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budprompt.name }}
+        {{- $root := . }}
+        {{- range $key, $value := .Values.microservices.budprompt.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name}}-bud-global
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 2
+          requests:
+            memory: 256Mi
+            cpu: 250m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budprompt
+spec:
+  ports:
+  - port: 3015
+    targetPort: 3015
+  selector:
+    app: {{ .Release.Name }}-budprompt
+  type: ClusterIP
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .Release.Name }}-budprompt-pubsub-subscription
+spec:
+  topic: budPromptMessages
+  routes:
+    default: /notifications
+  pubsubname: {{ .Release.Name }}-pubsub
+  deadLetterTopic: poisonMessages
+scopes:
+  - budprompt
+{{ end }}

@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budsim.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,6 +21,10 @@ spec:
         dapr.io/app-id: {{ .Values.microservices.budsim.daprid }}
         dapr.io/app-port: "3002"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budsim
         image: {{ .Values.microservices.budsim.image }}
@@ -28,6 +33,16 @@ spec:
         ports:
         - containerPort: 3002
         env:
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port | quote }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budsim.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budsim.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budsim.name }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budsim.env }}
           - name: {{ $key }}
@@ -38,7 +53,7 @@ spec:
               name: {{ .Release.Name}}-bud-global
         resources:
           limits:
-            memory: 32768Mi
+            memory: 1024Mi
             cpu: 2
           requests:
             memory: 256Mi
@@ -62,3 +77,17 @@ spec:
   selector:
     app: {{ .Release.Name }}-budsim
   type: ClusterIP
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .Release.Name }}-budsim-pubsub-subscription
+spec:
+  topic: budSimMessages
+  routes:
+    default: /notifications
+  pubsubname: {{ .Release.Name }}-pubsub
+  deadLetterTopic: poisonMessages
+scopes:
+  - budsim
+{{ end }}

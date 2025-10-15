@@ -29,15 +29,15 @@ use crate::function::{sample_variant, FunctionConfigChat};
 use crate::gateway_util::{AppState, AppStateData, StructuredJson};
 use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
 use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
-use crate::inference::types::resolved_input::FileWithPath;
+use crate::inference::types::resolved_input::{FileWithPath, ResolvedInput};
 use crate::inference::types::storage::StoragePath;
 use crate::inference::types::{
-    collect_chunks, AudioInferenceDatabaseInsert, Base64File, ChatInferenceDatabaseInsert,
+    collect_chunks, serialize_or_log, AudioInferenceDatabaseInsert, Base64File, ChatInferenceDatabaseInsert,
     CollectChunksArgs, ContentBlockChatOutput, ContentBlockChunk, EmbeddingInferenceDatabaseInsert,
     FetchContext, FinishReason, ImageInferenceDatabaseInsert, InferenceResult,
     InferenceResultChunk, InferenceResultStream, Input, InternalJsonInferenceOutput,
     JsonInferenceDatabaseInsert, JsonInferenceOutput, ModelInferenceResponseWithMetadata,
-    ModerationInferenceDatabaseInsert, RequestMessage, ResolvedInput, ResolvedInputMessageContent,
+    ModerationInferenceDatabaseInsert, RequestMessage, ResolvedInputMessageContent,
     Usage,
 };
 use crate::jsonschema_util::DynamicJSONSchema;
@@ -218,33 +218,42 @@ pub async fn inference_handler(
         model_credential_store,
         params,
     )
-    .await?;
+    .await;
+
     match inference_output {
-        InferenceOutput::NonStreaming {
+        Ok(InferenceOutput::NonStreaming {
             response,
             result,
             write_info,
-        } => {
+        }) => {
             // Extract model latency from the result (using the first model inference result) before moving result
             let model_latency_ms = match &result {
-                InferenceResult::Chat(chat_result) => {
-                    chat_result.model_inference_results.first()
-                        .and_then(|r| match &r.latency {
-                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Batch => None,
-                        })
-                        .unwrap_or(0)
-                },
-                InferenceResult::Json(json_result) => {
-                    json_result.model_inference_results.first()
-                        .and_then(|r| match &r.latency {
-                            crate::inference::types::Latency::NonStreaming { response_time } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Streaming { response_time, .. } => Some(response_time.as_millis() as u32),
-                            crate::inference::types::Latency::Batch => None,
-                        })
-                        .unwrap_or(0)
-                },
+                InferenceResult::Chat(chat_result) => chat_result
+                    .model_inference_results
+                    .first()
+                    .and_then(|r| match &r.latency {
+                        crate::inference::types::Latency::NonStreaming { response_time } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Streaming { response_time, .. } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Batch => None,
+                    })
+                    .unwrap_or(0),
+                InferenceResult::Json(json_result) => json_result
+                    .model_inference_results
+                    .first()
+                    .and_then(|r| match &r.latency {
+                        crate::inference::types::Latency::NonStreaming { response_time } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Streaming { response_time, .. } => {
+                            Some(response_time.as_millis() as u32)
+                        }
+                        crate::inference::types::Latency::Batch => None,
+                    })
+                    .unwrap_or(0),
                 // For other result types, we don't have model_inference_results, so default to 0
                 _ => 0,
             };
@@ -272,6 +281,7 @@ pub async fn inference_handler(
                         write_info.gateway_request,
                         gateway_response,
                         write_info.model_pricing,
+                        None, // No guardrail records for standard inference endpoint
                     )
                     .await;
                 });
@@ -308,12 +318,17 @@ pub async fn inference_handler(
 
             Ok(http_response)
         }
-        InferenceOutput::Streaming(stream) => {
+        Ok(InferenceOutput::Streaming(stream)) => {
             let event_stream = prepare_serialized_events(stream);
 
             Ok(Sse::new(event_stream)
                 .keep_alive(axum::response::sse::KeepAlive::new())
                 .into_response())
+        }
+        Err(error) => {
+            // The inference function already sends failure events internally for AllVariantsFailed
+            // Here we just return the error response
+            Err(error)
         }
     }
 }
@@ -467,6 +482,11 @@ pub async fn inference(
         });
     }
 
+    // Clone values that will be needed after params is partially moved
+    let obs_metadata_clone = params.observability_metadata.clone();
+    let function_name_clone = params.function_name.clone();
+    let model_name_clone = params.model_name.clone();
+
     // Should we store the results?
     let dryrun = params.dryrun.unwrap_or(false);
 
@@ -476,7 +496,7 @@ pub async fn inference(
             ("endpoint", "inference".to_string()),
             ("function_name", function_name.clone()),
         ];
-        if let Some(model_name) = params.model_name {
+        if let Some(ref model_name) = model_name_clone {
             labels.push(("model_name", model_name.clone()));
         }
         counter!("request_count", &labels).increment(1);
@@ -528,6 +548,7 @@ pub async fn inference(
 
     let models = config.models.read().await;
     let inference_models = InferenceModels { models: &models };
+
     let resolved_input = params
         .input
         .resolve(&FetchContext {
@@ -634,9 +655,10 @@ pub async fn inference(
                 Ok(result) => result,
                 Err(e) => {
                     tracing::warn!(
-                        "functions.{function_name}.variants.{variant_name} failed during inference: {e}",
+                        "functions.{function_name}.variants.{variant_name} failed during inference for inference_id {inference_id}: {e}",
                         function_name = function_name,
                         variant_name = variant_name,
+                        inference_id = inference_id,
                     );
                     variant_errors.insert(variant_name.to_string(), e);
                     continue;
@@ -659,15 +681,16 @@ pub async fn inference(
                 };
 
                 // Get model pricing from the result
-                let model_pricing = if let Some(first_result) = result.model_inference_results().first() {
-                    // Look up the model config to get pricing
-                    match models.get(&first_result.model_name).await {
-                        Ok(Some(model)) => model.pricing.clone(),
-                        _ => None,
-                    }
-                } else {
-                    None
-                };
+                let model_pricing =
+                    if let Some(first_result) = result.model_inference_results().first() {
+                        // Look up the model config to get pricing
+                        match models.get(&first_result.model_name).await {
+                            Ok(Some(model)) => model.pricing.clone(),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
 
                 Some(WriteInfo {
                     resolved_input: resolved_input.clone(),
@@ -696,10 +719,28 @@ pub async fn inference(
     }
 
     // Eventually, if we get here, it means we tried every variant and none of them worked
-    Err(ErrorDetails::AllVariantsFailed {
+    let error = Error::new(ErrorDetails::AllVariantsFailed {
         errors: variant_errors,
+    });
+
+    // Send failure event to Kafka and ClickHouse for observability
+    if !dryrun {
+        send_failure_event(
+            &kafka_connection_info,
+            &clickhouse_connection_info,
+            inference_id,
+            episode_id,
+            &error,
+            &resolved_input,
+            obs_metadata_clone,
+            function_name_clone,
+            model_name_clone,
+            start_time,
+        )
+        .await;
     }
-    .into())
+
+    Err(error)
 }
 
 /// Finds a function by `function_name` or `model_name`, erroring if an
@@ -900,6 +941,7 @@ fn create_stream(
                             gateway_request,
                             gateway_response,
                             model_pricing,
+                            None, // No guardrail records for standard inference endpoint
                         ).await;
 
                 }
@@ -1024,6 +1066,7 @@ pub async fn write_inference(
     gateway_request: Option<String>,
     gateway_response: Option<String>,
     model_pricing: Option<crate::model::ModelPricing>,
+    guardrail_records: Option<Vec<crate::guardrail::GuardrailInferenceDatabaseInsert>>,
 ) {
     let mut futures: Vec<Pin<Box<dyn Future<Output = ()> + Send>>> = Vec::new();
     if config.gateway.observability.enabled.unwrap_or(true) {
@@ -1117,45 +1160,48 @@ pub async fn write_inference(
             }
             InferenceResult::TextToSpeech(result) => {
                 // Extract the text input from the input
-                let text_input = input.messages.first()
+                let text_input = input
+                    .messages
+                    .first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
-                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        ResolvedInputMessageContent::Text { value } => {
+                            value.as_str().map(|s| s.to_string())
+                        }
                         _ => None,
                     })
                     .unwrap_or_else(|| "text input".to_string());
 
-                let audio_inference = AudioInferenceDatabaseInsert::new_text_to_speech(
-                    result,
-                    text_input,
-                    metadata,
-                );
+                let audio_inference =
+                    AudioInferenceDatabaseInsert::new_text_to_speech(result, text_input, metadata);
                 let _ = clickhouse_connection_info
                     .write(&[audio_inference], "AudioInference")
                     .await;
             }
             InferenceResult::ImageGeneration(result) => {
                 // Extract the prompt from the input
-                let prompt = input.messages.first()
+                let prompt = input
+                    .messages
+                    .first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
-                        ResolvedInputMessageContent::Text { value } => value.as_str().map(|s| s.to_string()),
+                        ResolvedInputMessageContent::Text { value } => {
+                            value.as_str().map(|s| s.to_string())
+                        }
                         _ => None,
                     })
                     .unwrap_or_else(|| "image prompt".to_string());
 
-                let image_inference = ImageInferenceDatabaseInsert::new(
-                    result,
-                    prompt,
-                    metadata,
-                );
+                let image_inference = ImageInferenceDatabaseInsert::new(result, prompt, metadata);
                 let _ = clickhouse_connection_info
                     .write(&[image_inference], "ImageInference")
                     .await;
             }
             InferenceResult::Moderation(result) => {
                 // Extract the input text from the input
-                let input_text = input.messages.first()
+                let input_text = input
+                    .messages
+                    .first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
                         ResolvedInputMessageContent::Text { value } => {
@@ -1164,18 +1210,25 @@ pub async fn write_inference(
                                 serde_json::Value::String(s) => Some(s.clone()),
                                 _ => value.as_str().map(|s| s.to_string()),
                             }
-                        },
+                        }
                         _ => None,
                     })
                     .unwrap_or_else(|| "moderation input".to_string());
 
-                let moderation_inference = ModerationInferenceDatabaseInsert::new(
-                    result,
-                    input_text,
-                    metadata,
-                );
+                let moderation_inference =
+                    ModerationInferenceDatabaseInsert::new(result, input_text, metadata);
                 let _ = clickhouse_connection_info
                     .write(&[moderation_inference], "ModerationInference")
+                    .await;
+            }
+        }
+
+        // Write guardrail records if provided
+        if let Some(guardrail_records) = guardrail_records {
+            // Batch write all guardrail records at once for efficiency
+            if !guardrail_records.is_empty() {
+                let _ = clickhouse_connection_info
+                    .write(&guardrail_records, "GuardrailInference")
                     .await;
             }
         }
@@ -1268,8 +1321,8 @@ pub async fn write_inference(
                 let input_multiplier = usage.input_tokens as f64 / pricing.per_tokens as f64;
                 let output_multiplier = usage.output_tokens as f64 / pricing.per_tokens as f64;
 
-                let total_cost = (input_multiplier * pricing.input_cost) +
-                                (output_multiplier * pricing.output_cost);
+                let total_cost = (input_multiplier * pricing.input_cost)
+                    + (output_multiplier * pricing.output_cost);
                 Some(total_cost)
             } else {
                 // Fallback to default pricing if not configured
@@ -1316,6 +1369,10 @@ pub async fn write_inference(
             api_key_id,
             user_id,
             api_key_project_id,
+            error_code: None,  // No error for successful inferences
+            error_message: None,
+            error_type: None,
+            status_code: None,
         };
 
         // Send to Kafka observability topic
@@ -1324,6 +1381,172 @@ pub async fn write_inference(
         }
     }));
     futures::future::join_all(futures).await;
+}
+
+/// Send failure event to Kafka for observability when an inference fails
+async fn send_failure_event(
+    kafka_connection_info: &KafkaConnectionInfo,
+    clickhouse_connection_info: &ClickHouseConnectionInfo,
+    inference_id: Uuid,
+    _episode_id: Uuid,  // Currently unused but kept for future use
+    error: &Error,
+    resolved_input: &ResolvedInput,
+    observability_metadata: Option<ObservabilityMetadata>,
+    function_name: Option<String>,
+    model_name: Option<String>,
+    start_time: Instant,
+) {
+    let request_arrival_time = chrono::Utc::now()
+        - chrono::Duration::milliseconds(start_time.elapsed().as_millis() as i64);
+    let request_forward_time = request_arrival_time + chrono::Duration::milliseconds(10);
+
+    // Extract error details
+    let error_details = error.get_details();
+    let status_code = error.status_code();
+    let error_message = error.to_string();
+
+    // Determine error type based on ErrorDetails variant
+    let error_type = match error_details {
+        ErrorDetails::AllVariantsFailed { .. } => "AllVariantsFailed",
+        ErrorDetails::InvalidInferenceTarget { .. } => "InvalidInferenceTarget",
+        ErrorDetails::ApiKeyMissing { .. } => "ApiKeyMissing",
+        ErrorDetails::BadCredentialsPreInference { .. } => "BadCredentials",
+        ErrorDetails::InferenceClient { .. } => "InferenceClient",
+        ErrorDetails::InferenceServer { .. } => "InferenceServer",
+        ErrorDetails::InferenceTimeout { .. } => "InferenceTimeout",
+        ErrorDetails::InputValidation { .. } => "InputValidation",
+        ErrorDetails::OutputValidation { .. } => "OutputValidation",
+        ErrorDetails::GuardrailInputViolation { .. } => "GuardrailInputViolation",
+        ErrorDetails::GuardrailOutputViolation { .. } => "GuardrailOutputViolation",
+        ErrorDetails::JsonSchemaValidation { .. } => "JsonSchemaValidation",
+        ErrorDetails::ModelProvidersExhausted { .. } => "ModelProvidersExhausted",
+        ErrorDetails::ModelChainExhausted { .. } => "ModelChainExhausted",
+        _ => "UnknownError",
+    };
+
+    // Use observability metadata if available, otherwise use function/model names
+    let (project_id, endpoint_id, model_id, api_key_id, user_id, api_key_project_id) =
+        if let Some(obs_metadata) = &observability_metadata {
+            (
+                obs_metadata.project_id.clone(),
+                obs_metadata.endpoint_id.clone(),
+                obs_metadata.model_id.clone(),
+                obs_metadata.api_key_id.clone(),
+                obs_metadata.user_id.clone(),
+                obs_metadata.api_key_project_id.clone(),
+            )
+        } else {
+            // Fallback to function/model names
+            let fn_name = function_name.as_deref().unwrap_or("unknown");
+            let mdl_name = model_name.as_deref().unwrap_or("unknown");
+            (
+                fn_name.to_string(),
+                "unknown".to_string(),
+                mdl_name.to_string(),
+                None,
+                None,
+                None,
+            )
+        };
+
+    let event = crate::kafka::cloudevents::ObservabilityEvent {
+        inference_id,
+        project_id: project_id.clone(),
+        endpoint_id: endpoint_id.clone(),
+        model_id: model_id.clone(),
+        is_success: false,  // This is a failure event
+        request_arrival_time,
+        request_forward_time,
+        request_ip: None,
+        cost: None,  // Failed requests may still incur costs, but we don't know yet
+        response_analysis: None,
+        api_key_id: api_key_id.clone(),
+        user_id: user_id.clone(),
+        api_key_project_id: api_key_project_id.clone(),
+        error_code: Some(format!("{:?}", status_code)),
+        error_message: Some(error_message.clone()),
+        error_type: Some(error_type.to_string()),
+        status_code: Some(status_code.as_u16()),
+    };
+
+    // Send to Kafka observability topic
+    if let Err(e) = kafka_connection_info.add_observability_event(event.clone()).await {
+        tracing::error!("Failed to send failure observability event to Kafka: {}", e);
+    }
+
+    // Also write to ClickHouse for failed inferences
+    // First, create a ModelInference record (required for JOIN queries)
+
+    let serialized_input = serialize_or_log(&resolved_input.messages);
+
+    let model_inference = crate::inference::types::ModelInferenceDatabaseInsert {
+        id: uuid::Uuid::now_v7(),
+        inference_id,
+        raw_request: "".to_string(),  // Failed before request could be made
+        raw_response: error_message.clone(),  // Store error as response
+        system: resolved_input.system.as_ref().and_then(|v| v.as_str()).map(|s| s.to_string()),
+        input_messages: serialized_input.clone(),
+        output: format!("Error: {}", error_message),
+        input_tokens: None,
+        output_tokens: None,
+        response_time_ms: Some(start_time.elapsed().as_millis() as u32),
+        model_name: model_id.clone(),
+        model_provider_name: "unknown".to_string(),
+        ttft_ms: None,
+        cached: false,
+        finish_reason: None,
+        gateway_request: None,
+        gateway_response: None,
+        endpoint_type: "chat".to_string(),
+        guardrail_scan_summary: Some(serde_json::json!({}).to_string()),
+    };
+
+
+    // Write the ModelInference record
+    if let Err(e) = clickhouse_connection_info
+        .write(&[model_inference], "ModelInference")
+        .await
+    {
+        tracing::error!("Failed to write failure to ClickHouse ModelInference: {}", e);
+    }
+
+    // Then create ModelInferenceDetails record with error information
+    // Note: The api_key_project_id might be truncated in the error - handle gracefully
+    let parsed_api_key_project_id = api_key_project_id.and_then(|id| {
+        // If the ID looks truncated (like "4c..."), try to handle it
+        if id.len() < 36 {
+            None  // Skip invalid UUIDs
+        } else {
+            uuid::Uuid::parse_str(&id).ok()
+        }
+    });
+
+    let inference_details = crate::clickhouse::ModelInferenceDetailsInsert {
+        inference_id,
+        request_ip: None,
+        project_id: uuid::Uuid::parse_str(&project_id).ok().unwrap_or_default(),
+        endpoint_id: uuid::Uuid::parse_str(&endpoint_id).ok().unwrap_or_default(),
+        model_id: uuid::Uuid::parse_str(&model_id).ok().unwrap_or_default(),
+        cost: None,
+        response_analysis: None,
+        is_success: false,
+        request_arrival_time,
+        request_forward_time,
+        api_key_id: api_key_id.and_then(|id| uuid::Uuid::parse_str(&id).ok()),
+        user_id: user_id.and_then(|id| uuid::Uuid::parse_str(&id).ok()),
+        api_key_project_id: parsed_api_key_project_id,
+        error_code: Some(format!("{:?}", status_code)),
+        error_message: Some(error_message),
+        error_type: Some(error_type.to_string()),
+        status_code: Some(status_code.as_u16()),
+    };
+
+    if let Err(e) = clickhouse_connection_info
+        .write(&[inference_details], "ModelInferenceDetails")
+        .await
+    {
+        tracing::error!("Failed to write failure to ClickHouse ModelInferenceDetails: {}", e);
+    }
 }
 
 /// InferenceResponse and InferenceResultChunk determine what gets serialized and sent to the client
@@ -1586,6 +1809,8 @@ pub struct ChatCompletionInferenceParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frequency_penalty: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub repetition_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub chat_template: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chat_template_kwargs: Option<Value>,
@@ -1619,6 +1844,8 @@ pub struct ChatCompletionInferenceParams {
     pub logit_bias: Option<HashMap<String, f32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ignore_eos: Option<bool>,
 }
 
 impl ChatCompletionInferenceParams {
@@ -1654,6 +1881,132 @@ impl ChatCompletionInferenceParams {
 
 fn is_false(v: &bool) -> bool {
     !*v
+}
+
+/// Write a blocked inference to the database for observability
+/// This is used when a request is blocked by guardrails before reaching the model
+pub async fn write_blocked_inference(
+    clickhouse_connection_info: &ClickHouseConnectionInfo,
+    kafka_connection_info: &crate::kafka::KafkaConnectionInfo,
+    config: &Config<'_>,
+    model_name: &str,
+    model_provider: &str,
+    resolved_input: ResolvedInput,
+    inference_id: Uuid,
+    episode_id: Uuid,
+    guardrail_records: Vec<crate::guardrail::GuardrailInferenceDatabaseInsert>,
+    observability_metadata: Option<ObservabilityMetadata>,
+    model_pricing: Option<crate::model::ModelPricing>,
+    gateway_request: Option<String>,
+) {
+    use crate::inference::types::{
+        current_timestamp, ChatInferenceResult, ContentBlockOutput, Latency, RequestMessage, Text,
+    };
+    // Create blocked content
+    let blocked_content = vec![ContentBlockChatOutput::Text(Text {
+        text: "Request blocked by content policy".to_string(),
+    })];
+
+    // Create the gateway response that would be sent to the client
+    let gateway_response_json = serde_json::json!({
+        "error": {
+            "message": "Input content violates content policy",
+            "type": "invalid_request_error",
+            "code": "content_filter"
+        }
+    });
+    let gateway_response_str = gateway_response_json.to_string();
+
+    // Create blocked model inference response
+    let model_response = ModelInferenceResponseWithMetadata {
+        id: Uuid::now_v7(),
+        created: current_timestamp(),
+        output: vec![ContentBlockOutput::Text(Text {
+            text: "Request blocked by content policy".to_string(),
+        })],
+        system: resolved_input
+            .system
+            .clone()
+            .and_then(|v| v.as_str().map(|s| s.to_string())),
+        input_messages: resolved_input
+            .messages
+            .iter()
+            .map(|msg| RequestMessage {
+                role: msg.role.clone(),
+                content: vec![], // Empty content for blocked messages
+            })
+            .collect(),
+        // Since we never made it to the provider, we don't have a raw request/response
+        // Use empty objects to indicate no provider interaction occurred
+        raw_request: "{}".to_string(),
+        raw_response: "{}".to_string(),
+        usage: Usage::default(),
+        latency: Latency::NonStreaming {
+            response_time: std::time::Duration::from_millis(0),
+        },
+        model_provider_name: model_provider.to_string().into(),
+        model_name: model_name.to_string().into(),
+        cached: false,
+        finish_reason: Some(FinishReason::ContentFilter),
+        gateway_request: gateway_request.clone(),
+        gateway_response: Some(gateway_response_str.clone()),
+        guardrail_scan_summary: if !guardrail_records.is_empty() {
+            let context = crate::guardrail::GuardrailExecutionContext {
+                scan_records: guardrail_records.clone(),
+                input_scan_time_ms: guardrail_records
+                    .iter()
+                    .filter(|r| r.guard_type == 1) // Input guard type
+                    .filter_map(|r| r.scan_latency_ms)
+                    .sum::<u32>()
+                    .into(),
+                output_scan_time_ms: None,
+                response_terminated: true,
+            };
+            Some(serde_json::to_string(&context.build_summary()).unwrap_or_default())
+        } else {
+            None
+        },
+    };
+
+    // Create blocked result
+    let blocked_result = InferenceResult::Chat(ChatInferenceResult {
+        inference_id,
+        created: current_timestamp(),
+        content: blocked_content,
+        usage: Usage::default(),
+        model_inference_results: vec![model_response],
+        inference_params: InferenceParams::default(),
+        original_response: None,
+        finish_reason: Some(FinishReason::ContentFilter),
+    });
+
+    // Create metadata
+    let metadata = InferenceDatabaseInsertMetadata {
+        function_name: "openai_compatible".to_string(),
+        variant_name: model_name.to_string(),
+        episode_id,
+        tool_config: None,
+        processing_time: Some(std::time::Duration::from_millis(0)),
+        tags: HashMap::new(),
+        extra_body: UnfilteredInferenceExtraBody::default(),
+        extra_headers: UnfilteredInferenceExtraHeaders::default(),
+    };
+
+    // Write inference and guardrail records
+    write_inference(
+        clickhouse_connection_info,
+        kafka_connection_info,
+        config,
+        resolved_input,
+        blocked_result,
+        metadata,
+        observability_metadata,
+        None, // gateway_request
+        None, // gateway_response
+        model_pricing,
+        Some(guardrail_records),
+    )
+    .await;
 }
 
 #[cfg(test)]

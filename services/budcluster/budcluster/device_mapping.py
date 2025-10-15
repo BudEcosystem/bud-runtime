@@ -76,7 +76,7 @@ class DeviceMappingRegistry:
             device_name: Device name from budsim (e.g., "A100", "Gaudi2")
             device_type: Device type ("cpu", "cuda", "hpu")
             device_model: Optional full device model name
-            raw_name: Optional raw device name
+            raw_name: Optional raw device name from NFD labels (e.g., "Tesla-V100-PCIE-16GB")
 
         Returns:
             Dictionary of node selector labels
@@ -84,14 +84,14 @@ class DeviceMappingRegistry:
         node_selector = {}
 
         if device_type == "cuda":
-            gpu_products = cls._get_gpu_products(device_name, device_model)
-            if gpu_products:
-                # Use the first available GPU product for node selection
-                # In production, this should be enhanced to check cluster availability
-                node_selector["nvidia.com/gpu.product"] = gpu_products[0]
+            # Prefer raw_name from NFD labels if available - this is the actual cluster GPU label
+            if raw_name and raw_name.strip() and raw_name != "Unknown NVIDIA GPU":
+                # Use the exact GPU product name from cluster NFD labels as-is
+                # NFD already provides the correct format that matches node labels
+                # No normalization needed - any modification could cause mismatches
+                node_selector["nvidia.com/gpu.product"] = raw_name.strip()
+                logger.info(f"Using exact GPU product name from cluster NFD: {raw_name.strip()}")
             else:
-                logger.warning(f"No GPU product mapping found for device: {device_name}")
-                # Fallback to generic GPU selection
                 node_selector["nvidia.com/gpu.present"] = "true"
 
         elif device_type == "hpu":
@@ -110,26 +110,6 @@ class DeviceMappingRegistry:
             logger.warning(f"Unknown device type: {device_type}")
 
         return node_selector
-
-    @classmethod
-    def _get_gpu_products(cls, device_name: str, device_model: Optional[str] = None) -> List[str]:
-        """Get list of possible GPU product names for a device."""
-        # First try exact device name match
-        if device_name in cls.NVIDIA_GPU_MAPPINGS:
-            return cls.NVIDIA_GPU_MAPPINGS[device_name]
-
-        # Try to extract device name from model if provided
-        if device_model:
-            for gpu_name, products in cls.NVIDIA_GPU_MAPPINGS.items():
-                if gpu_name.lower() in device_model.lower():
-                    return products
-
-        # Try partial matching on device name
-        for gpu_name, products in cls.NVIDIA_GPU_MAPPINGS.items():
-            if gpu_name.lower() in device_name.lower() or device_name.lower() in gpu_name.lower():
-                return products
-
-        return []
 
     @classmethod
     def _get_hpu_products(cls, device_name: str, device_model: Optional[str] = None) -> List[str]:

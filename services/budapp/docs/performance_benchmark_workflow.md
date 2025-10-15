@@ -325,7 +325,7 @@ Sample Response:
       "cluster": {
         "id": "1fbb9c3c-4198-4e7e-8a1e-02b86041ea82",
         "name": "Dev cluster",
-        "icon": "😍",
+        "icon": "🌐",
         "ingress_url": "http://20.244.107.114:13025/",
         "cluster_type": "ON_PERM",
         "created_at": "2025-03-05T14:23:09.647681Z",

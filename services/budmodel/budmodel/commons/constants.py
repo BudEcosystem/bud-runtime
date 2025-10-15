@@ -64,6 +64,7 @@ class ModelExtractionStatus(StrEnum):
 
     COMPLETED = auto()
     PARTIAL = auto()
+    CACHED = auto()  # Retrieved from BudConnect cache
 
 
 class LeaderboardDataOrigin(StrEnum):
@@ -260,3 +261,7 @@ LICENSE:
 # License Minio Object Names
 LICENSE_MINIO_OBJECT_NAME = "licenses"
 COMMON_LICENSE_MINIO_OBJECT_NAME = f"{LICENSE_MINIO_OBJECT_NAME}/common_licenses"
+
+# BudConnect Provider IDs
+# Fallback provider ID for Huggingface when dynamic fetching fails
+HUGGINGFACE_PROVIDER_ID_FALLBACK = "3f7ce438-8f4b-4737-8c73-7c2c336d1d1a"

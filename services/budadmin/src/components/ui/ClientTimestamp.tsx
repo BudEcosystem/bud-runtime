@@ -1,16 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 
 interface ClientTimestampProps {
   timestamp: string | Date | number;
-  format?: 'short' | 'long';
+  format?: "short" | "long";
 }
 
-export const ClientTimestamp: React.FC<ClientTimestampProps> = ({ timestamp, format = 'short' }) => {
-  const [formattedDate, setFormattedDate] = useState<string>('');
+export const ClientTimestamp: React.FC<ClientTimestampProps> = ({
+  timestamp,
+  format = "short",
+}) => {
+  const [formattedDate, setFormattedDate] = useState<string>("");
 
   useEffect(() => {
     if (!timestamp) {
-      setFormattedDate('');
+      setFormattedDate("");
       return;
     }
 
@@ -18,51 +21,56 @@ export const ClientTimestamp: React.FC<ClientTimestampProps> = ({ timestamp, for
       let dateStr = timestamp;
 
       // If it's a string without timezone indicator, assume it's UTC and add 'Z'
-      if (typeof timestamp === 'string') {
-        const hasTimezone = timestamp.endsWith('Z') ||
-                           timestamp.match(/[+-]\d{2}:\d{2}$/) ||
-                           timestamp.match(/[+-]\d{4}$/);
+      if (typeof timestamp === "string") {
+        const hasTimezone =
+          timestamp.endsWith("Z") ||
+          timestamp.match(/[+-]\d{2}:\d{2}$/) ||
+          timestamp.match(/[+-]\d{4}$/);
 
         if (!hasTimezone) {
-          dateStr = timestamp + 'Z';
+          dateStr = timestamp + "Z";
         }
       }
 
       const date = new Date(dateStr);
 
       if (isNaN(date.getTime())) {
-        setFormattedDate('Invalid date');
+        setFormattedDate("Invalid date");
         return;
       }
 
-      if (format === 'long') {
+      if (format === "long") {
         // With timezone
         const options: Intl.DateTimeFormatOptions = {
-          month: 'short',
-          day: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
+          month: "short",
+          day: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
           hour12: false,
-          timeZoneName: 'short'
+          timeZoneName: "short",
         };
-        setFormattedDate(new Intl.DateTimeFormat('en-US', options).format(date));
+        setFormattedDate(
+          new Intl.DateTimeFormat("en-US", options).format(date),
+        );
       } else {
         // Short format
         const options: Intl.DateTimeFormatOptions = {
-          month: 'short',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
         };
-        setFormattedDate(new Intl.DateTimeFormat('en-US', options).format(date));
+        setFormattedDate(
+          new Intl.DateTimeFormat("en-US", options).format(date),
+        );
       }
     } catch (error) {
-      console.error('Error formatting timestamp:', timestamp, error);
-      setFormattedDate('Error');
+      console.error("Error formatting timestamp:", timestamp, error);
+      setFormattedDate("Error");
     }
   }, [timestamp, format]);
 

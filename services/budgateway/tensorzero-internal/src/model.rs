@@ -26,6 +26,7 @@ use crate::inference::providers::aws_sagemaker::AWSSagemakerProvider;
 use crate::inference::providers::dummy::DummyProvider;
 use crate::inference::providers::google_ai_studio_gemini::GoogleAIStudioGeminiProvider;
 
+use crate::inference::providers::buddoc::BudDocProvider;
 use crate::inference::providers::helpers::peek_first_chunk;
 use crate::inference::providers::hyperbolic::HyperbolicProvider;
 use crate::inference::providers::provider_trait::WrappedProvider;
@@ -48,8 +49,8 @@ use crate::{
     inference::{
         providers::{
             anthropic::AnthropicProvider, aws_bedrock::AWSBedrockProvider, azure::AzureProvider,
-            deepseek::DeepSeekProvider, fireworks::FireworksProvider,
-            gcp_vertex_anthropic::GCPVertexAnthropicProvider,
+            azure_content_safety::AzureContentSafetyProvider, deepseek::DeepSeekProvider,
+            fireworks::FireworksProvider, gcp_vertex_anthropic::GCPVertexAnthropicProvider,
             gcp_vertex_gemini::GCPVertexGeminiProvider, mistral::MistralProvider,
             openai::OpenAIProvider, openrouter::OpenRouterProvider,
             provider_trait::InferenceProvider, together::TogetherProvider, vllm::VLLMProvider,
@@ -105,6 +106,7 @@ pub struct ModelConfig {
     pub retry_config: Option<RetryConfig>, // Optional model-level retry configuration
     pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
     pub pricing: Option<ModelPricing>, // Optional pricing information
+    pub guardrail_profile: Option<Arc<str>>, // Optional guardrail profile ID for wrapped inference
 }
 
 #[derive(Debug, Deserialize)]
@@ -120,6 +122,7 @@ pub(crate) struct UninitializedModelConfig {
     pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
     #[serde(default)]
     pub pricing: Option<ModelPricing>, // Optional pricing information
+    pub guardrail_profile: Option<Arc<str>>, // Optional guardrail profile ID for wrapped inference
 }
 
 /// Determine endpoint capabilities based on model name patterns
@@ -191,6 +194,99 @@ impl ModelConfig {
                     let embedding_response =
                         crate::embeddings::EmbeddingResponse::new(response, provider_name.clone());
                     return Ok(embedding_response);
+                }
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+        Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
+    }
+
+    /// Completions inference method (when model supports completions capability)
+    #[instrument(skip_all)]
+    pub async fn complete(
+        &self,
+        request: &crate::completions::CompletionRequest,
+        model_name: &str,
+        clients: &crate::endpoints::inference::InferenceClients<'_>,
+    ) -> Result<crate::completions::CompletionResponse, Error> {
+        // Verify this model supports completions
+        if !self.supports_endpoint(EndpointCapability::Completions) {
+            return Err(Error::new(ErrorDetails::ModelNotConfiguredForCapability {
+                model_name: model_name.to_string(),
+                capability: EndpointCapability::Completions.as_str().to_string(),
+            }));
+        }
+
+        let mut provider_errors: HashMap<String, Error> = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::ProviderNotFound {
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+
+            // Use the provider's complete method
+            let response = provider
+                .complete(request, clients.http_client, clients.credentials)
+                .await;
+
+            match response {
+                Ok(response) => {
+                    // Convert provider response to completion response
+                    let completion_response = crate::completions::CompletionResponse {
+                        id: response.id,
+                        object: "text_completion".to_string(),
+                        created: response.created,
+                        model: response.model,
+                        choices: response.choices,
+                        usage: response.usage,
+                        raw_request: response.raw_request,
+                        raw_response: response.raw_response,
+                        latency: response.latency,
+                    };
+                    return Ok(completion_response);
+                }
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+        Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
+    }
+
+    /// Streaming completion method (when model supports completions capability)
+    pub async fn complete_stream(
+        &self,
+        request: &crate::completions::CompletionRequest,
+        model_name: &str,
+        clients: &crate::endpoints::inference::InferenceClients<'_>,
+    ) -> Result<(crate::completions::CompletionStream, String), Error> {
+        // Verify this model supports completions
+        if !self.supports_endpoint(EndpointCapability::Completions) {
+            return Err(Error::new(ErrorDetails::ModelNotConfiguredForCapability {
+                model_name: model_name.to_string(),
+                capability: EndpointCapability::Completions.as_str().to_string(),
+            }));
+        }
+
+        let mut provider_errors: HashMap<String, Error> = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::ProviderNotFound {
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+
+            // Use the provider's complete_stream method
+            let response = provider
+                .complete_stream(request, clients.http_client, clients.credentials)
+                .await;
+
+            match response {
+                Ok((stream, raw_request)) => {
+                    return Ok((stream, raw_request));
                 }
                 Err(error) => {
                     provider_errors.insert(provider_name.to_string(), error);
@@ -580,6 +676,92 @@ impl ModelConfig {
         }
         Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
     }
+
+    /// Document processing method (when model supports document capability)
+    #[instrument(skip_all)]
+    pub async fn process_document(
+        &self,
+        request: &crate::documents::DocumentProcessingRequest,
+        model_name: &str,
+        clients: &crate::endpoints::inference::InferenceClients<'_>,
+    ) -> Result<crate::documents::DocumentProcessingResponse, Error> {
+        // Verify this model supports document processing
+        if !self.supports_endpoint(EndpointCapability::Document) {
+            return Err(Error::new(ErrorDetails::ModelNotConfiguredForCapability {
+                model_name: model_name.to_string(),
+                capability: EndpointCapability::Document.as_str().to_string(),
+            }));
+        }
+
+        let mut provider_errors: HashMap<String, Error> = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::ProviderNotFound {
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+
+            // Use the provider's process_document method
+            let response = provider
+                .process_document(request, clients.http_client, clients.credentials)
+                .await;
+
+            match response {
+                Ok(response) => {
+                    // TODO: Add caching support here if needed
+                    let document_response = crate::documents::DocumentProcessingResponse::new(
+                        response,
+                        provider_name.clone(),
+                    );
+                    return Ok(document_response);
+                }
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+        Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
+    }
+
+    /// Moderation method (when model supports moderation capability)
+    #[instrument(skip_all)]
+    pub async fn moderate(
+        &self,
+        request: &crate::moderation::ModerationRequest,
+        model_name: &str,
+        clients: &crate::endpoints::inference::InferenceClients<'_>,
+    ) -> Result<crate::moderation::ModerationResponse, Error> {
+        // Verify this model supports moderation
+        if !self.supports_endpoint(EndpointCapability::Moderation) {
+            return Err(Error::new(ErrorDetails::ModelNotConfiguredForCapability {
+                model_name: model_name.to_string(),
+                capability: EndpointCapability::Moderation.as_str().to_string(),
+            }));
+        }
+
+        let mut provider_errors: HashMap<String, Error> = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::ProviderNotFound {
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+
+            let response = provider
+                .moderate(request, clients.http_client, clients.credentials)
+                .await;
+            match response {
+                Ok(response) => {
+                    // TODO: Add caching support here
+                    return Ok(response);
+                }
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+        Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
+    }
 }
 
 impl UninitializedModelConfig {
@@ -618,6 +800,7 @@ impl UninitializedModelConfig {
             retry_config: self.retry_config,
             rate_limits: self.rate_limits,
             pricing: self.pricing,
+            guardrail_profile: self.guardrail_profile,
         })
     }
 }
@@ -1425,6 +1608,8 @@ impl ModelProvider {
             ProviderConfig::AWSBedrock(_) => "aws_bedrock",
             ProviderConfig::AWSSagemaker(_) => "aws_sagemaker",
             ProviderConfig::Azure(_) => "azure",
+            ProviderConfig::AzureContentSafety(_) => "azure_content_safety",
+            ProviderConfig::BudDoc(_) => "buddoc",
             ProviderConfig::Fireworks(_) => "fireworks",
             ProviderConfig::GCPVertexAnthropic(_) => "gcp_vertex_anthropic",
             ProviderConfig::GCPVertexGemini(_) => "gcp_vertex_gemini",
@@ -1452,6 +1637,7 @@ impl ModelProvider {
             // SageMaker doesn't have a meaningful model name concept, as we just invoke an endpoint
             ProviderConfig::AWSSagemaker(_) => None,
             ProviderConfig::Azure(provider) => Some(provider.deployment_id()),
+            ProviderConfig::AzureContentSafety(_) => None, // Content Safety doesn't have a model name
             ProviderConfig::Fireworks(provider) => Some(provider.model_name()),
             ProviderConfig::GCPVertexAnthropic(provider) => Some(provider.model_id()),
             ProviderConfig::GCPVertexGemini(provider) => Some(provider.model_id()),
@@ -1467,6 +1653,7 @@ impl ModelProvider {
             ProviderConfig::TGI(_) => None,
             ProviderConfig::SGLang(provider) => Some(provider.model_name()),
             ProviderConfig::DeepSeek(provider) => Some(provider.model_name()),
+            ProviderConfig::BudDoc(_) => None, // BudDoc doesn't have a model name in the inference sense
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => Some(provider.model_name()),
         }
@@ -1496,6 +1683,8 @@ pub enum ProviderConfig {
     AWSBedrock(AWSBedrockProvider),
     AWSSagemaker(AWSSagemakerProvider),
     Azure(AzureProvider),
+    AzureContentSafety(AzureContentSafetyProvider),
+    BudDoc(BudDocProvider),
     DeepSeek(DeepSeekProvider),
     Fireworks(FireworksProvider),
     GCPVertexAnthropic(GCPVertexAnthropicProvider),
@@ -1555,6 +1744,17 @@ pub(super) enum UninitializedProviderConfig {
     Azure {
         deployment_id: String,
         endpoint: Url,
+        api_key_location: Option<CredentialLocation>,
+    },
+    #[strum(serialize = "azure_content_safety")]
+    #[serde(rename = "azure_content_safety")]
+    AzureContentSafety {
+        endpoint: Url,
+        api_key_location: Option<CredentialLocation>,
+    },
+    BudDoc {
+        model_name: String,
+        api_base: Url,
         api_key_location: Option<CredentialLocation>,
     },
     #[strum(serialize = "gcp_vertex_anthropic")]
@@ -1714,6 +1914,25 @@ impl UninitializedProviderConfig {
                 endpoint,
                 api_key_location,
             )?),
+            UninitializedProviderConfig::AzureContentSafety {
+                endpoint,
+                api_key_location,
+            } => {
+                use crate::inference::providers::azure_content_safety::ProbeType;
+                ProviderConfig::AzureContentSafety(AzureContentSafetyProvider::new(
+                    endpoint,
+                    api_key_location,
+                    ProbeType::Moderation, // Default to Moderation for model-based configuration
+                )?)
+            }
+            UninitializedProviderConfig::BudDoc {
+                model_name: _,
+                api_base,
+                api_key_location,
+            } => ProviderConfig::BudDoc(BudDocProvider::new(
+                api_base.to_string(),
+                api_key_location,
+            )?),
             UninitializedProviderConfig::Fireworks {
                 model_name,
                 api_key_location,
@@ -1854,6 +2073,12 @@ impl ModelProvider {
             ProviderConfig::Azure(provider) => {
                 provider.infer(request, client, api_keys, self).await
             }
+            ProviderConfig::AzureContentSafety(_) => {
+                Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "inference".to_string(),
+                    provider: self.name.to_string(),
+                }))
+            }
             ProviderConfig::Fireworks(provider) => {
                 provider.infer(request, client, api_keys, self).await
             }
@@ -1889,6 +2114,11 @@ impl ModelProvider {
             ProviderConfig::TGI(provider) => provider.infer(request, client, api_keys, self).await,
             ProviderConfig::DeepSeek(provider) => {
                 provider.infer(request, client, api_keys, self).await
+            }
+            ProviderConfig::BudDoc(_) => {
+                return Err(Error::new(ErrorDetails::Config {
+                    message: "BudDoc provider does not support inference operations".to_string(),
+                }))
             }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
@@ -1926,6 +2156,12 @@ impl ModelProvider {
             }
             ProviderConfig::Azure(provider) => {
                 provider.infer_stream(request, client, api_keys, self).await
+            }
+            ProviderConfig::AzureContentSafety(_) => {
+                return Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "inference_stream".to_string(),
+                    provider: self.name.to_string(),
+                }))
             }
             ProviderConfig::Fireworks(provider) => {
                 provider.infer_stream(request, client, api_keys, self).await
@@ -1968,6 +2204,11 @@ impl ModelProvider {
             }
             ProviderConfig::DeepSeek(provider) => {
                 provider.infer_stream(request, client, api_keys, self).await
+            }
+            ProviderConfig::BudDoc(_) => {
+                return Err(Error::new(ErrorDetails::Config {
+                    message: "BudDoc provider does not support streaming inference".to_string(),
+                }))
             }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
@@ -2009,6 +2250,12 @@ impl ModelProvider {
                     .start_batch_inference(requests, client, api_keys)
                     .await
             }
+            ProviderConfig::AzureContentSafety(_) => {
+                Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "batch_inference".to_string(),
+                    provider: self.name.to_string(),
+                }))
+            }
             ProviderConfig::Fireworks(provider) => {
                 provider
                     .start_batch_inference(requests, client, api_keys)
@@ -2079,6 +2326,9 @@ impl ModelProvider {
                     .start_batch_inference(requests, client, api_keys)
                     .await
             }
+            ProviderConfig::BudDoc(_) => Err(Error::new(ErrorDetails::Config {
+                message: "BudDoc provider does not support batch inference".to_string(),
+            })),
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
@@ -2115,6 +2365,12 @@ impl ModelProvider {
                     .poll_batch_inference(batch_request, http_client, dynamic_api_keys)
                     .await
             }
+            ProviderConfig::AzureContentSafety(_) => {
+                Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                    capability: "batch_inference".to_string(),
+                    provider: self.name.to_string(),
+                }))
+            }
             ProviderConfig::Fireworks(provider) => {
                 provider
                     .poll_batch_inference(batch_request, http_client, dynamic_api_keys)
@@ -2185,6 +2441,9 @@ impl ModelProvider {
                     .poll_batch_inference(batch_request, http_client, dynamic_api_keys)
                     .await
             }
+            ProviderConfig::BudDoc(_) => Err(Error::new(ErrorDetails::Config {
+                message: "BudDoc provider does not support batch inference".to_string(),
+            })),
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
@@ -2230,6 +2489,58 @@ impl ModelProvider {
             // Other providers don't support embeddings yet
             _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
                 capability: EndpointCapability::Embedding.as_str().to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
+
+    /// Completions inference method
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_completion"))]
+    pub async fn complete(
+        &self,
+        request: &crate::completions::CompletionRequest,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<crate::completions::CompletionProviderResponse, Error> {
+        use crate::completions::CompletionProvider;
+
+        match &self.config {
+            ProviderConfig::VLLM(provider) => {
+                provider.complete(request, client, dynamic_api_keys).await
+            }
+            #[cfg(any(test, feature = "e2e_tests"))]
+            ProviderConfig::Dummy(provider) => {
+                provider.complete(request, client, dynamic_api_keys).await
+            }
+            // Other providers don't support completions yet
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Completions.as_str().to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
+
+    /// Streaming completions method
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_completion_stream"))]
+    pub async fn complete_stream(
+        &self,
+        request: &crate::completions::CompletionRequest,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<(crate::completions::CompletionStream, String), Error> {
+        use crate::completions::CompletionProvider;
+
+        match &self.config {
+            ProviderConfig::VLLM(provider) => {
+                provider.complete_stream(request, client, dynamic_api_keys).await
+            }
+            #[cfg(any(test, feature = "e2e_tests"))]
+            ProviderConfig::Dummy(provider) => {
+                provider.complete_stream(request, client, dynamic_api_keys).await
+            }
+            // Other providers don't support completions streaming yet
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Completions.as_str().to_string(),
                 provider: self.name.to_string(),
             })),
         }
@@ -2936,6 +3247,82 @@ impl ModelProvider {
             })),
         }
     }
+
+    /// Document processing method
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_document_processing"))]
+    pub async fn process_document(
+        &self,
+        request: &crate::documents::DocumentProcessingRequest,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<crate::documents::DocumentProcessingProviderResponse, Error> {
+        use crate::documents::DocumentProcessingProvider;
+
+        match &self.config {
+            ProviderConfig::BudDoc(provider) => {
+                provider
+                    .process_document(request, client, dynamic_api_keys)
+                    .await
+            }
+            // Other providers don't support document processing yet
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Document.as_str().to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
+
+    /// Moderation method
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_moderation"))]
+    pub async fn moderate(
+        &self,
+        request: &crate::moderation::ModerationRequest,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<crate::moderation::ModerationResponse, Error> {
+        use crate::moderation::ModerationProvider;
+
+        match &self.config {
+            ProviderConfig::AzureContentSafety(provider) => {
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
+                Ok(crate::moderation::ModerationResponse::new(
+                    provider_response,
+                    self.name.clone(),
+                ))
+            }
+            ProviderConfig::OpenAI(provider) => {
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
+                Ok(crate::moderation::ModerationResponse::new(
+                    provider_response,
+                    self.name.clone(),
+                ))
+            }
+            ProviderConfig::Mistral(provider) => {
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
+                Ok(crate::moderation::ModerationResponse::new(
+                    provider_response,
+                    self.name.clone(),
+                ))
+            }
+            #[cfg(any(test, feature = "e2e_tests"))]
+            ProviderConfig::Dummy(provider) => {
+                let provider_response =
+                    provider.moderate(request, client, dynamic_api_keys).await?;
+                Ok(crate::moderation::ModerationResponse::new(
+                    provider_response,
+                    self.name.clone(),
+                ))
+            }
+            // Other providers don't support moderation yet
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Moderation.as_str().to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -3277,11 +3664,12 @@ impl ShorthandModelConfig for ModelConfig {
                     extra_headers: Default::default(),
                 },
             )]),
-            endpoints,             // Use pre-computed endpoints based on model name
-            fallback_models: None, // Shorthand models don't support fallback
-            retry_config: None,    // Shorthand models don't have retry config
-            rate_limits: None,     // Shorthand models don't have rate limits
-            pricing: None,         // Shorthand models don't have pricing
+            endpoints,               // Use pre-computed endpoints based on model name
+            fallback_models: None,   // Shorthand models don't support fallback
+            retry_config: None,      // Shorthand models don't have retry config
+            rate_limits: None,       // Shorthand models don't have rate limits
+            pricing: None,           // Shorthand models don't have pricing
+            guardrail_profile: None, // Shorthand models don't have guardrail profiles
         })
     }
 
@@ -3396,6 +3784,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -3467,6 +3856,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let response = model_config
             .infer(&request, &clients, model_name)
@@ -3567,6 +3957,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         let model_name = "test model";
@@ -3637,6 +4028,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let (
             StreamResponse {
@@ -3711,6 +4103,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let response = model_config
             .infer_stream(
@@ -3813,6 +4206,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let (
             StreamResponse {
@@ -3895,6 +4289,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -4006,6 +4401,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
             tools_available: vec![],
@@ -4133,6 +4529,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
         let model_table: ModelTable = HashMap::from([("claude".into(), anthropic_model_config)])
             .try_into()
@@ -4245,6 +4642,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         assert!(model.supports_endpoint(EndpointCapability::Chat));
@@ -4273,6 +4671,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         let result = model.validate("test_model");
@@ -4313,7 +4712,8 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
-            pricing: None,
+                pricing: None,
+                guardrail_profile: None,
             },
         );
         models.insert(
@@ -4325,7 +4725,8 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
-            pricing: None,
+                pricing: None,
+                guardrail_profile: None,
             },
         );
         models.insert(
@@ -4337,7 +4738,8 @@ mod tests {
                 fallback_models: None,
                 retry_config: None,
                 rate_limits: None,
-            pricing: None,
+                pricing: None,
+                guardrail_profile: None,
             },
         );
 
@@ -4390,7 +4792,8 @@ mod tests {
                         fallback_models: None,
                         retry_config: None,
                         rate_limits: None,
-            pricing: None,
+                        pricing: None,
+                        guardrail_profile: None,
                     },
                 );
 
@@ -4436,6 +4839,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            guardrail_profile: None,
         };
 
         let request = crate::embeddings::EmbeddingRequest {

@@ -4,7 +4,7 @@ import "react-toastify/dist/ReactToastify.css";
 import toastIcn from "./../../../public/icons/toast-icon.svg";
 import Image from "next/image";
 
- const Toast = () => (
+const Toast = () => (
   <>
     <ToastContainer
       position="top-right"
@@ -22,22 +22,29 @@ import Image from "next/image";
   </>
 );
 export const errorToast = (
-  message = "Something went wrong. Try again later!"
+  message = "Something went wrong. Try again later!",
 ) => {
   toast.error(message, {
-    icon: ({theme, type}) =>  <Image alt="" height='20' width='20' src={`${toastIcn.src}`}/>, // Custom icon component
+    icon: ({ theme, type }) => (
+      <Image alt="" height="20" width="20" src={`${toastIcn.src}`} />
+    ), // Custom icon component
   });
   // toast.clearWaitingQueue();
 };
 
 export const successToast = (message) => {
   toast.success(message, {
-    icon: ({theme, type}) =>  <Image alt="" height='20' width='20' src={`${toastIcn.src}`}/>, // Custom icon component
+    icon: ({ theme, type }) => (
+      <Image alt="" height="20" width="20" src={`${toastIcn.src}`} />
+    ), // Custom icon component
   });
   // toast.clearWaitingQueue();
 };
-export const infoToast = (message) => toast.warning(message, {
-  icon: ({theme, type}) =>  <Image alt="" height='20' width='20' src={`${toastIcn.src}`}/>, // Custom icon component
-});
+export const infoToast = (message) =>
+  toast.warning(message, {
+    icon: ({ theme, type }) => (
+      <Image alt="" height="20" width="20" src={`${toastIcn.src}`} />
+    ), // Custom icon component
+  });
 
 export default Toast;

@@ -28,8 +28,6 @@
           image:
             repository: "{{ quantization_job_image }}"
           hfToken: "{{ hf_token }}"
-          imagePullSecrets:
-            auth: "{{ image_pull_secrets }}"
           volumeType: "{{ volume_type }}"
           nfs:
             server: "{{ nfs_server }}"

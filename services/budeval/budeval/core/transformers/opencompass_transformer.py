@@ -40,7 +40,9 @@ class OpenCompassTransformer(BaseTransformer):
     def _load_eval_manifest(self) -> None:
         """Load evaluation manifest with dataset mappings."""
         manifest_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "data", "eval_manifest.json"
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
+            "data",
+            "eval_manifest.json",
         )
 
         with open(manifest_path, "r") as f:
@@ -166,6 +168,23 @@ class OpenCompassTransformer(BaseTransformer):
         #     --max-num-workers {request.num_workers}{debug_flag}
 
         script = f"""
+# Setup data symlink for datasets (if data directory exists in PVC)
+echo "Setting up data access..."
+if [ -d /workspace/shared/data ]; then
+    ln -sf /workspace/shared/data /workspace/data
+    echo "Created symlink: /workspace/data -> /workspace/shared/data"
+else
+    echo "Warning: No /workspace/shared/data directory found"
+fi
+
+# Create output directory in shared storage
+mkdir -p /workspace/shared/results/opencompass-{request.eval_request_id}
+echo "Created output directory: /workspace/shared/results/opencompass-{request.eval_request_id}"
+
+# Verify directory structure
+echo "Directory structure:"
+ls -la /workspace/ | head -10
+
 # Create a model config file that uses environment variables
 mkdir -p /workspace/opencompass/configs/models
 cat > /workspace/opencompass/configs/models/bud_model.py << 'EOF'
@@ -190,11 +209,11 @@ EOF
 # Change to workspace directory where OpenCompass is installed
 cd /workspace
 
-# Run OpenCompass evaluation with model config and datasets via CLI
+# Run OpenCompass evaluation with direct output to shared storage
 python /workspace/run.py \\
     --models bud_model \\
     --datasets {datasets_str} \\
-    --work-dir /workspace/outputs \\
+    --work-dir /workspace/shared/results/opencompass-{request.eval_request_id} \\
     --max-num-workers {request.num_workers} --debug
 """
 
@@ -210,25 +229,14 @@ python /workspace/run.py \\
         return "ghcr.io/rahulvramesh/opencompass:latest"
 
     def get_volume_mounts(self) -> List[Dict[str, Any]]:
-        """Get volume mounts for OpenCompass."""
-        # Get PVC name from configuration
-        from budeval.commons.storage_config import StorageConfig
+        """Get volume mounts for OpenCompass.
 
-        pvc_name = StorageConfig.get_eval_datasets_pvc_name()
-
-        return [
-            {
-                "name": "datasets",
-                "mountPath": "/workspace/data",
-                "readOnly": True,
-                "claimName": pvc_name,
-            },
-            {
-                "name": "cache",
-                "mountPath": "/workspace/cache",
-                "type": "emptyDir",
-            },
-        ]
+        Note: This method is now handled by the base class create_job_config()
+        which sets up a single shared mount to avoid NFS CSI driver conflicts.
+        """
+        # Volume mounts are now configured in base.py create_job_config()
+        # to use a single shared-storage mount point
+        return []
 
     def get_environment_variables(self, request: GenericEvaluationRequest) -> Dict[str, str]:
         """Get environment variables for OpenCompass.

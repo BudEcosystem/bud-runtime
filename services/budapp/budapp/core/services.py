@@ -31,18 +31,26 @@ from budapp.commons.constants import (
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.model_ops.quantization_services import QuantizationService
-from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
+from budapp.workflow_ops.crud import (
+    WorkflowDataManager,
+    WorkflowStepDataManager,
+)
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
 
 from ..benchmark_ops.services import BenchmarkService
 from ..endpoint_ops.services import EndpointService
 from ..model_ops.services import LocalModelWorkflowService, ModelService
+from ..prompt_ops.services import PromptWorkflowService
 from ..shared.notification_service import BudNotifyService, NotificationBuilder
 from .crud import IconDataManager, ModelTemplateDataManager
 from .models import Icon as IconModel
 from .models import ModelTemplate as ModelTemplateModel
-from .schemas import NotificationPayload, NotificationResponse, NotificationResult
+from .schemas import (
+    NotificationPayload,
+    NotificationResponse,
+    NotificationResult,
+)
 
 
 logger = logging.get_logger(__name__)
@@ -65,10 +73,16 @@ class NotificationService(SessionMixin):
         """
         # Update workflow step data event
         try:
-            await self._update_workflow_step_events(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
+            await self._update_workflow_step_events(
+                BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value,
+                payload,
+            )
 
             # Update progress in workflow
-            await self._update_workflow_progress(BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value, payload)
+            await self._update_workflow_progress(
+                BudServeWorkflowStepEventName.BUD_SIMULATOR_EVENTS.value,
+                payload,
+            )
         except Exception:
             logger.error("Failed to update workflow step events")
 
@@ -201,11 +215,15 @@ class NotificationService(SessionMixin):
         """
         # Update workflow step data event
         await self._update_workflow_step_events(
-            BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value, payload
+            BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value,
+            payload,
         )
 
         # Update progress in workflow
-        await self._update_workflow_progress(BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value, payload)
+        await self._update_workflow_progress(
+            BudServeWorkflowStepEventName.MODEL_SECURITY_SCAN_EVENTS.value,
+            payload,
+        )
 
         # Create cluster in database if node info fetched successfully
         if payload.event == "results":
@@ -286,12 +304,14 @@ class NotificationService(SessionMixin):
         """
         # Update workflow step data event
         await self._update_workflow_step_events(
-            BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value, payload
+            BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value,
+            payload,
         )
 
         # Update progress in workflow
         await self._update_workflow_progress(
-            BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value, payload
+            BudServeWorkflowStepEventName.QUANTIZATION_DEPLOYMENT_EVENTS.value,
+            payload,
         )
 
         # Add quantization to model
@@ -334,69 +354,150 @@ class NotificationService(SessionMixin):
         # Update progress in workflow
         await self._update_workflow_progress(BudServeWorkflowStepEventName.EVALUATION_EVENTS.value, payload)
 
-        # # Handle evaluation completion/failure events similar to cluster creation
         # if payload.event == "results":
+        #
+        # if monitoring event , then update the evaluation and run status to running
+        # if payload.event == "monitor_eval_job_progress":
+        # Update the eval and run
+
+        # Handle evaluation completion/failure events similar to cluster creation
+        if payload.event == "results":
+            from ..eval_ops.services import EvaluationWorkflowService
+
+            await EvaluationWorkflowService(self.session).create_evaluation_from_notification_event(payload)
+
+        #     from budapp.eval_ops.models import Evaluation as EvaluationModel
+        #     from budapp.eval_ops.models import (
+        #         EvaluationStatusEnum,
+        #         RunStatusEnum,
+        #     )
+        #     from budapp.eval_ops.models import (
+        #         Run as RunModel,
+        #     )
+
         #     from ..eval_ops.services import EvaluationWorkflowService
 
-        #     await EvaluationWorkflowService(self.session).create_evaluation_from_notification_event(payload)
-        #     return
+        #     # Final Status
+        #     status_str = (payload.content.status or "").upper()
 
-        # # Advance workflow and notify on completion/failure
-        # if not payload.workflow_id:
-        #     return
+        #     # evaluation id
+        #     job_id = payload.content.result.job_id
+        #     # Extract only the UUID part from job_id (format: opencompass-<uuid>)
+        #     evaluation_id = job_id.split("-", 1)[1] if "-" in job_id else job_id
 
-        # db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
-        #     WorkflowModel, {"id": payload.workflow_id}
-        # )
-        # if not db_workflow:
-        #     return
-
-        # status_str = (payload.content.status or "").upper()
-        # updates: Dict[str, Any] = {}
-
-        # if status_str in {"COMPLETED", "FAILED"}:
-        #     updates["status"] = status_str.lower()
-        #     updates["current_step"] = db_workflow.total_steps
-        # else:
-        #     # Best-effort step advance while in progress
-        #     try:
-        #         curr = int(getattr(db_workflow, "current_step", 0) or 0)
-        #         total = int(getattr(db_workflow, "total_steps", 0) or 0)
-        #         if curr < total:
-        #             updates["current_step"] = curr + 1
-        #     except Exception:
-        #         pass
-
-        # if updates:
-        #     self.session.refresh(db_workflow)
-        #     await WorkflowDataManager(self.session).update_by_fields(db_workflow, updates)
-
-        # # Send final user notification on completion/failure
-        # if status_str in {"COMPLETED", "FAILED"}:
-        #     title = "Evaluation completed" if status_str == "COMPLETED" else "Evaluation failed"
-        #     message = payload.content.message or title
-        #     result = NotificationResult(target_id=db_workflow.id, target_type="workflow").model_dump(
-        #         exclude_none=True, exclude_unset=True
+        #     # Get Evaluation
+        #     evaluation = (
+        #         self.session.query(EvaluationModel)
+        #         .filter(EvaluationModel.id == evaluation_id)
+        #         .first()
         #     )
-        #     try:
-        #         notification_request = (
-        #             NotificationBuilder()
-        #             .set_content(title=title, message=message, result=result)
-        #             .set_payload(workflow_id=str(db_workflow.id), type=PayloadType.EVALUATE_MODEL.value)
-        #             .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
-        #             .build()
+
+        #     if evaluation:
+        #         evaluation.status = EvaluationStatusEnum.COMPLETED.value
+        #         self.session.commit()
+
+        #         runs = (
+        #             self.session.query(RunModel)
+        #             .filter(RunModel.evaluation_id == evaluation_id)
+        #             .all()
         #         )
-        #         await BudNotifyService().send_notification(notification_request)
-        #     except Exception:
-        #         logger.exception("Failed to send evaluation completion notification for workflow %s", db_workflow.id)
+
+        #         # For Each run, update the status to status_str
+        #         for run in runs:
+        #             run.status = RunStatusEnum.COMPLETED.value
+        #             self.session.commit()
+
+        #     # evaluation_service = EvaluationWorkflowService(self.session)
+        #     #
+
+        #     #
+        #     # return
+
+        #     # # Advance workflow and notify on completion/failure
+        #     # if not payload.workflow_id:
+        #     #     return
+
+        #     db_workflow = await WorkflowDataManager(
+        #         self.session
+        #     ).retrieve_by_fields(WorkflowModel, {"id": payload.workflow_id})
+        #     if not db_workflow:
+        #         logger.debug(
+        #             f"Workflow with ID {payload.workflow_id} not found"
+        #         )
+
+        #     # updates: Dict[str, Any] = {}
+
+        #     # if status_str in {"COMPLETED", "FAILED"}:
+        #     #     updates["status"] = status_str.lower()
+        #     #     updates["current_step"] = db_workflow.total_steps
+        #     # else:
+        #     #     # Best-effort step advance while in progress
+        #     #     try:
+        #     #         curr = int(getattr(db_workflow, "current_step", 0) or 0)
+        #     #         total = int(getattr(db_workflow, "total_steps", 0) or 0)
+        #     #         if curr < total:
+        #     #             updates["current_step"] = curr + 1
+        #     #     except Exception:
+        #     #         pass
+
+        #     # if updates:
+        #     #     self.session.refresh(db_workflow)
+        #     #     await WorkflowDataManager(self.session).update_by_fields(db_workflow, updates)
+
+        #     # Send final user notification on completion/failure
+        #     if status_str in {"COMPLETED", "FAILED"}:
+        #         title = (
+        #             "Evaluation completed"
+        #             if status_str == "COMPLETED"
+        #             else "Evaluation failed"
+        #         )
+        #         message = payload.content.message or title
+        #         result = NotificationResult(
+        #             target_id=db_workflow.id, target_type="workflow"
+        #         ).model_dump(exclude_none=True, exclude_unset=True)
+        #         try:
+        #             notification_request = (
+        #                 NotificationBuilder()
+        #                 .set_content(
+        #                     title=title, message=message, result=result
+        #                 )
+        #                 .set_payload(
+        #                     workflow_id=str(db_workflow.id),
+        #                     type=PayloadType.EVALUATE_MODEL.value,
+        #                 )
+        #                 .set_notification_request(
+        #                     subscriber_ids=[str(db_workflow.created_by)]
+        #                 )
+        #                 .build()
+        #             )
+        #             await BudNotifyService().send_notification(
+        #                 notification_request
+        #             )
+        #         except Exception:
+        #             logger.exception(
+        #                 "Failed to send evaluation completion notification for workflow %s",
+        #                 db_workflow.id,
+        #             )
+
+        # return NotificationResponse(
+        #     code=200,
+        #     object="notification",
+        #     message="Evaluation results are updated",
+        # ).to_http_response()
 
     async def update_adapter_deployment_events(self, payload: NotificationPayload) -> None:
         """Update the quantization deployment events for a workflow step."""
         # Update workflow step data event
-        await self._update_workflow_step_events(BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value, payload)
+        await self._update_workflow_step_events(
+            BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value,
+            payload,
+        )
 
         # Update progress in workflow
-        await self._update_workflow_progress(BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value, payload)
+        await self._update_workflow_progress(
+            BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS.value,
+            payload,
+        )
 
         if payload.event == "results":
             await EndpointService(self.session).add_adapter_from_notification_event(payload)
@@ -413,6 +514,25 @@ class NotificationService(SessionMixin):
         if payload.event == "results":
             await EndpointService(self.session).delete_adapter_from_notification_event(payload)
 
+    async def update_prompt_schema_events(self, payload: NotificationPayload) -> None:
+        """Update the prompt schema events for a workflow step.
+
+        Args:
+            payload: The payload to update the step with.
+
+        Returns:
+            None
+        """
+        # Update workflow step data event
+        await self._update_workflow_step_events(BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value, payload)
+
+        # Update progress in workflow
+        await self._update_workflow_progress(BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value, payload)
+
+        # Create prompt_id in workflow response
+        if payload.event == "results":
+            await PromptWorkflowService(self.session).create_prompt_schema_from_notification_event(payload)
+
     async def update_eta_events(self, payload: NotificationPayload) -> None:
         """Update ETA value for workflow progress and step."""
         if not payload.workflow_id:
@@ -423,13 +543,18 @@ class NotificationService(SessionMixin):
             eta = int(payload.content.message)
         except (TypeError, ValueError):
             logger.error(
-                "Invalid ETA value received for workflow %s: %s", payload.workflow_id, payload.content.message
+                "Invalid ETA value received for workflow %s: %s",
+                payload.workflow_id,
+                payload.content.message,
             )
             return
 
         event_name = PAYLOAD_TO_WORKFLOW_STEP_EVENT.get(PayloadType(payload.type))
         if not event_name:
-            logger.error("No workflow step mapping found for payload type %s", payload.type)
+            logger.error(
+                "No workflow step mapping found for payload type %s",
+                payload.type,
+            )
             return
 
         # Update workflow progress ETA
@@ -460,7 +585,10 @@ class NotificationService(SessionMixin):
             self.session.refresh(latest_step)
             await WorkflowStepDataManager(self.session).update_by_fields(latest_step, {"data": data})
         else:
-            logger.error("Error updating ETA for workflow %s: No workflow step found", payload.workflow_id)
+            logger.error(
+                "Error updating ETA for workflow %s: No workflow step found",
+                payload.workflow_id,
+            )
 
     async def _update_workflow_step_events(self, event_name: str, payload: NotificationPayload) -> None:
         """Update the workflow step events for a workflow step.
@@ -499,7 +627,12 @@ class NotificationService(SessionMixin):
         )
         logger.info(f"Updated workflow step with {event_name} events: {db_workflow_step.id}")
 
-    async def _update_step_data(self, event_name: str, step: WorkflowStepModel, payload: NotificationPayload) -> dict:
+    async def _update_step_data(
+        self,
+        event_name: str,
+        step: WorkflowStepModel,
+        payload: NotificationPayload,
+    ) -> dict:
         """Update the payload for the event in the step data.
 
         Args:
@@ -641,6 +774,7 @@ class SubscriberHandler:
             PayloadType.ADD_ADAPTER: self._handle_deploy_adapter,
             PayloadType.DELETE_ADAPTER: self._handle_delete_adapter,
             PayloadType.EVALUATE_MODEL: self._handle_evaluate_model,
+            PayloadType.PERFORM_PROMPT_SCHEMA: self._handle_perform_prompt_schema,
         }
 
         handler = handlers.get(payload.type)
@@ -786,6 +920,14 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Updated evaluation event in workflow step",
+        ).to_http_response()
+
+    async def _handle_perform_prompt_schema(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the perform prompt schema event."""
+        await NotificationService(self.session).update_prompt_schema_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated prompt schema event in workflow step",
         ).to_http_response()
 
 

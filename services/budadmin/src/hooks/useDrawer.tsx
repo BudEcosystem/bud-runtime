@@ -1,5 +1,8 @@
 import { errorToast } from "@/components/toast";
-import { FormProgressStatus, FormProgressType } from "@/components/ui/bud/progress/FormProgress";
+import {
+  FormProgressStatus,
+  FormProgressType,
+} from "@/components/ui/bud/progress/FormProgress";
 import { StepComponentsType } from "src/flows";
 import { create } from "zustand";
 import drawerFlows, { Flow } from "./drawerFlows";
@@ -54,15 +57,18 @@ export const useDrawer = create<{
     set({ expandedStep: null });
   },
   minimizeProcess: (step: DrawerStepParsedType) => {
+    console.log("Minimizing process", step);
     get().timeout && clearTimeout(get().timeout);
     get().closeDrawer();
     set((state) => {
       return {
         // 1 item in the list
-        minmizedProcessList: [{
-          step: step,
-          flow: get().currentFlow,
-        }],
+        minmizedProcessList: [
+          {
+            step: step,
+            flow: get().currentFlow,
+          },
+        ],
         showMinimizedItem: true,
         cancelAlert: false,
         // Hide the minimized item after 5 seconds
@@ -74,14 +80,14 @@ export const useDrawer = create<{
           });
         }, 3000),
       };
-    }
-    );
-
+    });
   },
   maxmizedProcess: (step: DrawerStepParsedType) => {
     set((state) => {
       return {
-        minmizedProcessList: state.minmizedProcessList.filter((s) => s.step.id !== step.id),
+        minmizedProcessList: state.minmizedProcessList.filter(
+          (s) => s.step.id !== step.id,
+        ),
         showMinimizedItem: false,
       };
     });
@@ -120,7 +126,7 @@ export const useDrawer = create<{
 
     const foundFlowSteps = drawerFlows[foundFlow].steps;
     const foundStepIndex = foundFlowSteps.find((s) => s.id === step).step;
-    const foundStep = foundFlowSteps.find((s) => s.id === step)
+    const foundStep = foundFlowSteps.find((s) => s.id === step);
 
     if (!foundStepIndex) {
       errorToast("Step not found");
@@ -147,9 +153,7 @@ export const useDrawer = create<{
 
     const foundFlowSteps = drawerFlows[foundFlow].steps;
     const foundStepIndex = foundFlowSteps.find((s) => s.id === step).step;
-    const foundStep = foundFlowSteps.find((s) => s.id === step)
-
-
+    const foundStep = foundFlowSteps.find((s) => s.id === step);
 
     if (!foundStepIndex) {
       errorToast("Step not found");
@@ -173,7 +177,16 @@ export const useDrawer = create<{
     });
   },
   closeDrawer: () => {
-    set({ isDrawerOpen: false, currentFlow: null, step: null, previousStep: null, expandedStep: null, isFailed: false, drawerProps: null, expandedDrawerProps: null });
+    set({
+      isDrawerOpen: false,
+      currentFlow: null,
+      step: null,
+      previousStep: null,
+      expandedStep: null,
+      isFailed: false,
+      drawerProps: null,
+      expandedDrawerProps: null,
+    });
   },
   currentFlow: "run-model-evaluations",
   // currentFlow: "view-model",

@@ -59,6 +59,8 @@ class TransferModelRequest(BaseModel):
     simulator_config: List[Dict[str, Any]] | None = None
     platform: Optional[ClusterPlatformEnum] = None
     existing_deployment_namespace: Optional[str] = None
+    default_storage_class: Optional[str] = None
+    default_access_mode: Optional[str] = None
     operation: Literal["download", "upload"] = "download"
 
 
@@ -82,6 +84,7 @@ class CommonDeploymentParams(BaseModel):
     simulator_id: Optional[UUID] = None
     endpoint_name: str
     model: str
+    model_size: Optional[int] = None
     concurrency: int
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
@@ -98,6 +101,11 @@ class DeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchma
     credential_id: Optional[UUID] = None
     existing_deployment_namespace: Optional[str] = None
     provider: Optional[str] = None
+    # User preferences for parser features
+    enable_tool_calling: Optional[bool] = None
+    enable_reasoning: Optional[bool] = None
+    default_storage_class: Optional[str] = None  # Added for cluster settings support
+    default_access_mode: Optional[str] = None
 
 
 class LocalDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchmarkParams):
@@ -110,6 +118,8 @@ class LocalDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBe
     credential_id: Optional[UUID] = None
     namespace: Optional[str] = None
     provider: Optional[str] = None
+    default_storage_class: Optional[str] = None  # Added for cluster settings support
+    default_access_mode: Optional[str] = None
 
 
 class CloudDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchmarkParams):
@@ -117,6 +127,8 @@ class CloudDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBe
 
     credential_id: UUID
     namespace: Optional[str] = None
+    default_storage_class: Optional[str] = None  # Added for cluster settings support
+    default_access_mode: Optional[str] = None
 
 
 class DeploymentInfo(BaseModel):
@@ -142,6 +154,12 @@ class DeploymentWorkflowRequest(DeploymentCreateRequest):
     namespace: str | None = None
     platform: Optional[ClusterPlatformEnum] = None
     add_worker: bool = False
+    # Parser types fetched from BudSim (internal workflow use only)
+    tool_calling_parser_type: Optional[str] = None
+    reasoning_parser_type: Optional[str] = None
+    chat_template: Optional[str] = None
+    default_storage_class: Optional[str] = None  # Added for cluster settings support
+    default_access_mode: Optional[str] = None
 
 
 class UpdateModelTransferStatusRequest(DeploymentWorkflowRequest):

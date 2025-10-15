@@ -25,6 +25,10 @@ variable "user" {
   }
 }
 
+variable "region" {
+  default = "West US"
+}
+
 variable "primary_sku" {
   type        = string
   description = "Sku for the primary vm"

@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
-import { ConfigProvider, Image, Popover, Select, Slider, Tag } from "antd";
+import { ConfigProvider, Image, Popover, Select, Spin } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import React from "react";
 import DashBoardLayout from "../layout";
@@ -21,9 +21,10 @@ import PageHeader from "@/components/ui/pageHeader";
 import NoAccess from "@/components/ui/noAccess";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
-import { getChromeColor } from "@/components/ui/bud/dataEntry/TagsInputData";
-import { formatDate } from "src/utils/formatDate";
-import { cloudProviders, Model, useModels } from "src/hooks/useModels";
+import useGuardrails from "src/hooks/useGuardrails";
+import { AppRequest } from "src/pages/api/requests";
+import { errorToast } from "@/components/toast";
+import { useModels } from "src/hooks/useModels";
 import Tags from "src/flows/components/DrawerTags";
 import {
   PrimaryButton,
@@ -31,38 +32,49 @@ import {
 } from "@/components/ui/bud/form/Buttons";
 import CustomPopover from "src/flows/components/customPopover";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
-import ImageIcon from "src/flows/components/ImageIcon";
 import NoDataFount from "@/components/ui/noDataFount";
-import ModelTags from "src/flows/components/ModelTags";
 import { PermissionEnum, useUser } from "src/stores/useUser";
-import IconRender from "src/flows/components/BudIconRender";
-import router from "next/router";
 import { PlusOutlined } from "@ant-design/icons";
 
+// Interface for GuardRail/Probe data structure
 interface GuardRail {
   id: string;
   name: string;
-  type: string;
+  uri?: string;
+  type?: string;
   category: string[];
   description?: string;
-  provider?: string;
+  provider?: any;
+  provider_type?: string;
   deployments?: number;
-  status?: "active" | "inactive" | "pending";
+  status?: string;
   createdAt?: string;
+  created_at?: string;
   icon?: string;
+  tags?: Array<{ name: string; color: string }>;
+  scanner_types?: string[];
+  modality_types?: string[];
+  guard_types?: string[];
+  examples?: string[];
 }
 
-function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
+function GuardRailCard({ item, index }: { item: any; index: number }) {
   const { openDrawer, openDrawerWithStep } = useDrawer();
   const [descriptionPopoverOpen, setDescriptionPopoverOpen] = useState(false);
 
   // Check if description is long enough to need "See more" (approximately 3 lines worth)
   const needsSeeMore = item.description && item.description.length > 150;
 
-  const getTypeIcon = (type: string) => {
-    switch(type) {
+  const getTypeIcon = (item: any) => {
+    // Use uri or type to determine icon
+    const typeIdentifier = item.uri || item.type || '';
+    switch (typeIdentifier.toLowerCase()) {
       case 'pii':
+      case 'personal_identifier_information':
         return '🔒';
+      case 'secrets':
+      case 'credentials':
+        return '🔐';
       case 'regex':
         return '📝';
       case 'toxicity':
@@ -83,7 +95,7 @@ function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
   };
 
   const getStatusColor = (status?: string) => {
-    switch(status) {
+    switch (status) {
       case 'active':
         return '#52C41A';
       case 'inactive':
@@ -106,7 +118,7 @@ function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
       <div className="flex items-start justify-between mb-[1.25rem]">
         <div className="flex items-center gap-[1rem]">
           <div className="w-[3rem] h-[3rem] bg-[#1F1F1F] rounded-[8px] flex items-center justify-center text-[1.75rem]">
-            {getTypeIcon(item.type)}
+            {getTypeIcon(item)}
           </div>
           <div className="flex-1">
             <Text_17_600_FFFFFF className="mb-[0.25rem] line-clamp-1">
@@ -114,7 +126,7 @@ function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
             </Text_17_600_FFFFFF>
             {item.provider && (
               <Text_12_400_B3B3B3>
-                by {item.provider}
+                by {typeof item.provider === 'object' ? item.provider.name : item.provider}
               </Text_12_400_B3B3B3>
             )}
           </div>
@@ -183,31 +195,41 @@ function GuardRailCard({ item, index }: { item: GuardRail; index: number }) {
 
       <div className="flex items-center justify-between mt-auto pt-[1rem] border-t border-[#1F1F1F]">
         <div className="flex items-center gap-[0.5rem] flex-wrap">
-          {item.category.slice(0, 3).map((cat, idx) => (
-            <Tag
-              key={idx}
-              className="text-[#B3B3B3] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
-              style={{
-                backgroundColor: "#1F1F1F",
-              }}
-            >
-              <span className="text-[0.75rem] font-[400] capitalize">
-                {cat}
-              </span>
-            </Tag>
-          ))}
-          {item.category.length > 3 && (
-            <Tag
-              className="text-[#757575] border-[0] rounded-[6px] flex items-center px-[0.75rem] py-[0.375rem]"
-              style={{
-                backgroundColor: "#1F1F1F",
-              }}
-            >
-              <span className="text-[0.75rem] font-[400]">
-                +{item.category.length - 3}
-              </span>
-            </Tag>
-          )}
+          {item.tags ? (
+            // Use tags from API if available
+            <>
+              {item.tags.slice(0, 3).map((tag: any, idx: number) => (
+                <Tags
+                  name={tag.name}
+                  color={tag.color || "#1F1F1F"}
+                  key={idx}
+                />
+              ))}
+              {item.tags.length > 3 && (
+                <Tags
+                  name={`+${item.tags.length - 3}`}
+                  color="#1F1F1F"
+                />
+              )}
+            </>
+          ) : item.category ? (
+            // Fallback to category if tags not available
+            <>
+              {item.category.slice(0, 3).map((cat: string, idx: number) => (
+                <Tags
+                  name={cat}
+                  color="#1F1F1F"
+                  key={idx}
+                />
+              ))}
+              {item.category.length > 3 && (
+                <Tags
+                  name={`+${item.category.length - 3}`}
+                  color="#1F1F1F"
+                />
+              )}
+            </>
+          ) : null}
         </div>
         {item.deployments !== undefined && (
           <Text_12_400_B3B3B3 className="shrink-0">
@@ -259,12 +281,13 @@ interface GuardRailFilters {
   status?: string[];
 }
 
+// Component for displaying selected filters
 const SelectedFilters = ({
   filters,
   removeTag,
 }: {
   filters: GuardRailFilters;
-  removeTag?: (key, item) => void;
+  removeTag?: (key: string, item: string) => void;
 }) => {
   return (
     <div className="flex justify-start gap-[.4rem] items-center absolute top-[.4rem] left-[3.5rem]">
@@ -312,167 +335,127 @@ const SelectedFilters = ({
   );
 };
 
-// Dummy guardrail data
-const dummyGuardRails: GuardRail[] = [
-  {
-    id: "1",
-    name: "PII Detection",
-    type: "pii",
-    category: ["harm", "compliance", "privacy"],
-    description: "Detects and masks personal identifiable information including SSN, credit cards, emails, phone numbers",
-    provider: "Bud Sentinel",
-    deployments: 12,
-    status: "active"
-  },
-  {
-    id: "2",
-    name: "Jailbreak Protection",
-    type: "jailbreak",
-    category: ["jailbreak", "security"],
-    description: "Prevents prompt injection and jailbreak attempts to bypass model safety guidelines",
-    provider: "Bud Sentinel",
-    deployments: 8,
-    status: "active"
-  },
-  {
-    id: "3",
-    name: "Toxicity Filter",
-    type: "toxicity",
-    category: ["toxic", "harm", "content"],
-    description: "Filters out toxic, harmful, and inappropriate content from model responses",
-    provider: "Bud Sentinel",
-    deployments: 15,
-    status: "active"
-  },
-  {
-    id: "4",
-    name: "Bias Detection",
-    type: "bias",
-    category: ["bias", "fairness"],
-    description: "Identifies and mitigates bias in AI model outputs including gender, racial, and age bias",
-    provider: "Bud Sentinel",
-    deployments: 5,
-    status: "pending"
-  },
-  {
-    id: "5",
-    name: "Profanity Blocker",
-    type: "profanity",
-    category: ["content", "harm"],
-    description: "Blocks profane language and offensive terms in both input and output",
-    provider: "Azure AI",
-    deployments: 20,
-    status: "active"
-  },
-  {
-    id: "6",
-    name: "RegEx Pattern Matcher",
-    type: "regex",
-    category: ["custom", "pattern"],
-    description: "Custom regex patterns for detecting specific text patterns or formats",
-    provider: "Custom",
-    deployments: 3,
-    status: "active"
-  },
-  {
-    id: "7",
-    name: "Semantic Similarity",
-    type: "semantic",
-    category: ["custom", "similarity"],
-    description: "Checks semantic similarity between prompts and predefined patterns",
-    provider: "Custom",
-    deployments: 0,
-    status: "inactive"
-  },
-  {
-    id: "8",
-    name: "Medical Info Filter",
-    type: "pii",
-    category: ["harm", "compliance", "healthcare"],
-    description: "Specialized filter for medical and health-related personal information",
-    provider: "Bud Sentinel",
-    deployments: 7,
-    status: "active"
-  },
-  {
-    id: "9",
-    name: "Financial Data Protection",
-    type: "pii",
-    category: ["compliance", "finance"],
-    description: "Protects financial data including account numbers, routing numbers, and transaction details",
-    provider: "AWS Bedrock",
-    deployments: 10,
-    status: "active"
-  }
-];
-
 export default function GuardRails() {
   const [isMounted, setIsMounted] = useState(false);
   const { hasPermission, loadingUser } = useUser();
   const {
     models,
-    getGlobalModels,
     getTasks,
     getAuthors,
-    authors,
-    tasks,
     totalModels,
     totalPages,
   } = useModels();
   const { showLoader, hideLoader } = useLoader();
-  const { openDrawer, openDrawerWithStep } = useDrawer();
+  const { openDrawer } = useDrawer();
   const { reset } = useDeployModel();
 
-  // State for guardrails
-  const [guardRails, setGuardRails] = useState<GuardRail[]>(dummyGuardRails);
+  // Use the guardrails hook (but we won't use its fetchProbes for the main listing)
+  // This is to avoid conflicts with the add guardrail workflow
+  const guardrailsHook = useGuardrails();
+
+  // Local state for main listing page probes
+  const [probes, setProbes] = useState<any[]>([]);
+  const [probesLoading, setProbesLoading] = useState(false);
+  const [totalProbes, setTotalProbes] = useState(0);
+  const [totalProbePages, setTotalProbePages] = useState(0);
+
+  // State for guardrails (fallback for when API is not available)
+  const [guardRails] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   // for pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize] = useState(10);
   const [tempFilter, setTempFilter] = useState<GuardRailFilters>({});
   const [filter, setFilter] = useState<GuardRailFilters>(defaultFilter);
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [filterReset, setFilterReset] = useState(false);
 
+  // Local fetch function for main listing page
+  const fetchMainPageProbes = useCallback(
+    async (params?: any) => {
+      setProbesLoading(true);
+      try {
+        const queryParams: any = {
+          page: params?.page || 1,
+          page_size: params?.page_size || 20,
+          search: params?.isSearching === true ? true : false, // Add search parameter
+        };
+
+        // Add optional filters
+        if (params?.searchTerm) {
+          queryParams.query = params.searchTerm; // Use 'query' for the actual search term
+        }
+        if (params?.provider_type) {
+          queryParams.provider_type = params.provider_type;
+        }
+        if (params?.tags) {
+          queryParams.tags = params.tags;
+        }
+        if (params?.status) {
+          queryParams.status = params.status; // Add status parameter
+        }
+
+        const response = await AppRequest.Get("/guardrails/probes", {
+          params: queryParams,
+        });
+
+        if (response.data) {
+          setProbes(response.data.probes || []);
+          setTotalProbes(response.data.total_record || 0);
+          setTotalProbePages(response.data.total_pages || 0);
+        }
+      } catch (error: any) {
+        errorToast(error?.message || "Failed to fetch probes");
+        setProbes([]);
+      } finally {
+        setProbesLoading(false);
+      }
+    },
+    []
+  );
+
   const load = useCallback(
-    async (filter: GuardRailFilters) => {
+    async (filter: GuardRailFilters, isSearching: boolean = false) => {
       if (hasPermission(PermissionEnum.ModelView)) {
-        // For now, just filter the local dummy data
-        // In real implementation, this would call an API
-        let filteredGuardRails = [...dummyGuardRails];
+        // Determine if we should set search to true
+        // Set search: true if we have name search or status filter
+        const shouldSearch = isSearching || !!filter.name || (filter.status?.length > 0);
+
+        // Use local fetch function instead of the hook's fetchProbes
+        const params: any = {
+          page: currentPage,
+          page_size: pageSize,
+          isSearching: shouldSearch, // Pass the search flag
+        };
 
         if (filter.name) {
-          filteredGuardRails = filteredGuardRails.filter(gr =>
-            gr.name.toLowerCase().includes(filter.name!.toLowerCase())
-          );
+          params.searchTerm = filter.name; // Use searchTerm for the actual search string
         }
 
         if (filter.provider?.length > 0) {
-          filteredGuardRails = filteredGuardRails.filter(gr =>
-            filter.provider!.includes(gr.provider?.toLowerCase().replace(/\s+/g, '-') || '')
-          );
+          // For provider filtering, we might need to pass provider_id or provider_type
+          // This depends on your API implementation
+          params.provider_type = filter.provider.join(',');
         }
 
         if (filter.guardRailType?.length > 0) {
-          filteredGuardRails = filteredGuardRails.filter(gr =>
-            filter.guardRailType!.includes(gr.type)
-          );
+          // Map guardRailType to tags or other API parameters
+          params.tags = filter.guardRailType.join(',');
         }
 
         if (filter.status?.length > 0) {
-          filteredGuardRails = filteredGuardRails.filter(gr =>
-            filter.status!.includes(gr.status || '')
-          );
+          // Pass status filter to API
+          params.status = filter.status.join(',');
         }
 
-        setGuardRails(filteredGuardRails);
+        await fetchMainPageProbes(params);
       }
     },
-    [hasPermission]
+    [hasPermission, currentPage, pageSize, fetchMainPageProbes]
   );
 
-  const handleOpenChange = (open) => {
+  const handleOpenChange = (open: boolean) => {
     setFilterOpen(open);
     setTempFilter(filter);
   };
@@ -481,7 +464,9 @@ export default function GuardRails() {
     setFilterOpen(false);
     setFilter(tempFilter);
     setCurrentPage(1);
-    load(tempFilter);
+    // Check if status filter is applied to determine if it's a search operation
+    const hasStatusFilter = tempFilter.status && tempFilter.status.length > 0;
+    load(tempFilter, hasStatusFilter);
     setFilterReset(false);
   };
 
@@ -510,42 +495,40 @@ export default function GuardRails() {
     }
   }, [filterReset]);
 
+  // Handle search with debounce
   useEffect(() => {
-    // debounce
+    if (!isMounted) return;
+
     const timer = setTimeout(() => {
-      load(filter);
-      setCurrentPage(1);
+      if (hasPermission(PermissionEnum.ModelView)) {
+        // Pass true for isSearching when searching by name
+        load(filter, !!filter.name);
+      }
     }, 500);
     return () => clearTimeout(timer);
-  }, [filter.name]);
+  }, [filter.name, isMounted, hasPermission]);
 
+  // Handle other filter changes (non-search)
+  useEffect(() => {
+    if (!isMounted) return;
+
+    if (hasPermission(PermissionEnum.ModelView)) {
+      // Pass true for isSearching when status filter is applied, false for others
+      const hasStatusFilter = filter.status && filter.status.length > 0;
+      load(filter, hasStatusFilter);
+    }
+  }, [filter.provider, filter.guardRailType, filter.modality, filter.status, currentPage, pageSize, isMounted, hasPermission]);
+
+  // Initial data fetch
   useEffect(() => {
     getTasks();
     getAuthors();
-  }, []);
+    setIsMounted(true);
 
-  useEffect(() => {
-    // openDrawer('cluster-event');
-  }, []);
-
-  const handleScroll = (e) => {
-    // is at the bottom
-    const bottom =
-      document.getElementById("model-repo")?.scrollTop > models.length * 30;
-    if (bottom && models.length < totalModels && currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
+    if (hasPermission(PermissionEnum.ModelView)) {
+      fetchMainPageProbes({ page: 1, page_size: 20, isSearching: false });
     }
-  };
-  useEffect(() => {
-    if (isMounted) {
-      setTimeout(() => {
-        load(filter);
-      }, 1000);
-    }
-  }, [currentPage, pageSize, getGlobalModels, filter, isMounted]);
-   useEffect(() => {
-      setIsMounted(true)
-    }, []);
+  }, [hasPermission]);
   return (
     <DashBoardLayout>
       <div className="boardPageView" id="model-container">
@@ -594,178 +577,6 @@ export default function GuardRails() {
                           </div>
                           <div className="height-1 bg-[#1F1F1F] mb-[1.5rem] w-full"></div>
                           <div className="w-full flex flex-col gap-size-20 px-[1.5rem] pb-[1.5rem]">
-
-                            {/* Provider Filter */}
-                            <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
-                              <div className="w-full">
-                                <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-                                  Provider
-                                  <CustomPopover title="Filter by guardrail provider">
-                                    <Image
-                                      src="/images/info.png"
-                                      preview={false}
-                                      alt="info"
-                                      style={{
-                                        width: ".75rem",
-                                        height: ".75rem",
-                                      }}
-                                    />
-                                  </CustomPopover>
-                                </Text_12_300_EEEEEE>
-                              </div>
-                              <div className="custom-select-two w-full rounded-[6px] relative">
-                                <ConfigProvider
-                                  theme={{
-                                    token: {
-                                      colorTextPlaceholder: "#808080",
-                                      boxShadowSecondary: "none",
-                                    },
-                                  }}
-                                >
-                                  <Select
-                                    placeholder="Select Provider"
-                                    style={{
-                                      backgroundColor: "transparent",
-                                      color: "#EEEEEE",
-                                      border: "0.5px solid #757575",
-                                      width: "100%",
-                                    }}
-                                    value={tempFilter.provider}
-                                    size="large"
-                                    mode="multiple"
-                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                    options={providerTypes}
-                                    onChange={(value) => {
-                                      setTempFilter({
-                                        ...tempFilter,
-                                        provider: value,
-                                      });
-                                    }}
-                                    tagRender={(props) => {
-                                      const { label } = props;
-                                      return (
-                                        <Tags name={label} color="#965CDE"></Tags>
-                                      );
-                                    }}
-                                  />
-                                </ConfigProvider>
-                              </div>
-                            </div>
-
-                            {/* GuardRail Type Filter */}
-                            <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
-                              <div className="w-full">
-                                <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-                                  GuardRail Type
-                                  <CustomPopover title="Filter by guardrail functionality">
-                                    <Image
-                                      src="/images/info.png"
-                                      preview={false}
-                                      alt="info"
-                                      style={{
-                                        width: ".75rem",
-                                        height: ".75rem",
-                                      }}
-                                    />
-                                  </CustomPopover>
-                                </Text_12_300_EEEEEE>
-                              </div>
-                              <div className="custom-select-two w-full rounded-[6px] relative">
-                                <ConfigProvider
-                                  theme={{
-                                    token: {
-                                      colorTextPlaceholder: "#808080",
-                                      boxShadowSecondary: "none",
-                                    },
-                                  }}
-                                >
-                                  <Select
-                                    placeholder="Select GuardRail Type"
-                                    style={{
-                                      backgroundColor: "transparent",
-                                      color: "#EEEEEE",
-                                      border: "0.5px solid #757575",
-                                      width: "100%",
-                                    }}
-                                    value={tempFilter.guardRailType}
-                                    size="large"
-                                    mode="multiple"
-                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                    options={guardRailTypes}
-                                    onChange={(value) => {
-                                      setTempFilter({
-                                        ...tempFilter,
-                                        guardRailType: value,
-                                      });
-                                    }}
-                                    tagRender={(props) => {
-                                      const { label } = props;
-                                      return (
-                                        <Tags name={label} color="#965CDE"></Tags>
-                                      );
-                                    }}
-                                  />
-                                </ConfigProvider>
-                              </div>
-                            </div>
-
-                            {/* Modality Filter */}
-                            <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
-                              <div className="w-full">
-                                <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1">
-                                  Modality
-                                  <CustomPopover title="Filter by supported data types">
-                                    <Image
-                                      src="/images/info.png"
-                                      preview={false}
-                                      alt="info"
-                                      style={{
-                                        width: ".75rem",
-                                        height: ".75rem",
-                                      }}
-                                    />
-                                  </CustomPopover>
-                                </Text_12_300_EEEEEE>
-                              </div>
-                              <div className="custom-select-two w-full rounded-[6px] relative">
-                                <ConfigProvider
-                                  theme={{
-                                    token: {
-                                      colorTextPlaceholder: "#808080",
-                                    },
-                                  }}
-                                >
-                                  <Select
-                                    placeholder="Select Modality"
-                                    style={{
-                                      backgroundColor: "transparent",
-                                      color: "#EEEEEE",
-                                      border: "0.5px solid #757575",
-                                      width: "100%",
-                                    }}
-                                    value={tempFilter.modality}
-                                    maxTagCount={2}
-                                    size="large"
-                                    mode="multiple"
-                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.15rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                    options={modalityTypes}
-                                    onChange={(value) => {
-                                      setTempFilter({
-                                        ...tempFilter,
-                                        modality: value,
-                                      });
-                                    }}
-                                    tagRender={(props) => {
-                                      const { label } = props;
-                                      return (
-                                        <Tags name={label} color="#965CDE"></Tags>
-                                      );
-                                    }}
-                                  />
-                                </ConfigProvider>
-                              </div>
-                            </div>
-
                             {/* Status Filter */}
                             <div className={`rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]`}>
                               <div className="w-full">
@@ -870,89 +681,82 @@ export default function GuardRails() {
               className="boardMainContainer listingContainer scroll-smooth pt-[1rem] relative"
               id="guardrails-container"
             >
+              {/* Selected Filters */}
+              {/* {(filter.provider?.length > 0 || filter.guardRailType?.length > 0 || filter.modality?.length > 0 || filter.status?.length > 0) && (
+                <SelectedFilters filters={filter} removeTag={removeSelectedTag} />
+              )} */}
               {/* Category Filter Tags */}
-              <div className="flex items-center gap-[0.75rem] mb-[2rem] px-[1.5rem]">
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "all"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("all")}
-                >
-                  All
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "harm"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("harm")}
-                >
-                  Harm
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "jailbreak"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("jailbreak")}
-                >
-                  Jailbreak
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "toxic"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("toxic")}
-                >
-                  Toxic
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "bias"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("bias")}
-                >
-                  Bias
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "compliance"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("compliance")}
-                >
-                  Compliance
-                </Tag>
-                <Tag
-                  className={`cursor-pointer px-[1rem] py-[0.5rem] rounded-[6px] transition-all ${
-                    selectedCategory === "custom"
-                      ? "bg-[#965CDE] text-white border-[#965CDE]"
-                      : "bg-transparent text-[#B3B3B3] border-[#757575] hover:border-[#965CDE] hover:text-[#965CDE]"
-                  }`}
-                  onClick={() => setSelectedCategory("custom")}
-                >
-                  Custom
-                </Tag>
+              <div className="flex items-center gap-[0.75rem] mb-[2rem] px-[1.5rem] flex-wrap">
+                {(() => {
+                  // Extract unique tag names from probes
+                  const uniqueTags = new Set<string>();
+                  uniqueTags.add("all"); // Always include "all"
+
+                  const dataToProcess = probes.length > 0 ? probes : guardRails;
+                  dataToProcess.forEach((probe: any) => {
+                    if (probe.tags) {
+                      probe.tags.forEach((tag: any) => {
+                        // Extract main category from tag name (e.g., "Content Safety" -> "Content Safety")
+                        const tagName = tag.name.toLowerCase();
+                        if (tagName.includes("content safety")) uniqueTags.add("content safety");
+                        else if (tagName.includes("data loss")) uniqueTags.add("dlp");
+                        else if (tagName.includes("compliance")) uniqueTags.add("compliance");
+                        else if (tagName.includes("harm")) uniqueTags.add("harm");
+                        else if (tagName.includes("jailbreak")) uniqueTags.add("jailbreak");
+                        else if (tagName.includes("toxic")) uniqueTags.add("toxic");
+                        else if (tagName.includes("bias")) uniqueTags.add("bias");
+                      });
+                    } else if (probe.category) {
+                      probe.category.forEach((cat: string) => uniqueTags.add(cat));
+                    }
+                  });
+
+                  return Array.from(uniqueTags).slice(0, 7).map((category) => (
+                    <Tags
+                      key={category}
+                      name={category.charAt(0).toUpperCase() + category.slice(1)}
+                      color={selectedCategory === category ? "#965CDE" : "#757575"}
+                      classNames="px-[1rem] py-[0.5rem] cursor-pointer"
+                      onTagClick={() => setSelectedCategory(category)}
+                    />
+                  ));
+                })()}
               </div>
 
               {/* GuardRails Grid */}
-              {(() => {
+              {probesLoading ? (
+                <div className="flex justify-center items-center h-[50vh]">
+                  <Spin size="large" />
+                </div>
+              ) : (() => {
+                // Use probes from API or fallback to guardRails state
+                const dataToDisplay = probes.length > 0 ? probes : guardRails;
+
+                // Filter by category if needed
                 const filteredGuardRails = selectedCategory === "all"
-                  ? guardRails
-                  : guardRails.filter(gr => gr.category.includes(selectedCategory));
+                  ? dataToDisplay
+                  : dataToDisplay.filter((gr: any) => {
+                    // Check tags first, then fallback to category
+                    if (gr.tags) {
+                      return gr.tags.some((tag: any) => {
+                        const tagName = tag.name.toLowerCase();
+                        const category = selectedCategory.toLowerCase();
+
+                        // Match different variations
+                        if (category === "dlp") {
+                          return tagName.includes("data loss");
+                        } else if (category === "content safety") {
+                          return tagName.includes("content safety");
+                        }
+                        return tagName.includes(category);
+                      });
+                    }
+                    return gr.category?.includes(selectedCategory);
+                  });
 
                 return filteredGuardRails.length > 0 ? (
                   <div className="grid gap-[1.5rem] grid-cols-3 pb-[1.5rem] px-[1.5rem]">
-                    {filteredGuardRails.map((item, index) => (
+                    {filteredGuardRails.map((item: any, index: number) => (
                       <GuardRailCard key={item.id} item={item} index={index} />
                     ))}
                   </div>

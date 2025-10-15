@@ -204,6 +204,49 @@ class WorkflowService(SessionMixin):
                 if adapter_model_id
                 else None
             )
+            prompt_type = required_data.get("prompt_type")
+            prompt_schema = required_data.get("prompt_schema")
+            auto_scale = required_data.get("auto_scale")
+            caching = required_data.get("caching")
+            concurrency = required_data.get("concurrency")
+            rate_limit = required_data.get("rate_limit")
+            rate_limit_value = required_data.get("rate_limit_value")
+            bud_prompt_id = required_data.get("bud_prompt_id")
+            bud_prompt_version = required_data.get("bud_prompt_version")
+            prompt_schema_events = required_data.get(BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value)
+
+            # Extract parser metadata
+            tool_calling_parser_type = required_data.get("tool_calling_parser_type")
+            reasoning_parser_type = required_data.get("reasoning_parser_type")
+            chat_template = required_data.get("chat_template")
+            enable_tool_calling = required_data.get("enable_tool_calling")
+            enable_reasoning = required_data.get("enable_reasoning")
+
+            # Handle experiment_id extraction with UUID conversion
+            experiment_id_str = required_data.get("experiment_id")
+            experiment_id = None
+            if experiment_id_str:
+                try:
+                    experiment_id = UUID(str(experiment_id_str))
+                except (ValueError, TypeError):
+                    experiment_id = None
+
+            # Handle trait_ids extraction with UUID conversion
+            trait_ids_raw = required_data.get("trait_ids")
+            trait_ids = None
+            if trait_ids_raw:
+                trait_ids = []
+                if isinstance(trait_ids_raw, list):
+                    for tid in trait_ids_raw:
+                        try:
+                            trait_ids.append(UUID(str(tid)))
+                        except (ValueError, TypeError):
+                            continue
+                if not trait_ids:
+                    trait_ids = None
+
+            # Extract traits_details directly
+            traits_details = required_data.get("traits_details")
 
             db_provider = (
                 await ProviderDataManager(self.session).retrieve_by_fields(
@@ -294,6 +337,9 @@ class WorkflowService(SessionMixin):
             )
 
             workflow_steps = RetrieveWorkflowStepData(
+                experiment_id=experiment_id if experiment_id else None,
+                trait_ids=trait_ids if trait_ids else None,
+                traits_details=traits_details if traits_details else None,
                 provider_type=provider_type if provider_type else None,
                 provider=db_provider if db_provider else None,
                 provider_id=provider_id if provider_id else None,
@@ -359,6 +405,21 @@ class WorkflowService(SessionMixin):
                 probe_selections=probe_selections if probe_selections else None,
                 guard_types=guard_types if guard_types else None,
                 severity_threshold=severity_threshold if severity_threshold else None,
+                prompt_type=prompt_type if prompt_type else None,
+                prompt_schema=prompt_schema if prompt_schema else None,
+                auto_scale=auto_scale if auto_scale else None,
+                caching=caching if caching else None,
+                concurrency=concurrency if concurrency else None,
+                rate_limit=rate_limit if rate_limit else None,
+                rate_limit_value=rate_limit_value if rate_limit_value else None,
+                bud_prompt_id=bud_prompt_id if bud_prompt_id else None,
+                bud_prompt_version=bud_prompt_version if bud_prompt_version else None,
+                prompt_schema_events=prompt_schema_events if prompt_schema_events else None,
+                tool_calling_parser_type=tool_calling_parser_type if tool_calling_parser_type else None,
+                reasoning_parser_type=reasoning_parser_type if reasoning_parser_type else None,
+                chat_template=chat_template if chat_template else None,
+                enable_tool_calling=enable_tool_calling if enable_tool_calling else None,
+                enable_reasoning=enable_reasoning if enable_reasoning else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -495,6 +556,11 @@ class WorkflowService(SessionMixin):
                 "credential_id",
                 "endpoint_details",
                 "scaling_specification",
+                "tool_calling_parser_type",
+                "reasoning_parser_type",
+                "chat_template",
+                "enable_tool_calling",
+                "enable_reasoning",
             ],
             "guardrail_deployment": [
                 "provider_id",
@@ -511,10 +577,36 @@ class WorkflowService(SessionMixin):
                 "guard_types",
                 "severity_threshold",
             ],
+            "prompt_creation": [
+                "model_id",
+                "project_id",
+                "cluster_id",
+                "endpoint_id",
+                "name",
+                "description",
+                "tags",
+                "prompt_type",
+                "auto_scale",
+                "caching",
+                "concurrency",
+                "rate_limit",
+                "rate_limit_value",
+                "prompt_schema",
+            ],
+            "prompt_schema_creation": [
+                "bud_prompt_id",
+                "bud_prompt_version",
+                BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value,
+            ],
         }
 
         # Combine all lists using set union
         all_keys = set().union(*workflow_keys.values())
+
+        # Add evaluation workflow specific keys
+        all_keys.add("experiment_id")
+        all_keys.add("trait_ids")
+        all_keys.add("traits_details")
 
         return list(all_keys)
 

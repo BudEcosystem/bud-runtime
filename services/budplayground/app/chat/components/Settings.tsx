@@ -69,9 +69,8 @@ export default function SettingsList({chatId}: {chatId: string}) {
 
     useEffect(() => {
         if (typeof window !== "undefined") {
-          // Access persisted store only on client
-          const hydrated = useChatStore.persist?.hasHydrated?.() ?? false;
-          setHasHydrated(hydrated);
+          // Store is now always hydrated since we use custom persistence
+          setHasHydrated(true);
         }
       }, []);
 
@@ -194,7 +193,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
                             value={`${settings?.sequence_length || 0}`}
                             defaultValue={`${settings?.sequence_length || 0}`}
                             type="number"
-                            onChange={(value) => handleChange({sequence_length: value})}
+                            onChange={(value) => handleChange({sequence_length: Math.max(0, parseInt(value, 10) || 0)})}
                         />}
                     </div>
                 ),
@@ -221,9 +220,9 @@ export default function SettingsList({chatId}: {chatId: string}) {
                             min={0}
                             max={1}
                             type="number"
-                            onChange={(value) => handleChange({repeat_penalty: value})}
+                            onChange={(value) => handleChange({repeat_penalty: Math.min(1, Math.max(0, parseFloat(value) || 0))})}
                         />
-                        <SliderInput
+                        {/* <SliderInput
                             title="Top P Sampling"
                             min={0.01}
                             max={1}
@@ -231,7 +230,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
                             defaultValue={settings?.top_p_sampling || 0}
                             value={settings?.top_p_sampling || 0}
                             onChange={(value) => handleChange({top_p_sampling: value})}
-                        />
+                        /> */}
                         {/* <SliderInput
                             title="Min P Sampling"
                             min={0.01}

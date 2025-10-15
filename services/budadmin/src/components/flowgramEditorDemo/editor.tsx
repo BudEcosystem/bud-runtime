@@ -1,0 +1,37 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+import { FixedLayoutEditorProvider, EditorRenderer } from '@flowgram.ai/fixed-layout-editor';
+
+import { nodeRegistries } from './node-registries';
+import { initialData } from './initial-data';
+import { useEditorProps } from './hooks/use-editor-props';
+import { FLOW_LIST } from './data';
+import { Tools } from './components/tools';
+import { FlowSelect } from './components/flow-select';
+// import { Minimap } from './components/minimap';
+// import { FlowSelect } from './components/flow-select';
+
+export const Editor = (props: { demo?: string; hideTools?: boolean; onNodeClick?: (nodeType: string, nodeId: string, nodeData: any) => void }) => {
+  const editorProps = useEditorProps(
+    props.demo ? FLOW_LIST[props.demo] : initialData,
+    nodeRegistries,
+    props.onNodeClick
+  );
+  return (
+    <FixedLayoutEditorProvider {...editorProps}>
+      <div className="demo-fixed-container">
+        <EditorRenderer>{/* add child panel here */}</EditorRenderer>
+      </div>
+      {!props.hideTools ? (
+        <>
+          {/* <Tools /> */}
+          {/* <FlowSelect /> */}
+          {/* <Minimap /> */}
+        </>
+      ) : null}
+    </FixedLayoutEditorProvider>
+  );
+};

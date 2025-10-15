@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budnotify.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,6 +21,10 @@ spec:
         dapr.io/app-id: {{ .Values.microservices.budnotify.daprid }}
         dapr.io/app-port: "3000"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: budnotify
         image: {{ .Values.microservices.budnotify.image }}
@@ -32,10 +37,10 @@ spec:
               name: {{ .Release.Name}}-bud-global
         resources:
           limits:
-            memory: 512Mi
+            memory: 256Mi
             cpu: 500m
           requests:
-            memory: 256Mi
+            memory: 128Mi
             cpu: 250m
 ---
 apiVersion: v1
@@ -49,3 +54,17 @@ spec:
   selector:
     app: {{ .Release.Name }}-budnotify
   type: ClusterIP
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .Release.Name }}-budnotify-pubsub-subscription
+spec:
+  topic: {{ .Values.microservices.budnotify.pubsubTopic }}
+  routes:
+    default: /notifications
+  pubsubname: {{ .Release.Name }}-pubsub
+  deadLetterTopic: poisonMessages
+scopes:
+  - budnotify
+{{ end }}

@@ -410,6 +410,7 @@ pub struct ModelInferenceRequest<'a> {
     pub max_tokens: Option<u32>,
     pub presence_penalty: Option<f32>,
     pub frequency_penalty: Option<f32>,
+    pub repetition_penalty: Option<f32>,
     pub seed: Option<u32>,
     pub stream: bool,
     pub json_mode: ModelInferenceRequestJsonMode,
@@ -454,6 +455,8 @@ pub struct ModelInferenceRequest<'a> {
     pub logit_bias: Option<HashMap<String, f32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ignore_eos: Option<bool>,
     /// The original request received by the gateway from the client
     #[serde(skip)]
     pub gateway_request: Option<String>,
@@ -505,7 +508,9 @@ pub struct ProviderInferenceResponse {
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Usage {
+    #[serde(alias = "prompt_tokens")]
     pub input_tokens: u32,
+    #[serde(alias = "completion_tokens")]
     pub output_tokens: u32,
 }
 
@@ -569,6 +574,9 @@ pub struct ModelInferenceResponseWithMetadata {
     /// The response sent by the gateway back to the client
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gateway_response: Option<String>,
+    /// Guardrail scan summary (JSON string)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guardrail_scan_summary: Option<String>,
 }
 
 impl ModelInferenceResponseWithMetadata {
@@ -1003,6 +1011,9 @@ pub struct ModelInferenceDatabaseInsert {
     pub gateway_request: Option<String>,
     /// The response sent by the gateway back to the client
     pub gateway_response: Option<String>,
+    /// Summary of guardrail scans performed for this inference, if available
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guardrail_scan_summary: Option<String>,
     /// The type of endpoint that generated this inference
     #[serde(default = "default_endpoint_type")]
     pub endpoint_type: String,
@@ -1152,6 +1163,7 @@ impl ModelInferenceResponseWithMetadata {
             cached: model_inference_response.cached,
             gateway_request: model_inference_response.gateway_request,
             gateway_response: model_inference_response.gateway_response,
+            guardrail_scan_summary: None,
         }
     }
 }
@@ -1366,6 +1378,7 @@ impl ModelInferenceDatabaseInsert {
         };
         let serialized_input_messages = serialize_or_log(&result.input_messages);
         let serialized_output = serialize_or_log(&result.output);
+        let guardrail_scan_summary = result.guardrail_scan_summary.clone();
 
         // A usage of 0 indicates that something went wrong, since a model
         // should always consume and produce at least one token.
@@ -1400,6 +1413,7 @@ impl ModelInferenceDatabaseInsert {
             finish_reason: result.finish_reason,
             gateway_request: result.gateway_request,
             gateway_response: result.gateway_response,
+            guardrail_scan_summary,
             endpoint_type: endpoint_type.to_string(),
         }
     }
@@ -2370,6 +2384,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
         let chat_inference_response = ChatInferenceResult::new(
             inference_id,
@@ -2422,6 +2437,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let weather_tool_config = get_temperature_tool_config();
@@ -2476,6 +2492,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2526,6 +2543,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2596,6 +2614,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2684,6 +2703,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2779,6 +2799,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2832,6 +2853,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2907,6 +2929,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -2966,6 +2989,7 @@ mod tests {
             cached: false,
             gateway_request: None,
             gateway_response: None,
+            guardrail_scan_summary: None,
         }];
 
         let chat_inference_response = ChatInferenceResult::new(
@@ -3934,10 +3958,10 @@ mod tests {
 
     #[test]
     fn test_embedding_database_insert_creation() {
-        use std::collections::HashMap;
-        use uuid::Uuid;
         use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
         use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
+        use std::collections::HashMap;
+        use uuid::Uuid;
 
         let inference_id = Uuid::now_v7();
         let embeddings = vec![vec![0.1, 0.2, 0.3], vec![0.4, 0.5, 0.6]];
@@ -3973,7 +3997,8 @@ mod tests {
             extra_headers: Default::default(),
         };
 
-        let database_insert = EmbeddingInferenceDatabaseInsert::new(embedding_result, input, metadata);
+        let database_insert =
+            EmbeddingInferenceDatabaseInsert::new(embedding_result, input, metadata);
 
         assert_eq!(database_insert.id, inference_id);
         assert_eq!(database_insert.function_name, "test-embedding-function");
@@ -3986,10 +4011,10 @@ mod tests {
 
     #[test]
     fn test_audio_transcription_database_insert_creation() {
-        use std::collections::HashMap;
-        use uuid::Uuid;
         use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
         use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
+        use std::collections::HashMap;
+        use uuid::Uuid;
 
         let inference_id = Uuid::now_v7();
 
@@ -4029,7 +4054,10 @@ mod tests {
 
         assert_eq!(database_insert.id, inference_id);
         assert_eq!(database_insert.function_name, "test-transcription-function");
-        assert_eq!(database_insert.audio_type as u8, AudioType::Transcription as u8);
+        assert_eq!(
+            database_insert.audio_type as u8,
+            AudioType::Transcription as u8
+        );
         assert_eq!(database_insert.input, "test_audio.wav");
         assert_eq!(database_insert.output, "Hello world transcription");
         assert_eq!(database_insert.language, Some("en".to_string()));
@@ -4039,10 +4067,10 @@ mod tests {
 
     #[test]
     fn test_moderation_database_insert_creation() {
-        use std::collections::HashMap;
-        use uuid::Uuid;
         use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
         use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
+        use std::collections::HashMap;
+        use uuid::Uuid;
 
         let inference_id = Uuid::now_v7();
 

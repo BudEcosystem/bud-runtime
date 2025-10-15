@@ -15,7 +15,7 @@ export interface BudInputProps {
   placeholder?: string;
   disabled?: boolean;
   ClassNames?: string;
-  InputClasses?:string;
+  InputClasses?: string;
   style?: React.CSSProperties;
   rules?: FormRule[];
   suffix?: React.ReactNode;
@@ -25,13 +25,23 @@ export interface BudInputProps {
 
 function CustomInput(props: BudInputProps) {
   return (
-    <Form.Item name={props.name} rules={props.rules} className="mb-0"  hasFeedback>
+    <Form.Item
+      name={props.name}
+      rules={props.rules}
+      className="mb-0"
+      hasFeedback
+    >
       <div className={`floating-textarea ${props.ClassNames}`}>
         <FloatLabel
           classNames={`mx-[.2rem] floatingLabel`}
-          label={<InfoLabel
-          required={props.rules.some((rule: any) => rule.required)}
-          text={props.label} content={props.info || ''} />}>
+          label={
+            <InfoLabel
+              required={props.rules.some((rule: any) => rule.required)}
+              text={props.label}
+              content={props.info || ""}
+            />
+          }
+        >
           <Input
             readOnly={props.readOnly}
             defaultValue={props.defaultValue}

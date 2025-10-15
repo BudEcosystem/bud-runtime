@@ -83,13 +83,13 @@ class JudgeInfo(BaseModel):
 class CurrentMetric(BaseModel):
     """Current metric for an evaluation."""
 
-    evaluation: str = Field(..., description="Evaluation name")
-    dataset: str = Field(..., description="Dataset name")
-    deployment_name: str = Field(..., description="Deployment name")
-    judge: JudgeInfo = Field(..., description="Judge information")
-    traits: List[str] = Field(..., description="List of traits")
-    last_run_at: datetime = Field(..., description="Last run timestamp")
-    run_id: str = Field(..., description="UUID of the latest run")
+    evaluation: str | None = Field(..., description="Evaluation name")
+    dataset: str | None = Field(..., description="Dataset name")
+    deployment_name: str | None = Field(..., description="Deployment name")
+    judge: Optional[JudgeInfo] = Field(None, description="Judge information")
+    traits: List[str] | None = Field(..., description="List of traits")
+    last_run_at: datetime | None = Field(..., description="Last run timestamp")
+    run_id: str | None = Field(..., description="UUID of the latest run")
 
 
 class ProgressDataset(BaseModel):
@@ -119,15 +119,15 @@ class ProgressOverview(BaseModel):
     run_id: str = Field(..., description="UUID of the run")
     title: str = Field(..., description="Title of the progress overview")
     objective: str = Field(..., description="Objective of the run")
-    current: ProgressDataset = Field(..., description="Current dataset being processed")
-    progress: ProgressInfo = Field(..., description="Progress information")
+    current: ProgressDataset | None = Field(..., description="Current dataset being processed")
+    progress: ProgressInfo | None = Field(..., description="Progress information")
     current_evaluation: str = Field(..., description="Current evaluation being performed")
     current_model: str = Field(..., description="Current model being evaluated")
     processing_rate_per_min: int = Field(..., description="Processing rate per minute")
     average_score_pct: float = Field(..., description="Average score percentage")
     eta_minutes: int = Field(..., description="Estimated time to completion in minutes")
     status: str = Field(..., description="Status of the run")
-    actions: ProgressActions = Field(..., description="Available actions")
+    actions: ProgressActions | None = Field(..., description="Available actions")
 
 
 # ------------------------ Experiment Schemas ------------------------
@@ -136,7 +136,12 @@ class ProgressOverview(BaseModel):
 class CreateExperimentRequest(BaseModel):
     """The request to create an experiment."""
 
-    name: str = Field(..., min_length=1, max_length=255, description="The name of the experiment.")
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="The name of the experiment.",
+    )
     description: Optional[str] = Field(None, max_length=500, description="The description of the experiment.")
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment (optional).")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
@@ -210,19 +215,47 @@ class Experiment(BaseModel):
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment.")
     tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
     status: Optional[str] = Field(
-        None, description="Computed status based on runs (running/failed/completed/pending/no_runs)."
+        None,
+        description="Computed status based on runs (running/failed/completed/pending/no_runs).",
     )
     models: Optional[List[ModelSummary]] = Field(default_factory=list, description="Models used in the experiment.")
     traits: Optional[List[TraitSummary]] = Field(
-        default_factory=list, description="Traits associated with the experiment."
+        default_factory=list,
+        description="Traits associated with the experiment.",
     )
     created_at: Optional[datetime] = Field(None, description="Timestamp when the experiment was created")
     # New fields for experiment detail
     stats: Optional[ExperimentStats] = Field(None, description="Experiment statistics")
     objective: Optional[str] = Field(None, description="Experiment objective")
-    current_metrics: Optional[List[CurrentMetric]] = Field(None, description="Current evaluation metrics")
+    current_metrics: Optional[List[dict]] = Field(None, description="Current evaluation metrics")
     progress_overview: Optional[List[ProgressOverview]] = Field(None, description="Progress overview for runs")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class Evaluation(BaseModel):
+    """Represents an evaluation record."""
+
+    id: UUID4 = Field(..., description="The UUID of the evaluation.")
+    experiment_id: UUID4 = Field(
+        ...,
+        description="The UUID of the experiment this evaluation belongs to.",
+    )
+    name: str = Field(..., description="The name of the evaluation.")
+    description: Optional[str] = Field(None, description="The description of the evaluation.")
+    workflow_id: Optional[UUID4] = Field(None, description="The workflow ID that created this evaluation.")
+    created_by: UUID4 = Field(..., description="The UUID of the user who created this evaluation.")
+    status: str = Field(..., description="The status of the evaluation.")
+    trait_ids: Optional[List[str]] = Field(
+        None,
+        description="List of trait UUIDs (as strings) selected for this evaluation.",
+    )
+    created_at: Optional[datetime] = Field(None, description="Timestamp when the evaluation was created.")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp.")
 
     class Config:
         """Pydantic model configuration."""
@@ -301,6 +334,41 @@ class RunWithResults(BaseModel):
     config: Optional[dict] = Field(None, description="Run-specific configuration.")
     metrics: List[dict] = Field([], description="List of metrics for this run.")
     raw_results: Optional[dict] = Field(None, description="Raw results for this run.")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class RunDetailedWithMetrics(BaseModel):
+    """Run with complete dataset details, model details, and metrics."""
+
+    id: UUID4 = Field(..., description="The UUID of the run.")
+    experiment_id: UUID4 = Field(..., description="The UUID of the parent experiment.")
+    run_index: int = Field(..., description="Auto-incrementing index within the experiment.")
+    status: RunStatusEnum = Field(..., description="Current status of the run.")
+    config: Optional[dict] = Field(None, description="Run-specific configuration.")
+
+    # Model details
+    model: Optional[dict] = Field(
+        None,
+        description="Complete model information including id, name, and deployment details.",
+    )
+
+    # Dataset details
+    dataset: Optional[dict] = Field(None, description="Complete dataset information with version details.")
+
+    # Metrics
+    metrics: List[dict] = Field(
+        [],
+        description="List of metrics for this run with metric_name, mode, and metric_value.",
+    )
+    raw_results: Optional[dict] = Field(None, description="Raw results preview for this run.")
+
+    # Timestamps
+    created_at: Optional[datetime] = Field(None, description="Timestamp when the run was created.")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp.")
 
     class Config:
         """Pydantic model configuration."""
@@ -680,7 +748,10 @@ class TraitWithDatasets(BaseModel):
 class EvaluationScore(BaseModel):
     """Evaluation score information from BudEval."""
 
-    status: str = Field(..., description="Evaluation job status (pending/running/completed/failed)")
+    status: str = Field(
+        ...,
+        description="Evaluation job status (pending/running/completed/failed)",
+    )
     overall_accuracy: Optional[float] = Field(None, description="Overall accuracy percentage (0-100)")
     datasets: Optional[List[dict]] = Field(None, description="Individual dataset scores")
 
@@ -704,6 +775,31 @@ class ExperimentEvaluationsResponse(SuccessResponse):
 
     experiment: Experiment = Field(..., description="Experiment information")
     evaluations: List[RunWithEvaluations] = Field(..., description="List of runs with evaluation details")
+
+
+# ------------------------ Evaluation Listing Schemas ------------------------
+
+
+class EvaluationListItem(BaseModel):
+    """A single evaluation item in the completed evaluations list."""
+
+    evaluation_name: str = Field(..., description="Name of the evaluation")
+    evaluation_id: UUID4 = Field(..., description="UUID of the evaluation")
+    model_name: str = Field(..., description="Name of the model used")
+    started_date: datetime = Field(..., description="Date when the evaluation was started")
+    duration_minutes: int = Field(..., description="Duration of the evaluation in minutes")
+    trait_name: str = Field(..., description="Name of the trait")
+    trait_score: float = Field(..., description="Score for this trait")
+    status: str = Field(
+        ...,
+        description="Status of the evaluation (pending/running/completed/failed)",
+    )
+
+
+class ListEvaluationsResponse(SuccessResponse):
+    """Response schema for listing completed evaluations."""
+
+    evaluations: List[EvaluationListItem] = Field(..., description="List of completed evaluations")
 
 
 # ------------------------ Run History Schemas ------------------------

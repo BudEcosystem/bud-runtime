@@ -268,6 +268,15 @@ class BudMetricService(SessionMixin):
 
             # Log the request data for debugging
             logger.info(f"CLIENT user inference request - api_key_project_id filter: {api_key_project_id_value}")
+        else:
+            # For ADMIN users, ensure filters dictionary exists if we need it
+            if request_data.get("filters") is None:
+                request_data["filters"] = {}
+
+            # Log the request data for debugging
+            logger.info(
+                f"ADMIN user inference request - project_id: {request.project_id}, filters: {request_data.get('filters', {})}"
+            )
 
         # Proxy request to budmetrics
         metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/inferences/list"
@@ -284,7 +293,25 @@ class BudMetricService(SessionMixin):
 
                 if response.status != status.HTTP_200_OK:
                     logger.error(f"Inference list request failed: status={response.status}, response={response_data}")
-                    error_message = response_data.get("detail", "Failed to list inferences")
+                    error_detail = response_data.get("detail", "Failed to list inferences")
+
+                    # Handle validation errors from budmetrics
+                    if isinstance(error_detail, list) and len(error_detail) > 0:
+                        # Extract the first error message
+                        first_error = error_detail[0]
+                        if isinstance(first_error, dict):
+                            error_message = first_error.get("msg", "Validation error")
+                            # Add more context if available
+                            if "loc" in first_error:
+                                field = ".".join(str(x) for x in first_error["loc"] if x != "body")
+                                error_message = f"{field}: {error_message}"
+                        else:
+                            error_message = str(error_detail)
+                    elif isinstance(error_detail, str):
+                        error_message = error_detail
+                    else:
+                        error_message = "Failed to list inferences"
+
                     raise ClientException(
                         error_message,
                         status_code=response.status,

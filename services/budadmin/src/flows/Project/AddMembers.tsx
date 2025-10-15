@@ -1,4 +1,3 @@
-
 import { successToast } from "@/components/toast";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
@@ -17,67 +16,81 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { InviteUser, ProjectMember, useProjects } from "src/hooks/useProjects";
 import CustomDropDown from "../components/CustomDropDown";
 
+function UserItem({
+  name,
+  color,
+  permissions,
+  id,
+  project_role,
+}: ProjectMember) {
+  const {
+    removeMembers,
+    selectedProject,
+    getMembers,
+    updatePermissions,
+    projectMembers,
+  } = useProjects();
 
-function UserItem({ name, color, permissions, id, project_role }: ProjectMember) {
-  const { removeMembers, selectedProject, getMembers, updatePermissions, projectMembers } = useProjects();
+  const managePermission = permissions?.find(
+    (permission) => permission.name === "endpoint:manage",
+  ).has_permission;
+  const viewPermission = permissions?.find(
+    (permission) => permission.name === "endpoint:view",
+  ).has_permission;
+  const isOwner = project_role === "owner";
+  const isParticipant = project_role === "participant";
 
-  const managePermission = permissions?.find((permission) => permission.name === 'endpoint:manage').has_permission;
-  const viewPermission = permissions?.find((permission) => permission.name === 'endpoint:view').has_permission;
-  const isOwner = project_role === 'owner';
-  const isParticipant = project_role === 'participant';
-
-  const items: MenuProps['items'] = [
+  const items: MenuProps["items"] = [
     {
-      label: 'Manage',
-      key: 'project:manage',
+      label: "Manage",
+      key: "project:manage",
       onClick: async () => {
         const result = await updatePermissions(selectedProject?.id, id, [
           {
-            name: 'endpoint:manage',
+            name: "endpoint:manage",
             has_permission: true,
           },
           {
-            name: 'endpoint:view',
+            name: "endpoint:view",
             has_permission: true,
-          }
-        ])
+          },
+        ]);
         if (result) {
           await getMembers(selectedProject?.id);
         }
-      }
+      },
     },
     {
-      label: 'View',
-      key: 'project:view',
+      label: "View",
+      key: "project:view",
       onClick: async () => {
         const result = await updatePermissions(selectedProject?.id, id, [
           {
-            name: 'endpoint:manage',
+            name: "endpoint:manage",
             has_permission: false,
           },
           {
-            name: 'endpoint:view',
+            name: "endpoint:view",
             has_permission: true,
-          }
-        ],
-        )
+          },
+        ]);
         if (result) {
           await getMembers(selectedProject?.id);
         }
-      }
+      },
     },
     {
-      type: 'divider',
+      type: "divider",
     },
     {
-      label: 'Remove',
-      key: '3',
+      label: "Remove",
+      key: "3",
       onClick: async () => {
-        const result = await removeMembers(selectedProject?.id, [id])
+        const result = await removeMembers(selectedProject?.id, [id]);
         if (result) {
           await getMembers(selectedProject?.id);
         }
-      }
+      },
     },
   ];
 
@@ -99,13 +112,13 @@ function UserItem({ name, color, permissions, id, project_role }: ProjectMember)
   };
 
   useEffect(() => {
-    console.log('projectMembers', projectMembers)
+    console.log("projectMembers", projectMembers);
   }, [projectMembers]);
 
   return (
     <div className="flex justify-between items-center">
       <div className="flex justify-start items-center">
-        <div className='w-[0.875rem] h-[0.875rem] mr-[.4rem] flex justify-center items-center rounded-[100%] verflow-hidden bg-[#EC9462]'>
+        <div className="w-[0.875rem] h-[0.875rem] mr-[.4rem] flex justify-center items-center rounded-[100%] verflow-hidden bg-[#EC9462]">
           <Image
             preview={false}
             src="/images/drawer/memoji.png"
@@ -113,7 +126,8 @@ function UserItem({ name, color, permissions, id, project_role }: ProjectMember)
             className="w-full h-full rounded-full"
             style={{
               padding: "1px",
-              width: '.75rem', height: '.75rem'
+              width: ".75rem",
+              height: ".75rem",
             }}
           />
         </div>
@@ -139,7 +153,7 @@ function UserItem({ name, color, permissions, id, project_role }: ProjectMember)
                   preview={false}
                   src="/images/drawer/down.png"
                   alt="info"
-                  style={{ width: '0.5rem', }}
+                  style={{ width: "0.5rem" }}
                 />
               </div>
             </Space>
@@ -147,23 +161,34 @@ function UserItem({ name, color, permissions, id, project_role }: ProjectMember)
         />
       </div>
     </div>
-  )
+  );
 }
 
 export default function AddMembers() {
-  const { selectedProject, getProjects, inviteMembers, getProject, projectMembers, getMembers } = useProjects();
+  const {
+    selectedProject,
+    getProjects,
+    inviteMembers,
+    getProject,
+    projectMembers,
+    getMembers,
+  } = useProjects();
   const { openDrawerWithStep, closeDrawer } = useDrawer();
   const { submittable, form, values } = useContext(BudFormContext);
   const [users, setUsers] = React.useState<InviteUser[]>([]);
-  const [selectedRole, setSelectedRole] = useState<any>()
+  const [selectedRole, setSelectedRole] = useState<any>();
 
   useEffect(() => {
     if (values?.users) {
-      setUsers(values?.users?.map((item) => ({
-        user_id: item?.id,
-        email: item?.id ? undefined : item?.email || item.label,
-        scopes: item.scopes
-      }))?.filter(Boolean) || [])
+      setUsers(
+        values?.users
+          ?.map((item) => ({
+            user_id: item?.id,
+            email: item?.id ? undefined : item?.email || item.label,
+            scopes: item.scopes,
+          }))
+          ?.filter(Boolean) || [],
+      );
     }
   }, [values]);
 
@@ -177,7 +202,7 @@ export default function AddMembers() {
 
   useEffect(() => {
     getMembers(selectedProject?.id);
-    console.log('projectMembers', projectMembers)
+    console.log("projectMembers", projectMembers);
   }, []);
 
   return (
@@ -186,13 +211,12 @@ export default function AddMembers() {
         users: [],
       }}
       onNext={(values) => {
-        inviteMembers(selectedProject?.id, { users })
-          .then(() => {
-            getProjects(1, 10);
-            getProject(selectedProject?.id);
-            // closeDrawer();
-            form.setFieldsValue({ users: [] });
-          });
+        inviteMembers(selectedProject?.id, { users }).then(() => {
+          getProjects(1, 10);
+          getProject(selectedProject?.id);
+          // closeDrawer();
+          form.setFieldsValue({ users: [] });
+        });
       }}
       // backText="Skip"
       nextText="Send Invite"
@@ -235,10 +259,7 @@ export default function AddMembers() {
           <div className="px-[1.4rem] pt-[.25rem] pb-[1.5rem]">
             <div className="rounded-[8px] px-[.9rem] py-[.95rem] bg-[#FFFFFF08] flex flex-col gap-[.95rem]">
               {projectMembers.map((member, index) => (
-                <UserItem
-                  key={index}
-                  {...member}
-                />
+                <UserItem key={index} {...member} />
               ))}
             </div>
           </div>

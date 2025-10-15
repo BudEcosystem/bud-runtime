@@ -7,7 +7,7 @@ function DrawerTitleCard({
   description,
   classNames,
   descriptionClass,
-  descriptionTextClass
+  descriptionTextClass,
 }: {
   title: string;
   description: string;
@@ -20,10 +20,11 @@ function DrawerTitleCard({
   }
 
   return (
-    <div className={`px-[1.4rem] rounded-ss-lg rounded-se-lg border-b-[.5px] border-b-[#1F1F1F] ${classNames}`}
+    <div
+      className={`px-[1.4rem] rounded-ss-lg rounded-se-lg border-b-[.5px] border-b-[#1F1F1F] ${classNames}`}
       style={{
-        paddingTop: '1.1rem',
-        paddingBottom: '.9rem'
+        paddingTop: "1.1rem",
+        paddingBottom: ".9rem",
       }}
     >
       <div className="flex justify-between align-center">
@@ -31,12 +32,15 @@ function DrawerTitleCard({
           {title}
         </Text_14_400_EEEEEE>
       </div>
-      <div className={`${descriptionClass}`}
+      <div
+        className={`${descriptionClass}`}
         style={{
-          paddingTop: '.55rem'
+          paddingTop: ".55rem",
         }}
       >
-        <Text_12_400_757575 className={`${descriptionTextClass ? descriptionTextClass : 'leading-[180%]'}`}>
+        <Text_12_400_757575
+          className={`${descriptionTextClass ? descriptionTextClass : "leading-[180%]"}`}
+        >
           {description}
         </Text_12_400_757575>
       </div>

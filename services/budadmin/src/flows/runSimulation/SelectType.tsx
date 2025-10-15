@@ -1,4 +1,3 @@
-
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
@@ -7,66 +6,71 @@ import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import React, { useContext, useEffect } from "react";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import { useCloudProviders } from "src/hooks/useCloudProviders";
-import { Image, Checkbox } from 'antd'
+import { Image, Checkbox } from "antd";
 
 import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
-import { Text_10_400_B3B3B3, Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
+import {
+  Text_10_400_B3B3B3,
+  Text_12_400_757575,
+  Text_14_400_EEEEEE,
+} from "@/components/ui/text";
 import Tags from "../components/DrawerTags";
 import { color } from "echarts";
 
-const evaluationTypes=[
+const evaluationTypes = [
   {
     id: 1,
-    icon: '/images/drawer/compare.png',
-    title: 'Compare Hardwares',
+    icon: "/images/drawer/compare.png",
+    title: "Compare Hardwares",
     tag: {
-      name: 'Rule based',
-      color: '#D1B854'
+      name: "Rule based",
+      color: "#D1B854",
     },
-    description: 'Compare hardware performance for a specific model and use case.'
+    description:
+      "Compare hardware performance for a specific model and use case.",
   },
   {
     id: 2,
-    icon: '/images/drawer/cusecase.png',
-    title: 'Compare Usecases',
+    icon: "/images/drawer/cusecase.png",
+    title: "Compare Usecases",
     tag: {
-      name: 'Rule based',
-      color: '#D1B854'
+      name: "Rule based",
+      color: "#D1B854",
     },
-    description: 'Compare use case performance on specific model and hardware.'
+    description: "Compare use case performance on specific model and hardware.",
   },
   {
     id: 3,
-    icon: '/images/drawer/cmodel.png',
-    title: 'Compare Models',
+    icon: "/images/drawer/cmodel.png",
+    title: "Compare Models",
     tag: {
-      name: 'Rule based',
-      color: '#D1B854'
+      name: "Rule based",
+      color: "#D1B854",
     },
-    description: 'Compare model performance on specific hardware and use case.'
+    description: "Compare model performance on specific hardware and use case.",
   },
   {
     id: 4,
-    icon: '/images/drawer/memory.png',
-    title: 'Estimate Memory Requirements',
+    icon: "/images/drawer/memory.png",
+    title: "Estimate Memory Requirements",
     tag: {
-      name: 'Rule based',
-      color: '#D1B854'
+      name: "Rule based",
+      color: "#D1B854",
     },
-    description: 'Estimate memory requirements for your GenAI deployment'
+    description: "Estimate memory requirements for your GenAI deployment",
   },
   {
     id: 5,
-    icon: '/images/drawer/roi.png',
-    title: 'ROI based Simulation',
+    icon: "/images/drawer/roi.png",
+    title: "ROI based Simulation",
     tag: {
-      name: 'Rule based',
-      color: '#D1B854'
+      name: "Rule based",
+      color: "#D1B854",
     },
-    description: 'Estimate the ROI for your GenAI deployments'
-  }
-]
+    description: "Estimate the ROI for your GenAI deployments",
+  },
+];
 
 type cardProps = {
   data?: any;
@@ -105,10 +109,7 @@ function CardWithCheckBox({
         <div className="flex items-center justify-between h-4 max-w-[100%]">
           <div className="flex justify-start items-start gap-[.6rem]">
             <Text_14_400_EEEEEE className="">{data.title}</Text_14_400_EEEEEE>
-            <Tags
-              name={data.tag.name}
-              color={data.tag.color}
-            />
+            <Tags name={data.tag.name} color={data.tag.color} />
           </div>
           <div className="w-[0.875rem] h-[0.875rem]">
             <Checkbox
@@ -140,13 +141,13 @@ export default function SelectEvaluationType() {
     getProviders(page, limit, search);
   }, []);
 
-  const filteredProviders = providers?.filter((provider) => provider.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredProviders = providers?.filter((provider) =>
+    provider.name.toLowerCase().includes(search.toLowerCase()),
+  );
 
   return (
     <BudForm
-      data={{
-      }}
-
+      data={{}}
       // disableNext={!selectedProvider?.id}
       onNext={async () => {
         // if (!currentWorkflow) {

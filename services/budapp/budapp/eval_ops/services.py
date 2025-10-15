@@ -1,23 +1,32 @@
+import random
+import re
 import uuid
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import aiohttp
 from budmicroframe.commons.schemas import WorkflowMetadataResponse
 from fastapi import HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
-from budapp.commons.constants import BUD_INTERNAL_WORKFLOW, BudServeWorkflowStepEventName, WorkflowTypeEnum
+from budapp.commons.constants import (
+    BUD_INTERNAL_WORKFLOW,
+    BudServeWorkflowStepEventName,
+    WorkflowTypeEnum,
+)
 from budapp.commons.exceptions import ClientException
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
-from budapp.eval_ops.models import ExpDataset as DatasetModel
 from budapp.eval_ops.models import (
+    Evaluation,
+    EvaluationStatusEnum,
     ExpDatasetVersion,
     ExperimentStatusEnum,
     RunStatusEnum,
 )
+from budapp.eval_ops.models import Evaluation as EvaluationModel
+from budapp.eval_ops.models import ExpDataset as DatasetModel
 from budapp.eval_ops.models import Experiment as ExperimentModel
 from budapp.eval_ops.models import (
     ExpMetric as MetricModel,
@@ -31,22 +40,35 @@ from budapp.eval_ops.models import (
     Run as RunModel,
 )
 from budapp.eval_ops.schemas import (
+    BudgetStats,
     ConfigureRunsRequest,
     CreateDatasetRequest,
     CreateExperimentRequest,
+    CurrentMetric,
     DatasetFilter,
+    EvaluationListItem,
     EvaluationWorkflowResponse,
     EvaluationWorkflowStepRequest,
+    ExperimentStats,
     ExperimentWorkflowResponse,
     ExperimentWorkflowStepData,
     ExperimentWorkflowStepRequest,
+    JudgeInfo,
     ModelSummary,
+    ProcessingRate,
+    ProgressActions,
+    ProgressDataset,
+    ProgressInfo,
+    ProgressOverview,
+    RuntimeStats,
+    TokenStats,
     TraitBasic,
     TraitSummary,
     UpdateDatasetRequest,
     UpdateExperimentRequest,
     UpdateRunRequest,
 )
+from budapp.eval_ops.schemas import Evaluation as EvaluationSchema
 from budapp.eval_ops.schemas import (
     ExpDataset as DatasetSchema,
 )
@@ -63,7 +85,10 @@ from budapp.eval_ops.schemas import (
     Trait as TraitSchema,
 )
 from budapp.model_ops.models import Model as ModelTable
-from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
+from budapp.workflow_ops.crud import (
+    WorkflowDataManager,
+    WorkflowStepDataManager,
+)
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStatusEnum
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -155,7 +180,8 @@ class ExperimentService:
             self.session.rollback()
             logger.warning(f"Failed to create experiment: {e}", exc_info=True)
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create experiment"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create experiment",
             ) from e
 
         # Create experiment schema with empty models and traits (new experiment has no runs yet)
@@ -166,7 +192,10 @@ class ExperimentService:
         return exp_data
 
     def configure_runs(
-        self, experiment_id: uuid.UUID, req: ConfigureRunsRequest, user_id: uuid.UUID
+        self,
+        experiment_id: uuid.UUID,
+        req: ConfigureRunsRequest,
+        user_id: uuid.UUID,
     ) -> List[RunSchema]:
         """Configure runs for an experiment by creating model-dataset combinations.
 
@@ -186,7 +215,10 @@ class ExperimentService:
         # Verify experiment exists and user has access
         experiment = self.session.get(ExperimentModel, experiment_id)
         if not experiment or experiment.created_by != user_id or experiment.status == "deleted":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
+            )
 
         try:
             # Get the next run_index to start from
@@ -222,7 +254,7 @@ class ExperimentService:
                         run_index=next_run_index,
                         model_id=model_id,
                         dataset_version_id=dataset_version.id,
-                        status=RunStatusEnum.PENDING.value,
+                        status=RunStatusEnum.RUNNING.value,
                         config=req.evaluation_config or {},
                     )
                     self.session.add(run)
@@ -240,7 +272,8 @@ class ExperimentService:
             self.session.rollback()
             logger.warning(f"Failed to configure runs: {e}", exc_info=True)
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to configure runs"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to configure runs",
             ) from e
 
     def list_experiments(
@@ -286,7 +319,8 @@ class ExperimentService:
             evs = q.all()
         except Exception as e:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list experiments"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to list experiments",
             ) from e
 
         # Get statuses for all experiments in one batch query
@@ -319,93 +353,268 @@ class ExperimentService:
         Raises:
             HTTPException(status_code=404): If experiment not found or access denied.
         """
-        from datetime import datetime
+        logger.info("Getting experiment - services")
 
-        from budapp.eval_ops.schemas import (
-            BudgetStats,
-            CurrentMetric,
-            ExperimentStats,
-            JudgeInfo,
-            ProcessingRate,
-            ProgressActions,
-            ProgressDataset,
-            ProgressInfo,
-            ProgressOverview,
-            RuntimeStats,
-            TokenStats,
-        )
-
+        # Get the Experiment
         ev = self.session.get(ExperimentModel, ev_id)
         if not ev or ev.created_by != user_id or ev.status == "deleted":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
+            raise ClientException(
+                message="Experiment not found or access denied",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
 
         # Create experiment schema and enrich with models, traits, and status
         exp_data = ExperimentSchema.from_orm(ev)
-        exp_data.models = self.get_models_for_experiment(ev.id)
-        exp_data.traits = self.get_traits_for_experiment(ev.id)
-        exp_data.status = self.compute_experiment_status(ev.id)
 
-        # Add dummy data for new fields
+        # Set default values for stats that are not yet available
         exp_data.stats = ExperimentStats(
-            budget=BudgetStats(limit_usd=100.0, used_usd=45.2, used_pct=45),
-            tokens=TokenStats(total=2100000, prefix=1200000, decode=900000, unit="tokens"),
-            runtime=RuntimeStats(active_seconds=8100, estimated_total_seconds=11100),
-            processing_rate=ProcessingRate(current_per_min=47, target_per_min=50),
+            budget=BudgetStats(limit_usd=0.0, used_usd=0.0, used_pct=0),
+            tokens=TokenStats(total=0, prefix=0, decode=0, unit="tokens"),
+            runtime=RuntimeStats(active_seconds=0, estimated_total_seconds=0),
+            processing_rate=ProcessingRate(current_per_min=0, target_per_min=0),
         )
 
-        exp_data.objective = "Compare GPT-4 and Claude-3 performance across academic benchmarks"
+        # Objective
+        exp_data.objective = ev.description or ""
 
-        import uuid as uuid_lib
+        # Traits and Models
+        # exp_data.models = self.get_models_for_experiment(ev.id)
 
-        # Generate actual UUIDs for run IDs
-        run_id_1 = str(uuid_lib.uuid4())
-        run_id_2 = str(uuid_lib.uuid4())
-        latest_run_id = str(uuid_lib.uuid4())
+        # Get all evaluations for the experiment
+        evaluations = (
+            self.session.query(Evaluation)
+            .filter(Evaluation.experiment_id == ev.id)
+            .order_by(Evaluation.created_at.desc())
+            .all()
+        )
 
-        exp_data.current_metrics = [
-            CurrentMetric(
-                evaluation="TruthfulQA",
-                dataset="dataset_name",
-                deployment_name="deployment_name",
-                judge=JudgeInfo(mode="llm_as_judge", model_name="Judge model name 1", score_pct=75),
-                traits=["trait_name_1", "trait_name_2"],
-                last_run_at=datetime.fromisoformat("2024-01-13T00:00:00Z"),
-                run_id=latest_run_id,
+        # Extract unique trait IDs from all evaluations
+        trait_ids_set = set()
+        for evaluation in evaluations:
+            if evaluation.trait_ids:
+                trait_ids_set.update(evaluation.trait_ids)
+
+        # Batch fetch all traits at once
+        traits_list = []
+        if trait_ids_set:
+            traits_list = self.session.query(TraitModel).filter(TraitModel.id.in_(list(trait_ids_set))).all()
+
+        # Get all the runs with metrics and get the run details as well as metric details
+        # Build current metrics table: each row represents a run with its evaluation, dataset, model, traits, and scores
+
+        # Get all runs for the experiment
+        all_experiment_runs = (
+            self.session.query(RunModel)
+            .filter(
+                RunModel.experiment_id == ev.id,
+                RunModel.status != RunStatusEnum.DELETED.value,
             )
+            .order_by(RunModel.created_at.desc())
+            .all()
+        )
+
+        # Batch fetch all related data to avoid N+1 queries
+        run_ids = [run.id for run in all_experiment_runs]
+        evaluation_ids = [run.evaluation_id for run in all_experiment_runs if run.evaluation_id]
+        model_ids = [run.model_id for run in all_experiment_runs if run.model_id]
+        dataset_version_ids = [run.dataset_version_id for run in all_experiment_runs if run.dataset_version_id]
+
+        # Batch fetch evaluations
+        evaluations_dict = {}
+        if evaluation_ids:
+            evaluations_batch = self.session.query(Evaluation).filter(Evaluation.id.in_(evaluation_ids)).all()
+            evaluations_dict = {eval.id: eval for eval in evaluations_batch}
+
+        # Batch fetch models
+        models_dict = {}
+        if model_ids:
+            models_batch = self.session.query(ModelTable).filter(ModelTable.id.in_(model_ids)).all()
+            models_dict = {model.id: model for model in models_batch}
+
+        # Batch fetch endpoints
+        endpoints_dict = {}
+        if model_ids:
+            endpoints_batch = self.session.query(EndpointModel).filter(EndpointModel.model_id.in_(model_ids)).all()
+            endpoints_dict = {endpoint.model_id: endpoint for endpoint in endpoints_batch}
+
+        # Batch fetch dataset versions and datasets
+        datasets_dict = {}
+        dataset_ids_for_traits = []
+        if dataset_version_ids:
+            dataset_versions_batch = (
+                self.session.query(ExpDatasetVersion).filter(ExpDatasetVersion.id.in_(dataset_version_ids)).all()
+            )
+            for dv in dataset_versions_batch:
+                datasets_dict[dv.id] = dv.dataset
+                if dv.dataset:
+                    dataset_ids_for_traits.append(dv.dataset.id)
+
+        # Batch fetch traits for all datasets
+        traits_by_dataset = {}
+        if dataset_ids_for_traits:
+            traits_pivot = (
+                self.session.query(PivotModel, TraitModel)
+                .join(TraitModel, PivotModel.trait_id == TraitModel.id)
+                .filter(PivotModel.dataset_id.in_(dataset_ids_for_traits))
+                .all()
+            )
+            for pivot, trait in traits_pivot:
+                if pivot.dataset_id not in traits_by_dataset:
+                    traits_by_dataset[pivot.dataset_id] = []
+                traits_by_dataset[pivot.dataset_id].append(trait.name)
+
+        # Batch fetch all metrics for all runs
+        metrics_by_run = {}
+        if run_ids:
+            metrics_batch = self.session.query(MetricModel).filter(MetricModel.run_id.in_(run_ids)).all()
+            for metric in metrics_batch:
+                if metric.run_id not in metrics_by_run:
+                    metrics_by_run[metric.run_id] = []
+                metrics_by_run[metric.run_id].append(metric)
+
+        # Build current metrics as a list of run records
+        exp_data.current_metrics = []
+
+        for run in all_experiment_runs:
+            # Get evaluation details from batched data
+            evaluation_name = "N/A"
+            if run.evaluation_id and run.evaluation_id in evaluations_dict:
+                evaluation_name = evaluations_dict[run.evaluation_id].name
+
+            # Get model details from batched data
+            model_name = "Unknown Model"
+            deployment_name = None
+            if run.model_id and run.model_id in models_dict:
+                model_name = models_dict[run.model_id].name
+                if run.model_id in endpoints_dict:
+                    deployment_name = endpoints_dict[run.model_id].namespace
+
+            # Get dataset and its traits from batched data
+            dataset_name = "Unknown Dataset"
+            traits_list = []
+            if run.dataset_version_id and run.dataset_version_id in datasets_dict:
+                dataset = datasets_dict[run.dataset_version_id]
+                if dataset:
+                    dataset_name = dataset.name
+                    traits_list = traits_by_dataset.get(dataset.id, [])
+
+            # Get metrics from batched data
+            metrics = metrics_by_run.get(run.id, [])
+
+            # Calculate average score
+            score_value = 0.0
+            judge_model = None  # TODO: Get judge model from config if available
+            if metrics:
+                total = sum(float(m.metric_value) for m in metrics)
+                score_value = round(total / len(metrics), 2)
+
+            # Format score with judge model if available
+            score_display = f"{score_value}%"
+            if judge_model:
+                score_display = f"{score_value}% - {judge_model}"
+
+            # Build the current metric record
+            metric_record = {
+                "evaluation": evaluation_name,
+                "dataset": dataset_name,
+                "deployment_name": deployment_name or "Not deployed",
+                "score": score_display,
+                "score_value": score_value,  # Raw value for sorting
+                "traits": traits_list,
+                "last_run": getattr(run, "updated_at", None) or getattr(run, "created_at", None),
+                "status": run.status,
+                "run_id": str(run.id),
+                "model_name": model_name,
+            }
+
+            exp_data.current_metrics.append(metric_record)
+
+        # Get evaluations with Running & Pending status
+        evaluations_running = [
+            eval
+            for eval in evaluations
+            if eval.status
+            in [
+                EvaluationStatusEnum.RUNNING.value,
+                EvaluationStatusEnum.PENDING.value,
+                EvaluationStatusEnum.COMPLETED.value,
+            ]
         ]
 
-        exp_data.progress_overview = [
-            ProgressOverview(
-                run_id=run_id_1,
-                title="Progress Overview of Run 1",
-                objective="Compare GPT-4 and Claude-3 performance across academic benchmarks",
-                current=ProgressDataset(dataset_label="MMLU - Mathematical Reasoning"),
-                progress=ProgressInfo(percent=65, completed=813, total=1247),
-                current_evaluation="TruthfulQA",
-                current_model="GPT-4 Turbo",
-                processing_rate_per_min=47,
-                average_score_pct=78.5,
-                eta_minutes=45,
-                status="running",
-                actions=ProgressActions(can_pause=True, pause_url=f"/experiments/{ev_id}/runs/{run_id_1}/pause"),
-            ),
-            ProgressOverview(
-                run_id=run_id_2,
-                title="Progress Overview of Run 2",
-                objective="Compare GPT-4 and Claude-3 performance across academic benchmarks",
-                current=ProgressDataset(dataset_label="MMLU - Mathematical Reasoning"),
-                progress=ProgressInfo(percent=65, completed=813, total=1247),
-                current_evaluation="TruthfulQA",
-                current_model="GPT-4 Turbo",
-                processing_rate_per_min=47,
-                average_score_pct=78.5,
-                eta_minutes=45,
-                status="running",
-                actions=ProgressActions(can_pause=True, pause_url=f"/experiments/{ev_id}/runs/{run_id_2}/pause"),
-            ),
-        ]
+        # Batch fetch all runs for running evaluations
+        evaluation_ids = [eval.id for eval in evaluations_running]
+        all_runs = []
+        if evaluation_ids:
+            all_runs = (
+                self.session.query(RunModel)
+                .filter(
+                    RunModel.evaluation_id.in_(evaluation_ids),
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .order_by(RunModel.created_at.desc())
+                .all()
+            )
 
-        exp_data.updated_at = datetime.fromisoformat("2024-01-13T00:00:00Z")
+        # Group runs by evaluation_id
+        evaluation_runs_map = {}
+        for run in all_runs:
+            if run.evaluation_id not in evaluation_runs_map:
+                evaluation_runs_map[run.evaluation_id] = []
+            evaluation_runs_map[run.evaluation_id].append(run)
+
+        # Collect all unique model IDs from runs
+        model_ids = set()
+        for runs in evaluation_runs_map.values():
+            for run in runs:
+                if run.model_id:
+                    model_ids.add(run.model_id)
+
+        # Batch fetch all models at once
+        models_dict = {}
+        if model_ids:
+            models = self.session.query(ModelTable).filter(ModelTable.id.in_(list(model_ids))).all()
+            models_dict = {model.id: model for model in models}
+
+        # Claculate The Averge Score Across All Datasete based on runs
+        overall_score = 0.0
+        if exp_data.current_metrics:
+            total_score = sum(metric["score_value"] for metric in exp_data.current_metrics)
+            overall_score = round(total_score / len(exp_data.current_metrics), 2)
+
+        # Build progress overview with cached model data
+        progress_overview = []
+        for evaluation in evaluations_running:
+            eval_runs = evaluation_runs_map.get(evaluation.id, [])
+            current_model_name = ""
+
+            if eval_runs and eval_runs[0].model_id:
+                model = models_dict.get(eval_runs[0].model_id)
+                if model:
+                    current_model_name = model.name
+                else:
+                    # Log missing model but don't fail
+                    logger.warning(f"Model {eval_runs[0].model_id} not found in database")
+                    current_model_name = "Unknown Model"
+
+            progress_overview.append(
+                ProgressOverview(
+                    run_id=str(evaluation.id),
+                    title=f"Progress Overview of {evaluation.name}",
+                    objective=evaluation.description,
+                    current=None,
+                    progress=ProgressInfo(percent=0, completed=0, total=0),
+                    current_evaluation="",
+                    current_model=current_model_name,
+                    processing_rate_per_min=0,
+                    average_score_pct=overall_score,
+                    eta_minutes=25,
+                    status=evaluation.status,
+                    actions=None,
+                )
+            )
+
+        # Final Response
+        exp_data.progress_overview = progress_overview
 
         return exp_data
 
@@ -431,7 +640,10 @@ class ExperimentService:
         """
         ev = self.session.get(ExperimentModel, ev_id)
         if not ev or ev.created_by != user_id or ev.status == "deleted":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
+            )
         if req.name is not None:
             ev.name = req.name
         if req.description is not None:
@@ -442,7 +654,8 @@ class ExperimentService:
         except Exception as e:
             self.session.rollback()
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update experiment"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update experiment",
             ) from e
 
         # Create experiment schema and enrich with models, traits, and status
@@ -465,14 +678,18 @@ class ExperimentService:
         """
         ev = self.session.get(ExperimentModel, ev_id)
         if not ev or ev.created_by != user_id or ev.status == "deleted":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
+            )
         ev.status = "deleted"
         try:
             self.session.commit()
         except Exception as e:
             self.session.rollback()
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete experiment"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete experiment",
             ) from e
 
     def list_traits(
@@ -532,7 +749,8 @@ class ExperimentService:
 
         except Exception as e:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list traits"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to list traits",
             ) from e
 
     # ------------------------ Experiment Enhancement Methods ------------------------
@@ -596,8 +814,14 @@ class ExperimentService:
                 )
                 .join(PivotModel, TraitModel.id == PivotModel.trait_id)
                 .join(DatasetModel, PivotModel.dataset_id == DatasetModel.id)
-                .join(ExpDatasetVersion, DatasetModel.id == ExpDatasetVersion.dataset_id)
-                .join(RunModel, ExpDatasetVersion.id == RunModel.dataset_version_id)
+                .join(
+                    ExpDatasetVersion,
+                    DatasetModel.id == ExpDatasetVersion.dataset_id,
+                )
+                .join(
+                    RunModel,
+                    ExpDatasetVersion.id == RunModel.dataset_version_id,
+                )
                 .filter(
                     RunModel.experiment_id == experiment_id,
                     RunModel.status != RunStatusEnum.DELETED.value,
@@ -722,30 +946,131 @@ class ExperimentService:
 
     # ------------------------ Run Methods ------------------------
 
-    def list_runs(self, experiment_id: uuid.UUID, user_id: uuid.UUID) -> List[RunSchema]:
-        """List all runs for a given experiment.
+    def list_runs(self, experiment_id: uuid.UUID, user_id: uuid.UUID) -> List[EvaluationListItem]:
+        """List all completed evaluations for a given experiment.
 
         Parameters:
             experiment_id (uuid.UUID): ID of the experiment.
             user_id (uuid.UUID): ID of the user.
 
         Returns:
-            List[RunSchema]: List of run schemas.
+            List[EvaluationListItem]: List of completed evaluation items with model, traits, and scores.
 
         Raises:
             HTTPException(status_code=404): If experiment not found or access denied.
         """
-        ev = self.session.get(ExperimentModel, experiment_id)
-        if not ev or ev.created_by != user_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
+        # First verify the experiment exists and belongs to the user
+        experiment = (
+            self.session.query(ExperimentModel)
+            .filter(
+                ExperimentModel.id == experiment_id,
+                ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
+            )
+            .first()
+        )
 
-        runs = (
-            self.session.query(RunModel)
-            .filter(RunModel.experiment_id == experiment_id, RunModel.status != RunStatusEnum.DELETED.value)
-            .order_by(RunModel.created_at.desc())
+        if not experiment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
+            )
+
+        # 1. Get all evaluations for the experiment
+        evaluations = (
+            self.session.query(EvaluationModel)
+            .filter(EvaluationModel.experiment_id == experiment_id)
+            .order_by(EvaluationModel.created_at.desc())
             .all()
         )
-        return [RunSchema.from_orm(r) for r in runs]
+
+        evaluation_items = []
+
+        # 2. For each evaluation, process its data
+        for evaluation in evaluations:
+            # Get runs associated with this evaluation
+            runs = self.session.query(RunModel).filter(RunModel.evaluation_id == evaluation.id).all()
+
+            if not runs:
+                continue
+
+            # Get the first run to extract model info (all runs in an evaluation typically use the same model)
+            first_run = runs[0]
+
+            # 4. Get model details and name
+            model = self.session.query(ModelTable).filter(ModelTable.id == first_run.model_id).first()
+            model_name = model.name if model else "Unknown Model"
+
+            # 2. Identify associated traits from evaluation.trait_ids
+            trait_ids = evaluation.trait_ids if evaluation.trait_ids else []
+
+            if trait_ids:
+                # Batch fetch all traits
+                traits = (
+                    self.session.query(TraitModel)
+                    .filter(TraitModel.id.in_([uuid.UUID(tid) for tid in trait_ids]))
+                    .all()
+                )
+
+                # 3. For each trait, get associated datasets
+                trait_dataset_map = {}
+                for trait in traits:
+                    # Get datasets associated with this trait
+                    datasets = (
+                        self.session.query(DatasetModel)
+                        .join(PivotModel, DatasetModel.id == PivotModel.dataset_id)
+                        .filter(PivotModel.trait_id == trait.id)
+                        .all()
+                    )
+                    trait_dataset_map[str(trait.id)] = {
+                        "trait": trait,
+                        "datasets": datasets,
+                    }
+
+                # 6. Map trait_id with trait_scores
+                trait_scores_map = evaluation.trait_scores if evaluation.trait_scores else {}
+
+                # Create evaluation items for each trait
+                for trait_id_str in trait_ids:
+                    trait_data = trait_dataset_map.get(trait_id_str)
+                    if not trait_data:
+                        continue
+
+                    trait = trait_data["trait"]
+
+                    # Get trait score from trait_scores mapping, or use default
+                    trait_score = float(trait_scores_map.get(trait_id_str, 0.0))
+
+                    # Calculate duration in minutes from duration_in_seconds
+                    duration_minutes = evaluation.duration_in_seconds // 60 if evaluation.duration_in_seconds else 0
+
+                    evaluation_item = EvaluationListItem(
+                        evaluation_name=evaluation.name,
+                        evaluation_id=evaluation.id,
+                        model_name=model_name,
+                        started_date=evaluation.created_at,
+                        duration_minutes=duration_minutes,
+                        trait_name=trait.name,
+                        trait_score=trait_score,
+                        status=evaluation.status,
+                    )
+                    evaluation_items.append(evaluation_item)
+            else:
+                # If no traits associated, create a single evaluation item with default trait
+                duration_minutes = evaluation.duration_in_seconds // 60 if evaluation.duration_in_seconds else 0
+
+                evaluation_item = EvaluationListItem(
+                    evaluation_name=evaluation.name,
+                    evaluation_id=evaluation.id,
+                    model_name=model_name,
+                    started_date=evaluation.created_at,
+                    duration_minutes=duration_minutes,
+                    trait_name="General",
+                    trait_score=0.0,
+                    status=evaluation.status,
+                )
+                evaluation_items.append(evaluation_item)
+
+        return evaluation_items
 
     def get_run_with_results(self, run_id: uuid.UUID, user_id: uuid.UUID) -> RunWithResultsSchema:
         """Get a run with its metrics and results.
@@ -762,7 +1087,10 @@ class ExperimentService:
         """
         run = self.session.get(RunModel, run_id)
         if not run or run.experiment.created_by != user_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found or access denied")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Run not found or access denied",
+            )
 
         # Get metrics for this run
         metrics = self.session.query(MetricModel).filter(MetricModel.run_id == run_id).all()
@@ -791,6 +1119,111 @@ class ExperimentService:
             raw_results=raw_results_data,
         )
 
+    def get_run_with_detailed_metrics(self, run_id: uuid.UUID, user_id: uuid.UUID) -> "RunDetailedWithMetrics":
+        """Get a run with complete dataset details, model details, and metrics.
+
+        Parameters:
+            run_id (uuid.UUID): ID of the run.
+            user_id (uuid.UUID): ID of the user.
+
+        Returns:
+            RunDetailedWithMetrics: Run schema with complete dataset, model, and metrics information.
+
+        Raises:
+            HTTPException(status_code=404): If run not found or access denied.
+        """
+        from budapp.eval_ops.schemas import RunDetailedWithMetrics
+
+        run = self.session.get(RunModel, run_id)
+        if not run or run.experiment.created_by != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Run not found or access denied",
+            )
+
+        # Get metrics for this run
+        metrics = self.session.query(MetricModel).filter(MetricModel.run_id == run_id).all()
+        metrics_data = [
+            {
+                "metric_name": metric.metric_name,
+                "mode": metric.mode,
+                "metric_value": float(metric.metric_value),
+            }
+            for metric in metrics
+        ]
+
+        # Get raw results for this run
+        raw_result = self.session.query(RawResultModel).filter(RawResultModel.run_id == run_id).first()
+        raw_results_data = raw_result.preview_results if raw_result else None
+
+        # Get model details
+        model_details = None
+        if run.model_id:
+            model = self.session.query(ModelTable).filter(ModelTable.id == run.model_id).first()
+            if model:
+                # Get deployment name from endpoint if exists
+                endpoint = self.session.query(EndpointModel).filter(EndpointModel.model_id == run.model_id).first()
+                model_details = {
+                    "id": str(model.id),
+                    "name": model.name,
+                    "display_name": model.display_name,
+                    "deployment_name": endpoint.namespace if endpoint else None,
+                    "description": model.description,
+                }
+
+        # Get dataset details with version information
+        dataset_details = None
+        if run.dataset_version_id:
+            dataset_version = (
+                self.session.query(ExpDatasetVersion).filter(ExpDatasetVersion.id == run.dataset_version_id).first()
+            )
+            if dataset_version and dataset_version.dataset:
+                dataset = dataset_version.dataset
+
+                # Get traits associated with this dataset
+                traits = (
+                    self.session.query(TraitModel)
+                    .join(PivotModel, TraitModel.id == PivotModel.trait_id)
+                    .filter(PivotModel.dataset_id == dataset.id)
+                    .all()
+                )
+
+                dataset_details = {
+                    "id": str(dataset.id),
+                    "name": dataset.name,
+                    "description": dataset.description,
+                    "version": dataset_version.version,
+                    "version_id": str(dataset_version.id),
+                    "estimated_input_tokens": dataset.estimated_input_tokens,
+                    "estimated_output_tokens": dataset.estimated_output_tokens,
+                    "language": dataset.language,
+                    "domains": dataset.domains,
+                    "modalities": dataset.modalities,
+                    "task_type": dataset.task_type,
+                    "traits": [
+                        {
+                            "id": str(trait.id),
+                            "name": trait.name,
+                            "description": trait.description,
+                        }
+                        for trait in traits
+                    ],
+                }
+
+        return RunDetailedWithMetrics(
+            id=run.id,
+            experiment_id=run.experiment_id,
+            run_index=run.run_index,
+            status=RunStatusEnum(run.status),
+            config=run.config,
+            model=model_details,
+            dataset=dataset_details,
+            metrics=metrics_data,
+            raw_results=raw_results_data,
+            created_at=run.created_at,
+            updated_at=run.updated_at,
+        )
+
     def update_run(
         self,
         run_id: uuid.UUID,
@@ -813,7 +1246,10 @@ class ExperimentService:
         """
         run = self.session.get(RunModel, run_id)
         if not run or run.experiment.created_by != user_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found or access denied")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Run not found or access denied",
+            )
 
         if req.status is not None:
             run.status = req.status.value
@@ -826,7 +1262,8 @@ class ExperimentService:
         except Exception as e:
             self.session.rollback()
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update run"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update run",
             ) from e
         return RunSchema.from_orm(run)
 
@@ -843,14 +1280,18 @@ class ExperimentService:
         """
         run = self.session.get(RunModel, run_id)
         if not run or run.experiment.created_by != user_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found or access denied")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Run not found or access denied",
+            )
         run.status = RunStatusEnum.DELETED.value
         try:
             self.session.commit()
         except Exception as e:
             self.session.rollback()
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete run"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete run",
             ) from e
 
     # ------------------------ Dataset Methods (Keep existing) ------------------------
@@ -872,7 +1313,10 @@ class ExperimentService:
             # Get the dataset
             dataset = self.session.get(DatasetModel, dataset_id)
             if not dataset:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Dataset not found",
+                )
 
             # Get associated traits through pivot table
             traits_query = (
@@ -934,7 +1378,8 @@ class ExperimentService:
             raise
         except Exception as e:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get dataset"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get dataset",
             ) from e
 
     def list_datasets(
@@ -1033,7 +1478,8 @@ class ExperimentService:
 
         except Exception as e:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list datasets"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to list datasets",
             ) from e
 
     def create_dataset(self, req: CreateDatasetRequest) -> DatasetSchema:
@@ -1077,7 +1523,8 @@ class ExperimentService:
                     trait = self.session.get(TraitModel, trait_id)
                     if not trait:
                         raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Trait with ID {trait_id} not found"
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Trait with ID {trait_id} not found",
                         )
 
                     pivot = PivotModel(trait_id=trait_id, dataset_id=dataset.id)
@@ -1096,7 +1543,8 @@ class ExperimentService:
             self.session.rollback()
             logger.warning(f"Failed to create dataset: {e}", exc_info=True)
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create dataset"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create dataset",
             ) from e
 
     def update_dataset(self, dataset_id: uuid.UUID, req: UpdateDatasetRequest) -> DatasetSchema:
@@ -1117,7 +1565,10 @@ class ExperimentService:
         try:
             dataset = self.session.get(DatasetModel, dataset_id)
             if not dataset:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Dataset not found",
+                )
 
             # Update dataset fields
             if req.name is not None:
@@ -1160,7 +1611,8 @@ class ExperimentService:
                     trait = self.session.get(TraitModel, trait_id)
                     if not trait:
                         raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Trait with ID {trait_id} not found"
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Trait with ID {trait_id} not found",
                         )
 
                     pivot = PivotModel(trait_id=trait_id, dataset_id=dataset_id)
@@ -1179,7 +1631,8 @@ class ExperimentService:
             self.session.rollback()
             logger.warning(f"Failed to update dataset: {e}", exc_info=True)
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update dataset"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update dataset",
             ) from e
 
     def delete_dataset(self, dataset_id: uuid.UUID) -> None:
@@ -1195,7 +1648,10 @@ class ExperimentService:
         try:
             dataset = self.session.get(DatasetModel, dataset_id)
             if not dataset:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Dataset not found",
+                )
 
             # Delete trait associations first
             self.session.query(PivotModel).filter(PivotModel.dataset_id == dataset_id).delete()
@@ -1210,7 +1666,8 @@ class ExperimentService:
         except Exception as e:
             self.session.rollback()
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete dataset"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete dataset",
             ) from e
 
     def get_runs_history(
@@ -1240,12 +1697,20 @@ class ExperimentService:
         """
         from datetime import datetime
 
-        from budapp.eval_ops.schemas import BenchmarkScore, RunHistoryData, RunHistoryItem, SortInfo
+        from budapp.eval_ops.schemas import (
+            BenchmarkScore,
+            RunHistoryData,
+            RunHistoryItem,
+            SortInfo,
+        )
 
         # Verify experiment exists and user has access
         experiment = self.session.get(ExperimentModel, experiment_id)
         if not experiment or experiment.created_by != user_id or experiment.status == "deleted":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
+            )
 
         # Return dummy data for now
         import uuid as uuid_lib
@@ -1297,12 +1762,18 @@ class ExperimentService:
         # Get experiment
         experiment = self.session.get(ExperimentModel, experiment_id)
         if not experiment or experiment.created_by != user_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
+            )
 
         # Get all runs for the experiment
         runs = (
             self.session.query(RunModel)
-            .filter(RunModel.experiment_id == experiment_id, RunModel.status != RunStatusEnum.DELETED.value)
+            .filter(
+                RunModel.experiment_id == experiment_id,
+                RunModel.status != RunStatusEnum.DELETED.value,
+            )
             .order_by(RunModel.run_index)
             .all()
         )
@@ -1323,7 +1794,14 @@ class ExperimentService:
             if eval_job_id:
                 evaluation_job_ids.append((run.id, eval_job_id))
 
-            evaluations.append({"run": run, "model": model, "traits": traits, "evaluation_job_id": eval_job_id})
+            evaluations.append(
+                {
+                    "run": run,
+                    "model": model,
+                    "traits": traits,
+                    "evaluation_job_id": eval_job_id,
+                }
+            )
 
         # Fetch scores from budeval in parallel
         scores_map = {}
@@ -1375,7 +1853,10 @@ class ExperimentService:
                 )
             )
 
-        return {"experiment": ExperimentSchema.model_validate(experiment), "evaluations": evaluation_results}
+        return {
+            "experiment": ExperimentSchema.model_validate(experiment),
+            "evaluations": evaluation_results,
+        }
 
     def get_model_details(self, model_id: uuid.UUID) -> "ModelDetail":
         """Get detailed model information.
@@ -1398,7 +1879,11 @@ class ExperimentService:
         # Try to get deployment name from endpoints
         endpoint = self.session.query(EndpointModel).filter(EndpointModel.model_id == model_id).first()
 
-        return ModelDetail(id=model.id, name=model.name, deployment_name=endpoint.namespace if endpoint else None)
+        return ModelDetail(
+            id=model.id,
+            name=model.name,
+            deployment_name=endpoint.namespace if endpoint else None,
+        )
 
     def get_traits_with_datasets_for_run(self, dataset_version_id: uuid.UUID) -> List["TraitWithDatasets"]:
         """Get traits with their datasets for a specific run.
@@ -1456,10 +1941,103 @@ class ExperimentService:
                 )
 
             traits_with_datasets.append(
-                TraitWithDatasets(id=trait.id, name=trait.name, icon=trait.icon, datasets=dataset_infos)
+                TraitWithDatasets(
+                    id=trait.id,
+                    name=trait.name,
+                    icon=trait.icon,
+                    datasets=dataset_infos,
+                )
             )
 
         return traits_with_datasets
+
+    def _get_current_metrics(self, experiment_id: uuid.UUID) -> List["CurrentMetric"]:
+        """Get current metrics for an experiment based on real run data.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+
+        Returns:
+            List[CurrentMetric]: List of current metrics derived from experiment runs.
+        """
+        try:
+            from budapp.eval_ops.schemas import CurrentMetric
+
+            # Query active runs for the experiment - use created_at for ordering to avoid NULL issues
+            runs = (
+                self.session.query(RunModel)
+                .filter(
+                    RunModel.experiment_id == experiment_id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .order_by(RunModel.created_at.desc())  # Use created_at instead of updated_at
+                .all()
+            )
+
+            current_metrics = []
+            for run in runs:
+                try:
+                    # Get model details with validation
+                    model_detail = self.get_model_details(run.model_id)
+                    if not model_detail or not hasattr(model_detail, "name") or not model_detail.name:
+                        logger.warning(f"Invalid model details for run {run.id}, skipping")
+                        continue
+
+                    # Get dataset information with validation
+                    dataset_version = self.session.get(ExpDatasetVersion, run.dataset_version_id)
+                    dataset_name = "Unknown Dataset"
+                    if dataset_version and dataset_version.dataset and dataset_version.dataset.name:
+                        dataset_name = dataset_version.dataset.name
+
+                    # Get traits for this run's dataset with validation
+                    traits_with_datasets = self.get_traits_with_datasets_for_run(run.dataset_version_id)
+                    trait_names = []
+                    if traits_with_datasets:
+                        trait_names = [
+                            trait.name
+                            for trait in traits_with_datasets
+                            if trait and hasattr(trait, "name") and trait.name
+                        ]
+
+                    # Validate required fields before creating CurrentMetric
+                    model_name = model_detail.name if model_detail.name else "Unknown Model"
+                    deployment_name = (
+                        model_detail.deployment_name
+                        if hasattr(model_detail, "deployment_name") and model_detail.deployment_name
+                        else model_name
+                    )
+                    evaluation_name = f"{model_name} on {dataset_name}"
+                    last_run_time = run.updated_at or run.created_at
+
+                    # Create CurrentMetric object with validated data
+                    current_metric = CurrentMetric(
+                        evaluation=evaluation_name,
+                        dataset=dataset_name,
+                        deployment_name=deployment_name,
+                        judge=None,  # Judge models not available yet
+                        traits=trait_names,
+                        last_run_at=last_run_time,
+                        run_id=str(run.id),
+                    )
+
+                    current_metrics.append(current_metric)
+
+                except Exception as e:
+                    logger.error(
+                        f"Failed to process run {run.id} for current_metrics: {e}",
+                        exc_info=True,
+                    )
+                    continue
+
+            logger.info(f"Generated {len(current_metrics)} current_metrics for experiment {experiment_id}")
+            return current_metrics
+
+        except Exception as e:
+            logger.error(
+                f"Failed to get current_metrics for experiment {experiment_id}: {e}",
+                exc_info=True,
+            )
+            return []  # Return empty list instead of failing
 
 
 class ExperimentWorkflowService:
@@ -1492,7 +2070,8 @@ class ExperimentWorkflowService:
             # Validate step number
             if request.step_number < 1 or request.step_number > 5:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid step number. Must be between 1 and 5."
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid step number. Must be between 1 and 5.",
                 )
 
             # Get or create workflow
@@ -1502,17 +2081,27 @@ class ExperimentWorkflowService:
                     WorkflowModel, {"id": request.workflow_id}
                 )
                 if not workflow:
-                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Workflow not found",
+                    )
                 workflow = cast(WorkflowModel, workflow)
                 if workflow.created_by != current_user_id:
-                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this workflow")
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access denied to this workflow",
+                    )
                 if workflow.status != WorkflowStatusEnum.IN_PROGRESS:
-                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Workflow is not in progress")
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Workflow is not in progress",
+                    )
             else:
                 # Creating new workflow (step 1 only)
                 if request.step_number != 1:
                     raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST, detail="workflow_id is required for steps 2-5"
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="workflow_id is required for steps 2-5",
                     )
                 workflow = await WorkflowDataManager(self.session).insert_one(
                     WorkflowModel(
@@ -1542,12 +2131,22 @@ class ExperimentWorkflowService:
 
             # If this is the final step and trigger_workflow is True, create the experiment
             if request.step_number == 5 and request.trigger_workflow:
-                await self._create_experiment_from_workflow(workflow.id, current_user_id)
-                # Mark workflow as completed
-                await WorkflowDataManager(self.session).update_by_fields(
-                    workflow,
-                    {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
+                experiment_id = await self._create_experiment_from_workflow(workflow.id, current_user_id)
+
+                # Store the experiment_id in a workflow step for retrieval
+                await WorkflowStepDataManager(self.session).insert_one(
+                    WorkflowStepModel(
+                        workflow_id=workflow.id,
+                        step_number=6,  # Use step 6 to store the result
+                        data={"experiment_id": str(experiment_id)},
+                    )
                 )
+
+                # Mark workflow as completed
+                # await WorkflowDataManager(self.session).update_by_fields(
+                #     workflow,
+                #     {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
+                # )
 
                 # if experiment_id, then call the eval workflow
                 # if experiment_id:
@@ -1556,7 +2155,9 @@ class ExperimentWorkflowService:
             # We now rely on unified workflow retrieval output; skip assembling local data
             _ = await self._get_accumulated_step_data(workflow.id)
 
-            from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
+            from budapp.workflow_ops.services import (
+                WorkflowService as GenericWorkflowService,
+            )
 
             # Return unified workflow response matching cluster creation
             return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
@@ -1564,9 +2165,13 @@ class ExperimentWorkflowService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.warning(f"Failed to process experiment workflow step: {e}", exc_info=True)
+            logger.warning(
+                f"Failed to process experiment workflow step: {e}",
+                exc_info=True,
+            )
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process workflow step"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to process workflow step",
             ) from e
 
     async def _validate_step_data(self, step_number: int, stage_data: dict) -> None:
@@ -1595,13 +2200,15 @@ class ExperimentWorkflowService:
                 tags = stage_data["tags"]
                 if not isinstance(tags, list):
                     raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="tags must be a list of strings"
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="tags must be a list of strings",
                     )
                 # Validate each tag is a string
                 for tag in tags:
                     if not isinstance(tag, str):
                         raise HTTPException(
-                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Each tag must be a string"
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="Each tag must be a string",
                         )
         elif step_number == 2:
             # Model Selection validation
@@ -1622,7 +2229,8 @@ class ExperimentWorkflowService:
             trait_ids = stage_data["trait_ids"]
             if not isinstance(trait_ids, list):
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="trait_ids must be a list"
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="trait_ids must be a list",
                 )
 
             # Validate each trait_id is a valid UUID and exists in database
@@ -1632,7 +2240,8 @@ class ExperimentWorkflowService:
                     trait_uuid = uuid.UUID(str(trait_id))
                 except (ValueError, TypeError) as e:
                     raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Invalid trait ID format: {trait_id}"
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"Invalid trait ID format: {trait_id}",
                     ) from e
 
                 # Check if trait exists in database
@@ -1648,7 +2257,8 @@ class ExperimentWorkflowService:
                 dataset_ids = stage_data["dataset_ids"]
                 if not isinstance(dataset_ids, list):
                     raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="dataset_ids must be a list"
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="dataset_ids must be a list",
                     )
 
                 # Validate each dataset_id is a valid UUID and exists in database
@@ -1697,8 +2307,14 @@ class ExperimentWorkflowService:
         """
         # Check if step already exists
         existing_step = await WorkflowStepDataManager(self.session).retrieve_by_fields(
-            WorkflowStepModel, {"workflow_id": workflow_id, "step_number": step_number}, missing_ok=True
+            WorkflowStepModel,
+            {"workflow_id": workflow_id, "step_number": step_number},
+            missing_ok=True,
         )
+
+        step_data = stage_data.copy()  # Create a copy to avoid modifying original
+        if "experiment_id" in stage_data:
+            step_data["experiment_id"] = str(stage_data["experiment_id"])
 
         if existing_step:
             # Update existing step
@@ -1709,7 +2325,11 @@ class ExperimentWorkflowService:
         else:
             # Create new step
             await WorkflowStepDataManager(self.session).insert_one(
-                WorkflowStepModel(workflow_id=workflow_id, step_number=step_number, data=stage_data)
+                WorkflowStepModel(
+                    workflow_id=workflow_id,
+                    step_number=step_number,
+                    data=stage_data,
+                )
             )
 
     async def _prepare_next_step_data(self, next_step: int, current_user_id: uuid.UUID) -> dict:
@@ -1735,7 +2355,12 @@ class ExperimentWorkflowService:
             return {
                 "message": "Select traits and datasets",
                 "available_traits": [
-                    {"id": str(trait.id), "name": trait.name, "description": trait.description} for trait in traits
+                    {
+                        "id": str(trait.id),
+                        "name": trait.name,
+                        "description": trait.description,
+                    }
+                    for trait in traits
                 ],
             }
         elif next_step == 4:
@@ -1885,7 +2510,7 @@ class ExperimentWorkflowService:
                         run_index=run_index,
                         model_id=model_uuid,
                         dataset_version_id=dataset_version.id,
-                        status=RunStatusEnum.PENDING.value,
+                        status=RunStatusEnum.RUNNING.value,
                         config=combined_data.evaluation_config,
                     )
                     self.session.add(run)
@@ -1922,10 +2547,14 @@ class ExperimentWorkflowService:
         try:
             # Get workflow record
             workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
-                WorkflowModel, {"id": workflow_id, "created_by": current_user_id}
+                WorkflowModel,
+                {"id": workflow_id, "created_by": current_user_id},
             )
             if not workflow:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Workflow not found",
+                )
             workflow = cast(WorkflowModel, workflow)
 
             # Get all accumulated step data
@@ -1938,7 +2567,9 @@ class ExperimentWorkflowService:
             if not is_complete:
                 await self._prepare_next_step_data(workflow.current_step + 1, current_user_id)
 
-            from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
+            from budapp.workflow_ops.services import (
+                WorkflowService as GenericWorkflowService,
+            )
 
             # Return unified workflow response matching cluster creation
             return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
@@ -1960,7 +2591,10 @@ class EvaluationWorkflowService:
         self.session = session
 
     async def process_evaluation_workflow_step(
-        self, experiment_id: uuid.UUID, request: EvaluationWorkflowStepRequest, current_user_id: uuid.UUID
+        self,
+        experiment_id: uuid.UUID,
+        request: EvaluationWorkflowStepRequest,
+        current_user_id: uuid.UUID,
     ) -> RetrieveWorkflowDataResponse:
         """Process a step in the evaluation creation workflow.
 
@@ -1982,7 +2616,8 @@ class EvaluationWorkflowService:
             experiment = self.session.get(ExperimentModel, experiment_id)
             if not experiment or experiment.created_by != current_user_id or experiment.status == "deleted":
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied"
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Experiment not found or access denied",
                 )
 
             # Get or create workflow
@@ -1992,21 +2627,37 @@ class EvaluationWorkflowService:
                     WorkflowModel, {"id": request.workflow_id}
                 )
                 if not workflow:
-                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Workflow not found",
+                    )
                 workflow = cast(WorkflowModel, workflow)
                 if workflow.created_by != current_user_id:
-                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this workflow")
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access denied to this workflow",
+                    )
                 if workflow.status != WorkflowStatusEnum.IN_PROGRESS:
-                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Workflow is not in progress")
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Workflow is not in progress",
+                    )
             else:
                 # Creating new workflow (step 1 only)
                 if request.step_number != 1:
                     raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST, detail="workflow_id is required for steps 2-5"
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="workflow_id is required for steps 2-5",
                     )
+                workflow_title = request.stage_data.get("name") if isinstance(request.stage_data, dict) else None
+                if isinstance(workflow_title, str) and workflow_title.strip():
+                    workflow_title = workflow_title.strip()
+                else:
+                    workflow_title = "New Model Evaualtion"
+
                 workflow = await WorkflowDataManager(self.session).insert_one(
                     WorkflowModel(
-                        title=f"evaluation_workflow_{experiment_id}",
+                        title=workflow_title,
                         workflow_type=WorkflowTypeEnum.EVALUATE_MODEL,
                         status=WorkflowStatusEnum.IN_PROGRESS,
                         current_step=0,  # Start at 0, will be updated to 1 after first step
@@ -2029,8 +2680,31 @@ class EvaluationWorkflowService:
                     detail=f"Invalid step number {request.step_number}. Must be between 1 and 5",
                 )
 
-            # Store workflow step data
-            await self._store_workflow_step(workflow.id, request.step_number, request.stage_data)
+            # Store workflow step data with experiment_id included
+            stage_data_with_experiment = request.stage_data.copy()
+            stage_data_with_experiment["experiment_id"] = str(experiment_id)
+
+            # For step 3 (trait selection), enrich with trait details before storing
+            if request.step_number == 3 and "trait_ids" in stage_data_with_experiment:
+                trait_ids = stage_data_with_experiment.get("trait_ids", [])
+                traits_details = []
+                for trait_id in trait_ids:
+                    try:
+                        trait_uuid = uuid.UUID(str(trait_id))
+                        trait = self.session.query(TraitModel).filter(TraitModel.id == trait_uuid).first()
+                        if trait:
+                            traits_details.append(
+                                {
+                                    "id": str(trait.id),
+                                    "name": trait.name,
+                                    "description": trait.description,
+                                }
+                            )
+                    except (ValueError, TypeError):
+                        continue
+                stage_data_with_experiment["traits_details"] = traits_details
+
+            await self._store_workflow_step(workflow.id, request.step_number, stage_data_with_experiment)
 
             # Validate step 4 dataset-trait relationships
             if request.step_number == 4:
@@ -2044,13 +2718,18 @@ class EvaluationWorkflowService:
                     {"current_step": request.step_number},
                 )
 
+            evaluation_id: uuid.UUID | None = None
             # If this is the final step and trigger_workflow is True, create the runs
             if request.step_number == 5 and request.trigger_workflow:
-                await self._create_runs_from_workflow(workflow.id, experiment_id, current_user_id)
-                # await WorkflowDataManager(self.session).update_by_fields(
-                #     workflow,
-                #     {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
-                # )
+                # Create The Evaluation & Runs
+                evaluation_id = await self._create_runs_from_workflow(workflow.id, experiment_id, current_user_id)
+
+                logger.warning(f"Created Evaluation ID: {evaluation_id}")
+
+                await WorkflowDataManager(self.session).update_by_fields(
+                    workflow,
+                    {"status": WorkflowStatusEnum.COMPLETED.value},  # type: ignore
+                )
 
             # After storing the workflow step, retrieve all accumulated data
             all_step_data = await self._get_accumulated_step_data(workflow.id)
@@ -2067,14 +2746,22 @@ class EvaluationWorkflowService:
             if next_step:
                 await self._get_next_step_data(next_step, all_step_data, experiment_id)
 
+            # Get The Evaluation ID
+
             # Trigger budeval evaluation if this is the final step
             if request.step_number == 5 and request.trigger_workflow:
                 logger.info("*" * 10)
                 logger.info(f"\n\nTriggering budeval evaluation for experiment {experiment_id} \n\n")
 
+                if evaluation_id is None:
+                    raise ClientException(
+                        message="Error getting evaluation ID",
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+
                 # Trigger Eval
                 trigger_workflow_response = await self._trigger_evaluations_for_experiment_and_get_response(
-                    experiment_id, current_user_id, workflow.id
+                    experiment_id, current_user_id, workflow.id, evaluation_id
                 )
 
                 logger.warning(f"Triggered budeval evaluation for experiment {trigger_workflow_response}")
@@ -2105,7 +2792,11 @@ class EvaluationWorkflowService:
                 # Update The Progress
                 trigger_workflow_response["progress_type"] = BudServeWorkflowStepEventName.EVALUATION_EVENTS.value
                 workflow = await WorkflowDataManager(self.session).update_by_fields(
-                    workflow, {"progress": trigger_workflow_response, "current_step": workflow_current_step}
+                    workflow,
+                    {
+                        "progress": trigger_workflow_response,
+                        "current_step": workflow_current_step,
+                    },
                 )
 
                 logger.debug(f"Updated progress, current step in workflow {workflow.id}")
@@ -2115,9 +2806,13 @@ class EvaluationWorkflowService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.warning(f"Failed to process evaluation workflow step: {e}", exc_info=True)
+            logger.warning(
+                f"Failed to process evaluation workflow step: {e}",
+                exc_info=True,
+            )
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process workflow step"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to process workflow step",
             ) from e
 
     async def _store_workflow_step(self, workflow_id: uuid.UUID, step_number: int, stage_data: dict) -> None:
@@ -2143,7 +2838,11 @@ class EvaluationWorkflowService:
         else:
             # Create new step
             await WorkflowStepDataManager(self.session).insert_one(
-                WorkflowStepModel(workflow_id=workflow_id, step_number=step_number, data=stage_data)
+                WorkflowStepModel(
+                    workflow_id=workflow_id,
+                    step_number=step_number,
+                    data=stage_data,
+                )
             )
 
     async def _get_accumulated_step_data(self, workflow_id: uuid.UUID) -> dict:
@@ -2199,7 +2898,13 @@ class EvaluationWorkflowService:
                         trait_uuid = uuid.UUID(str(trait_id))
                         trait = self.session.query(TraitModel).filter(TraitModel.id == trait_uuid).first()
                         if trait:
-                            traits.append({"id": str(trait.id), "name": trait.name, "description": trait.description})
+                            traits.append(
+                                {
+                                    "id": str(trait.id),
+                                    "name": trait.name,
+                                    "description": trait.description,
+                                }
+                            )
                     except (ValueError, TypeError):
                         continue
                 step_data["traits_details"] = traits
@@ -2216,7 +2921,10 @@ class EvaluationWorkflowService:
                             # Get associated traits for this dataset
                             associated_traits = (
                                 self.session.query(TraitModel)
-                                .join(PivotModel, TraitModel.id == PivotModel.trait_id)
+                                .join(
+                                    PivotModel,
+                                    TraitModel.id == PivotModel.trait_id,
+                                )
                                 .filter(PivotModel.dataset_id == dataset_uuid)
                                 .all()
                             )
@@ -2270,16 +2978,25 @@ class EvaluationWorkflowService:
         dataset_ids = step_data.get("dataset_ids", [])
 
         if not trait_ids:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No traits selected in previous step")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No traits selected in previous step",
+            )
 
         if not dataset_ids:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No datasets selected")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No datasets selected",
+            )
 
         # Validate each dataset is linked to at least one selected trait
         for dataset_id in dataset_ids:
             linked_count = (
                 self.session.query(PivotModel)
-                .filter(PivotModel.dataset_id == dataset_id, PivotModel.trait_id.in_(trait_ids))
+                .filter(
+                    PivotModel.dataset_id == dataset_id,
+                    PivotModel.trait_id.in_(trait_ids),
+                )
                 .count()
             )
             if linked_count == 0:
@@ -2289,8 +3006,11 @@ class EvaluationWorkflowService:
                 )
 
     async def _create_runs_from_workflow(
-        self, workflow_id: uuid.UUID, experiment_id: uuid.UUID, current_user_id: uuid.UUID
-    ) -> int:
+        self,
+        workflow_id: uuid.UUID,
+        experiment_id: uuid.UUID,
+        current_user_id: uuid.UUID,
+    ) -> uuid.UUID:
         """Create runs from workflow data.
 
         Parameters:
@@ -2305,23 +3025,63 @@ class EvaluationWorkflowService:
         all_data = await self._get_accumulated_step_data(workflow_id)
         model_id = all_data.get("step_2", {}).get("model_id")
         dataset_ids = all_data.get("step_4", {}).get("dataset_ids", [])
+        trait_ids = all_data.get("step_3", {}).get("trait_ids", [])
+
+        # Common details for evaluation
+        evaluation_name = all_data.get("step_1", {}).get("name", "Evaluation")
+        evaluation_description = all_data.get("step_1", {}).get("description")
 
         if not model_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No model selected")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No model selected",
+            )
 
         if not dataset_ids:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No datasets selected")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No datasets selected",
+            )
 
         # Get experiment
         experiment = self.session.get(ExperimentModel, experiment_id)
         if not experiment:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found",
+            )
 
         # Convert model_id to UUID if it's a string
         try:
             model_uuid = uuid.UUID(str(model_id))
         except (ValueError, TypeError):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid model ID format: {model_id}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid model ID format: {model_id}",
+            )
+
+        # Convert trait_ids to strings for JSONB storage
+        trait_id_strings = []
+        for trait_id in trait_ids:
+            try:
+                # Validate as UUID and convert to string for JSONB storage
+                validated_uuid = uuid.UUID(str(trait_id))
+                trait_id_strings.append(str(validated_uuid))
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid trait ID format: {trait_id}, skipping")
+
+        # Create Evaluation
+        evaluation = Evaluation(
+            experiment_id=experiment_id,
+            name=evaluation_name,
+            description=evaluation_description,
+            workflow_id=workflow_id,
+            created_by=current_user_id,
+            status=EvaluationStatusEnum.RUNNING.value,
+            trait_ids=trait_id_strings,
+        )
+        self.session.add(evaluation)
+        self.session.flush()
 
         # Get next run index for this experiment
         next_run_index = (
@@ -2347,24 +3107,31 @@ class EvaluationWorkflowService:
             run = RunModel(
                 experiment_id=experiment_id,
                 run_index=next_run_index,
+                evaluation_id=evaluation.id,
                 model_id=model_uuid,
                 dataset_version_id=dataset_version.id,
-                status=RunStatusEnum.PENDING.value,
+                status=RunStatusEnum.RUNNING.value,
                 config={},
             )
             self.session.add(run)
             next_run_index += 1
             runs_created += 1
 
+        # commit changes
+        self.session.commit()
+
         self.session.commit()
 
         # Trigger budeval evaluation for all created runs
         # await self._trigger_evaluations_for_experiment(experiment_id)
 
-        return runs_created
+        return evaluation.id
 
     async def _get_next_step_data(
-        self, next_step: Optional[int], accumulated_data: dict, experiment_id: uuid.UUID
+        self,
+        next_step: Optional[int],
+        accumulated_data: dict,
+        experiment_id: uuid.UUID,
     ) -> Optional[dict]:
         """Get data for the next step.
 
@@ -2384,7 +3151,10 @@ class EvaluationWorkflowService:
             existing_runs = self.session.query(RunModel).filter(RunModel.experiment_id == experiment_id).all()
 
             if not existing_runs:
-                return {"available_models": [], "message": "No models found in experiment. Please create runs first."}
+                return {
+                    "available_models": [],
+                    "message": "No models found in experiment. Please create runs first.",
+                }
 
             unique_model_ids = list({run.model_id for run in existing_runs})
 
@@ -2409,16 +3179,29 @@ class EvaluationWorkflowService:
                         }
                     )
                 else:
-                    available_models.append({"id": str(model_id), "name": f"Model {str(model_id)[:8]}"})
+                    available_models.append(
+                        {
+                            "id": str(model_id),
+                            "name": f"Model {str(model_id)[:8]}",
+                        }
+                    )
 
-            return {"available_models": available_models, "message": "Select a model for evaluation"}
+            return {
+                "available_models": available_models,
+                "message": "Select a model for evaluation",
+            }
 
         elif next_step == 3:
             # Return available traits
             traits = self.session.query(TraitModel).all()
             return {
                 "available_traits": [
-                    {"id": trait.id, "name": trait.name, "description": trait.description} for trait in traits
+                    {
+                        "id": trait.id,
+                        "name": trait.name,
+                        "description": trait.description,
+                    }
+                    for trait in traits
                 ]
             }
 
@@ -2488,7 +3271,11 @@ class EvaluationWorkflowService:
                         trait = self.session.query(TraitModel).filter(TraitModel.id == t_uuid).first()
                         if trait:
                             traits_details.append(
-                                {"id": str(trait.id), "name": trait.name, "description": trait.description}
+                                {
+                                    "id": str(trait.id),
+                                    "name": trait.name,
+                                    "description": trait.description,
+                                }
                             )
                     except (ValueError, TypeError):
                         continue
@@ -2537,7 +3324,10 @@ class EvaluationWorkflowService:
         return None
 
     async def get_evaluation_workflow_data(
-        self, experiment_id: uuid.UUID, workflow_id: uuid.UUID, current_user_id: uuid.UUID
+        self,
+        experiment_id: uuid.UUID,
+        workflow_id: uuid.UUID,
+        current_user_id: uuid.UUID,
     ) -> RetrieveWorkflowDataResponse:
         """Get complete evaluation workflow data for review.
 
@@ -2549,29 +3339,30 @@ class EvaluationWorkflowService:
         Returns:
             RetrieveWorkflowDataResponse: Complete workflow data response.
         """
-        from budapp.workflow_ops.services import WorkflowService as GenericWorkflowService
+        from budapp.workflow_ops.services import (
+            WorkflowService as GenericWorkflowService,
+        )
 
         try:
             # Verify experiment exists and user has access
             experiment = self.session.get(ExperimentModel, experiment_id)
             if not experiment or experiment.created_by != current_user_id or experiment.status == "deleted":
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found or access denied"
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Experiment not found or access denied",
                 )
 
             # Get workflow record
             workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
-                WorkflowModel, {"id": workflow_id, "created_by": current_user_id}
+                WorkflowModel,
+                {"id": workflow_id, "created_by": current_user_id},
             )
             if not workflow:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
-            workflow = cast(WorkflowModel, workflow)
-
-            # Verify workflow belongs to this experiment
-            if not workflow.title.endswith(str(experiment_id)):
                 raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, detail="Workflow does not belong to this experiment"
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Workflow not found",
                 )
+            workflow = cast(WorkflowModel, workflow)
 
             # Return unified workflow response
             return await GenericWorkflowService(self.session).retrieve_workflow_data(workflow.id)
@@ -2581,11 +3372,16 @@ class EvaluationWorkflowService:
         except Exception as e:
             logger.error(f"Failed to get evaluation workflow data: {e}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve workflow data"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve workflow data",
             ) from e
 
     async def trigger_budeval_evaluation(
-        self, run_id: uuid.UUID, evaluation_request: Dict[str, Any], workflow_id: uuid.UUID, current_user_id: uuid.UUID
+        self,
+        run_id: uuid.UUID,
+        evaluation_request: Dict[str, Any],
+        workflow_id: uuid.UUID,
+        current_user_id: uuid.UUID,
     ) -> Any:
         """Trigger evaluation in budeval service via Dapr.
 
@@ -2617,7 +3413,7 @@ class EvaluationWorkflowService:
                 },
                 "eval_datasets": [{"dataset_id": ds} for ds in evaluation_request["datasets"]],
                 "eval_configs": evaluation_request.get("eval_configs", []),
-                "kubeconfig": evaluation_request.get("kubeconfig", ""),  # Add required kubeconfig field
+                "kubeconfig": evaluation_request.get("kubeconfig", ""),  # Not required as we use the incluster config
                 "notification_metadata": {
                     "name": BUD_INTERNAL_WORKFLOW,
                     "subscriber_ids": str(current_user_id),
@@ -2761,7 +3557,11 @@ class EvaluationWorkflowService:
             raise
 
     async def _trigger_evaluations_for_experiment_and_get_response(
-        self, experiment_id: uuid.UUID, current_user_id: uuid.UUID, workflow_id: uuid.UUID
+        self,
+        experiment_id: uuid.UUID,
+        current_user_id: uuid.UUID,
+        workflow_id: uuid.UUID,
+        evaluation_id: uuid.UUID,
     ) -> dict:
         """Trigger budeval evaluation for all pending runs in experiment and return first WorkflowMetadataResponse.
 
@@ -2775,7 +3575,10 @@ class EvaluationWorkflowService:
             # Get pending runs for the experiment
             runs = (
                 self.session.query(RunModel)
-                .filter(RunModel.experiment_id == experiment_id, RunModel.status == RunStatusEnum.PENDING.value)
+                .filter(
+                    RunModel.evaluation_id == evaluation_id,
+                    RunModel.experiment_id == experiment_id,
+                )
                 .all()
             )
 
@@ -2786,43 +3589,56 @@ class EvaluationWorkflowService:
             logger.info(f"Triggering budeval evaluation for {len(runs)} runs in experiment {experiment_id}")
             logger.info("*" * 10)
 
-            # Collect all datasets from runs, starting with the demo dataset
-            all_datasets = ["demo_gsm8k_chat_gen"]
-
-            # Get model and endpoint information from the first run
-            # first_run = runs[0]
-            # model = self.session.query(ModelTable).filter(ModelTable.id == first_run.model_id).first()
-            # endpoint = self.session.query(EndpointModel).filter(EndpointModel.model_id == first_run.model_id).first()
-
-            # if not model or not endpoint:
-            #     logger.error(f"Model or endpoint not found for first run {first_run.id}")
-            #     return None
+            # Collect all datasets from runs by extracting eval_type configurations from database
+            all_datasets = []
 
             # Add datasets from each run (avoiding duplicates)
-            # for run in runs:
-            #     try:
-            #         if hasattr(run, 'dataset_version') and run.dataset_version and run.dataset_version.dataset:
-            #             dataset_id = run.dataset_version.dataset.dataset_id
-            #             if dataset_id not in all_datasets:
-            #                 all_datasets.append(dataset_id)
-            #     except Exception as e:
-            #         logger.warning(f"Could not retrieve dataset for run {run.id}: {e}")
+            for run in runs:
+                try:
+                    if run.dataset_version and run.dataset_version.dataset:
+                        dataset = run.dataset_version.dataset
+                        eval_types = dataset.eval_types
+
+                        if eval_types and isinstance(eval_types, dict):
+                            # Extract the "gen" evaluation type configuration
+                            # You can make this configurable based on run.config if needed
+                            if "gen" in eval_types:
+                                dataset_config = eval_types["gen"]
+                                if dataset_config and dataset_config not in all_datasets:
+                                    all_datasets.append(dataset_config)
+                                    logger.info(f"Added dataset config '{dataset_config}' from run {run.id}")
+                            else:
+                                logger.warning(f"Run {run.id}: Dataset '{dataset.name}' has no 'gen' eval_type")
+                        else:
+                            logger.warning(f"Run {run.id}: Dataset '{dataset.name}' has no eval_types configured")
+                except Exception as e:
+                    logger.error(
+                        f"Could not retrieve dataset configuration for run {run.id}: {e}",
+                        exc_info=True,
+                    )
 
             # Prepare single evaluation request with all datasets
+            if not all_datasets:
+                logger.error(f"No datasets with eval_types found for experiment {experiment_id}")
+                raise ClientException("No datasets with valid eval_type configurations found")
+
+            logger.info(f"Collected {len(all_datasets)} dataset configurations: {all_datasets}")
 
             evaluation_request = {
                 "model_name": "qwen3-32b",
                 "endpoint": "http://20.66.97.208/v1",
                 "api_key": "sk-BudLiteLLMMasterKey_123",
                 "extra_args": {},
-                "datasets": ["demo_gsm8k_chat_gen"],  # all_datasets,
+                "datasets": all_datasets,
                 "kubeconfig": "",  # TODO: Get actual kubeconfig
                 # Use service name as source for CloudEvent metadata (not the topic)
                 "source": app_settings.name,
                 "source_topic": app_settings.source_topic,
                 "experiment_id": experiment_id,  # Include experiment ID for tracking
-                "evaluation_id": str(workflow_id),  # TODO: Update to actual evaluation ID
+                "evaluation_id": str(evaluation_id),  # TODO: Update to actual evaluation ID
             }
+
+            logger.warning(f"::BUDEVAL:: Triggering budeval evaluation {evaluation_request}")
 
             # Update all runs status to running
             for run in runs:
@@ -2832,7 +3648,7 @@ class EvaluationWorkflowService:
             # Trigger single budeval evaluation for all runs
             try:
                 response = await self.trigger_budeval_evaluation(
-                    run_id=runs[0].id,  # Use first run's ID as representative
+                    run_id=runs[0].id,  # this is ignored
                     evaluation_request=evaluation_request,
                     workflow_id=workflow_id,
                     current_user_id=current_user_id,
@@ -2876,6 +3692,9 @@ class EvaluationWorkflowService:
             logger.error(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")
             raise ClientException(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")
 
+    async def update_eval_run_status_from_notification(self, payload) -> None:
+        pass
+
     async def create_evaluation_from_notification_event(self, payload) -> None:
         """Create/update evaluation records from notification event.
 
@@ -2888,9 +3707,14 @@ class EvaluationWorkflowService:
         Raises:
             ClientException: If the evaluation update fails
         """
+        from sqlalchemy import select
+
         from budapp.commons.constants import NotificationTypeEnum
         from budapp.core.schemas import NotificationResult
-        from budapp.shared.notification_service import BudNotifyService, NotificationBuilder
+        from budapp.shared.notification_service import (
+            BudNotifyService,
+            NotificationBuilder,
+        )
 
         logger.warning("Received event for evaluation completion")
 
@@ -2901,135 +3725,204 @@ class EvaluationWorkflowService:
                 WorkflowModel, {"id": workflow_id}
             )
             if not db_workflow:
-                logger.error(f"Workflow {workflow_id} not found for evaluation completion")
+                logger.error(f"::EvalResult:: Workflow {workflow_id} not found for evaluation completion")
                 raise ClientException(f"Workflow {workflow_id} not found")
 
-            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
-                {"workflow_id": workflow_id}
-            )
+            db_workflow = cast(WorkflowModel, db_workflow)
+            logger.warning(f"::EvalResult:: Workflow {db_workflow.id} found")
 
-            # Define the keys required for evaluation completion
-            keys_of_interest = [
-                "experiment_id",
-                "run_ids",
-                "evaluation_id",
-            ]
+            # Evaluation ID
+            status_str = (payload.content.status or "").upper()
+            logger.warning(f":EvalResult:: Status {status_str}")
 
-            # From workflow steps extract necessary information
-            required_data = {}
-            for db_workflow_step in db_workflow_steps:
-                if db_workflow_step.data:
-                    for key in keys_of_interest:
-                        if key in db_workflow_step.data:
-                            required_data[key] = db_workflow_step.data[key]
-
-            logger.warning("Collected required data from workflow steps")
-
-            # Get experiment details
-            experiment_id = required_data.get("experiment_id")
-            if not experiment_id:
-                # Try to extract from stage_data if available
-                for step in db_workflow_steps:
-                    if step.data and "stage_data" in step.data:
-                        stage_data = step.data["stage_data"]
-                        if "experiment_id" in stage_data:
-                            experiment_id = stage_data["experiment_id"]
-                            break
-
-            if not experiment_id:
-                logger.error("Could not find experiment_id in workflow steps")
-                raise ClientException("Experiment ID not found in workflow data")
-
-            # Get the experiment
-            experiment = self.session.get(ExperimentModel, experiment_id)
-            if not experiment:
-                logger.error(f"Experiment {experiment_id} not found")
-                raise ClientException(f"Experiment {experiment_id} not found")
-
-            # Extract evaluation results from payload
-            evaluation_results = payload.content.result if payload.content and payload.content.result else {}
-            evaluation_status = evaluation_results.get("status", "completed")
-
-            # Update workflow step data with final status
-            execution_status = {
-                "status": "success" if evaluation_status == "completed" else "error",
-                "message": f"Evaluation {evaluation_status}",
-                "results": evaluation_results,
-            }
-
-            workflow_data = {}
+            # Extract job_id from result dictionary with error handling
             try:
-                # Update runs if we have run information
-                run_ids = required_data.get("run_ids", [])
-                if run_ids:
-                    for run_id in run_ids:
+                job_id = payload.content.result.get("job_id")
+                if not job_id:
+                    raise ClientException("Missing job_id in evaluation completion notification")
+                evaluation_id = job_id.split("-", 1)[1] if "-" in job_id else job_id
+                logger.warning(f":EvalResult:: Evaluation ID {evaluation_id}")
+
+                # Convert to UUID with proper error handling
+                evaluation_uuid = uuid.UUID(evaluation_id)
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.error(f"::EvalResult:: Invalid evaluation ID format: {e}")
+                raise ClientException(f"Invalid evaluation ID format: {e}")
+
+            # Rest of the logics
+            evaluation = self.session.get(EvaluationModel, evaluation_uuid)
+
+            if not evaluation:
+                logger.error(f"::EvalResult:: Evaluation {evaluation_uuid} not found")
+                raise ClientException(f"Evaluation {evaluation_uuid} not found")
+
+            # 2. Get the runs using modern SQLAlchemy pattern
+            try:
+                runs_stmt = select(RunModel).where(RunModel.evaluation_id == evaluation.id)
+                runs = self.session.execute(runs_stmt).scalars().all()
+
+                logger.warning(f"::EvalResult:: Found {len(runs)} runs for evaluation {evaluation.id}")
+
+                # Extract dataset results from the notification payload
+                dataset_results = {}
+                try:
+                    summary = payload.content.result.get("summary", {})
+                    dataset_results = summary.get("dataset_results", {})
+                    logger.info(f"::EvalResult:: Extracted dataset_results: {dataset_results}")
+                except (AttributeError, TypeError) as e:
+                    logger.warning(f"::EvalResult:: Could not extract dataset_results: {e}")
+
+                # Update Evaluation Status based on job status
+                job_status = payload.content.result.get("status", "unknown")
+                if job_status == "succeeded":
+                    evaluation.status = EvaluationStatusEnum.COMPLETED.value
+                elif job_status == "failed":
+                    evaluation.status = EvaluationStatusEnum.FAILED.value
+                else:
+                    evaluation.status = EvaluationStatusEnum.COMPLETED.value  # Default to completed
+
+                # Update all runs and create metrics
+                for run in runs:
+                    # Match run with its dataset result by comparing dataset config
+                    dataset_config = None
+                    accuracy_score = None
+
+                    try:
+                        if run.dataset_version and run.dataset_version.dataset:
+                            dataset = run.dataset_version.dataset
+                            eval_types = dataset.eval_types
+
+                            if eval_types and isinstance(eval_types, dict):
+                                # Extract the "gen" evaluation type configuration
+                                if "gen" in eval_types:
+                                    dataset_config = eval_types["gen"]
+                                    logger.info(f"::EvalResult:: Run {run.id} - Dataset config: {dataset_config}")
+
+                                    # Extract base dataset name using regex to remove suffix patterns
+                                    # Matches: dataset_name_gen, dataset_name_ppl, dataset_name_chat_gen, etc.
+                                    base_dataset_name = re.sub(r"_(gen|ppl|chat_gen)$", "", dataset_config)
+
+                                    # Convert to lowercase for matching
+                                    base_dataset_name = base_dataset_name.lower()
+                                    logger.info(
+                                        f"::EvalResult:: Run {run.id} - Base dataset name: {base_dataset_name}"
+                                    )
+
+                                    # Find matching result in dataset_results using base name
+                                    if base_dataset_name in dataset_results:
+                                        accuracy_score = dataset_results[base_dataset_name]
+                                        logger.info(
+                                            f"::EvalResult:: Run {run.id} - Matched accuracy: {accuracy_score}% (config: {dataset_config}, matched: {base_dataset_name})"
+                                        )
+                                    elif dataset.name.lower() in dataset_results:
+                                        # Fallback to dataset.name
+                                        accuracy_score = dataset_results[dataset.name.lower()]
+                                        base_dataset_name = dataset.name.lower()
+                                        logger.info(
+                                            f"::EvalResult:: Run {run.id} - Matched using dataset.name: {dataset.name}"
+                                        )
+
+                                    if accuracy_score is not None:
+                                        logger.info(
+                                            f"::EvalResult:: Run {run.id} - Matched accuracy: {accuracy_score}% (matched: {base_dataset_name})"
+                                        )
+                                    else:
+                                        logger.warning(
+                                            f"::EvalResult:: Run {run.id} - No matching result found. Config: '{dataset_config}', Dataset name: '{dataset.name}', Available keys: {list(dataset_results.keys())}"
+                                        )
+                                else:
+                                    logger.warning(
+                                        f"::EvalResult:: Run {run.id} - Dataset '{dataset.name}' has no 'gen' eval_type"
+                                    )
+                            else:
+                                logger.warning(f"::EvalResult:: Run {run.id} - Dataset has no eval_types configured")
+                    except Exception as e:
+                        logger.error(
+                            f"::EvalResult:: Could not retrieve dataset config for run {run.id}: {e}",
+                            exc_info=True,
+                        )
+
+                    # Update run status
+                    if job_status == "succeeded":
+                        run.status = RunStatusEnum.COMPLETED.value
+                    elif job_status == "failed":
+                        run.status = RunStatusEnum.FAILED.value
+                    else:
+                        run.status = RunStatusEnum.COMPLETED.value
+
+                    # Create metric entry if we have a score
+                    if accuracy_score is not None:
                         try:
-                            run = self.session.get(RunModel, run_id)
-                            if run:
-                                run.status = (
-                                    RunStatusEnum.COMPLETED.value
-                                    if evaluation_status == "completed"
-                                    else RunStatusEnum.FAILED.value
+                            # Check if metric already exists
+                            existing_metric = (
+                                self.session.query(MetricModel)
+                                .filter(
+                                    MetricModel.run_id == run.id,
+                                    MetricModel.metric_name == "accuracy",
+                                    MetricModel.mode == "gen",
                                 )
-                                if hasattr(run, "evaluation_status"):
-                                    run.evaluation_status = evaluation_status
-                                if evaluation_results.get("scores"):
-                                    run.scores = evaluation_results["scores"]
-                        except Exception as e:
-                            logger.error(f"Failed to update run {run_id}: {e}")
+                                .first()
+                            )
 
-                    self.session.commit()
-                    logger.info(f"Updated {len(run_ids)} runs with evaluation results")
+                            if existing_metric:
+                                # Update existing metric
+                                existing_metric.metric_value = float(accuracy_score)
+                                logger.info(
+                                    f"::EvalResult:: Updated existing metric for run {run.id}: accuracy={accuracy_score}%"
+                                )
+                            else:
+                                # Create new metric
+                                metric = MetricModel(
+                                    run_id=run.id,
+                                    metric_name="accuracy",
+                                    mode="gen",
+                                    metric_value=float(accuracy_score),
+                                )
+                                self.session.add(metric)
+                                logger.info(
+                                    f"::EvalResult:: Created new metric for run {run.id}: accuracy={accuracy_score}%"
+                                )
+                        except Exception as metric_error:
+                            logger.error(
+                                f"::EvalResult:: Failed to create/update metric for run {run.id}: {metric_error}",
+                                exc_info=True,
+                            )
 
-                # Mark workflow as completed
-                workflow_data = {"status": WorkflowStatusEnum.COMPLETED}
-
-            except Exception as e:
-                logger.exception(f"Failed to update evaluation results: {e}")
-                execution_status.update(
-                    {"status": "error", "message": f"Failed to update evaluation results: {str(e)}"}
+                # Single commit for all changes to ensure atomicity
+                self.session.commit()
+                logger.warning(
+                    f"::EvalResult:: Successfully updated evaluation {evaluation.id} and {len(runs)} runs with metrics"
                 )
-                workflow_data = {"status": WorkflowStatusEnum.FAILED, "reason": str(e)}
 
-            finally:
-                # Update workflow step with execution status
-                workflow_step_data = {
-                    "workflow_execution_status": execution_status,
-                    "experiment_id": str(experiment_id),
-                }
+            except Exception as db_error:
+                self.session.rollback()
+                logger.error(f"::EvalResult:: Database error during evaluation update: {db_error}")
+                raise ClientException(f"Database error during evaluation update: {db_error}")
 
-                # Update current step number
-                current_step_number = db_workflow.current_step + 1
-                workflow_current_step = current_step_number
-
-                # Update or create next workflow step
-                db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                    db_workflow.id, current_step_number, workflow_step_data
-                )
-                logger.warning(f"Updated workflow step {db_workflow_step.id} with evaluation completion status")
-
-                # Update workflow
-                workflow_data.update({"current_step": workflow_current_step})
-                await WorkflowDataManager(self.session).update_by_fields(db_workflow, workflow_data)
-
-                # Send success notification to workflow creator
+            # Send Success Notification
+            try:
                 notification_request = (
                     NotificationBuilder()
                     .set_content(
-                        title=experiment.name,
-                        message=f"Evaluation {evaluation_status}",
-                        icon=getattr(experiment, "icon", None),
-                        result=NotificationResult(target_id=experiment.id, target_type="workflow").model_dump(
-                            exclude_none=True, exclude_unset=True
-                        ),
+                        title=evaluation.name,
+                        message=f"Evaluation {evaluation.status}",
+                        icon=None,
+                        result=NotificationResult(
+                            target_id=db_workflow.id,
+                            target_type="workflow",
+                        ).model_dump(exclude_none=True, exclude_unset=True),
                     )
-                    .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.EVALUATION_SUCCESS.value)
+                    .set_payload(
+                        workflow_id=str(db_workflow.id),
+                        type=NotificationTypeEnum.EVALUATION_SUCCESS.value,
+                    )
                     .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
                     .build()
                 )
                 await BudNotifyService().send_notification(notification_request)
-                logger.info(f"Sent evaluation completion notification for experiment {experiment_id}")
+            except Exception as e:
+                logger.warning(f"::EvalResult:: Failed to send notification: {e}")
 
         except Exception as e:
-            logger.exception(f"Failed to handle evaluation completion event: {e}")
-            raise ClientException(f"Failed to process evaluation completion: {str(e)}")
+            logger.exception(f"::EvalResult:: Failed to handle evaluation completion event: {e}")
+            raise ClientException(f"::EvalResult:: Failed to process evaluation completion: {str(e)}")

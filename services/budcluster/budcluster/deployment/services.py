@@ -21,7 +21,7 @@ import asyncio
 import math
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 import requests
@@ -209,6 +209,20 @@ class DeploymentService(SessionMixin):
             f"Cloud deployment: {is_cloud_deployment}"
         )
 
+        # Create sanitized version for logging - exclude sensitive fields
+        sanitized_fields = {
+            "cluster_id": str(deployment.cluster_id) if deployment.cluster_id else None,
+            "endpoint_name": deployment.endpoint_name,
+            "model": deployment.model,
+            "concurrency": deployment.concurrency,
+            "provider": deployment.provider,
+            "default_storage_class": deployment.default_storage_class,
+            "default_access_mode": deployment.default_access_mode,
+            "has_hf_token": bool(deployment.hf_token) if hasattr(deployment, "hf_token") else False,
+            "has_credential_id": bool(deployment.credential_id) if hasattr(deployment, "credential_id") else False,
+        }
+        logger.info(f"Deployment request (sanitized): {sanitized_fields}")
+
         if is_cloud_deployment:
             logger.info("Routing to cloud deployment workflow")
             response = await CreateCloudDeploymentWorkflow().__call__(deployment)
@@ -245,14 +259,17 @@ class DeploymentService(SessionMixin):
         return response
 
     @staticmethod
-    def get_deployment_eta(current_step: str, step_time: int = None) -> dict:
-        """Get deployment eta."""
+    def get_deployment_eta(
+        current_step: str, model_size: Optional[int] = None, device_type: Optional[str] = None, step_time: int = None
+    ) -> dict:
+        """Get deployment eta with model size and device type considerations."""
+        # Define base times for each step in minutes
         step_times = {
             "verify_cluster_connection": 0.5,
-            "transfer_model_to_cluster": 10,
-            "deploy_to_engine": 2,
+            "transfer_model_to_cluster": 5,
+            "deploy_to_engine": 1,
             "verify_deployment_status": 5,
-            "run_performance_benchmark": 2,
+            "run_performance_benchmark": 1,
         }
 
         # Define the order of steps
@@ -263,6 +280,50 @@ class DeploymentService(SessionMixin):
             "verify_deployment_status",
             "run_performance_benchmark",
         ]
+
+        # Apply model size scaling if provided
+        if model_size is not None:
+            # Convert model size if it's in compact format (e.g., 7 for 7B, 1760 for 1.76B)
+            # Assume if model_size < 100000, it's in billions format
+            model_size_in_params = model_size * 1000000000 if model_size < 100000 else model_size
+
+            # Adjust transfer time based on model size
+            if model_size_in_params > 7000000000:  # 7B+ parameters
+                transfer_scale_factor = 2.0
+                deploy_scale_factor = 1.5
+            elif model_size_in_params > 3000000000:  # 3B+ parameters
+                transfer_scale_factor = 1.5
+                deploy_scale_factor = 1.2
+            else:
+                transfer_scale_factor = 1.0
+                deploy_scale_factor = 1.0
+
+            step_times["transfer_model_to_cluster"] *= transfer_scale_factor
+            step_times["deploy_to_engine"] *= deploy_scale_factor
+            step_times["verify_deployment_status"] *= deploy_scale_factor
+
+        # Apply device type scaling if provided
+        if device_type is not None:
+            device_type_lower = device_type.lower()
+            if device_type_lower == "cpu":
+                # CPU deployments take longer
+                device_scale_factor = 1.5
+                if model_size is not None:
+                    # Even longer for larger models on CPU
+                    if model_size_in_params > 7000000000:  # 7B+ parameters
+                        device_scale_factor = 2.5
+                    elif model_size_in_params > 3000000000:  # 3B+ parameters
+                        device_scale_factor = 2.0
+            elif device_type_lower in ["cuda", "gpu"]:
+                # GPU deployments are faster
+                device_scale_factor = 0.8
+            else:
+                device_scale_factor = 1.0
+
+            # Apply device scaling to deployment and verification steps
+            step_times["deploy_to_engine"] *= device_scale_factor
+            step_times["verify_deployment_status"] *= device_scale_factor
+            step_times["run_performance_benchmark"] *= device_scale_factor
 
         if step_time is not None:
             step_times[current_step] = step_time
@@ -283,21 +344,60 @@ class DeploymentService(SessionMixin):
         deployment_request_json: dict,
         workflow_id: str,
         current_step: str,
+        model_size: Optional[int] = None,
+        device_type: Optional[str] = None,
         step_time: int = None,
     ):
-        """Publish estimated time to completion notification."""
-        eta = DeploymentService.get_deployment_eta(current_step, step_time)
+        """Publish estimated time to completion notification with model size and device type considerations."""
+        # Extract model_size from request if not explicitly provided
+        if model_size is None:
+            if hasattr(deployment_request_json, "model_size"):
+                model_size = deployment_request_json.model_size
+            elif isinstance(deployment_request_json, dict) and "model_size" in deployment_request_json:
+                model_size = deployment_request_json.get("model_size")
+
+        # Try to extract device_type from simulator_config if not provided
+        if device_type is None:
+            simulator_config = None
+            if hasattr(deployment_request_json, "simulator_config"):
+                simulator_config = deployment_request_json.simulator_config
+            elif isinstance(deployment_request_json, dict) and "simulator_config" in deployment_request_json:
+                simulator_config = deployment_request_json.get("simulator_config")
+
+            if (
+                simulator_config
+                and len(simulator_config) > 0
+                and isinstance(simulator_config[0], dict)
+                and "devices" in simulator_config[0]
+            ):
+                # Get device type from first simulator config
+                devices = simulator_config[0].get("devices", [])
+                if devices and len(devices) > 0 and isinstance(devices[0], dict):
+                    device_type = devices[0].get("type", None)
+
+        eta = DeploymentService.get_deployment_eta(current_step, model_size, device_type, step_time)
         notification_req.payload.event = "eta"
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
             message=f"{eta}",
             status=WorkflowStatus.RUNNING,
         )
+        # Extract source_topic and source for notification
+        if hasattr(deployment_request_json, "source_topic"):
+            source_topic = deployment_request_json.source_topic
+            source = deployment_request_json.source
+        elif isinstance(deployment_request_json, dict):
+            source_topic = deployment_request_json.get("source_topic")
+            source = deployment_request_json.get("source")
+        else:
+            source_topic = None
+            source = None
+
         DaprWorkflow().publish_notification(
             workflow_id=workflow_id,
             notification=notification_req,
-            target_topic_name=deployment_request_json.source_topic,
-            target_name=deployment_request_json.source,
+            target_topic_name=source_topic,
+            target_name=source,
         )
 
 

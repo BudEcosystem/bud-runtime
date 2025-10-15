@@ -24,6 +24,7 @@ import { errorToast } from "../toast";
 import { FormProgressStatus } from "../ui/bud/progress/FormProgress";
 import { calculateEta } from "src/flows/utils/calculateETA";
 import IconRender from "src/flows/components/BudIconRender";
+import { useEvaluations } from "@/hooks/useEvaluations";
 
 export function getFailedStep(data: WorkflowListItem) {
   return data?.progress?.steps?.find(
@@ -88,6 +89,10 @@ export function BudWidget({
     setDeploymentCluster,
     setSelectedCredentials,
   } = useDeployModel();
+
+  const {
+    getWorkflow: getEvaluationWorkflow,
+  } = useEvaluations();
   const { openDrawerWithStep } = useDrawer();
   const { close } = useIsland();
   const [loading, setLoading] = useState(false);
@@ -138,7 +143,7 @@ export function BudWidget({
 
   useEffect(() => {
     console.log("flowMapping", flowMapping);
-  }, [flowMapping]);
+  }, []);
 
   // useEffect(() => {
   //     console.log('index', index)
@@ -150,11 +155,16 @@ export function BudWidget({
 
   const openWidget = async () => {
     let workflow: WorkflowType;
+    console.log('WorkflowType data', data)
     setLoading(true);
     if (data.workflow_type === "model_deployment") {
       workflow = await getWorkflowCloud(data.id);
     } else {
       workflow = await getWorkflow(data.id);
+    }
+
+    if (data.workflow_type === "evaluate_model") {
+      workflow = await getEvaluationWorkflow(data.id);
     }
     setLoading(false);
     if (workflow.workflow_steps) {
@@ -185,6 +195,7 @@ export function BudWidget({
         ...workflow.workflow_steps.credential,
       });
     }
+    console.log('WorkflowType', workflow)
 
     // resovles the workflow type to the flow id and get the flow details
     if (!flow) {

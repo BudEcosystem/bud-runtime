@@ -201,7 +201,7 @@ const newProject: DrawerFlowType = {
 const deployModel: DrawerFlowType = {
   title: "Deployment",
   description: "Deployment Under Progress",
-  totalSteps: 9,
+  totalSteps: 10,
   steps: [
     {
       navigation: () => [
@@ -237,6 +237,10 @@ const deployModel: DrawerFlowType = {
         {
           status: FormProgressStatus.notCompleted,
           title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
         },
         {
           status: FormProgressStatus.notCompleted,
@@ -285,6 +289,10 @@ const deployModel: DrawerFlowType = {
         {
           status: FormProgressStatus.notCompleted,
           title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
         },
         {
           status: FormProgressStatus.notCompleted,
@@ -338,6 +346,10 @@ const deployModel: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
           title: "Auto Scaling",
         },
         {
@@ -384,6 +396,10 @@ const deployModel: DrawerFlowType = {
         {
           status: FormProgressStatus.notCompleted,
           title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
         },
         {
           status: FormProgressStatus.notCompleted,
@@ -436,6 +452,10 @@ const deployModel: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
           title: "Auto Scaling",
         },
         {
@@ -485,6 +505,10 @@ const deployModel: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
           title: "Auto Scaling",
         },
         {
@@ -503,10 +527,10 @@ const deployModel: DrawerFlowType = {
         `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
         "Deploy Model",
       ],
-      id: "deploy-model-auto-scaling",
-      component: StepComponents["deploy-model-auto-scaling"],
-      confirmClose: true,
+      id: "deploy-model-configuration",
       step: 7,
+      component: StepComponents["deploy-model-configuration"],
+      confirmClose: true,
       progress: [
         {
           status: FormProgressStatus.completed,
@@ -534,6 +558,63 @@ const deployModel: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.inProgress,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Auto Scaling",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Status",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+    },
+    {
+      navigation: () => [
+        "Projects",
+        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        "Deploy Model",
+      ],
+      id: "deploy-model-auto-scaling",
+      component: StepComponents["deploy-model-auto-scaling"],
+      confirmClose: true,
+      step: 8,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Deploy Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Credentials",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: " Select Deployment Templates",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Deployment Specification",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Finding Clusters",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.inProgress,
           title: "Auto Scaling",
         },
         {
@@ -554,7 +635,7 @@ const deployModel: DrawerFlowType = {
       ],
       id: "deploy-model-status",
       confirmClose: true,
-      step: 8,
+      step: 9,
       component: StepComponents["deploy-model-status"],
       progress: [
         {
@@ -583,6 +664,10 @@ const deployModel: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.completed,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.completed,
           title: "Auto Scaling",
         },
         {
@@ -603,7 +688,7 @@ const deployModel: DrawerFlowType = {
       ],
       id: "deploy-model-success",
       confirmClose: false,
-      step: 9,
+      step: 10,
       component: StepComponents["deploy-model-success"],
       progress: [
         {
@@ -629,6 +714,10 @@ const deployModel: DrawerFlowType = {
         {
           status: FormProgressStatus.completed,
           title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Deployment Configuration",
         },
         {
           status: FormProgressStatus.completed,
@@ -1022,6 +1111,114 @@ const addModelLocalFlow: DrawerFlowType = {
   ],
 };
 
+const documentModelFlow: DrawerFlowType = {
+  title: "Select Document Model",
+  description: "Select a document processing model",
+  totalSteps: 4,
+  steps: [
+    {
+      id: "document-model-list",
+      component: StepComponents["document-model-list"],
+      navigation: () => ["Model", "Document Models"],
+      confirmClose: true,
+      step: 1,
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Credentials",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Model Onboarding",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Scan Completed",
+        },
+      ],
+    },
+    {
+      id: "select-or-add-credentials",
+      step: 2,
+      component: StepComponents["select-or-add-credentials"],
+      navigation: () => ["Model", "Document Models", "Credentials"],
+      confirmClose: true,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Credentials",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Model Onboarding",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Scan Completed",
+        },
+      ],
+    },
+    {
+      id: "extracting-model-status",
+      step: 3,
+      confirmClose: false,
+      navigation: () => ["Model", "Document Models", "Model Onboarding"],
+      component: StepComponents["extracting-model"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Credentials",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Model Onboarding",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Scan Completed",
+        },
+      ],
+    },
+    {
+      id: "scan-completed",
+      step: 4,
+      confirmClose: true,
+      navigation: () => ["Model", "Document Models", "Success"],
+      component: StepComponents["scan-completed"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Credentials",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Model Onboarding",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Scan Completed",
+        },
+      ],
+    },
+  ],
+};
+
 const securityScan: DrawerFlowType = {
   title: "Security Scan",
   description: "Run a security scan on the model",
@@ -1081,7 +1278,7 @@ const runModelEvaluations: DrawerFlowType = {
       navigation: () => ["Projects", "Run Model Evaluations"],
       id: "select-model-evaluations",
       step: 1,
-      confirmClose: true,
+      confirmClose: false,
       component: StepComponents["select-model-evaluations"],
       progress: [
         {
@@ -3566,14 +3763,14 @@ const newExperiment: DrawerFlowType = {
 const runEvaluation: DrawerFlowType = {
   title: "New Evaluation",
   description: "New Evaluation",
-  totalSteps: 2,
+  totalSteps: 7,
   steps: [
     {
       navigation: () => [
         "New Evaluation",
       ],
       id: "new-evaluation",
-      confirmClose: false,
+      confirmClose: true,
       step: 1,
       component: StepComponents["new-evaluation"],
       progress: [
@@ -3581,7 +3778,30 @@ const runEvaluation: DrawerFlowType = {
           status: FormProgressStatus.inProgress,
           title: "New Evaluation",
         },
-
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Traits",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Evaluation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Evaluation Summary",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running Evaluation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Evaluation Complete",
+        },
       ],
     },
     {
@@ -3589,15 +3809,38 @@ const runEvaluation: DrawerFlowType = {
         "New Evaluation",
       ],
       id: "select-model-new-evaluation",
-      confirmClose: false,
+      confirmClose: true,
       step: 2,
       component: StepComponents["select-model-new-evaluation"],
       progress: [
         {
-          status: FormProgressStatus.inProgress,
+          status: FormProgressStatus.completed,
           title: "New Evaluation",
         },
-
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Traits",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Evaluation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Evaluation Summary",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running Evaluation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Evaluation Complete",
+        },
       ],
     },
     {
@@ -3605,15 +3848,38 @@ const runEvaluation: DrawerFlowType = {
         "New Evaluation",
       ],
       id: "select-traits",
-      confirmClose: false,
-      step: 2,
+      confirmClose: true,
+      step: 3,
       component: StepComponents["select-traits"],
       progress: [
         {
-          status: FormProgressStatus.inProgress,
+          status: FormProgressStatus.completed,
           title: "New Evaluation",
         },
-
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Traits",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Evaluation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Evaluation Summary",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running Evaluation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Evaluation Complete",
+        },
       ],
     },
     {
@@ -3621,15 +3887,38 @@ const runEvaluation: DrawerFlowType = {
         "New Evaluation",
       ],
       id: "select-evaluation",
-      confirmClose: false,
-      step: 2,
+      confirmClose: true,
+      step: 4,
       component: StepComponents["select-evaluation"],
       progress: [
         {
-          status: FormProgressStatus.inProgress,
+          status: FormProgressStatus.completed,
           title: "New Evaluation",
         },
-
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Traits",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Evaluation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Evaluation Summary",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running Evaluation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Evaluation Complete",
+        },
       ],
     },
     {
@@ -3637,15 +3926,38 @@ const runEvaluation: DrawerFlowType = {
         "New Evaluation",
       ],
       id: "evaluation-summary",
-      confirmClose: false,
-      step: 2,
+      confirmClose: true,
+      step: 5,
       component: StepComponents["evaluation-summary"],
       progress: [
         {
-          status: FormProgressStatus.inProgress,
+          status: FormProgressStatus.completed,
           title: "New Evaluation",
         },
-
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Traits",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Evaluation",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Evaluation Summary",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running Evaluation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Evaluation Complete",
+        },
       ],
     },
     {
@@ -3653,13 +3965,37 @@ const runEvaluation: DrawerFlowType = {
         "New Evaluation",
       ],
       id: "run-evaluation-status",
-      confirmClose: false,
+      confirmClose: true,
       step: 6,
       component: StepComponents["run-evaluation-status"],
       progress: [
         {
+          status: FormProgressStatus.completed,
+          title: "New Evaluation",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Traits",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Evaluation",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Evaluation Summary",
+        },
+        {
           status: FormProgressStatus.inProgress,
           title: "Running Evaluation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Evaluation Complete",
         },
       ],
     },
@@ -3672,6 +4008,30 @@ const runEvaluation: DrawerFlowType = {
       step: 7,
       component: StepComponents["run-evaluation-success"],
       progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "New Evaluation",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Traits",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Evaluation",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Evaluation Summary",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Running Evaluation",
+        },
         {
           status: FormProgressStatus.completed,
           title: "Evaluation Complete",
@@ -3947,23 +4307,23 @@ const addGuardrail: DrawerFlowType = {
       ],
       confirmClose: true,
     },
-    {
-      navigation: () => ["Guardrails", "Deploying"],
-      id: "deploying-probe",
-      step: 8,
-      component: StepComponents["deploying-probe"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Probe Settings",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Deploying",
-        },
-      ],
-      confirmClose: false,
-    },
+    // {
+    //   navigation: () => ["Guardrails", "Deploying"],
+    //   id: "deploying-probe",
+    //   step: 8,
+    //   component: StepComponents["deploying-probe"],
+    //   progress: [
+    //     {
+    //       status: FormProgressStatus.completed,
+    //       title: "Probe Settings",
+    //     },
+    //     {
+    //       status: FormProgressStatus.inProgress,
+    //       title: "Deploying",
+    //     },
+    //   ],
+    //   confirmClose: false,
+    // },
     {
       navigation: () => ["Guardrails", "Success"],
       id: "probe-deployment-success",
@@ -4106,12 +4466,216 @@ const addGuardrail: DrawerFlowType = {
   ],
 };
 
+// Flow For Adding Agent
+const addAgent: DrawerFlowType = {
+  title: "Add Agent",
+  description: "Create a new agent",
+  totalSteps: 6,
+  steps: [
+    {
+      navigation: () => ["Select Project", "Add Agent"],
+      id: "add-agent-select-project",
+      step: 1,
+      component: StepComponents["add-agent-select-project"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Review",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: false,
+    },
+    {
+      navigation: () => ["Select Type", "Add Agent"],
+      id: "add-agent-select-type",
+      step: 2,
+      component: StepComponents["add-agent-select-type"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Review",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Select Model", "Add Agent"],
+      id: "add-agent-select-model",
+      step: 3,
+      component: StepComponents["add-agent-select-model"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Review",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Configuration", "Add Agent"],
+      id: "add-agent-configuration",
+      step: 4,
+      component: StepComponents["add-agent-configuration"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Review",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Review", "Add Agent"],
+      id: "add-agent-deployment-warning",
+      step: 5,
+      component: StepComponents["add-agent-deployment-warning"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Review",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: false,
+    },
+    {
+      navigation: () => ["Success", "Add Agent"],
+      id: "add-agent-success",
+      step: 6,
+      component: StepComponents["add-agent-success"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Configuration",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Review",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Success",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 const flows = {
   "new-project": newProject,
   "deploy-model": deployModel,
   "add-model": addModel,
   "add-model-cloud-flow": addModelCloudFlow,
   "add-model-local-flow": addModelLocalFlow,
+  "document-model-flow": documentModelFlow,
   "security-scan": securityScan,
   "run-model-evaluations": runModelEvaluations,
   "edit-model": editModel,
@@ -4170,6 +4734,8 @@ const flows = {
   // blocking rules
   "create-blocking-rule": createBlockingRule,
   "view-blocking-rule": viewBlockingRule,
+  // agent
+  "add-agent": addAgent,
 };
 
 export const flowMapping: {
@@ -4188,6 +4754,7 @@ export const flowMapping: {
     "add_adapter": "add-adapter",
     "delete_adapter": "delete-adapter",
     "model_benchmark": "model_benchmark",
+    "evaluate_model": "run-evaluation",
 }
 
 export const inProgressSteps = [
@@ -4202,6 +4769,7 @@ export const inProgressSteps = [
     "deploy-quantization-status",
     "quantization-simulation-status",
     "quantization-deployment-status",
+    "run-evaluation-status"
 ];
 
 export type Flow = keyof typeof flows;

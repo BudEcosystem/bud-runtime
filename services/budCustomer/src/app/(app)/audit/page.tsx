@@ -46,6 +46,7 @@ import isYesterday from "dayjs/plugin/isYesterday";
 import styles from "./audit.module.scss";
 import { AppRequest } from "@/services/api/requests";
 import Tags from "@/components/ui/Tags";
+import { motion, AnimatePresence } from "framer-motion";
 
 dayjs.extend(relativeTime);
 dayjs.extend(isToday);
@@ -377,8 +378,8 @@ export default function AuditPage() {
     }
   };
 
-  const getAuditList = async () => {
-    setLoading(true);
+  const getAuditList = async (loader?: boolean) => {
+    setLoading(!loader);
     try {
       const params = {
         page: currentPage,
@@ -413,8 +414,8 @@ export default function AuditPage() {
     failedActions: 0,
     resourcesModified: 0,
   });
-  const getAuditSummary = async () => {
-    setIsStatsLoading(true);
+  const getAuditSummary = async (loader?: boolean) => {
+    setIsStatsLoading(!loader);
     try {
       // const params = {
       //   start_date: dateRange?.[0] ? formatDateString(dateRange[0]?.toDate(), false) : undefined,
@@ -600,11 +601,13 @@ export default function AuditPage() {
   }, [selectedAction, selectedResource, dateRange, currentPage, pageSize]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      getAuditList();
-      getAuditSummary();
-    }, 500);
-    return () => clearTimeout(timer);
+    if(searchText) {
+      const timer = setTimeout(() => {
+        getAuditList(true);
+        getAuditSummary(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
   }, [searchText]);
 
   return (
@@ -775,9 +778,9 @@ export default function AuditPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <Card className="bg-bud-bg-secondary border-bud-border">
+          <Card className="bg-bud-bg-secondary border-bud-border relative">
             {isStatsLoading ? (
-              <Skeleton active paragraph={{ rows: 2 }} />
+              <LoadingWrapper />
             ) : (
               <div className="flex items-center justify-between">
                 <div>
@@ -793,9 +796,9 @@ export default function AuditPage() {
             )}
           </Card>
 
-          <Card className="bg-bud-bg-secondary border-bud-border">
+          <Card className="bg-bud-bg-secondary border-bud-border relative">
             {isStatsLoading ? (
-              <Skeleton active paragraph={{ rows: 2 }} />
+              <LoadingWrapper />
             ) : (
               <div className="flex items-center justify-between">
                 <div>
@@ -814,9 +817,9 @@ export default function AuditPage() {
             )}
           </Card>
 
-          <Card className="bg-bud-bg-secondary border-bud-border hidden">
+          <Card className="bg-bud-bg-secondary border-bud-border hidden relative">
             {isStatsLoading ? (
-              <Skeleton active paragraph={{ rows: 2 }} />
+              <LoadingWrapper />
             ) : (
               <div className="flex items-center justify-between">
                 <div>
@@ -832,9 +835,9 @@ export default function AuditPage() {
             )}
           </Card>
 
-          <Card className="bg-bud-bg-secondary border-bud-border">
+          <Card className="bg-bud-bg-secondary border-bud-border relative">
             {isStatsLoading ? (
-              <Skeleton active paragraph={{ rows: 2 }} />
+              <LoadingWrapper />
             ) : (
               <div className="flex items-center justify-between">
                 <div>
@@ -860,9 +863,9 @@ export default function AuditPage() {
         </div>
 
         {/* Filters */}
-        <Card className="bg-bud-bg-secondary border-bud-border mb-6">
+        <Card className="bg-bud-bg-secondary border-bud-border mb-6 relative">
           {isStatsLoading ? (
-            <Skeleton active paragraph={{ rows: 2 }} />
+            <LoadingWrapper />
           ) : (
             <div className="flex items-center gap-4">
               <Input
@@ -1022,4 +1025,21 @@ export default function AuditPage() {
       </div>
     </DashboardLayout>
   );
+}
+
+const LoadingWrapper = () => {
+  return <div className={styles.loadingWrapper}>
+    <div className={styles.loadingContainer}>
+      <motion.div
+        className={styles.loadingBar}
+        initial={{ width: "0%" }}
+        animate={{ width: "100%" }}
+        transition={{
+          duration: 1.5,
+          ease: "easeInOut",
+          repeat: Infinity,
+        }}
+      />
+    </div>
+  </div>
 }
