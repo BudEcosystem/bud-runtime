@@ -1,10 +1,9 @@
 import { Field } from '@flowgram.ai/fixed-layout-editor';
 import { useSession } from '../contexts/SessionContext';
-import { PrimaryButton } from '../../ui/bud/form/Buttons';
 import { LoadingOutlined, CheckCircleFilled } from '@ant-design/icons';
 
 export const SystemPromptCard = () => {
-  const { session, onSaveSystemPrompt, isSavingSystemPrompt, systemPromptWorkflowStatus } = useSession();
+  const { session, systemPromptWorkflowStatus } = useSession();
 
   // Get system prompt from the session, with default if empty
   const systemPrompt = session?.systemPrompt || '';
@@ -108,50 +107,6 @@ export const SystemPromptCard = () => {
           </div>
         </div>
       </div>
-
-      {/* Card Footer */}
-      <div style={{
-        paddingTop: '12px',
-        borderTop: 'none',
-        fontSize: '12px',
-        color: '#808080',
-        textAlign: 'center',
-        background: 'transparent',
-      }}>
-        {systemPrompt ? 'System prompt configured' : 'No system prompt set'}
-      </div>
-
-      {/* Save Button */}
-      {onSaveSystemPrompt && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          marginTop: '16px',
-          paddingTop: '16px',
-          borderTop: '1px solid #333333',
-          background: 'transparent',
-        }}>
-          <PrimaryButton
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              onSaveSystemPrompt();
-            }}
-            loading={isSavingSystemPrompt}
-            disabled={isSavingSystemPrompt}
-            style={{
-              background: '#965CDE',
-              border: 'none',
-              color: 'white',
-              padding: '8px 24px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              cursor: isSavingSystemPrompt ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isSavingSystemPrompt ? 'Saving...' : 'Save'}
-          </PrimaryButton>
-        </div>
-      )}
     </div>
   );
 };
