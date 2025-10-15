@@ -52,6 +52,7 @@ from .schema_builder import CustomModelGenerator, DataModelGenerator
 from .schemas import Message, ModelSettings
 from .streaming_executors import execute_streaming_validation
 from .streaming_validation import add_field_validator_to_model
+from .streaming_validation_executor import StreamingValidationExecutor
 from .template_renderer import render_template
 from .utils import contains_pydantic_model, validate_input_data_type
 from .validation import add_validator_to_model_async
@@ -646,20 +647,40 @@ class SimplePromptExecutor:
                 # Check if streaming validation is needed
                 if output_validation and output_schema and contains_pydantic_model(output_type):
                     logger.debug("Performing streaming with validation")
-                    # Use streaming validation executor with the enhanced model
-                    # The model already has field validators added in _get_output_type
-                    return execute_streaming_validation(
-                        enhanced_model=output_type,  # Pass the already enhanced model
-                        pydantic_schema=output_schema,
+
+                    # # Use streaming validation executor with the enhanced model
+                    # # The model already has field validators added in _get_output_type
+                    # NOTE: Commented out older implementation (Non openai format)
+                    # return execute_streaming_validation(
+                    #     enhanced_model=output_type,  # Pass the already enhanced model
+                    #     pydantic_schema=output_schema,
+                    #     prompt=user_prompt or "",
+                    #     validation_prompt=output_validation,
+                    #     deployment_name=deployment_name,
+                    #     model_settings=model_settings.model_dump(exclude_none=True) if model_settings else None,
+                    #     llm_retry_limit=llm_retry_limit or 3,
+                    #     messages=message_history,
+                    #     system_prompt_role=system_prompt_role,
+                    #     api_key=api_key,
+                    # )
+
+                    # Extract model from NativeOutput wrapper
+                    model_with_validators = output_type.outputs if hasattr(output_type, "outputs") else output_type
+
+                    # Use new clean streaming validation executor
+                    executor = StreamingValidationExecutor(
+                        output_model=model_with_validators,
                         prompt=user_prompt or "",
-                        validation_prompt=output_validation,
                         deployment_name=deployment_name,
                         model_settings=model_settings.model_dump(exclude_none=True) if model_settings else None,
-                        llm_retry_limit=llm_retry_limit or 3,
-                        messages=message_history,
-                        system_prompt_role=system_prompt_role,
+                        validation_prompt=output_validation,
+                        retry_limit=llm_retry_limit or 3,
+                        messages=messages,
+                        message_history=message_history,
                         api_key=api_key,
                     )
+
+                    return executor.stream()
                 else:
                     # Regular streaming without validation
                     logger.debug(
