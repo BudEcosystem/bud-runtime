@@ -7,14 +7,14 @@ in
 
   boot.supportedFilesystems = [ "nfs" ];
   services.k3s = {
-    role = "server";
+    role = "agent";
     serverAddr = "https://${primaryIp}:6443";
   };
 
-  # ingress nodes are not part of the scid job
+  # worker nodes are not part of the scid job
   system.autoUpgrade = {
     enable = true;
-    flake = "github:BudEcosystem/bud-runtime#ingress";
+    flake = "github:BudEcosystem/bud-runtime#worker";
     flags = [ "-L" ];
     dates = "hourly";
   };

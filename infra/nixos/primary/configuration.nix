@@ -9,5 +9,8 @@
     ./modules/nfs.nix
   ];
 
-  services.k3s.clusterInit = true;
+  services.k3s = {
+    clusterInit = true;
+    role = "server";
+  };
 }

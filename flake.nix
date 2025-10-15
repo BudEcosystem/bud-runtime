@@ -163,6 +163,7 @@
       nixosConfigurations = lib.genAttrs [
         "primary"
         "ingress"
+        "worker"
       ] (host: makeNixos host "x86_64-linux");
     };
 }
