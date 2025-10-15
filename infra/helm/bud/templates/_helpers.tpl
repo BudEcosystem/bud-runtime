@@ -64,63 +64,63 @@
 
 
 {{- define "bud.ingress.url.budadmin" -}}
-{{- if ne .Values.ingress.httpsEnabled "disabled" }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budadmin" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budadmin" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.budcustomer" -}}
-{{- if ne .Values.ingress.httpsEnabled "disabled" }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budcustomer" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budcustomer" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.budplayground" -}}
-{{- if ne .Values.ingress.httpsEnabled "disabled" }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budplayground" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budplayground" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.budapp" -}}
-{{- if ne .Values.ingress.httpsEnabled "disabled" }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budapp" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budapp" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.budgateway" -}}
-{{- if ne .Values.ingress.httpsEnabled "disabled" }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budgateway" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budgateway" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.budask" -}}
-{{- if ne .Values.ingress.httpsEnabled "disabled" }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budask" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budask" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.novuapi" -}}
-{{- if ne .Values.ingress.httpsEnabled "disabled" }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.novuapi" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.novuapi" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.novuws" -}}
-{{- if ne .Values.ingress.httpsEnabled "disabled" }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.novuws" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.novuws" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.s3" -}}
-{{- if ne .Values.ingress.httpsEnabled "disabled" }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.s3" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.s3" $) }}
