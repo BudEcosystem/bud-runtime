@@ -29,7 +29,6 @@
   services.k3s = {
     gracefulNodeShutdown.enable = true;
     enable = true;
-    role = "server";
     tokenFile = config.sops.secrets."k3s_server_token".path;
 
     extraKubeletConfig.maxPods = 512;

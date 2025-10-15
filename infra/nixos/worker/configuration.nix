@@ -7,7 +7,7 @@ in
 
   boot.supportedFilesystems = [ "nfs" ];
   services.k3s = {
-    agent = "agent";
+    role = "agent";
     serverAddr = "https://${primaryIp}:6443";
   };
 
