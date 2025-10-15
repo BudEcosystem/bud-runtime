@@ -33,11 +33,11 @@ spec:
           - name: NEXT_PUBLIC_PRIVATE_KEY
             value: {{ .Values.microservices.rsaKeys.privateKey | b64enc }}
           - name: NEXT_PUBLIC_TEMP_API_BASE_URL
-            value: {{ include "bud.ingress.url.budapp" $ }}
+            value: http://{{ .Release.Name }}-budapp:9082
           - name: NEXT_PUBLIC_BASE_URL
-            value: {{ include "bud.ingress.url.budapp" $ }}
+            value: http://{{ .Release.Name }}-budapp:9082
           - name: NEXT_PUBLIC_COPY_CODE_API_BASE_URL
-            value: {{ include "bud.ingress.url.budgateway" $ }}/v1/
+            value: http://{{ .Release.Name }}-budgateway:3000/v1/
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budplayground.env }}
           - name: {{ $key }}
