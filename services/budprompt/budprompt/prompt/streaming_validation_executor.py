@@ -256,6 +256,28 @@ class StreamingValidationExecutor:
                     # Final chunk - validate completely
                     validated_result = await result.validate_structured_output(message, allow_partial=False)
 
+                    # Validation passed - emit any remaining deltas from final chunk
+                    for part in message.parts:
+                        if isinstance(part, TextPart) and part.content:
+                            delta_event = self.formatter.format_output_text_delta(part.content)
+                            if delta_event:
+                                yield delta_event
+
+                        elif isinstance(part, ThinkingPart) and part.content:
+                            # Handle any final reasoning content
+                            if not self.formatter.reasoning_started:
+                                yield self.formatter.format_reasoning_summary_part_added()
+                                self.formatter.reasoning_started = True
+
+                            delta_event = self.formatter.format_reasoning_summary_text_delta(part.content)
+                            if delta_event:
+                                yield delta_event
+
+                            self.formatter.add_thinking_content(part.content)
+
+                        elif isinstance(part, ToolCallPart):
+                            logger.debug(f"Tool call: {part.tool_name}")
+
                     # Store attempted data for retry context
                     if hasattr(validated_result, "model_dump"):
                         self.last_attempted_data = validated_result.model_dump()
