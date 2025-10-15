@@ -1,11 +1,10 @@
 import { Field } from '@flowgram.ai/fixed-layout-editor';
 import { AgentVariable } from '@/stores/useAgentStore';
 import { useSession } from '../contexts/SessionContext';
-import { PrimaryButton } from '../../ui/bud/form/Buttons';
 import { LoadingOutlined, CheckCircleFilled } from '@ant-design/icons';
 
 export const OutputCard = () => {
-  const { session, onSaveOutputSchema, isSavingOutput, outputWorkflowStatus } = useSession();
+  const { session, outputWorkflowStatus } = useSession();
 
   // Get output variables from the session, with default if empty
   const sessionVariables = session?.outputVariables || [];
@@ -138,50 +137,6 @@ export const OutputCard = () => {
           </div>
         ))}
       </div>
-
-      {/* Card Footer */}
-      <div style={{
-        paddingTop: '12px',
-        borderTop: 'none',
-        fontSize: '12px',
-        color: '#808080',
-        textAlign: 'center',
-        background: 'transparent',
-      }}>
-        {outputVariables.length} output variable{outputVariables.length !== 1 ? 's' : ''}
-      </div>
-
-      {/* Save Button */}
-      {onSaveOutputSchema && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          marginTop: '16px',
-          paddingTop: '16px',
-          borderTop: '1px solid #333333',
-          background: 'transparent',
-        }}>
-          <PrimaryButton
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              onSaveOutputSchema();
-            }}
-            loading={isSavingOutput}
-            disabled={isSavingOutput}
-            style={{
-              background: '#965CDE',
-              border: 'none',
-              color: 'white',
-              padding: '8px 24px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              cursor: isSavingOutput ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isSavingOutput ? 'Saving...' : 'Save'}
-          </PrimaryButton>
-        </div>
-      )}
     </div>
   );
 };

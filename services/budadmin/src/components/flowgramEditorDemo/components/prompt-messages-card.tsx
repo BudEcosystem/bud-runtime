@@ -1,10 +1,9 @@
 import { Field } from '@flowgram.ai/fixed-layout-editor';
 import { useSession } from '../contexts/SessionContext';
-import { PrimaryButton } from '../../ui/bud/form/Buttons';
 import { LoadingOutlined, CheckCircleFilled } from '@ant-design/icons';
 
 export const PromptMessagesCard = () => {
-  const { session, onSavePromptMessages, isSavingPromptMessages, promptMessagesWorkflowStatus } = useSession();
+  const { session, promptMessagesWorkflowStatus } = useSession();
 
   // Get prompt messages from the session, with default if empty
   const promptMessages = session?.promptMessages || '';
@@ -144,50 +143,6 @@ export const PromptMessagesCard = () => {
           </div>
         </div>
       </div>
-
-      {/* Card Footer */}
-      <div style={{
-        paddingTop: '12px',
-        borderTop: 'none',
-        fontSize: '12px',
-        color: '#808080',
-        textAlign: 'center',
-        background: 'transparent',
-      }}>
-        {messageCount > 0 ? `${messageCount} message${messageCount !== 1 ? 's' : ''} configured` : 'No prompt messages set'}
-      </div>
-
-      {/* Save Button */}
-      {onSavePromptMessages && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          marginTop: '16px',
-          paddingTop: '16px',
-          borderTop: '1px solid #333333',
-          background: 'transparent',
-        }}>
-          <PrimaryButton
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              onSavePromptMessages();
-            }}
-            loading={isSavingPromptMessages}
-            disabled={isSavingPromptMessages}
-            style={{
-              background: '#965CDE',
-              border: 'none',
-              color: 'white',
-              padding: '8px 24px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              cursor: isSavingPromptMessages ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isSavingPromptMessages ? 'Saving...' : 'Save'}
-          </PrimaryButton>
-        </div>
-      )}
     </div>
   );
 };

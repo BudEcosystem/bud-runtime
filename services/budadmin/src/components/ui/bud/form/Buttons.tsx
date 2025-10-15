@@ -35,7 +35,7 @@ export function PrimaryButton({
           <div className="relative inline-block">
             <Button
               {...props}
-              className={`pointer-events-none opacity-60 flex justify-center items-center h-[1.75rem] !border-[.5px] !border-[#965CDE] font-normal !bg-[#1E0C34] ${classNames}`}
+              className={`pointer-events-none opacity-60 flex justify-center items-center !border-[.5px] !border-[#965CDE] font-normal !bg-[#1E0C34] ${classNames}`}
               disabled={true} // keep enabled so events can bubble
               style={{
                 minWidth: "4rem",
@@ -43,13 +43,16 @@ export function PrimaryButton({
                 paddingRight: "0.7rem",
                 cursor: "not-allowed",
                 borderRadius: "0.3rem",
+                height: "1.75rem",
               }}
             >
               {Children}
               <div
-                className={`font-[600] text-[#EEEEEE] ${props.textClass} ${props.children == "Next" || props.text == "Next" ? "ml-[.4rem] mr-[0]" : ""}`}
+                className={`${textClass} ${props.children == "Next" || props.text == "Next" ? "ml-[.4rem] mr-[0]" : ""}`}
                 style={{
                   fontSize: "0.75rem",
+                  color: "#EEEEEE",
+                  fontWeight: 600,
                   lineHeight: "100%",
                   background: "transparent",
                 }}
@@ -67,7 +70,7 @@ export function PrimaryButton({
       ) : (
         <Button
           {...props}
-          className={`flex justify-center items-center h-[1.75rem] !border-[.5px] !border-[#965CDE] font-normal !bg-[#1E0C34] hover:bg-[#965CDE] ${classNames}
+          className={`flex justify-center items-center !border-[.5px] !border-[#965CDE] font-normal !bg-[#1E0C34] hover:bg-[#965CDE] ${classNames}
       ${disabled ? "!bg-[#1E0C34] hover:!bg-[#1E0C34] border-[#965CDE] text-[#888888] cursor-not-allowed" : "!bg-[#1E0C34] hover:!bg-[#965CDE]"} `}
           disabled={disabled} // Ensures that the button is actually disabled
           style={{
@@ -75,6 +78,7 @@ export function PrimaryButton({
             paddingLeft: ".7rem",
             paddingRight: ".7rem",
             borderRadius: "0.3rem",
+            height: "1.75rem",
           }}
         >
           {!permission ? (
@@ -86,7 +90,14 @@ export function PrimaryButton({
               <div className="flex justify-center items-center w-full h-full">
                 {Children}
                 <div
-                  className={`font-[600] text-[#EEEEEE] text-[0.75rem] leading-[100%] ${props.children == "Next" || props.text == "Next" ? "ml-[.4rem] mr-[0]" : ""}`}
+                  className={`${textClass} ${props.children == "Next" || props.text == "Next" ? "ml-[.4rem] mr-[0]" : ""}`}
+                  style={{
+                  fontSize: "0.75rem",
+                  color: "#EEEEEE",
+                  fontWeight: 600,
+                  lineHeight: "100%",
+                  background: "transparent",
+                }}
                 >
                   {props.children || props.text || "Next"}
                 </div>
@@ -101,7 +112,14 @@ export function PrimaryButton({
             <div className="flex justify-center items-center w-full h-full">
               {Children}
               <div
-                className={`font-[600] text-[#EEEEEE] text-[0.75rem] leading-[100%] ${props.children == "Next" || props.text == "Next" ? "ml-[.4rem] mr-[0]" : ""}`}
+                className={`${textClass} ${props.children == "Next" || props.text == "Next" ? "ml-[.4rem] mr-[0]" : ""}`}
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#EEEEEE",
+                  fontWeight: 600,
+                  lineHeight: "100%",
+                  background: "transparent",
+                }}
               >
                 {props.children || props.text || "Next"}
               </div>

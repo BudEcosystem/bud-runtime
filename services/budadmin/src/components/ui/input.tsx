@@ -146,8 +146,12 @@ const TextInput: React.FC<TextInputProps> = ({
 }) => (
   <TextField.Root
     maxLength={100}
-    className={`w-full place max-w-[350px] text-[0.740625rem] font-light text-[#44474D] h-[1.75rem] content-center	 bg-[#0f0f0f] outline-[.5px] outline-[white] rounded-md border border-[#212225] shadow-none bg-transparent leading-[100%] pt-[.2em] hover:border-[#63656c] ${className}`}
+    className={`w-full place max-w-[350px] text-[0.740625rem] font-light text-[#44474D] content-center outline-[.5px] outline-[white] rounded-md border border-[#212225] shadow-none leading-[100%] pt-[.2em] hover:border-[#63656c] ${className}`}
     {...props}
+    style={{
+      height: '1.75rem',
+      background: 'transparent',
+    }}
   >
     {textFieldSlot && textFieldSlot}
   </TextField.Root>
@@ -176,8 +180,10 @@ const TextAreaInput: React.FC<TextAreaInputProps> = ({
       outlineColor: 'white',
       borderWidth: '1px',
       borderColor: '#212225',
+      paddingLeft: '0',
+      paddingRight: '0',
      }}
-    className={`w-full rounded-md shadow-none hover:border-[#63656c] ${className}`}
+    className={`w-full textArea rounded-md shadow-none hover:border-[#63656c] ${className}`}
     {...props}
   />
 );
