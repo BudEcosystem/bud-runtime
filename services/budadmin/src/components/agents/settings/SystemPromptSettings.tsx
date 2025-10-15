@@ -79,7 +79,7 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
         <PrimaryButton
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation();
-            onSaveSystemPrompt();
+            onSaveSystemPrompt?.();
           }}
           loading={isSavingSystemPrompt}
           disabled={isSavingSystemPrompt}
