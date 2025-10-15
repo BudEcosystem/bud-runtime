@@ -1,10 +1,11 @@
 import { tempApiBaseUrl } from "@/components/environment";
 import { errorToast, successToast } from "@/components/toast";
-import { Project, useProjects } from "src/hooks/useProjects";
+import { Project } from "src/hooks/useProjects";
 import { Model } from "src/hooks/useModels";
 import { create } from "zustand";
 import { WorkflowType } from "./useWorkflow";
 import { AppRequest } from "src/pages/api/requests";
+import { Tag } from "@/components/ui/bud/dataEntry/TagsInput";
 
 export type AgentType = {
   id: string;
@@ -58,6 +59,7 @@ export const useAddAgent = create<{
   deploymentConfiguration: DeploymentConfiguration | null;
   warningData: WarningData | null;
   promptMessages: any[];
+  promptTags: Tag[];
 
   setLoading: (loading: boolean) => void;
   setCurrentWorkflow: (workflow: WorkflowType) => void;
@@ -74,6 +76,7 @@ export const useAddAgent = create<{
   reset: () => void;
 
   getWorkflow: (id?: string) => Promise<any>;
+  getPromptTags: () => Promise<void>;
   createWorkflow: (projectId: string) => Promise<any>;
   updateAgentType: () => Promise<any>;
   updateModel: () => Promise<any>;
@@ -102,6 +105,7 @@ export const useAddAgent = create<{
   deploymentConfiguration: null,
   warningData: null,
   promptMessages: [],
+  promptTags: [],
 
   setLoading: (loading: boolean) => {
     set({ loading });
@@ -203,6 +207,19 @@ export const useAddAgent = create<{
       return false;
     } finally {
       get().endRequest();
+    }
+  },
+
+  getPromptTags: async () => {
+    try {
+      const response: any = await AppRequest.Get(
+        `${tempApiBaseUrl}/prompts/tags?page=1&limit=1000`
+      );
+      if (response?.data?.tags) {
+        set({ promptTags: response.data.tags });
+      }
+    } catch (error) {
+      console.error("Error fetching prompt tags:", error);
     }
   },
 

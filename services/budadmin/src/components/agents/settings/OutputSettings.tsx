@@ -191,7 +191,7 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
         <PrimaryButton
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation();
-            onSaveOutputSchema();
+            onSaveOutputSchema?.();
           }}
           loading={isSavingOutput}
           disabled={isSavingOutput}

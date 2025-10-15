@@ -29,7 +29,9 @@ export default function AgentConfiguration() {
     setAgentConfiguration,
     setDeploymentConfiguration,
     setWarningData,
-    getWorkflow
+    getWorkflow,
+    getPromptTags,
+    promptTags
   } = useAddAgent();
 
   // Get the active agent session to retrieve promptId
@@ -38,6 +40,7 @@ export default function AgentConfiguration() {
   // State for form values
   const [deploymentName, setDeploymentName] = useState("");
   const [tags, setTags] = useState<Tag[]>([]);
+  const [tagOptions, setTagOptions] = useState<Tag[]>([]);
   const [description, setDescription] = useState("");
   const [minConcurrency, setMinConcurrency] = useState(1);
   const [maxConcurrency, setMaxConcurrency] = useState(10);
@@ -49,23 +52,28 @@ export default function AgentConfiguration() {
   // Trigger workflow is always true for agent deployments
   const triggerWorkflow = true;
 
+  // Fetch prompt tags on component mount
+  useEffect(() => {
+    getPromptTags();
+  }, [getPromptTags]);
+
+  // Transform promptTags to tagOptions format
+  useEffect(() => {
+    if (promptTags && promptTags.length > 0) {
+      const formattedTags = promptTags.map((tag) => ({
+        name: tag.name,
+        color: tag.color,
+      }));
+      setTagOptions(formattedTags);
+    }
+  }, [promptTags]);
+
   // Load workflow on component mount if it exists
   useEffect(() => {
     if (currentWorkflow?.workflow_id) {
       getWorkflow(currentWorkflow.workflow_id);
     }
   }, [currentWorkflow?.workflow_id, getWorkflow]);
-
-  // Tag options for the tags input
-  const tagOptions: Tag[] = [
-    { name: "test", color: "#FF6B6B" },
-    { name: "production", color: "#4ECDC4" },
-    { name: "development", color: "#45B7D1" },
-    { name: "staging", color: "#96CEB4" },
-    { name: "hardware", color: "#EC7575" },
-    { name: "intel", color: "#479D5F" },
-    { name: "performance", color: "#DE5CD1" },
-  ];
 
   const handleNext = async () => {
     try {

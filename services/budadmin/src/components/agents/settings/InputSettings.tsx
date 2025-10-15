@@ -240,7 +240,7 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
         <PrimaryButton
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation();
-            onSavePromptSchema();
+            onSavePromptSchema?.();
           }}
           loading={isSaving}
           disabled={isSaving}

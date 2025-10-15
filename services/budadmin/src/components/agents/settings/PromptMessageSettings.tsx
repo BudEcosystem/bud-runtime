@@ -225,7 +225,7 @@ export const PromptMessageSettings: React.FC<PromptMessageSettingsProps> = ({
         <PrimaryButton
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation();
-            onSavePromptMessages();
+            onSavePromptMessages?.();
           }}
           loading={isSavingPromptMessages}
           disabled={isSavingPromptMessages}

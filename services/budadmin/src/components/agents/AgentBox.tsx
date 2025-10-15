@@ -730,6 +730,12 @@ function AgentBoxInner({
             localPromptMessages={localPromptMessages}
             onSavePromptSchema={handleSavePromptSchema}
             isSaving={isSaving}
+            onSaveSystemPrompt={handleSaveSystemPrompt}
+            isSavingSystemPrompt={isSavingSystemPrompt}
+            onSavePromptMessages={handleSavePromptMessages}
+            isSavingPromptMessages={isSavingPromptMessages}
+            onSaveOutputSchema={handleSaveOutputSchema}
+            isSavingOutput={isSavingOutput}
           />
         </div>
       </div>
