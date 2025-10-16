@@ -1029,6 +1029,7 @@ impl CompletionProvider for DummyProvider {
                         logprobs: None,
                         finish_reason: if i == 5 { Some("stop".to_string()) } else { None },
                     }],
+                    usage: None,
                 })
             })
             .throttle(Duration::from_millis(10));

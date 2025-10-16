@@ -167,9 +167,19 @@ class PlaygroundService(SessionMixin):
                 logger.debug(f"Getting all published deployments for CLIENT user {current_user_id}")
                 project_ids = None  # None means no project filtering - show all published
             else:
-                # For ADMIN users, get all active project ids
+                # For ADMIN users, get only their accessible projects (not all projects in system)
                 logger.debug(f"Getting all playground deployments for ADMIN user {current_user_id}")
-                project_ids = await ProjectDataManager(self.session).get_all_active_project_ids()
+                project_service = ProjectService(self.session)
+
+                # Get all projects the ADMIN user has access to
+                all_projects, _ = await project_service.get_all_active_projects(
+                    current_user=user,
+                    offset=0,
+                    limit=1000,  # Get all projects (reasonable upper limit)
+                )
+
+                # Extract project IDs from user's accessible projects
+                project_ids = [p.project.id for p in all_projects] if all_projects else []
 
             return project_ids, filter_published_only
         elif api_key:

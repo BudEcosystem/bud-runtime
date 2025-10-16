@@ -32,6 +32,12 @@ interface SettingsSidebarProps {
   // Save props
   onSavePromptSchema?: () => void;
   isSaving?: boolean;
+  onSaveSystemPrompt?: () => void;
+  isSavingSystemPrompt?: boolean;
+  onSavePromptMessages?: () => void;
+  isSavingPromptMessages?: boolean;
+  onSaveOutputSchema?: () => void;
+  isSavingOutput?: boolean;
 }
 
 export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
@@ -48,7 +54,13 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   localSystemPrompt,
   localPromptMessages,
   onSavePromptSchema,
-  isSaving
+  isSaving,
+  onSaveSystemPrompt,
+  isSavingSystemPrompt,
+  onSavePromptMessages,
+  isSavingPromptMessages,
+  onSaveOutputSchema,
+  isSavingOutput
 }) => {
   const renderSettings = () => {
     switch (activeSettings) {
@@ -60,6 +72,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             onAddVariable={onAddInputVariable}
             onVariableChange={onVariableChange}
             onDeleteVariable={onDeleteVariable}
+            onSavePromptSchema={onSavePromptSchema}
+            isSaving={isSaving}
           />
         );
       case SettingsType.SYSTEM_PROMPT:
@@ -68,6 +82,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             sessionId={session.id}
             systemPrompt={localSystemPrompt}
             onSystemPromptChange={onSystemPromptChange}
+            onSaveSystemPrompt={onSaveSystemPrompt}
+            isSavingSystemPrompt={isSavingSystemPrompt}
           />
         );
       case SettingsType.PROMPT_MESSAGE:
@@ -76,6 +92,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             sessionId={session.id}
             promptMessages={localPromptMessages}
             onPromptMessagesChange={onPromptMessagesChange}
+            onSavePromptMessages={onSavePromptMessages}
+            isSavingPromptMessages={isSavingPromptMessages}
           />
         );
       case SettingsType.OUTPUT:
@@ -86,6 +104,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             onAddVariable={onAddOutputVariable}
             onVariableChange={onVariableChange}
             onDeleteVariable={onDeleteVariable}
+            onSaveOutputSchema={onSaveOutputSchema}
+            isSavingOutput={isSavingOutput}
           />
         );
       default:
@@ -98,16 +118,22 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               onAddVariable={onAddInputVariable}
               onVariableChange={onVariableChange}
               onDeleteVariable={onDeleteVariable}
+              onSavePromptSchema={onSavePromptSchema}
+              isSaving={isSaving}
             />
             <SystemPromptSettings
               sessionId={session.id}
               systemPrompt={localSystemPrompt}
               onSystemPromptChange={onSystemPromptChange}
+              onSaveSystemPrompt={onSaveSystemPrompt}
+              isSavingSystemPrompt={isSavingSystemPrompt}
             />
             <PromptMessageSettings
               sessionId={session.id}
               promptMessages={localPromptMessages}
               onPromptMessagesChange={onPromptMessagesChange}
+              onSavePromptMessages={onSavePromptMessages}
+              isSavingPromptMessages={isSavingPromptMessages}
             />
             <OutputSettings
               sessionId={session.id}
@@ -115,6 +141,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               onAddVariable={onAddOutputVariable}
               onVariableChange={onVariableChange}
               onDeleteVariable={onDeleteVariable}
+              onSaveOutputSchema={onSaveOutputSchema}
+              isSavingOutput={isSavingOutput}
             />
           </>
         );

@@ -583,8 +583,11 @@ function AgentBoxInner({
         <div className="flex items-center gap-3 min-w-[100px]">
           <span className="text-[#808080] text-xs font-medium">V{index + 1}</span>
           {isHovering && (
-            <PrimaryButton onClick={closeAgentDrawer}>
-              Close
+            <PrimaryButton onClick={closeAgentDrawer}
+              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem]"
+              textClass="!text-[0.625rem] !font-[400]"
+            >
+              Save
             </PrimaryButton>
           )}
         </div>
@@ -600,14 +603,12 @@ function AgentBoxInner({
         <div className="flex items-center gap-1">
           {/* Settings Button - Works as toggle */}
           <button
-            className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer ${
-              isRightSidebarOpen ? 'bg-[#965CDE] bg-opacity-20' : ''
-            }`}
+            className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer ${isRightSidebarOpen ? 'bg-[#965CDE] bg-opacity-20' : ''
+              }`}
             onClick={toggleSettings}
           >
-            <div className={`w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group ${
-              isRightSidebarOpen ? 'text-[#965CDE]' : 'text-[#B3B3B3] hover:text-[#FFFFFF]'
-            }`}>
+            <div className={`w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group ${isRightSidebarOpen ? 'text-[#965CDE]' : 'text-[#B3B3B3] hover:text-[#FFFFFF]'
+              }`}>
               <Tooltip title={isRightSidebarOpen ? "Close Settings" : "Settings"}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -729,6 +730,12 @@ function AgentBoxInner({
             localPromptMessages={localPromptMessages}
             onSavePromptSchema={handleSavePromptSchema}
             isSaving={isSaving}
+            onSaveSystemPrompt={handleSaveSystemPrompt}
+            isSavingSystemPrompt={isSavingSystemPrompt}
+            onSavePromptMessages={handleSavePromptMessages}
+            isSavingPromptMessages={isSavingPromptMessages}
+            onSaveOutputSchema={handleSaveOutputSchema}
+            isSavingOutput={isSavingOutput}
           />
         </div>
       </div>

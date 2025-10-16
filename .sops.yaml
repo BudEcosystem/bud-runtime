@@ -8,6 +8,7 @@ keys:
   - &server_github_runner age1ueq3k22vcfet3y0uqu7wu385wd0pwx5nslqp2z30v4e3zf9stpesx7wjxr
   - &server_budk8s_primary age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t
   - &server_budk8s_ingress age1v9papxpyyccg3esyzjsd7h0nwje0vry9ns29mh4njmlgylmyedzqr6a9gd
+  - &server_budk8s_worker age1ylsx7l8sf9tq58seyt82lswf7fue9c90yh04y9336swr42kav3escltxrk
 
 creation_rules:
   # server_budk8s_primary
@@ -30,6 +31,7 @@ creation_rules:
         - *admin_varun
         - *server_budk8s_primary
         - *server_budk8s_ingress
+        - *server_budk8s_worker
 
   # server_github_runner
   - path_regex: nix/workflows/dockerhub_budcustomer/secrets.yaml

@@ -496,6 +496,7 @@ where
                 max_tokens: inference_params.chat_completion.max_tokens,
                 presence_penalty: inference_params.chat_completion.presence_penalty,
                 frequency_penalty: inference_params.chat_completion.frequency_penalty,
+                repetition_penalty: inference_params.chat_completion.repetition_penalty,
                 seed: inference_params.chat_completion.seed,
                 stream,
                 // Template / guided-decoding parameters
@@ -575,6 +576,7 @@ where
                 max_tokens: inference_params.chat_completion.max_tokens,
                 presence_penalty: inference_params.chat_completion.presence_penalty,
                 frequency_penalty: inference_params.chat_completion.frequency_penalty,
+                repetition_penalty: inference_params.chat_completion.repetition_penalty,
                 seed: inference_params.chat_completion.seed,
                 stream,
                 // Template / guided-decoding parameters
