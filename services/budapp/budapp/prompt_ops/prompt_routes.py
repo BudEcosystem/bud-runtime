@@ -895,18 +895,17 @@ async def list_connectors(
 async def get_connector(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    connector_id: UUID,
+    connector_id: str,
 ) -> Union[ConnectorResponse, ErrorResponse]:
-    """Retrieve a single connector with its full details.
+    """Retrieve a single connector with its full details from MCP Foundry.
 
     This endpoint returns complete connector information including the
     credential schema needed to render authentication forms dynamically.
-    Currently returns hardcoded data until mcp_foundry service is available.
 
     Args:
         current_user: The authenticated user
         session: Database session
-        connector_id: UUID of the connector to retrieve
+        connector_id: String ID of the connector (e.g., "github", "slack")
 
     Returns:
         ConnectorResponse with full connector details or ErrorResponse on failure

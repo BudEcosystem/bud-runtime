@@ -893,21 +893,23 @@ class PromptTypeEnum(StrEnum):
 
 
 class ConnectorAuthTypeEnum(StrEnum):
-    """Enumeration of connector authentication types.
+    """Enumeration of connector authentication types from MCP registry.
 
     Attributes:
-        BASIC: Basic authentication with username/password.
-        BEARER: Bearer token authentication.
-        HEADERS: Custom headers authentication.
+        API: API authentication.
+        API_KEY: API Key authentication.
         OAUTH: OAuth authentication.
-        NONE: No authentication required.
+        OAUTH2_1: OAuth 2.1 authentication.
+        OAUTH2_1_AND_API_KEY: OAuth 2.1 combined with API Key authentication.
+        OPEN: No authentication required (open access).
     """
 
-    BASIC = auto()
-    BEARER = auto()
-    HEADERS = auto()
-    OAUTH = auto()
-    NONE = auto()
+    API = "API"
+    API_KEY = "API Key"
+    OAUTH = "OAuth"
+    OAUTH2_1 = "OAuth2.1"
+    OAUTH2_1_AND_API_KEY = "OAuth2.1 & API Key"
+    OPEN = "Open"
 
 
 class PromptStatusEnum(StrEnum):
@@ -2928,32 +2930,24 @@ EMOJIS = [
 
 # Connector Authentication Credentials Mapping
 CONNECTOR_AUTH_CREDENTIALS_MAP = {
-    ConnectorAuthTypeEnum.BASIC: [
+    ConnectorAuthTypeEnum.API: [
         {
             "type": "text",
-            "field": "username",
-            "label": "Username",
+            "field": "api_endpoint",
+            "label": "API Endpoint",
             "order": 1,
             "required": True,
-            "description": "Your username for basic authentication",
-        },
-        {
-            "type": "password",
-            "field": "password",
-            "label": "Password",
-            "order": 2,
-            "required": True,
-            "description": "Your password for basic authentication",
+            "description": "API endpoint URL",
         },
     ],
-    ConnectorAuthTypeEnum.BEARER: [
+    ConnectorAuthTypeEnum.API_KEY: [
         {
             "type": "password",
-            "field": "token",
-            "label": "Bearer Token",
+            "field": "api_key",
+            "label": "API Key",
             "order": 1,
             "required": True,
-            "description": "Your bearer token for API authentication",
+            "description": "Your API key for authentication",
         }
     ],
     ConnectorAuthTypeEnum.OAUTH: [
@@ -2999,29 +2993,59 @@ CONNECTOR_AUTH_CREDENTIALS_MAP = {
             "description": "Space-separated list of OAuth scopes",
         },
     ],
-    ConnectorAuthTypeEnum.HEADERS: [
+    ConnectorAuthTypeEnum.OAUTH2_1: [
         {
-            "type": "button",
-            "field": "add_header_button",
-            "label": "Add Header",
+            "type": "text",
+            "field": "client_id",
+            "label": "Client ID",
             "order": 1,
-            "required": False,
-            "description": "Click to add a new header",
+            "required": True,
+            "description": "Your OAuth 2.1 client ID",
         },
         {
-            "type": "array",
-            "field": "headers",
-            "label": "Custom Headers",
+            "type": "password",
+            "field": "client_secret",
+            "label": "Client Secret",
+            "order": 2,
             "required": True,
-            "description": "Add custom authentication headers",
-            "item_schema": {
-                "key": {"type": "text", "label": "Header Key", "placeholder": "e.g., X-API-Key"},
-                "value": {"type": "text", "label": "Header Value", "placeholder": "Enter header value"},
-            },
-            "min_items": 1,
+            "description": "Your OAuth 2.1 client secret",
+        },
+        {
+            "type": "url",
+            "field": "redirect_uri",
+            "label": "Redirect URI",
+            "order": 3,
+            "required": True,
+            "description": "OAuth 2.1 redirect URI",
         },
     ],
-    ConnectorAuthTypeEnum.NONE: [],
+    ConnectorAuthTypeEnum.OAUTH2_1_AND_API_KEY: [
+        {
+            "type": "text",
+            "field": "client_id",
+            "label": "Client ID",
+            "order": 1,
+            "required": True,
+            "description": "Your OAuth 2.1 client ID",
+        },
+        {
+            "type": "password",
+            "field": "client_secret",
+            "label": "Client Secret",
+            "order": 2,
+            "required": True,
+            "description": "Your OAuth 2.1 client secret",
+        },
+        {
+            "type": "password",
+            "field": "api_key",
+            "label": "API Key",
+            "order": 3,
+            "required": True,
+            "description": "Your API key for additional authentication",
+        },
+    ],
+    ConnectorAuthTypeEnum.OPEN: [],
 }
 
 # Define success messages for different workflow types

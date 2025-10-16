@@ -300,6 +300,62 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def list_connectors(
+        self, show_registered_only: bool = False, show_available_only: bool = True, offset: int = 0, limit: int = 10
+    ) -> tuple[List[Dict[str, Any]], int]:
+        """List connectors from MCP registry.
+
+        Args:
+            show_registered_only: Filter for registered servers only
+            show_available_only: Filter for available servers only
+            offset: Number of items to skip
+            limit: Maximum number of items to return
+
+        Returns:
+            Tuple of (list of connectors, total count)
+
+        Raises:
+            MCPFoundryException: If the API call fails
+        """
+        try:
+            logger.debug(
+                "Fetching connectors from MCP Foundry",
+                show_registered_only=show_registered_only,
+                show_available_only=show_available_only,
+                offset=offset,
+                limit=limit,
+            )
+
+            params = {
+                "show_registered_only": str(show_registered_only).lower(),
+                "show_available_only": str(show_available_only).lower(),
+                "limit": limit,
+                "offset": offset,
+            }
+
+            response = await self._make_request(
+                method="GET",
+                endpoint="/admin/mcp-registry/servers",
+                params=params,
+            )
+
+            servers = response.get("servers", [])
+            total = response.get("total", len(servers))
+
+            logger.debug(
+                "Successfully fetched connectors from MCP Foundry",
+                total_count=total,
+            )
+
+            return servers, total
+
+        except MCPFoundryException:
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error listing connectors: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def close(self):
         """Close the HTTP session."""
         if self._session and not self._session.closed:

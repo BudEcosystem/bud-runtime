@@ -617,15 +617,15 @@ class PromptService(SessionMixin):
         order_by: list = [],
         search: bool = False,
     ) -> tuple[list[ConnectorListItem], int]:
-        """Get connectors list.
-
-        TODO: Currently returns hardcoded data until mcp_foundry service is available.
-        When prompt_id is provided, filters connectors connected to that prompt.
+        """Get connectors list from MCP Foundry.
 
         Args:
             prompt_id: Optional UUID to filter connectors for a specific prompt
             offset: Pagination offset
             limit: Pagination limit
+            filters: Additional filters
+            order_by: Ordering fields
+            search: Enable search functionality
 
         Returns:
             Tuple of (list of connectors, total count)
@@ -637,57 +637,49 @@ class PromptService(SessionMixin):
                 fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE},
             )
 
-        # TODO: Hardcoded connector data until mcp_foundry service is ready
-        # This simulates what we'll get from the mcp_foundry service
-        connectors = [
-            Connector(
-                id=UUID("550e8400-e29b-41d4-a716-446655440001"),
-                name="GitHub",
-                type="github",
-                icon="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-                auth_type=ConnectorAuthTypeEnum.OAUTH,
-                credential_schema=CONNECTOR_AUTH_CREDENTIALS_MAP.get(ConnectorAuthTypeEnum.OAUTH, []),
-                url="https://api.github.com",
-            ),
-            Connector(
-                id=UUID("550e8400-e29b-41d4-a716-446655440002"),
-                name="Slack",
-                type="slack",
-                icon="https://a.slack-edge.com/80588/marketing/img/meta/favicon-32.png",
-                auth_type=ConnectorAuthTypeEnum.BEARER,
-                credential_schema=CONNECTOR_AUTH_CREDENTIALS_MAP.get(ConnectorAuthTypeEnum.BEARER, []),
-                url="https://slack.com/api",
-            ),
-        ]
+        logger.debug("Fetching connectors from MCP Foundry")
 
-        # Apply pagination
-        total_count = len(connectors)
-        paginated_connectors = connectors[offset : offset + limit]
-
-        # Convert to response format (only id, name, icon)
-        connector_items = [
-            ConnectorListItem(
-                id=connector.id,
-                name=connector.name,
-                icon=connector.icon,
+        # Call MCP Foundry API
+        try:
+            mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors(
+                show_registered_only=False, show_available_only=True, offset=offset, limit=limit
             )
-            for connector in paginated_connectors
-        ]
+            logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry API error: {e}")
+            mcp_foundry_response = []
+            total_count = 0
+        except Exception as e:
+            logger.error(f"Unexpected error calling MCP Foundry: {e}")
+            mcp_foundry_response = []
+            total_count = 0
 
-        logger.debug(
-            f"Returning {len(connector_items)} connectors out of {total_count} total"
-            f"{f' for prompt_id {prompt_id}' if prompt_id else ''}"
-        )
+        # Map MCP response to ConnectorListItem
+        connector_items = []
+        for item in mcp_foundry_response:
+            try:
+                connector_item = ConnectorListItem(
+                    id=item.get("id", ""),
+                    name=item.get("name", ""),
+                    icon=item.get("logo_url"),
+                    category=item.get("category"),
+                    url=item.get("url", ""),
+                    provider=item.get("provider", ""),
+                    description=item.get("description"),
+                    documentation_url=item.get("documentation_url"),
+                )
+                connector_items.append(connector_item)
+            except (ValueError, KeyError) as e:
+                logger.error(f"Found invalid connector item: {e}")
+                continue
 
         return connector_items, total_count
 
-    async def get_connector_by_id(self, connector_id: UUID) -> Connector:
-        """Get a single connector by its ID.
-
-        Currently returns from hardcoded data until mcp_foundry service is available.
+    async def get_connector_by_id(self, connector_id: str) -> Connector:
+        """Get a single connector by its ID from MCP Foundry.
 
         Args:
-            connector_id: UUID of the connector to retrieve
+            connector_id: String ID of the connector (e.g., "github", "slack")
 
         Returns:
             Connector object with full details
@@ -695,19 +687,62 @@ class PromptService(SessionMixin):
         Raises:
             ClientException: If connector not found
         """
-        # TODO: Hardcoded connector data until mcp_foundry service is ready
-        # This simulates what we'll get from the mcp_foundry service
-        connector = Connector(
-            id=connector_id,
-            name="GitHub",
-            type="github",
-            icon="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-            auth_type=ConnectorAuthTypeEnum.OAUTH,
-            credential_schema=CONNECTOR_AUTH_CREDENTIALS_MAP.get(ConnectorAuthTypeEnum.OAUTH, []),
-            url="https://api.github.com",
-        )
+        logger.debug(f"Getting connector with ID: {connector_id}")
 
-        return connector
+        try:
+            # Fetch all connectors and find the matching one
+            # TODO: Optimize with specific endpoint if MCP Foundry adds it
+            mcp_foundry_response, _ = await mcp_foundry_service.list_connectors(
+                show_registered_only=False,
+                show_available_only=True,
+                limit=100,  # Fetch more to ensure we get the one we need
+            )
+
+            # Find matching connector
+            connector_data = next((c for c in mcp_foundry_response if c.get("id") == connector_id), None)
+
+            if not connector_data:
+                logger.error(f"Connector not found: {connector_id}")
+                raise ClientException(
+                    message=f"Connector {connector_id} not found", status_code=status.HTTP_404_NOT_FOUND
+                )
+
+            # Map auth_type string to enum
+            auth_type_str = connector_data.get("auth_type", "Open")
+            auth_type = ConnectorAuthTypeEnum(auth_type_str)
+
+            # Get credential schema based on auth type
+            credential_schema = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
+
+            # Build Connector object
+            connector = Connector(
+                id=connector_data.get("id", ""),
+                name=connector_data.get("name", ""),
+                icon=connector_data.get("logo_url"),
+                category=connector_data.get("category"),
+                url=connector_data.get("url", ""),
+                provider=connector_data.get("provider", ""),
+                description=connector_data.get("description"),
+                documentation_url=connector_data.get("documentation_url"),
+                auth_type=auth_type,
+                credential_schema=credential_schema,
+            )
+
+            logger.debug(f"Successfully retrieved connector: {connector.name}")
+            return connector
+
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry error getting connector {connector_id}: {e}")
+            raise ClientException(
+                message=f"Failed to retrieve connector: {str(e)}", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error getting connector {connector_id}: {e}")
+            raise ClientException(
+                message="Failed to retrieve connector", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     async def get_tools(
         self,

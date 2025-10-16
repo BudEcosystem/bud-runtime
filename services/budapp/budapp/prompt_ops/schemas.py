@@ -601,9 +601,14 @@ class ConnectorListItem(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID4
+    id: str
     name: str
-    icon: str
+    icon: Optional[str] = None
+    category: Optional[str] = None
+    url: str
+    provider: str
+    description: Optional[str] = None
+    documentation_url: Optional[str] = None
 
 
 class ConnectorListResponse(PaginatedSuccessResponse):
@@ -623,13 +628,16 @@ class ConnectorFilter(BaseModel):
 class Connector(BaseModel):
     """Internal schema for full connector data."""
 
-    id: UUID4
+    id: str
     name: str
-    type: str
-    icon: str
+    icon: Optional[str] = None
+    category: Optional[str] = None
+    url: str
+    provider: str
+    description: Optional[str] = None
+    documentation_url: Optional[str] = None
     auth_type: ConnectorAuthTypeEnum
     credential_schema: List[Dict[str, Any]]
-    url: str
 
 
 class ConnectorResponse(SuccessResponse):
