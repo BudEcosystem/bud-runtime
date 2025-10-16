@@ -13,6 +13,7 @@ import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 import Tags from "../components/DrawerTags";
 
 export default function SelectProject() {
+  console.log("Rendering SelectProject component");
   const { openDrawerWithStep } = useDrawer();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("");
@@ -94,7 +95,7 @@ export default function SelectProject() {
 
   const handleProjectSelect = (project: any) => {
     // Handle nested project structure
-    const projectId = project.project?.id || project.id;
+    const projectId = project?.project?.id || project.id;
     setSelectedProject(projectId);
     setSelectedProjectData(project);
   };
@@ -143,12 +144,12 @@ export default function SelectProject() {
                 <>
                   {projects?.map((project, index) => (
                     <div
-                      key={project.project?.id || project.id || index}
+                      key={project?.project?.id || project.id || index}
                       onClick={() => handleProjectSelect(project)}
                       className={`pt-[1.05rem] pb-[.8rem] cursor-pointer hover:shadow-lg px-[1.5rem] border-y-[0.5px] flex-row flex hover:bg-[#FFFFFF08] transition-all ${
                         index === 0 ? "border-t-[#1F1F1F]" : ""
                       } ${
-                        selectedProject === (project.project?.id || project.id)
+                        selectedProject === (project?.project?.id || project.id)
                           ? "border-y-[#965CDE] bg-[#965CDE10]"
                           : "border-y-[#1F1F1F] hover:border-[#757575]"
                       }`}
@@ -158,9 +159,9 @@ export default function SelectProject() {
                           {/* Project Icon */}
                           <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center shrink-0">
                             <span className="text-[1.2rem]">
-                              {project.project.icon &&
-                              project.project.icon != "string"
-                                ? project.project.icon
+                              {project?.project?.icon &&
+                              project?.project?.icon != "string"
+                                ? project?.project?.icon
                                 : "📁"}
                             </span>
                           </div>
@@ -168,11 +169,11 @@ export default function SelectProject() {
                           {/* Project Details */}
                           <div className="flex flex-col">
                             <Text_14_400_EEEEEE className="mb-[0.25rem]">
-                              {project.project.name}
+                              {project?.project?.name}
                             </Text_14_400_EEEEEE>
-                            {project.tags.length > 0 && (
+                            {project?.tags?.length > 0 && (
                               <div className="flex gap-[0.3rem] mb-[0.25rem]">
-                                {project.tags.map((tag: any, index) => (
+                                {project?.tags?.map((tag: any, index) => (
                                   <Tags
                                     key={index}
                                     name={tag.name}
@@ -181,9 +182,9 @@ export default function SelectProject() {
                                 ))}
                               </div>
                             )}
-                            {project.project.description && (
+                            {project?.project?.description && (
                               <Text_12_400_757575 className="line-clamp-1">
-                                {project.project.description}
+                                {project?.project?.description}
                               </Text_12_400_757575>
                             )}
                           </div>
@@ -197,7 +198,7 @@ export default function SelectProject() {
                             </Text_12_400_757575>
                           )}
                           <Checkbox
-                            checked={selectedProject === project.project.id}
+                            checked={selectedProject === project?.project?.id}
                             className="AntCheckbox pointer-events-none"
                           />
                         </div>
