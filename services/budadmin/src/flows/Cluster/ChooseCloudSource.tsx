@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import ProviderCardWithCheckBox from "src/flows/components/ProviderCardWithCheckBox";
+import { enableDevMode } from "@/components/environment";
 
 export default function ChooseCloudSource() {
   const { openDrawerWithStep, openDrawer } = useDrawer();
@@ -49,16 +50,18 @@ export default function ChooseCloudSource() {
           />
 
           <div className="pt-[.4rem]">
-            {clusterOptions.map((option, index) => (
-              <ProviderCardWithCheckBox
-                key={index}
-                data={option}
-                selected={selectedOption === option.id}
-                handleClick={() => {
-                  setSelectedOption(option.id);
-                }}
-              />
-            ))}
+            {clusterOptions
+              .filter((option) => option.id !== "new" || enableDevMode)
+              .map((option, index) => (
+                <ProviderCardWithCheckBox
+                  key={index}
+                  data={option}
+                  selected={selectedOption === option.id}
+                  handleClick={() => {
+                    setSelectedOption(option.id);
+                  }}
+                />
+              ))}
           </div>
         </BudDrawerLayout>
       </BudWraperBox>

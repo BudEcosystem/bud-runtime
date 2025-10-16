@@ -20,7 +20,7 @@ import Evaluations from "./Evaluations/Evaluations";
 import PerformanceDetailed from "./Perfomance/Perfomance";
 import Advanced from "./Advanced/Advanced";
 import { useModels } from "src/hooks/useModels";
-import { assetBaseUrl } from "@/components/environment";
+import { assetBaseUrl, enableDevMode } from "@/components/environment";
 import BudStepAlert from "../components/BudStepAlert";
 import { successToast } from "@/components/toast";
 import ModelVerificationStatus from "../components/ModelVerificationStatus";
@@ -106,15 +106,21 @@ export default function ViewModel() {
   );
 
   useEffect(() => {
+    let filtered = items;
+
+    // Hide certain tabs for cloud models
     if (selectedModel?.provider_type === "cloud_model") {
-      setFilteredItems(
-        items.filter(
-          (item) => item.key !== "3" && item.key !== "4" && item.key !== "5",
-        ),
+      filtered = filtered.filter(
+        (item) => item.key !== "3" && item.key !== "4" && item.key !== "5",
       );
-    } else {
-      setFilteredItems(items); // Use all tabs
     }
+
+    // Hide Performance tab when dev mode is disabled
+    if (!enableDevMode) {
+      filtered = filtered.filter((item) => item.key !== "3");
+    }
+
+    setFilteredItems(filtered);
   }, [selectedModel, toAdapter]);
 
   const firstLineText = !selectedModel?.endpoints_count
