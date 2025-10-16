@@ -414,66 +414,107 @@ def replicate_dir(source: str, destination: str, is_override: bool = False):
 
 
 async def determine_modality_endpoints(
-    input_modality: Literal[
-        "llm", "mllm", "image", "embedding", "text_to_speech", "speech_to_text", "llm_embedding", "mllm_embedding"
-    ],
+    input_modality: str,
 ) -> Dict[str, Any]:
     """Determine the endpoints for the given modality.
 
+    This function accepts two input formats:
+    1. Comma-separated modality values: "text_input, text_output", "text_input, image_input, text_output", etc.
+    2. Legacy category keywords: "llm", "mllm", "image", etc. (for backward compatibility)
+
     Args:
-        modality: The modality to determine the endpoints for.
+        input_modality: The modality to determine the endpoints for.
+                       Can be comma-separated modality values or legacy category keywords.
 
     Returns:
-        The endpoints for the given modality.
+        A dictionary containing:
+        - "modality": List of ModalityEnum values
+        - "endpoints": List of ModelEndpointEnum values
+
+    Raises:
+        ValueError: If the modality format is invalid or cannot be determined.
     """
     from ..commons.constants import ModalityEnum, ModelEndpointEnum
 
-    result: Dict[str, Any] = {"modality": None, "endpoints": None}
-    if input_modality == "llm":
-        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.CHAT, ModelEndpointEnum.COMPLETION]
-    elif input_modality == "mllm":
-        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.CHAT, ModelEndpointEnum.DOCUMENT]
-    elif input_modality == "image":
-        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.IMAGE_GENERATION]
-    elif input_modality == "embedding":
-        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.EMBEDDING]
-    elif input_modality == "text_to_speech":
-        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.AUDIO_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.TEXT_TO_SPEECH]
-    elif input_modality == "speech_to_text":
-        result["modality"] = [ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.AUDIO_TRANSCRIPTION]
-    elif input_modality == "audio_translation":
-        result["modality"] = [ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.AUDIO_TRANSLATION]
-    elif input_modality == "image_edit":
-        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.IMAGE_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.IMAGE_EDIT]
-    elif input_modality == "image_variation":
-        result["modality"] = [ModalityEnum.IMAGE_INPUT, ModalityEnum.IMAGE_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.IMAGE_VARIATION]
-    # elif input_modality == "realtime":
-    #     result["modality"] = [
-    #         ModalityEnum.TEXT_INPUT,
-    #         ModalityEnum.AUDIO_INPUT,
-    #         ModalityEnum.TEXT_OUTPUT,
-    #         ModalityEnum.AUDIO_OUTPUT,
-    #     ]
-    #     result["endpoints"] = [ModelEndpointEnum.REALTIME_SESSION, ModelEndpointEnum.REALTIME_TRANSCRIPTION]
-    elif input_modality == "llm_embedding":
-        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.EMBEDDING]
-    elif input_modality == "mllm_embedding":
-        result["modality"] = [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT]
-        result["endpoints"] = [ModelEndpointEnum.EMBEDDING]
-    else:
-        raise ValueError(f"Invalid modality: {input_modality}")
+    # Define expected modality order for consistency
+    # Order matches category mapping patterns: TEXT_INPUT first, then other inputs, then outputs
+    modality_order = [
+        ModalityEnum.TEXT_INPUT,
+        ModalityEnum.IMAGE_INPUT,
+        ModalityEnum.AUDIO_INPUT,
+        ModalityEnum.TEXT_OUTPUT,
+        ModalityEnum.IMAGE_OUTPUT,
+        ModalityEnum.AUDIO_OUTPUT,
+    ]
 
-    return result
+    # Parse input to modality enums
+    if "," in input_modality:
+        # Comma-separated: parse directly to enums
+        logger.debug(f"Parsing comma-separated modality string: {input_modality}")
+        modality_values = [val.strip().lower() for val in input_modality.split(",")]
+        try:
+            modality_enums = [ModalityEnum(val) for val in modality_values]
+            # Sort by defined order for consistency with category mappings
+            modality_enums = sorted(modality_enums, key=lambda m: modality_order.index(m))
+        except ValueError as e:
+            raise ValueError(f"Invalid modality value in: {input_modality}") from e
+    else:
+        # Legacy category keywords - map to enums for backward compatibility
+        category_mapping = {
+            "llm": [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT],
+            "mllm": [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT],
+            "image": [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_OUTPUT],
+            "embedding": [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT],
+            "text_to_speech": [ModalityEnum.TEXT_INPUT, ModalityEnum.AUDIO_OUTPUT],
+            "speech_to_text": [ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT],
+            "audio_translation": [ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT],
+            "image_edit": [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.IMAGE_OUTPUT],
+            "image_variation": [ModalityEnum.IMAGE_INPUT, ModalityEnum.IMAGE_OUTPUT],
+            "llm_embedding": [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT],
+            "mllm_embedding": [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT],
+        }
+        if input_modality not in category_mapping:
+            raise ValueError(f"Invalid modality: {input_modality}")
+        modality_enums = category_mapping[input_modality]
+
+    # For consistent endpoint mapping, we use frozenset (order-independent)
+
+    # Determine endpoints based on modality combination
+    modality_set = frozenset(m.value for m in modality_enums)
+
+    # Define endpoint mappings based on modality combinations
+    # Note: text_input + text_output can map to either CHAT or EMBEDDING
+    # We check for specific category keywords to distinguish
+    if modality_set == frozenset(["text_input", "text_output"]):
+        # Determine if it's embedding or chat based on input format
+        if input_modality in ["embedding", "llm_embedding"]:
+            endpoints = [ModelEndpointEnum.EMBEDDING]
+        else:
+            endpoints = [ModelEndpointEnum.CHAT]
+    elif modality_set == frozenset(["text_input", "text_output", "image_input"]):
+        # MLLM can be chat+document or mllm_embedding
+        if input_modality == "mllm_embedding":
+            endpoints = [ModelEndpointEnum.EMBEDDING]
+        else:
+            endpoints = [ModelEndpointEnum.CHAT, ModelEndpointEnum.DOCUMENT]
+    elif modality_set == frozenset(["text_input", "image_output"]):
+        endpoints = [ModelEndpointEnum.IMAGE_GENERATION]
+    elif modality_set == frozenset(["audio_input", "text_output"]):
+        # Both speech_to_text and audio_translation have same modality
+        if input_modality == "audio_translation":
+            endpoints = [ModelEndpointEnum.AUDIO_TRANSLATION]
+        else:
+            endpoints = [ModelEndpointEnum.AUDIO_TRANSCRIPTION]
+    elif modality_set == frozenset(["text_input", "audio_output"]):
+        endpoints = [ModelEndpointEnum.TEXT_TO_SPEECH]
+    elif modality_set == frozenset(["text_input", "image_input", "image_output"]):
+        endpoints = [ModelEndpointEnum.IMAGE_EDIT]
+    elif modality_set == frozenset(["image_input", "image_output"]):
+        endpoints = [ModelEndpointEnum.IMAGE_VARIATION]
+    else:
+        raise ValueError(f"No endpoints defined for modality combination: {input_modality}")
+
+    return {"modality": modality_enums, "endpoints": endpoints}
 
 
 async def determine_supported_endpoints(
@@ -495,10 +536,8 @@ async def determine_supported_endpoints(
     if {
         ModalityEnum.TEXT_INPUT.value,
         ModalityEnum.TEXT_OUTPUT.value,
-    }.issubset(modality_set):
-        endpoints.update({ModelEndpointEnum.CHAT, ModelEndpointEnum.COMPLETION})
-    elif ModalityEnum.TEXT_INPUT.value in modality_set:
-        endpoints.add(ModelEndpointEnum.COMPLETION)
+    }.issubset(modality_set) or ModalityEnum.TEXT_INPUT.value in modality_set:
+        endpoints.add(ModelEndpointEnum.CHAT)
 
     if ModalityEnum.IMAGE_OUTPUT.value in modality_set:
         endpoints.add(ModelEndpointEnum.IMAGE_GENERATION)

@@ -18,7 +18,10 @@ from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 from budeval.commons.logging import logging
 from budeval.commons.storage_config import StorageConfig
-from budeval.commons.utils import check_workflow_status_in_statestore, update_workflow_data_in_statestore
+from budeval.commons.utils import (
+    check_workflow_status_in_statestore,
+    update_workflow_data_in_statestore,
+)
 from budeval.core.schemas import (
     DatasetCategory,
     GenericDatasetConfig,
@@ -160,6 +163,7 @@ class EvaluationWorkflow:
         try:
             request = json.loads(extraction_request)
             job_id = request["job_id"]
+            evaluation_id = request.get("evaluation_id")
             model_name = request["model_name"]
             kubeconfig = request.get("kubeconfig")
             namespace = request.get("namespace", "budeval")
@@ -175,6 +179,7 @@ class EvaluationWorkflow:
             results = asyncio.run(
                 processor.extract_and_process(
                     job_id=job_id,
+                    evaluation_id=evaluation_id,
                     model_name=model_name,
                     namespace=namespace,
                     kubeconfig=kubeconfig,
@@ -191,10 +196,11 @@ class EvaluationWorkflow:
                 "extracted_path": results.extraction_path,
                 "files_count": len(results.datasets),
                 "overall_accuracy": results.summary.overall_accuracy,
-                # "total_datasets": results.summary.total_datasets,
-                # "total_examples": results.summary.total_examples,
-                # "total_correct": results.summary.total_correct,
+                "total_datasets": results.summary.total_datasets,
+                "total_examples": results.summary.total_examples,
+                "total_correct": results.summary.total_correct,
                 "dataset_accuracies": results.summary.dataset_accuracies,
+                "model_name": results.summary.model_name,
                 "message": f"Extraction completed successfully. {results.summary.total_datasets} datasets processed with {results.summary.overall_accuracy:.2f}% overall accuracy",
                 # "results": results.model_dump(),
             }
@@ -224,14 +230,13 @@ class EvaluationWorkflow:
             request_data = json.loads(monitor_request)
             job_id = request_data["job_id"]
             _parent_workflow_id = request_data["parent_workflow_id"]
-            max_attempts = request_data.get("max_attempts", 360)
-            poll_interval = request_data.get("poll_interval", 5)
+            poll_interval = request_data.get("poll_interval", 30)
             attempt = request_data.get("attempt", 1)  # Track current attempt
         except Exception as e:
             logger.error(f"Error parsing monitor request: {e}", exc_info=True)
             return {"status": "error", "message": str(e)}
 
-        logger.debug(f"Monitoring job {job_id}, attempt {attempt}/{max_attempts}")
+        logger.debug(f"Monitoring job {job_id}, attempt {attempt}")
 
         # Monitor job once per workflow execution
         monitor_result = yield ctx.call_activity(
@@ -241,15 +246,7 @@ class EvaluationWorkflow:
 
         # Handle monitoring failure
         if not monitor_result.get("success"):
-            logger.warning(f"Monitoring attempt {attempt} failed")
-
-            # Check if we should continue trying
-            if attempt >= max_attempts:
-                return {
-                    "status": "timeout",
-                    "job_id": job_id,
-                    "message": f"Monitoring failed after {max_attempts} attempts",
-                }
+            logger.warning(f"Monitoring attempt {attempt} failed, will retry")
 
             # Continue with next attempt using continue_as_new to reset timer history
             request_data["attempt"] = attempt + 1
@@ -274,6 +271,7 @@ class EvaluationWorkflow:
 
                 extraction_request = {
                     "job_id": job_id,
+                    "evaluation_id": notification_data.get("evaluation_id"),  # Original UUID
                     "model_name": model_name,
                     "kubeconfig": request_data.get("kubeconfig"),
                     "namespace": request_data.get("namespace", "budeval"),
@@ -296,19 +294,16 @@ class EvaluationWorkflow:
                     "overall_accuracy": extraction_result.get("overall_accuracy", 0.0),
                     "total_datasets": extraction_result.get("total_datasets", 0),
                     "total_examples": extraction_result.get("total_examples", 0),
+                    "dataset_accuracies": extraction_result.get("dataset_accuracies", {}),
+                    "model_name": extraction_result.get("model_name", ""),
                     "message": extraction_result.get("message", ""),
                 }
                 if extraction_result
                 else None,
             }
 
-        # Job still running - check if we should timeout
-        if attempt >= max_attempts:
-            return {
-                "status": "timeout",
-                "job_id": job_id,
-                "message": f"Timed out after {max_attempts} attempts",
-            }
+        # Job still running - continue monitoring indefinitely
+        logger.debug(f"Job {job_id} still running, will check again in {poll_interval} seconds")
 
         # Continue monitoring with next attempt using continue_as_new
         # This prevents replay storm by resetting workflow history
@@ -551,6 +546,7 @@ class EvaluationWorkflow:
                     await initialize_storage(storage)
                     # Build initial record fields
                     job_id = job_details.get("job_id")
+                    evaluation_id = str(evaluate_model_request_json.uuid)  # Original evaluation request UUID
                     model_name = evaluate_model_request_json.eval_model_info.model_name
                     engine = evaluate_model_request_json.engine.value
                     experiment_id = (
@@ -562,6 +558,7 @@ class EvaluationWorkflow:
                     if hasattr(storage, "create_initial_job_record"):
                         await storage.create_initial_job_record(
                             job_id=job_id,
+                            evaluation_id=evaluation_id,
                             experiment_id=experiment_id,
                             model_name=model_name,
                             engine=engine,
@@ -1050,13 +1047,16 @@ class EvaluationWorkflow:
             "parent_workflow_id": instance_id,
             "kubeconfig": evaluate_model_request_json.kubeconfig,
             "namespace": StorageConfig.get_current_namespace(),
-            "max_attempts": 360,  # 30 minutes with 5-second intervals
-            "poll_interval": 5,
+            "poll_interval": 30,
             "notification_data": {
                 "instance_id": instance_id,
                 "source_topic": evaluate_model_request_json.source_topic,
                 "source": evaluate_model_request_json.source,
                 "model_name": evaluate_model_request_json.eval_model_info.model_name,
+                "evaluation_id": str(evaluate_model_request_json.uuid),
+                "experiment_id": str(evaluate_model_request_json.experiment_id)
+                if evaluate_model_request_json.experiment_id
+                else None,
             },
         }
 
@@ -1120,7 +1120,9 @@ class EvaluationWorkflow:
 
         notification_req.payload.event = "monitor_eval_job_progress"
         notification_req.payload.content = NotificationContent(
-            title="Monitoring Completed", message="Monitoring Completed", status=WorkflowStatus.COMPLETED
+            title="Monitoring Completed",
+            message="Monitoring Completed",
+            status=WorkflowStatus.COMPLETED,
         )
 
         # Publish the appropriate monitoring result notification
@@ -1159,10 +1161,14 @@ class EvaluationWorkflow:
             _monitoring_result.get("extraction_summary", {}) if _monitoring_result.get("status") == "completed" else {}
         )
 
-        workflow_status = check_workflow_status_in_statestore(instance_id)
-        if workflow_status:
-            logger.info(f"Workflow status: {workflow_status}")
-            return workflow_status
+        # Debug log to verify extraction_summary contents
+        logger.debug(f"Monitoring result status: {_monitoring_result.get('status')}")
+        logger.debug(f"Extraction summary received: {json.dumps(extraction_summary, default=str)}")
+
+        # workflow_status = check_workflow_status_in_statestore(instance_id)
+        # if workflow_status:
+        #     logger.info(f"Workflow status: {workflow_status}")
+        #     return workflow_status
 
         notification_req.payload.event = "results"
         notification_req.payload.content = NotificationContent(
@@ -1173,16 +1179,26 @@ class EvaluationWorkflow:
                 "job_id": job_id,
                 "status": _monitoring_result.get("job_status", "unknown"),
                 "storage": "clickhouse",
+                "model_name": extraction_summary.get("model_name", "unknown"),
                 "summary": {
                     "overall_accuracy": extraction_summary.get("overall_accuracy", 0.0),
                     "total_datasets": extraction_summary.get("total_datasets", 0),
                     "total_examples": extraction_summary.get("total_examples", 0),
+                    "dataset_results": extraction_summary.get("dataset_accuracies", {}),
                 }
                 if extraction_summary
                 else {},
                 "retrieval_info": f"Use job_id '{job_id}' to retrieve full results from ClickHouse",
             },
         )
+
+        # Log the notification content in a readable JSON format for debugging
+        logger.debug(
+            f"Sending evaluation results notification: {notification_req.payload.content.model_dump_json(indent=2)}"
+        )
+        workflow_status = check_workflow_status_in_statestore(instance_id)
+        if workflow_status:
+            return
         dapr_workflows.publish_notification(
             workflow_id=instance_id,
             notification=notification_req,
@@ -1205,7 +1221,12 @@ class EvaluationWorkflow:
             target_name=evaluate_model_request_json.source,
         )
 
-        return
+        # Return workflow result to prevent Dapr from marking it as FAILED
+        return {
+            "workflow_id": instance_id,
+            "status": "completed",
+            "job_id": job_id,
+        }
 
     async def __call__(
         self, request: StartEvaluationRequest, workflow_id: str | None = None

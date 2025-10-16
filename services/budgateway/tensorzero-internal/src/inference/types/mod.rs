@@ -410,6 +410,7 @@ pub struct ModelInferenceRequest<'a> {
     pub max_tokens: Option<u32>,
     pub presence_penalty: Option<f32>,
     pub frequency_penalty: Option<f32>,
+    pub repetition_penalty: Option<f32>,
     pub seed: Option<u32>,
     pub stream: bool,
     pub json_mode: ModelInferenceRequestJsonMode,
@@ -454,6 +455,8 @@ pub struct ModelInferenceRequest<'a> {
     pub logit_bias: Option<HashMap<String, f32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ignore_eos: Option<bool>,
     /// The original request received by the gateway from the client
     #[serde(skip)]
     pub gateway_request: Option<String>,
@@ -505,7 +508,9 @@ pub struct ProviderInferenceResponse {
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Usage {
+    #[serde(alias = "prompt_tokens")]
     pub input_tokens: u32,
+    #[serde(alias = "completion_tokens")]
     pub output_tokens: u32,
 }
 

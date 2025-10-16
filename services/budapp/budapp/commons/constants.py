@@ -1086,7 +1086,7 @@ EMOJIS = [
     "😊",
     "😇",
     "🥰",
-    "😍",
+    "🌐",
     "🤩",
     "😘",
     "😗",
@@ -3161,7 +3161,6 @@ class ModelEndpointEnum(Enum):
 
     Attributes:
         CHAT (str): Chat completion endpoint for conversational AI.
-        COMPLETION (str): Text completion endpoint for non-conversational AI.
         IMAGE_GENERATION (str): Image creation endpoint.
         IMAGE_EDIT (str): Image editing endpoint for modifying existing images.
         IMAGE_VARIATION (str): Image variation endpoint for creating variations of existing images.
@@ -3178,7 +3177,6 @@ class ModelEndpointEnum(Enum):
     """
 
     CHAT = "/v1/chat/completions"
-    COMPLETION = "/v1/completions"
     EMBEDDING = "/v1/embeddings"
     RESPONSES = "/v1/responses"
     AUDIO_TRANSCRIPTION = "/v1/audio/transcriptions"
@@ -3210,7 +3208,6 @@ class ModelEndpointEnum(Enum):
         # Define endpoint labels
         endpoint_labels = {
             cls.CHAT: "Chat Completions",
-            cls.COMPLETION: "Completions",
             cls.IMAGE_GENERATION: "Image Generation",
             cls.IMAGE_EDIT: "Image Editing",
             cls.IMAGE_VARIATION: "Image Variations",

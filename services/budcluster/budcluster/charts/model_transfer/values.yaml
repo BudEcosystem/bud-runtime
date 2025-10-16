@@ -3,6 +3,8 @@ pvcName: models-pvc
 image: budstudio/minio-downloader:0.1
 podName: model-transfer
 pvcSize: 10
+storageClass: default
+accessMode: ReadWriteOnce
 
 imagePullSecrets:
   name: bud-registry-secret

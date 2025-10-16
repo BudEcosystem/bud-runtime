@@ -6,7 +6,7 @@ import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 import TagsInput from "@/components/ui/bud/dataEntry/TagsInput";
-import { successToast } from "@/components/toast";
+import { successToast, errorToast } from "@/components/toast";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useEvaluations } from "src/hooks/useEvaluations";
 import { useProjects } from "src/hooks/useProjects";
@@ -50,6 +50,7 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
       />
       <TagsInput
         label="Tags"
+        required
         options={options}
         info="Add keywords to help organize and find your experiment later. Max 10 tags, 20 characters each."
         name="tags"
@@ -84,7 +85,7 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
             },
           },
         ]}
-        ClassNames="mb-[0px]"
+        ClassNames="mb-[1rem]"
         SelectClassNames="mb-[.5rem]"
         menuplacement="top"
       />
@@ -96,7 +97,6 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
         placeholder="Provide a brief description about the experiment."
         rules={[
           { required: true, message: "Description is required" },
-          { min: 10, message: "Description must be at least 10 characters" },
           { max: 500, message: "Description must not exceed 500 characters" },
           {
             validator: (_, value) => {
@@ -136,10 +136,10 @@ export default function NewExperimentDrawer() {
 
       // Additional validation before API call
       if (!cleanedName || cleanedName.length < 3) {
-        throw new Error("Invalid experiment name");
+        return;
       }
       if (!cleanedDescription || cleanedDescription.length < 10) {
-        throw new Error("Invalid description");
+        return;
       }
 
       // Map form values to API payload format matching the expected input
@@ -152,21 +152,26 @@ export default function NewExperimentDrawer() {
 
       // Call the API to create experiment
       const response = await createExperiment(payload);
+      console.log('createExperiment response', response)
+      // Check if the response indicates success
+      if (response && (response.id || response.experiment?.id || response.data?.id)) {
+        // Show success message only when API returns success
+        successToast("Experiment created successfully");
 
-      // Refresh the experiments list
-      await getExperiments({
-        page: 1,
-        limit: 10,
-      });
+        // Refresh the experiments list
+        await getExperiments({
+          page: 1,
+          limit: 10,
+        });
 
-      successToast("Experiment created successfully");
-
-      // Pass the experiment ID to the success screen
-      openDrawerWithStep("new-experiment-success", {
-        experimentId:
-          response.id || response.experiment?.id || response.data?.id,
-      });
-    } catch (error) {
+        // Pass the experiment ID to the success screen
+        openDrawerWithStep("new-experiment-success", {
+          experimentId:
+            response.id || response.experiment?.id || response.data?.id,
+        });
+      }
+    } catch (error: any) {
+      console.log('error', error)
       console.error("Failed to create experiment:", error);
     }
   };

@@ -73,6 +73,20 @@ export interface TraitSimple {
 
 export interface MetaLinks {
   manifest_id: string;
+  github?: string;
+  paper?: string;
+  papers?: string[];
+  website?: string;
+  author?: string;
+  author_url?: string;
+  website_url?: string;
+  create_date?: string;
+  creator?: {
+    avatar?: string;
+    name?: string;
+    nickname?: string;
+    uid?: string;
+  }
 }
 
 export interface SampleQuestionsAnswers {
@@ -161,13 +175,11 @@ export const useEvaluations = create<{
       if (payload?.language) params.append('language', payload.language);
       if (payload?.domains) params.append('domains', payload.domains);
       if (payload?.trait_ids && payload.trait_ids.length > 0) {
-        console.log('Adding trait_ids to params:', payload.trait_ids);
-        payload.trait_ids.forEach(id => params.append('trait_ids', id));
+        params.append('trait_ids', payload.trait_ids.join(','));
       }
 
       const queryString = params.toString();
       const url = `${tempApiBaseUrl}/experiments/datasets${queryString ? `?${queryString}` : ''}`;
-      console.log('Fetching evaluations with URL:', url);
 
       const response: any = await AppRequest.Get(url);
       set({ evaluationsList: response.data.datasets });
@@ -187,10 +199,8 @@ export const useEvaluations = create<{
     set({ loading: true });
     try {
       const url = `${tempApiBaseUrl}/experiments/datasets/${datasetId}`;
-      console.log('Fetching evaluation details with URL:', url);
 
       const response: any = await AppRequest.Get(url);
-      console.log('Evaluation details response:', response.data);
 
       set({ evaluationDetails: response.data });
       return response.data;
@@ -310,8 +320,10 @@ export const useEvaluations = create<{
     set({ loading: true });
     try {
       const response: any = await AppRequest.Post(`${tempApiBaseUrl}/experiments/`, payload);
+      console.log('response', response)
       return response.data;
     } catch (error) {
+      console.log('error', error)
       console.error("Error creating experiment:", error);
       throw error;
     } finally {
@@ -355,7 +367,6 @@ export const useEvaluations = create<{
       if (response && response.data) {
         const workflow: WorkflowType = response.data;
         set({ currentWorkflow: workflow });
-        console.log('Updated workflow with fetched data:', workflow);
         return workflow;
       }
       return false;
@@ -380,10 +391,8 @@ export const useEvaluations = create<{
     set({ loading: true });
     try {
       const url = `${tempApiBaseUrl}/experiments/${experimentId}/evaluations/workflow/${workflowId}`;
-      console.log('Fetching workflow data with URL:', url);
 
       const response: any = await AppRequest.Get(url);
-      console.log('Workflow data response:', response.data);
 
       set({ workflowData: response.data });
       return response.data;

@@ -1,7 +1,7 @@
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import React, { use, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 
 import { useEvaluations } from "src/hooks/useEvaluations";
@@ -25,9 +25,6 @@ export default function RunEvaluationStatus() {
             setShowAlert(true);
         }
     }
-     useEffect(() => {
-        console.log("currentWorkflow:", currentWorkflow);
-      }, [currentWorkflow]);
 
     return <BudForm
         data={{}}
@@ -64,7 +61,7 @@ export default function RunEvaluationStatus() {
                     setIsFailed(true);
                 }}
                 title="Running Evaluation"
-                description={`We've started running the evaluation workflow for experiment ${experimentId}. This process may take a while depending on the selected evaluations and model. Feel free to minimize the screen, we'll notify you once it's done.`}
+                description={`We've started running the evaluation workflow for ${currentWorkflow?.workflow_steps?.name}. This process may take a while depending on the selected evaluations and model. Feel free to minimize the screen, we'll notify you once it's done.`}
             />
         </BudWraperBox>
     </BudForm>

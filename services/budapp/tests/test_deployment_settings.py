@@ -388,7 +388,7 @@ async def test_cache_publishing_with_deployment_settings():
     mock_endpoint = MagicMock()
     mock_endpoint.id = endpoint_id
     mock_endpoint.model_id = model_id
-    mock_endpoint.supported_endpoints = [ModelEndpointEnum.CHAT, ModelEndpointEnum.COMPLETION]
+    mock_endpoint.supported_endpoints = [ModelEndpointEnum.CHAT]
 
     # Mock model
     mock_model = MagicMock()

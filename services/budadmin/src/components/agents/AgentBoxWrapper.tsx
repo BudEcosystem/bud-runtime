@@ -17,8 +17,6 @@ interface AgentBoxWrapperProps {
   session: AgentSession;
   index: number;
   totalSessions: number;
-  onToggleRightSidebar?: () => void;
-  isRightSidebarOpen?: boolean;
 }
 
 const AgentBoxWrapper: React.FC<AgentBoxWrapperProps> = (props) => {

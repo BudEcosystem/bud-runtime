@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budadmin.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,6 +17,10 @@ spec:
       labels:
         app: {{ .Release.Name }}-budadmin
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budadmin
         image: {{ .Values.microservices.budadmin.image }}
@@ -40,11 +45,13 @@ spec:
           - name: NEXT_PUBLIC_NOVU_BASE_URL
             value: {{ include "bud.ingress.url.novuapi" $ }}
           - name: NEXT_PUBLIC_COPY_CODE_API_BASE_URL
-            value: {{ include "bud.ingress.url.budgateway" $ }}
+            value: {{ include "bud.ingress.url.budgateway" $ }}/
           - name: NEXT_PUBLIC_PLAYGROUND_URL
             value: {{ include "bud.ingress.url.budplayground" $ }}
           - name: NEXT_PUBLIC_ASK_BUD_URL
             value: '{{ include "bud.ingress.url.budask" $ }}/v1'
+          - name: NEXT_PUBLIC_ASK_BUD_MODEL
+            value: {{ .Values.microservices.askbud.model }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budadmin.env }}
           - name: {{ $key }}
@@ -72,3 +79,4 @@ spec:
   selector:
     app: {{ .Release.Name }}-budadmin
   type: ClusterIP
+{{ end }}

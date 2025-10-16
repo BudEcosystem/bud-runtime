@@ -45,6 +45,12 @@ export type BudSimilatorEvent = {
     workflow_name: string;
     progress_type: string;
     recommended_cluster_count?: number;
+    metadata?: {
+        tool_calling_parser_type?: string;
+        reasoning_parser_type?: string;
+        chat_template?: string;
+        [key: string]: any;
+    };
 }
 
 
@@ -162,6 +168,7 @@ export type WorkflowType = {
         trait_ids?: string;
         traits_details?: any;
         experiment_id?: string;
+        bud_prompt_id?: string;
     }
     template_id?: string;
 }

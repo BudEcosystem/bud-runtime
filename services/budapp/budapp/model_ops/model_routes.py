@@ -1218,6 +1218,11 @@ async def deploy_model_by_step(
             trigger_workflow=deploy_request.trigger_workflow,
             credential_id=deploy_request.credential_id,
             scaling_specification=deploy_request.scaling_specification,
+            enable_tool_calling=deploy_request.enable_tool_calling,
+            enable_reasoning=deploy_request.enable_reasoning,
+            tool_calling_parser_type=deploy_request.tool_calling_parser_type,
+            reasoning_parser_type=deploy_request.reasoning_parser_type,
+            chat_template=deploy_request.chat_template,
         )
 
         return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)

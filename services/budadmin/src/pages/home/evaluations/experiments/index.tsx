@@ -278,7 +278,7 @@ const ExperimentsTable = () => {
     {
       title: (
         <div className="flex items-center">
-          Created Date
+          Created date
           <svg
             className="ml-1"
             width="12"

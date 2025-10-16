@@ -7,6 +7,14 @@ locals {
       }]]
     )...
   )
+
+  worker = merge(
+    flatten([
+      for sku, count in var.worker_sku : [for i in range(count) : {
+        "${replace(sku, "/[^a-zA-Z0-9]/", "")}-${i}" = sku
+      }]]
+    )...
+  )
 }
 
 variable "prefix" {
@@ -40,6 +48,14 @@ variable "ingress_sku" {
   description = "Map of ingress sku to sku count"
 
   default = {
+    Standard_DS1_v2 = 1 // CPU
+  }
+}
+variable "worker_sku" {
+  type        = map(string)
+  description = "Map of worker sku to sku count"
+
+  default = {
     Standard_DS1_v2            = 1 // CPU
     Standard_NC24ads_A100_v4   = 0 // NVIDIA A100
     Standard_NV12ads_A10_v5    = 0 // NVIDIA A10
@@ -54,5 +70,6 @@ variable "disk_size" {
     primary      = 64
     primary_data = 128
     ingress      = 32
+    worker       = 32
   }
 }

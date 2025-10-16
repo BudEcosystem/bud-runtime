@@ -203,6 +203,99 @@ impl ModelConfig {
         Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
     }
 
+    /// Completions inference method (when model supports completions capability)
+    #[instrument(skip_all)]
+    pub async fn complete(
+        &self,
+        request: &crate::completions::CompletionRequest,
+        model_name: &str,
+        clients: &crate::endpoints::inference::InferenceClients<'_>,
+    ) -> Result<crate::completions::CompletionResponse, Error> {
+        // Verify this model supports completions
+        if !self.supports_endpoint(EndpointCapability::Completions) {
+            return Err(Error::new(ErrorDetails::ModelNotConfiguredForCapability {
+                model_name: model_name.to_string(),
+                capability: EndpointCapability::Completions.as_str().to_string(),
+            }));
+        }
+
+        let mut provider_errors: HashMap<String, Error> = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::ProviderNotFound {
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+
+            // Use the provider's complete method
+            let response = provider
+                .complete(request, clients.http_client, clients.credentials)
+                .await;
+
+            match response {
+                Ok(response) => {
+                    // Convert provider response to completion response
+                    let completion_response = crate::completions::CompletionResponse {
+                        id: response.id,
+                        object: "text_completion".to_string(),
+                        created: response.created,
+                        model: response.model,
+                        choices: response.choices,
+                        usage: response.usage,
+                        raw_request: response.raw_request,
+                        raw_response: response.raw_response,
+                        latency: response.latency,
+                    };
+                    return Ok(completion_response);
+                }
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+        Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
+    }
+
+    /// Streaming completion method (when model supports completions capability)
+    pub async fn complete_stream(
+        &self,
+        request: &crate::completions::CompletionRequest,
+        model_name: &str,
+        clients: &crate::endpoints::inference::InferenceClients<'_>,
+    ) -> Result<(crate::completions::CompletionStream, String), Error> {
+        // Verify this model supports completions
+        if !self.supports_endpoint(EndpointCapability::Completions) {
+            return Err(Error::new(ErrorDetails::ModelNotConfiguredForCapability {
+                model_name: model_name.to_string(),
+                capability: EndpointCapability::Completions.as_str().to_string(),
+            }));
+        }
+
+        let mut provider_errors: HashMap<String, Error> = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::ProviderNotFound {
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+
+            // Use the provider's complete_stream method
+            let response = provider
+                .complete_stream(request, clients.http_client, clients.credentials)
+                .await;
+
+            match response {
+                Ok((stream, raw_request)) => {
+                    return Ok((stream, raw_request));
+                }
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+        Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
+    }
+
     /// Audio transcription method (when model supports audio transcription capability)
     #[instrument(skip_all)]
     pub async fn transcribe(
@@ -2396,6 +2489,58 @@ impl ModelProvider {
             // Other providers don't support embeddings yet
             _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
                 capability: EndpointCapability::Embedding.as_str().to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
+
+    /// Completions inference method
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_completion"))]
+    pub async fn complete(
+        &self,
+        request: &crate::completions::CompletionRequest,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<crate::completions::CompletionProviderResponse, Error> {
+        use crate::completions::CompletionProvider;
+
+        match &self.config {
+            ProviderConfig::VLLM(provider) => {
+                provider.complete(request, client, dynamic_api_keys).await
+            }
+            #[cfg(any(test, feature = "e2e_tests"))]
+            ProviderConfig::Dummy(provider) => {
+                provider.complete(request, client, dynamic_api_keys).await
+            }
+            // Other providers don't support completions yet
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Completions.as_str().to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
+
+    /// Streaming completions method
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_completion_stream"))]
+    pub async fn complete_stream(
+        &self,
+        request: &crate::completions::CompletionRequest,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<(crate::completions::CompletionStream, String), Error> {
+        use crate::completions::CompletionProvider;
+
+        match &self.config {
+            ProviderConfig::VLLM(provider) => {
+                provider.complete_stream(request, client, dynamic_api_keys).await
+            }
+            #[cfg(any(test, feature = "e2e_tests"))]
+            ProviderConfig::Dummy(provider) => {
+                provider.complete_stream(request, client, dynamic_api_keys).await
+            }
+            // Other providers don't support completions streaming yet
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Completions.as_str().to_string(),
                 provider: self.name.to_string(),
             })),
         }

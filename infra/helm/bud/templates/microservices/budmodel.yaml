@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budmodel.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,6 +21,10 @@ spec:
         dapr.io/app-id: {{ .Values.microservices.budmodel.daprid }}
         dapr.io/app-port: "3004"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budmodel
         image: {{ .Values.microservices.budmodel.image }}
@@ -28,6 +33,30 @@ spec:
         ports:
         - containerPort: 3004
         env:
+          # postgresql
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port | quote }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budmodel.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budmodel.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budmodel.name }}
+          # minio
+          - name: MINIO_ENDPOINT
+            value: {{ include "bud.externalServices.minio.endpoint" . }}
+          - name: MINIO_ACCESS_KEY
+            value: {{ include "bud.externalServices.minio.auth.accessKey" . }}
+          - name: MINIO_SECRET_KEY
+            value: {{ include "bud.externalServices.minio.auth.secretKey" . }}
+          - name: MINIO_BUCKET
+            value: {{ .Values.externalServices.minio.buckets.modelRegistry }}
+          - name: MINIO_MODEL_BUCKET
+            value: {{ .Values.externalServices.minio.buckets.modelInfo }}
+          - name: MINIO_SECURE
+            value: "false"
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budmodel.env }}
           - name: {{ $key }}
@@ -38,10 +67,10 @@ spec:
               name: {{ .Release.Name}}-bud-global
         resources:
           limits:
-            memory: 32768Mi
+            memory: 8192Mi
             cpu: 1
           requests:
-            memory: 256Mi
+            memory: 1024Mi
             cpu: 250m
         volumeMounts:
         - name: models-registry
@@ -67,3 +96,17 @@ spec:
   selector:
     app: {{ .Release.Name }}-budmodel
   type: ClusterIP
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .Release.Name }}-budmodel-pubsub-subscription
+spec:
+  topic: budModelMessages
+  routes:
+    default: /notifications
+  pubsubname: {{ .Release.Name }}-pubsub
+  deadLetterTopic: poisonMessages
+scopes:
+  - budmodel
+{{ end }}

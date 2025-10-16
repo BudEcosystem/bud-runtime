@@ -496,6 +496,7 @@ where
                 max_tokens: inference_params.chat_completion.max_tokens,
                 presence_penalty: inference_params.chat_completion.presence_penalty,
                 frequency_penalty: inference_params.chat_completion.frequency_penalty,
+                repetition_penalty: inference_params.chat_completion.repetition_penalty,
                 seed: inference_params.chat_completion.seed,
                 stream,
                 // Template / guided-decoding parameters
@@ -548,6 +549,7 @@ where
                 logit_bias: inference_params.chat_completion.logit_bias.clone(),
                 user: inference_params.chat_completion.user.clone(),
                 gateway_request: inference_config.gateway_request.clone(),
+                ignore_eos: inference_params.chat_completion.ignore_eos,
             }
         }
         FunctionConfig::Json(json_config) => {
@@ -574,6 +576,7 @@ where
                 max_tokens: inference_params.chat_completion.max_tokens,
                 presence_penalty: inference_params.chat_completion.presence_penalty,
                 frequency_penalty: inference_params.chat_completion.frequency_penalty,
+                repetition_penalty: inference_params.chat_completion.repetition_penalty,
                 seed: inference_params.chat_completion.seed,
                 stream,
                 // Template / guided-decoding parameters
@@ -626,6 +629,7 @@ where
                 logit_bias: inference_params.chat_completion.logit_bias.clone(),
                 user: inference_params.chat_completion.user.clone(),
                 gateway_request: inference_config.gateway_request.clone(),
+                ignore_eos: inference_params.chat_completion.ignore_eos,
             }
         }
     })

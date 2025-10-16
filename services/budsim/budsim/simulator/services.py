@@ -431,6 +431,12 @@ class SimulationService:
         quantization_type: str,
         engine_image: str,
         simulation_method: SimulationMethod,
+        model_uri: Optional[str] = None,
+        engine_version: Optional[str] = None,
+        tool_calling_parser_type: Optional[str] = None,
+        reasoning_parser_type: Optional[str] = None,
+        architecture_family: Optional[str] = None,
+        chat_template: Optional[str] = None,
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K deployment configurations based on the provided parameters.
@@ -456,6 +462,7 @@ class SimulationService:
                 logger.info("Using DirectSearchOptimizer for heuristic mode")
                 optimizer = DirectSearchOptimizer(
                     model=pretrained_model_uri,
+                    model_uri=model_uri,  # Pass the original cloud/HF URI
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     max_concurrency=concurrency,
@@ -506,6 +513,11 @@ class SimulationService:
                         "top_k_configs": [],
                         "engine": engine_name,
                         "engine_image": engine_image,
+                        "engine_version": engine_version,
+                        "tool_calling_parser_type": tool_calling_parser_type,
+                        "reasoning_parser_type": reasoning_parser_type,
+                        "architecture_family": architecture_family,
+                        "chat_template": chat_template,
                         "device_config": device_config,
                         "error": "No valid configurations found - device may not have enough memory for this model",
                     }
@@ -540,6 +552,11 @@ class SimulationService:
                                 "top_k_configs": top_k_configs,
                                 "engine": engine_name,
                                 "engine_image": engine_image,
+                                "engine_version": engine_version,
+                                "tool_calling_parser_type": tool_calling_parser_type,
+                                "reasoning_parser_type": reasoning_parser_type,
+                                "architecture_family": architecture_family,
+                                "chat_template": chat_template,
                                 "device_config": device_result,
                             }
                         )
@@ -552,6 +569,11 @@ class SimulationService:
                             "top_k_configs": top_k_configs,
                             "engine": engine_name,
                             "engine_image": engine_image,
+                            "engine_version": engine_version,
+                            "tool_calling_parser_type": tool_calling_parser_type,
+                            "reasoning_parser_type": reasoning_parser_type,
+                            "architecture_family": architecture_family,
+                            "chat_template": chat_template,
                             "device_config": device_config,
                         }
                     ]
@@ -571,6 +593,11 @@ class SimulationService:
                         "top_k_configs": top_k_configs,
                         "engine": engine_name,
                         "engine_image": engine_image,
+                        "engine_version": engine_version,
+                        "tool_calling_parser_type": tool_calling_parser_type,
+                        "reasoning_parser_type": reasoning_parser_type,
+                        "architecture_family": architecture_family,
+                        "chat_template": chat_template,
                         "device_config": device_config,
                     }
                 )
@@ -587,6 +614,11 @@ class SimulationService:
                     "top_k_configs": [],
                     "engine": engine_name,
                     "engine_image": engine_image,
+                    "engine_version": engine_version,
+                    "tool_calling_parser_type": tool_calling_parser_type,
+                    "reasoning_parser_type": reasoning_parser_type,
+                    "architecture_family": architecture_family,
+                    "chat_template": chat_template,
                     "device_config": device_config,
                     "error": f"Simulation failed: {str(e)}",
                 }
@@ -602,6 +634,12 @@ class SimulationService:
         device_config: Dict[str, Any],
         engine_image: str,
         simulation_method: SimulationMethod,
+        model_uri: Optional[str] = None,
+        engine_version: Optional[str] = None,
+        tool_calling_parser_type: Optional[str] = None,
+        reasoning_parser_type: Optional[str] = None,
+        architecture_family: Optional[str] = None,
+        chat_template: Optional[str] = None,
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K deployment configurations based on the provided parameters.
@@ -650,6 +688,11 @@ class SimulationService:
             "top_k_configs": top_k_configs,
             "engine": engine_name,
             "engine_image": engine_image,
+            "engine_version": engine_version,
+            "tool_calling_parser_type": tool_calling_parser_type,
+            "reasoning_parser_type": reasoning_parser_type,
+            "architecture_family": architecture_family,
+            "chat_template": chat_template,
             "device_config": device_config,
         }
 
@@ -662,6 +705,12 @@ class SimulationService:
         quantization_type: str,
         engine_image: str,
         simulation_method: SimulationMethod,
+        model_uri: Optional[str] = None,
+        engine_version: Optional[str] = None,
+        tool_calling_parser_type: Optional[str] = None,
+        reasoning_parser_type: Optional[str] = None,
+        architecture_family: Optional[str] = None,
+        chat_template: Optional[str] = None,
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K quantization engine configurations based on the provided parameters.
@@ -711,6 +760,11 @@ class SimulationService:
             "top_k_configs": top_k_configs,
             "engine": engine_name,
             "engine_image": engine_image,
+            "engine_version": engine_version,
+            "tool_calling_parser_type": tool_calling_parser_type,
+            "reasoning_parser_type": reasoning_parser_type,
+            "architecture_family": architecture_family,
+            "chat_template": chat_template,
             "device_config": device_config,
         }
 
@@ -888,6 +942,7 @@ class SimulationService:
         pretrained_model_uri: str,
         cluster_info: List[Dict[str, Any]],
         notification_request: NotificationRequest,
+        model_uri: Optional[str] = None,
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
         proprietary_only: bool = False,
@@ -941,7 +996,7 @@ class SimulationService:
                 target_name=target_name,
             )
 
-            compatible_engines = get_compatible_engines(pretrained_model_uri, proprietary_only)
+            compatible_engines = get_compatible_engines(pretrained_model_uri, model_uri, proprietary_only)
 
             if len(compatible_engines) == 0:
                 raise ValueError("No compatible engines found")
@@ -1349,6 +1404,11 @@ class SimulationService:
                         **device_config_cleaned,
                         "engine": result["engine"],
                         "engine_image": result["engine_image"],
+                        "engine_version": result.get("engine_version"),
+                        "tool_calling_parser_type": result.get("tool_calling_parser_type"),
+                        "reasoning_parser_type": result.get("reasoning_parser_type"),
+                        "architecture_family": result.get("architecture_family"),
+                        "chat_template": result.get("chat_template"),
                         "top_k_configs": config_dict,
                     }
                     records.append(record)
@@ -1454,6 +1514,7 @@ class SimulationService:
             request.pretrained_model_uri,
             cluster_info,
             notification_request,
+            request.model_uri,  # Pass the cloud/HF URI
             request.source_topic,
             request.source,
             proprietary_only=request.is_proprietary_model,
@@ -1529,6 +1590,12 @@ class SimulationService:
                     error_rate=0,
                     cost_per_million_tokens=0,
                 ),
+                # Include engine metadata from the simulation result
+                engine_version=getattr(result, "engine_version", None),
+                tool_calling_parser_type=getattr(result, "tool_calling_parser_type", None),
+                reasoning_parser_type=getattr(result, "reasoning_parser_type", None),
+                architecture_family=getattr(result, "architecture_family", None),
+                chat_template=getattr(result, "chat_template", None),
             )
             deployment_config = self.optimal_search_node_group_config([result], concurrency)
             if deployment_config is not None:
@@ -1680,6 +1747,11 @@ class SimulationService:
             device_name=device_name,
             device_model=device_model,
             raw_name=raw_name,
+            engine_version=getattr(template_result, "engine_version", None),
+            tool_calling_parser_type=getattr(template_result, "tool_calling_parser_type", None),
+            reasoning_parser_type=getattr(template_result, "reasoning_parser_type", None),
+            architecture_family=getattr(template_result, "architecture_family", None),
+            chat_template=getattr(template_result, "chat_template", None),
         )
 
     @staticmethod
@@ -1792,6 +1864,15 @@ class SimulationService:
         if not config.node_groups:
             logger.error("No node groups created, returning None")
             return None
+
+        # Populate engine metadata from the first node group (they should all have the same metadata)
+        if config.node_groups:
+            first_group = config.node_groups[0]
+            config.engine_version = first_group.engine_version
+            config.tool_calling_parser_type = first_group.tool_calling_parser_type
+            config.reasoning_parser_type = first_group.reasoning_parser_type
+            config.architecture_family = first_group.architecture_family
+            config.chat_template = first_group.chat_template
 
         logger.info(f"Successfully created config with {len(config.node_groups)} node groups")
         return config

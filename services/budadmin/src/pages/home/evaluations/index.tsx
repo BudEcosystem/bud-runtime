@@ -33,7 +33,7 @@ interface EvaluationCard {
 }
 
 const Evaluations = () => {
-  const [activeTab, setActiveTab] = useState("1");
+  const [activeTab, setActiveTab] = useState("2");
   const router = useRouter();
   const { openDrawer } = useDrawer();
   const [searchValue, setSearchValue] = useState("");
@@ -152,24 +152,24 @@ const Evaluations = () => {
             tabBarExtraContent={operations}
             className="h-full"
             items={[
-              // {
-              //   label: (
-              //     <div className="flex items-center gap-[0.375rem]">
-              //       <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
-              //         <Image
-              //           preview={false}
-              //           className=""
-              //           style={{ width: "auto", height: "0.875rem" }}
-              //           src="/images/evaluations/icons/summary.svg"
-              //           alt="Logo"
-              //         />
-              //       </div>
-              //       <Text_14_600_B3B3B3>Summary</Text_14_600_B3B3B3>
-              //     </div>
-              //   ),
-              //   key: "1",
-              //   children: <EvaluationSumary />,
-              // },
+              {
+                label: (
+                  <div className="flex items-center gap-[0.375rem]">
+                    <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
+                      <Image
+                        preview={false}
+                        className=""
+                        style={{ width: "auto", height: "0.875rem" }}
+                        src="/images/evaluations/icons/summary.svg"
+                        alt="Logo"
+                      />
+                    </div>
+                    <Text_14_600_B3B3B3>Summary</Text_14_600_B3B3B3>
+                  </div>
+                ),
+                key: "1",
+                children: <EvaluationSumary />,
+              },
               // {
               //   label: (
               //     <div className="flex items-center gap-[0.375rem]">
@@ -196,24 +196,6 @@ const Evaluations = () => {
                         preview={false}
                         className=""
                         style={{ width: "auto", height: "0.875rem" }}
-                        src="/images/evaluations/icons/evaluations.svg"
-                        alt="Logo"
-                      />
-                    </div>
-                    <Text_14_600_B3B3B3>Evaluations</Text_14_600_B3B3B3>
-                  </div>
-                ),
-                key: "1",
-                children: <EvaluationList />,
-              },
-              {
-                label: (
-                  <div className="flex items-center gap-[0.375rem]">
-                    <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
-                      <Image
-                        preview={false}
-                        className=""
-                        style={{ width: "auto", height: "0.875rem" }}
                         src="/images/evaluations/icons/experiments.svg"
                         alt="Logo"
                       />
@@ -224,6 +206,25 @@ const Evaluations = () => {
                 key: "2",
                 children: <ExperimentsTable />,
               },
+              {
+                label: (
+                  <div className="flex items-center gap-[0.375rem]">
+                    <div className="flex justify-center h-[0.875rem] w-[0.875rem]">
+                      <Image
+                        preview={false}
+                        className=""
+                        style={{ width: "auto", height: "0.875rem" }}
+                        src="/images/evaluations/icons/evaluations.svg"
+                        alt="Logo"
+                      />
+                    </div>
+                    <Text_14_600_B3B3B3>Evaluations Hub</Text_14_600_B3B3B3>
+                  </div>
+                ),
+                key: "3",
+                children: <EvaluationList />,
+              },
+
 
               // {
               //   label: (

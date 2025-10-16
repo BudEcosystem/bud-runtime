@@ -13,12 +13,12 @@ import {
   Text_13_400_B3B3B3,
   Text_12_400_B3B3B3,
   Text_12_300_EEEEEE,
+  Text_12_600_EEEEEE,
 } from "./../../../components/ui/text";
 import { useLoader } from "src/context/appContext";
 import PageHeader from "@/components/ui/pageHeader";
 import NoAccess from "@/components/ui/noAccess";
 import { useDrawer } from "src/hooks/useDrawer";
-import { getChromeColor } from "@/components/ui/bud/dataEntry/TagsInputData";
 import { formatDate } from "src/utils/formatDate";
 import Tags from "src/flows/components/DrawerTags";
 import {
@@ -29,25 +29,25 @@ import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import NoDataFount from "@/components/ui/noDataFount";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import { PlusOutlined } from "@ant-design/icons";
-// import { useAgentStore } from "@/stores/useAgentStore";
+import { useAgentStore } from "@/stores/useAgentStore";
 import AgentDrawer from "@/components/agents/AgentDrawer";
 import { usePromptsAgents, type PromptAgent } from "@/stores/usePromptsAgents";
+import { IconOnlyRender } from "src/flows/components/BudIconRender";
+import PromptAgentTags from "src/flows/components/PromptAgentTags";
 
 
 function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) {
-  const { openDrawer } = useDrawer();
-
   const getTypeColor = (type?: string) => {
     return type === 'agent' ? '#965CDE' : '#5CADFF';
   };
 
-  const getTypeIcon = (type?: string) => {
-    return type === 'agent' ? '>' : '=�';
-  };
+  // Check if description is long enough to need "See more" (approximately 2 lines worth)
+  const needsSeeMore = item.description && item.description.length > 100;
+
 
   return (
     <div
-      className="flex flex-col justify-between bg-[#101010] border border-[#1F1F1F] rounded-lg pt-[1.54em] 1680px:pt-[1.85em] min-h-[325px] 1680px:min-h-[400px] 2048px:min-h-[475px] group cursor-pointer hover:shadow-[1px_1px_6px_-1px_#2e3036] overflow-hidden"
+      className="flex flex-col justify-start bg-[#101010] border border-[#1F1F1F] rounded-lg min-h-[250px] 1680px:min-h-[325px] 2048px:min-h-[400px] group cursor-pointer hover:shadow-[1px_1px_6px_-1px_#2e3036] overflow-hidden"
       key={index}
       onClick={async () => {
         // Handle click - will need to implement drawer flow or navigation
@@ -55,117 +55,122 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
         console.log("View prompt/agent:", item.name);
       }}
     >
-      <div className="px-[1.6rem] min-h-[230px]">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-[2.40125rem] h-[2.40125rem] bg-[#1F1F1F] rounded-[5px] flex items-center justify-center text-[1.2rem]">
-            {getTypeIcon(item.prompt_type)}
+      <div className="pr-[1.5em] pl-[1.5em] pt-[1.6em] pb-[.6rem] h-full flex flex-col">
+        <div className="min-h-[160px]">
+          <div className="flex justify-between w-full">
+            <div className="flex items-center justify-center bg-[#1F1F1F] w-[2.40125rem] h-[2.40125rem] rounded">
+              {item.model_icon ? (
+                <div className="w-[2.40125rem] h-[2.40125rem] bg-[#1F1F1F] rounded-[5px] flex items-center justify-center">
+                  <IconOnlyRender
+                    icon={item?.model_icon}
+                    size={26}
+                    imageSize={24}
+                    model={item}
+                  />
+                </div>
+              ) : (
+                <div className="text-[1.5625rem]">
+                  {item.prompt_type === 'agent' ? '🤖' : '📝'}
+                </div>
+              )}
+            </div>
           </div>
-          <Tag
-            className="border-0 rounded-[4px] px-2 py-1"
-            style={{
-              backgroundColor: getTypeColor(item.prompt_type) + '20',
-              color: getTypeColor(item.prompt_type),
-            }}
-          >
-            {item.prompt_type === 'agent' ? 'Agent' : 'Prompt'}
-          </Tag>
-        </div>
 
-        {(item?.modified_at || item?.created_at) && (
-          <div className="mt-[1.2rem]">
+          <div className="pl-[.1rem] pt-[1.25rem]">
             <Text_11_400_808080>
               {formatDate(item?.modified_at || item?.created_at)}
             </Text_11_400_808080>
-          </div>
-        )}
-
-        <Text_17_600_FFFFFF
-          className="max-w-[100] truncate w-[calc(100%-20px)] mt-[.4rem]"
-        >
-          {item.name}
-        </Text_17_600_FFFFFF>
-
-        <Text_13_400_B3B3B3 className="mt-[.6rem] leading-[1.125rem] h-[2.5rem] tracking-[.01em] line-clamp-2 overflow-hidden display-webkit-box">
-          {item?.description || ""}
-        </Text_13_400_B3B3B3>
-
-        <div className="flex items-center flex-wrap py-[1.1em] gap-[.3rem]">
-          {(item.tags || []).slice(0, 3).map((tag, idx) => (
-            <Tag
-              key={idx}
-              className="text-[#B3B3B3] border-[0] rounded-[6px] py-[.3rem] px-[.4rem]"
-              style={{
-                backgroundColor: getChromeColor("#1F1F1F"),
-                background: "#1F1F1F",
-              }}
-            >
-              <div className="text-[0.625rem] font-[400] leading-[100%]" style={{ color: "#EEEEEE" }}>
-                {typeof tag === 'string' ? tag : tag.name}
+            <Text_17_600_FFFFFF className="pt-[.35em] text-wrap pr-1 truncate-text max-w-[90%]">
+              {item.name}
+            </Text_17_600_FFFFFF>
+            <div className="pt-[.85em] pr-[.45em] min-h-[5rem]">
+              <div
+                className="line-clamp-2 overflow-hidden"
+                style={{
+                  display: "-webkit-box",
+                  WebkitBoxOrient: "vertical",
+                  WebkitLineClamp: 2
+                }}
+              >
+                <Text_13_400_B3B3B3 className="text-[0.75em] tracking-[.01em] leading-[150%]">
+                  {item?.description || ""}
+                </Text_13_400_B3B3B3>
               </div>
-            </Tag>
-          ))}
-          {(item.tags || []).length > 3 && (
-            <Tag
-              className="text-[#B3B3B3] border-[0] rounded-[6px] py-[.3rem] px-[.4rem]"
-              style={{
-                backgroundColor: getChromeColor("#1F1F1F"),
-                background: "#1F1F1F",
-              }}
-            >
-              <div className="text-[0.625rem] font-[400] leading-[100%]" style={{ color: "#808080" }}>
-                +{(item.tags || []).length - 3}
-              </div>
-            </Tag>
-          )}
-        </div>
-      </div>
-
-      <div className="px-[1.6rem] pt-[.9rem] pb-[1rem] bg-[#161616] border-t-[.5px] border-t-[#1F1F1F] min-h-[32%]">
-        <div className="flex items-center justify-between mb-2">
-          <Text_12_400_B3B3B3>Usage & Rating</Text_12_400_B3B3B3>
-          <Text_12_400_B3B3B3>v{item.default_version || item.version || '1.0'}</Text_12_400_B3B3B3>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Tag
-              className="text-[#B3B3B3] border-[0] rounded-[6px] py-[.3rem] px-[.4rem]"
-              style={{
-                backgroundColor: getChromeColor("#1F1F1F"),
-                background: "#1F1F1F",
-              }}
-            >
-              <div className="text-[0.625rem] font-[400] leading-[100%]" style={{ color: "#EEEEEE" }}>
-                {(item.usage_count || 0).toLocaleString()} uses
-              </div>
-            </Tag>
-
-            <Tag
-              className="text-[#B3B3B3] border-[0] rounded-[6px] py-[.3rem] px-[.4rem]"
-              style={{
-                backgroundColor: getChromeColor("#1F1F1F"),
-                background: "#1F1F1F",
-              }}
-            >
-              <div className="text-[0.625rem] font-[400] leading-[100%]" style={{ color: "#EEEEEE" }}>
-                P {item.rating || 0}
-              </div>
-            </Tag>
-          </div>
-
-          <Tag
-            className="text-[#B3B3B3] border-[0] rounded-[6px] py-[.3rem] px-[.4rem]"
-            style={{
-              backgroundColor: getChromeColor("#1F1F1F"),
-              background: "#1F1F1F",
-            }}
-          >
-            <div className="text-[0.625rem] font-[400] leading-[100%]" style={{ color: "#EEEEEE" }}>
-              {item.category || 'Uncategorized'}
+              {needsSeeMore && (
+                <ConfigProvider
+                  theme={{
+                    token: {
+                      sizePopupArrow: 0,
+                    },
+                  }}
+                >
+                  <Popover
+                    content={
+                      <div className="max-w-[400px] p-[1rem] bg-[#111113] border border-[#1F1F1F] rounded-[6px]">
+                        <Text_13_400_B3B3B3 className="leading-[1.4] whitespace-pre-wrap">
+                          {item.description}
+                        </Text_13_400_B3B3B3>
+                      </div>
+                    }
+                    trigger="hover"
+                    placement="top"
+                    rootClassName="prompt-agent-description-popover"
+                    getPopupContainer={(trigger) =>
+                      (trigger.parentNode as HTMLElement) || document.body
+                    }
+                  >
+                    <Text_12_600_EEEEEE
+                      className="cursor-pointer mt-[0.3rem] inline-block hover:text-[#965CDE] transition-colors"
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                      }}
+                    >
+                      See more
+                    </Text_12_600_EEEEEE>
+                  </Popover>
+                </ConfigProvider>
+              )}
             </div>
-          </Tag>
+          </div>
+        </div>
+
+        <div
+          className="mt-[1.1rem] flex gap-[.45rem] justify-start items-center flex-wrap overflow-hidden mb-[1.1rem]"
+          style={{
+            maxHeight: "4rem",
+            lineHeight: "1.5rem",
+          }}
+        >
+          <PromptAgentTags promptAgent={item} maxTags={3} limit={false} />
         </div>
       </div>
+
+      {/* <div className="pt-[1.1rem] pr-[1.5em] pl-[1.5em] pb-[1.45em] bg-[#161616] flex justify-between items-center">
+        <div>
+          <Text_17_600_FFFFFF className="block px-[.2em] group-hover:text-[#FFFFFF] text[0.75rem] leading-[100%]">
+            {(item.usage_count || 0).toLocaleString()}
+          </Text_17_600_FFFFFF>
+          <Text_13_400_B3B3B3 className="pt-[.3rem]">
+            Uses
+          </Text_13_400_B3B3B3>
+        </div>
+        <div>
+          <Text_17_600_FFFFFF className="block px-[.2em] group-hover:text-[#FFFFFF] text[0.75rem] leading-[100%]">
+            {item.rating || 0}
+          </Text_17_600_FFFFFF>
+          <Text_13_400_B3B3B3 className="pt-[.3rem]">
+            Rating
+          </Text_13_400_B3B3B3>
+        </div>
+        <div>
+          <Text_17_600_FFFFFF className="block px-[.2em] group-hover:text-[#FFFFFF] text[0.75rem] leading-[100%]">
+            v{item.default_version || item.version || '1.0'}
+          </Text_17_600_FFFFFF>
+          <Text_13_400_B3B3B3 className="pt-[.3rem]">
+            Version
+          </Text_13_400_B3B3B3>
+        </div>
+      </div> */}
     </div>
   );
 }
@@ -231,8 +236,8 @@ export default function PromptsAgents() {
   const { hasPermission, loadingUser } = useUser();
   const { showLoader, hideLoader } = useLoader();
   const { openDrawer } = useDrawer();
-  // const { openAgentDrawer } = useAgentStore();
-
+  const { openAgentDrawer } = useAgentStore();
+  // openAgentDrawer();
   // Use the store
   const {
     filteredPrompts,
@@ -340,11 +345,11 @@ export default function PromptsAgents() {
         <div className="boardPageTop">
           <PageHeader
             headding="Prompts & Agents"
-            // buttonLabel="Agent"
-            // buttonPermission={hasPermission(PermissionEnum.ModelManage)}
-            // buttonAction={() => {
-            //   openAgentDrawer();
-            // }}
+            buttonLabel="Agent"
+            buttonPermission={hasPermission(PermissionEnum.ModelManage)}
+            buttonAction={() => {
+              openDrawer("add-agent");
+            }}
             ButtonIcon={PlusOutlined}
             rightComponent={
               <div className="flex gap-x-[.2rem] hidden">
@@ -676,11 +681,10 @@ export default function PromptsAgents() {
                   ).length > 0 ? (
                     <NoDataFount
                       classNames="h-[60vh]"
-                      textMessage={`No prompts or agents found for the ${
-                        filter.name
+                      textMessage={`No prompts or agents found for the ${filter.name
                           ? `search term "${filter.name}"`
                           : "selected filters"
-                      }`}
+                        }`}
                     />
                   ) : (
                     <NoDataFount

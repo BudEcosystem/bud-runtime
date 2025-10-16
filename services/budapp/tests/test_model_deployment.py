@@ -57,7 +57,7 @@ async def test_create_endpoint_directly_for_cloud_model():
     mock_cloud_model = MagicMock()
     mock_cloud_model.id = cloud_model_id
     mock_cloud_model.status = CloudModelStatusEnum.ACTIVE
-    mock_cloud_model.supported_endpoints = ["/v1/chat/completions", "/v1/completions"]
+    mock_cloud_model.supported_endpoints = ["/v1/chat/completions"]
 
     # Mock deployment config
     deploy_config = DeploymentTemplateCreate(

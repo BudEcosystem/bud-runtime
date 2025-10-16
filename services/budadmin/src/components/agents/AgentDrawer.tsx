@@ -20,7 +20,6 @@ const AgentDrawer: React.FC = () => {
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [drawerWidth, setDrawerWidth] = useState<string>('100%');
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   // Get active sessions
   const activeSessions = sessions.filter((session) =>
@@ -101,13 +100,13 @@ const AgentDrawer: React.FC = () => {
               </Tooltip>
             </div>
             <div>
-              {/* Settings Icon */}
-              <Tooltip title="Settings" placement="right">
+              {/* Settings Icon - Now opens settings for individual agent boxes */}
+              <Tooltip title="Use settings icon in each agent box" placement="right">
                 <button
-                  onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                  className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#1A1A1A] transition-colors mb-3"
+                  className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#1A1A1A] transition-colors mb-3 opacity-50 cursor-not-allowed"
+                  disabled
                 >
-                  <SettingOutlined className="text-[#808080] hover:text-[#EEEEEE] text-lg" />
+                  <SettingOutlined className="text-[#808080] text-lg" />
                 </button>
               </Tooltip>
 
@@ -151,8 +150,6 @@ const AgentDrawer: React.FC = () => {
                         session={session}
                         index={index}
                         totalSessions={activeSessions.length}
-                        onToggleRightSidebar={() => setIsSettingsOpen(!isSettingsOpen)}
-                        isRightSidebarOpen={isSettingsOpen}
                       />
                     </div>
                   ))}

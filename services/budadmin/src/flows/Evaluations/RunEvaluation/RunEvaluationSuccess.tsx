@@ -5,11 +5,12 @@ import React from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useEvaluations } from "src/hooks/useEvaluations";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import { Text_14_600_EEEEEE, Text_12_400_757575 } from "@/components/ui/text";
+import { Text_12_300_EEEEEE, Text_12_400_B3B3B3, Text_24_600_EEEEEE } from "@/components/ui/text";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { useRouter } from "next/router";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import BudStepAlert from "src/flows/components/BudStepAlert";
+import { Image } from "antd";
 
 export default function RunEvaluationSuccess() {
   const { closeDrawer, drawerProps } = useDrawer();
@@ -19,7 +20,8 @@ export default function RunEvaluationSuccess() {
 
   const handleViewExperiment = () => {
     closeDrawer();
-    router.push(`/home/evaluations/experiments/${experimentId}`);
+    router.push(`/home/evaluations/experiments`);
+    // router.push(`/home/evaluations/experiments/${experimentId}`);
   };
 
   const handleClose = () => {
@@ -36,12 +38,32 @@ export default function RunEvaluationSuccess() {
     >
       <BudWraperBox>
         <BudDrawerLayout>
-          <BudStepAlert
-            type="success"
-            title="Evaluation Complete"
-            description={`The evaluation workflow for experiment ${currentWorkflow?.workflow_steps?.name} has been completed.
-                You can now view the results and metrics in the experiment details page.`}
-          />
+          <div className="flex flex-col	justify-start items-center p-[2.5rem]">
+            <div className="align-center">
+              <Image
+                preview={false}
+                src="/images/successHand.png"
+                alt="info"
+                width={140}
+                height={129}
+              />
+            </div>
+            <div className="max-w-[90%] mt-[1rem] mb-[3rem] flex flex-col items-center justify-center">
+              <Text_24_600_EEEEEE className="text-center leading-[2rem] mb-[1.2rem] max-w-[90%]">
+                Evaluation Ran Successfully!
+              </Text_24_600_EEEEEE>
+              <Text_12_400_B3B3B3 className="text-center">
+                You can now view the results and metrics for {currentWorkflow?.workflow_steps?.name} in the experiment details page.
+              </Text_12_400_B3B3B3>
+            </div>
+            {/* <PrimaryButton
+              onClick={handleViewExperiment}
+            >
+              <Text_12_300_EEEEEE className="ml-[.3rem]">
+                View Experiment
+              </Text_12_300_EEEEEE>
+            </PrimaryButton> */}
+          </div>
         </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>

@@ -87,6 +87,12 @@ class Provider(BaseModel):
     icon: str
     capabilities: list[ProviderCapabilityEnum]
 
+    @field_validator("capabilities", mode="before")
+    @classmethod
+    def handle_none_capabilities(cls, v):
+        """Convert None to empty list for capabilities."""
+        return v if v is not None else []
+
 
 class ProviderResponse(PaginatedSuccessResponse):
     """Provider response schema."""
@@ -1068,6 +1074,13 @@ class ModelDeployStepRequest(BaseModel):
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
     scaling_specification: ScalingSpecification | None = None
+    # Parser configuration options
+    enable_tool_calling: bool | None = None
+    enable_reasoning: bool | None = None
+    # Parser metadata from simulator/cluster
+    tool_calling_parser_type: str | None = None
+    reasoning_parser_type: str | None = None
+    chat_template: str | None = None
 
     @field_validator("endpoint_name")
     @classmethod
@@ -1130,6 +1143,12 @@ class DeploymentWorkflowStepData(BaseModel):
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
     scaling_specification: ScalingSpecification | None = None
+    enable_tool_calling: bool | None = None
+    enable_reasoning: bool | None = None
+    # Parser metadata from simulator/cluster
+    tool_calling_parser_type: str | None = None
+    reasoning_parser_type: str | None = None
+    chat_template: str | None = None
 
 
 class ModelDeploymentRequest(BaseModel):
@@ -1152,6 +1171,11 @@ class ModelDeploymentRequest(BaseModel):
     credential_id: UUID4 | None = None
     podscaler: ScalingSpecification | None = None
     provider: str | None = None
+    # User preferences for parser features
+    enable_tool_calling: bool | None = None
+    enable_reasoning: bool | None = None
+    default_storage_class: str | None = None
+    default_access_mode: str | None = None
 
 
 class TopLeaderboardRequest(BaseModel):

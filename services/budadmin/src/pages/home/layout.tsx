@@ -175,7 +175,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       route: "/guardrails",
       icon: '/icons/guard.png',
       iconWhite: '/icons/guardWhite.png',
-      cmd: "9",
+      cmd: "10",
     },
   ]
 
@@ -235,13 +235,13 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   }, []);
 
 
-  useEffect(() => {
-    console.log("Novu Notification Center version:", pkg.version);
-    console.log("process.env.NEXT_PUBLIC_BASE_URL", process.env.NEXT_PUBLIC_BASE_URL);
-    console.log("process.env.NEXT_PUBLIC_NOVU_SOCKET_URL", process.env.NEXT_PUBLIC_NOVU_SOCKET_URL);
-    console.log("process.env.NEXT_PUBLIC_NOVU_BASE_URL", process.env.NEXT_PUBLIC_NOVU_BASE_URL);
-    console.log("process.env.NEXT_PUBLIC_NOVU_APP_ID", process.env.NEXT_PUBLIC_NOVU_APP_ID);
-  }, []);
+  // useEffect(() => {
+  //   console.log("Novu Notification Center version:", pkg.version);
+  //   console.log("process.env.NEXT_PUBLIC_BASE_URL", process.env.NEXT_PUBLIC_BASE_URL);
+  //   console.log("process.env.NEXT_PUBLIC_NOVU_SOCKET_URL", process.env.NEXT_PUBLIC_NOVU_SOCKET_URL);
+  //   console.log("process.env.NEXT_PUBLIC_NOVU_BASE_URL", process.env.NEXT_PUBLIC_NOVU_BASE_URL);
+  //   console.log("process.env.NEXT_PUBLIC_NOVU_APP_ID", process.env.NEXT_PUBLIC_NOVU_APP_ID);
+  // }, []);
 
   const handleOpenChange = (open: boolean) => {
     setGeneralOpen(open);

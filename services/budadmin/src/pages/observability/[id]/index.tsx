@@ -14,6 +14,7 @@ import {
   message,
   Tooltip,
   Flex,
+  Alert,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -132,6 +133,12 @@ interface InferenceDetail {
   cached: boolean;
   finish_reason?: string;
   cost?: number;
+  error_code?: string;
+  error_message?: string;
+  error_type?: string;
+  status_code?: number;
+  raw_request?: string;
+  raw_response?: string;
   gateway_request?: any;
   gateway_response?: any;
   gateway_metadata?: GatewayMetadata;
@@ -429,7 +436,7 @@ const ObservabilityDetailPage: React.FC = () => {
           </div>
 
           {/* Gateway Metadata */}
-          {inferenceData.gateway_metadata && (
+          {inferenceData.gateway_metadata && inferenceData.gateway_metadata?.client_ip && (
             <div className="flex items-center flex-col border border-[#1F1F1F] rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-[#101010] mb-[1.6rem]">
               <div className="w-full">
                 <Text_14_600_EEEEEE className="text-[#EEEEEE] mb-4">
@@ -713,9 +720,111 @@ const ObservabilityDetailPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Error Details - Only show for failed requests */}
+          {inferenceData.is_success === false && (
+            <div className="flex items-center flex-col border border-red-500 rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-red-950/20 mb-[1.6rem]">
+              <div className="w-full">
+                <Alert
+                  message="Request Failed"
+                  description={`This inference request failed with error code ${inferenceData.error_code || 'unknown'}`}
+                  type="error"
+                  showIcon
+                  className="mb-4"
+                />
+
+                <Text_14_600_EEEEEE className="text-red-400 mb-4">
+                  Error Details
+                </Text_14_600_EEEEEE>
+
+                <div className="space-y-3">
+                  {inferenceData.error_code && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">
+                        Error Code
+                      </Text_12_400_B3B3B3>
+                      <Tag color="error" className="text-base">
+                        {inferenceData.error_code}
+                      </Tag>
+                    </div>
+                  )}
+
+                  {inferenceData.error_type && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">
+                        Error Type
+                      </Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE className="text-red-400">
+                        {inferenceData.error_type}
+                      </Text_12_600_EEEEEE>
+                    </div>
+                  )}
+
+                  {inferenceData.error_message && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">
+                        Error Message
+                      </Text_12_400_B3B3B3>
+                      <div className="bg-red-950/30 border border-red-800 rounded-md p-3 mt-1">
+                        <Text_12_600_EEEEEE className="text-red-300 font-mono whitespace-pre-wrap">
+                          {inferenceData.error_message}
+                        </Text_12_600_EEEEEE>
+                      </div>
+                    </div>
+                  )}
+
+                  {inferenceData.raw_response && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">
+                        Error Response Details
+                      </Text_12_400_B3B3B3>
+                      <div className="bg-red-950/30 border border-red-800 rounded-md p-3 mt-1 max-h-64 overflow-auto">
+                        <Text_12_600_EEEEEE className="text-red-300 font-mono text-xs whitespace-pre-wrap">
+                          {inferenceData.raw_response}
+                        </Text_12_600_EEEEEE>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4 mt-3">
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">
+                        Failed Request ID
+                      </Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE className="font-mono text-xs">
+                        {inferenceData.inference_id}
+                      </Text_12_600_EEEEEE>
+                    </div>
+
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">
+                        Failed At
+                      </Text_12_400_B3B3B3>
+                      <Text_12_600_EEEEEE>
+                        {formatTimestampWithTZ(inferenceData.timestamp)}
+                      </Text_12_600_EEEEEE>
+                    </div>
+                  </div>
+
+                  {inferenceData.messages && inferenceData.messages.length > 0 && (
+                    <div>
+                      <Text_12_400_B3B3B3 className="mb-1">
+                        Failed Request Preview
+                      </Text_12_400_B3B3B3>
+                      <div className="bg-[#1A1A1A] border border-[#2F2F2F] rounded-md p-3 mt-1">
+                        <Text_12_600_EEEEEE className="font-mono text-xs">
+                          {JSON.stringify(inferenceData.messages[0], null, 2).substring(0, 200)}...
+                        </Text_12_600_EEEEEE>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Conversation - Only show for chat endpoint type */}
           {(!inferenceData.endpoint_type ||
-            inferenceData.endpoint_type === "chat") && (
+            inferenceData.endpoint_type === "chat") && (inferenceData.messages && inferenceData?.messages?.length > 0) && (
             <div className="flex items-center flex-col border border-[#1F1F1F] rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-[#101010] mb-[1.6rem]">
               <div className="w-full">
                 <div className="flex justify-between items-center mb-4">

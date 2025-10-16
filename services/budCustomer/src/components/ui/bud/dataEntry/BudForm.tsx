@@ -11,7 +11,8 @@ import { BudDrawerLayout } from "./BudDrawerLayout";
 import { BudWraperBox } from "../card/wraperBox";
 import { useWorkflow } from "@/stores/useWorkflow";
 import { useDeployModel } from "@/stores/useDeployModel";
-import loaderIcn from "public/icons/loader.gif";
+// Use direct path for public assets in Next.js
+const loaderIcn = "/icons/loader.gif";
 import { Text_12_400_5B6168 } from "../../text";
 import { usePerfomanceBenchmark } from "@/stores/usePerfomanceBenchmark";
 

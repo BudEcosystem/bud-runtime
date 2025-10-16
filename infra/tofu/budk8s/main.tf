@@ -18,10 +18,14 @@ module "azure" {
   ingress_sku = {
     Standard_D32als_v6 = 2
   }
+  worker_sku = {
+    Standard_D32als_v6 = 1
+  }
   disk_size = {
     primary      = 512
     primary_data = 4095
     ingress      = 256
+    worker      = 256
   }
 }
 
@@ -64,4 +68,26 @@ module "ingress_install" {
   target_user        = local.install_user
   ssh_private_key    = tls_private_key.ssh.private_key_openssh
   extra_files_script = "${path.module}/decrypt-ingress-sops-age.sh"
+}
+
+
+module "worker_nixos" {
+  source    = "github.com/nix-community/nixos-anywhere//terraform/nix-build"
+  attribute = ".#nixosConfigurations.worker.config.system.build.toplevel"
+}
+module "worker_disko" {
+  source    = "github.com/nix-community/nixos-anywhere//terraform/nix-build"
+  attribute = ".#nixosConfigurations.worker.config.system.build.diskoScript"
+}
+module "worker_install" {
+  for_each          = module.azure.ip.worker.v4
+  source            = "github.com/nix-community/nixos-anywhere//terraform/install"
+  nixos_system      = module.worker_nixos.result.out
+  nixos_partitioner = module.worker_disko.result.out
+  instance_id       = each.value
+
+  target_host        = each.value
+  target_user        = local.install_user
+  ssh_private_key    = tls_private_key.ssh.private_key_openssh
+  extra_files_script = "${path.module}/decrypt-worker-sops-age.sh"
 }

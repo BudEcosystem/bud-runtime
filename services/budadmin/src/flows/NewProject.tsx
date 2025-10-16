@@ -47,7 +47,7 @@ export default function NewProject() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍"
+        icon: "🌐"
       }}
       drawerLoading={isCreating}
       // disableNext={!submittable}
@@ -107,7 +107,9 @@ export default function NewProject() {
               required
               options={options}
               info='Add keywords to help organize and find your project later.'
-              name="tags" placeholder="Add Tags (e.g. Data Science, Banking) " rules={[
+              name="tags"
+              placeholder="Add Tags (e.g. Data Science, Banking) "
+              rules={[
                 { required: true, message: "Please add tags to categorize the project." }
               ]} />
             <div className="h-[1rem] w-full" />

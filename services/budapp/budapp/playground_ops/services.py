@@ -82,8 +82,29 @@ class PlaygroundService(SessionMixin):
         filters = filters or {}
         order_by = order_by or []
 
+        # Extract project_id filter if provided
+        filtered_project_id = filters.pop("project_id", None)
+
         project_ids, filter_published_only = await self._get_authorized_project_ids(current_user_id, api_key)
         logger.debug("authorized project_ids: %s, filter_published_only: %s", project_ids, filter_published_only)
+
+        # If a specific project_id is requested, validate and override project_ids
+        if filtered_project_id:
+            # For CLIENT users with no project restriction (project_ids=None), allow any project since they only see published
+            # For users with specific project_ids, validate they have access
+            if project_ids is not None and filtered_project_id not in project_ids:
+                logger.warning(
+                    "Unauthorized project access attempt for user '%s' to project '%s'. Authorized projects: %s",
+                    current_user_id,
+                    filtered_project_id,
+                    project_ids,
+                )
+                raise ClientException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    message=f"Access denied to project {filtered_project_id}",
+                )
+            # Override to filter by specific project
+            project_ids = [filtered_project_id]
 
         # Add published filter if needed for CLIENT users
         if filter_published_only:
@@ -144,9 +165,19 @@ class PlaygroundService(SessionMixin):
                 logger.debug(f"Getting all published deployments for CLIENT user {current_user_id}")
                 project_ids = None  # None means no project filtering - show all published
             else:
-                # For ADMIN users, get all active project ids
+                # For ADMIN users, get only their accessible projects (not all projects in system)
                 logger.debug(f"Getting all playground deployments for ADMIN user {current_user_id}")
-                project_ids = await ProjectDataManager(self.session).get_all_active_project_ids()
+                project_service = ProjectService(self.session)
+
+                # Get all projects the ADMIN user has access to
+                all_projects, _ = await project_service.get_all_active_projects(
+                    current_user=user,
+                    offset=0,
+                    limit=1000,  # Get all projects (reasonable upper limit)
+                )
+
+                # Extract project IDs from user's accessible projects
+                project_ids = [p.project.id for p in all_projects] if all_projects else []
 
             return project_ids, filter_published_only
         elif api_key:

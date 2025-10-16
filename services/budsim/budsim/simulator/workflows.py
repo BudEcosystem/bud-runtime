@@ -227,6 +227,13 @@ class SimulationWorkflows:
                                         **request.model_dump(mode="json"),
                                         "engine_name": engine_device_combo["engine_name"],
                                         "engine_image": engine_device_combo["image"],
+                                        "engine_version": engine_device_combo.get("version"),
+                                        "tool_calling_parser_type": engine_device_combo.get(
+                                            "tool_calling_parser_type"
+                                        ),
+                                        "reasoning_parser_type": engine_device_combo.get("reasoning_parser_type"),
+                                        "architecture_family": engine_device_combo.get("architecture_family"),
+                                        "chat_template": engine_device_combo.get("chat_template"),
                                         "simulation_method": simulation_method.value,
                                     }
                                 ),
@@ -332,6 +339,7 @@ class SimulationWorkflows:
             input={
                 "workflow_id": workflow_id,
                 "pretrained_model_uri": request.pretrained_model_uri,
+                "model_uri": request.model_uri,  # Pass the cloud/HF URI
                 "cluster_info": cluster_info,
                 "notification_request": notification_request_dict,
                 "target_topic_name": request.source_topic,

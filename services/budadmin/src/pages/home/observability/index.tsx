@@ -577,7 +577,7 @@ const ObservabilityPage: React.FC = () => {
                 ),
                 key: "requests",
                 children: (
-                  <div className="listingContainer">
+                  <div className="listingContainer observability">
                     <div className="mb-4">
                       <InferenceFilters
                         projectId={"all"} // Pass a dummy ID for global view

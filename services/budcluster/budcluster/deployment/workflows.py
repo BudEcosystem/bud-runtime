@@ -254,6 +254,8 @@ class CreateDeploymentWorkflow:
                 node_list=node_list,
                 platform=platform,
                 namespace=existing_deployment_namespace,
+                default_storage_class=transfer_model_request_json.default_storage_class,
+                default_access_mode=transfer_model_request_json.default_access_mode,
             )
             if status is not None:
                 workflow_status = check_workflow_status_in_statestore(workflow_id)
@@ -307,6 +309,11 @@ class CreateDeploymentWorkflow:
             workflow_status = check_workflow_status_in_statestore(workflow_id)
             if workflow_status:
                 return workflow_status
+            # Get parser types from workflow request (fetched from BudSim)
+            tool_calling_parser = getattr(deploy_engine_request_json, "tool_calling_parser_type", None)
+            reasoning_parser = getattr(deploy_engine_request_json, "reasoning_parser_type", None)
+            chat_template = getattr(deploy_engine_request_json, "chat_template", None)
+
             status, namespace, deployment_url, number_of_nodes, node_list = deployment_handler.deploy(
                 node_list=node_list,
                 endpoint_name=endpoint_name,
@@ -318,6 +325,13 @@ class CreateDeploymentWorkflow:
                 podscaler=podscaler,
                 input_tokens=deploy_engine_request_json.input_tokens,
                 output_tokens=deploy_engine_request_json.output_tokens,
+                tool_calling_parser_type=tool_calling_parser,
+                reasoning_parser_type=reasoning_parser,
+                enable_tool_calling=deploy_engine_request_json.enable_tool_calling,
+                enable_reasoning=deploy_engine_request_json.enable_reasoning,
+                chat_template=chat_template,
+                default_storage_class=getattr(deploy_engine_request_json, "default_storage_class", None),
+                default_access_mode=getattr(deploy_engine_request_json, "default_access_mode", None),
             )
             update_workflow_data_in_statestore(
                 str(workflow_id),
@@ -471,7 +485,6 @@ class CreateDeploymentWorkflow:
         namespace = workflow_run_benchmark_request_json.namespace
         # NOTE: For performance benchmark, we need to cleanup the namespace after the benchmark is done
         cleanup_namespace = workflow_run_benchmark_request_json.cleanup_namespace
-        logger.info(f"Workflow run benchmark request: {workflow_run_benchmark_request_json.benchmark_request}")
         run_benchmark_request_json = workflow_run_benchmark_request_json.benchmark_request
         logger.info(f"Run benchmark for endpoint: {run_benchmark_request_json.deployment_url}")
         exception_occurred = False
@@ -737,13 +750,17 @@ class CreateDeploymentWorkflow:
                         }
                     simulator_config.append(node_info)
             elif deployment_request_json.simulator_id:
-                simulator_config = asyncio.run(
+                simulator_config, metadata = asyncio.run(
                     SimulatorHandler().get_cluster_simulator_config(
                         deployment_request_json.cluster_id,
                         deployment_request_json.simulator_id,
                         deployment_request_json.concurrency,
                     )
                 )
+                # Store metadata for later use in deployment
+                deployment_request_json.tool_calling_parser_type = metadata.get("tool_calling_parser_type")
+                deployment_request_json.reasoning_parser_type = metadata.get("reasoning_parser_type")
+                deployment_request_json.chat_template = metadata.get("chat_template")
             logger.info(f"Simulator config got from budsim: {simulator_config}")
             deployment_request_json.simulator_config = simulator_config
         except Exception as e:
@@ -771,6 +788,8 @@ class CreateDeploymentWorkflow:
             endpoint_name=deployment_request_json.endpoint_name,
             platform=deployment_request_json.platform,
             existing_deployment_namespace=deployment_request_json.existing_deployment_namespace,
+            default_storage_class=getattr(deployment_request_json, "default_storage_class", None),
+            default_access_mode=getattr(deployment_request_json, "default_access_mode", None),
         )
         transfer_model_result = yield ctx.call_activity(
             CreateDeploymentWorkflow.transfer_model, input=transfer_model_request.model_dump_json()
@@ -1176,6 +1195,8 @@ class CreateCloudDeploymentWorkflow:
                 add_worker=add_worker,
                 use_tensorzero=True,
                 provider=deploy_engine_request_json.provider,
+                default_storage_class=getattr(deploy_engine_request_json, "default_storage_class", None),
+                default_access_mode=getattr(deploy_engine_request_json, "default_access_mode", None),
             )
             update_workflow_data_in_statestore(
                 str(workflow_id),
@@ -1349,13 +1370,17 @@ class CreateCloudDeploymentWorkflow:
                         }
                     )
             elif deployment_request_json.simulator_id:
-                simulator_config = asyncio.run(
+                simulator_config, metadata = asyncio.run(
                     SimulatorHandler().get_cluster_simulator_config(
                         deployment_request_json.cluster_id,
                         deployment_request_json.simulator_id,
                         deployment_request_json.concurrency,
                     )
                 )
+                # Store metadata for later use in deployment (cloud workflow)
+                deployment_request_json.tool_calling_parser_type = metadata.get("tool_calling_parser_type")
+                deployment_request_json.reasoning_parser_type = metadata.get("reasoning_parser_type")
+                deployment_request_json.chat_template = metadata.get("chat_template")
             logger.info(f"Simulator config got from budsim: {simulator_config}")
             deployment_request_json.simulator_config = simulator_config
         except Exception as e:

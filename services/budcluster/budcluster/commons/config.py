@@ -47,10 +47,6 @@ class AppConfig(BaseAppConfig):
     max_endpoint_retry_attempts: int = Field(15, alias="MAX_ENDPOINT_RETRY_ATTEMPTS")
     endpoint_retry_interval: int = Field(20, alias="ENDPOINT_RETRY_INTERVAL")
 
-    registry_server: str = Field(..., alias="REGISTRY_SERVER")
-    registry_username: str = Field(..., alias="REGISTRY_USERNAME")
-    registry_password: str = Field(..., alias="REGISTRY_PASSWORD")
-
     # Microservice
     notify_service_name: str = Field("notify", alias="NOTIFY_SERVICE_NAME")
     notify_service_topic: Optional[str] = Field(None, alias="NOTIFY_SERVICE_TOPIC")

@@ -1,6 +1,6 @@
 {
   imports = [
-    ../budk8s/configuration.nix
+    ../master/configuration.nix
     ./disko.nix
 
     ./modules/scid.nix

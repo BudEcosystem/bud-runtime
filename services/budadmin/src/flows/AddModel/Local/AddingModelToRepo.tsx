@@ -68,7 +68,7 @@ export default function AddingModelToRepo() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍",
+        icon: "🌐",
       }}
       onNext={() => {
         openDrawerWithStep("select-or-add-credentials");

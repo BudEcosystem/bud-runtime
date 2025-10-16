@@ -64,65 +64,96 @@
 
 
 {{- define "bud.ingress.url.budadmin" -}}
-{{- if .Values.ingress.httpsEnabled }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budadmin" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budadmin" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.budcustomer" -}}
-{{- if .Values.ingress.httpsEnabled }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budcustomer" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budcustomer" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.budplayground" -}}
-{{- if .Values.ingress.httpsEnabled }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budplayground" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budplayground" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.budapp" -}}
-{{- if .Values.ingress.httpsEnabled }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budapp" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budapp" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.budgateway" -}}
-{{- if .Values.ingress.httpsEnabled }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budgateway" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budgateway" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.budask" -}}
-{{- if .Values.ingress.httpsEnabled }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budask" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budask" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.novuapi" -}}
-{{- if .Values.ingress.httpsEnabled }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.novuapi" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.novuapi" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.novuws" -}}
-{{- if .Values.ingress.httpsEnabled }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.novuws" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.novuws" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.s3" -}}
-{{- if .Values.ingress.httpsEnabled }}
+{{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.s3" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.s3" $) }}
+{{- end }}
+{{- end }}
+
+
+{{- define "bud.externalServices.minio.endpoint" -}}
+{{- if .Values.externalServices.minio.endpoint }}
+{{- print .Values.externalServices.minio.endpoint  }}
+{{- else }}
+{{- printf "%s-minio.%s:9000" .Release.Name .Release.Namespace }}
+{{- end }}
+{{- end }}
+{{- define "bud.externalServices.minio.auth.accessKey" -}}
+{{- if .Values.externalServices.minio.auth.accessKey }}
+{{- print .Values.externalServices.minio.auth.accessKey  }}
+{{- else }}
+{{- print .Values.minio.auth.rootUser  }}
+{{- end }}
+{{- end }}
+{{- define "bud.externalServices.minio.auth.secretKey" -}}
+{{- if .Values.externalServices.minio.auth.secretKey }}
+{{- print .Values.externalServices.minio.auth.secretKey  }}
+{{- else }}
+{{- print .Values.minio.auth.rootPassword  }}
+{{- end }}
+{{- end }}
+
+{{- define "bud.externalServices.postgresql.host" -}}
+{{- if .Values.externalServices.postgresql.host }}
+{{- print .Values.externalServices.postgresql.host  }}
+{{- else }}
+{{- printf "%s-postgresql.%s" .Release.Name .Release.Namespace }}
 {{- end }}
 {{- end }}

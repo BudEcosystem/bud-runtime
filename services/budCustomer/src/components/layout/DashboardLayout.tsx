@@ -180,26 +180,6 @@ const DashboardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     }
   }, [pathname]); // Re-run on pathname change like budadmin
 
-  useEffect(() => {
-    console.log("Novu Notification Center version:", pkg.version);
-    console.log(
-      "process.env.NEXT_PUBLIC_BASE_URL",
-      process.env.NEXT_PUBLIC_BASE_URL,
-    );
-    console.log(
-      "process.env.NEXT_PUBLIC_NOVU_SOCKET_URL",
-      process.env.NEXT_PUBLIC_NOVU_SOCKET_URL,
-    );
-    console.log(
-      "process.env.NEXT_PUBLIC_NOVU_BASE_URL",
-      process.env.NEXT_PUBLIC_NOVU_BASE_URL,
-    );
-    console.log(
-      "process.env.NEXT_PUBLIC_NOVU_APP_ID",
-      process.env.NEXT_PUBLIC_NOVU_APP_ID,
-    );
-  }, []);
-
   return (
     <div className="flex h-screen bg-[#f2f2f2] dark:bg-bud-bg-primary">
       {/* Sidebar */}
