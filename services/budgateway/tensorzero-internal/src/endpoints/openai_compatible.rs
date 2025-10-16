@@ -55,7 +55,7 @@ use crate::audio::{
     TimestampGranularity,
 };
 use crate::completions::{
-    CompletionPrompt, CompletionRequest, CompletionStop,
+    CompletionChoiceChunk, CompletionPrompt, CompletionRequest, CompletionStop,
 };
 use crate::embeddings::EmbeddingRequest;
 use crate::file_storage::validate_batch_file;
@@ -2375,6 +2375,7 @@ impl CompletionStreamProcessor {
                 total_tokens: 0,
             };
             let mut completion_id: Option<String> = None;
+            let mut chunks_forwarded = 0;
 
             // Process all chunks and accumulate usage
             while let Some(chunk_result) = self.stream.next().await {
@@ -2385,47 +2386,76 @@ impl CompletionStreamProcessor {
                             completion_id = Some(chunk.id.clone());
                         }
 
+                        chunks_forwarded += 1;
+                        tracing::debug!(
+                            "CompletionStreamProcessor forwarding chunk #{} to client: id={}, choices.len={}, has_usage={}",
+                            chunks_forwarded,
+                            chunk.id,
+                            chunk.choices.len(),
+                            chunk.usage.is_some()
+                        );
+
                         // Accumulate usage (vLLM sends usage in chunks)
                         // For now, we'll track it but usage is typically only in final chunk
 
-                        // Convert to OpenAI-compatible format
-                        let openai_chunk = serde_json::json!({
-                            "id": chunk.id,
-                            "object": chunk.object,
-                            "created": chunk.created,
-                            "model": chunk.model,
-                            "choices": chunk.choices,
-                            "usage": chunk.usage.map(|u| OpenAICompatibleUsage {
-                                prompt_tokens: u.input_tokens,
-                                completion_tokens: u.output_tokens,
-                                total_tokens: u.input_tokens + u.output_tokens,
-                            }),
+                        // Convert to OpenAI-compatible format with proper usage structure
+                        // Serialize directly to avoid buffering overhead from serde_json::json!()
+                        let openai_usage = chunk.usage.map(|u| OpenAICompatibleUsage {
+                            prompt_tokens: u.input_tokens,
+                            completion_tokens: u.output_tokens,
+                            total_tokens: u.input_tokens + u.output_tokens,
                         });
 
-                        yield Ok(Event::default().json_data(openai_chunk).map_err(|e| {
-                            Error::new(ErrorDetails::Inference {
-                                message: format!("Failed to convert completion chunk to Event: {e}"),
+                        // Create a wrapper struct for efficient serialization
+                        #[derive(serde::Serialize)]
+                        struct OpenAICompletionChunk<'a> {
+                            id: &'a str,
+                            object: &'a str,
+                            created: u64,
+                            model: &'a str,
+                            choices: &'a [CompletionChoiceChunk],
+                            #[serde(skip_serializing_if = "Option::is_none")]
+                            usage: Option<OpenAICompatibleUsage>,
+                        }
+
+                        let serializable_chunk = OpenAICompletionChunk {
+                            id: &chunk.id,
+                            object: &chunk.object,
+                            created: chunk.created,
+                            model: &chunk.model,
+                            choices: &chunk.choices,
+                            usage: openai_usage,
+                        };
+
+                        // Serialize to JSON string and create SSE event manually for immediate flushing
+                        let json_str = serde_json::to_string(&serializable_chunk).map_err(|e| {
+                            Error::new(ErrorDetails::Serialization {
+                                message: format!("Failed to serialize completion chunk: {e}"),
                             })
-                        })?);
+                        })?;
+
+                        // Create SSE event with explicit data field
+                        let event = Event::default().data(json_str);
+
+                        yield Ok(event);
                     }
                     Err(e) => {
-                        tracing::error!("Error in completion stream: {}", e);
-                        // Send error event to client and terminate stream
-                        let error_event = serde_json::json!({
-                            "error": {
-                                "message": e.to_string(),
-                                "type": "provider_error"
-                            }
-                        });
-                        yield Ok(Event::default().json_data(error_event).map_err(|e| {
-                            Error::new(ErrorDetails::Inference {
-                                message: format!("Failed to convert error to Event: {e}"),
-                            })
-                        })?);
-                        break; // Stop processing on error
+                        tracing::error!(
+                            "Error from vLLM completion stream after {} chunks forwarded, skipping chunk and continuing: {}",
+                            chunks_forwarded,
+                            e
+                        );
+                        // Log error but continue processing (matches ChatCompletion behavior)
+                        // Skip this chunk and continue to next one
+                        continue;
                     }
                 }
             }
+
+            tracing::info!(
+                "CompletionStreamProcessor finished. Total chunks forwarded to client: {}",
+                chunks_forwarded
+            );
 
             // Handle final usage message if stream_options.include_usage is true
             if let Some(ref options) = self.stream_options {
@@ -2645,13 +2675,34 @@ pub async fn completion_handler(
 
     if stream {
         // Streaming response - use model's complete_stream method
-        let (completion_stream, _raw_request) = model
+        let (mut completion_stream, _raw_request) = model
             .complete_stream(&request, &original_model_name, &clients)
             .await?;
 
+        // CRITICAL FIX: Peek at first chunk to ensure stream is ready before creating SSE response
+        // This prevents [DONE] from arriving before content chunks under high concurrency
+        // by forcing the underlying vLLM SSE connection to establish before we start the response
+        let mut first_chunk = None;
+        use futures::StreamExt;
+        if let Some(chunk_result) = completion_stream.next().await {
+            first_chunk = Some(chunk_result);
+        }
+
+        // Create a combined stream that re-injects the first chunk, then yields the rest
+        let combined_stream: crate::completions::CompletionStream = Box::pin(async_stream::stream! {
+            // Yield the first chunk if we have one
+            if let Some(chunk) = first_chunk {
+                yield chunk;
+            }
+            // Then yield the rest of the stream
+            while let Some(chunk) = completion_stream.next().await {
+                yield chunk;
+            }
+        });
+
         // Convert completion stream to SSE events
         let sse_stream = prepare_serialized_completion_events(
-            completion_stream,
+            combined_stream,
             original_model_name,
             stream_options,
         );
