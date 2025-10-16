@@ -22,7 +22,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Type
 
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
-from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ThinkingPart, ToolCallPart
+from pydantic_ai.messages import ModelMessage, ModelResponse, ThinkingPart, ToolCallPart
 from pydantic_ai.output import NativeOutput
 from pydantic_ai.settings import ModelSettings
 
@@ -107,6 +107,9 @@ class StreamingValidationExecutor:
         self.validated_fields: Dict[str, Any] = {}  # Fields that passed validation
         self.failed_fields: Dict[str, Any] = {}  # Fields that failed validation
 
+        # Track what we've sent to client for delta computation
+        self.last_sent_fields: Dict[str, Any] = {}
+
         # Create provider
         self.provider = BudServeProvider(api_key=api_key)
 
@@ -165,6 +168,7 @@ class StreamingValidationExecutor:
                     # Reset formatter text accumulation for retry
                     self.formatter.accumulated_text = ""
                     self.formatter.accumulated_reasoning = ""
+                    # Don't reset last_sent_fields - keep delta tracking across retries
                     # Note: Don't reset validated_fields/failed_fields - they're used in retry prompt
                     continue
                 else:
@@ -181,6 +185,7 @@ class StreamingValidationExecutor:
                 if attempt < self.retry_limit - 1:
                     self.formatter.accumulated_text = ""
                     self.formatter.accumulated_reasoning = ""
+                    # Don't reset last_sent_fields - keep delta tracking across retries
                     # Note: Don't reset validated_fields/failed_fields - they're used in retry prompt
                     continue
                 else:
@@ -236,14 +241,27 @@ class StreamingValidationExecutor:
                     try:
                         async for validation_result in validator.process_streaming_message(message):
                             if validation_result["valid"]:
-                                # Valid - extract and emit text deltas (same as _run_agent_stream)
-                                for part in message.parts:
-                                    if isinstance(part, TextPart) and part.content:
-                                        delta_event = self.formatter.format_output_text_delta(part.content)
-                                        if delta_event:
-                                            yield delta_event
+                                # Get current validated data
+                                current_validated = validation_result.get("validated_data", {})
 
-                                    elif isinstance(part, ThinkingPart) and part.content:
+                                # Compute delta (only changed fields)
+                                field_delta = self._compute_field_delta(current_validated)
+
+                                if field_delta:
+                                    # Convert delta to JSON string
+                                    delta_json = json.dumps(field_delta, separators=(",", ":"))
+
+                                    # Emit as text delta
+                                    delta_event = self.formatter.format_output_text_delta(delta_json)
+                                    if delta_event:
+                                        yield delta_event
+
+                                    # Update what we've sent
+                                    self.last_sent_fields.update(field_delta)
+
+                                # Handle reasoning/thinking parts
+                                for part in message.parts:
+                                    if isinstance(part, ThinkingPart) and part.content:
                                         # Handle reasoning
                                         if not self.formatter.reasoning_started:
                                             yield self.formatter.format_reasoning_summary_part_added()
@@ -270,14 +288,39 @@ class StreamingValidationExecutor:
                     # Final chunk - validate completely
                     validated_result = await result.validate_structured_output(message, allow_partial=False)
 
-                    # Validation passed - emit any remaining deltas from final chunk
-                    for part in message.parts:
-                        if isinstance(part, TextPart) and part.content:
-                            delta_event = self.formatter.format_output_text_delta(part.content)
-                            if delta_event:
-                                yield delta_event
+                    # Validation passed - merge previously validated fields to preserve them
+                    # This ensures LLM doesn't change already-validated fields during retry
+                    if hasattr(validated_result, "model_dump"):
+                        final_validated_data = validated_result.model_dump()
+                    else:
+                        final_validated_data = validated_result if isinstance(validated_result, dict) else {}
 
-                        elif isinstance(part, ThinkingPart) and part.content:
+                    # Merge validated fields from previous attempts (overwrite any LLM changes)
+                    if self.validated_fields:
+                        final_validated_data = {**final_validated_data, **self.validated_fields}
+
+                    # Compute delta (only new or changed fields since last send)
+                    final_delta = self._compute_field_delta(final_validated_data)
+
+                    if final_delta:
+                        # Convert delta to JSON string
+                        delta_json = json.dumps(final_delta, separators=(",", ":"))
+
+                        # Emit as text delta
+                        delta_event = self.formatter.format_output_text_delta(delta_json)
+                        if delta_event:
+                            yield delta_event
+
+                        # Update what we've sent
+                        self.last_sent_fields.update(final_delta)
+
+                    # Set accumulated_text to complete final JSON for done events
+                    complete_json = json.dumps(final_validated_data, separators=(",", ":"))
+                    self.formatter.accumulated_text = complete_json
+
+                    # Handle reasoning/thinking parts
+                    for part in message.parts:
+                        if isinstance(part, ThinkingPart) and part.content:
                             # Handle any final reasoning content
                             if not self.formatter.reasoning_started:
                                 yield self.formatter.format_reasoning_summary_part_added()
@@ -293,11 +336,11 @@ class StreamingValidationExecutor:
                             logger.debug(f"Tool call: {part.tool_name}")
 
                     # Store attempted data for retry context
-                    if hasattr(validated_result, "model_dump"):
-                        self.last_attempted_data = validated_result.model_dump()
-                        # All fields passed validation on success
-                        self.validated_fields = validated_result.model_dump()
-                        self.failed_fields = {}
+                    # Use the merged final_validated_data (with preserved fields) not raw validated_result
+                    self.last_attempted_data = final_validated_data
+                    # All fields passed validation on success
+                    self.validated_fields = final_validated_data
+                    self.failed_fields = {}
 
                     # Capture usage
                     if message.usage:
@@ -369,3 +412,21 @@ Generate the complete corrected {model_name} object with all fields."""
                 rules.append(f"- {field_name}: {field_validation['prompt']}")
 
         return "\n".join(rules) if rules else "No specific validation rules"
+
+    def _compute_field_delta(self, current_validated: Dict[str, Any]) -> Dict[str, Any]:
+        """Compute fields that are new or changed since last send.
+
+        Args:
+            current_validated: Currently validated fields from validator
+
+        Returns:
+            Dict containing only new/changed fields
+        """
+        delta = {}
+
+        for field_name, field_value in current_validated.items():
+            # Include if field is new or value changed
+            if field_name not in self.last_sent_fields or self.last_sent_fields[field_name] != field_value:
+                delta[field_name] = field_value
+
+        return delta
