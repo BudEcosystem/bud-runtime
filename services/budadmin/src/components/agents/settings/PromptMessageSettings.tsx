@@ -46,6 +46,19 @@ export const PromptMessageSettings: React.FC<PromptMessageSettingsProps> = ({
 
   const [messageOpenStates, setMessageOpenStates] = React.useState<Record<string, boolean>>({});
 
+  // Sync messages state when promptMessages prop changes (e.g., from external delete)
+  React.useEffect(() => {
+    try {
+      if (promptMessages && typeof promptMessages === 'string' && promptMessages.startsWith('[')) {
+        const parsedMessages = JSON.parse(promptMessages);
+        setMessages(parsedMessages);
+      }
+    } catch (e) {
+      // Invalid JSON, keep current state
+      console.error('Error parsing promptMessages:', e);
+    }
+  }, [promptMessages]);
+
   // Initialize first message as open
   React.useEffect(() => {
     if (messages.length > 0 && Object.keys(messageOpenStates).length === 0) {
@@ -89,10 +102,6 @@ export const PromptMessageSettings: React.FC<PromptMessageSettingsProps> = ({
       ...prev,
       [messageId]: !prev[messageId]
     }));
-  };
-
-  const getRoleDisplayName = (role: string) => {
-    return role.charAt(0).toUpperCase() + role.slice(1);
   };
 
   return (

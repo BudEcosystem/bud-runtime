@@ -150,6 +150,32 @@ function AgentBoxInner({
     if (session) updateSession(session.id, { promptMessages: value });
   };
 
+  const handleDeletePromptMessage = (messageId: string) => {
+    if (!session) return;
+
+    // Parse current messages
+    let messages: any[] = [];
+    try {
+      if (session.promptMessages && typeof session.promptMessages === 'string') {
+        messages = JSON.parse(session.promptMessages);
+      }
+    } catch (e) {
+      console.error('Error parsing prompt messages:', e);
+      return;
+    }
+
+    // Keep at least one message
+    if (messages.length <= 1) return;
+
+    // Filter out the deleted message
+    const updatedMessages = messages.filter(msg => msg.id !== messageId);
+
+    // Update session with new messages
+    const updatedMessagesString = JSON.stringify(updatedMessages);
+    setLocalPromptMessages(updatedMessagesString);
+    updateSession(session.id, { promptMessages: updatedMessagesString });
+  };
+
   // Handler for when a flowgram card is clicked
   const handleNodeClick = (nodeType: string, nodeId: string, nodeData: any) => {
     // The openSettings function in context already handles the mapping
@@ -727,6 +753,7 @@ function AgentBoxInner({
               onSaveSystemPrompt={handleSaveSystemPrompt}
               onSavePromptMessages={handleSavePromptMessages}
               onDeleteVariable={handleDeleteVariable}
+              onDeletePromptMessage={handleDeletePromptMessage}
               isSaving={isSaving}
               isSavingOutput={isSavingOutput}
               isSavingSystemPrompt={isSavingSystemPrompt}
