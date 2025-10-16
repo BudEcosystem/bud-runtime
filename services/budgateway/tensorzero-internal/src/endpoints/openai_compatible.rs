@@ -2586,7 +2586,7 @@ pub async fn completion_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(params.model.as_str()),
         &headers,
         false, // not for embedding
     )?;
