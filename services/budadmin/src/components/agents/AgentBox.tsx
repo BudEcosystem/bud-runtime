@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from "react";
-import { Dropdown, Tooltip } from "antd";
+import { ConfigProvider, Dropdown, Tooltip } from "antd";
 import {
   CloseOutlined,
   CopyOutlined,
@@ -647,26 +647,51 @@ function AgentBoxInner({
           </Tooltip>
 
           {/* More Options Dropdown */}
-          <Dropdown menu={{ items: menuItems }} trigger={["click"]} placement="bottomRight">
-            <Tooltip title="Options" placement="bottom">
-              <button className="w-7 h-7 rounded-md flex justify-center items-center cursor-pointer hover:bg-[#1A1A1A] transition-colors">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  fill="none"
-                >
-                  <path
-                    fill="currentColor"
-                    fillRule="evenodd"
-                    d="M10.453 3.226a1.226 1.226 0 1 1-2.453 0 1.226 1.226 0 0 1 2.453 0Zm0 5.45a1.226 1.226 0 1 1-2.453 0 1.226 1.226 0 0 1 2.453 0Zm-1.226 6.676a1.226 1.226 0 1 0 0-2.452 1.226 1.226 0 0 0 0 2.452Z"
-                    clipRule="evenodd"
-                    className="text-[#B3B3B3] hover:text-white"
-                  />
-                </svg>
-              </button>
-            </Tooltip>
-          </Dropdown>
+          <ConfigProvider
+            theme={{
+              components: {
+                Dropdown: {
+                  colorBgElevated: '#161616',
+                  borderRadiusLG: 6,
+                  controlItemBgHover: '#1F1F1F',
+                  colorText: '#FFFFFF',
+                },
+              },
+            }}
+          >
+            <Dropdown
+              menu={{
+                items: menuItems,
+                style: {
+                  background: '#161616',
+                  border: '1px solid #1F1F1F',
+                  borderRadius: '6px',
+                  padding: '.7rem .6rem',
+                }
+              }}
+              trigger={["click"]}
+              placement="bottomRight"
+            >
+              <Tooltip title="Options" placement="bottom">
+                <button className="w-7 h-7 rounded-md flex justify-center items-center cursor-pointer hover:bg-[#1A1A1A] transition-colors">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    fill="none"
+                  >
+                    <path
+                      fill="currentColor"
+                      fillRule="evenodd"
+                      d="M10.453 3.226a1.226 1.226 0 1 1-2.453 0 1.226 1.226 0 0 1 2.453 0Zm0 5.45a1.226 1.226 0 1 1-2.453 0 1.226 1.226 0 0 1 2.453 0Zm-1.226 6.676a1.226 1.226 0 1 0 0-2.452 1.226 1.226 0 0 0 0 2.452Z"
+                      clipRule="evenodd"
+                      className="text-[#B3B3B3] hover:text-white"
+                    />
+                  </svg>
+                </button>
+              </Tooltip>
+            </Dropdown>
+          </ConfigProvider>
 
           {/* Close Button */}
           {totalSessions > 1 && (
@@ -701,6 +726,7 @@ function AgentBoxInner({
               onSaveOutputSchema={handleSaveOutputSchema}
               onSaveSystemPrompt={handleSaveSystemPrompt}
               onSavePromptMessages={handleSavePromptMessages}
+              onDeleteVariable={handleDeleteVariable}
               isSaving={isSaving}
               isSavingOutput={isSavingOutput}
               isSavingSystemPrompt={isSavingSystemPrompt}
