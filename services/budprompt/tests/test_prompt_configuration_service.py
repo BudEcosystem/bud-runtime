@@ -791,7 +791,7 @@ class TestValidateSchema:
     @patch('budprompt.prompt.services.run_async')
     @patch('budprompt.prompt.services.dapr_workflow')
     def test_prompt_schema_request_with_null_schema(
-        self, mock_dapr_workflow, mock_run_async
+        self, mock_dapr_workflow, mock_run_async, llm_config
     ):
         """Test PromptConfigurationService.__call__ with schema containing null values."""
         # Arrange
@@ -807,6 +807,7 @@ class TestValidateSchema:
                 validations=None  # Clear validations
             ),
             type="input",
+            deployment_name=llm_config["model_name"],
         )
 
         # Mock Redis operations
@@ -838,11 +839,19 @@ class TestGenerateValidationCodes:
         notification_req.payload.content = None
         return notification_req
 
+    @patch('budprompt.prompt.revised_code.field_validation.BudServeProvider')
     @patch('budprompt.prompt.services.dapr_workflow')
+    @pytest.mark.integration
+    @pytest.mark.llm
     def test_generate_validation_codes_success(
-        self, mock_dapr_workflow, mock_notification_request
+        self, mock_dapr_workflow, mock_provider_class, mock_notification_request, llm_model, llm_config
     ):
         """Test successful validation code generation with actual LLM calls."""
+        # Mock the BudServeProvider to return our test LLM model
+        mock_provider = Mock()
+        mock_provider.get_model.return_value = llm_model
+        mock_provider_class.return_value = mock_provider
+
         # Arrange
         workflow_id = str(uuid.uuid4())
 
@@ -864,6 +873,7 @@ class TestGenerateValidationCodes:
                 }
             ),
             type="input",
+            deployment_name=llm_config["model_name"],
         )
 
         # Act - This will make actual LLM calls
@@ -871,6 +881,7 @@ class TestGenerateValidationCodes:
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
             validations=request.schema.validations,
+            deployment_name=llm_config["model_name"],
         )
 
         # Assert
@@ -893,11 +904,19 @@ class TestGenerateValidationCodes:
         assert "def validate_name" in name_code
         assert "def validate_age" in age_code
 
+    @patch('budprompt.prompt.revised_code.field_validation.BudServeProvider')
     @patch('budprompt.prompt.services.dapr_workflow')
+    @pytest.mark.integration
+    @pytest.mark.llm
     def test_generate_validation_codes_with_output_schema(
-        self, mock_dapr_workflow, mock_notification_request
+        self, mock_dapr_workflow, mock_provider_class, mock_notification_request, llm_model, llm_config
     ):
         """Test validation code generation with output schema using actual LLM."""
+        # Mock the BudServeProvider to return our test LLM model
+        mock_provider = Mock()
+        mock_provider.get_model.return_value = llm_model
+        mock_provider_class.return_value = mock_provider
+
         # Arrange
         workflow_id = str(uuid.uuid4())
 
@@ -919,6 +938,7 @@ class TestGenerateValidationCodes:
                 }
             ),
             type="output",
+            deployment_name=llm_config["model_name"],
         )
 
         # Act - This will make actual LLM calls
@@ -926,6 +946,7 @@ class TestGenerateValidationCodes:
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
             validations=request.schema.validations,
+            deployment_name=llm_config["model_name"],
         )
 
         print(result, "===============")
@@ -948,11 +969,19 @@ class TestGenerateValidationCodes:
         assert "def validate_token" in token_code
         assert "def validate_expires_in" in expires_code
 
+    @patch('budprompt.prompt.revised_code.field_validation.BudServeProvider')
     @patch('budprompt.prompt.services.dapr_workflow')
+    @pytest.mark.integration
+    @pytest.mark.llm
     def test_generate_validation_codes_no_validations(
-        self, mock_dapr_workflow, mock_notification_request
+        self, mock_dapr_workflow, mock_provider_class, mock_notification_request, llm_model, llm_config
     ):
         """Test when there are no validations to generate."""
+        # Mock the BudServeProvider to return our test LLM model
+        mock_provider = Mock()
+        mock_provider.get_model.return_value = llm_model
+        mock_provider_class.return_value = mock_provider
+
         # Arrange
         workflow_id = str(uuid.uuid4())
 
@@ -963,6 +992,7 @@ class TestGenerateValidationCodes:
                 validations={}
             ),
             type="input",
+            deployment_name=llm_config["model_name"],
         )
 
         # Act
@@ -970,6 +1000,7 @@ class TestGenerateValidationCodes:
             workflow_id=workflow_id,
             notification_request=mock_notification_request,
             validations=request.schema.validations,
+            deployment_name=llm_config["model_name"],
         )
 
         # Assert

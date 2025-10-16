@@ -92,6 +92,25 @@ fn merge_credentials_from_store(
     credentials
 }
 
+/// Helper function to merge credentials from headers (for dynamic authorization)
+fn merge_credentials_from_headers(
+    headers: &HeaderMap,
+    credentials: &mut InferenceCredentials,
+) {
+    // Extract authorization header if present
+    if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            // Strip "Bearer " prefix if present
+            let token = auth_str.strip_prefix("Bearer ").unwrap_or(auth_str);
+            // Use "authorization" as the key so dynamic::authorization lookup can find it
+            credentials.insert(
+                "authorization".to_string(),
+                secrecy::SecretString::from(token.to_string()),
+            );
+        }
+    }
+}
+
 /// Helper function to create OpenAI-compatible error response for guardrail violations
 fn create_guardrail_error_response(
     message: &str,
@@ -194,7 +213,7 @@ pub async fn inference_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &openai_compatible_params.model,
+        Some(&openai_compatible_params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -2567,7 +2586,7 @@ pub async fn completion_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(params.model.as_str()),
         &headers,
         false, // not for embedding
     )?;
@@ -2768,7 +2787,7 @@ pub async fn embedding_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &openai_compatible_params.model,
+        Some(&openai_compatible_params.model),
         &headers,
         true, // for embedding
     )?;
@@ -3091,7 +3110,7 @@ pub async fn moderation_handler(
         .unwrap_or_else(|| "omni-moderation-latest".to_string());
 
     // Resolve the model name based on authentication state
-    let model_resolution = model_resolution::resolve_model_name(&model_name, &headers, false)?;
+    let model_resolution = model_resolution::resolve_model_name(Some(&model_name), &headers, false)?;
 
     let resolved_model_name = model_resolution
         .model_name
@@ -3728,7 +3747,7 @@ pub async fn audio_transcription_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -3957,7 +3976,7 @@ pub async fn audio_translation_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4121,7 +4140,7 @@ pub async fn text_to_speech_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4279,7 +4298,7 @@ pub async fn realtime_session_handler(
 ) -> Result<Response<Body>, Error> {
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4364,7 +4383,7 @@ pub async fn realtime_transcription_session_handler(
 ) -> Result<Response<Body>, Error> {
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4612,7 +4631,7 @@ pub async fn image_generation_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4941,7 +4960,7 @@ pub async fn image_edit_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -5110,7 +5129,7 @@ pub async fn image_variation_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -5547,16 +5566,16 @@ pub async fn response_create_handler(
         );
     }
 
-    // Resolve the model name based on authentication state
+    // Resolve the model name based on authentication state (optional for prompt-based requests)
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        params.model.as_deref(),
         &headers,
         false, // not for embedding
     )?;
 
     let model_name = model_resolution.model_name.ok_or_else(|| {
         Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
-            message: "Response requests must specify a model, not a function".to_string(),
+            message: "Response requests must specify a model or prompt.id".to_string(),
         })
     })?;
 
@@ -5579,7 +5598,10 @@ pub async fn response_create_handler(
         })?;
 
     // Merge credentials from the credential store
-    let credentials = merge_credentials_from_store(&model_credential_store);
+    let mut credentials = merge_credentials_from_store(&model_credential_store);
+
+    // Merge credentials from headers for dynamic authorization (responses API only)
+    merge_credentials_from_headers(&headers, &mut credentials);
 
     // Create inference clients
     let cache_options = crate::cache::CacheOptions {
@@ -5603,36 +5625,98 @@ pub async fn response_create_handler(
         );
     }
 
-    // Check if streaming is requested
-    if params.stream.unwrap_or(false) {
-        // Handle streaming response
-        let stream = model
-            .stream_response(&params, &model_resolution.original_model_name, &clients)
-            .await?;
+    // Check if this is a BudPrompt request with prompt parameter
+    // BudPrompt determines streaming based on internal prompt config, not the stream parameter
+    let is_budprompt_with_prompt = {
+        let models = config.models.read().await;
+        let model_info = models.get(&model_name).await?.ok_or_else(|| {
+            Error::new(ErrorDetails::Config {
+                message: format!("Model '{}' not found", model_name),
+            })
+        })?;
 
-        // Convert to SSE stream
-        let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
-            Ok(event) => Event::default().json_data(event).map_err(|e| {
-                Error::new(ErrorDetails::Inference {
-                    message: format!("Failed to serialize SSE event: {e}"),
-                })
-            }),
-            Err(e) => Err(e),
+        // Check if any provider is BudPrompt
+        let has_budprompt = model_info.providers.values().any(|p| {
+            matches!(p.config, crate::model::ProviderConfig::BudPrompt(_))
         });
 
-        Ok(Sse::new(sse_stream).into_response())
-    } else {
-        // Handle non-streaming response
-        let response = model
-            .create_response(&params, &model_resolution.original_model_name, &clients)
+        has_budprompt && params.prompt.is_some()
+    };
+
+    if is_budprompt_with_prompt {
+        // Use automatic format detection for BudPrompt with prompt parameter
+        use crate::responses::ResponseResult;
+
+        let result = model
+            .execute_response_with_detection(&params, &model_resolution.original_model_name, &clients)
             .await?;
 
-        // Log the response size for debugging
-        if let Ok(response_json) = serde_json::to_string(&response) {
-            tracing::debug!("Response size: {} bytes", response_json.len());
-        }
+        match result {
+            ResponseResult::Streaming(stream) => {
+                // Convert to SSE stream
+                let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
+                    Ok(event) => {
+                        Event::default()
+                            .event(event.event)
+                            .json_data(event.data)
+                            .map_err(|e| {
+                                Error::new(ErrorDetails::Inference {
+                                    message: format!("Failed to serialize SSE event: {e}"),
+                                })
+                            })
+                    },
+                    Err(e) => Err(e),
+                });
 
-        Ok(Json(response).into_response())
+                Ok(Sse::new(sse_stream).into_response())
+            }
+            ResponseResult::NonStreaming(response) => {
+                // Log the response size for debugging
+                if let Ok(response_json) = serde_json::to_string(&response) {
+                    tracing::debug!("Response size: {} bytes", response_json.len());
+                }
+
+                Ok(Json(response).into_response())
+            }
+        }
+    } else {
+        // Standard behavior: check stream parameter
+        if params.stream.unwrap_or(false) {
+            // Handle streaming response
+            let stream = model
+                .stream_response(&params, &model_resolution.original_model_name, &clients)
+                .await?;
+
+            // Convert to SSE stream
+            let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
+                Ok(event) => {
+                    // For ResponseStreamEvent, use event field as SSE event type and data field as data
+                    Event::default()
+                        .event(event.event)
+                        .json_data(event.data)
+                        .map_err(|e| {
+                            Error::new(ErrorDetails::Inference {
+                                message: format!("Failed to serialize SSE event: {e}"),
+                            })
+                        })
+                },
+                Err(e) => Err(e),
+            });
+
+            Ok(Sse::new(sse_stream).into_response())
+        } else {
+            // Handle non-streaming response
+            let response = model
+                .create_response(&params, &model_resolution.original_model_name, &clients)
+                .await?;
+
+            // Log the response size for debugging
+            if let Ok(response_json) = serde_json::to_string(&response) {
+                tracing::debug!("Response size: {} bytes", response_json.len());
+            }
+
+            Ok(Json(response).into_response())
+        }
     }
 }
 
@@ -5685,9 +5769,13 @@ pub async fn response_retrieve_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
@@ -5766,9 +5854,13 @@ pub async fn response_delete_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
@@ -5847,9 +5939,13 @@ pub async fn response_cancel_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
@@ -5928,9 +6024,13 @@ pub async fn response_input_items_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
@@ -7453,14 +7553,15 @@ mod tests {
 
         // Test that the handler properly resolves model names
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4-responses".to_string(),
-            input: json!("Test input"),
+            model: Some("gpt-4-responses".to_string()),
+            input: Some(json!("Test input")),
             instructions: None,
             tools: None,
             tool_choice: None,
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7497,8 +7598,8 @@ mod tests {
 
         // Test that streaming parameters are properly handled
         let params_streaming = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test")),
             stream: Some(true),
             stream_options: Some(json!({"include_usage": true})),
             instructions: None,
@@ -7507,6 +7608,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7526,8 +7628,8 @@ mod tests {
 
         // Test non-streaming
         let params_non_streaming = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test")),
             stream: Some(false),
             stream_options: None,
             instructions: None,
@@ -7536,6 +7638,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7565,8 +7668,8 @@ mod tests {
         metadata.insert("custom_data".to_string(), json!({"key": "value"}));
 
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test")),
             metadata: Some(metadata.clone()),
             stream: None,
             stream_options: None,
@@ -7576,6 +7679,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7606,8 +7710,8 @@ mod tests {
 
         // Test text-only modality
         let params_text = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Text input"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Text input")),
             modalities: Some(vec!["text".to_string()]),
             stream: None,
             stream_options: None,
@@ -7617,6 +7721,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7634,11 +7739,11 @@ mod tests {
 
         // Test multimodal with text and audio
         let params_multimodal = OpenAIResponseCreateParams {
-            model: "gpt-4o-audio".to_string(),
-            input: json!([
+            model: Some("gpt-4o-audio".to_string()),
+            input: Some(json!([
                 {"type": "text", "text": "Describe this image"},
                 {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
-            ]),
+            ])),
             modalities: Some(vec!["text".to_string(), "audio".to_string()]),
             stream: None,
             stream_options: None,
@@ -7648,6 +7753,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7696,8 +7802,8 @@ mod tests {
         ];
 
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("What's the weather in New York?"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("What's the weather in New York?")),
             tools: Some(tools.clone()),
             tool_choice: Some(json!("auto")),
             parallel_tool_calls: Some(true),
@@ -7706,6 +7812,7 @@ mod tests {
             stream_options: None,
             instructions: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -8299,7 +8406,7 @@ pub async fn document_processing_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &openai_compatible_params.model,
+        Some(&openai_compatible_params.model),
         &headers,
         false, // not for embeddings
     )?;

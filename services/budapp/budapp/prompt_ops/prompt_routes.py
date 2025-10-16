@@ -20,6 +20,7 @@ from typing import Annotated, List, Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -70,6 +71,7 @@ from .services import PromptService, PromptVersionService, PromptWorkflowService
 logger = logging.get_logger(__name__)
 
 router = APIRouter(prefix="/prompts", tags=["prompt"])
+security = HTTPBearer()
 
 
 @router.get(
@@ -664,12 +666,14 @@ async def create_prompt_schema_workflow(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     request: PromptSchemaRequest,
+    token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Create a prompt workflow."""
     try:
         db_workflow = await PromptWorkflowService(session).create_prompt_schema_workflow(
             current_user_id=current_user.id,
             request=request,
+            access_token=token.credentials,
         )
 
         return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
@@ -724,7 +728,7 @@ async def save_prompt_config(
     try:
         # Create service instance and save prompt config
         prompt_service = PromptService(session)
-        response = await prompt_service.save_prompt_config(request)
+        response = await prompt_service.save_prompt_config(request, current_user.id)
 
         return response.to_http_response()
 

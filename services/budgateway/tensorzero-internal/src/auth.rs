@@ -11,9 +11,14 @@ use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiKeyMetadata {
-    pub endpoint_id: String,
-    pub model_id: String,
-    pub project_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub endpoint_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
 }
 
 // Auth metadata from Redis __metadata__ field
@@ -179,11 +184,12 @@ pub async fn require_api_key(
     let path = parts.uri.path();
     let is_batch_or_file_endpoint =
         path.starts_with("/v1/batches") || path.starts_with("/v1/files");
+    let is_responses_endpoint = path.starts_with("/v1/responses");
 
     let mut request = Request::from_parts(parts, Body::from(bytes.clone()));
 
     if !is_batch_or_file_endpoint {
-        // Parse the JSON body to validate and extract model name
+        // Parse the JSON body to validate and extract model name or prompt.id
         let val: Value = match serde_json::from_slice(&bytes) {
             Ok(v) => v,
             Err(_) => {
@@ -194,51 +200,91 @@ pub async fn require_api_key(
             }
         };
 
-        let model = match val.get("model").and_then(|v| v.as_str()) {
-            Some(m) => m,
-            None => {
-                return Err(auth_error_response(
-                    StatusCode::BAD_REQUEST,
-                    "Missing model name in request body",
-                ))
-            }
+        // Determine lookup key: either model OR prompt.id with prompt: prefix
+        let (lookup_key, is_prompt_based, _original_prompt_id) = if let Some(model) = val.get("model").and_then(|v| v.as_str()) {
+            // Traditional model-based request
+            (model.to_string(), false, None)
+        } else if let Some(prompt_id) = val.get("prompt")
+            .and_then(|p| p.get("id"))
+            .and_then(|id| id.as_str()) {
+            // Add prompt: prefix for authorization lookup
+            (format!("prompt:{}", prompt_id), true, Some(prompt_id.to_string()))
+        } else {
+            // Provide endpoint-specific error message
+            let error_message = if is_responses_endpoint {
+                "Model name or prompt.id required in request body"
+            } else {
+                "Missing model name in request body"
+            };
+            return Err(auth_error_response(
+                StatusCode::BAD_REQUEST,
+                error_message,
+            ));
         };
 
         // We already checked that api_config is Ok in the if statement above
         #[expect(clippy::unwrap_used)]
         let api_config = api_config.unwrap();
-        let metadata = match api_config.get(model) {
+        let metadata = match api_config.get(&lookup_key) {
             Some(v) => v,
             None => {
+                let error_message = if is_prompt_based {
+                    // Strip "prompt:" prefix for clearer error message
+                    let prompt_id = lookup_key.strip_prefix("prompt:").unwrap_or(&lookup_key);
+                    format!("Prompt not found: {}", prompt_id)
+                } else {
+                    format!("Model not found: {}", lookup_key)
+                };
                 return Err(auth_error_response(
                     StatusCode::NOT_FOUND,
-                    &format!("Model not found: {model}"),
+                    &error_message,
                 ))
             }
         };
 
-        // Add the model name as a custom header for downstream handlers
-        if let Ok(header_value) = model.parse() {
-            request
-                .headers_mut()
-                .insert("x-tensorzero-model-name", header_value);
+        // Add headers based on request type
+        if is_prompt_based {
+            // For prompt-based requests, use prompt_id from config for routing
+            if let Some(ref prompt_id) = metadata.prompt_id {
+                if let Ok(header_value) = prompt_id.parse() {
+                    request
+                        .headers_mut()
+                        .insert("x-tensorzero-prompt-id", header_value);
+                }
+            }
+        } else {
+            // For model-based requests, add the model name header
+            if let Ok(header_value) = lookup_key.parse() {
+                request
+                    .headers_mut()
+                    .insert("x-tensorzero-model-name", header_value);
+            }
+            // For model-based requests, set endpoint_id for routing
+            if let Some(ref endpoint_id) = metadata.endpoint_id {
+                if let Ok(header_value) = endpoint_id.parse() {
+                    request
+                        .headers_mut()
+                        .insert("x-tensorzero-endpoint-id", header_value);
+                }
+            }
         }
 
-        // Add metadata headers for observability
-        if let Ok(header_value) = metadata.project_id.parse() {
-            request
-                .headers_mut()
-                .insert("x-tensorzero-project-id", header_value);
+        // Add metadata headers for observability (if present)
+        if let Some(ref project_id) = metadata.project_id {
+            if let Ok(header_value) = project_id.parse() {
+                request
+                    .headers_mut()
+                    .insert("x-tensorzero-project-id", header_value);
+            }
         }
-        if let Ok(header_value) = metadata.endpoint_id.parse() {
-            request
-                .headers_mut()
-                .insert("x-tensorzero-endpoint-id", header_value);
-        }
-        if let Ok(header_value) = metadata.model_id.parse() {
-            request
-                .headers_mut()
-                .insert("x-tensorzero-model-id", header_value);
+
+        // Add model_id header if present (optional for prompt-based requests)
+        if let Some(ref model_id) = metadata.model_id {
+            if let Ok(header_value) = model_id.parse() {
+                request
+                    .headers_mut()
+                    .insert("x-tensorzero-model-id", header_value);
+            }
         }
 
         // Add auth metadata headers if available

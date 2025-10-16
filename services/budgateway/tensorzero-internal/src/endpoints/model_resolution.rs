@@ -30,19 +30,49 @@ pub struct ModelResolution<'a> {
 /// This function handles the following scenarios:
 /// 1. Authenticated requests with standard model names (e.g., "gpt-3.5-turbo")
 /// 2. Unauthenticated requests with standard model names
-/// 3. Legacy format with prefixes (for backward compatibility)
+/// 3. Prompt-based requests (using prompt.id for authorization)
+/// 4. Legacy format with prefixes (for backward compatibility)
 ///
 /// # Arguments
-/// * `model` - The model name from the request
+/// * `model` - The model name from the request (optional for prompt-based requests)
 /// * `headers` - HTTP headers containing auth metadata
 /// * `for_embedding` - Whether this is for an embedding endpoint
 pub fn resolve_model_name<'a>(
-    model: &'a str,
+    model: Option<&'a str>,
     headers: &HeaderMap,
     for_embedding: bool,
 ) -> Result<ModelResolution<'a>, Error> {
     // Check if we have authentication metadata
     let is_authenticated = headers.contains_key("x-tensorzero-endpoint-id");
+
+    // Check if this is a prompt-based request
+    let is_prompt_based = headers.contains_key("x-tensorzero-prompt-id");
+
+    // Handle prompt-based requests
+    if is_prompt_based {
+        let prompt_id = headers
+            .get("x-tensorzero-prompt-id")
+            .and_then(|v| v.to_str().ok())
+            .ok_or_else(|| {
+                Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
+                    message: "Missing prompt_id for prompt-based request".to_string(),
+                })
+            })?;
+
+        return Ok(ModelResolution {
+            function_name: None,
+            model_name: Some(prompt_id.to_string()),
+            original_model_name: Cow::Owned(prompt_id.to_string()),
+            is_authenticated: true,
+        });
+    }
+
+    // For non-prompt requests, model is required
+    let model = model.ok_or_else(|| {
+        Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
+            message: "Missing model name in request".to_string(),
+        })
+    })?;
 
     // Get the user-provided model name from header (set by auth middleware)
     let user_model_name = headers
@@ -141,7 +171,7 @@ mod tests {
         let headers = HeaderMap::new();
 
         // Standard model name
-        let result = resolve_model_name("gpt-3.5-turbo", &headers, false).unwrap();
+        let result = resolve_model_name(Some("gpt-3.5-turbo"), &headers, false).unwrap();
         assert_eq!(result.model_name, Some("gpt-3.5-turbo".to_string()));
         assert_eq!(result.function_name, None);
         assert_eq!(result.original_model_name.as_ref(), "gpt-3.5-turbo");
@@ -149,7 +179,7 @@ mod tests {
 
         // Function name with prefix
         let result =
-            resolve_model_name("tensorzero::function_name::my_function", &headers, false).unwrap();
+            resolve_model_name(Some("tensorzero::function_name::my_function"), &headers, false).unwrap();
         assert_eq!(result.function_name, Some("my_function".to_string()));
         assert_eq!(result.model_name, None);
         assert_eq!(
@@ -160,7 +190,7 @@ mod tests {
 
         // Model name with prefix
         let result =
-            resolve_model_name("tensorzero::model_name::my_model", &headers, false).unwrap();
+            resolve_model_name(Some("tensorzero::model_name::my_model"), &headers, false).unwrap();
         assert_eq!(result.model_name, Some("my_model".to_string()));
         assert_eq!(result.function_name, None);
         assert_eq!(result.original_model_name.as_ref(), "my_model");
@@ -180,7 +210,7 @@ mod tests {
         );
 
         // Standard model name with auth
-        let result = resolve_model_name("gpt-3.5-turbo", &headers, false).unwrap();
+        let result = resolve_model_name(Some("gpt-3.5-turbo"), &headers, false).unwrap();
         assert_eq!(result.model_name, Some("endpoint-123".to_string()));
         assert_eq!(result.function_name, None);
         assert_eq!(result.original_model_name.as_ref(), "gpt-3.5-turbo");
@@ -193,7 +223,7 @@ mod tests {
 
         // Embedding model with prefix
         let result = resolve_model_name(
-            "tensorzero::embedding_model_name::text-embedding-ada-002",
+            Some("tensorzero::embedding_model_name::text-embedding-ada-002"),
             &headers,
             true,
         )
@@ -210,7 +240,7 @@ mod tests {
 
         // Regular model prefix for embeddings
         let result = resolve_model_name(
-            "tensorzero::model_name::text-embedding-ada-002",
+            Some("tensorzero::model_name::text-embedding-ada-002"),
             &headers,
             true,
         )
@@ -226,7 +256,7 @@ mod tests {
         );
 
         // Standard name for embeddings
-        let result = resolve_model_name("text-embedding-ada-002", &headers, true).unwrap();
+        let result = resolve_model_name(Some("text-embedding-ada-002"), &headers, true).unwrap();
         assert_eq!(
             result.model_name,
             Some("text-embedding-ada-002".to_string())
@@ -243,7 +273,7 @@ mod tests {
         let headers = HeaderMap::new();
 
         // Deprecated prefix
-        let result = resolve_model_name("tensorzero::my_function", &headers, false).unwrap();
+        let result = resolve_model_name(Some("tensorzero::my_function"), &headers, false).unwrap();
         assert_eq!(result.function_name, Some("my_function".to_string()));
         assert_eq!(result.model_name, None);
         assert_eq!(
@@ -262,7 +292,7 @@ mod tests {
         );
 
         // This should work because we check for endpoint-id presence
-        let result = resolve_model_name("gpt-3.5-turbo", &headers, false).unwrap();
+        let result = resolve_model_name(Some("gpt-3.5-turbo"), &headers, false).unwrap();
         assert_eq!(result.model_name, Some("gpt-3.5-turbo".to_string()));
         assert!(!result.is_authenticated);
     }
@@ -277,7 +307,7 @@ mod tests {
 
         // Even with auth, prefixed model names should work (backward compatibility)
         let result =
-            resolve_model_name("tensorzero::model_name::my_model", &headers, false).unwrap();
+            resolve_model_name(Some("tensorzero::model_name::my_model"), &headers, false).unwrap();
         assert_eq!(result.model_name, Some("my_model".to_string()));
         assert_eq!(result.function_name, None);
         // Since user provided prefixed format, we don't have a separate original name
@@ -290,17 +320,17 @@ mod tests {
         let headers = HeaderMap::new();
 
         // Empty function name after prefix
-        let result = resolve_model_name("tensorzero::function_name::", &headers, false).unwrap();
+        let result = resolve_model_name(Some("tensorzero::function_name::"), &headers, false).unwrap();
         assert_eq!(result.function_name, Some("".to_string()));
         assert_eq!(result.model_name, None);
 
         // Empty model name after prefix
-        let result = resolve_model_name("tensorzero::model_name::", &headers, false).unwrap();
+        let result = resolve_model_name(Some("tensorzero::model_name::"), &headers, false).unwrap();
         assert_eq!(result.model_name, Some("".to_string()));
         assert_eq!(result.function_name, None);
 
         // Model name that looks like a prefix but isn't
-        let result = resolve_model_name("my-model-tensorzero::something", &headers, false).unwrap();
+        let result = resolve_model_name(Some("my-model-tensorzero::something"), &headers, false).unwrap();
         assert_eq!(
             result.model_name,
             Some("my-model-tensorzero::something".to_string())
@@ -329,7 +359,7 @@ mod tests {
         );
 
         // With full auth metadata
-        let result = resolve_model_name("claude-3-opus", &headers, false).unwrap();
+        let result = resolve_model_name(Some("claude-3-opus"), &headers, false).unwrap();
         assert_eq!(result.model_name, Some("endpoint-123".to_string()));
         assert_eq!(result.function_name, None);
         assert_eq!(result.original_model_name.as_ref(), "claude-3-opus");

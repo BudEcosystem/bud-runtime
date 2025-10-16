@@ -46,6 +46,7 @@ async def execute_streaming_validation(
     llm_retry_limit: int = 3,
     messages: Optional[List[ModelMessage]] = None,
     system_prompt_role: str = "system",
+    api_key: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream structured output with recursive retry mechanism using partial data.
 
@@ -65,6 +66,7 @@ async def execute_streaming_validation(
         llm_retry_limit: Maximum number of retries
         messages: Optional message history
         system_prompt_role: Role for system prompts
+        api_key: Optional API key for authorization
 
     Yields:
         SSE-formatted string chunks with validation events
@@ -103,8 +105,8 @@ async def execute_streaming_validation(
         # It's already the model
         input_model_simple_with_validator = enhanced_model
 
-    # Create provider and model with settings
-    provider = BudServeProvider()
+    # Create provider with api_key (handles None internally)
+    provider = BudServeProvider(api_key=api_key)
 
     # Prepare model settings
     model_kwargs = {}
