@@ -234,7 +234,7 @@ microservices:
     image: budstudio/budprompt:nightly
     env:
       LOG_LEVEL: INFO
-      BUD_GATEWAY_BASE_URL: https://gateway.dev.bud.studio/v1
+      BUD_GATEWAY_BASE_URL: http://{{ .Release.Name }}-budgateway:3000/v1
       BUD_DEFAULT_MODEL_NAME: qwen3-32b
 
       REDIS_HOST: "{{ .Release.Name }}-valkey-primary"
