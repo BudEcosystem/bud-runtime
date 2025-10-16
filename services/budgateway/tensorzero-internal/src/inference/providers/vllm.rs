@@ -1086,38 +1086,78 @@ impl CompletionProvider for VLLMProvider {
 
         let stream = Box::pin(stream! {
             futures::pin_mut!(event_source);
+            let mut chunk_count = 0;
+            let mut error_count = 0;
+
             while let Some(result) = event_source.next().await {
                 match result {
                     Err(e) => {
+                        error_count += 1;
+                        let error_msg = format!("Error in completion stream: {}", DisplayOrDebugGateway::new(e));
+                        tracing::error!(
+                            "SSE error from vLLM (error #{}): {}",
+                            error_count,
+                            error_msg
+                        );
                         yield Err(Error::new(ErrorDetails::InferenceServer {
-                            message: format!("Error in completion stream: {}", DisplayOrDebugGateway::new(e)),
+                            message: error_msg,
                             raw_request: None,
                             raw_response: None,
                             provider_type: PROVIDER_TYPE.to_string(),
                         }));
                     }
                     Ok(event) => match event {
-                        Event::Open => continue,
+                        Event::Open => {
+                            tracing::debug!("vLLM completions SSE connection opened");
+                            continue;
+                        }
                         Event::Message(msg) => {
+                            tracing::debug!("Received SSE message from vLLM: {}", msg.data);
+
                             if msg.data == "[DONE]" {
+                                tracing::info!(
+                                    "Received [DONE] from vLLM completions stream. Total chunks forwarded: {}, errors: {}",
+                                    chunk_count,
+                                    error_count
+                                );
                                 break;
                             }
 
                             match serde_json::from_str::<CompletionChunk>(&msg.data) {
-                                Ok(chunk) => yield Ok(chunk),
+                                Ok(chunk) => {
+                                    chunk_count += 1;
+                                    tracing::debug!(
+                                        "Successfully deserialized vLLM completion chunk #{}: id={}, choices.len={}, has_usage={}",
+                                        chunk_count,
+                                        chunk.id,
+                                        chunk.choices.len(),
+                                        chunk.usage.is_some()
+                                    );
+                                    yield Ok(chunk)
+                                },
                                 Err(e) => {
-                                    yield Err(Error::new(ErrorDetails::InferenceServer {
-                                        message: format!("Error parsing completion chunk: {}", DisplayOrDebugGateway::new(e)),
-                                        raw_request: None,
-                                        raw_response: Some(msg.data.clone()),
-                                        provider_type: PROVIDER_TYPE.to_string(),
-                                    }));
+                                    error_count += 1;
+                                    // Enhanced error logging to identify which field caused the failure
+                                    tracing::error!(
+                                        "Failed to deserialize vLLM completion chunk (error #{}). Error: {}. Raw JSON: {}. Skipping chunk and continuing stream.",
+                                        error_count,
+                                        e,
+                                        msg.data
+                                    );
+                                    // Don't yield error - just log and continue processing
+                                    // This matches ChatCompletion behavior and prevents one bad chunk from killing the stream
+                                    continue;
                                 }
                             }
                         }
                     },
                 }
             }
+            tracing::info!(
+                "vLLM completions stream ended. Total chunks forwarded: {}, errors: {}",
+                chunk_count,
+                error_count
+            );
         });
 
         Ok((stream, raw_request))
