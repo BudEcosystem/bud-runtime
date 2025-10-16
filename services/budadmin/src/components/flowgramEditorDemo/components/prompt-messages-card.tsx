@@ -1,48 +1,45 @@
 import { Field } from '@flowgram.ai/fixed-layout-editor';
 import { useSession } from '../contexts/SessionContext';
 import { LoadingOutlined, CheckCircleFilled } from '@ant-design/icons';
+import { Image } from "antd";
+
+interface PromptMessage {
+  id: string;
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
 
 export const PromptMessagesCard = () => {
-  const { session, promptMessagesWorkflowStatus } = useSession();
+  const { session, promptMessagesWorkflowStatus, onDeletePromptMessage } = useSession();
 
   // Get prompt messages from the session, with default if empty
-  const promptMessages = session?.promptMessages || '';
+  const promptMessagesString = session?.promptMessages || '';
 
-  // Parse and format the messages for display
-  const getDisplayContent = () => {
-    if (!promptMessages) {
-      return 'Enter prompt messages';
+  // Parse messages from JSON string
+  const messages: PromptMessage[] = (() => {
+    if (!promptMessagesString) {
+      return [];
     }
-
     try {
-      const parsed = JSON.parse(promptMessages);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Display all message contents, one per line
-        return parsed.map((msg: any) => msg.content || '').filter(Boolean).join('\n\n');
-      }
-      return promptMessages;
-    } catch (e) {
-      // If it's not valid JSON, display as-is
-      return promptMessages;
-    }
-  };
-
-  // Get count of messages for footer
-  const getMessageCount = () => {
-    if (!promptMessages) return 0;
-    try {
-      const parsed = JSON.parse(promptMessages);
+      const parsed = JSON.parse(promptMessagesString);
       if (Array.isArray(parsed)) {
-        return parsed.length;
+        return parsed;
       }
-      return 1;
+      return [];
     } catch (e) {
-      return promptMessages ? 1 : 0;
+      return [];
     }
-  };
+  })();
 
-  const displayContent = getDisplayContent();
-  const messageCount = getMessageCount();
+  // Get role display name with color
+  const getRoleDisplay = (role: string) => {
+    const roleMap = {
+      'system': { name: 'System', color: '#965CDE' },
+      'user': { name: 'User', color: '#52C41A' },
+      'assistant': { name: 'Assistant', color: '#1890FF' }
+    };
+    return roleMap[role as keyof typeof roleMap] || { name: role, color: '#808080' };
+  };
 
   return (
     <div className="prompt-messages-card" style={{
@@ -126,22 +123,86 @@ export const PromptMessagesCard = () => {
         marginBottom: '20px',
         background: 'transparent',
       }}>
-        <div style={{
-          padding: '12px',
-          borderRadius: '8px',
-          minHeight: '80px',
-          background: '#FFFFFF05',
-        }}>
+        {messages.length === 0 ? (
           <div style={{
-            fontSize: '12px',
-            color: displayContent === 'Enter prompt messages' ? '#808080' : '#EEEEEE',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            background: 'transparent',
+            padding: '12px',
+            borderRadius: '8px',
+            minHeight: '80px',
+            background: '#FFFFFF05',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}>
-            {displayContent}
+            <div style={{
+              fontSize: '12px',
+              color: '#808080',
+              background: 'transparent',
+            }}>
+              Enter prompt messages
+            </div>
           </div>
-        </div>
+        ) : (
+          messages.map((message) => {
+            const roleDisplay = getRoleDisplay(message.role);
+            return (
+              <div
+                key={message.id}
+                style={{
+                  padding: '.8rem',
+                  borderRadius: '.75rem',
+                  background: '#FFFFFF05',
+                }}
+                className='group flex flex-col gap-2 cursor-default'
+              >
+                {/* Role tag and delete button */}
+                <div className='flex justify-between items-center'>
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      color: roleDisplay.color,
+                      background: `${roleDisplay.color}15`,
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {roleDisplay.name}
+                  </div>
+                  {/* Delete button - only show when there are more than 1 messages */}
+                  {messages.length > 1 && (
+                    <div
+                      className='opacity-0 group-hover:opacity-100 cursor-pointer'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeletePromptMessage?.(message.id);
+                      }}
+                    >
+                      <Image
+                        preview={false}
+                        width={'0.8125rem'}
+                        height={'0.8125rem'}
+                        alt='delete'
+                        src="/icons/deleteWhite.svg"
+                      />
+                    </div>
+                  )}
+                </div>
+                {/* Message content */}
+                <div style={{
+                  fontSize: '12px',
+                  color: '#EEEEEE',
+                  fontWeight: '400',
+                  background: 'transparent',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}>
+                  {message.content || <span style={{ color: '#606060' }}>No content</span>}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

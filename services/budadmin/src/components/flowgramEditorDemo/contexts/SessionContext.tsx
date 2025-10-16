@@ -8,6 +8,8 @@ interface SessionContextType {
   onSaveOutputSchema?: () => void;
   onSaveSystemPrompt?: () => void;
   onSavePromptMessages?: () => void;
+  onDeleteVariable?: (variableId: string) => void;
+  onDeletePromptMessage?: (messageId: string) => void;
   isSaving?: boolean;
   isSavingOutput?: boolean;
   isSavingSystemPrompt?: boolean;
@@ -29,6 +31,8 @@ export const SessionProvider: React.FC<{
   onSaveOutputSchema?: () => void;
   onSaveSystemPrompt?: () => void;
   onSavePromptMessages?: () => void;
+  onDeleteVariable?: (variableId: string) => void;
+  onDeletePromptMessage?: (messageId: string) => void;
   isSaving?: boolean;
   isSavingOutput?: boolean;
   isSavingSystemPrompt?: boolean;
@@ -44,6 +48,8 @@ export const SessionProvider: React.FC<{
   onSaveOutputSchema,
   onSaveSystemPrompt,
   onSavePromptMessages,
+  onDeleteVariable,
+  onDeletePromptMessage,
   isSaving,
   isSavingOutput,
   isSavingSystemPrompt,
@@ -60,6 +66,8 @@ export const SessionProvider: React.FC<{
       onSaveOutputSchema,
       onSaveSystemPrompt,
       onSavePromptMessages,
+      onDeleteVariable,
+      onDeletePromptMessage,
       isSaving,
       isSavingOutput,
       isSavingSystemPrompt,
