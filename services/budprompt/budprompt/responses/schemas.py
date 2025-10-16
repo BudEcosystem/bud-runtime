@@ -58,3 +58,20 @@ class ResponsePromptResponse(SuccessResponse):
     """Response model for prompt execution via responses API."""
 
     data: Optional[Dict[str, Any]] = Field(None, description="Response data from prompt execution")
+
+
+class OpenAIError(BaseModel):
+    """OpenAI-compatible error details."""
+
+    message: str = Field(..., description="Error message description")
+    type: str = Field(..., description="Error type based on HTTP status (e.g., bad_request, not_found)")
+    param: Optional[str] = Field(
+        None, description="Parameter path that caused the error (e.g., prompt.variables.amount)"
+    )
+    code: Optional[str] = Field(None, description="Specific error code (e.g., invalid_type, required)")
+
+
+class OpenAIResponsesError(BaseModel):
+    """OpenAI-compatible error response format for responses API."""
+
+    error: OpenAIError = Field(..., description="Error details in OpenAI format")

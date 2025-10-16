@@ -38,6 +38,7 @@ import { TrashIcon } from "lucide-react";
 import { useConfirmAction } from "src/hooks/useConfirmAction";
 import { successToast, errorToast } from "@/components/toast";
 import { SelectInput } from "@/components/ui/input";
+import { enableDevMode } from "@/components/environment";
 
 const ACCESS_MODE_OPTIONS = [
   {
@@ -443,7 +444,7 @@ const ClusterDetailsPage = () => {
                 key: "2",
                 children: <DeploymentListTable />,
               },
-              {
+              ...(enableDevMode ? [{
                 label: (
                   <div className="flex items-center gap-[0.375rem]">
                     <div className="w-[.975rem] pt-[.15rem]">
@@ -466,7 +467,7 @@ const ClusterDetailsPage = () => {
                 ),
                 key: "3",
                 children: <ClusterNodes data={selectedCluster} />,
-              },
+              }] : []),
               // {
               //   label: <div className="flex items-center gap-[0.375rem]">
               //     <div className="w-[.975rem] pt-[.15rem]">
@@ -513,7 +514,7 @@ const ClusterDetailsPage = () => {
               //   key: '5',
               //   children: <CostAnalysis data={selectedCluster} />
               // },
-              {
+              ...(enableDevMode ? [{
                 label: (
                   <div className="flex items-center gap-[0.375rem]">
                     <div className="w-[.975rem] pt-[.15rem]">
@@ -536,7 +537,7 @@ const ClusterDetailsPage = () => {
                 ),
                 key: "6",
                 children: <Analytics cluster_id={selectedCluster.id} />,
-              },
+              }] : []),
               ...(hasPermission(PermissionEnum.ClusterManage) ? [{
                 label: <div className="flex items-center gap-[0.375rem]">
                   <div className="w-[.975rem] pt-[.15rem]">

@@ -31,7 +31,7 @@ from budapp.shared.redis_service import RedisService
 from ..auth.schemas import RefreshTokenRequest
 from ..commons import logging
 from ..commons.config import app_settings
-from ..commons.constants import EndpointStatusEnum, ProjectStatusEnum, ProjectTypeEnum, UserTypeEnum
+from ..commons.constants import EndpointStatusEnum, ProjectStatusEnum, ProjectTypeEnum, PromptStatusEnum, UserTypeEnum
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
 from ..commons.keycloak import KeycloakManager
@@ -44,6 +44,8 @@ from ..model_ops.services import ModelService
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from ..project_ops.services import ProjectService
+from ..prompt_ops.crud import PromptDataManager
+from ..prompt_ops.models import Prompt as PromptModel
 from ..user_ops.crud import UserDataManager
 from ..user_ops.models import Tenant, TenantClient
 from ..user_ops.models import User as UserModel
@@ -374,6 +376,11 @@ class PlaygroundService(SessionMixin):
                 search=False,
             )
 
+            # Get active prompts for playground - matching endpoint filtering pattern
+            db_prompts, _ = await PromptDataManager(self.session).get_all_active_prompts_for_projects(
+                project_ids=project_ids  # None for CLIENT (all prompts), list of IDs for ADMIN
+            )
+
             # Step 7: Prepare cache data (same structure as API keys)
             cache_data = {}
 
@@ -386,6 +393,43 @@ class PlaygroundService(SessionMixin):
                     "model_id": str(endpoint.model.id),
                     "project_id": str(endpoint.project_id),
                 }
+
+            # Add prompts to cache data with prompt: prefix
+            for db_prompt in db_prompts:
+                # Use same naming pattern as proxy cache: prompt:{prompt_name}
+                prompt_cache_key = f"prompt:{db_prompt.name}"
+
+                cache_data[prompt_cache_key] = {
+                    "prompt_id": str(db_prompt.id),
+                    "project_id": str(db_prompt.project_id),
+                }
+
+            # Add draft/tryout prompts from Redis
+            draft_prompt_count = 0
+            try:
+                redis_service = RedisService()
+                draft_pattern = f"draft_prompt:{db_user.id}:*"
+                draft_keys = await redis_service.keys(draft_pattern)
+
+                for draft_key in draft_keys:
+                    # Decode key if it's bytes
+                    key_str = draft_key.decode() if isinstance(draft_key, bytes) else draft_key
+                    draft_data_str = await redis_service.get(key_str)
+
+                    if draft_data_str:
+                        draft_data = json.loads(draft_data_str)
+                        draft_prompt_id = draft_data.get("prompt_id")
+
+                        if draft_prompt_id:
+                            # Use prompt_id as the cache key (with prompt: prefix)
+                            draft_cache_key = f"prompt:{draft_prompt_id}"
+                            cache_data[draft_cache_key] = {"prompt_id": draft_prompt_id}
+                            draft_prompt_count += 1
+
+                logger.debug(f"Added {draft_prompt_count} draft prompts to cache for user {db_user.id}")
+            except Exception as e:
+                logger.error(f"Failed to fetch draft prompts: {e}")
+                # Continue - draft prompts are optional
 
             # Add metadata to cache
             cache_data["__metadata__"] = {
@@ -420,7 +464,8 @@ class PlaygroundService(SessionMixin):
             )
 
             logger.info(
-                f"Initialized playground session for user {db_user.id} with {len(db_endpoints)} endpoints cached"
+                f"Initialized playground session for user {db_user.id} with "
+                f"{len(db_endpoints)} endpoints, {len(db_prompts)} prompts, and {draft_prompt_count} draft prompts cached"
             )
 
             # Step 10: Return response with new tokens

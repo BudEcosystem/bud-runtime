@@ -16,8 +16,9 @@
 
 """Business logic services for the prompt ops module."""
 
+import json
 from ast import Dict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
 import aiohttp
@@ -28,13 +29,16 @@ from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
+    BUD_PROMPT_API_KEY_LOCATION,
     BudServeWorkflowStepEventName,
     EndpointStatusEnum,
+    ModelEndpointEnum,
     ModelProviderTypeEnum,
     ProjectStatusEnum,
     PromptStatusEnum,
     PromptTypeEnum,
     PromptVersionStatusEnum,
+    ProxyProviderEnum,
     VisibilityEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
@@ -42,12 +46,15 @@ from ..commons.constants import (
 from ..commons.db_utils import SessionMixin
 from ..commons.exceptions import ClientException
 from ..core.schemas import NotificationPayload
+from ..credential_ops.services import CredentialService
 from ..endpoint_ops.crud import EndpointDataManager
 from ..endpoint_ops.models import Endpoint as EndpointModel
+from ..endpoint_ops.schemas import ProxyModelConfig, ProxyModelPricing
 from ..model_ops.crud import ProviderDataManager
 from ..model_ops.models import Provider as ProviderModel
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
+from ..shared.redis_service import RedisService
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
 from ..workflow_ops.schemas import WorkflowUtilCreate
@@ -56,6 +63,7 @@ from .crud import PromptDataManager, PromptVersionDataManager
 from .models import Prompt as PromptModel
 from .models import PromptVersion as PromptVersionModel
 from .schemas import (
+    BudPromptConfig,
     CreatePromptWorkflowRequest,
     CreatePromptWorkflowSteps,
     PromptConfigCopyRequest,
@@ -206,6 +214,23 @@ class PromptService(SessionMixin):
                 logger.error(f"Failed to delete Redis configuration for prompt {db_prompt.name}: {str(e)}")
                 raise
 
+        # Delete from proxy cache
+        try:
+            await self.delete_prompt_from_proxy_cache(prompt_id)
+            logger.debug(f"Deleted prompt {db_prompt.name} from proxy cache")
+        except Exception as e:
+            logger.error(f"Failed to delete prompt from proxy cache: {e}")
+            # Continue - cache cleanup is non-critical
+
+        # Update credential proxy cache to remove deleted prompt
+        try:
+            credential_service = CredentialService(self.session)
+            await credential_service.update_proxy_cache(db_prompt.project_id)
+            logger.debug(f"Updated credential proxy cache for project {db_prompt.project_id}")
+        except Exception as e:
+            logger.error(f"Failed to update credential proxy cache: {e}")
+            # Continue - cache cleanup is non-critical
+
         # Update prompt status to DELETED
         await PromptDataManager(self.session).update_by_fields(db_prompt, {"status": PromptStatusEnum.DELETED})
 
@@ -287,11 +312,12 @@ class PromptService(SessionMixin):
         db_tags, count = await PromptDataManager(self.session).get_all_tags(offset, limit)
         return db_tags, count
 
-    async def save_prompt_config(self, request: PromptConfigRequest) -> PromptConfigResponse:
+    async def save_prompt_config(self, request: PromptConfigRequest, current_user_id: UUID) -> PromptConfigResponse:
         """Save prompt configuration by forwarding request to budprompt service.
 
         Args:
             request: The prompt configuration request
+            current_user_id: The ID of the current user creating the draft prompt
 
         Returns:
             PromptConfigResponse containing the bud_prompt_id and bud_prompt_version
@@ -302,6 +328,21 @@ class PromptService(SessionMixin):
         # Extract prompt_id and version from the response
         prompt_id = response_data.get("prompt_id")
         version = response_data.get("version")
+
+        # Save draft prompt reference for playground access
+        try:
+            redis_service = RedisService()
+            draft_key = f"draft_prompt:{current_user_id}:{prompt_id}"
+            draft_value = json.dumps({"prompt_id": prompt_id, "user_id": str(current_user_id)})
+            # Set TTL to 24 hours (86400 seconds) - matching budprompt temporary storage
+            await redis_service.set(draft_key, draft_value, ex=86400)
+
+            # Add to proxy cache for routing (prompt_name = prompt_id for draft prompts)
+            await PromptWorkflowService(self.session).add_prompt_to_proxy_cache(prompt_id, prompt_id)
+            logger.debug(f"Added draft prompt {prompt_id} to cache for user {current_user_id}")
+        except Exception as e:
+            logger.error(f"Failed to cache draft prompt: {e}")
+            # Don't fail the request if caching fails
 
         # Create and return response
         return PromptConfigResponse(
@@ -610,6 +651,20 @@ class PromptService(SessionMixin):
                 message="Failed to copy prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
+    async def delete_prompt_from_proxy_cache(self, prompt_id: UUID) -> None:
+        """Delete prompt from proxy cache.
+
+        Args:
+            prompt_id: The prompt UUID to remove from cache
+        """
+        try:
+            redis_service = RedisService()
+            await redis_service.delete_keys_by_pattern(f"model_table:{prompt_id}*")
+            logger.debug(f"Deleted prompt {prompt_id} from proxy cache")
+        except Exception as e:
+            logger.error(f"Failed to delete prompt from proxy cache: {e}")
+            # Don't raise - cache cleanup is non-critical
+
 
 class PromptWorkflowService(SessionMixin):
     """Service for managing prompt workflows."""
@@ -889,6 +944,23 @@ class PromptWorkflowService(SessionMixin):
             # Update prompt with default version
             await PromptDataManager(self.session).update_by_fields(db_prompt, {"default_version_id": db_version.id})
 
+            # Add prompt to proxy cache for routing
+            try:
+                await self.add_prompt_to_proxy_cache(db_prompt.id, db_prompt.name)
+                logger.debug(f"Added prompt {db_prompt.name} to proxy cache")
+            except Exception as e:
+                logger.error(f"Failed to add prompt to proxy cache: {e}")
+                # Continue - cache update is non-critical
+
+            # Update credential proxy cache to include new prompt
+            try:
+                credential_service = CredentialService(self.session)
+                await credential_service.update_proxy_cache(db_prompt.project_id)
+                logger.debug(f"Updated credential proxy cache for project {db_prompt.project_id}")
+            except Exception as e:
+                logger.error(f"Failed to update credential proxy cache: {e}")
+                # Continue - cache update is non-critical
+
             # Store final result in workflow step
             # NOTE: increment step to display success message
             final_step_data = {"prompt_id": str(db_prompt.id), "version_id": str(db_version.id)}
@@ -904,7 +976,7 @@ class PromptWorkflowService(SessionMixin):
         return db_workflow
 
     async def create_prompt_schema_workflow(
-        self, current_user_id: UUID, request: PromptSchemaRequest
+        self, current_user_id: UUID, request: PromptSchemaRequest, access_token: str
     ) -> WorkflowModel:
         """Create a prompt schema workflow with validation."""
         # Get request data
@@ -1008,7 +1080,7 @@ class PromptWorkflowService(SessionMixin):
             try:
                 # Perform model extraction
                 await self._perform_prompt_schema_creation(
-                    current_step_number, merged_data, current_user_id, db_workflow
+                    current_step_number, merged_data, current_user_id, db_workflow, access_token
                 )
             except ClientException as e:
                 raise e
@@ -1016,7 +1088,12 @@ class PromptWorkflowService(SessionMixin):
         return db_workflow
 
     async def _perform_prompt_schema_creation(
-        self, current_step_number: int, data: Dict, current_user_id: UUID, db_workflow: WorkflowModel
+        self,
+        current_step_number: int,
+        data: Dict,
+        current_user_id: UUID,
+        db_workflow: WorkflowModel,
+        access_token: str,
     ) -> None:
         """Perform prompt schema creation request to budprompt app.
 
@@ -1025,8 +1102,31 @@ class PromptWorkflowService(SessionMixin):
             data: request body to send to budprompt.
             current_user_id: the id of the current user.
             db_workflow: the workflow instance.
+            access_token: JWT access token for API key bypass.
         """
-        bud_prompt_schema_response = await self._perform_prompt_schema_request(data, current_user_id, db_workflow.id)
+        # Fetch endpoint details if deployment_name is provided
+        endpoint_id = None
+        model_id = None
+        project_id = None
+
+        deployment_name = data.get("deployment_name")
+        if deployment_name:
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel,
+                {"name": deployment_name},
+                exclude_fields={"status": EndpointStatusEnum.DELETED},
+                missing_ok=True,
+            )
+
+            if db_endpoint:
+                endpoint_id = str(db_endpoint.id)
+                model_id = str(db_endpoint.model_id)
+                project_id = str(db_endpoint.project_id)
+
+        # Pass the extracted fields to the request
+        bud_prompt_schema_response = await self._perform_prompt_schema_request(
+            data, current_user_id, db_workflow.id, endpoint_id, model_id, project_id, access_token
+        )
 
         # Add payload dict to response
         for step in bud_prompt_schema_response["steps"]:
@@ -1050,12 +1150,25 @@ class PromptWorkflowService(SessionMixin):
         )
 
     async def _perform_prompt_schema_request(
-        self, data: Dict[str, Any], current_user_id: UUID, workflow_id: UUID
+        self,
+        data: Dict[str, Any],
+        current_user_id: UUID,
+        workflow_id: UUID,
+        endpoint_id: Optional[str] = None,
+        model_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        access_token: Optional[str] = None,
     ) -> Dict:
         """Perform prompt schema creation request to budprompt app.
 
         Args:
             data: request body to send to budprompt.
+            current_user_id: the id of the current user.
+            workflow_id: the workflow instance id.
+            endpoint_id: the endpoint id for API key bypass.
+            model_id: the model id for API key bypass.
+            project_id: the project id for API key bypass.
+            access_token: JWT access token for API key bypass.
         """
         license_faq_fetch_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-schema"
@@ -1075,6 +1188,19 @@ class PromptWorkflowService(SessionMixin):
             },
             "source_topic": f"{app_settings.source_topic}",
         }
+
+        # Add API key bypass fields if available
+        if endpoint_id:
+            payload["endpoint_id"] = endpoint_id
+        if model_id:
+            payload["model_id"] = model_id
+        if project_id:
+            payload["project_id"] = project_id
+            payload["api_key_project_id"] = project_id  # Same as project_id
+        if current_user_id:
+            payload["user_id"] = str(current_user_id)
+        if access_token:
+            payload["access_token"] = access_token
 
         logger.debug(f"Performing create prompt schema request to budprompt {payload}")
         try:
@@ -1111,6 +1237,34 @@ class PromptWorkflowService(SessionMixin):
             "bud_prompt_version": prompt_version,
         }
 
+        # Save draft prompt reference for playground access
+        try:
+            # Get user_id from workflow's created_by field
+            user_id = db_workflow.created_by
+
+            if user_id and prompt_id:
+                redis_service = RedisService()
+                draft_key = f"draft_prompt:{user_id}:{prompt_id}"
+                draft_value = json.dumps(
+                    {
+                        "prompt_id": prompt_id,
+                        "user_id": str(user_id),
+                    }
+                )
+                # Set TTL to 24 hours (86400 seconds) - matching budprompt temporary storage
+                await redis_service.set(draft_key, draft_value, ex=86400)
+        except Exception as e:
+            logger.error(f"Failed to cache draft prompt: {e}")
+            # Don't fail the notification handler
+
+        # Add prompt to proxy cache for routing
+        try:
+            await self.add_prompt_to_proxy_cache(prompt_id, prompt_id)
+            logger.debug(f"Added prompt {prompt_id} to proxy cache")
+        except Exception as e:
+            logger.error(f"Failed to add prompt to proxy cache: {e}")
+            # Continue - cache update is non-critical
+
         # Update prompt_id as next step
         # Update current step number
         current_step_number = db_workflow.current_step + 1
@@ -1126,6 +1280,46 @@ class PromptWorkflowService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(
             db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
         )
+
+    async def add_prompt_to_proxy_cache(self, prompt_id: Union[UUID, str], prompt_name: str) -> None:
+        """Add prompt to proxy cache for routing through budgateway.
+
+        Args:
+            prompt_id: The prompt UUID (can be UUID object or string)
+            prompt_name: The prompt name to use as model_name (for draft prompts, same as prompt_id)
+        """
+        try:
+            prompt_key_name = f"prompt:{prompt_name}"
+            # Create BudPromptConfig for the provider
+            prompt_config = BudPromptConfig(
+                type="budprompt",
+                api_base=app_settings.bud_prompt_service_url,
+                model_name=prompt_key_name,
+                api_key_location=BUD_PROMPT_API_KEY_LOCATION,
+            )
+
+            # Get endpoint name using enum's name property
+            endpoint_name = ModelEndpointEnum.RESPONSES.name.lower()  # "responses"
+
+            # Create the proxy model configuration using ProxyModelConfig
+            model_config = ProxyModelConfig(
+                routing=[ProxyProviderEnum.BUDPROMPT],
+                providers={ProxyProviderEnum.BUDPROMPT: prompt_config.model_dump(exclude_none=True)},
+                endpoints=[endpoint_name],
+                api_key=None,
+                pricing=None,  # No pricing for prompts
+            )
+
+            # Store in Redis with key pattern matching endpoints
+            redis_service = RedisService()
+            await redis_service.set(
+                f"model_table:{prompt_id}", json.dumps({str(prompt_id): model_config.model_dump(exclude_none=True)})
+            )
+            logger.debug(f"Added prompt {prompt_name} to proxy cache with key model_table:{prompt_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to add prompt to proxy cache: {e}")
+            # Don't raise - cache update is non-critical
 
 
 class PromptVersionService(SessionMixin):

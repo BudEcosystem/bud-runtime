@@ -225,6 +225,37 @@ class PromptDataManager(DataManagerUtils):
         tags = [res[0] for res in results] if results else []
         return tags, count
 
+    async def get_all_active_prompts_for_projects(
+        self, project_ids: Optional[List[UUID]] = None
+    ) -> Tuple[List[PromptModel], int]:
+        """Get active prompts with optional project filtering.
+
+        Args:
+            project_ids: Optional list of project IDs to filter by.
+                         If None, returns all active prompts.
+                         If provided, returns prompts from those projects only.
+
+        Returns:
+            Tuple of (list of active prompts, count)
+        """
+        if project_ids is not None:
+            # Filter by specific projects
+            stmt = select(PromptModel).filter(
+                and_(PromptModel.project_id.in_(project_ids), PromptModel.status == PromptStatusEnum.ACTIVE)
+            )
+            count_stmt = select(func.count(PromptModel.id)).filter(
+                and_(PromptModel.project_id.in_(project_ids), PromptModel.status == PromptStatusEnum.ACTIVE)
+            )
+        else:
+            # Get all active prompts (no project filter)
+            stmt = select(PromptModel).filter(PromptModel.status == PromptStatusEnum.ACTIVE)
+            count_stmt = select(func.count(PromptModel.id)).filter(PromptModel.status == PromptStatusEnum.ACTIVE)
+
+        count = self.execute_scalar(count_stmt)
+        result = self.scalars_all(stmt)
+
+        return result, count
+
 
 class PromptVersionDataManager(DataManagerUtils):
     """CRUD operations for PromptVersion model."""

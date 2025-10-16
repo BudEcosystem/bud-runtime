@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -o xtrace
+
 bud_config_dir="${XDG_DATA_HOME:-$HOME/.config}/bud"
 bud_share_dir="${XDG_DATA_HOME:-$HOME/.local/share}/bud"
 
@@ -11,9 +13,15 @@ die() {
 	printf "\033[31;1mErr: %b\033[0m\n" "${1:-no args for die()}" 1>&2
 	exit "${2:-1}"
 }
-
+is_nixos() {
+	grep -q 'DISTRIB_ID=nixos' /etc/lsb-release >/dev/null 2>&1
+}
 dir_ensure() {
-	git clone "$bud_repo" "$bud_repo_local" || exit 1
+	if [ -d "$bud_repo_local" ]; then
+		git -C "$bud_repo_local" pull || exit 1
+	else
+		git clone "$bud_repo" "$bud_repo_local" || exit 1
+	fi
 
 	mkdir -p "$bud_config_dir"
 	mkdir -p "$bud_share_dir"
@@ -37,19 +45,26 @@ k3s_install() {
 }
 k8s_ensure() {
 	if ! k8s_is_installed; then
-		k3s_install
+		if is_nixos; then
+			die "NixOS: Use the k3s modules instead to setup k8s"
+		else
+			k3s_install
+		fi
 	fi
 }
 
 helm_install() {
 	name="$1"
+	shift
+
 	chart_path="$bud_repo_local/infra/helm/$name"
+	values_path="$chart_path/values.yaml"
 	scid_path="$chart_path/scid.toml"
 
-	namespace="$(tq -f "$scid_path" -r '.namespace')"
-	release_name="$(tq -f "$scid_path" -r '.release_name')"
-	if tq -f "$scid_path" -r '.chart_path_override' >/dev/null 2>&1; then
-		chart_path="$(tq -f "$scid_path" -r '.chart_path_override')"
+	namespace="$(tq -f "$scid_path" '.namespace')"
+	release_name="$(tq -f "$scid_path" '.release_name')"
+	if tq -f "$scid_path" '.chart_path_override' >/dev/null 2>&1; then
+		chart_path="$chart_path/$(tq -f "$scid_path" '.chart_path_override')"
 	fi
 
 	helm upgrade \
@@ -58,31 +73,22 @@ helm_install() {
 		--create-namespace \
 		"$release_name" \
 		"$chart_path" \
-		-f "$chart_path/values.yaml" \
+		-f "$values_path" \
 		"$@"
 }
-
 helm_ensure() {
 	helm_install keel -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
 	helm_install dapr
 
-	nvim "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
-	helm_install bud -f "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
-}
-
-is_nixos() {
-	if grep -q 'DISTRIB_ID=nixos' /etc/lsb-release >/dev/null 2>&1; then
-		return 0
-	fi
+	vim "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
+	helm_install bud \
+		-f "$bud_repo_local/infra/helm/bud/example.standalone.yaml" \
+		-f "$bud_repo_local/infra/helm/bud/example.secrets.yaml"
 }
 
 ##########
 ## MAIN ##
 ##########
-
-if is_nixos; then
-	die "NixOS: Use the modules instead"
-fi
 
 dir_ensure
 k8s_ensure
