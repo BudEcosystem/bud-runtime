@@ -158,6 +158,7 @@ microservices:
       CLOUD_MODEL_SEEDER_ENGINE: tensorzero
       BUD_CONNECT_BASE_URL: https://budconnect.bud.studio
       BUD_DOC_SERVICE_URL: "http://{{ $.Release.Name }}-buddoc:9081"
+      BUD_PROMPT_SERVICE_URL: "http://{{ $.Release.Name }}-budprompt:3015/v1/"
 
   # backend internal services
   budcluster:
@@ -233,12 +234,12 @@ microservices:
     image: budstudio/budprompt:nightly
     env:
       LOG_LEVEL: INFO
-      BUD_GATEWAY_BASE_URL: http://20.66.97.208/v1
+      BUD_GATEWAY_BASE_URL: https://gateway.dev.bud.studio/v1
       BUD_DEFAULT_MODEL_NAME: qwen3-32b
 
       REDIS_HOST: "{{ .Release.Name }}-valkey-primary"
       REDIS_PORT: "6379"
-      REDIS_DB_INDEX: "10"
+      REDIS_DB_INDEX: "2"
       REDIS_PASSWORD: "{{ .Values.valkey.auth.password }}"
   global:
     env:

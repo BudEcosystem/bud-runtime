@@ -16,6 +16,7 @@
 
 """The exceptions used in the budprompt module."""
 
+from http import HTTPStatus
 from typing import Any, Dict, Optional
 
 from budmicroframe.commons.exceptions import ClientException as BudMicroframeClientException
@@ -73,3 +74,60 @@ class ClientException(BudMicroframeClientException):
         self.status_code = status_code
         self.params = params
         super().__init__(self.message, self.status_code)
+
+
+class OpenAIResponseException(Exception):
+    """Exception for OpenAI-compatible error responses.
+
+    This exception encapsulates all necessary information to return
+    an OpenAI-compatible error response with proper HTTP status codes.
+
+    The error type is automatically derived from the HTTP status code
+    using Python's http.HTTPStatus if not explicitly provided.
+    """
+
+    def __init__(
+        self,
+        status_code: int,
+        message: str,
+        type: Optional[str] = None,
+        param: Optional[str] = None,
+        code: Optional[str] = None,
+    ):
+        """Initialize the OpenAIResponseException.
+
+        Args:
+            status_code: HTTP status code (400, 404, 500, etc.)
+            message: Human-readable error message
+            type: OpenAI error type (auto-derived from status_code if not provided)
+            param: Optional parameter path that caused the error
+            code: Optional specific error code (required, invalid_type, etc.)
+        """
+        self.status_code = status_code
+        self.message = message
+        self.type = type or self._status_to_type(status_code)
+        self.param = param
+        self.code = code
+        super().__init__(self.message)
+
+    @staticmethod
+    def _status_to_type(status_code: int) -> str:
+        """Convert HTTP status code to OpenAI error type.
+
+        Uses Python's http.HTTPStatus to get the standard phrase and converts it
+        to snake_case format expected by OpenAI.
+
+        Args:
+            status_code: HTTP status code
+
+        Returns:
+            Error type string (e.g., 'bad_request', 'not_found', 'internal_server_error')
+
+        Examples:
+            400 -> "Bad Request" -> "bad_request"
+            404 -> "Not Found" -> "not_found"
+            500 -> "Internal Server Error" -> "internal_server_error"
+        """
+        status = HTTPStatus(status_code)
+        # Convert phrase to snake_case: "Not Found" -> "not_found"
+        return status.phrase.lower().replace(" ", "_").replace("-", "_")

@@ -39,6 +39,7 @@ from budapp.model_ops.models import Provider as ProviderModel
 from budapp.permissions.crud import PermissionDataManager, ProjectPermissionDataManager
 from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.services import ProjectService
+from budapp.prompt_ops.crud import PromptDataManager
 from budapp.shared.notification_service import BudNotifyService, NotificationBuilder
 from budapp.shared.redis_service import RedisService, cache
 from budapp.user_ops.crud import UserDataManager
@@ -337,6 +338,18 @@ class CredentialService(SessionMixin):
                 "endpoint_id": str(deployment[0].id),
                 "model_id": str(deployment[0].profile_id),  # Using profile_id as model_id
                 "project_id": str(deployment[0].project_id),
+            }
+
+        # Get active prompts for the project
+        prompts, _ = await PromptDataManager(self.session).get_all_active_prompts_for_projects([project_id])
+        for prompt in prompts:
+            # For prompts, endpoint_id is the prompt id itself
+            # We don't have a direct model_id for prompts, so we'll use prompt_id as both
+            # NOTE: To allow prompt name same as other resources, Added a prefix 'prompt:'
+            prompt_key_name = f"prompt:{prompt.name}"
+            models[prompt_key_name] = {
+                "prompt_id": str(prompt.id),
+                "project_id": str(project_id),
             }
 
         redis_service = RedisService()

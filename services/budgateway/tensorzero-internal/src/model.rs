@@ -27,6 +27,7 @@ use crate::inference::providers::dummy::DummyProvider;
 use crate::inference::providers::google_ai_studio_gemini::GoogleAIStudioGeminiProvider;
 
 use crate::inference::providers::buddoc::BudDocProvider;
+use crate::inference::providers::budprompt::BudPromptProvider;
 use crate::inference::providers::helpers::peek_first_chunk;
 use crate::inference::providers::hyperbolic::HyperbolicProvider;
 use crate::inference::providers::provider_trait::WrappedProvider;
@@ -1529,6 +1530,44 @@ impl ModelConfig {
             provider_errors,
         }))
     }
+
+    /// Execute response with automatic format detection (for providers like BudPrompt)
+    #[tracing::instrument(skip_all, fields(model_name = model_name, otel.name = "model_execute_response_with_detection"))]
+    pub async fn execute_response_with_detection(
+        &self,
+        request: &crate::responses::OpenAIResponseCreateParams,
+        model_name: &str,
+        clients: &InferenceClients<'_>,
+    ) -> Result<crate::responses::ResponseResult, Error> {
+        let mut provider_errors = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::InvalidModelProvider {
+                    model_name: model_name.to_string(),
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+            let response = provider
+                .execute_response_with_detection(
+                    request,
+                    model_name,
+                    clients.http_client,
+                    clients.credentials,
+                )
+                .await;
+            match response {
+                Ok(response) => {
+                    return Ok(response);
+                }
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+        Err(Error::new(ErrorDetails::ModelProvidersExhausted {
+            provider_errors,
+        }))
+    }
 }
 
 async fn stream_with_cache_write(
@@ -1610,6 +1649,7 @@ impl ModelProvider {
             ProviderConfig::Azure(_) => "azure",
             ProviderConfig::AzureContentSafety(_) => "azure_content_safety",
             ProviderConfig::BudDoc(_) => "buddoc",
+            ProviderConfig::BudPrompt(_) => "budprompt",
             ProviderConfig::Fireworks(_) => "fireworks",
             ProviderConfig::GCPVertexAnthropic(_) => "gcp_vertex_anthropic",
             ProviderConfig::GCPVertexGemini(_) => "gcp_vertex_gemini",
@@ -1654,6 +1694,7 @@ impl ModelProvider {
             ProviderConfig::SGLang(provider) => Some(provider.model_name()),
             ProviderConfig::DeepSeek(provider) => Some(provider.model_name()),
             ProviderConfig::BudDoc(_) => None, // BudDoc doesn't have a model name in the inference sense
+            ProviderConfig::BudPrompt(_) => None, // BudPrompt doesn't have a model name in the provider
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => Some(provider.model_name()),
         }
@@ -1685,6 +1726,7 @@ pub enum ProviderConfig {
     Azure(AzureProvider),
     AzureContentSafety(AzureContentSafetyProvider),
     BudDoc(BudDocProvider),
+    BudPrompt(BudPromptProvider),
     DeepSeek(DeepSeekProvider),
     Fireworks(FireworksProvider),
     GCPVertexAnthropic(GCPVertexAnthropicProvider),
@@ -1753,6 +1795,11 @@ pub(super) enum UninitializedProviderConfig {
         api_key_location: Option<CredentialLocation>,
     },
     BudDoc {
+        model_name: String,
+        api_base: Url,
+        api_key_location: Option<CredentialLocation>,
+    },
+    BudPrompt {
         model_name: String,
         api_base: Url,
         api_key_location: Option<CredentialLocation>,
@@ -1931,6 +1978,14 @@ impl UninitializedProviderConfig {
                 api_key_location,
             } => ProviderConfig::BudDoc(BudDocProvider::new(
                 api_base.to_string(),
+                api_key_location,
+            )?),
+            UninitializedProviderConfig::BudPrompt {
+                model_name: _,
+                api_base,
+                api_key_location,
+            } => ProviderConfig::BudPrompt(BudPromptProvider::new(
+                api_base.clone(),
                 api_key_location,
             )?),
             UninitializedProviderConfig::Fireworks {
@@ -2120,6 +2175,11 @@ impl ModelProvider {
                     message: "BudDoc provider does not support inference operations".to_string(),
                 }))
             }
+            ProviderConfig::BudPrompt(_) => {
+                return Err(Error::new(ErrorDetails::Config {
+                    message: "BudPrompt provider does not support inference operations, only v1/responses endpoint".to_string(),
+                }))
+            }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider.infer(request, client, api_keys, self).await
@@ -2208,6 +2268,11 @@ impl ModelProvider {
             ProviderConfig::BudDoc(_) => {
                 return Err(Error::new(ErrorDetails::Config {
                     message: "BudDoc provider does not support streaming inference".to_string(),
+                }))
+            }
+            ProviderConfig::BudPrompt(_) => {
+                return Err(Error::new(ErrorDetails::Config {
+                    message: "BudPrompt provider does not support streaming inference, only v1/responses endpoint".to_string(),
                 }))
             }
             #[cfg(any(test, feature = "e2e_tests"))]
@@ -2329,6 +2394,9 @@ impl ModelProvider {
             ProviderConfig::BudDoc(_) => Err(Error::new(ErrorDetails::Config {
                 message: "BudDoc provider does not support batch inference".to_string(),
             })),
+            ProviderConfig::BudPrompt(_) => Err(Error::new(ErrorDetails::Config {
+                message: "BudPrompt provider does not support batch inference".to_string(),
+            })),
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
@@ -2443,6 +2511,9 @@ impl ModelProvider {
             }
             ProviderConfig::BudDoc(_) => Err(Error::new(ErrorDetails::Config {
                 message: "BudDoc provider does not support batch inference".to_string(),
+            })),
+            ProviderConfig::BudPrompt(_) => Err(Error::new(ErrorDetails::Config {
+                message: "BudPrompt provider does not support batch inference".to_string(),
             })),
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
@@ -2772,6 +2843,11 @@ impl ModelProvider {
                     .create_response(request, client, dynamic_api_keys)
                     .await
             }
+            ProviderConfig::BudPrompt(provider) => {
+                provider
+                    .create_response(request, client, dynamic_api_keys)
+                    .await
+            }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
@@ -2809,6 +2885,11 @@ impl ModelProvider {
                     .stream_response(request, client, dynamic_api_keys)
                     .await
             }
+            ProviderConfig::BudPrompt(provider) => {
+                provider
+                    .stream_response(request, client, dynamic_api_keys)
+                    .await
+            }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
@@ -2833,6 +2914,11 @@ impl ModelProvider {
         use crate::responses::ResponseProvider;
         match &self.config {
             ProviderConfig::OpenAI(provider) => {
+                provider
+                    .retrieve_response(response_id, client, dynamic_api_keys)
+                    .await
+            }
+            ProviderConfig::BudPrompt(provider) => {
                 provider
                     .retrieve_response(response_id, client, dynamic_api_keys)
                     .await
@@ -2865,6 +2951,11 @@ impl ModelProvider {
                     .delete_response(response_id, client, dynamic_api_keys)
                     .await
             }
+            ProviderConfig::BudPrompt(provider) => {
+                provider
+                    .delete_response(response_id, client, dynamic_api_keys)
+                    .await
+            }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
@@ -2889,6 +2980,11 @@ impl ModelProvider {
         use crate::responses::ResponseProvider;
         match &self.config {
             ProviderConfig::OpenAI(provider) => {
+                provider
+                    .cancel_response(response_id, client, dynamic_api_keys)
+                    .await
+            }
+            ProviderConfig::BudPrompt(provider) => {
                 provider
                     .cancel_response(response_id, client, dynamic_api_keys)
                     .await
@@ -2921,10 +3017,50 @@ impl ModelProvider {
                     .list_response_input_items(response_id, client, dynamic_api_keys)
                     .await
             }
+            ProviderConfig::BudPrompt(provider) => {
+                provider
+                    .list_response_input_items(response_id, client, dynamic_api_keys)
+                    .await
+            }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
                     .list_response_input_items(response_id, client, dynamic_api_keys)
+                    .await
+            }
+            // Other providers don't support responses yet
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Responses.as_str().to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
+
+    /// Execute response with automatic format detection (for providers like BudPrompt)
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_execute_response_with_detection"))]
+    pub async fn execute_response_with_detection(
+        &self,
+        request: &crate::responses::OpenAIResponseCreateParams,
+        model_name: &str,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<crate::responses::ResponseResult, Error> {
+        use crate::responses::ResponseProvider;
+        match &self.config {
+            ProviderConfig::BudPrompt(provider) => {
+                provider
+                    .execute_response_with_detection(request, model_name, client, dynamic_api_keys)
+                    .await
+            }
+            ProviderConfig::OpenAI(provider) => {
+                provider
+                    .execute_response_with_detection(request, model_name, client, dynamic_api_keys)
+                    .await
+            }
+            #[cfg(any(test, feature = "e2e_tests"))]
+            ProviderConfig::Dummy(provider) => {
+                provider
+                    .execute_response_with_detection(request, model_name, client, dynamic_api_keys)
                     .await
             }
             // Other providers don't support responses yet
