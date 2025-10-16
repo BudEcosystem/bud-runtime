@@ -12,6 +12,7 @@ import CredentialsListTable from "@/components/ui/bud/table/CredentialsListTable
 import { Tabs } from "antd";
 import ProjectsListTable from "@/components/ui/bud/table/ProjectsListTable";
 import CloudProvidersListTable from "@/components/ui/bud/table/CloudProvidersListTable";
+import { enableDevMode } from "@/components/environment";
 
 const ApiKeys = () => {
   const [activeTab, setActiveTab] = useState("1");
@@ -192,7 +193,7 @@ const ApiKeys = () => {
                 key: "2",
                 children: <ProjectsListTable />,
               },
-              {
+              ...(enableDevMode ? [{
                 label: (
                   <div className="flex items-center gap-[0.375rem]">
                     {activeTab === "3" ? (
@@ -263,7 +264,7 @@ const ApiKeys = () => {
                 ),
                 key: "3",
                 children: <CloudProvidersListTable />,
-              },
+              }] : []),
             ]}
           />
         </div>

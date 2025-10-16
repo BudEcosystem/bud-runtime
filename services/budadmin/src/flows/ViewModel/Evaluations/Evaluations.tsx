@@ -12,6 +12,7 @@ import ComingSoon from "@/components/ui/comingSoon";
 import EvaluationResultsTable from "@/components/ui/bud/table/EvaluationResultsTable";
 import { useUser } from "src/stores/useUser";
 import { Model } from "src/hooks/useModels";
+import { enableDevMode } from "@/components/environment";
 
 const tags = [
   {
@@ -183,7 +184,7 @@ export default function Evaluations({ model }: { model: Model }) {
           <div className="hR mt-[.1rem] mb-[1rem]"></div>
         </>
       )}
-      <EvaluationResultsTable />
+      {enableDevMode && <EvaluationResultsTable />}
     </div>
   );
 }
