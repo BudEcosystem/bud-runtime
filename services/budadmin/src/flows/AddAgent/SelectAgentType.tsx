@@ -18,6 +18,7 @@ interface AgentTypeOption {
   label: string;
   description: string;
   icon: string;
+  status: 'active' | 'inactive';
 }
 
 export default function SelectAgentType() {
@@ -55,24 +56,28 @@ export default function SelectAgentType() {
       label: 'Simple Prompt',
       description: 'Create simple text generation prompt for basic LLM interactions',
       icon: 'images/drawer/brain.png', // LLM icon from modalityTypeList
+      status: 'active',
     },
     {
       value: 'prompt_workflow',
       label: 'Prompt Workflow',
       description: 'Create complex prompt chains with multiple models and steps',
       icon: 'images/drawer/compare.png', // Action transformers icon
+      status: 'inactive',
     },
     {
       value: 'agent',
       label: 'Agent',
       description: 'Create autonomous agent with custom tools and capabilities',
       icon: 'images/drawer/embedding.png', // Embedding icon for agent intelligence
+      status: 'inactive',
     },
     {
       value: 'chatflow',
       label: 'Chatflow',
       description: 'Create conversational flow with dialog management',
       icon: 'images/drawer/textToSpeach.png', // Text to speech for conversations
+      status: 'inactive',
     },
   ];
 
@@ -181,6 +186,7 @@ export default function SelectAgentType() {
                   description: type.description,
                   icon: type.icon,
                   iconLocal: true,
+                  status: type.status,
                 }}
                 selected={selectedType === type.value}
                 handleClick={() => setSelectedType(type.value)}

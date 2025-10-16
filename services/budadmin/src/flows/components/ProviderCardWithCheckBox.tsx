@@ -18,12 +18,23 @@ function ProviderCardWithCheckBox({
 }: cardProps) {
   const [hover, setHover] = React.useState(false);
 
+  // Determine if the card should be inactive
+  const isInactive = data?.status === 'inactive';
+
   return (
     <div
-      onMouseEnter={() => setHover(true)}
-      onClick={handleClick}
-      onMouseLeave={() => setHover(false)}
-      className={`py-[1rem] hover:bg-[#FFFFFF03] cursor-pointer hover:shadow-lg px-[1.4rem] border-b-[0.5px] border-t-[0.5px] border-t-[transparent] border-b-[#1F1F1F] hover:border-t-[.5px] hover:border-[#757575] flex-row flex border-box ${ClassNames}`}
+      onMouseEnter={() => !isInactive && setHover(true)}
+      onClick={() => {
+        if (!isInactive) {
+          handleClick?.();
+        }
+      }}
+      onMouseLeave={() => !isInactive && setHover(false)}
+      className={`py-[1rem] px-[1.4rem] border-b-[0.5px] border-t-[0.5px] border-t-[transparent] border-b-[#1F1F1F] flex-row flex border-box ${ClassNames} ${
+        isInactive
+          ? "cursor-not-allowed text-[#757575] opacity-30"
+          : "cursor-pointer hover:bg-[#FFFFFF03] hover:shadow-lg hover:border-t-[.5px] hover:border-[#757575]"
+      }`}
     >
       <div className="mr-[.7rem] flex flex-col justify-center">
         <div className="bg-[#1F1F1F] w-[1.75rem] h-[1.75rem] rounded-[5px] flex justify-center items-center grow-0 shrink-0">
@@ -51,6 +62,7 @@ function ProviderCardWithCheckBox({
                 display: hover || selected ? "flex" : "none",
               }}
               checked={selected}
+              disabled={isInactive}
               className="AntCheckbox text-[#757575] w-[0.875rem] h-[0.875rem] text-[0.875rem] mt-[.85rem]"
             />
           </div>
