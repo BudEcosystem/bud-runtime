@@ -1,0 +1,10 @@
+- hosts: local
+  gather_facts: false
+  tasks:
+    - name: Apply Kubernetes manifest from file
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        namespace: "{{ namespace }}"
+        state: present
+        apply: true
+        src: "{{ manifest_path }}"
