@@ -3411,7 +3411,7 @@ class EvaluationWorkflowService:
                     "api_key": evaluation_request["api_key"],
                     "extra_args": evaluation_request.get("extra_args", {}),
                 },
-                "eval_datasets": [{"dataset_id": ds} for ds in evaluation_request["datasets"]],
+                "eval_datasets": evaluation_request["datasets"],
                 "eval_configs": evaluation_request.get("eval_configs", []),
                 "kubeconfig": evaluation_request.get("kubeconfig", ""),  # Not required as we use the incluster config
                 "notification_metadata": {
@@ -3605,7 +3605,11 @@ class EvaluationWorkflowService:
                             if "gen" in eval_types:
                                 dataset_config = eval_types["gen"]
                                 if dataset_config and dataset_config not in all_datasets:
-                                    all_datasets.append(dataset_config)
+                                    dataset_item = {
+                                        "dataset_id": dataset_config,
+                                        "run_id": run.id,
+                                    }
+                                    all_datasets.append(dataset_item)
                                     logger.info(f"Added dataset config '{dataset_config}' from run {run.id}")
                             else:
                                 logger.warning(f"Run {run.id}: Dataset '{dataset.name}' has no 'gen' eval_type")
@@ -3625,7 +3629,7 @@ class EvaluationWorkflowService:
             logger.info(f"Collected {len(all_datasets)} dataset configurations: {all_datasets}")
 
             evaluation_request = {
-                "model_name": "qwen3-32b",
+                "model_name": "gpt-oss-20b",
                 "endpoint": "http://20.66.97.208/v1",
                 "api_key": "sk-BudLiteLLMMasterKey_123",
                 "extra_args": {},
@@ -3635,7 +3639,7 @@ class EvaluationWorkflowService:
                 "source": app_settings.name,
                 "source_topic": app_settings.source_topic,
                 "experiment_id": experiment_id,  # Include experiment ID for tracking
-                "evaluation_id": str(evaluation_id),  # TODO: Update to actual evaluation ID
+                "evaluation_id": str(evaluation_id),
             }
 
             logger.warning(f"::BUDEVAL:: Triggering budeval evaluation {evaluation_request}")
@@ -3800,7 +3804,11 @@ class EvaluationWorkflowService:
 
                                     # Extract base dataset name using regex to remove suffix patterns
                                     # Matches: dataset_name_gen, dataset_name_ppl, dataset_name_chat_gen, etc.
-                                    base_dataset_name = re.sub(r"_(gen|ppl|chat_gen)$", "", dataset_config)
+                                    base_dataset_name = re.sub(
+                                        r"_(gen|ppl|chat_gen)$",
+                                        "",
+                                        dataset_config,
+                                    )
 
                                     # Convert to lowercase for matching
                                     base_dataset_name = base_dataset_name.lower()
