@@ -25,12 +25,14 @@ import aiohttp
 from fastapi import status
 
 from ..commons import logging
-from ..commons.config import app_settings
+from ..commons.config import app_settings, secrets_settings
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
     BUD_PROMPT_API_KEY_LOCATION,
+    CONNECTOR_AUTH_CREDENTIALS_MAP,
     BudServeWorkflowStepEventName,
+    ConnectorAuthTypeEnum,
     EndpointStatusEnum,
     ModelEndpointEnum,
     ModelProviderTypeEnum,
@@ -44,7 +46,7 @@ from ..commons.constants import (
     WorkflowTypeEnum,
 )
 from ..commons.db_utils import SessionMixin
-from ..commons.exceptions import ClientException
+from ..commons.exceptions import ClientException, MCPFoundryException
 from ..core.schemas import NotificationPayload
 from ..credential_ops.services import CredentialService
 from ..endpoint_ops.crud import EndpointDataManager
@@ -54,6 +56,7 @@ from ..model_ops.crud import ProviderDataManager
 from ..model_ops.models import Provider as ProviderModel
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
+from ..shared.mcp_foundry_service import mcp_foundry_service
 from ..shared.redis_service import RedisService
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
@@ -64,6 +67,8 @@ from .models import Prompt as PromptModel
 from .models import PromptVersion as PromptVersionModel
 from .schemas import (
     BudPromptConfig,
+    Connector,
+    ConnectorListItem,
     CreatePromptWorkflowRequest,
     CreatePromptWorkflowSteps,
     PromptConfigCopyRequest,
@@ -79,6 +84,8 @@ from .schemas import (
     PromptSchemaWorkflowSteps,
     PromptVersionListItem,
     PromptVersionResponse,
+    Tool,
+    ToolListItem,
 )
 
 
@@ -600,6 +607,378 @@ class PromptService(SessionMixin):
             raise ClientException(
                 message="Failed to delete prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
+
+    async def get_connectors(
+        self,
+        prompt_id: Optional[UUID] = None,
+        offset: int = 0,
+        limit: int = 10,
+        filters: dict = {},
+        order_by: list = [],
+        search: bool = False,
+    ) -> tuple[list[ConnectorListItem], int]:
+        """Get connectors list from MCP Foundry.
+
+        Args:
+            prompt_id: Optional UUID to filter connectors for a specific prompt
+            offset: Pagination offset
+            limit: Pagination limit
+            filters: Additional filters
+            order_by: Ordering fields
+            search: Enable search functionality
+
+        Returns:
+            Tuple of (list of connectors, total count)
+        """
+        # Validate prompt if prompt_id is provided
+        if prompt_id:
+            db_prompt = await PromptDataManager(self.session).retrieve_by_fields(  # noqa: F841
+                PromptModel,
+                fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE},
+            )
+
+        # Extract name filter if provided
+        name_filter = filters.get("name")
+
+        logger.debug(
+            f"Fetching connectors from MCP Foundry{f' with name filter: {name_filter}' if name_filter else ''}"
+        )
+
+        # Call MCP Foundry API
+        try:
+            mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors(
+                show_registered_only=False, show_available_only=True, name=name_filter, offset=offset, limit=limit
+            )
+            logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry API error: {e}")
+            mcp_foundry_response = []
+            total_count = 0
+        except Exception as e:
+            logger.error(f"Unexpected error calling MCP Foundry: {e}")
+            mcp_foundry_response = []
+            total_count = 0
+
+        # Map MCP response to ConnectorListItem
+        connector_items = []
+        for item in mcp_foundry_response:
+            try:
+                connector_item = ConnectorListItem(
+                    id=item.get("id", ""),
+                    name=item.get("name", ""),
+                    icon=item.get("logo_url"),
+                    category=item.get("category"),
+                    url=item.get("url", ""),
+                    provider=item.get("provider", ""),
+                    description=item.get("description"),
+                    documentation_url=item.get("documentation_url"),
+                )
+                connector_items.append(connector_item)
+            except (ValueError, KeyError) as e:
+                logger.error(f"Found invalid connector item: {e}")
+                continue
+
+        return connector_items, total_count
+
+    async def get_connector_by_id(self, connector_id: str) -> Connector:
+        """Get a single connector by its ID from MCP Foundry.
+
+        Args:
+            connector_id: String ID of the connector (e.g., "github", "slack")
+
+        Returns:
+            Connector object with full details
+
+        Raises:
+            ClientException: If connector not found
+        """
+        logger.debug(f"Getting connector with ID: {connector_id}")
+
+        try:
+            # Fetch connector using name filter for efficient server-side filtering
+            mcp_foundry_response, _ = await mcp_foundry_service.list_connectors(
+                show_registered_only=False,
+                show_available_only=True,
+                name=connector_id,  # Filter by connector ID server-side
+                limit=1,  # Only need one result
+            )
+
+            # Check if connector was found
+            if not mcp_foundry_response:
+                logger.error(f"Connector not found: {connector_id}")
+                raise ClientException(
+                    message=f"Connector {connector_id} not found", status_code=status.HTTP_404_NOT_FOUND
+                )
+
+            connector_data = mcp_foundry_response[0]
+
+            # Map auth_type string to enum (no fallback - let ValueError propagate)
+            auth_type_str = connector_data.get("auth_type", "Open")
+            auth_type = ConnectorAuthTypeEnum(auth_type_str)
+
+            # Get credential schema based on auth type
+            credential_schema = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
+
+            # Build Connector object
+            connector = Connector(
+                id=connector_data.get("id", ""),
+                name=connector_data.get("name", ""),
+                icon=connector_data.get("logo_url"),
+                category=connector_data.get("category"),
+                url=connector_data.get("url", ""),
+                provider=connector_data.get("provider", ""),
+                description=connector_data.get("description"),
+                documentation_url=connector_data.get("documentation_url"),
+                auth_type=auth_type,
+                credential_schema=credential_schema,
+            )
+
+            logger.debug(f"Successfully retrieved connector: {connector.name}")
+            return connector
+
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry error getting connector {connector_id}: {e}")
+            raise ClientException(
+                message=f"Failed to retrieve connector: {str(e)}", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error getting connector {connector_id}: {e}")
+            raise ClientException(
+                message="Failed to retrieve connector", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    async def get_tools(
+        self,
+        connector_type: str,
+        offset: int = 0,
+        limit: int = 10,
+        filters: dict = {},
+        order_by: list = [],
+        search: bool = False,
+    ) -> tuple[list[ToolListItem], int]:
+        """Get tools list from MCP Foundry.
+
+        Args:
+            connector_type: MANDATORY - Type of connector to filter tools
+            offset: Pagination offset
+            limit: Pagination limit
+            filters: Additional filters (e.g., name)
+            order_by: Ordering fields
+            search: Enable search functionality
+
+        Returns:
+            Tuple of (list of tools, total count)
+        """
+        logger.debug(f"Fetching tools from MCP Foundry for connector_type: {connector_type}")
+
+        # Call MCP Foundry API using the service with pagination
+        try:
+            mcp_foundry_response, total_count = await mcp_foundry_service.list_tools(
+                connector_type=connector_type, offset=offset, limit=limit
+            )
+            logger.debug(
+                f"Successfully fetched {len(mcp_foundry_response)} tools from MCP Foundry, total: {total_count}"
+            )
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry API error: {e}")
+            mcp_foundry_response = []
+            total_count = 0
+        except Exception as e:
+            logger.error(f"Unexpected error calling MCP Foundry: {e}")
+            mcp_foundry_response = []
+            total_count = 0
+
+        # If no response from MCP Foundry, use mock data
+        if not mcp_foundry_response:
+            logger.warning("Using mock data as MCP Foundry returned no tools")
+            # TODO: Mock MCP Foundry response data for now
+            mcp_foundry_response = [
+                {
+                    "id": "3cbd6002-2c87-4eb1-96e1-f6aeadbeee26",
+                    "originalName": "add_comment_to_pending_review",
+                    "displayName": "Add Comment To Pending Review",
+                    "description": "Add review comment to the requester&#x27;s latest pending pull request review. A pending review needs to already exist to call this (check with the user if not sure).",
+                    "inputSchema": {
+                        "properties": {
+                            "body": {
+                                "description": "The text of the review comment",
+                                "type": "string",
+                            },
+                            "line": {
+                                "description": "The line of the blob in the pull request diff that the comment applies to. For multi-line comments, the last line of the range",
+                                "type": "number",
+                            },
+                            "owner": {"description": "Repository owner", "type": "string"},
+                            "path": {
+                                "description": "The relative path to the file that necessitates a comment",
+                                "type": "string",
+                            },
+                            "pullNumber": {
+                                "description": "Pull request number",
+                                "type": "number",
+                            },
+                            "repo": {"description": "Repository name", "type": "string"},
+                            "side": {
+                                "description": "The side of the diff to comment on. LEFT indicates the previous state, RIGHT indicates the new state",
+                                "enum": ["LEFT", "RIGHT"],
+                                "type": "string",
+                            },
+                            "startLine": {
+                                "description": "For multi-line comments, the first line of the range that the comment applies to",
+                                "type": "number",
+                            },
+                            "startSide": {
+                                "description": "For multi-line comments, the starting side of the diff that the comment applies to. LEFT indicates the previous state, RIGHT indicates the new state",
+                                "enum": ["LEFT", "RIGHT"],
+                                "type": "string",
+                            },
+                            "subjectType": {
+                                "description": "The level at which the comment is targeted",
+                                "enum": ["FILE", "LINE"],
+                                "type": "string",
+                            },
+                        },
+                        "required": [
+                            "owner",
+                            "repo",
+                            "pullNumber",
+                            "path",
+                            "body",
+                            "subjectType",
+                        ],
+                        "type": "object",
+                    },
+                }
+            ]
+
+            # Update total_count for mock data
+            total_count = len(mcp_foundry_response)
+
+        # NOTE: Parse MCP Foundry response directly to ToolListItem
+        # No need for intermediate Tool objects since we only need id, name, and type
+        tool_items = []
+        for item in mcp_foundry_response:
+            try:
+                tool_item = ToolListItem(
+                    id=UUID(item.get("id", "")),
+                    name=item.get("displayName", ""),
+                    type=item.get("originalName", ""),
+                )
+                tool_items.append(tool_item)
+            except (ValueError, KeyError) as e:
+                logger.error(f"Found invalid tool item: {e}")
+                continue
+
+        logger.debug(
+            f"Returning {len(tool_items)} tools out of {total_count} total for connector_type={connector_type}"
+        )
+
+        return tool_items, total_count
+
+    async def get_tool_by_id(self, tool_id: UUID) -> Tool:
+        """Get a single tool by ID.
+
+        Args:
+            tool_id: Tool ID to retrieve
+
+        Returns:
+            Tool object with complete details
+
+        Raises:
+            ClientException: If tool not found
+        """
+        logger.debug(f"Getting tool with ID: {tool_id}")
+
+        # Try to fetch from MCP Foundry first
+        try:
+            mcp_foundry_response = await mcp_foundry_service.get_tool_by_id(str(tool_id.hex))
+            logger.debug(f"Successfully fetched tool from MCP Foundry: {tool_id}")
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry API error for tool {tool_id}: {e}")
+            # Fall back to mock data if MCP Foundry is unavailable
+            mcp_foundry_response = None
+        except Exception as e:
+            logger.error(f"Unexpected error getting tool {tool_id} from MCP Foundry: {e}")
+            mcp_foundry_response = None
+
+        # If no response from MCP Foundry, use mock data
+        if not mcp_foundry_response:
+            logger.warning(f"Using mock data for tool {tool_id}")
+            mcp_foundry_response = {
+                "id": str(tool_id),
+                "originalName": "add_comment_to_pending_review",
+                "displayName": "Add Comment To Pending Review",
+                "description": "Add review comment to the requester&#x27;s latest pending pull request review. A pending review needs to already exist to call this (check with the user if not sure).",
+                "inputSchema": {
+                    "properties": {
+                        "body": {
+                            "description": "The text of the review comment",
+                            "type": "string",
+                        },
+                        "line": {
+                            "description": "The line of the blob in the pull request diff that the comment applies to. For multi-line comments, the last line of the range",
+                            "type": "number",
+                        },
+                        "owner": {"description": "Repository owner", "type": "string"},
+                        "path": {
+                            "description": "The relative path to the file that necessitates a comment",
+                            "type": "string",
+                        },
+                        "pullNumber": {
+                            "description": "Pull request number",
+                            "type": "number",
+                        },
+                        "repo": {"description": "Repository name", "type": "string"},
+                        "side": {
+                            "description": "The side of the diff to comment on. LEFT indicates the previous state, RIGHT indicates the new state",
+                            "enum": ["LEFT", "RIGHT"],
+                            "type": "string",
+                        },
+                        "startLine": {
+                            "description": "For multi-line comments, the first line of the range that the comment applies to",
+                            "type": "number",
+                        },
+                        "startSide": {
+                            "description": "For multi-line comments, the starting side of the diff that the comment applies to. LEFT indicates the previous state, RIGHT indicates the new state",
+                            "enum": ["LEFT", "RIGHT"],
+                            "type": "string",
+                        },
+                        "subjectType": {
+                            "description": "The level at which the comment is targeted",
+                            "enum": ["FILE", "LINE"],
+                            "type": "string",
+                        },
+                    },
+                    "required": [
+                        "owner",
+                        "repo",
+                        "pullNumber",
+                        "path",
+                        "body",
+                        "subjectType",
+                    ],
+                    "type": "object",
+                },
+            }
+
+        # Parse MCP response to Tool format
+        try:
+            tool = Tool(
+                id=UUID(mcp_foundry_response.get("id", str(tool_id))),
+                name=mcp_foundry_response.get("displayName", "Unknown Tool"),
+                description=mcp_foundry_response.get("description", ""),
+                type=mcp_foundry_response.get("originalName", "unknown"),
+                schema=mcp_foundry_response.get("inputSchema", {}),
+            )
+
+            logger.debug(f"Successfully retrieved tool: {tool.name} with ID: {tool_id}")
+            return tool
+
+        except (ValueError, KeyError) as e:
+            logger.error(f"Failed to parse tool response for {tool_id}: {e}")
+            raise ClientException(f"Invalid tool data for ID {tool_id}", status_code=500)
 
     async def _perform_copy_prompt_config_request(self, request: PromptConfigCopyRequest) -> Dict[str, Any]:
         """Perform the actual copy-config request to budprompt service via Dapr.

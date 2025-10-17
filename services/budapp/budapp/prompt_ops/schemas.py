@@ -24,6 +24,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model
 
 from ..cluster_ops.schemas import ClusterResponse
 from ..commons.constants import (
+    ConnectorAuthTypeEnum,
     ModalityEnum,
     PromptStatusEnum,
     PromptTypeEnum,
@@ -593,3 +594,98 @@ class BudPromptConfig(BaseModel):
     api_base: str
     model_name: str  # This will be the prompt name
     api_key_location: str = "dynamic::authorization"
+
+
+class ConnectorListItem(BaseModel):
+    """Schema for individual connector item in list."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    icon: Optional[str] = None
+    category: Optional[str] = None
+    url: str
+    provider: str
+    description: Optional[str] = None
+    documentation_url: Optional[str] = None
+
+
+class ConnectorListResponse(PaginatedSuccessResponse):
+    """Connector list response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    connectors: list[ConnectorListItem] = []
+
+
+class ConnectorFilter(BaseModel):
+    """Filter schema for connector list API."""
+
+    name: str | None = None
+
+
+class Connector(BaseModel):
+    """Internal schema for full connector data."""
+
+    id: str
+    name: str
+    icon: Optional[str] = None
+    category: Optional[str] = None
+    url: str
+    provider: str
+    description: Optional[str] = None
+    documentation_url: Optional[str] = None
+    auth_type: ConnectorAuthTypeEnum
+    credential_schema: List[Dict[str, Any]]
+
+
+class ConnectorResponse(SuccessResponse):
+    """Response schema for single connector retrieval."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    connector: Connector
+
+
+class Tool(BaseModel):
+    """Schema for tool data."""
+
+    id: UUID4
+    name: str
+    description: str
+    type: str
+    schema: Dict[str, Any]
+
+
+class ToolListItem(BaseModel):
+    """Schema for tool item in list response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    type: str
+
+
+class ToolFilter(BaseModel):
+    """Filter schema for tool list API."""
+
+    connector_type: str
+    name: str | None = None
+
+
+class ToolListResponse(PaginatedSuccessResponse):
+    """Tool list response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    tools: list[ToolListItem] = []
+
+
+class ToolResponse(SuccessResponse):
+    """Response schema for single tool retrieval."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    tool: Tool

@@ -38,6 +38,9 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
+    ConnectorFilter,
+    ConnectorListResponse,
+    ConnectorResponse,
     CreatePromptVersionRequest,
     CreatePromptWorkflowRequest,
     EditPromptRequest,
@@ -58,6 +61,9 @@ from .schemas import (
     PromptVersionResponse,
     SinglePromptResponse,
     SinglePromptVersionResponse,
+    ToolFilter,
+    ToolListResponse,
+    ToolResponse,
 )
 from .services import PromptService, PromptVersionService, PromptWorkflowService
 
@@ -790,3 +796,257 @@ async def get_prompt_config(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve prompt configuration"
         ).to_http_response()
+
+
+@router.get(
+    "/connectors",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ConnectorListResponse,
+            "description": "Successfully listed connectors",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="List all connectors with optional filtering by prompt_id",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def list_connectors(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[ConnectorFilter, Depends()],
+    prompt_id: Optional[UUID] = Query(None, description="Filter connectors connected to a specific prompt"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[ConnectorListResponse, ErrorResponse]:
+    """List all connectors with optional filtering by prompt_id.
+
+    This endpoint returns a list of available connectors. When prompt_id is provided,
+    it filters to show only connectors connected to that specific prompt.
+    Currently returns hardcoded data until mcp_foundry service is available.
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        prompt_id: Optional UUID to filter connectors for a specific prompt
+        page: Page number for pagination
+        limit: Number of items per page
+
+    Returns:
+        ConnectorListResponse with the list of connectors or ErrorResponse on failure
+    """
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert filter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    try:
+        # Get connectors from service
+        connectors_list, count = await PromptService(session).get_connectors(
+            prompt_id=prompt_id, offset=offset, limit=limit, filters=filters_dict, order_by=order_by, search=search
+        )
+
+        return ConnectorListResponse(
+            connectors=connectors_list,
+            total_record=count,
+            page=page,
+            limit=limit,
+            object="connectors.list",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to list connectors: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list connectors: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list connectors"
+        ).to_http_response()
+
+
+@router.get(
+    "/connectors/{connector_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ConnectorResponse,
+            "description": "Successfully retrieved connector",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Connector not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Retrieve a single connector by ID",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_connector(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    connector_id: str,
+) -> Union[ConnectorResponse, ErrorResponse]:
+    """Retrieve a single connector with its full details from MCP Foundry.
+
+    This endpoint returns complete connector information including the
+    credential schema needed to render authentication forms dynamically.
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        connector_id: String ID of the connector (e.g., "github", "slack")
+
+    Returns:
+        ConnectorResponse with full connector details or ErrorResponse on failure
+    """
+    try:
+        # Get the connector from service
+        connector = await PromptService(session).get_connector_by_id(connector_id)
+
+        return ConnectorResponse(
+            connector=connector,
+            message="Connector retrieved successfully",
+            code=status.HTTP_200_OK,
+            object="connector.get",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to retrieve connector: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve connector: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve connector"
+        ).to_http_response()
+
+
+@router.get(
+    "/tools",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ToolListResponse,
+            "description": "Successfully listed tools",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="List tools filtered by connector type",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def list_tools(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    filters: Annotated[ToolFilter, Depends()],
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[ToolListResponse, ErrorResponse]:
+    """List all tools filtered by connector type.
+
+    This endpoint returns a list of available tools for a specific connector type.
+    The connector_type parameter is MANDATORY.
+    Currently returns hardcoded data until mcp_foundry service is available.
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        filters: Tool filters including mandatory connector_type
+        page: Page number for pagination
+        limit: Number of items per page
+        order_by: Ordering fields
+        search: Enable search functionality
+
+    Returns:
+        ToolListResponse with the list of tools or ErrorResponse on failure
+    """
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Convert filter to dictionary
+    filters_dict = filters.model_dump(exclude_none=True)
+
+    # Validate that connector_type is provided (it's mandatory in the schema)
+    if not filters.connector_type:
+        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message="connector_type is required").to_http_response()
+
+    try:
+        # Get tools from service
+        tools_list, count = await PromptService(session).get_tools(
+            connector_type=filters.connector_type,
+            offset=offset,
+            limit=limit,
+            filters=filters_dict,
+            order_by=order_by,
+            search=search,
+        )
+
+        return ToolListResponse(
+            tools=tools_list,
+            total_record=count,
+            page=page,
+            limit=limit,
+            object="tools.list",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to list tools: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list tools: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list tools"
+        ).to_http_response()
+
+
+@router.get("/tools/{tool_id}", response_model=ToolResponse)
+async def get_tool(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    tool_id: UUID,
+    session: Session = Depends(get_session),
+) -> ToolResponse:
+    """Get a single tool by ID.
+
+    Args:
+        tool_id: Tool ID to retrieve
+        session: Database session
+        current_user: Authenticated user
+
+    Returns:
+        Tool details with complete schema
+    """
+    try:
+        prompt_service = PromptService(session)
+        tool = await prompt_service.get_tool_by_id(tool_id)
+
+        return ToolResponse(
+            tool=tool,
+            success=True,
+            message="Tool retrieved successfully",
+            code=status.HTTP_200_OK,
+        )
+    except ClientException as e:
+        logger.error(f"Failed to get tool: {e}")
+        raise ClientException(message=e.message, status_code=e.status_code)
+    except Exception as e:
+        logger.exception(f"Failed to get tool: {e}")
+        raise ClientException(
+            message="Failed to get tool",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
