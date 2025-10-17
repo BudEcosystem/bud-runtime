@@ -31,14 +31,15 @@ class BudServeProvider:
     inference gateway, which provides an OpenAI-compatible API.
     """
 
-    def __init__(self, api_key: str = "sk_", base_url: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         """Initialize the BudServe provider.
 
         Args:
-            api_key: API key for authentication (default: "sk_" for BudInference)
+            api_key: API key for authentication (default: "sk_" if not provided)
             base_url: Base URL for the API (default: from AppConfig)
         """
-        self.api_key = api_key
+        # Use provided api_key or fallback to "sk_" for backwards compatibility
+        self.api_key = api_key if api_key else "sk_"
         self.base_url = base_url or app_settings.bud_gateway_base_url
         self._provider = None
 

@@ -6,6 +6,7 @@ import {
   MessageOutlined
 } from "@ant-design/icons";
 import { useAgentStore } from "@/stores/useAgentStore";
+import { useDrawer } from "@/hooks/useDrawer";
 import AgentBoxWrapper from "./AgentBoxWrapper";
 import AgentSelector from "./AgentSelector";
 
@@ -16,16 +17,34 @@ const AgentDrawer: React.FC = () => {
     sessions,
     activeSessionIds,
     createSession,
+    workflowContext,
   } = useAgentStore();
+
+  const { openDrawerWithStep } = useDrawer();
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [drawerWidth, setDrawerWidth] = useState<string>('100%');
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   // Get active sessions
   const activeSessions = sessions.filter((session) =>
     activeSessionIds.includes(session.id)
   );
+
+  // Handle close button click
+  const handleCloseDrawer = () => {
+    // Check if we're in a workflow
+    if (workflowContext.isInWorkflow) {
+      // Close the agent drawer
+      closeAgentDrawer();
+      // Navigate back to select agent type
+      setTimeout(() => {
+        openDrawerWithStep("add-agent-select-type");
+      }, 100);
+    } else {
+      // Just close the drawer
+      closeAgentDrawer();
+    }
+  };
 
   // Create initial session when drawer opens if none exist
   useEffect(() => {
@@ -57,7 +76,7 @@ const AgentDrawer: React.FC = () => {
     <>
       <Drawer
         open={isAgentDrawerOpen}
-        onClose={closeAgentDrawer}
+        onClose={handleCloseDrawer}
         placement="right"
         width={drawerWidth}
         className="agent-drawer p-[.75rem]"
@@ -88,7 +107,7 @@ const AgentDrawer: React.FC = () => {
             <div className="this-back mb-3">
               <Tooltip title="Back" placement="right">
                 <button
-                  onClick={closeAgentDrawer}
+                  onClick={handleCloseDrawer}
                   className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md border-none bg-transparent p-0"
                 >
                   <Image
@@ -101,13 +120,13 @@ const AgentDrawer: React.FC = () => {
               </Tooltip>
             </div>
             <div>
-              {/* Settings Icon */}
-              <Tooltip title="Settings" placement="right">
+              {/* Settings Icon - Now opens settings for individual agent boxes */}
+              <Tooltip title="Use settings icon in each agent box" placement="right">
                 <button
-                  onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                  className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#1A1A1A] transition-colors mb-3"
+                  className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#1A1A1A] transition-colors mb-3 opacity-50 cursor-not-allowed"
+                  disabled
                 >
-                  <SettingOutlined className="text-[#808080] hover:text-[#EEEEEE] text-lg" />
+                  <SettingOutlined className="text-[#808080] text-lg" />
                 </button>
               </Tooltip>
 
@@ -151,8 +170,6 @@ const AgentDrawer: React.FC = () => {
                         session={session}
                         index={index}
                         totalSessions={activeSessions.length}
-                        onToggleRightSidebar={() => setIsSettingsOpen(!isSettingsOpen)}
-                        isRightSidebarOpen={isSettingsOpen}
                       />
                     </div>
                   ))}

@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use futures::{StreamExt, TryStreamExt};
 use reqwest_eventsource::RequestBuilderExt;
@@ -17,6 +17,11 @@ use super::openai::{
 };
 use super::provider_trait::{InferenceProvider, TensorZeroEventError};
 use crate::cache::ModelProviderRequest;
+use crate::completions::{
+    CompletionChoice, CompletionChunk, CompletionLogProbs,
+    CompletionPrompt, CompletionProvider, CompletionProviderResponse, CompletionRequest,
+    CompletionStream, CompletionStop,
+};
 use crate::embeddings::{EmbeddingProvider, EmbeddingProviderResponse, EmbeddingRequest};
 use crate::endpoints::inference::InferenceCredentials;
 use crate::error::{DisplayOrDebugGateway, Error, ErrorDetails};
@@ -335,6 +340,8 @@ struct VLLMRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     frequency_penalty: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    repetition_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     max_tokens: Option<u32>,
     stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -369,6 +376,8 @@ struct VLLMRequest<'a> {
     logprobs: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     seed: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ignore_eos: Option<bool>,
 }
 
 impl<'a> VLLMRequest<'a> {
@@ -406,6 +415,7 @@ impl<'a> VLLMRequest<'a> {
             top_p: request.top_p,
             presence_penalty: request.presence_penalty,
             frequency_penalty: request.frequency_penalty,
+            repetition_penalty: request.repetition_penalty,
             max_tokens: request.max_tokens,
             stream: request.stream,
             stream_options,
@@ -427,6 +437,7 @@ impl<'a> VLLMRequest<'a> {
                 false => Some(false), // client explicitly disabled it
             },
             seed: request.seed,
+            ignore_eos: request.ignore_eos,
         })
     }
 }
@@ -536,6 +547,21 @@ fn tensorzero_to_vllm_system_message(system: Option<&str>) -> Option<OpenAIReque
     system.map(|instructions| {
         OpenAIRequestMessage::System(OpenAISystemRequestMessage {
             content: Cow::Borrowed(instructions),
+        })
+    })
+}
+
+// vLLM Completions Support
+
+/// Get the completions endpoint URL for vLLM
+fn get_completions_url(base_url: &Url) -> Result<Url, Error> {
+    let mut url = base_url.clone();
+    if !url.path().ends_with('/') {
+        url.set_path(&format!("{}/", url.path()));
+    }
+    url.join("completions").map_err(|e| {
+        Error::new(ErrorDetails::InvalidBaseUrl {
+            message: e.to_string(),
         })
     })
 }
@@ -710,6 +736,391 @@ impl EmbeddingProvider for VLLMProvider {
                 PROVIDER_TYPE,
             ))
         }
+    }
+}
+
+// vLLM Completions Provider Implementation
+
+#[derive(Debug, Serialize)]
+struct VLLMCompletionRequest<'a> {
+    model: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prompt: Option<VLLMCompletionPrompt<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    suffix: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    top_p: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    n: Option<u32>,
+    stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream_options: Option<StreamOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logprobs: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    echo: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stop: Option<VLLMCompletionStop<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    presence_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    frequency_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repetition_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    best_of: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logit_bias: Option<&'a std::collections::HashMap<String, f32>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    user: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    seed: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ignore_eos: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+enum VLLMCompletionPrompt<'a> {
+    String(&'a str),
+    StringArray(&'a [String]),
+    TokenArray(&'a [u32]),
+    TokenArrays(&'a [Vec<u32>]),
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+enum VLLMCompletionStop<'a> {
+    String(&'a str),
+    StringArray(&'a [String]),
+}
+
+#[derive(Debug, Deserialize)]
+struct VLLMCompletionResponse {
+    id: String,
+    object: String,
+    created: u64,
+    model: String,
+    choices: Vec<VLLMCompletionChoice>,
+    usage: VLLMCompletionUsage,
+}
+
+#[derive(Debug, Deserialize)]
+struct VLLMCompletionChoice {
+    text: String,
+    index: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logprobs: Option<VLLMCompletionLogProbs>,
+    finish_reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct VLLMCompletionLogProbs {
+    tokens: Vec<String>,
+    token_logprobs: Vec<Option<f32>>,
+    top_logprobs: Vec<std::collections::HashMap<String, f32>>,
+    text_offset: Vec<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct VLLMCompletionUsage {
+    prompt_tokens: u32,
+    completion_tokens: u32,
+    total_tokens: u32,
+}
+
+impl CompletionProvider for VLLMProvider {
+    async fn complete(
+        &self,
+        request: &CompletionRequest,
+        client: &reqwest::Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<CompletionProviderResponse, Error> {
+        let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
+
+        // Build request body
+        let prompt = request.prompt.as_ref().map(|p| match p {
+            CompletionPrompt::String(s) => VLLMCompletionPrompt::String(s),
+            CompletionPrompt::StringArray(arr) => VLLMCompletionPrompt::StringArray(arr.as_slice()),
+            CompletionPrompt::TokenArray(arr) => VLLMCompletionPrompt::TokenArray(arr.as_slice()),
+            CompletionPrompt::TokenArrays(arr) => VLLMCompletionPrompt::TokenArrays(arr.as_slice()),
+        });
+
+        let stop = request.stop.as_ref().map(|s| match s {
+            CompletionStop::String(s) => VLLMCompletionStop::String(s),
+            CompletionStop::StringArray(arr) => VLLMCompletionStop::StringArray(arr.as_slice()),
+        });
+
+        let request_body = VLLMCompletionRequest {
+            model: &self.model_name,
+            prompt,
+            suffix: request.suffix.as_deref(),
+            max_tokens: request.max_tokens,
+            temperature: request.temperature,
+            top_p: request.top_p,
+            n: request.n,
+            stream: false,
+            stream_options: None,
+            logprobs: request.logprobs,
+            echo: request.echo,
+            stop,
+            presence_penalty: request.presence_penalty,
+            frequency_penalty: request.frequency_penalty,
+            repetition_penalty: request.repetition_penalty,
+            best_of: request.best_of,
+            logit_bias: request.logit_bias.as_ref(),
+            user: request.user.as_deref(),
+            seed: request.seed,
+            ignore_eos: request.ignore_eos,
+        };
+
+        // Log request parameters for debugging
+        tracing::debug!(
+            "vLLM completions request: model={}, max_tokens={:?}, temperature={:?}, ignore_eos={:?}, request_body={}",
+            &self.model_name,
+            request.max_tokens,
+            request.temperature,
+            request.ignore_eos,
+            serde_json::to_string(&request_body).unwrap_or_else(|_| "failed to serialize".to_string())
+        );
+
+        let request_url = get_completions_url(&self.api_base)?;
+        let start_time = Instant::now();
+
+        let mut request_builder = client
+            .post(request_url)
+            .header("Content-Type", "application/json");
+
+        if let Some(key) = api_key {
+            request_builder = request_builder.bearer_auth(key.expose_secret());
+        }
+
+        let res = request_builder
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| {
+                Error::new(ErrorDetails::InferenceClient {
+                    status_code: e.status(),
+                    message: format!(
+                        "Error sending completion request to vLLM: {}",
+                        DisplayOrDebugGateway::new(e)
+                    ),
+                    raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
+                    raw_response: None,
+                    provider_type: PROVIDER_TYPE.to_string(),
+                })
+            })?;
+
+        let latency = Latency::NonStreaming {
+            response_time: start_time.elapsed(),
+        };
+
+        if res.status().is_success() {
+            let raw_response = res.text().await.map_err(|e| {
+                Error::new(ErrorDetails::InferenceServer {
+                    message: format!("Error parsing completion response: {}", DisplayOrDebugGateway::new(e)),
+                    raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
+                    raw_response: None,
+                    provider_type: PROVIDER_TYPE.to_string(),
+                })
+            })?;
+
+            let response: VLLMCompletionResponse = serde_json::from_str(&raw_response).map_err(|e| {
+                Error::new(ErrorDetails::InferenceServer {
+                    message: format!("Error parsing completion response: {}", DisplayOrDebugGateway::new(e)),
+                    raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
+                    raw_response: Some(raw_response.clone()),
+                    provider_type: PROVIDER_TYPE.to_string(),
+                })
+            })?;
+
+            // Convert vLLM response to our format
+            let choices: Vec<CompletionChoice> = response.choices.into_iter().map(|choice| {
+                CompletionChoice {
+                    text: choice.text,
+                    index: choice.index,
+                    logprobs: choice.logprobs.map(|lp| CompletionLogProbs {
+                        tokens: lp.tokens,
+                        token_logprobs: lp.token_logprobs,
+                        top_logprobs: lp.top_logprobs,
+                        text_offset: lp.text_offset,
+                    }),
+                    finish_reason: choice.finish_reason,
+                }
+            }).collect();
+
+            let usage = Usage {
+                input_tokens: response.usage.prompt_tokens,
+                output_tokens: response.usage.completion_tokens,
+            };
+
+            let raw_request = serde_json::to_string(&request_body).map_err(|e| {
+                Error::new(ErrorDetails::Serialization {
+                    message: format!("Error serializing request: {}", DisplayOrDebugGateway::new(e)),
+                })
+            })?;
+
+            Ok(CompletionProviderResponse {
+                id: request.id,
+                created: response.created,
+                model: Arc::from(response.model),
+                choices,
+                usage,
+                raw_request,
+                raw_response,
+                latency,
+            })
+        } else {
+            let status = res.status();
+            let raw_response = res.text().await.map_err(|e| {
+                Error::new(ErrorDetails::InferenceServer {
+                    message: format!("Error parsing error response: {}", DisplayOrDebugGateway::new(e)),
+                    raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
+                    raw_response: None,
+                    provider_type: PROVIDER_TYPE.to_string(),
+                })
+            })?;
+
+            Err(handle_openai_error(
+                &serde_json::to_string(&request_body).unwrap_or_default(),
+                status,
+                &raw_response,
+                PROVIDER_TYPE,
+            ))
+        }
+    }
+
+    async fn complete_stream(
+        &self,
+        request: &CompletionRequest,
+        client: &reqwest::Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<(CompletionStream, String), Error> {
+        let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
+
+        // Build request body
+        let prompt = request.prompt.as_ref().map(|p| match p {
+            CompletionPrompt::String(s) => VLLMCompletionPrompt::String(s),
+            CompletionPrompt::StringArray(arr) => VLLMCompletionPrompt::StringArray(arr.as_slice()),
+            CompletionPrompt::TokenArray(arr) => VLLMCompletionPrompt::TokenArray(arr.as_slice()),
+            CompletionPrompt::TokenArrays(arr) => VLLMCompletionPrompt::TokenArrays(arr.as_slice()),
+        });
+
+        let stop = request.stop.as_ref().map(|s| match s {
+            CompletionStop::String(s) => VLLMCompletionStop::String(s),
+            CompletionStop::StringArray(arr) => VLLMCompletionStop::StringArray(arr.as_slice()),
+        });
+
+        let request_body = VLLMCompletionRequest {
+            model: &self.model_name,
+            prompt,
+            suffix: request.suffix.as_deref(),
+            max_tokens: request.max_tokens,
+            temperature: request.temperature,
+            top_p: request.top_p,
+            n: request.n,
+            stream: true,
+            stream_options: Some(StreamOptions {
+                include_usage: true,
+            }),
+            logprobs: request.logprobs,
+            echo: request.echo,
+            stop,
+            presence_penalty: request.presence_penalty,
+            frequency_penalty: request.frequency_penalty,
+            repetition_penalty: request.repetition_penalty,
+            best_of: request.best_of,
+            logit_bias: request.logit_bias.as_ref(),
+            user: request.user.as_deref(),
+            seed: request.seed,
+            ignore_eos: request.ignore_eos,
+        };
+
+        // Log request parameters for debugging
+        tracing::debug!(
+            "vLLM completions stream request: model={}, max_tokens={:?}, temperature={:?}, ignore_eos={:?}, stream=true, request_body={}",
+            &self.model_name,
+            request.max_tokens,
+            request.temperature,
+            request.ignore_eos,
+            serde_json::to_string(&request_body).unwrap_or_else(|_| "failed to serialize".to_string())
+        );
+
+        let raw_request = serde_json::to_string(&request_body).map_err(|e| {
+            Error::new(ErrorDetails::Serialization {
+                message: format!("Error serializing request: {}", DisplayOrDebugGateway::new(e)),
+            })
+        })?;
+
+        let request_url = get_completions_url(&self.api_base)?;
+
+        let mut request_builder = client
+            .post(request_url)
+            .header("Content-Type", "application/json");
+
+        if let Some(key) = api_key {
+            request_builder = request_builder.bearer_auth(key.expose_secret());
+        }
+
+        let event_source = request_builder
+            .json(&request_body)
+            .eventsource()
+            .map_err(|e| {
+                Error::new(ErrorDetails::InferenceClient {
+                    message: format!("Error sending completion stream request to vLLM: {}", DisplayOrDebugGateway::new(e)),
+                    status_code: None,
+                    raw_request: Some(raw_request.clone()),
+                    raw_response: None,
+                    provider_type: PROVIDER_TYPE.to_string(),
+                })
+            })?;
+
+        // Convert SSE stream to completion chunks using proper event handling
+        use async_stream::stream;
+        use reqwest_eventsource::Event;
+
+        let stream = Box::pin(stream! {
+            futures::pin_mut!(event_source);
+            while let Some(result) = event_source.next().await {
+                match result {
+                    Err(e) => {
+                        yield Err(Error::new(ErrorDetails::InferenceServer {
+                            message: format!("Error in completion stream: {}", DisplayOrDebugGateway::new(e)),
+                            raw_request: None,
+                            raw_response: None,
+                            provider_type: PROVIDER_TYPE.to_string(),
+                        }));
+                    }
+                    Ok(event) => match event {
+                        Event::Open => continue,
+                        Event::Message(msg) => {
+                            if msg.data == "[DONE]" {
+                                break;
+                            }
+
+                            match serde_json::from_str::<CompletionChunk>(&msg.data) {
+                                Ok(chunk) => yield Ok(chunk),
+                                Err(e) => {
+                                    yield Err(Error::new(ErrorDetails::InferenceServer {
+                                        message: format!("Error parsing completion chunk: {}", DisplayOrDebugGateway::new(e)),
+                                        raw_request: None,
+                                        raw_response: Some(msg.data.clone()),
+                                        provider_type: PROVIDER_TYPE.to_string(),
+                                    }));
+                                }
+                            }
+                        }
+                    },
+                }
+            }
+        });
+
+        Ok((stream, raw_request))
     }
 }
 
@@ -946,5 +1357,73 @@ mod tests {
         .unwrap();
         assert!(logs_contain("automatically appends `/chat/completions`"));
         assert!(logs_contain(invalid_url_2.as_ref()));
+    }
+
+    #[test]
+    fn test_vllm_request_ignore_eos() {
+        // Test that ignore_eos parameter is properly passed through
+        let request_with_ignore_eos = ModelInferenceRequest {
+            inference_id: Uuid::now_v7(),
+            messages: vec![RequestMessage {
+                role: Role::User,
+                content: vec!["Generate text".to_string().into()],
+            }],
+            system: None,
+            temperature: Some(0.7),
+            max_tokens: Some(200),
+            ignore_eos: Some(true),
+            stream: false,
+            json_mode: ModelInferenceRequestJsonMode::Off,
+            tool_config: None,
+            function_type: FunctionType::Chat,
+            output_schema: None,
+            extra_body: Default::default(),
+            ..Default::default()
+        };
+
+        let vllm_request = VLLMRequest::new("llama-v3-8b", &request_with_ignore_eos).unwrap();
+
+        assert_eq!(vllm_request.ignore_eos, Some(true));
+        assert_eq!(vllm_request.max_tokens, Some(200));
+
+        // Test with ignore_eos set to false
+        let request_without_ignore_eos = ModelInferenceRequest {
+            inference_id: Uuid::now_v7(),
+            messages: vec![RequestMessage {
+                role: Role::User,
+                content: vec!["Generate text".to_string().into()],
+            }],
+            ignore_eos: Some(false),
+            stream: false,
+            json_mode: ModelInferenceRequestJsonMode::Off,
+            tool_config: None,
+            function_type: FunctionType::Chat,
+            output_schema: None,
+            extra_body: Default::default(),
+            ..Default::default()
+        };
+
+        let vllm_request = VLLMRequest::new("llama-v3-8b", &request_without_ignore_eos).unwrap();
+        assert_eq!(vllm_request.ignore_eos, Some(false));
+
+        // Test with ignore_eos not set (None)
+        let request_no_ignore_eos = ModelInferenceRequest {
+            inference_id: Uuid::now_v7(),
+            messages: vec![RequestMessage {
+                role: Role::User,
+                content: vec!["Generate text".to_string().into()],
+            }],
+            ignore_eos: None,
+            stream: false,
+            json_mode: ModelInferenceRequestJsonMode::Off,
+            tool_config: None,
+            function_type: FunctionType::Chat,
+            output_schema: None,
+            extra_body: Default::default(),
+            ..Default::default()
+        };
+
+        let vllm_request = VLLMRequest::new("llama-v3-8b", &request_no_ignore_eos).unwrap();
+        assert_eq!(vllm_request.ignore_eos, None);
     }
 }

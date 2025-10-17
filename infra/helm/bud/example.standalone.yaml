@@ -1,0 +1,46 @@
+ingress:
+    https: disabled
+    hosts:
+        root: bud
+
+imagePullPolicy: "Always"
+deploymentAnnotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+    keel.sh/match-tag: true
+    keel.sh/pollSchedule: "@every 1m"
+
+storage:
+    budmodelRegistry:
+        size: "128Gi"
+minio:
+    persistence:
+        size: "128Gi"
+
+microservices:
+    budadmin:
+        image: budstudio/budadmin:nightly
+    budcustomer:
+        image: budstudio/budcustomer:nightly
+    budplayground:
+        image: budstudio/budplayground:nightly
+    budgateway:
+        image: budstudio/budgateway:nightly
+    askbud:
+        image: budstudio/askbud:nightly
+    budapp:
+        image: budstudio/budapp:nightly
+    budcluster:
+        image: budstudio/budcluster:nightly
+    budmetrics:
+        image: budstudio/budmetrics:nightly
+    budmodel:
+        image: budstudio/budmodel:nightly
+    budsim:
+        image: budstudio/budsim:nightly
+    budnotify:
+        image: budstudio/budnotify:nightly
+    budprompt:
+        image: budstudio/budprompt:nightly
+    buddoc:
+        image: budstudio/buddoc:nightly

@@ -15,7 +15,7 @@ export default function RunModelSuccess() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍",
+        icon: "🌐",
       }}
       onBack={() => {
         closeDrawer();

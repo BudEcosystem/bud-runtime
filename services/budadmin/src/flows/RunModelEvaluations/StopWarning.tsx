@@ -15,7 +15,7 @@ export default function StopWarning() {
         name: "",
         description: "",
         tags: [],
-        icon: "😍",
+        icon: "🌐",
       }}
       onBack={() => {
         closeDrawer();

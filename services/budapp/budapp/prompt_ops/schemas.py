@@ -97,6 +97,12 @@ class PromptVersionListResponse(PaginatedSuccessResponse):
     versions: list[PromptVersionListItem] = []
 
 
+class PaginatedTagsResponse(PaginatedSuccessResponse):
+    """Paginated tags response schema for prompts."""
+
+    tags: list[Tag] = []
+
+
 class ModelSettings(BaseModel):
     """Model settings for LLM configuration.
 
@@ -578,3 +584,12 @@ class PromptConfigCopyRequest(BaseModel):
         True, description="If true, replace entire target config. If false, merge only fields present in source"
     )
     set_as_default: bool = Field(True, description="Whether to set the copied version as default for target prompt")
+
+
+class BudPromptConfig(BaseModel):
+    """BudPrompt provider config for prompt execution."""
+
+    type: str = "budprompt"
+    api_base: str
+    model_name: str  # This will be the prompt name
+    api_key_location: str = "dynamic::authorization"

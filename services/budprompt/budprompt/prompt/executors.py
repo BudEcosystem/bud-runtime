@@ -31,6 +31,8 @@ from pydantic_ai.messages import (
     ModelResponse,
     SystemPromptPart,
     TextPart,
+    ThinkingPart,
+    ToolCallPart,
     UserPromptPart,
 )
 from pydantic_ai.models.openai import ModelSettings as OpenAIModelSettings
@@ -43,11 +45,14 @@ from budprompt.commons.exceptions import (
 )
 from budprompt.shared.providers import BudServeProvider
 
+from .openai_response_formatter import OpenAIResponseFormatter
+from .openai_streaming_formatter import OpenAIStreamingFormatter
 from .revised_code.field_validation import ModelValidationEnhancer
 from .schema_builder import CustomModelGenerator, DataModelGenerator
 from .schemas import Message, ModelSettings
 from .streaming_executors import execute_streaming_validation
 from .streaming_validation import add_field_validator_to_model
+from .streaming_validation_executor import StreamingValidationExecutor
 from .template_renderer import render_template
 from .utils import contains_pydantic_model, validate_input_data_type
 from .validation import add_validator_to_model_async
@@ -318,6 +323,7 @@ class SimplePromptExecutorDeprecated:
         llm_retry_limit: Optional[int] = None,
         allow_multiple_calls: bool = True,
         system_prompt_role: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Agent:
         """Create Pydantic AI agent with automatic parameter routing.
 
@@ -328,6 +334,7 @@ class SimplePromptExecutorDeprecated:
             llm_retry_limit: Number of retries for validation failures
             allow_multiple_calls: Whether to allow multiple LLM calls
             system_prompt_role: Role for system prompts (system/developer/user)
+            api_key: Optional API key for authorization
 
         Returns:
             Configured AI agent
@@ -336,8 +343,11 @@ class SimplePromptExecutorDeprecated:
         # This automatically routes BudEcosystem parameters to extra_body
         openai_settings = self._convert_to_openai_settings(model_settings)
 
+        # Create provider with api_key (handles None internally)
+        provider = BudServeProvider(api_key=api_key)
+
         # Create model using BudServeProvider with system_prompt_role
-        model = self.provider.get_model(
+        model = provider.get_model(
             model_name=deployment_name, system_prompt_role=system_prompt_role, settings=openai_settings
         )
 
@@ -545,8 +555,8 @@ class SimplePromptExecutor:
 
     def __init__(self):
         """Initialize the SimplePromptExecutor."""
-        self.provider = BudServeProvider()
         self.model_generator = CustomModelGenerator()
+        self.response_formatter = OpenAIResponseFormatter()
 
     async def execute(
         self,
@@ -563,6 +573,7 @@ class SimplePromptExecutor:
         enable_tools: bool = False,
         allow_multiple_calls: bool = True,
         system_prompt_role: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt with structured or unstructured input and output.
 
@@ -580,6 +591,7 @@ class SimplePromptExecutor:
             enable_tools: Enable tool calling capability (requires allow_multiple_calls=true)
             allow_multiple_calls: Allow multiple LLM calls for retries and tools
             system_prompt_role: Role for system prompts (system/developer/user)
+            api_key: Optional API key for authorization
 
         Returns:
             Output data (Dict for structured, str for unstructured) or AsyncGenerator for streaming
@@ -621,6 +633,7 @@ class SimplePromptExecutor:
                 llm_retry_limit if output_validation and not stream else None,
                 allow_multiple_calls,
                 system_prompt_role,
+                api_key=api_key,
             )
 
             # Build message history from all messages
@@ -634,28 +647,70 @@ class SimplePromptExecutor:
                 # Check if streaming validation is needed
                 if output_validation and output_schema and contains_pydantic_model(output_type):
                     logger.debug("Performing streaming with validation")
-                    # Use streaming validation executor with the enhanced model
-                    # The model already has field validators added in _get_output_type
-                    return execute_streaming_validation(
-                        enhanced_model=output_type,  # Pass the already enhanced model
-                        pydantic_schema=output_schema,
+
+                    # # Use streaming validation executor with the enhanced model
+                    # # The model already has field validators added in _get_output_type
+                    # NOTE: Commented out older implementation (Non openai format)
+                    # return execute_streaming_validation(
+                    #     enhanced_model=output_type,  # Pass the already enhanced model
+                    #     pydantic_schema=output_schema,
+                    #     prompt=user_prompt or "",
+                    #     validation_prompt=output_validation,
+                    #     deployment_name=deployment_name,
+                    #     model_settings=model_settings.model_dump(exclude_none=True) if model_settings else None,
+                    #     llm_retry_limit=llm_retry_limit or 3,
+                    #     messages=message_history,
+                    #     system_prompt_role=system_prompt_role,
+                    #     api_key=api_key,
+                    # )
+
+                    # Extract model from NativeOutput wrapper
+                    model_with_validators = output_type.outputs if hasattr(output_type, "outputs") else output_type
+
+                    # Use new clean streaming validation executor
+                    executor = StreamingValidationExecutor(
+                        output_model=model_with_validators,
                         prompt=user_prompt or "",
-                        validation_prompt=output_validation,
                         deployment_name=deployment_name,
                         model_settings=model_settings.model_dump(exclude_none=True) if model_settings else None,
-                        llm_retry_limit=llm_retry_limit or 3,
-                        messages=message_history,
-                        system_prompt_role=system_prompt_role,
+                        validation_prompt=output_validation,
+                        retry_limit=llm_retry_limit or 3,
+                        messages=messages,
+                        message_history=message_history,
+                        api_key=api_key,
                     )
+
+                    return executor.stream()
                 else:
                     # Regular streaming without validation
                     logger.debug(
                         f"Using regular streaming - validation={bool(output_validation)}, schema={bool(output_schema)}, contains_pydantic={contains_pydantic_model(output_type) if output_type else False}"
                     )
-                    return self._run_agent_stream(agent, user_prompt, message_history, output_schema)
+                    return self._run_agent_stream(
+                        agent,
+                        user_prompt,
+                        message_history,
+                        output_schema,
+                        deployment_name,
+                        model_settings,
+                        messages,
+                    )
             else:
                 # Execute the agent with both history and current prompt
-                return await self._run_agent(agent, user_prompt, message_history, output_schema)
+                result = await self._run_agent(
+                    agent,
+                    user_prompt,
+                    message_history,
+                    output_schema,
+                )
+
+                # Format to OpenAI response for non-streaming
+                return self.response_formatter.format_response(
+                    pydantic_result=result,
+                    model_settings=model_settings,
+                    messages=messages,
+                    deployment_name=deployment_name,
+                )
 
         except (SchemaGenerationException, ValidationError, PromptExecutionException, TemplateRenderingException):
             raise
@@ -793,6 +848,7 @@ class SimplePromptExecutor:
         llm_retry_limit: Optional[int] = None,
         allow_multiple_calls: bool = True,
         system_prompt_role: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Agent:
         """Create Pydantic AI agent with automatic parameter routing.
 
@@ -803,6 +859,7 @@ class SimplePromptExecutor:
             llm_retry_limit: Number of retries for validation failures
             allow_multiple_calls: Whether to allow multiple LLM calls
             system_prompt_role: Role for system prompts (system/developer/user)
+            api_key: Optional API key for authorization
 
         Returns:
             Configured AI agent
@@ -811,8 +868,11 @@ class SimplePromptExecutor:
         # This automatically routes BudEcosystem parameters to extra_body
         openai_settings = self._convert_to_openai_settings(model_settings)
 
+        # Create provider with api_key (handles None internally)
+        provider = BudServeProvider(api_key=api_key)
+
         # Create model using BudServeProvider with system_prompt_role
-        model = self.provider.get_model(
+        model = provider.get_model(
             model_name=deployment_name, system_prompt_role=system_prompt_role, settings=openai_settings
         )
 
@@ -930,7 +990,7 @@ class SimplePromptExecutor:
             output_schema: Output schema to determine result processing
 
         Returns:
-            Agent execution result (dict for structured, string for unstructured)
+            Tuple of (result object, raw output) for further processing
 
         Raises:
             PromptExecutionException: If execution fails
@@ -946,13 +1006,7 @@ class SimplePromptExecutor:
             logger.debug("Pydantic AI execution result: %s", result.all_messages())
             logger.debug("================================================")
 
-            # Process and return result based on output schema
-            if output_schema is not None:
-                # Structured output: return as dict
-                return result.output.model_dump() if hasattr(result.output, "model_dump") else result.output
-            else:
-                # Unstructured output: return as string
-                return result.output
+            return result
         except UnexpectedModelBehavior as e:
             # Handle validation retry exhaustion with specific message
             error_msg = str(e)
@@ -973,39 +1027,112 @@ class SimplePromptExecutor:
         user_prompt: Optional[str],
         message_history: List[ModelMessage],
         output_schema: Optional[Dict[str, Any]],
+        deployment_name: str,
+        model_settings: ModelSettings,
+        messages: List[Message],
     ) -> AsyncGenerator[str, None]:
-        """Run agent with streaming and yield SSE-formatted chunks.
+        """Run agent with OpenAI-compatible streaming.
 
         Args:
             agent: Configured AI agent
             user_prompt: Current user prompt from input_data
             message_history: Conversation history from messages
             output_schema: Output schema to determine streaming type
+            deployment_name: Model deployment name for response metadata
+            model_settings: Model settings for response metadata
+            messages: Original input messages for response metadata
 
         Yields:
-            SSE-formatted string chunks with data: prefix and double newlines
+            SSE-formatted string chunks matching OpenAI Responses API format
         """
-        try:
-            # Use async context manager for run_stream
-            async with agent.run_stream(user_prompt=user_prompt, message_history=message_history) as stream_result:
-                logger.debug("Starting streaming with stream_structured()...")
+        # Initialize OpenAI streaming formatter
+        formatter = OpenAIStreamingFormatter(
+            deployment_name=deployment_name, model_settings=model_settings, messages=messages
+        )
 
-                # Use stream_structured() for getting structured messages
-                # This works for both structured and unstructured outputs
+        try:
+            # EVENT 1: response.created (sequence 0)
+            yield formatter.format_response_created()
+
+            # EVENT 2: response.in_progress (sequence 1)
+            yield formatter.format_response_in_progress()
+
+            # EVENT 3: response.output_item.added (sequence 2)
+            yield formatter.format_output_item_added()
+
+            # EVENT 4: response.content_part.added (sequence 3)
+            yield formatter.format_content_part_added()
+
+            # Track final usage
+            final_usage = None
+
+            # Stream pydantic-ai responses
+            async with agent.run_stream(user_prompt=user_prompt, message_history=message_history) as stream_result:
+                logger.debug("Starting OpenAI-compatible streaming...")
+
                 async for message, last_message in stream_result.stream_structured():
                     logger.debug(f"Received message type: {type(message)}, last_message: {last_message}")
 
-                    # Handle ModelResponse dataclass
                     if isinstance(message, ModelResponse):
-                        # Convert ModelResponse to dict using asdict
-                        message_dict = asdict(message)
-                        message_dict["timestamp"] = datetime.now().isoformat()
-                        message_dict["end"] = last_message
+                        # Update model name if available
+                        if message.model_name:
+                            formatter.update_model_name(message.model_name)
 
-                        # Format as SSE with proper data prefix and newlines
-                        yield f"data: {json.dumps(message_dict)}\n\n"
+                        # Process each part in the ModelResponse
+                        for part in message.parts:
+                            if isinstance(part, TextPart):
+                                # EVENTS 5+: response.output_text.delta (multiple)
+                                if part.content:
+                                    delta_event = formatter.format_output_text_delta(part.content)
+                                    if delta_event:  # Only yield if there's new content
+                                        yield delta_event
+
+                            elif isinstance(part, ThinkingPart):
+                                # Handle reasoning/thinking streaming
+                                if part.content:
+                                    # First time seeing thinking? Emit .added event
+                                    if not formatter.reasoning_started:
+                                        yield formatter.format_reasoning_summary_part_added()
+                                        formatter.reasoning_started = True
+
+                                    # Emit delta event for thinking content
+                                    delta_event = formatter.format_reasoning_summary_text_delta(part.content)
+                                    if delta_event:
+                                        yield delta_event
+
+                                    # Also accumulate for final response.completed summary
+                                    formatter.add_thinking_content(part.content)
+
+                            elif isinstance(part, ToolCallPart):
+                                # TODO: Handle tool calls in future
+                                # Would emit response.function_call_arguments.delta
+                                logger.debug(f"Tool call detected: {part.tool_name} (not yet streamed)")
+
+                        # Capture final usage from last message
+                        if last_message and message.usage:
+                            final_usage = message.usage
+
+            # If we had reasoning, emit done events
+            if formatter.reasoning_started:
+                # REASONING EVENT 1: response.reasoning_summary_text.done
+                yield formatter.format_reasoning_summary_text_done()
+
+                # REASONING EVENT 2: response.reasoning_summary_part.done
+                yield formatter.format_reasoning_summary_part_done()
+
+            # EVENT N+1: response.output_text.done
+            yield formatter.format_output_text_done()
+
+            # EVENT N+2: response.content_part.done
+            yield formatter.format_content_part_done()
+
+            # EVENT N+3: response.output_item.done
+            yield formatter.format_output_item_done()
+
+            # EVENT N+4: response.completed (with usage)
+            yield formatter.format_response_completed(final_usage)
 
         except Exception as e:
             logger.error(f"Error during streaming: {str(e)}")
-            # Send error in SSE format
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            # ERROR EVENT: response.failed
+            yield formatter.format_response_failed(str(e))

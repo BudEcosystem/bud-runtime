@@ -86,13 +86,24 @@ async fn extract_model_from_request(request: &mut Request) -> Result<String, Rat
         }
     }
 
-    // Strategy 2: Check for pre-extracted model from early extraction layer
+    // Strategy 2: Check for prompt ID from authentication (for prompt-based requests)
+    if let Some(prompt_id_header) = request.headers().get("x-tensorzero-prompt-id") {
+        if let Ok(prompt_id) = prompt_id_header.to_str() {
+            debug!(
+                "Using prompt ID for rate limiting: {}",
+                prompt_id
+            );
+            return Ok(prompt_id.to_string());
+        }
+    }
+
+    // Strategy 3: Check for pre-extracted model from early extraction layer
     if let Some(extracted) = request.extensions().get::<ExtractedModel>() {
         debug!("Using pre-extracted model: {}", extracted.0);
         return Ok(extracted.0.clone());
     }
 
-    // Strategy 3: Check for X-Model-Name header (fastest path)
+    // Strategy 4: Check for X-Model-Name header (fastest path)
     if let Some(model_header) = request.headers().get("x-model-name") {
         if let Ok(model) = model_header.to_str() {
             debug!("Extracted model from X-Model-Name header: {}", model);
@@ -100,14 +111,14 @@ async fn extract_model_from_request(request: &mut Request) -> Result<String, Rat
         }
     }
 
-    // Strategy 4: Try to extract from URL path
+    // Strategy 5: Try to extract from URL path
     let path = request.uri().path().to_string(); // Clone the path to avoid borrow issues
     if let Some(model) = try_extract_from_path(&path) {
         debug!("Extracted model from URL path: {}", model);
         return Ok(model);
     }
 
-    // Strategy 5: Try to extract from request body (slowest path, only for POST)
+    // Strategy 6: Try to extract from request body (slowest path, only for POST)
     if request.method() == axum::http::Method::POST {
         // Read the body
         let body = std::mem::replace(request.body_mut(), Body::empty());

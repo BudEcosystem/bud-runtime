@@ -10,7 +10,7 @@ mod test_model_input_standardization {
 
         // Test standard model name without authentication
         let result =
-            model_resolution::resolve_model_name("gpt-3.5-turbo", &headers, false).unwrap();
+            model_resolution::resolve_model_name(Some("gpt-3.5-turbo"), &headers, false).unwrap();
         assert_eq!(result.model_name, Some("gpt-3.5-turbo".to_string()));
         assert_eq!(result.function_name, None);
         assert_eq!(result.original_model_name.as_ref(), "gpt-3.5-turbo");
@@ -18,7 +18,7 @@ mod test_model_input_standardization {
 
         // Test another standard model
         let result =
-            model_resolution::resolve_model_name("claude-3-opus", &headers, false).unwrap();
+            model_resolution::resolve_model_name(Some("claude-3-opus"), &headers, false).unwrap();
         assert_eq!(result.model_name, Some("claude-3-opus".to_string()));
         assert!(!result.is_authenticated);
     }
@@ -38,7 +38,7 @@ mod test_model_input_standardization {
 
         // Test standard model name with authentication
         let result =
-            model_resolution::resolve_model_name("gpt-3.5-turbo", &headers, false).unwrap();
+            model_resolution::resolve_model_name(Some("gpt-3.5-turbo"), &headers, false).unwrap();
         assert_eq!(result.model_name, Some("endpoint-uuid-123".to_string()));
         assert_eq!(result.function_name, None);
         assert_eq!(result.original_model_name.as_ref(), "gpt-3.5-turbo");
@@ -52,7 +52,7 @@ mod test_model_input_standardization {
 
         // Test model name with prefix (backward compatibility)
         let result = model_resolution::resolve_model_name(
-            "tensorzero::model_name::gpt-3.5-turbo",
+            Some("tensorzero::model_name::gpt-3.5-turbo"),
             &headers,
             false,
         )
@@ -63,7 +63,7 @@ mod test_model_input_standardization {
 
         // Test function name with prefix
         let result = model_resolution::resolve_model_name(
-            "tensorzero::function_name::my_function",
+            Some("tensorzero::function_name::my_function"),
             &headers,
             false,
         )
@@ -83,7 +83,7 @@ mod test_model_input_standardization {
 
         // Test standard embedding model name
         let result = model_resolution::resolve_model_name(
-            "text-embedding-ada-002",
+            Some("text-embedding-ada-002"),
             &headers,
             true, // for_embedding = true
         )
@@ -100,7 +100,7 @@ mod test_model_input_standardization {
 
         // Test embedding model with specific prefix
         let result = model_resolution::resolve_model_name(
-            "tensorzero::embedding_model_name::text-embedding-ada-002",
+            Some("tensorzero::embedding_model_name::text-embedding-ada-002"),
             &headers,
             true,
         )
@@ -127,7 +127,7 @@ mod test_model_input_standardization {
         );
 
         let result = model_resolution::resolve_model_name(
-            "tensorzero::model_name::custom-model",
+            Some("tensorzero::model_name::custom-model"),
             &headers,
             false,
         )
@@ -138,7 +138,7 @@ mod test_model_input_standardization {
 
         // Test function with auth (should still work with prefix)
         let result = model_resolution::resolve_model_name(
-            "tensorzero::function_name::my_func",
+            Some("tensorzero::function_name::my_func"),
             &headers,
             false,
         )
@@ -155,7 +155,7 @@ mod test_model_input_standardization {
 
         // Model name that contains but doesn't start with prefix
         let result = model_resolution::resolve_model_name(
-            "my-tensorzero::model_name::something",
+            Some("my-tensorzero::model_name::something"),
             &headers,
             false,
         )
@@ -167,7 +167,7 @@ mod test_model_input_standardization {
         assert_eq!(result.function_name, None);
 
         // Empty string
-        let result = model_resolution::resolve_model_name("", &headers, false).unwrap();
+        let result = model_resolution::resolve_model_name(Some(""), &headers, false).unwrap();
         assert_eq!(result.model_name, Some("".to_string()));
         assert_eq!(result.function_name, None);
     }
@@ -178,7 +178,7 @@ mod test_model_input_standardization {
         let mut headers = HeaderMap::new();
 
         // No auth headers
-        let result = model_resolution::resolve_model_name("model", &headers, false).unwrap();
+        let result = model_resolution::resolve_model_name(Some("model"), &headers, false).unwrap();
         assert!(!result.is_authenticated);
 
         // Only model name header (not enough for auth)
@@ -186,7 +186,7 @@ mod test_model_input_standardization {
             HeaderName::from_static("x-tensorzero-model-name"),
             HeaderValue::from_static("model"),
         );
-        let result = model_resolution::resolve_model_name("model", &headers, false).unwrap();
+        let result = model_resolution::resolve_model_name(Some("model"), &headers, false).unwrap();
         assert!(!result.is_authenticated);
 
         // Add endpoint-id header (now authenticated)
@@ -194,7 +194,7 @@ mod test_model_input_standardization {
             HeaderName::from_static("x-tensorzero-endpoint-id"),
             HeaderValue::from_static("endpoint-123"),
         );
-        let result = model_resolution::resolve_model_name("model", &headers, false).unwrap();
+        let result = model_resolution::resolve_model_name(Some("model"), &headers, false).unwrap();
         assert!(result.is_authenticated);
     }
 }

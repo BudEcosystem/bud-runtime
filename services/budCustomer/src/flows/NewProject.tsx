@@ -113,7 +113,7 @@ export default function NewProject() {
           name: "",
           description: "",
           tags: [],
-          icon: "😍",
+          icon: "🌐",
         }}
         onNext={(values) => {
           // Prevent multiple submissions
@@ -161,7 +161,7 @@ export default function NewProject() {
             name: values.name ? values.name.trim() : "",
             description: values.description ? values.description.trim() : "",
             tags: formattedTags,
-            icon: values.icon || "😍",
+            icon: values.icon || "🌐",
             project_type: "client_app",
             benchmark: false,
           };

@@ -50,6 +50,7 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
       />
       <TagsInput
         label="Tags"
+        required
         options={options}
         info="Add keywords to help organize and find your experiment later. Max 10 tags, 20 characters each."
         name="tags"
@@ -84,7 +85,7 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
             },
           },
         ]}
-        ClassNames="mb-[0px]"
+        ClassNames="mb-[1rem]"
         SelectClassNames="mb-[.5rem]"
         menuplacement="top"
       />
@@ -96,7 +97,6 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
         placeholder="Provide a brief description about the experiment."
         rules={[
           { required: true, message: "Description is required" },
-          { min: 10, message: "Description must be at least 10 characters" },
           { max: 500, message: "Description must not exceed 500 characters" },
           {
             validator: (_, value) => {

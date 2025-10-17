@@ -309,3 +309,60 @@ curl --location 'https://<base_url>/clusters/clusters' \
   "trigger_workflow": true
 }
 ```
+
+## Create Prompt Schema
+
+```json
+{
+  "version": 1,
+  "set_default": true,
+  "schema": {
+    "schema": {
+      "type": "object",
+      "$defs": {
+        "Person": {
+          "type": "object",
+          "title": "Person",
+          "required": [
+            "name",
+            "age",
+            "email"
+          ],
+          "properties": {
+            "age": {
+              "type": "integer"
+            },
+            "name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        }
+      },
+      "title": "Schema",
+      "required": [
+        "content"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/$defs/Person"
+        }
+      }
+    },
+    "validations": {
+      "Person": {
+        "name": "Name must be at least 3 characters",
+        "age": "Age must be between 18 and 100"
+      }
+    }
+  },
+  "type": "output",
+  "deployment_name": "qwen3-8b",
+  "source_topic": null,
+  "debug": true,
+  "notification_metadata": null
+}
+```

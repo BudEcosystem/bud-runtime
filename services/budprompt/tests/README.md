@@ -21,6 +21,30 @@ def test_failure_array_below_minimum_items(...)    # Array validation failure
 def test_failure_number_invalid_multiple_of(...)   # Invalid multiple rejection
 ```
 
+## Pytest Markers
+
+### CI/CD Marker
+All tests intended for CI/CD pipeline execution must be marked with `@pytest.mark.ci_cd`:
+
+```python
+@pytest.mark.ci_cd
+def test_success_string_valid_patterns(...):
+    """Test that valid patterns are accepted."""
+    ...
+```
+
+### Available Markers:
+- **`ci_cd`** - Tests that run in CI/CD pipeline (GitHub Actions)
+
+To run only CI/CD tests locally:
+```bash
+# Run all tests with ci_cd marker
+docker exec budserve-development-budprompt pytest tests/ -m ci_cd -v
+
+# Run ci_cd tests from a specific file
+docker exec budserve-development-budprompt pytest tests/test_structured_output.py -m ci_cd -v
+```
+
 ## Benefits of This Convention:
 
 1. **CI/CD Pipeline Clarity**: Immediately identify if a failing test is:
@@ -38,13 +62,13 @@ def test_failure_number_invalid_multiple_of(...)   # Invalid multiple rejection
 ### Unit Tests (Docker Container)
 ```bash
 # Run all unit tests
-docker exec budserve-development-budprompt bash -c "PYTHONPATH=/app pytest tests/test_unit_tests -v"
+docker exec budserve-development-budprompt bash -c "PYTHONPATH=/app pytest tests/ -v"
 
 # Run structured output tests
-docker exec budserve-development-budprompt bash -c "PYTHONPATH=/app pytest tests/test_unit_tests/test_structured_output -v"
+docker exec budserve-development-budprompt bash -c "PYTHONPATH=/app pytest tests/test_structured_output.py -v"
 
-# Run specific test file
-docker exec budserve-development-budprompt bash -c "PYTHONPATH=/app pytest tests/test_unit_tests/test_structured_output/test_structured_output_comprehensive.py -v"
+# Run specific test with markers
+docker exec budserve-development-budprompt bash -c "PYTHONPATH=/app pytest tests/ -m ci_cd -v"
 ```
 
 ### Integration Tests with LLM
@@ -59,6 +83,15 @@ PYTHONPATH=<ABSOLUTE_PATH>bud-runtime/services/budprompt pytest tests/test_integ
 
 # Wait for containers to be ready, then run tests
 docker exec budserve-development-budprompt pytest tests/ -v
+```
+
+### CI/CD Pipeline Testing
+```bash
+# Run only CI/CD marked tests (as done in GitHub Actions)
+docker exec budserve-development-budprompt pytest tests/ -m ci_cd -v
+
+# Run CI/CD tests with coverage
+docker exec budserve-development-budprompt pytest tests/ -m ci_cd --cov=budprompt --cov-report=term-missing -v
 ```
 
 ## Test Categories
@@ -94,9 +127,11 @@ When creating new test functions, always:
 3. Group related tests together
 4. Add comments for complex validation scenarios
 5. Ensure proper error assertions for failure tests
+6. Apply `@pytest.mark.ci_cd` decorator for tests that should run in CI/CD
 
 Example structure:
 ```python
+@pytest.mark.ci_cd
 def test_success_feature_valid_scenario():
     """Test that valid input is accepted."""
     # Arrange
@@ -108,6 +143,7 @@ def test_success_feature_valid_scenario():
     # Assert
     assert result.field == expected_value
 
+@pytest.mark.ci_cd
 def test_failure_feature_invalid_scenario():
     """Test that invalid input is properly rejected."""
     # Arrange

@@ -44,11 +44,11 @@ local_cache_size = 10000
 # 1. `models.gpt_4o_mini.providers.openai`
 # 2. `models.gpt_4o_mini.providers.azure`
 routing = ["vllm"]
-endpoints = ["chat"]
+endpoints = ["chat", "completions"]
 
 [models.gpt.providers.vllm]
 type = "vllm"
-model_name = "qwen3-4b"
+model_name = "qwen3-32b"
 api_base = "http://20.66.97.208/v1"
 api_key_location = "none"
 

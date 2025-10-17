@@ -6166,14 +6166,15 @@ mod tests {
         use serde_json::json;
 
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test input"),
-            instructions: Some("Be helpful".to_string()),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test input")),
+            instructions: Some(json!("Be helpful")),
             tools: None,
             tool_choice: None,
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: Some(0.7),
             max_output_tokens: Some(1000),
             response_format: None,
@@ -6214,8 +6215,8 @@ mod tests {
         use serde_json::json;
 
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test")),
             stream: Some(true),
             stream_options: Some(json!({
                 "include_usage": true
@@ -6226,6 +6227,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -6252,14 +6254,15 @@ mod tests {
 
         // Test text input
         let text_params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Simple text input"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Simple text input")),
             instructions: None,
             tools: None,
             tool_choice: None,
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -6281,8 +6284,8 @@ mod tests {
 
         // Test array input with multimodal content
         let multimodal_params = OpenAIResponseCreateParams {
-            model: "gpt-4o".to_string(),
-            input: json!([
+            model: Some("gpt-4o".to_string()),
+            input: Some(json!([
                 {
                     "type": "text",
                     "text": "What's in this image?"
@@ -6293,7 +6296,7 @@ mod tests {
                         "url": "data:image/png;base64,iVBORw0KGgoAAAANS..."
                     }
                 }
-            ]),
+            ])),
             modalities: Some(vec!["text".to_string(), "image".to_string()]),
             instructions: None,
             tools: None,
@@ -6301,6 +6304,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -6343,6 +6347,7 @@ mod tests {
             top_p: Some(0.95),
             presence_penalty: Some(0.0),
             frequency_penalty: Some(0.0),
+            repetition_penalty: Some(1.0),
             stream: false,
             json_mode: ModelInferenceRequestJsonMode::Off,
             function_type: FunctionType::Chat,
@@ -6367,6 +6372,7 @@ mod tests {
             guided_decoding_backend: None,
             guided_whitespace_pattern: None,
             gateway_request: None,
+            ignore_eos: None,
         };
 
         let openai_request = OpenAIRequest::new("gpt-4", &request_with_new_params).unwrap();

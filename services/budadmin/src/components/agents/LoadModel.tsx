@@ -1,10 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Button, Image, Empty } from "antd";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Button, Image, Empty, Spin } from "antd";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useAgentStore } from "@/stores/useAgentStore";
+import { useAddAgent } from "@/stores/useAddAgent";
 import BlurModal from "./BlurModal";
-import { Text_12_400_EEEEEE } from "../ui/text";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
+import { AppRequest } from "src/pages/api/requests";
+import { tempApiBaseUrl } from "@/components/environment";
+import { errorToast } from "@/components/toast";
+import { ModelListCard } from "../ui/bud/deploymentDrawer/ModelListCard";
+import { Model } from "src/hooks/useModels";
 
 interface LoadModelProps {
   sessionId: string;
@@ -12,188 +17,165 @@ interface LoadModelProps {
   setOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-interface ModelEndpoint {
-  id: string;
-  name: string;
-  model?: {
-    icon?: string;
-    provider?: {
-      icon?: string;
-    };
-  };
-  provider?: string;
-  description?: string;
-  tags?: string[];
+interface ModelWrapper {
+  model: Model;
+  [key: string]: any;
 }
 
-// Mock endpoints for demonstration - replace with actual API
-const mockEndpoints: ModelEndpoint[] = [
-  {
-    id: "gpt-3.5-turbo",
-    name: "GPT 3.5 Turbo",
-    provider: "OpenAI",
-    description: "Fast and efficient model for general purposes",
-    tags: ["fast", "general", "chat"],
-    model: {
-      provider: {
-        icon: "/icons/openai.png"
-      }
-    }
-  },
-  {
-    id: "gpt-4",
-    name: "GPT 4",
-    provider: "OpenAI",
-    description: "Most capable model for complex tasks",
-    tags: ["advanced", "reasoning", "chat"],
-    model: {
-      provider: {
-        icon: "/icons/openai.png"
-      }
-    }
-  },
-  {
-    id: "claude-3-opus",
-    name: "Claude 3 Opus",
-    provider: "Anthropic",
-    description: "Powerful model with strong reasoning capabilities",
-    tags: ["reasoning", "analysis", "chat"],
-    model: {
-      provider: {
-        icon: "/icons/anthropic.png"
-      }
-    }
-  },
-  {
-    id: "claude-3-sonnet",
-    name: "Claude 3 Sonnet",
-    provider: "Anthropic",
-    description: "Balanced performance and speed",
-    tags: ["balanced", "efficient", "chat"],
-    model: {
-      provider: {
-        icon: "/icons/anthropic.png"
-      }
-    }
-  },
-  {
-    id: "llama-3-70b",
-    name: "Llama 3 70B",
-    provider: "Meta",
-    description: "Open source large language model",
-    tags: ["opensource", "large", "chat"],
-    model: {
-      provider: {
-        icon: "/icons/meta.png"
-      }
-    }
-  },
-];
 
-const ModelListCard: React.FC<{
-  data: ModelEndpoint;
-  selected?: boolean;
-  selectable?: boolean;
-  handleClick: () => void;
-}> = ({ data, selected, selectable, handleClick }) => {
-  return (
-    <div
-      onClick={handleClick}
-      className={`px-5 py-3 border-b border-[#1F1F1F] hover:bg-[#1A1A1A] cursor-pointer transition-colors ${selected ? "bg-[#1A1A1A]" : ""
-        }`}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Image
-            src={data.model?.provider?.icon || "/icons/modelRepoWhite.png"}
-            fallback="/icons/modelRepoWhite.png"
-            preview={false}
-            alt="model"
-            width={20}
-            height={20}
-          />
-          <div>
-            <div className="text-[#EEEEEE] text-sm font-medium">{data.name}</div>
-            {data.description && (
-              <div className="text-[#808080] text-xs mt-1">{data.description}</div>
-            )}
-          </div>
-        </div>
-        {selectable && (
-          <div className="text-[#4ADE80] text-xs">Currently Loaded</div>
-        )}
-      </div>
-      {data.tags && data.tags.length > 0 && (
-        <div className="flex gap-1 mt-2 flex-wrap">
-          {data.tags.map((tag, index) => (
-            <span
-              key={index}
-              className="text-[#808080] text-[10px] bg-[#1F1F1F] px-2 py-1 rounded"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+
 
 export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) {
   const { updateSession, sessions } = useAgentStore();
+  const { selectedProject } = useAddAgent();
   const session = sessions.find(s => s.id === sessionId);
 
   const [sortBy] = useState("recency");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [currentlyLoaded, setCurrentlyLoaded] = useState<ModelEndpoint[]>([]);
-  const [availableModels, setAvailableModels] = useState<ModelEndpoint[]>([]);
+  const [currentlyLoaded, setCurrentlyLoaded] = useState<ModelWrapper[]>([]);
+  const [availableModels, setAvailableModels] = useState<ModelWrapper[]>([]);
   const [searchValue, setSearchValue] = useState("");
-  const [filteredModels, setFilteredModels] = useState<ModelEndpoint[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalModels, setTotalModels] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const pageSize = 10;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  useEffect(() => {
-    // Set currently loaded model
-    const current = mockEndpoints.filter(
-      endpoint => endpoint.id === session?.selectedDeployment?.id
-    );
-    setCurrentlyLoaded(current);
+  // Fetch models from API
+  const fetchModels = useCallback(async (page: number, search?: string, isLoadMore: boolean = false) => {
+    if (isLoadMore) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
 
-    // Set available models (excluding currently loaded)
-    const available = mockEndpoints.filter(
-      endpoint => endpoint.id !== session?.selectedDeployment?.id
-    );
-    setAvailableModels(available);
-  }, [session?.selectedDeployment]);
+    try {
+      const params: any = {
+        page,
+        limit: pageSize,
+        search: Boolean(search)
+      };
 
-  useEffect(() => {
-    // Filter and sort available models
-    let filtered = availableModels.filter(endpoint =>
-      endpoint.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-      endpoint.tags?.some(tag => tag.toLowerCase().includes(searchValue.toLowerCase()))
-    );
-
-    // Sort models
-    filtered = filtered.sort((a, b) => {
-      if (sortOrder === "asc") {
-        return a.name.localeCompare(b.name);
-      } else {
-        return b.name.localeCompare(a.name);
+      // Add search parameter if exists
+      if (search) {
+        params.name = search;
       }
-    });
 
-    setFilteredModels(filtered);
-  }, [availableModels, searchValue, sortOrder]);
+      // Add project_id filter if selected project exists
+      if (selectedProject?.id) {
+        params.project_id = selectedProject.id;
+      }
 
-  const handleSelectModel = (endpoint: ModelEndpoint) => {
+      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/playground/deployments`, {
+        params
+      });
+
+      if (response?.data) {
+        const endpoints = response.data.endpoints || [];
+        setTotalPages(response.data.total_pages || 1);
+        setTotalModels(response.data.total_record || 0);
+
+        if (isLoadMore) {
+          // Append to existing models
+          setAvailableModels(prev => [...prev, ...endpoints]);
+        } else {
+          // Replace models
+          setAvailableModels(endpoints);
+        }
+
+        // Set currently loaded model if it exists
+        if (session?.selectedDeployment?.id) {
+          const current = endpoints.find(
+            (endpoint: ModelWrapper) => endpoint.model?.id === session.selectedDeployment?.id || endpoint.id === session.selectedDeployment?.id
+          );
+          if (current) {
+            setCurrentlyLoaded([current]);
+            // Remove from available models
+            setAvailableModels(prev =>
+              prev.filter((endpoint: ModelWrapper) => {
+                const modelId = endpoint.model?.id || endpoint.id;
+                return modelId !== session.selectedDeployment?.id;
+              })
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching deployments:", error);
+      errorToast("Failed to load deployments");
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [session?.selectedDeployment?.id, sortOrder, pageSize, selectedProject?.id]);
+
+  // Initial load when modal opens
+  useEffect(() => {
+    if (open) {
+      setCurrentPage(1);
+      fetchModels(1, searchValue, false);
+
+      // If there's already a selected deployment, ensure it's in currentlyLoaded
+      // Don't set it here as fetchModels will find and set it from the API response
+    }
+  }, [open, sortOrder, fetchModels]);
+
+  // Handle search with debounce
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      if (open) {
+        setCurrentPage(1);
+        fetchModels(1, searchValue, false);
+      }
+    }, 500);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchValue, fetchModels, open]);
+
+  // Handle scroll for lazy loading
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const element = e.currentTarget;
+    const { scrollTop, scrollHeight, clientHeight } = element;
+
+    // Check if scrolled to bottom
+    if (scrollHeight - scrollTop <= clientHeight + 50 &&
+        !isLoadingMore &&
+        currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
+      fetchModels(currentPage + 1, searchValue, true);
+    }
+  }, [currentPage, totalPages, isLoadingMore, searchValue, fetchModels]);
+
+  const handleSelectModel = (endpoint: ModelWrapper | Model) => {
+    // Handle both direct model object and wrapped model object
+    const modelData = 'model' in endpoint ? endpoint.model : endpoint;
+    // Get the endpoint ID from the root level (for wrapped objects)
+    const endpointId = 'model' in endpoint ? endpoint.id : endpoint.id;
+
     updateSession(sessionId, {
-      modelId: endpoint.id,
-      modelName: endpoint.name,
+      modelId: modelData.id,
+      modelName: modelData.name,
       selectedDeployment: {
-        id: endpoint.id,
-        name: endpoint.name,
-        model: endpoint.model
+        id: endpointId, // Store endpoint ID, not model ID
+        name: modelData.name,
+        model: {
+          icon: modelData.icon || modelData.uri,
+          provider: modelData.provider
+        }
       }
     });
     setOpen(false);
@@ -235,13 +217,13 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
                 </div>
               </div>
               <div className="max-h-[120px] overflow-y-auto">
-                {currentlyLoaded.map((endpoint) => (
+                {currentlyLoaded.map((model) => (
                   <ModelListCard
-                    key={endpoint.id}
-                    data={endpoint}
-                    selectable={true}
+                    key={model.model.id}
+                    data={model.model}
+                    hideSeeMore={true}
                     selected={true}
-                    handleClick={() => handleSelectModel(endpoint)}
+                    handleClick={() => handleSelectModel(model)}
                   />
                 ))}
               </div>
@@ -254,7 +236,7 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
               <div className="text-[#757575] text-xs">
                 Models Available
                 <span className="text-white text-xs ml-1">
-                  {filteredModels.length}
+                  {totalModels}
                 </span>
               </div>
               <div
@@ -271,15 +253,31 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
                 )}
               </div>
             </div>
-            <div className="h-[320px] overflow-y-auto">
-              {filteredModels.length > 0 ? (
-                filteredModels.map((endpoint) => (
-                  <ModelListCard
-                    key={endpoint.id}
-                    data={endpoint}
-                    handleClick={() => handleSelectModel(endpoint)}
-                  />
-                ))
+            <div
+              className="h-[320px] overflow-y-auto"
+              onScroll={handleScroll}
+              ref={scrollContainerRef}
+            >
+              {isLoading && availableModels.length === 0 ? (
+                <div className="flex justify-center items-center h-full">
+                  <Spin size="default" />
+                </div>
+              ) : availableModels.length > 0 ? (
+                <>
+                  {availableModels.map((model) => (
+                    <ModelListCard
+                      key={model.model.id}
+                      data={model.model}
+                      hideSeeMore={true}
+                      handleClick={() => handleSelectModel(model)}
+                    />
+                  ))}
+                  {isLoadingMore && (
+                    <div className="flex justify-center py-4">
+                      <Spin size="small" />
+                    </div>
+                  )}
+                </>
               ) : (
                 <Empty
                   description={
@@ -302,13 +300,19 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
         {session?.selectedDeployment ? (
           <Button
             type="default"
-            className="w-[12.25rem] 2rem border-[1px] border-[#1F1F1F]"
+            className="w-[12.25rem] h-[2rem] border-[1px] border-[#1F1F1F] bg-transparent hover:bg-[#1A1A1A] flex items-center justify-center gap-2"
             onClick={() => setOpen(!open)}
+            style={{
+              backgroundColor: 'transparent',
+              color: '#EEEEEE'
+            }}
           >
             <Image
-              src={typeof session.selectedDeployment.model === 'string'
-                ? "/icons/modelRepoWhite.png"
-                : session.selectedDeployment.model?.provider?.icon || "/icons/modelRepoWhite.png"}
+              src={
+                session.selectedDeployment.model?.icon ||
+                session.selectedDeployment.model?.provider?.icon ||
+                "/icons/modelRepoWhite.png"
+              }
               fallback="/icons/modelRepoWhite.png"
               preview={false}
               alt="model"
@@ -317,15 +321,20 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
                 height: ".875rem",
               }}
             />
-            <Text_12_400_EEEEEE className="Open-Sans">{session.selectedDeployment.name}</Text_12_400_EEEEEE>
+            <span className="text-[#EEEEEE] text-xs Open-Sans">{session.selectedDeployment.name}</span>
           </Button>
         ) : (
           <Button
             type="primary"
-            className=" w-[12.25rem] 2rem"
+            className="w-[12.25rem] h-[2rem] flex items-center justify-center"
             onClick={() => setOpen(!open)}
+            style={{
+              backgroundColor: '#965CDE',
+              borderColor: '#965CDE',
+              color: '#FFFFFF'
+            }}
           >
-            <Text_12_400_EEEEEE className="Open-Sans">Load Model</Text_12_400_EEEEEE>
+            <span className="text-white text-xs Open-Sans">Load Model</span>
           </Button>
         )}
       </div>

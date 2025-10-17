@@ -5,6 +5,7 @@ import { Text_12_400_EEEEEE } from "@/components/ui/text";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { capitalize } from "@/lib/utils";
 import { endpointStatusMapping } from "@/lib/colorMapping";
+import { formatMonthYear } from "@/utils/formatDate";
 
 interface RunHistoryItem {
     runId: string;
@@ -72,7 +73,7 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
             dataIndex: "startedDate",
             key: "startedDate",
             render: (text: string) => (
-                <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
+                <Text_12_400_EEEEEE>{formatMonthYear(text)}</Text_12_400_EEEEEE>
             ),
         },
         {

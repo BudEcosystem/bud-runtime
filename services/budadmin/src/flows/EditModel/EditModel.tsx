@@ -444,7 +444,7 @@ export default function EditModel() {
       }}
       data={{
         ...selectedModel,
-        icon: selectedModel?.icon?.length > 1 ? "😍" : selectedModel?.icon,
+        icon: selectedModel?.icon?.length > 1 ? "🌐" : selectedModel?.icon,
       }}
     >
       <EditModelForm formData={formData} setFormData={setFormData} />

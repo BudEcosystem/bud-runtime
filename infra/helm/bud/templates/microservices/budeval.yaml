@@ -1,14 +1,17 @@
+{{- if (default .Values.microservices.budeval.enabled false) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-budeval-dataset
 spec:
-  storageClassName: {{ .Values.microservices.budeval.storageClassName }}
+{{ if .Values.storage.budevalDataset.className }}
+  storageClassName: {{ .Values.storage.budevalDataset.className }}
+{{ end }}
   accessModes:
     - ReadWriteMany
   resources:
     requests:
-      storage: 32Gi
+      storage: {{ .Values.storage.budevalDataset.size }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -65,6 +68,10 @@ spec:
         dapr.io/app-id: {{ .Values.microservices.budeval.daprid }}
         dapr.io/app-port: "3003"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budeval
         image: {{ .Values.microservices.budeval.image }}
@@ -86,7 +93,7 @@ spec:
           - name: CLICKHOUSE_HOST
             value: "{{ .Release.Name }}-clickhouse"
           - name: CLICKHOUSE_PORT
-            value: "{{ .Values.clickhouse.containerPorts.tcp }}"
+            value: {{ .Values.clickhouse.containerPorts.tcp | quote }}
           - name: CLICKHOUSE_DATABASE
             value: "budeval"
           - name: CLICKHOUSE_USER
@@ -111,6 +118,16 @@ spec:
             value: {{ .Values.microservices.budnotify.daprid }}
           - name: NOTIFY_SERVICE_TOPIC
             value: {{ .Values.microservices.budnotify.pubsubTopic }}
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port | quote }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budeval.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budeval.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budeval.name }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budeval.env }}
           - name: {{ $key }}
@@ -118,7 +135,7 @@ spec:
         {{- end }}
         resources:
           limits:
-            memory: 1024Mi
+            memory: 512Mi
             cpu: 1
           requests:
             memory: 256Mi
@@ -135,3 +152,17 @@ spec:
   selector:
     app: {{ .Release.Name }}-budeval
   type: ClusterIP
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .Release.Name }}-budeval-pubsub-subscription
+spec:
+  topic: budEvalMessages
+  routes:
+    default: /notifications
+  pubsubname: {{ .Release.Name }}-pubsub
+  deadLetterTopic: poisonMessages
+scopes:
+  - budeval
+{{ end }}

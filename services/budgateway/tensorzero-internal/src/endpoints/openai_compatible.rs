@@ -54,6 +54,9 @@ use crate::audio::{
     AudioTranslationRequest, AudioVoice, ChunkingStrategy, TextToSpeechRequest,
     TimestampGranularity,
 };
+use crate::completions::{
+    CompletionPrompt, CompletionRequest, CompletionStop,
+};
 use crate::embeddings::EmbeddingRequest;
 use crate::file_storage::validate_batch_file;
 use crate::inference::providers::batch::BatchProvider;
@@ -87,6 +90,25 @@ fn merge_credentials_from_store(
         }
     }
     credentials
+}
+
+/// Helper function to merge credentials from headers (for dynamic authorization)
+fn merge_credentials_from_headers(
+    headers: &HeaderMap,
+    credentials: &mut InferenceCredentials,
+) {
+    // Extract authorization header if present
+    if let Some(auth_header) = headers.get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            // Strip "Bearer " prefix if present
+            let token = auth_str.strip_prefix("Bearer ").unwrap_or(auth_str);
+            // Use "authorization" as the key so dynamic::authorization lookup can find it
+            credentials.insert(
+                "authorization".to_string(),
+                secrecy::SecretString::from(token.to_string()),
+            );
+        }
+    }
 }
 
 /// Helper function to create OpenAI-compatible error response for guardrail violations
@@ -191,7 +213,7 @@ pub async fn inference_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &openai_compatible_params.model,
+        Some(&openai_compatible_params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -1205,6 +1227,7 @@ pub struct OpenAICompatibleParams {
     messages: Vec<OpenAICompatibleMessage>,
     model: String,
     frequency_penalty: Option<f32>,
+    repetition_penalty: Option<f32>,
     max_tokens: Option<u32>,
     max_completion_tokens: Option<u32>,
     presence_penalty: Option<f32>,
@@ -1240,6 +1263,8 @@ pub struct OpenAICompatibleParams {
     structural_tag: Option<String>,
     guided_decoding_backend: Option<String>,
     guided_whitespace_pattern: Option<String>,
+    /// If true, ignore end-of-sequence tokens and continue generating until max_tokens is reached
+    ignore_eos: Option<bool>,
     #[serde(rename = "tensorzero::variant_name")]
     tensorzero_variant_name: Option<String>,
     #[serde(rename = "tensorzero::dryrun")]
@@ -1506,6 +1531,7 @@ impl Params {
             top_p: openai_compatible_params.top_p,
             presence_penalty: openai_compatible_params.presence_penalty,
             frequency_penalty: openai_compatible_params.frequency_penalty,
+            repetition_penalty: openai_compatible_params.repetition_penalty,
             chat_template: openai_compatible_params.chat_template,
             chat_template_kwargs: openai_compatible_params.chat_template_kwargs,
             mm_processor_kwargs: openai_compatible_params.mm_processor_kwargs,
@@ -1523,6 +1549,7 @@ impl Params {
             n: openai_compatible_params.n,
             logit_bias: openai_compatible_params.logit_bias,
             user: openai_compatible_params.user,
+            ignore_eos: openai_compatible_params.ignore_eos,
         };
         let inference_params = InferenceParams {
             chat_completion: chat_completion_inference_params,
@@ -2335,6 +2362,360 @@ impl From<ToolCallChunk> for OpenAICompatibleToolCall {
     }
 }
 
+// Completion Stream Processor
+
+/// Stream processor for completions (simpler than chat - no tool calls, no roles)
+struct CompletionStreamProcessor {
+    stream: crate::completions::CompletionStream,
+    model_name: String,
+    stream_options: Option<OpenAICompatibleStreamOptions>,
+}
+
+impl CompletionStreamProcessor {
+    fn new(
+        stream: crate::completions::CompletionStream,
+        model_name: String,
+        stream_options: Option<OpenAICompatibleStreamOptions>,
+    ) -> Self {
+        Self {
+            stream,
+            model_name,
+            stream_options,
+        }
+    }
+
+    fn process_stream(mut self) -> impl Stream<Item = Result<Event, Error>> {
+        async_stream::stream! {
+            use futures::StreamExt;
+
+            let total_usage = OpenAICompatibleUsage {
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                total_tokens: 0,
+            };
+            let mut completion_id: Option<String> = None;
+
+            // Process all chunks and accumulate usage
+            while let Some(chunk_result) = self.stream.next().await {
+                match chunk_result {
+                    Ok(chunk) => {
+                        // Store the completion ID from first chunk
+                        if completion_id.is_none() {
+                            completion_id = Some(chunk.id.clone());
+                        }
+
+                        // Accumulate usage (vLLM sends usage in chunks)
+                        // For now, we'll track it but usage is typically only in final chunk
+
+                        // Convert to OpenAI-compatible format
+                        let openai_chunk = serde_json::json!({
+                            "id": chunk.id,
+                            "object": chunk.object,
+                            "created": chunk.created,
+                            "model": chunk.model,
+                            "choices": chunk.choices,
+                            "usage": chunk.usage.map(|u| OpenAICompatibleUsage {
+                                prompt_tokens: u.input_tokens,
+                                completion_tokens: u.output_tokens,
+                                total_tokens: u.input_tokens + u.output_tokens,
+                            }),
+                        });
+
+                        yield Ok(Event::default().json_data(openai_chunk).map_err(|e| {
+                            Error::new(ErrorDetails::Inference {
+                                message: format!("Failed to convert completion chunk to Event: {e}"),
+                            })
+                        })?);
+                    }
+                    Err(e) => {
+                        tracing::error!("Error in completion stream: {}", e);
+                        // Send error event to client and terminate stream
+                        let error_event = serde_json::json!({
+                            "error": {
+                                "message": e.to_string(),
+                                "type": "provider_error"
+                            }
+                        });
+                        yield Ok(Event::default().json_data(error_event).map_err(|e| {
+                            Error::new(ErrorDetails::Inference {
+                                message: format!("Failed to convert error to Event: {e}"),
+                            })
+                        })?);
+                        break; // Stop processing on error
+                    }
+                }
+            }
+
+            // Handle final usage message if stream_options.include_usage is true
+            if let Some(ref options) = self.stream_options {
+                if options.include_usage && total_usage.total_tokens > 0 {
+                    let final_usage_message = serde_json::json!({
+                        "id": completion_id.unwrap_or_else(|| format!("cmpl-{}", Uuid::new_v4())),
+                        "choices": [],
+                        "created": std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs(),
+                        "model": self.model_name,
+                        "object": "text_completion",
+                        "usage": total_usage
+                    });
+
+                    yield Ok(Event::default().json_data(final_usage_message).map_err(|e| {
+                        Error::new(ErrorDetails::Inference {
+                            message: format!("Failed to convert final usage to Event: {e}"),
+                        })
+                    })?);
+                }
+            }
+
+            // Send [DONE] to signal the end of the stream
+            yield Ok(Event::default().data("[DONE]"));
+        }
+    }
+}
+
+/// Prepares SSE events for completion streaming
+fn prepare_serialized_completion_events(
+    stream: crate::completions::CompletionStream,
+    model_name: String,
+    stream_options: Option<OpenAICompatibleStreamOptions>,
+) -> impl Stream<Item = Result<Event, Error>> {
+    CompletionStreamProcessor::new(stream, model_name, stream_options).process_stream()
+}
+
+// OpenAI-compatible completions types and handler
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct OpenAICompatibleCompletionParams {
+    model: String,
+    prompt: CompletionPrompt,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    suffix: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    top_p: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    n: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logprobs: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    echo: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stop: Option<CompletionStop>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    presence_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    frequency_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repetition_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    best_of: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logit_bias: Option<HashMap<String, f32>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    user: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    seed: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ignore_eos: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream_options: Option<OpenAICompatibleStreamOptions>,
+    #[serde(flatten)]
+    unknown_fields: HashMap<String, Value>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct OpenAICompatibleCompletionResponse {
+    id: String,
+    object: String, // "text_completion"
+    created: u64,
+    model: String,
+    choices: Vec<OpenAICompatibleCompletionChoice>,
+    usage: OpenAICompatibleUsage,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct OpenAICompatibleCompletionChoice {
+    text: String,
+    index: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logprobs: Option<OpenAICompatibleCompletionLogProbs>,
+    finish_reason: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct OpenAICompatibleCompletionLogProbs {
+    tokens: Vec<String>,
+    token_logprobs: Vec<Option<f32>>,
+    top_logprobs: Vec<HashMap<String, f32>>,
+    text_offset: Vec<u32>,
+}
+
+pub async fn completion_handler(
+    State(AppStateData {
+        config,
+        http_client,
+        clickhouse_connection_info,
+        kafka_connection_info: _,
+        authentication_info: _,
+        model_credential_store,
+        ..
+    }): AppState,
+    headers: HeaderMap,
+    StructuredJson(params): StructuredJson<OpenAICompatibleCompletionParams>,
+) -> Result<Response<Body>, Error> {
+    // Log unknown fields
+    let unknown_fields: Vec<&str> = params
+        .unknown_fields
+        .keys()
+        .map(|k| k.as_str())
+        .collect();
+
+    if !unknown_fields.is_empty() {
+        tracing::warn!(
+            "Ignoring unknown fields in OpenAI-compatible completion request: {:?}",
+            unknown_fields
+        );
+    }
+
+    // Resolve the model name based on authentication state
+    let model_resolution = model_resolution::resolve_model_name(
+        Some(params.model.as_str()),
+        &headers,
+        false, // not for embedding
+    )?;
+
+    let model_id = model_resolution.model_name.ok_or_else(|| {
+        Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
+            message: "Completion requests must specify a model, not a function".to_string(),
+        })
+    })?;
+
+    let original_model_name = model_resolution.original_model_name.to_string();
+
+    // Extract model configuration
+    use crate::model::ModelTableExt;
+    let models = config.models.read().await;
+    let model = models
+        .get_with_capability(
+            &model_id,
+            crate::endpoints::capability::EndpointCapability::Completions,
+        )
+        .await?
+        .ok_or_else(|| {
+            Error::new(ErrorDetails::ModelNotConfiguredForCapability {
+                model_name: model_id.to_string(),
+                capability: "completions".to_string(),
+            })
+        })?;
+
+    // Merge credentials from the credential store
+    let credentials = merge_credentials_from_store(&model_credential_store);
+
+    // Create inference clients
+    let cache_options: crate::cache::CacheOptions = (
+        Default::default(),
+        false, // dryrun is false
+    )
+        .into();
+    let clients = super::inference::InferenceClients {
+        http_client: &http_client,
+        credentials: &credentials,
+        clickhouse_connection_info: &clickhouse_connection_info,
+        cache_options: &cache_options,
+    };
+
+    // Create the completion request
+    let request_id = Uuid::now_v7();
+    let request = CompletionRequest {
+        id: request_id,
+        model: Arc::from(model_id.as_str()),
+        prompt: Some(params.prompt),
+        suffix: params.suffix,
+        max_tokens: params.max_tokens,
+        temperature: params.temperature,
+        top_p: params.top_p,
+        n: params.n,
+        stream: params.stream,
+        logprobs: params.logprobs,
+        echo: params.echo,
+        stop: params.stop,
+        presence_penalty: params.presence_penalty,
+        frequency_penalty: params.frequency_penalty,
+        repetition_penalty: params.repetition_penalty,
+        best_of: params.best_of,
+        logit_bias: params.logit_bias,
+        user: params.user,
+        seed: params.seed,
+        ignore_eos: params.ignore_eos,
+    };
+
+    // Validate request parameters
+    request.validate()?;
+
+    let stream = params.stream.unwrap_or(false);
+    let stream_options = params.stream_options.clone();
+
+    if stream {
+        // Streaming response - use model's complete_stream method
+        let (completion_stream, _raw_request) = model
+            .complete_stream(&request, &original_model_name, &clients)
+            .await?;
+
+        // Convert completion stream to SSE events
+        let sse_stream = prepare_serialized_completion_events(
+            completion_stream,
+            original_model_name,
+            stream_options,
+        );
+
+        Ok(Sse::new(sse_stream)
+            .keep_alive(axum::response::sse::KeepAlive::new())
+            .into_response())
+    } else {
+        // Non-streaming response - use model's complete method
+        let response = model
+            .complete(&request, &original_model_name, &clients)
+            .await?;
+
+        // Convert to OpenAI format
+        let openai_response = OpenAICompatibleCompletionResponse {
+            id: format!("cmpl-{}", response.id),
+            object: response.object,
+            created: response.created,
+            model: original_model_name,
+            choices: response
+                .choices
+                .into_iter()
+                .map(|choice| OpenAICompatibleCompletionChoice {
+                    text: choice.text,
+                    index: choice.index,
+                    logprobs: choice.logprobs.map(|lp| OpenAICompatibleCompletionLogProbs {
+                        tokens: lp.tokens,
+                        token_logprobs: lp.token_logprobs,
+                        top_logprobs: lp.top_logprobs,
+                        text_offset: lp.text_offset,
+                    }),
+                    finish_reason: choice.finish_reason,
+                })
+                .collect(),
+            usage: OpenAICompatibleUsage {
+                prompt_tokens: response.usage.input_tokens,
+                completion_tokens: response.usage.output_tokens,
+                total_tokens: response.usage.input_tokens + response.usage.output_tokens,
+            },
+        };
+
+        Ok(Json(openai_response).into_response())
+    }
+}
+
 // OpenAI-compatible embedding types and handler
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -2406,7 +2787,7 @@ pub async fn embedding_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &openai_compatible_params.model,
+        Some(&openai_compatible_params.model),
         &headers,
         true, // for embedding
     )?;
@@ -2729,7 +3110,7 @@ pub async fn moderation_handler(
         .unwrap_or_else(|| "omni-moderation-latest".to_string());
 
     // Resolve the model name based on authentication state
-    let model_resolution = model_resolution::resolve_model_name(&model_name, &headers, false)?;
+    let model_resolution = model_resolution::resolve_model_name(Some(&model_name), &headers, false)?;
 
     let resolved_model_name = model_resolution
         .model_name
@@ -3366,7 +3747,7 @@ pub async fn audio_transcription_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -3595,7 +3976,7 @@ pub async fn audio_translation_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -3759,7 +4140,7 @@ pub async fn text_to_speech_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -3917,7 +4298,7 @@ pub async fn realtime_session_handler(
 ) -> Result<Response<Body>, Error> {
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4002,7 +4383,7 @@ pub async fn realtime_transcription_session_handler(
 ) -> Result<Response<Body>, Error> {
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4250,7 +4631,7 @@ pub async fn image_generation_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4579,7 +4960,7 @@ pub async fn image_edit_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -4748,7 +5129,7 @@ pub async fn image_variation_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        Some(&params.model),
         &headers,
         false, // not for embedding
     )?;
@@ -5185,16 +5566,16 @@ pub async fn response_create_handler(
         );
     }
 
-    // Resolve the model name based on authentication state
+    // Resolve the model name based on authentication state (optional for prompt-based requests)
     let model_resolution = model_resolution::resolve_model_name(
-        &params.model,
+        params.model.as_deref(),
         &headers,
         false, // not for embedding
     )?;
 
     let model_name = model_resolution.model_name.ok_or_else(|| {
         Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
-            message: "Response requests must specify a model, not a function".to_string(),
+            message: "Response requests must specify a model or prompt.id".to_string(),
         })
     })?;
 
@@ -5217,7 +5598,10 @@ pub async fn response_create_handler(
         })?;
 
     // Merge credentials from the credential store
-    let credentials = merge_credentials_from_store(&model_credential_store);
+    let mut credentials = merge_credentials_from_store(&model_credential_store);
+
+    // Merge credentials from headers for dynamic authorization (responses API only)
+    merge_credentials_from_headers(&headers, &mut credentials);
 
     // Create inference clients
     let cache_options = crate::cache::CacheOptions {
@@ -5241,36 +5625,98 @@ pub async fn response_create_handler(
         );
     }
 
-    // Check if streaming is requested
-    if params.stream.unwrap_or(false) {
-        // Handle streaming response
-        let stream = model
-            .stream_response(&params, &model_resolution.original_model_name, &clients)
-            .await?;
+    // Check if this is a BudPrompt request with prompt parameter
+    // BudPrompt determines streaming based on internal prompt config, not the stream parameter
+    let is_budprompt_with_prompt = {
+        let models = config.models.read().await;
+        let model_info = models.get(&model_name).await?.ok_or_else(|| {
+            Error::new(ErrorDetails::Config {
+                message: format!("Model '{}' not found", model_name),
+            })
+        })?;
 
-        // Convert to SSE stream
-        let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
-            Ok(event) => Event::default().json_data(event).map_err(|e| {
-                Error::new(ErrorDetails::Inference {
-                    message: format!("Failed to serialize SSE event: {e}"),
-                })
-            }),
-            Err(e) => Err(e),
+        // Check if any provider is BudPrompt
+        let has_budprompt = model_info.providers.values().any(|p| {
+            matches!(p.config, crate::model::ProviderConfig::BudPrompt(_))
         });
 
-        Ok(Sse::new(sse_stream).into_response())
-    } else {
-        // Handle non-streaming response
-        let response = model
-            .create_response(&params, &model_resolution.original_model_name, &clients)
+        has_budprompt && params.prompt.is_some()
+    };
+
+    if is_budprompt_with_prompt {
+        // Use automatic format detection for BudPrompt with prompt parameter
+        use crate::responses::ResponseResult;
+
+        let result = model
+            .execute_response_with_detection(&params, &model_resolution.original_model_name, &clients)
             .await?;
 
-        // Log the response size for debugging
-        if let Ok(response_json) = serde_json::to_string(&response) {
-            tracing::debug!("Response size: {} bytes", response_json.len());
-        }
+        match result {
+            ResponseResult::Streaming(stream) => {
+                // Convert to SSE stream
+                let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
+                    Ok(event) => {
+                        Event::default()
+                            .event(event.event)
+                            .json_data(event.data)
+                            .map_err(|e| {
+                                Error::new(ErrorDetails::Inference {
+                                    message: format!("Failed to serialize SSE event: {e}"),
+                                })
+                            })
+                    },
+                    Err(e) => Err(e),
+                });
 
-        Ok(Json(response).into_response())
+                Ok(Sse::new(sse_stream).into_response())
+            }
+            ResponseResult::NonStreaming(response) => {
+                // Log the response size for debugging
+                if let Ok(response_json) = serde_json::to_string(&response) {
+                    tracing::debug!("Response size: {} bytes", response_json.len());
+                }
+
+                Ok(Json(response).into_response())
+            }
+        }
+    } else {
+        // Standard behavior: check stream parameter
+        if params.stream.unwrap_or(false) {
+            // Handle streaming response
+            let stream = model
+                .stream_response(&params, &model_resolution.original_model_name, &clients)
+                .await?;
+
+            // Convert to SSE stream
+            let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
+                Ok(event) => {
+                    // For ResponseStreamEvent, use event field as SSE event type and data field as data
+                    Event::default()
+                        .event(event.event)
+                        .json_data(event.data)
+                        .map_err(|e| {
+                            Error::new(ErrorDetails::Inference {
+                                message: format!("Failed to serialize SSE event: {e}"),
+                            })
+                        })
+                },
+                Err(e) => Err(e),
+            });
+
+            Ok(Sse::new(sse_stream).into_response())
+        } else {
+            // Handle non-streaming response
+            let response = model
+                .create_response(&params, &model_resolution.original_model_name, &clients)
+                .await?;
+
+            // Log the response size for debugging
+            if let Ok(response_json) = serde_json::to_string(&response) {
+                tracing::debug!("Response size: {} bytes", response_json.len());
+            }
+
+            Ok(Json(response).into_response())
+        }
     }
 }
 
@@ -5323,9 +5769,13 @@ pub async fn response_retrieve_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
@@ -5404,9 +5854,13 @@ pub async fn response_delete_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
@@ -5485,9 +5939,13 @@ pub async fn response_cancel_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
@@ -5566,9 +6024,13 @@ pub async fn response_input_items_handler(
             })
         })?;
 
+    // Create credentials and merge from headers for dynamic authorization
+    let mut credentials = InferenceCredentials::default();
+    merge_credentials_from_headers(&headers, &mut credentials);
+
     let clients = InferenceClients {
         http_client: &http_client,
-        credentials: &InferenceCredentials::default(),
+        credentials: &credentials,
         clickhouse_connection_info: &clickhouse_connection_info,
         cache_options: &crate::cache::CacheOptions {
             max_age_s: None,
@@ -7091,14 +7553,15 @@ mod tests {
 
         // Test that the handler properly resolves model names
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4-responses".to_string(),
-            input: json!("Test input"),
+            model: Some("gpt-4-responses".to_string()),
+            input: Some(json!("Test input")),
             instructions: None,
             tools: None,
             tool_choice: None,
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7135,8 +7598,8 @@ mod tests {
 
         // Test that streaming parameters are properly handled
         let params_streaming = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test")),
             stream: Some(true),
             stream_options: Some(json!({"include_usage": true})),
             instructions: None,
@@ -7145,6 +7608,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7164,8 +7628,8 @@ mod tests {
 
         // Test non-streaming
         let params_non_streaming = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test")),
             stream: Some(false),
             stream_options: None,
             instructions: None,
@@ -7174,6 +7638,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7203,8 +7668,8 @@ mod tests {
         metadata.insert("custom_data".to_string(), json!({"key": "value"}));
 
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Test"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Test")),
             metadata: Some(metadata.clone()),
             stream: None,
             stream_options: None,
@@ -7214,6 +7679,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7244,8 +7710,8 @@ mod tests {
 
         // Test text-only modality
         let params_text = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("Text input"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("Text input")),
             modalities: Some(vec!["text".to_string()]),
             stream: None,
             stream_options: None,
@@ -7255,6 +7721,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7272,11 +7739,11 @@ mod tests {
 
         // Test multimodal with text and audio
         let params_multimodal = OpenAIResponseCreateParams {
-            model: "gpt-4o-audio".to_string(),
-            input: json!([
+            model: Some("gpt-4o-audio".to_string()),
+            input: Some(json!([
                 {"type": "text", "text": "Describe this image"},
                 {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
-            ]),
+            ])),
             modalities: Some(vec!["text".to_string(), "audio".to_string()]),
             stream: None,
             stream_options: None,
@@ -7286,6 +7753,7 @@ mod tests {
             parallel_tool_calls: None,
             max_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7334,8 +7802,8 @@ mod tests {
         ];
 
         let params = OpenAIResponseCreateParams {
-            model: "gpt-4".to_string(),
-            input: json!("What's the weather in New York?"),
+            model: Some("gpt-4".to_string()),
+            input: Some(json!("What's the weather in New York?")),
             tools: Some(tools.clone()),
             tool_choice: Some(json!("auto")),
             parallel_tool_calls: Some(true),
@@ -7344,6 +7812,7 @@ mod tests {
             stream_options: None,
             instructions: None,
             previous_response_id: None,
+            prompt: None,
             temperature: None,
             max_output_tokens: None,
             response_format: None,
@@ -7937,7 +8406,7 @@ pub async fn document_processing_handler(
 
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
-        &openai_compatible_params.model,
+        Some(&openai_compatible_params.model),
         &headers,
         false, // not for embeddings
     )?;

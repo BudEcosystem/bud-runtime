@@ -3,35 +3,38 @@ from typing import Any, Dict, List, Type, Union
 from budmicroframe.commons import logging
 from pydantic import BaseModel, field_validator
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
+
+from budprompt.commons.config import app_settings
+from budprompt.shared.providers import BudServeProvider
 
 
 logger = logging.get_logger(__name__)
 
 
-# Bud LLM setup
-bud_provider = OpenAIProvider(
-    base_url="http://20.66.97.208/v1",
-    api_key="sk_",
-)
-settings = ModelSettings(temperature=0.1)
-bud_model = OpenAIModel(model_name="qwen3-32b", provider=bud_provider, settings=settings)
-
-
-async def generate_validation_function(field_name: str, validation_prompt: str) -> str:
+async def generate_validation_function(
+    field_name: str, validation_prompt: str, deployment_name: str, access_token: str = None
+) -> str:
     """Generate a validation function for a specific field using LLM.
 
     Args:
         field_name: The name of the field to validate
         validation_prompt: Natural language description of validation rule
+        deployment_name: The name of the model deployment to use
+        access_token: The access token to use for authentication (if not provided, uses default)
 
     Returns:
         Python code string containing the validation function
     """
+    # Use access token if provided, otherwise fall back to a default (for testing)
+    api_key = access_token if access_token else "sk_"
+
+    # Create provider and model using BudServeProvider
+    provider = BudServeProvider(base_url=app_settings.bud_gateway_base_url, api_key=api_key)
+    model = provider.get_model(deployment_name, settings=ModelSettings(temperature=0.1))
+
     code_gen_agent = Agent(
-        model=bud_model,
+        model=model,
         output_type=str,
         system_prompt="""You are a Python validation function generator.
 

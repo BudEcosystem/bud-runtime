@@ -1,6 +1,6 @@
 {{- if not (empty $.Values.postgresqlExtra.autoCreateDB) }}
 apiVersion: v1
-kind: ConfigMap # TODO: convert to secret or nix
+kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-postgres-db-create-script
 data:
@@ -33,12 +33,12 @@ spec:
             name: {{ .Release.Name }}-postgres-db-create-script
       containers:
       - name: postgres-db-create
-        image: {{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}
+        image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
         volumeMounts:
           - mountPath: "/var/script.sh"
             name: {{ .Release.Name }}-postgres-db-create-script
             subPath: script.sh
             readOnly: true
-        command: ["/bin/bash", "/var/script.sh"]
+        command: ["/bin/sh", "/var/script.sh"]
       restartPolicy: Never
 {{- end }}

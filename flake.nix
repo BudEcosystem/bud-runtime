@@ -145,6 +145,7 @@
               workflow_dockerhub_budcustomer = pkgs.callPackage ./nix/workflows/dockerhub_budcustomer { };
 
               budcustomer = pkgs.callPackage ./nix/packages/budcustomer.nix { };
+              k8s_deploy = pkgs.callPackage ./nix/packages/k8s_deploy { };
             }
           ))
           (
@@ -162,6 +163,7 @@
       nixosConfigurations = lib.genAttrs [
         "primary"
         "ingress"
+        "worker"
       ] (host: makeNixos host "x86_64-linux");
     };
 }

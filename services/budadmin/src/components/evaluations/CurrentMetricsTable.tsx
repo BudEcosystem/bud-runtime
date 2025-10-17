@@ -1,5 +1,5 @@
 import React from "react";
-import { Table } from "antd";
+import { Table, Popover } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { Text_12_400_EEEEEE } from "@/components/ui/text";
 import ProjectTags from "src/flows/components/ProjectTags";
@@ -40,7 +40,7 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
             ),
         },
         {
-            title: "Deployment Name",
+            title: "Model Name",
             dataIndex: "model_name",
             key: "model_name",
             render: (text: string) => (
@@ -62,10 +62,18 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
             title: "Traits",
             dataIndex: "traits",
             key: "traits",
-            render: (traits: string[]) => (
-                <div className="flex flex-wrap gap-1">
-                    {traits && traits.length > 0 ? (
-                        traits.map((trait, idx) => (
+            render: (traits: string[]) => {
+                if (!traits || traits.length === 0) {
+                    return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+                }
+
+                const visibleTraits = traits.slice(0, 2);
+                const remainingTraits = traits.slice(2);
+                const hasMore = remainingTraits.length > 0;
+
+                return (
+                    <div className="flex flex-wrap gap-1 items-center">
+                        {visibleTraits.map((trait, idx) => (
                             <ProjectTags
                                 key={idx}
                                 name={trait}
@@ -73,12 +81,40 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
                                 textClass="text-[.65rem] py-[.15rem]"
                                 tagClass="py-[0rem]"
                             />
-                        ))
-                    ) : (
-                        <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>
-                    )}
-                </div>
-            ),
+                        ))}
+                        {hasMore && (
+                            <Popover
+                                content={
+                                    <div className="flex flex-wrap gap-1 max-w-[300px] p-[0.5rem]">
+                                        {traits.map((trait, idx) => (
+                                            <ProjectTags
+                                                key={idx}
+                                                name={trait}
+                                                color="#965CDE"
+                                                textClass="text-[.65rem] py-[.15rem]"
+                                                tagClass="py-[0rem]"
+                                            />
+                                        ))}
+                                    </div>
+                                }
+                                title={
+                                    <span className="text-white font-medium px-[0.5rem]">All Traits</span>
+                                }
+                                trigger="hover"
+                                placement="top"
+                                color="#1F1F1F"
+                                arrow={true}
+                            >
+                                <div className="flex items-center justify-center h-[1.2rem] w-[1.2rem] bg-[#965CDE20] rounded-full cursor-pointer hover:bg-[#965CDE30] transition-colors">
+                                    <span className="text-[#965CDE] text-[.65rem] font-medium">
+                                        +{remainingTraits.length}
+                                    </span>
+                                </div>
+                            </Popover>
+                        )}
+                    </div>
+                );
+            },
         },
         {
             title: "Last Run",

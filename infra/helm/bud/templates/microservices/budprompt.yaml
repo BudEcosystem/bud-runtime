@@ -1,3 +1,4 @@
+{{- if (default .Values.microservices.budprompt.enabled false) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,6 +21,10 @@ spec:
         dapr.io/app-id: {{ .Values.microservices.budprompt.daprid }}
         dapr.io/app-port: "3015"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name}}-budprompt
         image: {{ .Values.microservices.budprompt.image }}
@@ -30,6 +35,16 @@ spec:
         env:
           # - name: BUD_GATEWAY_BASE_URL
             # value: {{ include "bud.ingress.url.budgateway" $ }}
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port | quote }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budprompt.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budprompt.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budprompt.name }}
         {{- $root := . }}
         {{- range $key, $value := .Values.microservices.budprompt.env }}
           - name: {{ $key }}
@@ -40,7 +55,7 @@ spec:
               name: {{ .Release.Name}}-bud-global
         resources:
           limits:
-            memory: 4768Mi
+            memory: 512Mi
             cpu: 2
           requests:
             memory: 256Mi
@@ -57,3 +72,17 @@ spec:
   selector:
     app: {{ .Release.Name }}-budprompt
   type: ClusterIP
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .Release.Name }}-budprompt-pubsub-subscription
+spec:
+  topic: budPromptMessages
+  routes:
+    default: /notifications
+  pubsubname: {{ .Release.Name }}-pubsub
+  deadLetterTopic: poisonMessages
+scopes:
+  - budprompt
+{{ end }}

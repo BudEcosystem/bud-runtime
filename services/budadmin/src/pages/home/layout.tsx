@@ -36,6 +36,7 @@ import { useIsland } from "src/hooks/useIsland";
 import BudIsland from "@/components/island/BudIsland";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import pkg from '@novu/notification-center/package.json';
+import { enableDevMode } from "@/components/environment";
 
 interface LayoutProps {
   children: ReactNode;
@@ -156,6 +157,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       // iconSvg: true,
       cmd: "7",
       customSvg: "prompts",
+      hide: !enableDevMode,
     },
     {
       label: "Observability",
@@ -169,13 +171,14 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       icon: '/icons/simulations.png',
       iconWhite: '/icons/simulationsWhite.svg',
       cmd: "9",
+      hide: !enableDevMode,
     },
     {
       label: "Guard Rails",
       route: "/guardrails",
       icon: '/icons/guard.png',
       iconWhite: '/icons/guardWhite.png',
-      cmd: "9",
+      cmd: "10",
     },
   ]
 
@@ -354,7 +357,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
               <div
                 className="flex justify-start items-center flex-col menuWrap pt-[0.235rem] px-[.6rem]"
               >
-                {tabs.map((tab) => {
+                {tabs.filter(tab => !tab.hide).map((tab) => {
                   const isActive = pathname?.includes(tab.route);
                   const isVisible = !tab.hide;
 

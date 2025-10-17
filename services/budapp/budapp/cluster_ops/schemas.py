@@ -17,6 +17,7 @@
 
 """Contains core Pydantic schemas used for data validation and serialization within the cluster ops services."""
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -626,3 +627,97 @@ class AnalyticsPanelResponse(SuccessResponse):
     """Analytics panel response schema."""
 
     panel: AnalyticsPanel
+
+
+# Cluster Settings Schemas
+VALID_K8S_ACCESS_MODES = {
+    "ReadWriteOnce",
+    "ReadWriteMany",
+    "ReadOnlyMany",
+    "ReadWriteOncePod",
+}
+
+
+class ClusterSettingsBase(BaseModel):
+    """Base schema for cluster settings."""
+
+    default_storage_class: Optional[str] = Field(None, description="Default storage class for cluster deployments")
+    default_access_mode: Optional[str] = Field(None, description="Default access mode for cluster volumes")
+
+    @field_validator("default_storage_class", mode="before")
+    @classmethod
+    def validate_storage_class(cls, value: str | None) -> str | None:
+        """Validate storage class name."""
+        if value is None:
+            return None
+
+        cleaned_value = value.strip()
+        if not cleaned_value:
+            return None
+
+        if not re.match(r"^[a-zA-Z0-9.-]*$", cleaned_value):
+            raise ValueError("Storage class name can only contain alphanumeric characters, hyphens, and dots")
+        if cleaned_value.startswith("-") or cleaned_value.endswith("-"):
+            raise ValueError("Storage class name cannot start or end with a hyphen")
+
+        return cleaned_value
+
+    @field_validator("default_access_mode", mode="before")
+    @classmethod
+    def validate_access_mode(cls, value: str | None) -> str | None:
+        """Validate provided access mode."""
+        if value is None:
+            return None
+
+        cleaned_value = value.strip()
+        if not cleaned_value:
+            return None
+
+        if cleaned_value not in VALID_K8S_ACCESS_MODES:
+            allowed_values = ", ".join(sorted(VALID_K8S_ACCESS_MODES))
+            raise ValueError(f"Access mode must be one of: {allowed_values}")
+
+        return cleaned_value
+
+
+class ClusterSettingsCreate(ClusterSettingsBase):
+    """Schema for creating cluster settings."""
+
+    cluster_id: UUID4 = Field(description="UUID of the cluster")
+    created_by: UUID4 = Field(description="UUID of the user creating the settings")
+
+
+class ClusterSettingsUpdate(ClusterSettingsBase):
+    """Schema for updating cluster settings."""
+
+    pass
+
+
+class ClusterSettingsResponse(ClusterSettingsBase):
+    """Response schema for cluster settings."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    cluster_id: UUID
+    created_by: UUID
+    created_at: datetime
+    modified_at: datetime
+
+
+class ClusterSettingsDetailResponse(SuccessResponse):
+    """Single cluster settings response."""
+
+    settings: ClusterSettingsResponse
+
+
+class CreateClusterSettingsRequest(ClusterSettingsBase):
+    """Request schema for creating cluster settings."""
+
+    pass
+
+
+class UpdateClusterSettingsRequest(ClusterSettingsBase):
+    """Request schema for updating cluster settings."""
+
+    pass

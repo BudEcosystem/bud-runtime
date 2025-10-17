@@ -59,7 +59,7 @@ export default function ConfigureClusterDetails() {
     formData.set("workflow_total_steps", "3");
     formData.set("trigger_workflow", "true");
     formData.set("name", values.name || "");
-    formData.set("icon", values.icon || "😍");
+    formData.set("icon", values.icon || "🌐");
     formData.set("region", values.region || "");
     formData.set("cluster_type", "CLOUD");
 
@@ -71,7 +71,7 @@ export default function ConfigureClusterDetails() {
   return (
     <BudForm
       data={{
-        icon: "😍",
+        icon: "🌐",
         ...clusterValues,
       }}
       onBack={() => openDrawerWithStep("choose-cloud-credential")}

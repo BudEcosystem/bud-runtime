@@ -12,6 +12,10 @@ use uuid::Uuid;
 use super::provider_trait::InferenceProvider;
 
 use crate::cache::ModelProviderRequest;
+use crate::completions::{
+    CompletionChoice, CompletionChunk, CompletionChoiceChunk, CompletionProvider,
+    CompletionProviderResponse, CompletionRequest, CompletionStream,
+};
 use crate::embeddings::{EmbeddingProvider, EmbeddingProviderResponse, EmbeddingRequest};
 use crate::endpoints::inference::InferenceCredentials;
 use crate::error::{Error, ErrorDetails};
@@ -937,6 +941,106 @@ impl crate::audio::TextToSpeechProvider for DummyProvider {
     }
 }
 
+impl CompletionProvider for DummyProvider {
+    async fn complete(
+        &self,
+        request: &CompletionRequest,
+        _client: &reqwest::Client,
+        _dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<CompletionProviderResponse, Error> {
+        // Handle error models
+        if self.model_name.starts_with("error") {
+            return Err(ErrorDetails::InferenceClient {
+                message: format!(
+                    "Error sending request to Dummy provider for model '{}'.",
+                    self.model_name
+                ),
+                raw_request: Some("raw request".to_string()),
+                raw_response: None,
+                status_code: None,
+                provider_type: PROVIDER_TYPE.to_string(),
+            }
+            .into());
+        }
+
+        // Generate dummy completion response
+        let text = "This is a dummy completion response.";
+        let choice = CompletionChoice {
+            text: text.to_string(),
+            index: 0,
+            logprobs: None,
+            finish_reason: "stop".to_string(),
+        };
+
+        Ok(CompletionProviderResponse {
+            id: request.id,
+            created: current_timestamp(),
+            model: request.model.clone(),
+            choices: vec![choice],
+            usage: Usage {
+                input_tokens: 10,
+                output_tokens: 10,
+            },
+            raw_request: "dummy completion request".to_string(),
+            raw_response: text.to_string(),
+            latency: Latency::NonStreaming {
+                response_time: Duration::from_millis(100),
+            },
+        })
+    }
+
+    async fn complete_stream(
+        &self,
+        request: &CompletionRequest,
+        _client: &reqwest::Client,
+        _dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<(CompletionStream, String), Error> {
+        // Handle error models
+        if self.model_name.starts_with("error") {
+            return Err(ErrorDetails::InferenceClient {
+                message: format!(
+                    "Error sending request to Dummy provider for model '{}'.",
+                    self.model_name
+                ),
+                raw_request: Some("raw request".to_string()),
+                raw_response: None,
+                status_code: None,
+                provider_type: PROVIDER_TYPE.to_string(),
+            }
+            .into());
+        }
+
+        // Stream dummy chunks
+        let chunks = vec!["This ", "is ", "a ", "dummy ", "completion ", "stream."];
+        let created = current_timestamp();
+        let request_id = request.id.to_string();
+        let model = request.model.to_string();
+
+        let stream = tokio_stream::iter(chunks.into_iter().enumerate())
+            .map(move |(i, chunk)| {
+                Ok(CompletionChunk {
+                    id: request_id.clone(),
+                    object: "text_completion".to_string(),
+                    created,
+                    model: model.clone(),
+                    choices: vec![CompletionChoiceChunk {
+                        text: chunk.to_string(),
+                        index: 0,
+                        logprobs: None,
+                        finish_reason: if i == 5 { Some("stop".to_string()) } else { None },
+                    }],
+                    usage: None,
+                })
+            })
+            .throttle(Duration::from_millis(10));
+
+        Ok((
+            Box::pin(stream) as CompletionStream,
+            "dummy completion request".to_string(),
+        ))
+    }
+}
+
 impl crate::images::ImageGenerationProvider for DummyProvider {
     async fn generate_image(
         &self,
@@ -1079,7 +1183,7 @@ impl ResponseProvider for DummyProvider {
             instructions: request.instructions.clone(),
             max_output_tokens: request.max_output_tokens,
             max_tool_calls: request.max_tool_calls,
-            model: request.model.clone(),
+            model: request.model.clone().unwrap_or_else(|| "dummy-model".to_string()),
             output: vec![json!({
                 "id": format!("msg_{}", Uuid::now_v7()),
                 "type": "message",
@@ -1094,6 +1198,7 @@ impl ResponseProvider for DummyProvider {
             })],
             parallel_tool_calls: request.parallel_tool_calls,
             previous_response_id: request.previous_response_id.clone(),
+            prompt: request.prompt.clone(),
             reasoning: Some(json!({
                 "effort": null,
                 "summary": null
@@ -1206,7 +1311,7 @@ impl ResponseProvider for DummyProvider {
             background: Some(false),
             error: None,
             incomplete_details: None,
-            instructions: Some("You are a helpful assistant.".to_string()),
+            instructions: Some(json!("You are a helpful assistant.")),
             max_output_tokens: Some(1000),
             max_tool_calls: None,
             model: "dummy-model".to_string(),
@@ -1216,6 +1321,7 @@ impl ResponseProvider for DummyProvider {
             })],
             parallel_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             reasoning: None,
             service_tier: Some("default".to_string()),
             store: Some(true),
@@ -1270,13 +1376,14 @@ impl ResponseProvider for DummyProvider {
                 message: "Response was cancelled".to_string(),
             }),
             incomplete_details: None,
-            instructions: Some("You are a helpful assistant.".to_string()),
+            instructions: Some(json!("You are a helpful assistant.")),
             max_output_tokens: Some(1000),
             max_tool_calls: None,
             model: "dummy-model".to_string(),
             output: vec![],
             parallel_tool_calls: None,
             previous_response_id: None,
+            prompt: None,
             reasoning: None,
             service_tier: Some("default".to_string()),
             store: Some(true),

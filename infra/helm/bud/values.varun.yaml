@@ -8,5 +8,13 @@ deploymentAnnotations: null
 microservices:
     budprompt:
         image: vsrvarun/budprompt:vsr
+        env:
+            REDIS_DB_INDEX: "2"
+            BUD_GATEWAY_BASE_URL: https://gateway.varun.bud.studio/v1
+            LOG_LEVEL: DEBUG
     budapp:
         image: vsrvarun/budapp:vsr
+        env:
+            LOG_LEVEL: DEBUG
+    budgateway:
+        image: vsrvarun/budgateway:vsr

@@ -440,6 +440,47 @@ async def get_cluster_config(
     return response.to_http_response()
 
 
+@cluster_router.get(
+    "/{cluster_id}/storage-classes",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Get cluster storage classes",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Internal server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Bad request",
+        },
+    },
+    status_code=status.HTTP_200_OK,
+    description="Get all storage classes available in the cluster",
+    tags=["Clusters"],
+)
+async def get_cluster_storage_classes(
+    cluster_id: UUID,
+    session: Session = Depends(get_session),  # noqa: B008
+):
+    """Get all storage classes available in the cluster.
+
+    Args:
+        cluster_id: The ID of the cluster to get storage classes from.
+
+    Returns:
+        SuccessResponse: A response object containing the list of storage classes.
+        ErrorResponse: A response object containing the error message.
+    """
+    try:
+        response = await ClusterService(session).get_cluster_storage_classes(cluster_id)
+    except Exception as e:
+        logger.error(f"Error getting storage classes for cluster {cluster_id}: {e}")
+        response = ErrorResponse(message=str(e))
+    return response.to_http_response()
+
+
 @cluster_router.get("/periodic-node-status-update/health")
 async def periodic_node_status_health():
     """Health check endpoint to verify periodic node status sync is configured.

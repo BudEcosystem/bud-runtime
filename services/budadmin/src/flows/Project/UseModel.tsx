@@ -170,7 +170,7 @@ export default function UseModel() {
     process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL ||
     process.env.NEXT_PUBLIC_BASE_URL ||
     "";
-  const apiUrl = `${baseUrl}${endpoint}`;
+  const apiUrl = `${baseUrl.replace( /\/+$/, '')}/${endpoint}`;
 
   const generateCurlCommand = () => {
     // Special handling for audio transcription (file upload)

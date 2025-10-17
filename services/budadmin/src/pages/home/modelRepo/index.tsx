@@ -38,6 +38,7 @@ import { PermissionEnum, useUser } from "src/stores/useUser";
 import IconRender from "src/flows/components/BudIconRender";
 import router from "next/router";
 import { PlusOutlined } from "@ant-design/icons";
+import { enableDevMode } from "@/components/environment";
 
 function ModelCard(item: Model, index) {
   const { getModel } = useModels();
@@ -747,25 +748,27 @@ export default function ModelRepo() {
                       </label>
                     </Popover>
                   </ConfigProvider>
-                  <div
-                    className="group flex justtify-center items-center gap-[.1rem] mr-[.5rem] cursor-pointer"
-                    onClick={() => router.push("/modelRepo/benchmarks-history")}
-                  >
-                    <div className="relative">
-                      <Text_12_400_EEEEEE className="group-hover:text-[#FFFFFF]">
-                        Benchmark history
-                      </Text_12_400_EEEEEE>
-                      <div className="absolute bottom-[2px] h-[1px] w-[100%] bg-[#EEEEEE] brightness-50 group-hover:brightness-100"></div>
+                  {enableDevMode && (
+                    <div
+                      className="group flex justtify-center items-center gap-[.1rem] mr-[.5rem] cursor-pointer"
+                      onClick={() => router.push("/modelRepo/benchmarks-history")}
+                    >
+                      <div className="relative">
+                        <Text_12_400_EEEEEE className="group-hover:text-[#FFFFFF]">
+                          Benchmark history
+                        </Text_12_400_EEEEEE>
+                        <div className="absolute bottom-[2px] h-[1px] w-[100%] bg-[#EEEEEE] brightness-50 group-hover:brightness-100"></div>
+                      </div>
+                      <div>
+                        <Image
+                          preview={false}
+                          src="/images/icons/ArrowTopRight.png"
+                          style={{ width: "0.75rem" }}
+                          className="transition-transform duration-200 group-hover:scale-110"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Image
-                        preview={false}
-                        src="/images/icons/ArrowTopRight.png"
-                        style={{ width: "0.75rem" }}
-                        className="transition-transform duration-200 group-hover:scale-110"
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
               )
             }
