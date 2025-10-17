@@ -637,12 +637,17 @@ class PromptService(SessionMixin):
                 fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE},
             )
 
-        logger.debug("Fetching connectors from MCP Foundry")
+        # Extract name filter if provided
+        name_filter = filters.get("name")
+
+        logger.debug(
+            f"Fetching connectors from MCP Foundry{f' with name filter: {name_filter}' if name_filter else ''}"
+        )
 
         # Call MCP Foundry API
         try:
             mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors(
-                show_registered_only=False, show_available_only=True, offset=offset, limit=limit
+                show_registered_only=False, show_available_only=True, name=name_filter, offset=offset, limit=limit
             )
             logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
         except MCPFoundryException as e:
@@ -690,24 +695,24 @@ class PromptService(SessionMixin):
         logger.debug(f"Getting connector with ID: {connector_id}")
 
         try:
-            # Fetch all connectors and find the matching one
-            # TODO: Optimize with specific endpoint if MCP Foundry adds it
+            # Fetch connector using name filter for efficient server-side filtering
             mcp_foundry_response, _ = await mcp_foundry_service.list_connectors(
                 show_registered_only=False,
                 show_available_only=True,
-                limit=100,  # Fetch more to ensure we get the one we need
+                name=connector_id,  # Filter by connector ID server-side
+                limit=1,  # Only need one result
             )
 
-            # Find matching connector
-            connector_data = next((c for c in mcp_foundry_response if c.get("id") == connector_id), None)
-
-            if not connector_data:
+            # Check if connector was found
+            if not mcp_foundry_response:
                 logger.error(f"Connector not found: {connector_id}")
                 raise ClientException(
                     message=f"Connector {connector_id} not found", status_code=status.HTTP_404_NOT_FOUND
                 )
 
-            # Map auth_type string to enum
+            connector_data = mcp_foundry_response[0]
+
+            # Map auth_type string to enum (no fallback - let ValueError propagate)
             auth_type_str = connector_data.get("auth_type", "Open")
             auth_type = ConnectorAuthTypeEnum(auth_type_str)
 

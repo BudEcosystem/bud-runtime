@@ -301,13 +301,19 @@ class MCPFoundryService(metaclass=SingletonMeta):
             raise MCPFoundryException(error_msg, status_code=500)
 
     async def list_connectors(
-        self, show_registered_only: bool = False, show_available_only: bool = True, offset: int = 0, limit: int = 10
+        self,
+        show_registered_only: bool = False,
+        show_available_only: bool = True,
+        name: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 10,
     ) -> tuple[List[Dict[str, Any]], int]:
         """List connectors from MCP registry.
 
         Args:
             show_registered_only: Filter for registered servers only
             show_available_only: Filter for available servers only
+            name: Filter by connector name
             offset: Number of items to skip
             limit: Maximum number of items to return
 
@@ -322,6 +328,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 "Fetching connectors from MCP Foundry",
                 show_registered_only=show_registered_only,
                 show_available_only=show_available_only,
+                name=name,
                 offset=offset,
                 limit=limit,
             )
@@ -332,6 +339,10 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 "limit": limit,
                 "offset": offset,
             }
+
+            # Add name filter if provided
+            if name:
+                params["name"] = name
 
             response = await self._make_request(
                 method="GET",
