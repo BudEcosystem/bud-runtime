@@ -27,6 +27,7 @@ from novu.api import (
     FeedApi,
     IntegrationApi,
     LayoutApi,
+    MessageApi,
     NotificationGroupApi,
     NotificationTemplateApi,
     SubscriberApi,
@@ -37,6 +38,7 @@ from novu.dto.event import EventDto
 from novu.dto.feed import FeedDto
 from novu.dto.integration import IntegrationDto
 from novu.dto.layout import LayoutDto
+from novu.dto.message import PaginatedMessageDto
 from novu.dto.notification_group import NotificationGroupDto
 from novu.dto.notification_template import (
     NotificationTemplateDto,
@@ -1439,3 +1441,69 @@ class NovuService(NovuBaseApiClient):
         except HTTPError as err:
             error_message = err.response.json().get("message", "Unknown error occurred")
             raise NovuApiClientException(f"Failed to list feeds: {error_message}") from None
+
+    @_handle_exception
+    async def get_all_messages(
+        self,
+        page: int = 0,
+        limit: int = 10,
+        channel: Optional[str] = None,
+        subscriber_id: Optional[str] = None,
+        transaction_id: Optional[str] = None,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> PaginatedMessageDto:
+        """Retrieve a paginated list of messages from the Novu system.
+
+        Args:
+            page (int): The page number to retrieve. Defaults to 0.
+            limit (int): The maximum number of messages to return per page. Defaults to 10.
+            channel (Optional[str]): Filter by notification channel. Defaults to None.
+            subscriber_id (Optional[str]): Filter by subscriber ID. Defaults to None.
+            transaction_id (Optional[str]): Filter by transaction ID. Defaults to None.
+            api_key (Optional[str]): The API key for Novu. If not provided, it will be resolved based on the environment.
+            environment (str): The environment to use for the API call. Defaults to "dev".
+
+        Raises:
+            NovuApiClientException: If listing messages fails due to an API error.
+
+        Returns:
+            PaginatedMessageDto: A paginated list of messages.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = MessageApi(self.base_url, api_key=novu_api_key).list(
+                limit=limit, page=page, channel=channel, subscriber_id=subscriber_id, transaction_id=transaction_id
+            )
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to list messages: {error_message}") from None
+
+    @_handle_exception
+    async def delete_message(
+        self,
+        message_id: str,
+        api_key: Optional[str] = None,
+        environment: str = "dev",
+    ) -> bool:
+        """Delete a message from the Novu system.
+
+        Args:
+            message_id (str): The ID of the message to be deleted.
+            api_key (Optional[str]): The API key for Novu. If not provided, it will be resolved based on the environment.
+            environment (str): The environment to use for the API call. Defaults to "dev".
+
+        Raises:
+            NovuApiClientException: If the message deletion fails due to an API error.
+
+        Returns:
+            bool: True if the message was successfully deleted.
+        """
+        novu_api_key = await self._resolve_api_key(api_key=api_key, environment=environment)
+        try:
+            response = MessageApi(self.base_url, api_key=novu_api_key).delete(message_id=message_id)
+            return response
+        except HTTPError as err:
+            error_message = err.response.json().get("message", "Unknown error occurred")
+            raise NovuApiClientException(f"Failed to delete message: {error_message}") from None

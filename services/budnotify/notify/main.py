@@ -33,6 +33,7 @@ from .commons.constants import Environment
 from .commons.exceptions import NovuApiClientException, NovuSeederException
 from .commons.helpers import retry
 from .core import sync_routes
+from .core.message_routes import message_router
 from .core.meta_routes import meta_router
 from .core.notify_routes import notify_router
 from .core.profiler_middleware import ProfilerMiddleware
@@ -85,10 +86,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 )
             )
 
+    async def schedule_notification_cleanup() -> None:
+        """Schedule periodic notification cleanup workflow.
+
+        This background task runs the cleanup workflow at configured intervals
+        to remove expired notifications from Novu based on TTL settings.
+        """
+        from notify.core.workflows import start_cleanup_workflow
+
+        # Wait for initial setup to complete
+        await asyncio.sleep(10)
+
+        logger.info(f"Starting notification cleanup scheduler (interval: {app_settings.cleanup_interval_seconds}s)")
+
+        while True:
+            try:
+                instance_id = await start_cleanup_workflow(environment="prod")
+                logger.info(f"Started cleanup workflow: {instance_id}")
+            except Exception as err:
+                logger.error(f"Failed to start cleanup workflow: {err}")
+
+            # Wait for configured interval (7 days by default)
+            await asyncio.sleep(app_settings.cleanup_interval_seconds)
+
     if app_settings.configstore_name or app_settings.secretstore_name:
-        task = asyncio.create_task(schedule_secrets_and_config_sync())
+        config_sync_task = asyncio.create_task(schedule_secrets_and_config_sync())
     else:
-        task = None
+        config_sync_task = None
+
+    # Always start cleanup scheduler
+    cleanup_task = asyncio.create_task(schedule_notification_cleanup())
 
     async def shutdown_app(message: str) -> None:
         """Shutdown the application by logging the provided message and sending a termination signal.
@@ -135,11 +162,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
-    if task is not None:
+    # Cleanup background tasks on shutdown
+    if config_sync_task is not None:
         try:
-            task.cancel()
+            config_sync_task.cancel()
+            await config_sync_task
         except asyncio.CancelledError:
-            logger.exception("Failed to cleanup config & store sync.")
+            logger.info("Config & secrets sync task cancelled")
+        except Exception as err:
+            logger.exception(f"Error cancelling config sync task: {err}")
+
+    if cleanup_task is not None:
+        try:
+            cleanup_task.cancel()
+            await cleanup_task
+        except asyncio.CancelledError:
+            logger.info("Notification cleanup task cancelled")
+        except Exception as err:
+            logger.exception(f"Error cancelling cleanup task: {err}")
 
 
 app = FastAPI(
@@ -160,6 +200,7 @@ internal_router.include_router(sync_routes.sync_router)
 
 app.include_router(integration_router)
 app.include_router(internal_router)
+app.include_router(message_router)
 app.include_router(notify_router)
 app.include_router(settings_router)
 app.include_router(subscriber_router)

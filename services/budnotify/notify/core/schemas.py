@@ -58,6 +58,12 @@ class NotificationPayload(BaseModel):
     workflow_id: str | None = None
     source: str
     content: NotificationContent
+    ttl_seconds: int | None = Field(
+        None,
+        description="Time-to-live in seconds. After this duration, the notification will be eligible for cleanup. If not specified, uses service default TTL.",
+        ge=60,
+        le=31536000,
+    )  # Min 1 minute, max 1 year
 
 
 class NotificationRequest(CloudEventBase):
@@ -260,3 +266,44 @@ class CredentialsResponse(SuccessResponse):
     model_config = ConfigDict(extra="ignore")
 
     prod_app_id: str | None = None
+
+
+# Schemas related to message management
+
+
+class MessageDto(BaseModel):
+    """Represents a message response from Novu."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(None, alias="_id")
+    environment_id: str = Field(None, alias="_environmentId")
+    organization_id: str = Field(None, alias="_organizationId")
+    transaction_id: str = Field(None, alias="transactionId")
+    subscriber_id: str = Field(None, alias="_subscriberId")
+    template_id: str = Field(None, alias="_templateId")
+    channel: str | None = None
+    content: str | Dict | None = None
+    seen: bool | None = None
+    read: bool | None = None
+    created_at: str = Field(None, alias="createdAt")
+    last_seen_date: str | None = Field(None, alias="lastSeenDate")
+    last_read_date: str | None = Field(None, alias="lastReadDate")
+    status: str | None = None
+
+
+class PaginatedMessageResponse(PaginatedSuccessResponse):
+    """Represents a paginated message response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    messages: list[MessageDto] = Field(default_factory=list, alias="data")
+
+
+class MessageDeleteResponse(SuccessResponse):
+    """Represents a message delete response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    acknowledged: bool
+    status: str

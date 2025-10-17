@@ -214,6 +214,25 @@ class AppConfig(BaseConfig):
     pubsub_topic: Optional[str] = None
     dead_letter_topic: Optional[str] = None
 
+    # TTL Configuration
+    default_ttl_seconds: int = Field(
+        2592000,  # 30 days default
+        alias="DEFAULT_TTL_SECONDS",
+        description="Default time-to-live for notifications in seconds (30 days)",
+        ge=3600,
+        le=31536000,
+    )  # Min 1 hour, max 1 year
+    cleanup_interval_seconds: int = Field(
+        604800,  # 7 days
+        alias="CLEANUP_INTERVAL_SECONDS",
+        description="Interval for running cleanup workflow in seconds (7 days)",
+        ge=300,
+        le=31536000,
+    )  # Min 5 minutes, max 1 year
+    cleanup_batch_size: int = Field(
+        100, alias="CLEANUP_BATCH_SIZE", description="Number of messages to process per cleanup batch", ge=10, le=1000
+    )
+
     @model_validator(mode="before")
     @classmethod
     def resolve_env(cls, data: Dict[str, Any]) -> Dict[str, Any]:

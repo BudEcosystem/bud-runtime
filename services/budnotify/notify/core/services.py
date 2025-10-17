@@ -39,6 +39,7 @@ from .schemas import (
     TopicSubscriberRequest,
     TopicUpdateRequest,
 )
+from .ttl_service import TTLTrackingService
 
 
 logger = logging.get_logger(__name__)
@@ -455,11 +456,17 @@ class TopicService(NovuService):
 class NotificationService(NovuService):
     """Implements notification services for sending notifications."""
 
+    def __init__(self) -> None:
+        """Initialize the notification service."""
+        super().__init__()
+        self.ttl_service = TTLTrackingService()
+
     async def trigger_novu_notification_event(self, notification_data: NotificationRequest) -> EventDto:
         """Triggers a notification event in Novu based on the provided notification data.
 
         This method sends a notification event to Novu using the specified notification name,
-        recipients, and payload.
+        recipients, and payload. If TTL is specified in the payload, it tracks the notification
+        for automatic cleanup.
 
         Args:
             notification_data (NotificationRequest): The request object containing the notification
@@ -500,6 +507,21 @@ class NotificationService(NovuService):
                     message=f"Notification type {notification_data.notification_type.value} is not supported."
                 )
             logger.debug(f"Triggered notification successfully. Status: {event_data.status}")
+
+            # Track TTL if specified in payload
+            ttl_seconds = notification_data.payload.get("ttl_seconds")
+            if ttl_seconds or notification_data.payload:
+                # Extract metadata for tracking
+                metadata = {
+                    "notification_type": notification_data.notification_type.value,
+                    "notification_name": notification_data.name,
+                    "category": notification_data.payload.get("category"),
+                    "source": notification_data.payload.get("source"),
+                }
+                await self.ttl_service.track_notification_ttl(
+                    transaction_id=event_data.transaction_id, ttl_seconds=ttl_seconds, metadata=metadata
+                )
+
             return event_data
         except NovuApiClientException as err:
             logger.error(err.message)
