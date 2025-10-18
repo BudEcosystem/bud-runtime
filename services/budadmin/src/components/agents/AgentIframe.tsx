@@ -12,8 +12,7 @@ const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [] }) 
 
   // Build iframe URL for agent playground with promptIds
   const promptIdsParam = promptIds.filter(id => id).join(',');
-  // const iframeUrl = `http://localhost:8007/chat?embedded=true&refresh_token=${refreshToken}&agent_session=${sessionId || ''}${promptIdsParam ? `&promptIds=${promptIdsParam}` : ''}${promptIdsParam ? `?promptIds=${promptIdsParam}` : ''}`;
-  const iframeUrl = `${playGroundUrl}/chat?embedded=true&refresh_token=${refreshToken}&agent_session=${sessionId || ''}${promptIdsParam ? `&promptIds=${promptIdsParam}` : ''}${promptIdsParam ? `?promptIds=${promptIdsParam}` : ''}`;
+  const iframeUrl = `${playGroundUrl}/chat?embedded=true&refresh_token=${refreshToken}&agent_session=${sessionId || ''}${promptIdsParam ? `&promptIds=${promptIdsParam}` : ''}`;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
