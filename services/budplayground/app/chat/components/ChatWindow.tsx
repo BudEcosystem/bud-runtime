@@ -14,6 +14,7 @@ import MessageLoading from './MessageLoading';
 import NormalEditor from '@/app/components/bud/components/input/NormalEditor';
 import { useChatStore } from '@/app/store/chat';
 import SettingsList from './Settings';
+import PromptForm from './PromptForm';
 
 
 
@@ -21,11 +22,12 @@ const { Header, Footer, Sider, Content } = Layout;
 
 export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSingleChat: boolean }) {
 
-  const { addMessage, getMessages, updateChat, createChat, disableChat, currentSettingPreset, deleteMessageAfter } = useChatStore();
+  const { addMessage, getMessages, updateChat, createChat, disableChat, currentSettingPreset, deleteMessageAfter, getPromptIds } = useChatStore();
   const { apiKey, accessKey } = useAuth();
 
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
+  const [showPromptForm, setShowPromptForm] = useState<boolean>(false);
 
   const promptRef = useRef("");
   const lastMessageRef = useRef<string>("");
@@ -71,6 +73,16 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       }
     }
   }, [messages]);
+
+  // Check URL parameter to show form (for testing/demo)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const showForm = 'true';
+    // const showForm = params.get('show_form');
+    if (showForm === 'true') {
+      setShowPromptForm(true);
+    }
+  }, []);
 
 
 
@@ -155,8 +167,15 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     append(message)
   }
 
+  const handlePromptFormSubmit = (data: { firstName: string; lastName: string; phoneNumber: string }) => {
+    console.log('Form submitted:', data);
+    // Handle form submission here
+    // You can store the data, send it to an API, etc.
+    setShowPromptForm(false);
+  };
+
   return (
-    <Layout className={`chat-container ${isSingleChat ? 'single-chat' : ''}`}>
+    <Layout className={`chat-container relative ${isSingleChat ? 'single-chat' : ''}`}>
       <Sider
         width="280px"
         className={`leftSider rounded-l-[1rem] border-[1px] border-[#1F1F1F] border-r-[0px] overflow-hidden ml-[-250px] ease-in-out ${toggleLeft ? "visible ml-[0]" : "invisible ml-[-280px]"
@@ -210,7 +229,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         </div>
       </Sider>
       <Layout
-        className={`centerLayout border-[1px] border-[#1F1F1F] ${!toggleLeft && "!rounded-l-[0.875rem] overflow-hidden"
+        className={`centerLayout relative border-[1px] border-[#1F1F1F] ${!toggleLeft && "!rounded-l-[0.875rem] overflow-hidden"
           } ${!toggleRight && "!rounded-r-[0.875rem] overflow-hidden"}`}
       >
         <Header>
@@ -237,23 +256,23 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             {(!chat?.selectedDeployment?.name) &&
               (!messages || messages.length === 0) && (
                 <div className="h-full flex flex-col items-center justify-center">
-                <div className="mt-[-4.75rem] text-[#EEEEEE] text-center">
-                  {/* <div className="relative z-10 Open-Sans mt-[4.75rem] text-[1.575rem]">
+                  <div className="mt-[-4.75rem] text-[#EEEEEE] text-center">
+                    {/* <div className="relative z-10 Open-Sans mt-[4.75rem] text-[1.575rem]">
                     Hello there 👋
                   </div> */}
-                  <Image
-                    preview={false}
-                    src="images/looking.gif"
-                    alt="bud"
-                    width={"1150px"} // 750px
-                  // height={"150px"}
-                  className="relative z-9 mt-[-8.5rem]"
-                  />
+                    <Image
+                      preview={false}
+                      src="images/looking.gif"
+                      alt="bud"
+                      width={"1150px"} // 750px
+                      // height={"150px"}
+                      className="relative z-9 mt-[-8.5rem]"
+                    />
 
-                  <div className="relative z-10 Open-Sans text-[1.575rem] mt-[-18.5rem]">
-                    Select a model to get started
+                    <div className="relative z-10 Open-Sans text-[1.575rem] mt-[-18.5rem]">
+                      Select a model to get started
+                    </div>
                   </div>
-                </div>
                 </div>
               )}
             {(status === "submitted" || status === "streaming") && (
@@ -304,6 +323,14 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             input={input}
           />
         </Footer>
+        {/* Prompt Form - Absolutely positioned at bottom */}
+        {showPromptForm && (
+          <PromptForm
+            promptIds={getPromptIds()}
+            onSubmit={handlePromptFormSubmit}
+            onClose={() => setShowPromptForm(false)}
+          />
+        )}
       </Layout>
       <Sider
         width="280px"
