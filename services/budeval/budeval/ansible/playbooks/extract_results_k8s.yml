@@ -153,7 +153,7 @@
                 volumes:
                   - name: eval-datasets-shared
                     persistentVolumeClaim:
-                      claimName: eval-datasets-pvc-rwx
+                      claimName: bud-dev-budeval-dataset
                 restartPolicy: Never
             backoffLimit: 2
 
