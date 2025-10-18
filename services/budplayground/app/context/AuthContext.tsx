@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, createContext, useContext, useEffect, useState, useRef } from 'react';
+import { ReactNode, createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useEndPoints } from '../components/bud/hooks/useEndPoint';
 import { useUserSwitching } from '../hooks/useUserSwitching';
 import { useChatStore } from '../store/chat';
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   // Function to schedule automatic re-initialization
-  const scheduleRefresh = (refreshTime: number) => {
+  const scheduleRefresh = useCallback((refreshTime: number) => {
     // Clear any existing timeout
     if (refreshTimeoutId) {
       clearTimeout(refreshTimeoutId);
@@ -97,10 +97,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }, refreshTime);
 
     setRefreshTimeoutId(timeoutId);
-  };
+  }, [refreshTimeoutId]);
 
   // Function to refresh the session using stored refresh token
-  const refreshSession = async (): Promise<boolean> => {
+  const refreshSession = useCallback(async (): Promise<boolean> => {
     if (!refreshToken) {
       setIsSessionValid(false);
       return false;
@@ -141,10 +141,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setIsSessionValid(false);
       return false;
     }
-  };
+  }, [refreshToken, scheduleRefresh]);
 
   // Initialize session with refresh token
-  const initializeWithRefreshToken = async (refreshTokenValue: string): Promise<boolean> => {
+  const initializeWithRefreshToken = useCallback(async (refreshTokenValue: string): Promise<boolean> => {
     // Prevent multiple simultaneous initialization attempts
     if (isInitializing) {
       return false;
@@ -194,7 +194,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsInitializing(false);
     }
-  };
+  }, [isInitializing, scheduleRefresh]);
 
   // Legacy function - now redirects to refresh token flow
   const initializeWithJWT = async (jwt: string): Promise<boolean> => {
@@ -329,7 +329,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => {
       mounted = false;
     };
-  }, []); // Empty dependency array ensures this runs only once
+  }, [initializeWithRefreshToken, refreshSession, scheduleRefresh]);
 
   const login = async (key?: string, accessKeyParam?: string) => {
     // Clear all auth data

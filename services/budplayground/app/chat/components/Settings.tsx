@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Button, Image, Select, Tag } from "antd";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { getChromeColor } from "@/app/components/bud/utils/color";
 import SliderInput from "@/app/components/bud/components/input/SliderInput";
 import InlineInput from "@/app/components/bud/components/input/InlineInput";
@@ -104,7 +104,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
 
     }, [hasHydrated, addSettingPreset, currentSettingPreset, setCurrentSettingPreset, settingPresets.length]);
 
-    const handleAddPreset = (name: string) => {
+    const handleAddPreset = useCallback((name: string) => {
         if (!name) return;
         const newPreset = {
             id: uuidv4(),
@@ -127,17 +127,17 @@ export default function SettingsList({chatId}: {chatId: string}) {
         };
         addSettingPreset(newPreset);
         setSettings(newPreset);
-    };
+    }, [settings, addSettingPreset]);
 
-    const changePreset = (id: string) => {
+    const changePreset = useCallback((id: string) => {
         const preset = settingPresets.find((preset) => preset.id === id);
         if (preset) {
             setSettings(preset);
             setCurrentSettingPreset(preset);
         }
-    }
+    }, [settingPresets, setCurrentSettingPreset]);
 
-    const handleChange = (params: any) => {
+    const handleChange = useCallback((params: any) => {
         const newSettings = {
             ...settings,
             ...params,
@@ -145,7 +145,7 @@ export default function SettingsList({chatId}: {chatId: string}) {
         setSettings(newSettings);
         updateSettingPreset(newSettings);
         setCurrentSettingPreset(newSettings);
-    };
+    }, [settings, updateSettingPreset, setCurrentSettingPreset]);
 
 
     const initComponents = React.useCallback(() => {

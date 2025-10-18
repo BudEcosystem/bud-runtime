@@ -47,7 +47,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       },
       settings: currentSettingPreset,
     };
-  }, [chat, chat?.selectedDeployment, currentSettingPreset]);
+  }, [chat, currentSettingPreset]);
 
 
   const { messages, input, handleInputChange, handleSubmit, reload, error, stop, status, setMessages, append } = useChat({
