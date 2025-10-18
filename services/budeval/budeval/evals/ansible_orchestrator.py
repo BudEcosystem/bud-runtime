@@ -278,7 +278,7 @@ class AnsibleOrchestrator:
                             "volumes": [
                                 {
                                     "name": "eval-datasets-shared",
-                                    "persistentVolumeClaim": {"claimName": "eval-datasets-pvc-rwx"},
+                                    "persistentVolumeClaim": {"claimName": "bud-dev-budeval-dataset"},
                                 },
                                 {"name": "cache-volume", "emptyDir": {}},
                             ],
