@@ -3401,7 +3401,7 @@ class EvaluationWorkflowService:
                 f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_eval_app_id}/method/evals/start"
             )
             eval_request = {
-                "uuid": str(evaluation_request.get("evaluation_id")),
+                "eval_id": str(evaluation_request.get("evaluation_id")),
                 "experiment_id": str(evaluation_request.get("experiment_id"))
                 if evaluation_request.get("experiment_id")
                 else None,
