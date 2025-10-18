@@ -4,9 +4,9 @@ import { NextResponse } from 'next/server';
 
 export async function GET(
   req: Request,
-  { params }: { params: { prompt_id: string } }
+  { params }: { params: Promise<{ prompt_id: string }> }
 ) {
-  const { prompt_id } = params;
+  const { prompt_id } = await params;
 
   // Get the JWT token from Authorization header (case-insensitive)
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
