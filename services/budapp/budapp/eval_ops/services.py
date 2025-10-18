@@ -3607,7 +3607,7 @@ class EvaluationWorkflowService:
                                 if dataset_config and dataset_config not in all_datasets:
                                     dataset_item = {
                                         "dataset_id": dataset_config,
-                                        "run_id": run.id,
+                                        "run_id": str(run.id),
                                     }
                                     all_datasets.append(dataset_item)
                                     logger.info(f"Added dataset config '{dataset_config}' from run {run.id}")
