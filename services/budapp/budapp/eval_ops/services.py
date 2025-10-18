@@ -3735,177 +3735,61 @@ class EvaluationWorkflowService:
             db_workflow = cast(WorkflowModel, db_workflow)
             logger.warning(f"::EvalResult:: Workflow {db_workflow.id} found")
 
-            # Evaluation ID
-            status_str = (payload.content.status or "").upper()
-            logger.warning(f":EvalResult:: Status {status_str}")
+            # Get the result from payload
+            results = payload.content.result.get("results", [])
+            eval_raw = payload.content.result.get("evaluation_id", None)
 
-            # Extract job_id from result dictionary with error handling
-            try:
-                job_id = payload.content.result.get("job_id")
-                if not job_id:
-                    raise ClientException("Missing job_id in evaluation completion notification")
-                evaluation_id = job_id.split("-", 1)[1] if "-" in job_id else job_id
-                logger.warning(f":EvalResult:: Evaluation ID {evaluation_id}")
+            if not eval_raw:
+                logger.error(f"::EvalResult:: Evaluation ID not found for workflow {db_workflow.id}")
+                raise ClientException("Evaluation ID not found")  # if empty
 
-                # Convert to UUID with proper error handling
-                evaluation_uuid = uuid.UUID(evaluation_id)
-            except (ValueError, TypeError, AttributeError) as e:
-                logger.error(f"::EvalResult:: Invalid evaluation ID format: {e}")
-                raise ClientException(f"Invalid evaluation ID format: {e}")
-
-            # Rest of the logics
-            evaluation = self.session.get(EvaluationModel, evaluation_uuid)
-
+            if not results:
+                logger.warning(f"::EvalResult:: No results found for workflow {db_workflow.id}")
+            eval_id = uuid.UUID(eval_raw)
+            # from one of the run , get the evaluation
+            evaluation = self.session.get(EvaluationModel, eval_id)
             if not evaluation:
-                logger.error(f"::EvalResult:: Evaluation {evaluation_uuid} not found")
-                raise ClientException(f"Evaluation {evaluation_uuid} not found")
+                logger.error(f"::EvalResult:: Evaluation {eval_id} not found")
+                raise ClientException(f"Evaluation {eval_id} not found")
 
-            # 2. Get the runs using modern SQLAlchemy pattern
-            try:
-                runs_stmt = select(RunModel).where(RunModel.evaluation_id == evaluation.id)
-                runs = self.session.execute(runs_stmt).scalars().all()
+            # Update the eval status
+            evaluation.status = EvaluationStatusEnum.COMPLETED.value
 
-                logger.warning(f"::EvalResult:: Found {len(runs)} runs for evaluation {evaluation.id}")
+            # Updare runs
+            for run in results:
+                logger.debug(f"::EvalResult:: Updating run from payload {run.id}")
 
-                # Extract dataset results from the notification payload
-                dataset_results = {}
-                try:
-                    summary = payload.content.result.get("summary", {})
-                    dataset_results = summary.get("dataset_results", {})
-                    logger.info(f"::EvalResult:: Extracted dataset_results: {dataset_results}")
-                except (AttributeError, TypeError) as e:
-                    logger.warning(f"::EvalResult:: Could not extract dataset_results: {e}")
+                # get the run
+                runs_stmt = select(RunModel).where(RunModel.id == run.id)
+                dbrun = self.session.execute(runs_stmt).scalars().one_or_none()
 
-                # Update Evaluation Status based on job status
-                job_status = payload.content.result.get("status", "unknown")
-                if job_status == "succeeded":
-                    evaluation.status = EvaluationStatusEnum.COMPLETED.value
-                elif job_status == "failed":
-                    evaluation.status = EvaluationStatusEnum.FAILED.value
-                else:
-                    evaluation.status = EvaluationStatusEnum.COMPLETED.value  # Default to completed
+                if not dbrun:
+                    logger.warning(f"::EvalResult:: Run {run.id} not found for workflow {db_workflow.id}")
+                    continue
 
-                # Update all runs and create metrics
-                for run in runs:
-                    # Match run with its dataset result by comparing dataset config
-                    dataset_config = None
-                    accuracy_score = None
+                # Update run status
+                run_status = run.get("status", "failed")
+                if run_status == "failed":
+                    run.status = RunStatusEnum.FAILED.value
+                elif run_status == "success":
+                    run.status = RunStatusEnum.COMPLETED.value
 
-                    try:
-                        if run.dataset_version and run.dataset_version.dataset:
-                            dataset = run.dataset_version.dataset
-                            eval_types = dataset.eval_types
+                # Update The Metrics
+                accuracy_score_ar = run.get("scores", [])
+                if len(accuracy_score_ar) > 0:
+                    final_acc = 0.0
+                    for acc in accuracy_score_ar:
+                        final_acc = float(acc.get("score", 0.0))
+                    metric = MetricModel(
+                        run_id=run.id,
+                        metric_name="accuracy",
+                        mode="gen",
+                        metric_value=float(final_acc),
+                    )
+                    self.session.add(metric)
 
-                            if eval_types and isinstance(eval_types, dict):
-                                # Extract the "gen" evaluation type configuration
-                                if "gen" in eval_types:
-                                    dataset_config = eval_types["gen"]
-                                    logger.info(f"::EvalResult:: Run {run.id} - Dataset config: {dataset_config}")
-
-                                    # Extract base dataset name using regex to remove suffix patterns
-                                    # Matches: dataset_name_gen, dataset_name_ppl, dataset_name_chat_gen, etc.
-                                    base_dataset_name = re.sub(
-                                        r"_(gen|ppl|chat_gen)$",
-                                        "",
-                                        dataset_config,
-                                    )
-
-                                    # Convert to lowercase for matching
-                                    base_dataset_name = base_dataset_name.lower()
-                                    logger.info(
-                                        f"::EvalResult:: Run {run.id} - Base dataset name: {base_dataset_name}"
-                                    )
-
-                                    # Find matching result in dataset_results using base name
-                                    if base_dataset_name in dataset_results:
-                                        accuracy_score = dataset_results[base_dataset_name]
-                                        logger.info(
-                                            f"::EvalResult:: Run {run.id} - Matched accuracy: {accuracy_score}% (config: {dataset_config}, matched: {base_dataset_name})"
-                                        )
-                                    elif dataset.name.lower() in dataset_results:
-                                        # Fallback to dataset.name
-                                        accuracy_score = dataset_results[dataset.name.lower()]
-                                        base_dataset_name = dataset.name.lower()
-                                        logger.info(
-                                            f"::EvalResult:: Run {run.id} - Matched using dataset.name: {dataset.name}"
-                                        )
-
-                                    if accuracy_score is not None:
-                                        logger.info(
-                                            f"::EvalResult:: Run {run.id} - Matched accuracy: {accuracy_score}% (matched: {base_dataset_name})"
-                                        )
-                                    else:
-                                        logger.warning(
-                                            f"::EvalResult:: Run {run.id} - No matching result found. Config: '{dataset_config}', Dataset name: '{dataset.name}', Available keys: {list(dataset_results.keys())}"
-                                        )
-                                else:
-                                    logger.warning(
-                                        f"::EvalResult:: Run {run.id} - Dataset '{dataset.name}' has no 'gen' eval_type"
-                                    )
-                            else:
-                                logger.warning(f"::EvalResult:: Run {run.id} - Dataset has no eval_types configured")
-                    except Exception as e:
-                        logger.error(
-                            f"::EvalResult:: Could not retrieve dataset config for run {run.id}: {e}",
-                            exc_info=True,
-                        )
-
-                    # Update run status
-                    if job_status == "succeeded":
-                        run.status = RunStatusEnum.COMPLETED.value
-                    elif job_status == "failed":
-                        run.status = RunStatusEnum.FAILED.value
-                    else:
-                        run.status = RunStatusEnum.COMPLETED.value
-
-                    # Create metric entry if we have a score
-                    if accuracy_score is not None:
-                        try:
-                            # Check if metric already exists
-                            existing_metric = (
-                                self.session.query(MetricModel)
-                                .filter(
-                                    MetricModel.run_id == run.id,
-                                    MetricModel.metric_name == "accuracy",
-                                    MetricModel.mode == "gen",
-                                )
-                                .first()
-                            )
-
-                            if existing_metric:
-                                # Update existing metric
-                                existing_metric.metric_value = float(accuracy_score)
-                                logger.info(
-                                    f"::EvalResult:: Updated existing metric for run {run.id}: accuracy={accuracy_score}%"
-                                )
-                            else:
-                                # Create new metric
-                                metric = MetricModel(
-                                    run_id=run.id,
-                                    metric_name="accuracy",
-                                    mode="gen",
-                                    metric_value=float(accuracy_score),
-                                )
-                                self.session.add(metric)
-                                logger.info(
-                                    f"::EvalResult:: Created new metric for run {run.id}: accuracy={accuracy_score}%"
-                                )
-                        except Exception as metric_error:
-                            logger.error(
-                                f"::EvalResult:: Failed to create/update metric for run {run.id}: {metric_error}",
-                                exc_info=True,
-                            )
-
-                # Single commit for all changes to ensure atomicity
                 self.session.commit()
-                logger.warning(
-                    f"::EvalResult:: Successfully updated evaluation {evaluation.id} and {len(runs)} runs with metrics"
-                )
-
-            except Exception as db_error:
-                self.session.rollback()
-                logger.error(f"::EvalResult:: Database error during evaluation update: {db_error}")
-                raise ClientException(f"Database error during evaluation update: {db_error}")
+                logger.warning("::EvalResult:: Successfully updated evaluation runs with metrics")
 
             # Send Success Notification
             try:
@@ -3932,5 +3816,6 @@ class EvaluationWorkflowService:
                 logger.warning(f"::EvalResult:: Failed to send notification: {e}")
 
         except Exception as e:
+            self.session.rollback()
             logger.exception(f"::EvalResult:: Failed to handle evaluation completion event: {e}")
             raise ClientException(f"::EvalResult:: Failed to process evaluation completion: {str(e)}")

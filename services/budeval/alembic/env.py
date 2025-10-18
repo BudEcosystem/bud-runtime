@@ -23,7 +23,7 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 from budmicroframe.shared.psql_service import PSQLBase
 from budmicroframe.shared.dapr_workflow import WorkflowRunsSchema, WorkflowStepsSchema
-from budeval.evals.eval_sync.models import EvalSyncState
+# from budeval.evals.eval_sync.models import EvalSyncState
 
 
 target_metadata = PSQLBase.metadata
