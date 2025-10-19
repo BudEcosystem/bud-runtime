@@ -978,7 +978,10 @@ async def register_connector(
     try:
         # Register the connector
         gateway = await PromptService(session).register_connector_for_prompt(
-            budprompt_id=budprompt_id, connector_id=connector_id, credentials=request.credentials
+            budprompt_id=budprompt_id,
+            connector_id=connector_id,
+            credentials=request.credentials,
+            version=request.version,
         )
 
         return RegisterConnectorResponse(

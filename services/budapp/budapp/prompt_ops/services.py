@@ -72,6 +72,7 @@ from .schemas import (
     CreatePromptWorkflowRequest,
     CreatePromptWorkflowSteps,
     GatewayResponse,
+    MCPToolConfig,
     PromptConfigCopyRequest,
     PromptConfigGetResponse,
     PromptConfigRequest,
@@ -751,7 +752,7 @@ class PromptService(SessionMixin):
             )
 
     async def register_connector_for_prompt(
-        self, budprompt_id: str, connector_id: str, credentials: Dict[str, Any]
+        self, budprompt_id: str, connector_id: str, credentials: Dict[str, Any], version: Optional[int] = None
     ) -> GatewayResponse:
         """Register a connector for a prompt by creating gateway in MCP Foundry.
 
@@ -759,6 +760,7 @@ class PromptService(SessionMixin):
             budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
             connector_id: The connector ID to register
             credentials: Connector credentials based on auth_type
+            version: Optional version to update. If None, updates default version
 
         Returns:
             gateway
@@ -808,6 +810,9 @@ class PromptService(SessionMixin):
                 visibility="public",
             )
 
+            # Store MCP tool configuration in Redis via budprompt service
+            await self._store_mcp_tool_config(budprompt_id, connector_id, gateway.gateway_id, version)
+
             return gateway
 
         except MCPFoundryException as e:
@@ -820,6 +825,127 @@ class PromptService(SessionMixin):
             logger.error(f"Unexpected error registering connector: {e}")
             raise ClientException(
                 message="Failed to register connector", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    async def _store_mcp_tool_config(
+        self, budprompt_id: str, connector_id: str, gateway_id: str, version: Optional[int] = None
+    ) -> None:
+        """Store MCP tool configuration in Redis via budprompt service.
+
+        Args:
+            budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
+            connector_id: The connector ID
+            gateway_id: The gateway ID from MCP Foundry
+            version: Optional version to update. If None, updates default version
+
+        Raises:
+            ClientException: If storing configuration fails
+        """
+        # 1. Create MCPToolConfig using Pydantic schema
+        mcp_tool = MCPToolConfig(
+            type="mcp",
+            server_label=None,
+            server_description=None,
+            server_url=None,
+            require_approval="never",
+            allowed_tools=[],
+            connector_id=None,  # Set to None as requested
+            gateway_config={connector_id: gateway_id},
+        )
+        mcp_tool_dict = mcp_tool.model_dump(exclude_none=True)
+
+        # 2. Fetch existing prompt configuration
+        config_exists = True
+        existing_config_data = {}
+
+        try:
+            config_response = await self._perform_get_prompt_config_request(
+                budprompt_id,
+                version=version,  # Use provided version or None for default
+            )
+            config_data = config_response.get("data", {})
+            existing_tools = config_data.get("tools", [])
+
+            # Store the entire existing config data to preserve it
+            existing_config_data = config_data
+
+            # Determine the version to use
+            target_version = config_response.get("version", 1) if version is None else version
+
+        except ClientException as e:
+            if e.status_code == 404:
+                # No existing config
+                config_exists = False
+                existing_tools = []
+                target_version = version if version else 1  # Default to 1 if not specified
+            else:
+                raise
+
+        # 3. Replace existing connector if found, otherwise append
+        tool_found = False
+        updated_tools = []
+
+        for tool in existing_tools:
+            gateway_config = tool.get("gateway_config", {})
+            if connector_id in gateway_config:
+                # Replace this tool with the new one
+                updated_tools.append(mcp_tool_dict)
+                tool_found = True
+                logger.debug(f"Replacing existing connector {connector_id} configuration")
+            else:
+                # Keep existing tool
+                updated_tools.append(tool)
+
+        if not tool_found:
+            # Connector not found, append new tool
+            updated_tools.append(mcp_tool_dict)
+            logger.debug(f"Adding new connector {connector_id} configuration")
+
+        # 4. Save updated config
+        # For existing configs: preserve all existing data and only update tools
+        # For new configs: only save tools
+
+        prompt_config_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config"
+        )
+
+        if config_exists:
+            # Preserve all existing config data, only update tools field
+            payload = {
+                **existing_config_data,  # Spread all existing fields
+                "prompt_id": budprompt_id,
+                "version": target_version,
+                "set_default": False,  # Don't change default for existing configs
+                "tools": updated_tools,  # Override tools field
+            }
+        else:
+            # New config: only save tools
+            payload = {
+                "prompt_id": budprompt_id,
+                "version": target_version,
+                "set_default": True,  # Set as default for new configs
+                "tools": updated_tools,
+            }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(prompt_config_endpoint, json=payload) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        logger.error(f"Failed to save MCP tool config: {response.status} {response_data}")
+                        raise ClientException(
+                            message="Failed to save MCP tool configuration",
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
+
+                    logger.debug(f"Successfully stored MCP tool config for connector {connector_id}")
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Network error saving MCP tool config: {e}")
+            raise ClientException(
+                message="Unable to save MCP tool configuration",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
     async def get_tools(

@@ -518,6 +518,23 @@ class PromptConfigResponse(SuccessResponse):
     bud_prompt_version: int = Field(..., ge=1, description="The version of the prompt configuration from budprompt")
 
 
+class MCPToolConfig(BaseModel):
+    """MCP Tool configuration stored in prompt config."""
+
+    type: Literal["mcp"] = "mcp"
+    server_label: Optional[str] = Field(None, description="Virtual server name")
+    server_description: Optional[str] = Field(None, description="Server description")
+    server_url: Optional[str] = Field(None, description="Server URL")
+    require_approval: Literal["always", "never", "auto"] = Field(
+        default="never", description="Tool approval requirement"
+    )
+    allowed_tools: List[str] = Field(default_factory=list, description="List of tool IDs allowed")
+    connector_id: Optional[str] = Field(None, description="Virtual server ID from MCP Foundry")
+    gateway_config: Dict[str, str] = Field(
+        ..., description="Gateway configuration with connector_id as key and gateway_id as value"
+    )
+
+
 class PromptConfigurationData(BaseModel):
     """Schema for prompt configuration data retrieved from budprompt."""
 
@@ -555,6 +572,7 @@ class PromptConfigurationData(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
+    tools: Optional[List[MCPToolConfig]] = Field(None, description="MCP tool configurations")
 
 
 class GetPromptVersionResponse(SuccessResponse):
@@ -571,6 +589,7 @@ class PromptConfigGetResponse(SuccessResponse):
     """
 
     prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")
+    version: int = Field(..., description="The version number of the configuration retrieved")
     data: PromptConfigurationData = Field(..., description="The prompt configuration data")
 
 
@@ -696,6 +715,9 @@ class RegisterConnectorRequest(BaseModel):
 
     credentials: Dict[str, Any] = Field(
         default_factory=dict, description="Connector credentials based on auth_type. Empty for OPEN auth type."
+    )
+    version: Optional[int] = Field(
+        None, ge=1, description="Version to update. If not specified, updates default version."
     )
 
     # TODO: Add credential validation in service layer against CONNECTOR_AUTH_CREDENTIALS_MAP
