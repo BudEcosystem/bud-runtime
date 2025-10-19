@@ -132,7 +132,6 @@ class AnsibleOrchestrator:
 
         pdir = Path(tempfile.mkdtemp(prefix=f"ansible_{uuid}_"))
         logger.debug("Created private data dir: %s", pdir)
-        logger.debug("Using Python interpreter: test")
 
         # Write ansible.cfg to enforce interpreter and disable host key checking
         (pdir / "ansible.cfg").write_text(
@@ -247,121 +246,6 @@ class AnsibleOrchestrator:
 
             bash_script = eval_request.get("script", "")
 
-            # Enhanced script that writes results to shared volume for extraction
-            enhanced_script = f"""{bash_script}
-
-# === RESULTS EXTRACTION SETUP ===
-echo "=== Setting up results extraction ==="
-RESULTS_BASE_DIR="/workspace/shared/results"
-RUN_RESULTS_DIR="$RESULTS_BASE_DIR/{temp_id}"
-mkdir -p "$RUN_RESULTS_DIR"
-
-# Function to write job completion status
-write_completion_status() {{
-    local status=$1
-    local error_msg=${{2:-""}}
-
-    cat > "$RUN_RESULTS_DIR/job_status.json" << EOF
-{{
-    "run_id": "{temp_id}",
-    "eval_id": "{eval_request.get("eval_id", "unknown")}",
-    "status": "$status",
-    "completion_time": "$(date -Iseconds)",
-    "error_message": "$error_msg"
-}}
-EOF
-}}
-
-# Function to extract and copy results
-extract_results() {{
-    echo "Extracting results to shared volume..."
-
-    # Look for OpenCompass summary files and CSV results
-    find /workspace -name "*.csv" -type f -exec cp {{}} "$RUN_RESULTS_DIR/" \\; 2>/dev/null || true
-    find /workspace -name "*summary*.json" -type f -exec cp {{}} "$RUN_RESULTS_DIR/" \\; 2>/dev/null || true
-    find /workspace -name "*.txt" -path "*/outputs/*" -exec cp {{}} "$RUN_RESULTS_DIR/" \\; 2>/dev/null || true
-
-    # Create a simple results summary if we have CSV files
-    if ls "$RUN_RESULTS_DIR"/*.csv 1> /dev/null 2>&1; then
-        echo "CSV results found, creating summary"
-        python3 -c "
-import json
-import csv
-import glob
-import os
-
-results = []
-csv_files = glob.glob('$RUN_RESULTS_DIR/*.csv')
-
-for csv_file in csv_files:
-    try:
-        with open(csv_file, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                # Look for common OpenCompass result columns
-                dataset = row.get('dataset', row.get('Dataset', ''))
-                accuracy = row.get('accuracy', row.get('Accuracy', row.get('acc', '')))
-
-                if dataset and accuracy:
-                    try:
-                        score = float(accuracy) * 100 if float(accuracy) <= 1.0 else float(accuracy)
-                        results.append({{
-                            'dataset': dataset,
-                            'metric': 'accuracy',
-                            'score': score,
-                            'version': row.get('version', 'unknown')
-                        }})
-                    except (ValueError, TypeError):
-                        pass
-    except Exception as e:
-        print(f'Error processing {{csv_file}}: {{e}}')
-
-# Write results summary
-summary = {{
-    'run_id': '{temp_id}',
-    'eval_id': '{eval_request.get("eval_id", "unknown")}',
-    'results_count': len(results),
-    'scores': results
-}}
-
-with open('$RUN_RESULTS_DIR/results_summary.json', 'w') as f:
-    json.dump(summary, f, indent=2)
-
-print(f'Extracted {{len(results)}} results to summary')
-"
-    else
-        echo "No CSV results found"
-    fi
-}}
-
-# Trap to ensure we write status even on failure
-trap 'write_completion_status "failed" "Job script failed or was interrupted"' EXIT
-
-# Write initial status
-write_completion_status "running" ""
-
-echo "=== Original script execution starts ==="
-"""
-
-            # Add the completion logic at the end
-            enhanced_script += """
-
-echo "=== Original script execution completed ==="
-
-# Extract results to shared volume
-extract_results
-
-# Write successful completion status
-write_completion_status "completed" ""
-
-# Remove the trap since we completed successfully
-trap - EXIT
-
-echo "=== Results extraction completed ==="
-echo "Results written to: $RUN_RESULTS_DIR"
-ls -la "$RUN_RESULTS_DIR"
-"""
-
             # Generate job manifest using proper YAML dictionary to avoid escaping issues
             job_manifest_dict = {
                 "apiVersion": "batch/v1",
@@ -376,7 +260,7 @@ ls -la "$RUN_RESULTS_DIR"
                                     "name": "engine",
                                     "image": "ghcr.io/rahulvramesh/opencompass:latest",
                                     "command": ["bash"],
-                                    "args": ["-c", enhanced_script],
+                                    "args": ["-c", bash_script],
                                     "env": [
                                         {"name": "ENGINE_ARGS", "value": ""},
                                         {"name": "OPENCOMPASS_CONFIG_PATH", "value": "/workspace/configs"},
@@ -429,10 +313,13 @@ ls -la "$RUN_RESULTS_DIR"
         return jobs
 
     def extract_job_results(self, eval_id: str, run_ids: list[str], kubeconfig: Optional[str] = None) -> dict:
-        """Extract results from completed evaluation jobs by reading from shared volume.
+        """Extract results from completed evaluation jobs using Kubernetes extraction job.
 
-        This method uses volume-based extraction instead of pod logs to avoid RBAC issues.
-        It reads result files that were written by the evaluation jobs to the shared PVC.
+        This method:
+        1. Deploys a Kubernetes Job that mounts the eval-datasets PVC
+        2. Runs a Python script to parse OpenCompass CSV results
+        3. Retrieves the parsed results via kubectl logs
+        4. Returns structured results with run_id
 
         Args:
             eval_id: Evaluation request ID
@@ -446,7 +333,7 @@ ls -la "$RUN_RESULTS_DIR"
                     {
                         "run_id": "...",
                         "eval_id": "...",
-                        "status": "success|error|running",
+                        "status": "success|error",
                         "scores": [
                             {
                                 "dataset": "demo_gsm8k",
@@ -459,8 +346,8 @@ ls -la "$RUN_RESULTS_DIR"
                 ]
             }
         """
-        temp_id = f"extract-volume-{uuid.uuid4().hex[:8]}"
-        playbook = "extract_results_volume.yml"
+        temp_id = f"extract-{uuid.uuid4().hex[:8]}"
+        playbook = "extract_results_k8s.yml"
 
         files, extravars = self._parse_kubeconfig(kubeconfig, temp_id)
 
@@ -471,27 +358,28 @@ ls -la "$RUN_RESULTS_DIR"
         extravars["run_ids"] = ",".join(run_ids)
         extravars["temp_id"] = temp_id
 
-        logger.info(f"Extracting results via volume for eval_id={eval_id}, run_ids={run_ids}")
+        logger.info(f"Extracting results for eval_id={eval_id}, run_ids={run_ids}")
 
+        # Run The Playbook
         try:
             self._run_ansible_playbook(playbook, temp_id, files, extravars)
 
             # Read results from temporary file created by playbook
-            results_file = Path(tempfile.gettempdir()) / f"volume_extraction_results_{temp_id}.json"
+            results_file = Path(tempfile.gettempdir()) / f"extraction_results_{temp_id}.json"
 
             if results_file.exists():
                 with open(results_file, "r") as f:
                     extraction_results = json.load(f)
                 results_file.unlink()  # Clean up
 
-                logger.info(f"Successfully extracted results for {len(run_ids)} runs via volume")
+                logger.info(f"Successfully extracted results for {len(run_ids)} runs")
                 return extraction_results
             else:
-                logger.error("Volume extraction results file not found")
+                logger.error("Extraction results file not found")
                 return {"success": False, "results": [], "error": "Results file not created"}
 
         except Exception as e:
-            logger.error(f"Failed to extract results via volume: {e}", exc_info=True)
+            logger.error(f"Failed to extract results: {e}", exc_info=True)
             return {"success": False, "results": [], "error": str(e)}
 
     def _render_job_with_volumes_yaml(
