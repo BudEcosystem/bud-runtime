@@ -1031,6 +1031,13 @@ class PromptService:
                         message=f"Default version not found for prompt_id: {prompt_id}",
                     )
 
+                # Decode bytes to string if needed
+                if isinstance(redis_key, bytes):
+                    redis_key = redis_key.decode("utf-8")
+
+            # Extract version from redis_key (format: prompt:{prompt_id}:v{version})
+            retrieved_version = int(redis_key.split(":v")[-1])
+
             # Fetch data from Redis using the determined key
             config_json = await self.redis_service.get(redis_key)
 
@@ -1052,6 +1059,7 @@ class PromptService:
                 code=200,
                 message="Prompt configuration retrieved successfully",
                 prompt_id=prompt_id,
+                version=retrieved_version,
                 data=config_data,
             )
 
