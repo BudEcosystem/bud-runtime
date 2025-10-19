@@ -71,6 +71,7 @@ from .schemas import (
     ConnectorListItem,
     CreatePromptWorkflowRequest,
     CreatePromptWorkflowSteps,
+    GatewayResponse,
     PromptConfigCopyRequest,
     PromptConfigGetResponse,
     PromptConfigRequest,
@@ -747,6 +748,78 @@ class PromptService(SessionMixin):
             logger.error(f"Unexpected error getting connector {connector_id}: {e}")
             raise ClientException(
                 message="Failed to retrieve connector", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    async def register_connector_for_prompt(
+        self, budprompt_id: str, connector_id: str, credentials: Dict[str, Any]
+    ) -> GatewayResponse:
+        """Register a connector for a prompt by creating gateway in MCP Foundry.
+
+        Args:
+            budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
+            connector_id: The connector ID to register
+            credentials: Connector credentials based on auth_type
+
+        Returns:
+            gateway
+
+        Raises:
+            ClientException: If connector not found or gateway creation fails
+        """
+        logger.debug(f"Registering connector {connector_id} for prompt {budprompt_id}")
+
+        # Get connector details from MCP Foundry
+        try:
+            connector = await self.get_connector_by_id(connector_id)
+        except ClientException as e:
+            logger.error(f"Failed to retrieve connector {connector_id}: {e}")
+            raise
+
+        # Construct gateway name: {budprompt_id}__{connector_id}
+        # Using double underscore as separator (MCP Foundry only allows letters, numbers, _, -)
+        gateway_name = f"{budprompt_id}__{connector_id}"
+
+        # Create gateway in MCP Foundry
+        try:
+            gateway_response = await mcp_foundry_service.create_gateway(
+                name=gateway_name, url=connector.url, transport="SSE", visibility="public"
+            )
+
+            logger.debug(
+                f"Successfully created gateway for connector {connector_id} and prompt {budprompt_id}",
+                gateway_id=gateway_response.get("id", gateway_response.get("gateway_id")),
+            )
+
+            # TODO: Store credentials in Redis via budprompt service
+            # Pending budprompt API implementation for credential storage
+
+            # TODO: Validate credentials against CONNECTOR_AUTH_CREDENTIALS_MAP schema
+            # Pending implementation
+
+            # TODO: Encrypt sensitive credential fields before storage
+            # Pending implementation
+
+            # Create GatewayResponse object
+            gateway = GatewayResponse(
+                gateway_id=gateway_response.get("id", gateway_response.get("gateway_id")),
+                name=gateway_name,
+                url=connector.url,
+                transport="SSE",
+                visibility="public",
+            )
+
+            return gateway
+
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry error creating gateway: {e}")
+            raise ClientException(
+                message="Failed to create mcp gateway.",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error registering connector: {e}")
+            raise ClientException(
+                message="Failed to register connector", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
     async def get_tools(

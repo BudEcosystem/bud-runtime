@@ -45,6 +45,7 @@ from .schemas import (
     CreatePromptWorkflowRequest,
     EditPromptRequest,
     EditPromptVersionRequest,
+    GatewayResponse,
     GetPromptVersionResponse,
     PaginatedTagsResponse,
     PromptConfigGetResponse,
@@ -59,6 +60,8 @@ from .schemas import (
     PromptVersionListItem,
     PromptVersionListResponse,
     PromptVersionResponse,
+    RegisterConnectorRequest,
+    RegisterConnectorResponse,
     SinglePromptResponse,
     SinglePromptVersionResponse,
     ToolFilter,
@@ -927,6 +930,72 @@ async def get_connector(
         logger.exception(f"Failed to retrieve connector: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve connector"
+        ).to_http_response()
+
+
+@router.post(
+    "/{budprompt_id}/connectors/{connector_id}/register",
+    responses={
+        status.HTTP_200_OK: {
+            "model": RegisterConnectorResponse,
+            "description": "Successfully registered connector",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Connector not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Register a connector for a prompt by creating gateway in MCP Foundry",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def register_connector(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    budprompt_id: str,
+    connector_id: str,
+    request: RegisterConnectorRequest,
+) -> Union[RegisterConnectorResponse, ErrorResponse]:
+    """Register a connector for a prompt.
+
+    This endpoint creates a gateway in MCP Foundry to connect the specified
+    connector to the prompt. The gateway name will be in the format:
+    {budprompt_id}__{connector_id}
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
+        connector_id: The connector ID to register
+        request: RegisterConnectorRequest containing credentials
+
+    Returns:
+        RegisterConnectorResponse with gateway details or ErrorResponse on failure
+    """
+    try:
+        # Register the connector
+        gateway = await PromptService(session).register_connector_for_prompt(
+            budprompt_id=budprompt_id, connector_id=connector_id, credentials=request.credentials
+        )
+
+        return RegisterConnectorResponse(
+            gateway=gateway,
+            connector_id=connector_id,
+            budprompt_id=budprompt_id,
+            message="Connector registered successfully",
+            code=status.HTTP_200_OK,
+            object="connector.register",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to register connector: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to register connector: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to register connector"
         ).to_http_response()
 
 

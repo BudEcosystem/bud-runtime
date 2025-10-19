@@ -689,3 +689,33 @@ class ToolResponse(SuccessResponse):
     model_config = ConfigDict(extra="ignore")
 
     tool: Tool
+
+
+class RegisterConnectorRequest(BaseModel):
+    """Request schema for registering a connector to a prompt."""
+
+    credentials: Dict[str, Any] = Field(
+        default_factory=dict, description="Connector credentials based on auth_type. Empty for OPEN auth type."
+    )
+
+    # TODO: Add credential validation in service layer against CONNECTOR_AUTH_CREDENTIALS_MAP
+    # This should validate that provided credentials match the connector's auth_type schema
+
+
+class GatewayResponse(BaseModel):
+    """Response from MCP Foundry gateway creation."""
+
+    gateway_id: str = Field(..., description="Gateway ID from MCP Foundry")
+    name: str
+    url: str
+    transport: str
+    visibility: str
+    created_at: Optional[datetime] = None
+
+
+class RegisterConnectorResponse(SuccessResponse):
+    """Response schema for connector registration."""
+
+    gateway: GatewayResponse
+    connector_id: str
+    budprompt_id: str

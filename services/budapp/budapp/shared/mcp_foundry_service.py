@@ -367,6 +367,68 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def create_gateway(
+        self,
+        name: str,
+        url: str,
+        transport: str = "SSE",
+        visibility: str = "public",
+    ) -> Dict[str, Any]:
+        """Create a gateway in MCP Foundry.
+
+        Args:
+            name: Gateway name (format: budprompt_id:connector_id)
+            url: MCP server URL from connector details
+            transport: Transport type (SSE, stdio) - default SSE
+            visibility: Gateway visibility (public, private) - default public
+
+        Returns:
+            Dict[str, Any]: Gateway creation response with gateway_id
+
+        Raises:
+            MCPFoundryException: If gateway creation fails
+        """
+        try:
+            logger.debug(
+                "Creating gateway in MCP Foundry",
+                name=name,
+                url=url,
+                transport=transport,
+                visibility=visibility,
+            )
+
+            # Prepare request payload
+            payload = {
+                "name": name,
+                "url": url,
+                "transport": transport,
+                "visibility": visibility,
+            }
+
+            # Make the API call
+            response = await self._make_request(
+                method="POST",
+                endpoint="/gateways",
+                json_data=payload,
+            )
+
+            logger.debug(
+                "Successfully created gateway in MCP Foundry",
+                gateway_id=response.get("id", response.get("gateway_id", "Unknown")),
+                name=name,
+            )
+
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error creating gateway {name}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def close(self):
         """Close the HTTP session."""
         if self._session and not self._session.closed:
