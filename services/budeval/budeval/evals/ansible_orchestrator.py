@@ -132,6 +132,7 @@ class AnsibleOrchestrator:
 
         pdir = Path(tempfile.mkdtemp(prefix=f"ansible_{uuid}_"))
         logger.debug("Created private data dir: %s", pdir)
+        logger.debug("Using Python interpreter: test")
 
         # Write ansible.cfg to enforce interpreter and disable host key checking
         (pdir / "ansible.cfg").write_text(
