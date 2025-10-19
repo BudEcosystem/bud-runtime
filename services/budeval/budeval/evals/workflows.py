@@ -429,7 +429,7 @@ class EvaluationWorkflow:
                 status=WorkflowStatus.COMPLETED,
                 result={
                     "results": extraction_result.get("results", []),
-                    "evaluation_id": evaluate_model_request_json.eval_id,
+                    "evaluation_id": str(evaluate_model_request_json.eval_id),
                 },
             )
 
@@ -448,7 +448,7 @@ class EvaluationWorkflow:
                 status=WorkflowStatus.COMPLETED,
                 metadata={
                     "results": extraction_result.get("results", []),
-                    "evaluation_id": evaluate_model_request_json.eval_id,
+                    "evaluation_id": str(evaluate_model_request_json.eval_id),
                 },  # Include results in notification
             )
             dapr_workflows.publish_notification(
