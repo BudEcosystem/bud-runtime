@@ -3755,24 +3755,30 @@ class EvaluationWorkflowService:
             # Update the eval status
             evaluation.status = EvaluationStatusEnum.COMPLETED.value
 
-            # Updare runs
+            # Update runs
             for run in results:
-                logger.debug(f"::EvalResult:: Updating run from payload {run.id}")
+                # Fix 1: Access run_id from dictionary
+                run_id = run.get("run_id")
+                if not run_id:
+                    logger.warning(f"::EvalResult:: Missing run_id in payload for workflow {db_workflow.id}")
+                    continue
 
-                # get the run
-                runs_stmt = select(RunModel).where(RunModel.id == run.id)
+                logger.debug(f"::EvalResult:: Updating run from payload {run_id}")
+
+                # get the run - Fix 2: Use run_id variable
+                runs_stmt = select(RunModel).where(RunModel.id == run_id)
                 dbrun = self.session.execute(runs_stmt).scalars().one_or_none()
 
                 if not dbrun:
-                    logger.warning(f"::EvalResult:: Run {run.id} not found for workflow {db_workflow.id}")
+                    logger.warning(f"::EvalResult:: Run {run_id} not found for workflow {db_workflow.id}")
                     continue
 
-                # Update run status
+                # Update run status - Fix 3: Update dbrun, not run dict
                 run_status = run.get("status", "failed")
                 if run_status == "failed":
-                    run.status = RunStatusEnum.FAILED.value
+                    dbrun.status = RunStatusEnum.FAILED.value
                 elif run_status == "success":
-                    run.status = RunStatusEnum.COMPLETED.value
+                    dbrun.status = RunStatusEnum.COMPLETED.value
 
                 # Update The Metrics
                 accuracy_score_ar = run.get("scores", [])
@@ -3781,7 +3787,7 @@ class EvaluationWorkflowService:
                     for acc in accuracy_score_ar:
                         final_acc = float(acc.get("score", 0.0))
                     metric = MetricModel(
-                        run_id=run.id,
+                        run_id=run_id,  # Fix 4: Use run_id variable
                         metric_name="accuracy",
                         mode="gen",
                         metric_value=float(final_acc),
