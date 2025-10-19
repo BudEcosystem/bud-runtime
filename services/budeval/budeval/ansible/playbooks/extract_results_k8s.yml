@@ -1,0 +1,224 @@
+---
+- name: Extract Evaluation Results from PVC
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    kubeconfig_path: ""
+    namespace: "default"
+    eval_id: ""
+    run_ids: ""  # Comma-separated run IDs
+    temp_id: ""
+
+  tasks:
+    - name: Ensure required variables are provided
+      ansible.builtin.assert:
+        that:
+          - namespace is defined
+          - namespace | length > 0
+          - eval_id is defined
+          - eval_id | length > 0
+          - run_ids is defined
+          - run_ids | length > 0
+          - temp_id is defined
+          - temp_id | length > 0
+        fail_msg: "namespace, eval_id, run_ids, and temp_id must be provided"
+
+    - name: Create Python extraction script
+      ansible.builtin.set_fact:
+        extraction_script: |
+          import csv
+          import json
+          import glob
+          import os
+          from pathlib import Path
+
+          def extract_results(eval_id, run_id):
+              """Extract results for a single run."""
+              base_path = f"/workspace/shared/results/{eval_id}/opencompass-{run_id}"
+
+              if not os.path.exists(base_path):
+                  return {
+                      "run_id": run_id,
+                      "eval_id": eval_id,
+                      "status": "error",
+                      "error": "Results directory not found",
+                      "scores": []
+                  }
+
+              # Find summary CSV files (may be in timestamped subdirectories)
+              csv_files = glob.glob(f"{base_path}/*/summary/summary_*.csv")
+              if not csv_files:
+                  # Try direct path without timestamp
+                  csv_files = glob.glob(f"{base_path}/summary/summary_*.csv")
+
+              if not csv_files:
+                  return {
+                      "run_id": run_id,
+                      "eval_id": eval_id,
+                      "status": "error",
+                      "error": "No CSV results found",
+                      "scores": []
+                  }
+
+              # Use latest CSV file
+              csv_file = sorted(csv_files)[-1]
+
+              # Parse CSV
+              scores = []
+              try:
+                  with open(csv_file, 'r') as f:
+                      reader = csv.DictReader(f)
+                      for row in reader:
+                          dataset = row.get('dataset', '')
+                          version = row.get('version', '')
+                          metric = row.get('metric', '')
+                          mode = row.get('mode', '')
+
+                          # Model score is the last column (not dataset/version/metric/mode)
+                          score_cols = [k for k in row.keys()
+                                       if k not in ['dataset', 'version', 'metric', 'mode']]
+
+                          if score_cols:
+                              try:
+                                  score_value = float(row[score_cols[0]])
+                                  scores.append({
+                                      "dataset": dataset,
+                                      "version": version,
+                                      "metric": metric,
+                                      "mode": mode,
+                                      "score": score_value
+                                  })
+                              except (ValueError, TypeError):
+                                  continue
+
+                  return {
+                      "run_id": run_id,
+                      "eval_id": eval_id,
+                      "status": "success",
+                      "scores": scores,
+                      "csv_file": csv_file
+                  }
+
+              except Exception as e:
+                  return {
+                      "run_id": run_id,
+                      "eval_id": eval_id,
+                      "status": "error",
+                      "error": str(e),
+                      "scores": []
+                  }
+
+          # Main execution
+          eval_id = os.environ.get("EVAL_ID", "")
+          run_ids_str = os.environ.get("RUN_IDS", "")
+
+          results_list = []
+          for run_id in run_ids_str.split(","):
+              run_id = run_id.strip()
+              if run_id:
+                  result = extract_results(eval_id, run_id)
+                  results_list.append(result)
+
+          # Output results as JSON
+          print(json.dumps({"success": True, "results": results_list}))
+
+    - name: Create extraction job manifest
+      ansible.builtin.set_fact:
+        extraction_job:
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: "extract-results-{{ temp_id }}"
+            namespace: "{{ namespace }}"
+          spec:
+            ttlSecondsAfterFinished: 300  # Clean up after 5 minutes
+            template:
+              spec:
+                containers:
+                  - name: extractor
+                    image: python:3.10-slim
+                    command: ["python", "-c"]
+                    args:
+                      - "{{ extraction_script }}"
+                    env:
+                      - name: EVAL_ID
+                        value: "{{ eval_id }}"
+                      - name: RUN_IDS
+                        value: "{{ run_ids }}"
+                    volumeMounts:
+                      - name: eval-datasets-shared
+                        mountPath: /workspace/shared
+                volumes:
+                  - name: eval-datasets-shared
+                    persistentVolumeClaim:
+                      claimName: bud-dev-budeval-dataset
+                restartPolicy: Never
+            backoffLimit: 2
+
+    - name: Apply extraction job
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ extraction_job }}"
+        kubeconfig: "{{ kubeconfig_path if kubeconfig_path else omit }}"
+
+    - name: Wait for extraction job to complete
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        name: "extract-results-{{ temp_id }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path if kubeconfig_path else omit }}"
+      register: job_status
+      until: >
+        (job_status.resources[0].status.succeeded | default(0)) > 0 or
+        (job_status.resources[0].status.failed | default(0)) > 0
+      retries: 60
+      delay: 5
+
+    - name: Check if job succeeded
+      ansible.builtin.fail:
+        msg: "Extraction job failed"
+      when: (job_status.resources[0].status.failed | default(0)) > 0
+
+    - name: Get pod name for extraction job
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - "job-name=extract-results-{{ temp_id }}"
+        kubeconfig: "{{ kubeconfig_path if kubeconfig_path else omit }}"
+      register: extraction_pod
+
+    - name: Get logs from extraction pod
+      kubernetes.core.k8s_log:
+        api_version: v1
+        kind: Pod
+        name: "{{ extraction_pod.resources[0].metadata.name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path if kubeconfig_path else omit }}"
+      register: extraction_logs
+      when: extraction_pod.resources | length > 0
+
+    - name: Parse extraction results
+      ansible.builtin.set_fact:
+        extraction_results: "{{ extraction_logs.log | from_json }}"
+      when: extraction_logs.log is defined
+
+    - name: Write results to temporary file
+      ansible.builtin.copy:
+        content: "{{ extraction_results | to_nice_json }}"
+        dest: "/tmp/extraction_results_{{ temp_id }}.json"
+      when: extraction_results is defined
+
+    - name: Delete extraction job
+      kubernetes.core.k8s:
+        api_version: batch/v1
+        kind: Job
+        name: "extract-results-{{ temp_id }}"
+        namespace: "{{ namespace }}"
+        state: absent
+        kubeconfig: "{{ kubeconfig_path if kubeconfig_path else omit }}"
+      ignore_errors: true

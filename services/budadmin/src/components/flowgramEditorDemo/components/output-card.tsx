@@ -2,9 +2,10 @@ import { Field } from '@flowgram.ai/fixed-layout-editor';
 import { AgentVariable } from '@/stores/useAgentStore';
 import { useSession } from '../contexts/SessionContext';
 import { LoadingOutlined, CheckCircleFilled } from '@ant-design/icons';
+import { Image} from "antd";
 
 export const OutputCard = () => {
-  const { session, outputWorkflowStatus } = useSession();
+  const { session, outputWorkflowStatus, onDeleteVariable } = useSession();
 
   // Get output variables from the session, with default if empty
   const sessionVariables = session?.outputVariables || [];
@@ -67,8 +68,8 @@ export const OutputCard = () => {
                 color: '#FF4D4F',
               }}
             >
-              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="2" fill="none"/>
-              <path d="M5 5L11 11M11 5L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="2" fill="none" />
+              <path d="M5 5L11 11M11 5L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           )}
         </div>
@@ -105,10 +106,12 @@ export const OutputCard = () => {
       }}>
         {outputVariables.map((variable: AgentVariable, index: number) => (
           <div key={variable.id} style={{
-            padding: '12px',
-            borderRadius: '8px',
+            padding: '.8rem',
+            borderRadius: '.75rem',
             background: '#FFFFFF05',
-          }}>
+          }}
+          className='group flex justify-between items-center cursor-default'
+          >
             <div style={{
               fontSize: '12px',
               color: '#EEEEEE',
@@ -117,7 +120,25 @@ export const OutputCard = () => {
             }}>
               {variable.name || `Output Variable ${index + 1}`}
             </div>
-            {variable.description && (
+
+            {outputVariables.length > 1 && index > 0 && (
+              <div
+                className='opacity-0 group-hover:opacity-100 cursor-pointer'
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteVariable?.(variable.id);
+                }}
+              >
+                <Image
+                  preview={false}
+                  width={'0.8125rem'}
+                  height={'0.8125rem'}
+                  alt='delete'
+                  src="/icons/deleteWhite.svg"
+                />
+              </div>
+            )}
+            {/* {variable.description && (
               <div style={{
                 fontSize: '11px',
                 color: '#B3B3B3',
@@ -133,7 +154,7 @@ export const OutputCard = () => {
               background: 'transparent',
             }}>
               Type: {variable.dataType || 'string'}
-            </div>
+            </div> */}
           </div>
         ))}
       </div>

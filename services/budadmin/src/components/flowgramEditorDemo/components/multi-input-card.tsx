@@ -2,9 +2,10 @@ import { Field } from '@flowgram.ai/fixed-layout-editor';
 import { AgentVariable } from '@/stores/useAgentStore';
 import { useSession } from '../contexts/SessionContext';
 import { LoadingOutlined, CheckCircleFilled } from '@ant-design/icons';
+import { Image} from "antd";
 
 export const MultiInputCard = () => {
-  const { session, workflowStatus } = useSession();
+  const { session, workflowStatus, onDeleteVariable } = useSession();
 
   // Get input variables from the session, with default if empty
   const sessionVariables = session?.inputVariables || [];
@@ -106,19 +107,38 @@ export const MultiInputCard = () => {
       }}>
         {inputVariables.map((variable: AgentVariable, index: number) => (
           <div key={variable.id} style={{
-            padding: '12px',
-            borderRadius: '8px',
+            padding: '.8rem',
+            borderRadius: '.75rem',
             background: '#FFFFFF05',
-          }}>
+          }}
+          className='group flex justify-between items-center cursor-default'
+          >
             <div style={{
               fontSize: '12px',
               color: '#EEEEEE',
-              marginBottom: '4px',
+              fontWeight: '400',
               background: 'transparent',
             }}>
               {variable.name || `Input Variable ${index + 1}`}
             </div>
-            {variable.description && (
+            {inputVariables.length > 1 && index > 0 && (
+              <div
+                className='opacity-0 group-hover:opacity-100 cursor-pointer'
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteVariable?.(variable.id);
+                }}
+              >
+                <Image
+                  preview={false}
+                  width={'0.8125rem'}
+                  height={'0.8125rem'}
+                  alt='delete'
+                  src="/icons/deleteWhite.svg"
+                />
+              </div>
+            )}
+            {/* {variable.description && (
               <div style={{
                 fontSize: '11px',
                 color: '#B3B3B3',
@@ -134,7 +154,7 @@ export const MultiInputCard = () => {
               background: 'transparent',
             }}>
               Type: {variable.dataType || 'string'}
-            </div>
+            </div> */}
           </div>
         ))}
       </div>

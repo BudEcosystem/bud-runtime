@@ -6,8 +6,10 @@ import {
   MessageOutlined
 } from "@ant-design/icons";
 import { useAgentStore } from "@/stores/useAgentStore";
+import { useDrawer } from "@/hooks/useDrawer";
 import AgentBoxWrapper from "./AgentBoxWrapper";
 import AgentSelector from "./AgentSelector";
+import AgentIframe from "./AgentIframe";
 
 const AgentDrawer: React.FC = () => {
   const {
@@ -16,15 +18,49 @@ const AgentDrawer: React.FC = () => {
     sessions,
     activeSessionIds,
     createSession,
+    workflowContext,
   } = useAgentStore();
+
+  const { openDrawerWithStep } = useDrawer();
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [drawerWidth, setDrawerWidth] = useState<string>('100%');
+  const [showPlayground, setShowPlayground] = useState(false);
 
   // Get active sessions
   const activeSessions = sessions.filter((session) =>
     activeSessionIds.includes(session.id)
   );
+
+  // Handle close button click
+  const handleCloseDrawer = () => {
+    // Check if we're in a workflow
+    if (workflowContext.isInWorkflow) {
+      // Close the agent drawer
+      closeAgentDrawer();
+      // Navigate back to select agent type
+      setTimeout(() => {
+        openDrawerWithStep("add-agent-select-type");
+      }, 100);
+    } else {
+      // Just close the drawer
+      closeAgentDrawer();
+    }
+    // Reset playground view when drawer closes
+    setShowPlayground(false);
+  };
+
+  // Handle Play button click
+  const handlePlayClick = () => {
+    setShowPlayground(!showPlayground);
+  };
+
+  // Handle Settings button click
+  const handleSettingsClick = () => {
+    if (showPlayground) {
+      setShowPlayground(false);
+    }
+  };
 
   // Create initial session when drawer opens if none exist
   useEffect(() => {
@@ -56,7 +92,7 @@ const AgentDrawer: React.FC = () => {
     <>
       <Drawer
         open={isAgentDrawerOpen}
-        onClose={closeAgentDrawer}
+        onClose={handleCloseDrawer}
         placement="right"
         width={drawerWidth}
         className="agent-drawer p-[.75rem]"
@@ -87,7 +123,7 @@ const AgentDrawer: React.FC = () => {
             <div className="this-back mb-3">
               <Tooltip title="Back" placement="right">
                 <button
-                  onClick={closeAgentDrawer}
+                  onClick={handleCloseDrawer}
                   className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md border-none bg-transparent p-0"
                 >
                   <Image
@@ -101,26 +137,36 @@ const AgentDrawer: React.FC = () => {
             </div>
             <div>
               {/* Settings Icon - Now opens settings for individual agent boxes */}
-              <Tooltip title="Use settings icon in each agent box" placement="right">
+              <Tooltip title={showPlayground ? "Back to Agent Settings" : "Use settings icon in each agent box"} placement="right">
                 <button
-                  className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#1A1A1A] transition-colors mb-3 opacity-50 cursor-not-allowed"
-                  disabled
+                  onClick={handleSettingsClick}
+                  className={`control-bar-icon w-8 h-8 flex items-center justify-center rounded-md  transition-colors mb-3 ${
+                    showPlayground
+                      ? 'cursor-pointer'
+                      : activeSessions.length > 0
+                        ? 'cursor-not-allowed'
+                        : 'opacity-50 cursor-not-allowed'
+                  }`}
+                  disabled={!showPlayground}
                 >
-                  <SettingOutlined className="text-[#808080] text-lg" />
+                  <SettingOutlined className={`text-lg ${activeSessions.length > 0 && !showPlayground ? 'text-[#EEEEEE]' : 'text-[#808080]'}`} />
                 </button>
               </Tooltip>
 
 
               {/* Play/Run Icon */}
-              <Tooltip title="Run Agent" placement="right">
-                <button className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#1A1A1A] transition-colors mb-3">
-                  <PlayCircleOutlined className="text-[#808080] hover:text-[#4ADE80] text-lg" />
+              <Tooltip title={showPlayground ? "Back to Agent" : "Run Agent"} placement="right">
+                <button
+                  onClick={handlePlayClick}
+                  className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md  transition-colors mb-3"
+                >
+                  <PlayCircleOutlined className={`text-lg ${showPlayground ? 'text-[#EEEEEE]' : 'text-[#808080] hover:text-[#EEEEEE]'}`} />
                 </button>
               </Tooltip>
 
               {/* Chat/Message Icon */}
               <Tooltip title="Chat History" placement="right">
-                <button className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#1A1A1A] transition-colors">
+                <button className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors">
                   <MessageOutlined className="text-[#808080] hover:text-[#965CDE] text-lg" />
                 </button>
               </Tooltip>
@@ -130,42 +176,55 @@ const AgentDrawer: React.FC = () => {
           <div className="w-full">
             {/* Content */}
             <div className="h-full bg-[transparent] relative">
-              {activeSessions.length > 0 ? (
-                <div
-                  ref={scrollContainerRef}
-                  className="flex h-full overflow-x-auto overflow-y-hidden gap-4 agent-boxes-container"
-                  style={{
-                    scrollBehavior: "smooth",
-                    scrollSnapType: "x proximity",
-                  }}
-                >
-                  {/* Agent Boxes */}
-                  {activeSessions.map((session, index) => (
-                    <div
-                      key={session.id}
-                      className="flex-shrink-0"
-                      style={{ scrollSnapAlign: "start" }}
-                    >
-                      <AgentBoxWrapper
-                        session={session}
-                        index={index}
-                        totalSessions={activeSessions.length}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <Empty
-                    description={
-                      <div className="text-center">
-                        <p className="text-[#808080] mb-4">No agents configured</p>
-                        <p className="text-[#606060] text-xs">Create a new agent session to get started</p>
-                      </div>
-                    }
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+              {showPlayground ? (
+                /* Playground/Iframe View */
+                <div className="flex justify-center items-center h-full w-full">
+                  <AgentIframe
+                    sessionId={activeSessions[0]?.id}
+                    promptIds={activeSessions.map(session => session.promptId).filter(Boolean) as string[]}
                   />
                 </div>
+              ) : (
+                /* Agent Boxes View */
+                <>
+                  {activeSessions.length > 0 ? (
+                    <div
+                      ref={scrollContainerRef}
+                      className="flex h-full overflow-x-auto overflow-y-hidden gap-4 agent-boxes-container"
+                      style={{
+                        scrollBehavior: "smooth",
+                        scrollSnapType: "x proximity",
+                      }}
+                    >
+                      {/* Agent Boxes */}
+                      {activeSessions.map((session, index) => (
+                        <div
+                          key={session.id}
+                          className="flex-shrink-0"
+                          style={{ scrollSnapAlign: "start" }}
+                        >
+                          <AgentBoxWrapper
+                            session={session}
+                            index={index}
+                            totalSessions={activeSessions.length}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <Empty
+                        description={
+                          <div className="text-center">
+                            <p className="text-[#808080] mb-4">No agents configured</p>
+                            <p className="text-[#606060] text-xs">Create a new agent session to get started</p>
+                          </div>
+                        }
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

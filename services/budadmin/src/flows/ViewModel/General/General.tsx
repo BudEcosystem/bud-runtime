@@ -13,7 +13,7 @@ import { useState } from "react";
 import { Model } from "src/hooks/useModels";
 import { SpecificationTableItem } from "src/flows/components/SpecificationTableItem";
 import { getSpecValueWidthOddEven } from "@/lib/utils";
-import { assetBaseUrl } from "@/components/environment";
+import { assetBaseUrl, enableDevMode } from "@/components/environment";
 import { useDrawer } from "src/hooks/useDrawer";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import ModelTags from "src/flows/components/ModelTags";
@@ -610,7 +610,7 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
             <div className="hR"></div>
           </>
         )}
-        {specs.length > 0 && (
+        {enableDevMode && specs.length > 0 && (
           <div className="mt-[1.4rem] mb-[1.4rem]">
             <Text_14_400_EEEEEE>
               Minimum Hardware Specification
