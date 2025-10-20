@@ -804,6 +804,41 @@ class PromptService(SessionMixin):
                 message="Failed to retrieve connector", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    async def _check_connector_already_registered(
+        self, budprompt_id: str, connector_id: str, version: Optional[int] = None
+    ) -> bool:
+        """Check if a connector is already registered for a prompt.
+
+        Args:
+            budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
+            connector_id: The connector ID to check
+            version: Optional version to check. If None, checks default version
+
+        Returns:
+            True if connector is already registered, False otherwise
+        """
+        try:
+            config_response = await self._perform_get_prompt_config_request(budprompt_id, version=version)
+            config_data = config_response.get("data", {})
+            tools = config_data.get("tools", [])
+
+            # Check if connector_id exists in any tool's gateway_config
+            for tool in tools:
+                if tool.get("type") == "mcp":
+                    gateway_config = tool.get("gateway_config", {})
+                    if connector_id in gateway_config:
+                        return True
+
+            return False
+
+        except ClientException as e:
+            if e.status_code == 404:
+                # No config exists, connector not registered
+                return False
+            else:
+                # Re-raise other errors
+                raise
+
     async def register_connector_for_prompt(
         self, budprompt_id: str, connector_id: str, credentials: Dict[str, Any], version: Optional[int] = None
     ) -> GatewayResponse:
@@ -822,6 +857,15 @@ class PromptService(SessionMixin):
             ClientException: If connector not found or gateway creation fails
         """
         logger.debug(f"Registering connector {connector_id} for prompt {budprompt_id}")
+
+        # Check if connector is already registered for this prompt
+        is_registered = await self._check_connector_already_registered(budprompt_id, connector_id, version)
+        if is_registered:
+            logger.error(f"Connector {connector_id} is already registered for prompt {budprompt_id}")
+            raise ClientException(
+                message="Connector is already registered for prompt",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Get connector details from MCP Foundry
         try:
@@ -934,27 +978,23 @@ class PromptService(SessionMixin):
             else:
                 raise
 
-        # 3. Replace existing connector if found, otherwise append
-        tool_found = False
-        updated_tools = []
-
+        # 3. Check if connector already exists - raise error if found
+        # This is a safety net in case the pre-registration check is bypassed
         for tool in existing_tools:
-            gateway_config = tool.get("gateway_config", {})
-            if connector_id in gateway_config:
-                # Replace this tool with the new one
-                updated_tools.append(mcp_tool_dict)
-                tool_found = True
-                logger.debug(f"Replacing existing connector {connector_id} configuration")
-            else:
-                # Keep existing tool
-                updated_tools.append(tool)
+            if tool.get("type") == "mcp":
+                gateway_config = tool.get("gateway_config", {})
+                if connector_id in gateway_config:
+                    logger.error(f"Connector {connector_id} already exists in prompt config")
+                    raise ClientException(
+                        message="Connector is already registered for prompt.",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
 
-        if not tool_found:
-            # Connector not found, append new tool
-            updated_tools.append(mcp_tool_dict)
-            logger.debug(f"Adding new connector {connector_id} configuration")
+        # 4. Append new tool to existing tools
+        updated_tools = existing_tools + [mcp_tool_dict]
+        logger.debug(f"Adding new connector {connector_id} configuration")
 
-        # 4. Save updated config
+        # 5. Save updated config
         # For existing configs: preserve all existing data and only update tools
         # For new configs: only save tools
 
