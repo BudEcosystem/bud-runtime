@@ -612,7 +612,8 @@ class PromptService(SessionMixin):
 
     async def get_connectors(
         self,
-        prompt_id: Optional[UUID] = None,
+        prompt_id: Optional[str] = None,
+        version: Optional[int] = None,
         offset: int = 0,
         limit: int = 10,
         filters: dict = {},
@@ -622,7 +623,8 @@ class PromptService(SessionMixin):
         """Get connectors list from MCP Foundry.
 
         Args:
-            prompt_id: Optional UUID to filter connectors for a specific prompt
+            prompt_id: Optional prompt ID (UUID or draft ID) to filter connectors for a specific prompt
+            version: Optional version number. If not specified, uses default version
             offset: Pagination offset
             limit: Pagination limit
             filters: Additional filters
@@ -632,34 +634,85 @@ class PromptService(SessionMixin):
         Returns:
             Tuple of (list of connectors, total count)
         """
-        # Validate prompt if prompt_id is provided
-        if prompt_id:
-            db_prompt = await PromptDataManager(self.session).retrieve_by_fields(  # noqa: F841
-                PromptModel,
-                fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE},
-            )
-
         # Extract name filter if provided
         name_filter = filters.get("name")
 
-        logger.debug(
-            f"Fetching connectors from MCP Foundry{f' with name filter: {name_filter}' if name_filter else ''}"
-        )
+        if prompt_id:
+            # Get registered connector IDs from Redis if prompt_id provided
+            registered_connector_ids = set()
 
-        # Call MCP Foundry API
-        try:
-            mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors(
-                show_registered_only=False, show_available_only=True, name=name_filter, offset=offset, limit=limit
+            # Fetch prompt configuration from Redis to get registered connectors
+            try:
+                # Pass version parameter (None for default version)
+                config_response = await self._perform_get_prompt_config_request(prompt_id, version=version)
+                config_data = config_response.get("data", {})
+                tools = config_data.get("tools", [])
+
+                # Get the actual version from response
+                actual_version = config_response.get("version", version or 1)
+
+                # Extract connector IDs from gateway_config in each tool
+                for tool in tools:
+                    if tool.get("type") == "mcp":
+                        gateway_config = tool.get("gateway_config", {})
+                        # gateway_config is {connector_id: gateway_id}
+                        registered_connector_ids.update(gateway_config.keys())
+
+                logger.debug(
+                    f"Found {len(registered_connector_ids)} registered connectors "
+                    f"for prompt {prompt_id} version {actual_version}"
+                )
+
+            except ClientException as e:
+                if e.status_code == 404:
+                    # No config found, no registered connectors
+                    logger.debug(
+                        f"No configuration found for prompt {prompt_id} "
+                        f"{'version ' + str(version) if version else '(default version)'}, "
+                        f"returning empty list"
+                    )
+                    registered_connector_ids = set()
+                else:
+                    raise
+
+            # Call MCP Foundry API
+            try:
+                mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors_by_connector_ids(
+                    connector_ids=list(registered_connector_ids),
+                    show_registered_only=False,
+                    show_available_only=True,
+                    name=name_filter,
+                    offset=offset,
+                    limit=limit,
+                )
+                logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
+            except MCPFoundryException as e:
+                logger.error(f"MCP Foundry API error: {e}")
+                mcp_foundry_response = []
+                total_count = 0
+            except Exception as e:
+                logger.error(f"Unexpected error calling MCP Foundry: {e}")
+                mcp_foundry_response = []
+                total_count = 0
+        else:
+            logger.debug(
+                f"Fetching connectors from MCP Foundry{f' with name filter: {name_filter}' if name_filter else ''}"
             )
-            logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
-        except MCPFoundryException as e:
-            logger.error(f"MCP Foundry API error: {e}")
-            mcp_foundry_response = []
-            total_count = 0
-        except Exception as e:
-            logger.error(f"Unexpected error calling MCP Foundry: {e}")
-            mcp_foundry_response = []
-            total_count = 0
+
+            # Call MCP Foundry API
+            try:
+                mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors(
+                    show_registered_only=False, show_available_only=True, name=name_filter, offset=offset, limit=limit
+                )
+                logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
+            except MCPFoundryException as e:
+                logger.error(f"MCP Foundry API error: {e}")
+                mcp_foundry_response = []
+                total_count = 0
+            except Exception as e:
+                logger.error(f"Unexpected error calling MCP Foundry: {e}")
+                mcp_foundry_response = []
+                total_count = 0
 
         # Map MCP response to ConnectorListItem
         connector_items = []

@@ -367,6 +367,115 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def list_connectors_by_connector_ids(
+        self,
+        connector_ids: List[str],
+        show_registered_only: bool = False,
+        show_available_only: bool = True,
+        name: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 10,
+    ) -> tuple[List[Dict[str, Any]], int]:
+        """List connectors from MCP registry filtered by connector IDs.
+
+        Since the MCP Foundry API doesn't support filtering by connector IDs,
+        this method fetches all connectors with pagination and filters them in-memory.
+
+        Args:
+            connector_ids: List of connector IDs to filter by
+            show_registered_only: Filter for registered servers only
+            show_available_only: Filter for available servers only
+            name: Filter by connector name
+            offset: Number of items to skip (applied to filtered results)
+            limit: Maximum number of items to return (applied to filtered results)
+
+        Returns:
+            Tuple of (filtered and paginated list of connectors, total count of filtered connectors)
+
+        Raises:
+            MCPFoundryException: If the API call fails
+        """
+        try:
+            logger.debug(
+                f"Fetching connectors from MCP Foundry filtered by {len(connector_ids)} connector IDs",
+                show_registered_only=show_registered_only,
+                show_available_only=show_available_only,
+                name=name,
+            )
+
+            # Step 1: Fetch ALL connectors from MCP Foundry with pagination
+            all_connectors = []
+            current_offset = 0
+            page_limit = 100  # Fetch 100 at a time for efficiency
+
+            while True:
+                params = {
+                    "show_registered_only": str(show_registered_only).lower(),
+                    "show_available_only": str(show_available_only).lower(),
+                    "limit": page_limit,
+                    "offset": current_offset,
+                }
+
+                # Add name filter if provided
+                if name:
+                    params["name"] = name
+
+                response = await self._make_request(
+                    method="GET",
+                    endpoint="/admin/mcp-registry/servers",
+                    params=params,
+                )
+
+                servers = response.get("servers", [])
+                total_available = response.get("total", 0)
+
+                all_connectors.extend(servers)
+
+                logger.debug(
+                    f"Fetched page: offset={current_offset}, "
+                    f"page_size={len(servers)}, "
+                    f"total_fetched={len(all_connectors)}/{total_available}"
+                )
+
+                # Check if we've fetched all connectors
+                current_offset += page_limit
+                if current_offset >= total_available or len(servers) < page_limit:
+                    break
+
+            logger.debug(f"Fetched {len(all_connectors)} total connectors from MCP Foundry")
+
+            # Step 2: Filter connectors by connector_ids
+            connector_ids_set = set(connector_ids)  # Convert to set for O(1) lookup
+            filtered_connectors = []
+
+            for connector in all_connectors:
+                connector_id = connector.get("id", "")
+                if connector_id in connector_ids_set:
+                    filtered_connectors.append(connector)
+
+            total_filtered = len(filtered_connectors)
+
+            logger.debug(
+                f"Filtered to {total_filtered} connectors matching provided IDs out of {len(all_connectors)} total"
+            )
+
+            # Step 3: Apply offset and limit to filtered results
+            paginated_connectors = filtered_connectors[offset : offset + limit]
+
+            logger.debug(
+                f"Returning {len(paginated_connectors)} connectors "
+                f"(offset={offset}, limit={limit}, total={total_filtered})"
+            )
+
+            return paginated_connectors, total_filtered
+
+        except MCPFoundryException:
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error listing connectors by IDs: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def create_gateway(
         self,
         name: str,
