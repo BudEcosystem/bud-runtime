@@ -14,6 +14,7 @@ from budmicroframe.shared.http_client import AsyncHTTPClient
 
 from ..cluster_ops import (
     apply_security_context,
+    delete_namespace,
     delete_pod,
     deploy_quantization_job,
     deploy_runtime,
@@ -706,10 +707,10 @@ api_key_location = "env::API_KEY"
     def delete(self, namespace: str, platform: Optional[ClusterPlatformEnum] = None):
         """Delete a deployment by namespace."""
         print("Delete triggered")
-        # try:
-        #     asyncio.run(delete_namespace(self.config, namespace, platform))
-        # except Exception as e:
-        #     raise Exception(f"Deletion failed: {str(e)}") from e
+        try:
+            asyncio.run(delete_namespace(self.config, namespace, platform))
+        except Exception as e:
+            raise Exception(f"Deletion failed: {str(e)}") from e
 
     def delete_pod(
         self, namespace: str, deployment_name: str, pod_name: str, platform: Optional[ClusterPlatformEnum] = None
