@@ -536,6 +536,119 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def create_virtual_server(
+        self,
+        name: str,
+        associated_tools: List[str],
+        visibility: str = "public",
+    ) -> Dict[str, Any]:
+        """Create a virtual server in MCP Foundry.
+
+        Args:
+            name: Virtual server name (prompt_id)
+            associated_tools: List of tool IDs
+            visibility: Server visibility (default: "public")
+
+        Returns:
+            Dict[str, Any]: Virtual server creation response with id
+
+        Raises:
+            MCPFoundryException: If virtual server creation fails
+        """
+        try:
+            logger.debug(
+                "Creating virtual server in MCP Foundry",
+                name=name,
+                associated_tools=associated_tools,
+                visibility=visibility,
+            )
+
+            # Prepare request payload
+            payload = {
+                "server": {
+                    "id": None,
+                    "name": name,
+                    "associated_tools": associated_tools,
+                    "visibility": visibility,
+                }
+            }
+
+            # Make the API call
+            response = await self._make_request(
+                method="POST",
+                endpoint="/servers",
+                json_data=payload,
+            )
+
+            logger.debug(
+                "Successfully created virtual server in MCP Foundry",
+                virtual_server_id=response.get("id", "Unknown"),
+                name=name,
+            )
+
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error creating virtual server {name}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
+    async def update_virtual_server(
+        self,
+        server_id: str,
+        associated_tools: List[str],
+    ) -> Dict[str, Any]:
+        """Update a virtual server's associated tools.
+
+        Args:
+            server_id: Virtual server ID
+            associated_tools: List of tool IDs (replaces existing)
+
+        Returns:
+            Dict[str, Any]: Updated virtual server response
+
+        Raises:
+            MCPFoundryException: If virtual server update fails
+        """
+        try:
+            logger.debug(
+                "Updating virtual server in MCP Foundry",
+                server_id=server_id,
+                associated_tools=associated_tools,
+            )
+
+            # Prepare request payload
+            payload = {
+                "associated_tools": associated_tools,
+            }
+
+            # Make the API call
+            response = await self._make_request(
+                method="PUT",
+                endpoint=f"/servers/{server_id}",
+                json_data=payload,
+            )
+
+            logger.debug(
+                "Successfully updated virtual server in MCP Foundry",
+                server_id=server_id,
+            )
+
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error updating virtual server {server_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def close(self):
         """Close the HTTP session."""
         if self._session and not self._session.closed:

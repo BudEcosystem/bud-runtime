@@ -38,6 +38,8 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from .schemas import (
+    AddToolRequest,
+    AddToolResponse,
     ConnectorFilter,
     ConnectorListResponse,
     ConnectorResponse,
@@ -1008,6 +1010,80 @@ async def register_connector(
         logger.exception(f"Failed to register connector: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to register connector"
+        ).to_http_response()
+
+
+@router.post(
+    "/prompt-config/add-tool",
+    responses={
+        status.HTTP_200_OK: {
+            "model": AddToolResponse,
+            "description": "Tool added successfully",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt not found",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Add tools for a prompt by creating/updating virtual server in MCP Foundry",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_CREATE])
+async def add_tool(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: AddToolRequest,
+) -> Union[AddToolResponse, ErrorResponse]:
+    """Add tools for a prompt by creating/updating virtual server.
+
+    This endpoint:
+    1. Validates that the prompt exists in Redis
+    2. Checks if a virtual server already exists for the connector
+    3. If exists: Updates the virtual server with new tools (replaces existing)
+    4. If not exists: Creates a new virtual server in MCP Foundry
+    5. Stores the updated configuration in Redis
+    6. Returns virtual server details
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        request: AddToolRequest with prompt_id, connector_id, tool_ids, and optional version
+
+    Returns:
+        AddToolResponse with virtual server details or ErrorResponse on failure
+    """
+    try:
+        # Add tools via service
+        result = await PromptService(session).add_tool_for_prompt(
+            prompt_id=request.prompt_id,
+            connector_id=request.connector_id,
+            tool_ids=request.tool_ids,
+            version=request.version,
+        )
+
+        return AddToolResponse(
+            virtual_server_id=result["virtual_server_id"],
+            virtual_server_name=result["virtual_server_name"],
+            added_tools=result["added_tools"],
+            success=True,
+            message="Tools added successfully",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to add tool: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to add tool: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add tool"
         ).to_http_response()
 
 

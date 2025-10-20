@@ -924,6 +924,150 @@ class PromptService(SessionMixin):
                 message="Failed to register connector", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    async def add_tool_for_prompt(
+        self, prompt_id: str, connector_id: str, tool_ids: List[str], version: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Add tools for a prompt by creating/updating virtual server in MCP Foundry.
+
+        Args:
+            prompt_id: The prompt ID (UUID or draft ID) - also used as virtual server name
+            connector_id: The connector ID
+            tool_ids: List of tool IDs to add (replaces existing tools)
+            version: Optional version to update. If None, uses default version
+
+        Returns:
+            Dict with virtual_server_id, virtual_server_name, added_tools, and action
+
+        Raises:
+            ClientException: If prompt not found (404) or operation fails
+        """
+        logger.debug(f"Adding tools for prompt {prompt_id}, connector {connector_id}")
+
+        # Step 1: Fetch tool details from MCP Foundry to get originalName
+        tool_original_names = []
+        for tool_id in tool_ids:
+            try:
+                tool_data = await mcp_foundry_service.get_tool_by_id(tool_id)
+                original_name = tool_data["originalName"]  # Direct access, will raise KeyError if missing
+                tool_original_names.append(original_name)
+            except MCPFoundryException as e:
+                logger.error(f"Failed to fetch tool {tool_id}: {e}")
+                raise ClientException(message="Tool not found", status_code=status.HTTP_404_NOT_FOUND)
+            except KeyError:
+                logger.error(f"Tool {tool_id} missing originalName field")
+                raise ClientException(
+                    message="Invalid tool data",
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        # Step 2: Fetch existing prompt configuration (must exist)
+        try:
+            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version)
+            config_data = config_response.get("data", {})
+            tools = config_data.get("tools", [])
+        except ClientException:
+            raise
+
+        # Step 3: Find MCP tool and validate connector
+        mcp_tool = None
+        mcp_tool_index = None
+
+        for index, tool in enumerate(tools):
+            if tool.get("type") == "mcp":
+                mcp_tool = tool
+                mcp_tool_index = index
+                break
+
+        if not mcp_tool:
+            logger.error(f"MCP tool configuration not found for prompt {prompt_id}")
+            raise ClientException(
+                message="MCP tool configuration not found for this prompt",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        gateway_config = mcp_tool.get("gateway_config", {})
+        if connector_id not in gateway_config:
+            logger.error(f"Connector {connector_id} not registered for prompt {prompt_id}")
+            raise ClientException(
+                message=f"Connector {connector_id} is not registered for this prompt",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Step 4: Create or update virtual server based on server_url existence
+        virtual_server_id = mcp_tool.get("server_url")
+
+        try:
+            if virtual_server_id:
+                # Update existing virtual server
+                logger.debug(f"Updating existing virtual server {virtual_server_id}")
+                await mcp_foundry_service.update_virtual_server(server_id=virtual_server_id, associated_tools=tool_ids)
+            else:
+                # Create new virtual server
+                logger.debug(f"Creating new virtual server for prompt {prompt_id}")
+                vs_response = await mcp_foundry_service.create_virtual_server(
+                    name=prompt_id, associated_tools=tool_ids, visibility="public"
+                )
+                virtual_server_id = vs_response.get("id")
+
+            # Update MCP tool config (always happens)
+            mcp_tool["server_label"] = f"{prompt_id}__{virtual_server_id}"
+            mcp_tool["server_url"] = virtual_server_id
+            mcp_tool["allowed_tools"] = tool_original_names
+            mcp_tool["connector_id"] = virtual_server_id
+            mcp_tool["server_config"] = {connector_id: tool_ids}
+            tools[mcp_tool_index] = mcp_tool
+
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry error: {e}")
+            raise ClientException(
+                message="Failed to create/update virtual server",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Step 5: Save updated configuration to Redis
+        # Determine version to use
+        target_version = config_response.get("version", 1) if version is None else version
+
+        prompt_config_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config"
+        )
+
+        # Preserve all existing config data, only update tools field
+        payload = {
+            **config_data,  # Spread all existing fields
+            "prompt_id": prompt_id,
+            "version": target_version,
+            "set_default": False,  # Don't change default for existing configs
+            "tools": tools,  # Override tools field
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(prompt_config_endpoint, json=payload) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        logger.error(f"Failed to save prompt config: {response.status} {response_data}")
+                        raise ClientException(
+                            message="Failed to save prompt configuration",
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
+
+                    logger.debug(f"Successfully saved prompt config for {prompt_id}")
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Network error saving prompt config: {e}")
+            raise ClientException(
+                message="Unable to save prompt configuration", status_code=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        # Step 6: Return response
+        return {
+            "virtual_server_id": virtual_server_id,
+            "virtual_server_name": prompt_id,
+            "added_tools": tool_ids,
+        }
+
     async def _store_mcp_tool_config(
         self, budprompt_id: str, connector_id: str, gateway_id: str, version: Optional[int] = None
     ) -> None:

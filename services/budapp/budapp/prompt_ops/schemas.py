@@ -533,6 +533,9 @@ class MCPToolConfig(BaseModel):
     gateway_config: Dict[str, str] = Field(
         ..., description="Gateway configuration with connector_id as key and gateway_id as value"
     )
+    server_config: Dict[str, str] = Field(
+        ..., description="Gateway configuration with connector_id as key and gateway_id as value"
+    )
 
 
 class PromptConfigurationData(BaseModel):
@@ -724,6 +727,25 @@ class RegisterConnectorRequest(BaseModel):
 
     # TODO: Add credential validation in service layer against CONNECTOR_AUTH_CREDENTIALS_MAP
     # This should validate that provided credentials match the connector's auth_type schema
+
+
+class AddToolRequest(BaseModel):
+    """Request schema for adding tools to a prompt."""
+
+    prompt_id: str = Field(..., description="Prompt ID (must exist in Redis)")
+    connector_id: str = Field(..., description="Connector ID")
+    tool_ids: List[str] = Field(..., min_items=1, description="Tool IDs to add (replaces existing)")
+    version: Optional[int] = Field(None, ge=1, description="Prompt config version")
+
+
+class AddToolResponse(SuccessResponse):
+    """Response schema for adding tools."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    virtual_server_id: str = Field(..., description="Virtual server ID from MCP Foundry")
+    virtual_server_name: str = Field(..., description="Virtual server name (same as prompt_id)")
+    added_tools: List[str] = Field(..., description="List of added tool IDs")
 
 
 class GatewayResponse(BaseModel):
