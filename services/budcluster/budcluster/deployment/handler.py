@@ -706,7 +706,6 @@ api_key_location = "env::API_KEY"
 
     def delete(self, namespace: str, platform: Optional[ClusterPlatformEnum] = None):
         """Delete a deployment by namespace."""
-        print("Delete triggered")
         try:
             asyncio.run(delete_namespace(self.config, namespace, platform))
         except Exception as e:

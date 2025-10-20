@@ -126,15 +126,22 @@ class DeviceExtractor:
     }
 
     @staticmethod
-    def parse_memory_size(memory_str: str) -> Optional[int]:
+    def parse_memory_size(memory_str: str, source_label: Optional[str] = None) -> Optional[int]:
         """Parse memory size from various formats to GB.
+
+        Args:
+            memory_str: Memory value string to parse (e.g., "40960 MiB", "40 GB", "46068")
+            source_label: Optional label name indicating the data source (e.g., "nvidia.com/gpu.memory")
+                         Used to determine the correct unit when no unit is specified.
 
         Examples:
             "40960 MiB" -> 40
             "40 GB" -> 40
             "81920 MB" -> 80
             "43008 MiB" -> 42
-            "46068" -> 45 (plain number, assumes MB for NVIDIA GFD labels)
+            "46068" -> 45 (plain number from NVIDIA GFD label, always MB)
+            "128" -> 125 (plain number from NVIDIA GFD label, always MB)
+            "96" -> 96 (plain number from other source, heuristic: assume GB if <= 100)
         """
         if not memory_str:
             return None
@@ -151,16 +158,25 @@ class DeviceExtractor:
 
         # Handle plain numbers (no unit specified)
         if unit is None:
-            # NVIDIA GFD labels (nvidia.com/gpu.memory) are in MB without unit
+            # NVIDIA GFD labels (nvidia.com/gpu.memory) are ALWAYS in MB without unit
+            # This is reliable and documented behavior from NVIDIA GPU Feature Discovery
+            if source_label and "nvidia.com/gpu.memory" in source_label:
+                result_gb = round(value / 1024)
+                logger.debug(
+                    f"Parsed plain number '{memory_str}' from NVIDIA GFD label '{source_label}' as MB: {result_gb} GB"
+                )
+                return result_gb
+
+            # For other sources, use heuristic:
             # If the number is large (> 100), assume MB
             # If the number is small (≤ 100), assume GB
             if value > 100:
                 # Round to nearest GB instead of truncating
                 result_gb = round(value / 1024)
-                logger.debug(f"Parsed plain number '{memory_str}' as MB (NVIDIA GFD format): {result_gb} GB")
+                logger.debug(f"Parsed plain number '{memory_str}' as MB (heuristic): {result_gb} GB")
                 return result_gb
             else:
-                logger.debug(f"Parsed plain number '{memory_str}' as GB: {int(value)} GB")
+                logger.debug(f"Parsed plain number '{memory_str}' as GB (heuristic): {int(value)} GB")
                 return int(value)
 
         unit = unit.upper()
@@ -307,7 +323,7 @@ class DeviceExtractor:
             # Extract memory
             memory_label_value = labels.get("nvidia.com/gpu.memory", "")
             if memory_label_value:
-                gpu.memory_gb = self.parse_memory_size(memory_label_value)
+                gpu.memory_gb = self.parse_memory_size(memory_label_value, source_label="nvidia.com/gpu.memory")
                 logger.debug(
                     f"GPU {gpu.raw_name}: Parsed memory from NFD label '{memory_label_value}' -> {gpu.memory_gb} GB"
                 )
