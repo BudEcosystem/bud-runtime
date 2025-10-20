@@ -1225,13 +1225,17 @@ class PromptService(SessionMixin):
                 return [], 0
             raise
 
-        # 2. Find gateway_id from gateway_config
+        # 2. Find gateway_id and added tool IDs from gateway_config and server_config
         gateway_id = None
+        added_tool_ids = []
         for tool in tools:
             if tool.get("type") == "mcp":
                 gateway_config = tool.get("gateway_config", {})
                 if connector_id in gateway_config:
                     gateway_id = gateway_config[connector_id]
+                    # Extract added tool IDs from server_config
+                    server_config = tool.get("server_config", {})
+                    added_tool_ids = server_config.get(connector_id, [])
                     break
 
         if not gateway_id:
@@ -1239,7 +1243,7 @@ class PromptService(SessionMixin):
             logger.debug(f"Connector {connector_id} not found in prompt {prompt_id}")
             return [], 0
 
-        logger.debug(f"Found gateway_id={gateway_id} for connector={connector_id}")
+        logger.debug(f"Found gateway_id={gateway_id} for connector={connector_id}, added_tool_ids={added_tool_ids}")
 
         # 3. Call MCP Foundry API with server_id (gateway_id)
         try:
@@ -1260,10 +1264,13 @@ class PromptService(SessionMixin):
         tool_items = []
         for item in mcp_foundry_response:
             try:
+                tool_id = item.get("id", "")
+                is_added = tool_id in added_tool_ids
                 tool_item = ToolListItem(
-                    id=UUID(item.get("id", "")),
+                    id=UUID(tool_id),
                     name=item.get("displayName", ""),
                     type=item.get("originalName", ""),
+                    is_added=is_added,
                 )
                 tool_items.append(tool_item)
             except (ValueError, KeyError) as e:

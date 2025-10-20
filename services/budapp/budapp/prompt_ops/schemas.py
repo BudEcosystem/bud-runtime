@@ -688,6 +688,7 @@ class ToolListItem(BaseModel):
     id: UUID4
     name: str
     type: str
+    is_added: bool = Field(..., description="Whether tool is added to prompt config")
 
 
 class ToolFilter(BaseModel):

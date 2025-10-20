@@ -1035,7 +1035,7 @@ async def register_connector(
     },
     description="Add tools for a prompt by creating/updating virtual server in MCP Foundry",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_CREATE])
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def add_tool(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
