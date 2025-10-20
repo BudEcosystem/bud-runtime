@@ -1131,7 +1131,7 @@ class PromptService(SessionMixin):
         return tool_items, total_count
 
     async def get_tool_by_id(self, tool_id: UUID) -> Tool:
-        """Get a single tool by ID.
+        """Get a single tool by ID from MCP Foundry.
 
         Args:
             tool_id: Tool ID to retrieve
@@ -1140,81 +1140,21 @@ class PromptService(SessionMixin):
             Tool object with complete details
 
         Raises:
-            ClientException: If tool not found
+            ClientException: If tool not found or request fails
         """
         logger.debug(f"Getting tool with ID: {tool_id}")
 
-        # Try to fetch from MCP Foundry first
+        # Fetch from MCP Foundry
         try:
             mcp_foundry_response = await mcp_foundry_service.get_tool_by_id(str(tool_id.hex))
             logger.debug(f"Successfully fetched tool from MCP Foundry: {tool_id}")
+
         except MCPFoundryException as e:
             logger.error(f"MCP Foundry API error for tool {tool_id}: {e}")
-            # Fall back to mock data if MCP Foundry is unavailable
-            mcp_foundry_response = None
+            raise ClientException(message="Tool not found", status_code=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error(f"Unexpected error getting tool {tool_id} from MCP Foundry: {e}")
-            mcp_foundry_response = None
-
-        # If no response from MCP Foundry, use mock data
-        if not mcp_foundry_response:
-            logger.warning(f"Using mock data for tool {tool_id}")
-            mcp_foundry_response = {
-                "id": str(tool_id),
-                "originalName": "add_comment_to_pending_review",
-                "displayName": "Add Comment To Pending Review",
-                "description": "Add review comment to the requester&#x27;s latest pending pull request review. A pending review needs to already exist to call this (check with the user if not sure).",
-                "inputSchema": {
-                    "properties": {
-                        "body": {
-                            "description": "The text of the review comment",
-                            "type": "string",
-                        },
-                        "line": {
-                            "description": "The line of the blob in the pull request diff that the comment applies to. For multi-line comments, the last line of the range",
-                            "type": "number",
-                        },
-                        "owner": {"description": "Repository owner", "type": "string"},
-                        "path": {
-                            "description": "The relative path to the file that necessitates a comment",
-                            "type": "string",
-                        },
-                        "pullNumber": {
-                            "description": "Pull request number",
-                            "type": "number",
-                        },
-                        "repo": {"description": "Repository name", "type": "string"},
-                        "side": {
-                            "description": "The side of the diff to comment on. LEFT indicates the previous state, RIGHT indicates the new state",
-                            "enum": ["LEFT", "RIGHT"],
-                            "type": "string",
-                        },
-                        "startLine": {
-                            "description": "For multi-line comments, the first line of the range that the comment applies to",
-                            "type": "number",
-                        },
-                        "startSide": {
-                            "description": "For multi-line comments, the starting side of the diff that the comment applies to. LEFT indicates the previous state, RIGHT indicates the new state",
-                            "enum": ["LEFT", "RIGHT"],
-                            "type": "string",
-                        },
-                        "subjectType": {
-                            "description": "The level at which the comment is targeted",
-                            "enum": ["FILE", "LINE"],
-                            "type": "string",
-                        },
-                    },
-                    "required": [
-                        "owner",
-                        "repo",
-                        "pullNumber",
-                        "path",
-                        "body",
-                        "subjectType",
-                    ],
-                    "type": "object",
-                },
-            }
+            logger.error(f"Unexpected error getting tool {tool_id}: {e}")
+            raise ClientException(message="Tool not found", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Parse MCP response to Tool format
         try:
@@ -1231,7 +1171,10 @@ class PromptService(SessionMixin):
 
         except (ValueError, KeyError) as e:
             logger.error(f"Failed to parse tool response for {tool_id}: {e}")
-            raise ClientException(f"Invalid tool data for ID {tool_id}", status_code=500)
+            raise ClientException(
+                message="Invalid tool data found",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     async def _perform_copy_prompt_config_request(self, request: PromptConfigCopyRequest) -> Dict[str, Any]:
         """Perform the actual copy-config request to budprompt service via Dapr.
