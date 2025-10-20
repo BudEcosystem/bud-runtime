@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { PlusOutlined, CloseOutlined } from "@ant-design/icons";
-import { Image, Switch, Select } from "antd";
+import { Image, Switch, Select, Checkbox } from "antd";
 import { PrimaryButton } from "../../ui/bud/form/Buttons";
-import { Text_12_400_B3B3B3, Text_14_400_757575, Text_14_400_EEEEEE, Text_16_400_EEEEEE } from "../../ui/text";
+import { Text_12_400_808080, Text_12_400_B3B3B3, Text_14_400_757575, Text_14_400_EEEEEE, Text_16_400_EEEEEE } from "../../ui/text";
 import { TextInput, TextAreaInput } from "../../ui/input";
 import { AgentVariable } from "@/stores/useAgentStore";
 
@@ -30,6 +30,18 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
   const [isOpen, setIsOpen] = React.useState(true);
   const [structuredOutputEnabled, setStructuredOutputEnabled] = React.useState(false);
   const [variableOpenStates, setVariableOpenStates] = React.useState<Record<string, boolean>>({});
+  const [validationEnabled, setValidationEnabled] = React.useState<Record<string, boolean>>({});
+
+  // Initialize validation enabled state based on existing validation values
+  React.useEffect(() => {
+    const newValidationEnabled: Record<string, boolean> = {};
+    outputVariables.forEach(variable => {
+      if (variable.validation) {
+        newValidationEnabled[variable.id] = true;
+      }
+    });
+    setValidationEnabled(prev => ({ ...prev, ...newValidationEnabled }));
+  }, [outputVariables]);
 
   return (
     <div className="flex flex-col justify-between h-full w-full">
@@ -170,6 +182,36 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
                             />
                           </div>
                         </div>
+                      </div>
+                      <div className='px-[.5rem] pt-4'>
+                        {/* validation checkbox */}
+                        <div className='flex justify-start gap-[.6rem] items-center mt-3'>
+                          <Checkbox
+                            checked={validationEnabled[variable.id] || false}
+                            className=""
+                            onChange={(e) => {
+                              setValidationEnabled({ ...validationEnabled, [variable.id]: e.target.checked });
+                              if (!e.target.checked) {
+                                onVariableChange(variable.id, "validation", "");
+                              }
+                            }}
+                          />
+                          <Text_12_400_808080>Validation</Text_12_400_808080>
+                        </div>
+                        {/* validation input - only shown when checkbox is checked */}
+                        {validationEnabled[variable.id] && (
+                          <div className="flex flex-col gap-1 mt-2">
+                            <TextInput
+                              name={`variable-validation-${variable.id}`}
+                              className="!w-full !max-w-full !h-[1.9375rem] placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] text-[#EEEEEE] text-[.75rem] indent-[.625rem] px-[0] bg-[#FFFFFF08]"
+                              value={variable.validation || ''}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                onVariableChange(variable.id, "validation", e.target.value)
+                              }
+                              placeholder="Enter validation pattern (e.g., regex, min/max)"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
