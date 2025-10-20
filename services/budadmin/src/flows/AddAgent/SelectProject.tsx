@@ -54,9 +54,6 @@ export default function SelectProject() {
       // Store selected project in Add Agent store
       setStoreSelectedProject(selectedProjectData.project || selectedProjectData);
 
-      // Store selected project data for later use in the flow
-      localStorage.setItem("addAgent_selectedProject", JSON.stringify(selectedProjectData));
-
       // Create or update the workflow with the selected project
       const response = await createWorkflow(selectedProject);
 
