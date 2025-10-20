@@ -697,7 +697,6 @@ class ToolFilter(BaseModel):
     prompt_id: str = Field(..., description="Prompt ID to filter tools (UUID or draft ID)")
     connector_id: str = Field(..., description="Connector ID to filter tools")
     version: Optional[int] = Field(None, ge=1, description="Version of prompt config")
-    name: str | None = None
 
 
 class ToolListResponse(PaginatedSuccessResponse):

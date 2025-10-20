@@ -806,7 +806,7 @@ class PromptService(SessionMixin):
 
     async def _check_connector_already_registered(
         self, budprompt_id: str, connector_id: str, version: Optional[int] = None
-    ) -> bool:
+    ) -> tuple[bool, dict]:
         """Check if a connector is already registered for a prompt.
 
         Args:
@@ -815,7 +815,9 @@ class PromptService(SessionMixin):
             version: Optional version to check. If None, checks default version
 
         Returns:
-            True if connector is already registered, False otherwise
+            Tuple of (is_registered: bool, config_data: dict)
+            - is_registered: True if connector already registered, False otherwise
+            - config_data: The prompt config data dict (empty dict if 404)
         """
         try:
             config_response = await self._perform_get_prompt_config_request(budprompt_id, version=version)
@@ -827,14 +829,14 @@ class PromptService(SessionMixin):
                 if tool.get("type") == "mcp":
                     gateway_config = tool.get("gateway_config", {})
                     if connector_id in gateway_config:
-                        return True
+                        return True, config_data
 
-            return False
+            return False, config_data
 
         except ClientException as e:
             if e.status_code == 404:
                 # No config exists, connector not registered
-                return False
+                return False, {}
             else:
                 # Re-raise other errors
                 raise
@@ -858,14 +860,27 @@ class PromptService(SessionMixin):
         """
         logger.debug(f"Registering connector {connector_id} for prompt {budprompt_id}")
 
-        # Check if connector is already registered for this prompt
-        is_registered = await self._check_connector_already_registered(budprompt_id, connector_id, version)
+        # Check if connector is already registered and get config data
+        is_registered, config_data = await self._check_connector_already_registered(
+            budprompt_id, connector_id, version
+        )
+
         if is_registered:
             logger.error(f"Connector {connector_id} is already registered for prompt {budprompt_id}")
             raise ClientException(
                 message="Connector is already registered for prompt",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Validate allow_multiple_calls if config exists (before creating gateway)
+        if config_data:  # Config exists
+            allow_multiple_calls = config_data.get("allow_multiple_calls", False)
+            if not allow_multiple_calls:
+                logger.error(f"Cannot register connector: allow_multiple_calls is disabled for prompt {budprompt_id}")
+                raise ClientException(
+                    message="Allow Multiple Calls must be enabled for MCP tool usage",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
 
         # Get connector details from MCP Foundry
         try:
@@ -889,13 +904,7 @@ class PromptService(SessionMixin):
                 gateway_id=gateway_response.get("id", gateway_response.get("gateway_id")),
             )
 
-            # TODO: Store credentials in Redis via budprompt service
-            # Pending budprompt API implementation for credential storage
-
             # TODO: Validate credentials against CONNECTOR_AUTH_CREDENTIALS_MAP schema
-            # Pending implementation
-
-            # TODO: Encrypt sensitive credential fields before storage
             # Pending implementation
 
             # Create GatewayResponse object
@@ -1156,11 +1165,12 @@ class PromptService(SessionMixin):
                 "tools": updated_tools,  # Override tools field
             }
         else:
-            # New config: only save tools
+            # New config: set allow_multiple_calls=true for MCP support
             payload = {
                 "prompt_id": budprompt_id,
                 "version": target_version,
                 "set_default": True,  # Set as default for new configs
+                "allow_multiple_calls": True,  # Enable for MCP tools
                 "tools": updated_tools,
             }
 
