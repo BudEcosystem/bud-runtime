@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export interface AgentVariable {
   id: string;
@@ -129,9 +128,7 @@ const createDefaultSession = (): AgentSession => ({
   }
 });
 
-export const useAgentStore = create<AgentStore>()(
-  persist(
-    (set, get) => ({
+export const useAgentStore = create<AgentStore>()((set, get) => ({
       // Initial State
       sessions: [],
       activeSessionIds: [],
@@ -383,47 +380,4 @@ export const useAgentStore = create<AgentStore>()(
       setActiveSessionIds: (ids) => {
         set({ activeSessionIds: ids });
       }
-    }),
-    {
-      name: "agent-store",
-      version: 1, // Adding version to force migration
-      partialize: (state) => ({
-        sessions: state.sessions,
-        activeSessionIds: state.activeSessionIds
-      }),
-      // Migration to fix promptMessages if it's an array and add default output variable
-      migrate: (persistedState: any, _version: number) => {
-        // Clean up any corrupted promptMessages data
-        if (persistedState && persistedState.sessions) {
-          persistedState.sessions = persistedState.sessions.map((session: any) => {
-            const updatedSession = { ...session };
-
-            // If promptMessages is an array or object, convert it to empty string
-            if (typeof session.promptMessages !== 'string') {
-              updatedSession.promptMessages = "";
-              updatedSession.systemPrompt = session.systemPrompt || "";
-            }
-
-            // Add default output variable if none exist
-            if (!updatedSession.outputVariables || updatedSession.outputVariables.length === 0) {
-              updatedSession.outputVariables = [
-                {
-                  id: generateVariableId(),
-                  name: "Output Variable 1",
-                  value: "",
-                  type: "output",
-                  description: "",
-                  dataType: "string",
-                  defaultValue: ""
-                }
-              ];
-            }
-
-            return updatedSession;
-          });
-        }
-        return persistedState;
-      }
-    }
-  )
-);
+    }));
