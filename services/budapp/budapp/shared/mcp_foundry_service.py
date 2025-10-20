@@ -189,13 +189,11 @@ class MCPFoundryService(metaclass=SingletonMeta):
         logger.error(error_msg)
         raise MCPFoundryException(error_msg, status_code=503)
 
-    async def list_tools(
-        self, connector_type: str, offset: int = 0, limit: int = 10
-    ) -> tuple[List[Dict[str, Any]], int]:
-        """List tools for a specific connector type with pagination.
+    async def list_tools(self, server_id: str, offset: int = 0, limit: int = 10) -> tuple[List[Dict[str, Any]], int]:
+        """List tools for a specific server (gateway).
 
         Args:
-            connector_type: The type of connector (e.g., 'github', 'slack')
+            server_id: MANDATORY - The gateway/server ID to filter tools
             offset: Number of items to skip
             limit: Maximum number of items to return
 
@@ -208,7 +206,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         try:
             logger.info(
                 "Fetching tools from MCP Foundry",
-                connector_type=connector_type,
+                server_id=server_id,
                 offset=offset,
                 limit=limit,
             )
@@ -216,7 +214,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             # Prepare parameters for MCP Foundry API
             params = {
                 "include_inactive": "false",
-                # "tags": connector_type,  # TODO: uncomment this when MCP Foundry has tags
+                "server_id": server_id,
             }
 
             # Make the API call
@@ -241,9 +239,9 @@ class MCPFoundryService(metaclass=SingletonMeta):
             # This avoids the while loop for fetching all pages
             total_count = 0
 
-            logger.info(
+            logger.debug(
                 "Successfully fetched tools from MCP Foundry",
-                connector_type=connector_type,
+                server_id=server_id,
                 returned_count=len(paginated_tools),
                 total_count=total_count,
             )

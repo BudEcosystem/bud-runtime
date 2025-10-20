@@ -1043,113 +1043,76 @@ class PromptService(SessionMixin):
 
     async def get_tools(
         self,
-        connector_type: str,
+        prompt_id: str,
+        connector_id: str,
+        version: Optional[int] = None,
         offset: int = 0,
         limit: int = 10,
         filters: dict = {},
         order_by: list = [],
         search: bool = False,
     ) -> tuple[list[ToolListItem], int]:
-        """Get tools list from MCP Foundry.
+        """Get tools list from MCP Foundry for a specific prompt and connector.
 
         Args:
-            connector_type: MANDATORY - Type of connector to filter tools
+            prompt_id: Prompt ID (UUID or draft ID)
+            connector_id: Connector ID to get tools for
+            version: Optional version of prompt config
             offset: Pagination offset
             limit: Pagination limit
-            filters: Additional filters (e.g., name)
+            filters: Additional filters
             order_by: Ordering fields
-            search: Enable search functionality
+            search: Enable search
 
         Returns:
             Tuple of (list of tools, total count)
         """
-        logger.debug(f"Fetching tools from MCP Foundry for connector_type: {connector_type}")
+        logger.debug(f"Fetching tools for prompt_id={prompt_id}, connector_id={connector_id}, version={version}")
 
-        # Call MCP Foundry API using the service with pagination
+        # 1. Fetch prompt config from Redis
+        try:
+            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version)
+            config_data = config_response.get("data", {})
+            tools = config_data.get("tools", [])
+        except ClientException as e:
+            if e.status_code == 404:
+                # Prompt config not found - return empty
+                logger.debug(f"Prompt config not found for {prompt_id}")
+                return [], 0
+            raise
+
+        # 2. Find gateway_id from gateway_config
+        gateway_id = None
+        for tool in tools:
+            if tool.get("type") == "mcp":
+                gateway_config = tool.get("gateway_config", {})
+                if connector_id in gateway_config:
+                    gateway_id = gateway_config[connector_id]
+                    break
+
+        if not gateway_id:
+            # Connector not registered for this prompt
+            logger.debug(f"Connector {connector_id} not found in prompt {prompt_id}")
+            return [], 0
+
+        logger.debug(f"Found gateway_id={gateway_id} for connector={connector_id}")
+
+        # 3. Call MCP Foundry API with server_id (gateway_id)
         try:
             mcp_foundry_response, total_count = await mcp_foundry_service.list_tools(
-                connector_type=connector_type, offset=offset, limit=limit
+                server_id=gateway_id, offset=offset, limit=limit
             )
             logger.debug(
-                f"Successfully fetched {len(mcp_foundry_response)} tools from MCP Foundry, total: {total_count}"
+                f"Successfully fetched {len(mcp_foundry_response)} tools from MCP Foundry for gateway {gateway_id}"
             )
         except MCPFoundryException as e:
             logger.error(f"MCP Foundry API error: {e}")
-            mcp_foundry_response = []
-            total_count = 0
+            return [], 0
         except Exception as e:
             logger.error(f"Unexpected error calling MCP Foundry: {e}")
-            mcp_foundry_response = []
-            total_count = 0
+            return [], 0
 
-        # If no response from MCP Foundry, use mock data
-        if not mcp_foundry_response:
-            logger.warning("Using mock data as MCP Foundry returned no tools")
-            # TODO: Mock MCP Foundry response data for now
-            mcp_foundry_response = [
-                {
-                    "id": "3cbd6002-2c87-4eb1-96e1-f6aeadbeee26",
-                    "originalName": "add_comment_to_pending_review",
-                    "displayName": "Add Comment To Pending Review",
-                    "description": "Add review comment to the requester&#x27;s latest pending pull request review. A pending review needs to already exist to call this (check with the user if not sure).",
-                    "inputSchema": {
-                        "properties": {
-                            "body": {
-                                "description": "The text of the review comment",
-                                "type": "string",
-                            },
-                            "line": {
-                                "description": "The line of the blob in the pull request diff that the comment applies to. For multi-line comments, the last line of the range",
-                                "type": "number",
-                            },
-                            "owner": {"description": "Repository owner", "type": "string"},
-                            "path": {
-                                "description": "The relative path to the file that necessitates a comment",
-                                "type": "string",
-                            },
-                            "pullNumber": {
-                                "description": "Pull request number",
-                                "type": "number",
-                            },
-                            "repo": {"description": "Repository name", "type": "string"},
-                            "side": {
-                                "description": "The side of the diff to comment on. LEFT indicates the previous state, RIGHT indicates the new state",
-                                "enum": ["LEFT", "RIGHT"],
-                                "type": "string",
-                            },
-                            "startLine": {
-                                "description": "For multi-line comments, the first line of the range that the comment applies to",
-                                "type": "number",
-                            },
-                            "startSide": {
-                                "description": "For multi-line comments, the starting side of the diff that the comment applies to. LEFT indicates the previous state, RIGHT indicates the new state",
-                                "enum": ["LEFT", "RIGHT"],
-                                "type": "string",
-                            },
-                            "subjectType": {
-                                "description": "The level at which the comment is targeted",
-                                "enum": ["FILE", "LINE"],
-                                "type": "string",
-                            },
-                        },
-                        "required": [
-                            "owner",
-                            "repo",
-                            "pullNumber",
-                            "path",
-                            "body",
-                            "subjectType",
-                        ],
-                        "type": "object",
-                    },
-                }
-            ]
-
-            # Update total_count for mock data
-            total_count = len(mcp_foundry_response)
-
-        # NOTE: Parse MCP Foundry response directly to ToolListItem
-        # No need for intermediate Tool objects since we only need id, name, and type
+        # 4. Parse MCP Foundry response to ToolListItem
         tool_items = []
         for item in mcp_foundry_response:
             try:
@@ -1160,12 +1123,10 @@ class PromptService(SessionMixin):
                 )
                 tool_items.append(tool_item)
             except (ValueError, KeyError) as e:
-                logger.error(f"Found invalid tool item: {e}")
+                logger.error(f"Invalid tool item: {e}")
                 continue
 
-        logger.debug(
-            f"Returning {len(tool_items)} tools out of {total_count} total for connector_type={connector_type}"
-        )
+        logger.debug(f"Returning {len(tool_items)} tools out of {total_count} total")
 
         return tool_items, total_count
 

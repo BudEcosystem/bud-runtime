@@ -1039,16 +1039,15 @@ async def list_tools(
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
     search: bool = False,
 ) -> Union[ToolListResponse, ErrorResponse]:
-    """List all tools filtered by connector type.
+    """List tools filtered by prompt_id and connector_id.
 
-    This endpoint returns a list of available tools for a specific connector type.
-    The connector_type parameter is MANDATORY.
-    Currently returns hardcoded data until mcp_foundry service is available.
+    Fetches prompt configuration from Redis, extracts gateway_id for the connector,
+    and retrieves tools from MCP Foundry API filtered by server_id (gateway_id).
 
     Args:
         current_user: The authenticated user
         session: Database session
-        filters: Tool filters including mandatory connector_type
+        filters: Tool filters including mandatory prompt_id and connector_id
         page: Page number for pagination
         limit: Number of items per page
         order_by: Ordering fields
@@ -1063,14 +1062,12 @@ async def list_tools(
     # Convert filter to dictionary
     filters_dict = filters.model_dump(exclude_none=True)
 
-    # Validate that connector_type is provided (it's mandatory in the schema)
-    if not filters.connector_type:
-        return ErrorResponse(code=status.HTTP_400_BAD_REQUEST, message="connector_type is required").to_http_response()
-
     try:
         # Get tools from service
         tools_list, count = await PromptService(session).get_tools(
-            connector_type=filters.connector_type,
+            prompt_id=filters.prompt_id,
+            connector_id=filters.connector_id,
+            version=filters.version,
             offset=offset,
             limit=limit,
             filters=filters_dict,
