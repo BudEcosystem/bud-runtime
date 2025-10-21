@@ -365,6 +365,65 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def get_connector_by_id(self, connector_id: str) -> Dict[str, Any]:
+        """Get a single connector by its ID from MCP Foundry.
+
+        Since the MCP Foundry API doesn't have a direct /connectors/{id} endpoint,
+        this method fetches all connectors using pagination and searches for the
+        matching connector ID.
+
+        Args:
+            connector_id: The connector ID to find (e.g., "github", "slack")
+
+        Returns:
+            Dict containing the connector data
+
+        Raises:
+            MCPFoundryException: If connector not found or API error occurs
+        """
+        try:
+            logger.debug(f"Searching for connector with ID: {connector_id}")
+
+            page_size = 100  # Fetch in batches of 100
+            offset = 0
+            total_checked = 0
+
+            while True:
+                # Fetch a page of connectors
+                connectors, total = await self.list_connectors(
+                    show_registered_only=False, show_available_only=True, offset=offset, limit=page_size
+                )
+
+                # Search for connector ID in this batch
+                for connector in connectors:
+                    if connector.get("id") == connector_id:
+                        logger.debug(f"Found connector: {connector.get('name', connector_id)}")
+                        return connector
+
+                # Update counters
+                total_checked += len(connectors)
+                offset += page_size
+
+                # Check if we've fetched all connectors
+                if offset >= total or len(connectors) == 0:
+                    break
+
+                logger.debug(f"Connector not found in first {total_checked} connectors, checking more...")
+
+            # Connector not found after checking all pages
+            error_msg = f"Connector {connector_id} not found in {total_checked} available connectors"
+            logger.error(error_msg)
+            raise MCPFoundryException(error_msg, status_code=404)
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error getting connector {connector_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def list_connectors_by_connector_ids(
         self,
         connector_ids: List[str],

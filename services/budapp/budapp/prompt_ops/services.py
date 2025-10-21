@@ -433,13 +433,14 @@ class PromptService(SessionMixin):
         )
 
     async def _perform_get_prompt_config_request(
-        self, prompt_id: str, version: Optional[int] = None
+        self, prompt_id: str, version: Optional[int] = None, raw_data: bool = False
     ) -> Dict[str, Any]:
         """Perform get prompt configuration request to budprompt service.
 
         Args:
             prompt_id: The prompt configuration identifier
             version: Optional version number
+            raw_data: If True, returns raw data from Redis without Pydantic processing
 
         Returns:
             Response data from budprompt service
@@ -447,12 +448,16 @@ class PromptService(SessionMixin):
         # Build the URL with optional version query parameter
         prompt_config_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config/{prompt_id}"
 
-        # Add version as query parameter if provided
+        # Add version and raw_data as query parameters if provided
         params = {}
         if version is not None:
             params["version"] = version
+        if raw_data:
+            params["raw_data"] = "true"
 
-        logger.debug(f"Retrieving prompt config from budprompt: prompt_id={prompt_id}, version={version}")
+        logger.debug(
+            f"Retrieving prompt config from budprompt: prompt_id={prompt_id}, version={version}, raw_data={raw_data}"
+        )
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -801,22 +806,8 @@ class PromptService(SessionMixin):
         logger.debug(f"Getting connector with ID: {connector_id}")
 
         try:
-            # Fetch connector using name filter for efficient server-side filtering
-            mcp_foundry_response, _ = await mcp_foundry_service.list_connectors(
-                show_registered_only=False,
-                show_available_only=True,
-                name=connector_id,  # Filter by connector ID server-side
-                limit=1,  # Only need one result
-            )
-
-            # Check if connector was found
-            if not mcp_foundry_response:
-                logger.error(f"Connector not found: {connector_id}")
-                raise ClientException(
-                    message=f"Connector {connector_id} not found", status_code=status.HTTP_404_NOT_FOUND
-                )
-
-            connector_data = mcp_foundry_response[0]
+            # Use the new get_connector_by_id method which fetches all connectors with pagination
+            connector_data = await mcp_foundry_service.get_connector_by_id(connector_id)
 
             # Map auth_type string to enum (no fallback - let ValueError propagate)
             auth_type_str = connector_data.get("auth_type", "Open")
@@ -871,7 +862,9 @@ class PromptService(SessionMixin):
             - config_data: The prompt config data dict (empty dict if 404)
         """
         try:
-            config_response = await self._perform_get_prompt_config_request(budprompt_id, version=version)
+            config_response = await self._perform_get_prompt_config_request(
+                budprompt_id, version=version, raw_data=True
+            )
             config_data = config_response.get("data", {})
             tools = config_data.get("tools", [])
 
@@ -1332,6 +1325,7 @@ class PromptService(SessionMixin):
             config_response = await self._perform_get_prompt_config_request(
                 budprompt_id,
                 version=version,  # Use provided version or None for default
+                raw_data=True,
             )
             config_data = config_response.get("data", {})
             existing_tools = config_data.get("tools", [])
