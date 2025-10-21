@@ -8,6 +8,8 @@
   curl,
   tomlq,
   vim,
+  kmod,
+  pciutils,
 }:
 writeShellApplication {
   name = "k8s_deploy";
@@ -20,6 +22,8 @@ writeShellApplication {
     curl
     tomlq
     vim
+    kmod
+    pciutils
   ];
 
   text = builtins.readFile ./script.sh;
