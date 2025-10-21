@@ -767,3 +767,13 @@ class RegisterConnectorResponse(SuccessResponse):
     gateway: GatewayResponse
     connector_id: str
     budprompt_id: str
+
+
+class DisconnectConnectorResponse(SuccessResponse):
+    """Response schema for disconnecting connector."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    prompt_id: str = Field(..., description="Prompt ID")
+    connector_id: str = Field(..., description="Disconnected connector ID")
+    deleted_gateway_id: str = Field(..., description="Deleted gateway ID")

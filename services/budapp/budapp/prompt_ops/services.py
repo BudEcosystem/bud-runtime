@@ -1128,6 +1128,175 @@ class PromptService(SessionMixin):
             "added_tools": tool_ids,
         }
 
+    async def disconnect_connector_from_prompt(
+        self, budprompt_id: str, connector_id: str, version: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Disconnect a connector from a prompt by deleting gateway and cleaning config.
+
+        Args:
+            budprompt_id: The bud prompt ID (UUID or draft ID)
+            connector_id: The connector ID to disconnect
+            version: Optional version to update. If None, updates default version
+
+        Returns:
+            Dict with deletion details
+
+        Raises:
+            ClientException: If prompt not found or connector not registered
+        """
+        logger.debug(f"Disconnecting connector {connector_id} from prompt {budprompt_id}")
+
+        # Step 1: Fetch prompt config from Redis
+        config_response = await self._perform_get_prompt_config_request(budprompt_id, version=version)
+        config_data = config_response.get("data", {})
+        tools = config_data.get("tools", [])
+        target_version = config_response.get("version", 1) if version is None else version
+
+        # Step 2: Find MCP tool config and validate connector is registered
+        mcp_tool = None
+        mcp_tool_index = None
+
+        for index, tool in enumerate(tools):
+            if tool.get("type") == "mcp":
+                mcp_tool = tool
+                mcp_tool_index = index
+                break
+
+        if not mcp_tool:
+            raise ClientException(
+                message="No MCP connectors registered for this prompt",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        gateway_config = mcp_tool.get("gateway_config", {})
+        if connector_id not in gateway_config:
+            raise ClientException(
+                message=f"Connector {connector_id} is not registered for this prompt",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        gateway_id = gateway_config[connector_id]
+        server_config = mcp_tool.get("server_config", {})
+        tool_ids_to_remove = server_config.get(connector_id, [])
+
+        # Step 3: Fetch tool originalNames BEFORE deleting gateway
+        # (Once gateway is deleted, tools are removed from MCP Foundry)
+        tool_original_names_to_remove = []
+        for tool_id in tool_ids_to_remove:
+            try:
+                tool_data = await mcp_foundry_service.get_tool_by_id(tool_id)
+                original_name = tool_data["originalName"]
+                tool_original_names_to_remove.append(original_name)
+            except Exception as e:
+                logger.warning(f"Could not fetch tool {tool_id} to remove from allowed_tools: {e}")
+
+        # Step 4: Delete gateway in MCP Foundry (auto-removes tools from virtual server)
+        try:
+            await mcp_foundry_service.delete_gateway(gateway_id)
+            logger.debug(f"Successfully deleted gateway {gateway_id}")
+        except MCPFoundryException as e:
+            logger.error(f"Failed to delete gateway {gateway_id}: {e}")
+            # Continue with Redis cleanup even if gateway deletion fails
+
+        # Step 5: Update gateway_config - remove connector
+        del gateway_config[connector_id]
+
+        # Step 6: Update server_config - remove connector's tools
+        server_config.pop(connector_id, None)
+
+        # Step 7: Update allowed_tools - remove this connector's tool originalNames
+        allowed_tools = mcp_tool.get("allowed_tools", [])
+        updated_allowed_tools = [tool for tool in allowed_tools if tool not in tool_original_names_to_remove]
+
+        # Step 8: Determine if we should remove entire MCP config or update it
+        if not gateway_config:  # No more connectors - complete cleanup
+            # Delete virtual server from MCP Foundry
+            virtual_server_id = mcp_tool.get("server_url")
+            if virtual_server_id:
+                try:
+                    await mcp_foundry_service.delete_virtual_server(virtual_server_id)
+                    logger.debug(f"Successfully deleted virtual server {virtual_server_id}")
+                except MCPFoundryException as e:
+                    logger.error(f"Failed to delete virtual server {virtual_server_id}: {e}")
+                    # Continue with cleanup
+
+            # Remove entire MCP tool config from tools array
+            tools.pop(mcp_tool_index)
+            logger.debug("Removed entire MCP tool config (no connectors remaining)")
+        else:
+            # Update MCP tool config (connectors still remain)
+            mcp_tool["gateway_config"] = gateway_config
+            mcp_tool["server_config"] = server_config
+            mcp_tool["allowed_tools"] = updated_allowed_tools
+            tools[mcp_tool_index] = mcp_tool
+            logger.debug(f"Updated MCP tool config ({len(gateway_config)} connectors remaining)")
+
+        # Step 9: Save updated config to Redis
+        await self._save_prompt_config_to_redis(
+            budprompt_id=budprompt_id,
+            config_data=config_data,
+            tools=tools,
+            version=target_version,
+        )
+
+        # Step 10: Return response
+        return {
+            "prompt_id": budprompt_id,
+            "connector_id": connector_id,
+            "deleted_gateway_id": gateway_id,
+        }
+
+    async def _save_prompt_config_to_redis(
+        self,
+        budprompt_id: str,
+        config_data: dict,
+        tools: list,
+        version: int,
+    ) -> None:
+        """Save updated prompt configuration to Redis.
+
+        Args:
+            budprompt_id: The bud prompt ID
+            config_data: Existing config data to preserve
+            tools: Updated tools array
+            version: Target version number
+
+        Raises:
+            ClientException: If save fails
+        """
+        prompt_config_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config"
+        )
+
+        payload = {
+            **config_data,
+            "prompt_id": budprompt_id,
+            "version": version,
+            "set_default": False,
+            "tools": tools,
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(prompt_config_endpoint, json=payload) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        logger.error(f"Failed to save prompt config: {response.status} {response_data}")
+                        raise ClientException(
+                            message="Failed to save prompt configuration",
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
+
+                    logger.debug(f"Successfully saved prompt config for {budprompt_id}")
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Network error saving prompt config: {e}")
+            raise ClientException(
+                message="Unable to save prompt configuration",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
     async def _store_mcp_tool_config(
         self, budprompt_id: str, connector_id: str, gateway_id: str, version: Optional[int] = None
     ) -> None:

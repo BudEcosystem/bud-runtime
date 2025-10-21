@@ -649,6 +649,69 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def delete_gateway(
+        self,
+        gateway_id: str,
+    ) -> Dict[str, Any]:
+        """Delete a gateway from MCP Foundry.
+
+        When a gateway is deleted, MCP Foundry automatically removes
+        all tools associated with this gateway from the virtual server.
+
+        Args:
+            gateway_id: The gateway ID to delete
+
+        Returns:
+            Response from MCP Foundry (may be empty dict on success)
+
+        Raises:
+            MCPFoundryException: If deletion fails (except 404)
+        """
+        try:
+            response = await self._make_request(
+                method="DELETE",
+                endpoint=f"/gateways/{gateway_id}",
+            )
+            logger.debug(f"Successfully deleted gateway {gateway_id}")
+            return response
+
+        except MCPFoundryException as e:
+            if e.status_code == 404:
+                # Gateway already deleted - this is okay
+                logger.warning(f"Gateway {gateway_id} not found (already deleted)")
+                return {}
+            raise
+
+    async def delete_virtual_server(
+        self,
+        server_id: str,
+    ) -> Dict[str, Any]:
+        """Delete a virtual server from MCP Foundry.
+
+        Args:
+            server_id: The virtual server ID to delete
+
+        Returns:
+            Response from MCP Foundry (may be empty dict on success)
+
+        Raises:
+            MCPFoundryException: If deletion fails (except 404)
+        """
+        try:
+            response = await self._make_request(
+                method="DELETE",
+                endpoint=f"/servers/{server_id}",
+            )
+            logger.debug(f"Successfully deleted virtual server {server_id}")
+            return response
+
+        except MCPFoundryException as e:
+            if e.status_code == 404:
+                # Virtual server already deleted - this is okay
+                logger.warning(f"Virtual server {server_id} not found (already deleted)")
+                return {}
+            raise
+
     async def close(self):
         """Close the HTTP session."""
         if self._session and not self._session.closed:

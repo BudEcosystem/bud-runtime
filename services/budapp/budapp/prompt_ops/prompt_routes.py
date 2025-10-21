@@ -45,6 +45,7 @@ from .schemas import (
     ConnectorResponse,
     CreatePromptVersionRequest,
     CreatePromptWorkflowRequest,
+    DisconnectConnectorResponse,
     EditPromptRequest,
     EditPromptVersionRequest,
     GatewayResponse,
@@ -1017,6 +1018,80 @@ async def register_connector(
         logger.exception(f"Failed to register connector: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to register connector"
+        ).to_http_response()
+
+
+@router.delete(
+    "/{budprompt_id}/connectors/{connector_id}/disconnect",
+    responses={
+        status.HTTP_200_OK: {
+            "model": DisconnectConnectorResponse,
+            "description": "Successfully disconnected connector",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or connector not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Disconnect a connector from a prompt by deleting gateway and cleaning configuration",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def disconnect_connector(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    budprompt_id: str,
+    connector_id: str,
+    version: Optional[int] = Query(
+        None, ge=1, description="Version of prompt config. If not specified, uses default version"
+    ),
+) -> Union[DisconnectConnectorResponse, ErrorResponse]:
+    """Disconnect a connector from a prompt.
+
+    This endpoint:
+    1. Fetches tool originalNames before deletion
+    2. Deletes the gateway in MCP Foundry (which auto-removes tools from virtual server)
+    3. Removes connector from gateway_config and server_config
+    4. Updates allowed_tools list
+    5. If last connector: deletes virtual server and removes entire MCP config
+    6. Saves updated configuration to Redis
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
+        connector_id: The connector ID to disconnect
+        version: Optional version number. If not specified, uses default version
+
+    Returns:
+        DisconnectConnectorResponse with deletion details or ErrorResponse on failure
+    """
+    try:
+        result = await PromptService(session).disconnect_connector_from_prompt(
+            budprompt_id=budprompt_id,
+            connector_id=connector_id,
+            version=version,
+        )
+
+        return DisconnectConnectorResponse(
+            prompt_id=result["prompt_id"],
+            connector_id=result["connector_id"],
+            deleted_gateway_id=result["deleted_gateway_id"],
+            success=True,
+            message="Connector disconnected successfully",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to disconnect connector: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to disconnect connector: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to disconnect connector"
         ).to_http_response()
 
 
