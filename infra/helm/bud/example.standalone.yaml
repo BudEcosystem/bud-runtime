@@ -1,7 +1,7 @@
 ingress:
     https: disabled
     hosts:
-        root: bud
+        root: bane.tsnet.sinanmohd.com
 
 imagePullPolicy: "Always"
 deploymentAnnotations:
@@ -44,3 +44,8 @@ microservices:
         image: budstudio/budprompt:nightly
     buddoc:
         image: budstudio/buddoc:nightly
+    global:
+        env:
+            SUPER_USER_EMAIL: root@example.com
+            # tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32
+            SUPER_USER_PASSWORD: LCMSaOh2M2zMtMim0JOD5ctmyPFeVVNG
