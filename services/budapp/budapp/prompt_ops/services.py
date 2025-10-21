@@ -1225,12 +1225,14 @@ class PromptService(SessionMixin):
             logger.debug(f"Updated MCP tool config ({len(gateway_config)} connectors remaining)")
 
         # Step 9: Save updated config to Redis
-        await self._save_prompt_config_to_redis(
-            budprompt_id=budprompt_id,
-            config_data=config_data,
-            tools=tools,
-            version=target_version,
-        )
+        payload = {
+            **config_data,
+            "prompt_id": budprompt_id,
+            "version": target_version,
+            "set_default": False,
+            "tools": tools,
+        }
+        await self._save_prompt_config_to_redis(payload)
 
         # Step 10: Return response
         return {
@@ -1239,20 +1241,13 @@ class PromptService(SessionMixin):
             "deleted_gateway_id": gateway_id,
         }
 
-    async def _save_prompt_config_to_redis(
-        self,
-        budprompt_id: str,
-        config_data: dict,
-        tools: list,
-        version: int,
-    ) -> None:
-        """Save updated prompt configuration to Redis.
+    async def _save_prompt_config_to_redis(self, payload: dict) -> None:
+        """Save prompt configuration to Redis via budprompt service.
 
         Args:
-            budprompt_id: The bud prompt ID
-            config_data: Existing config data to preserve
-            tools: Updated tools array
-            version: Target version number
+            payload: Complete payload dictionary to send to budprompt service.
+                    Must include: prompt_id, version, tools
+                    Optional: set_default, allow_multiple_calls, and any other config fields
 
         Raises:
             ClientException: If save fails
@@ -1260,14 +1255,6 @@ class PromptService(SessionMixin):
         prompt_config_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config"
         )
-
-        payload = {
-            **config_data,
-            "prompt_id": budprompt_id,
-            "version": version,
-            "set_default": False,
-            "tools": tools,
-        }
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -1281,7 +1268,7 @@ class PromptService(SessionMixin):
                             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         )
 
-                    logger.debug(f"Successfully saved prompt config for {budprompt_id}")
+                    logger.debug(f"Successfully saved prompt config for {payload.get('prompt_id')}")
 
         except aiohttp.ClientError as e:
             logger.exception(f"Network error saving prompt config: {e}")
@@ -1345,30 +1332,47 @@ class PromptService(SessionMixin):
             else:
                 raise
 
-        # 3. Check if connector already exists - raise error if found
-        # This is a safety net in case the pre-registration check is bypassed
-        for tool in existing_tools:
-            if tool.get("type") == "mcp":
-                gateway_config = tool.get("gateway_config", {})
-                if connector_id in gateway_config:
-                    logger.error(f"Connector {connector_id} already exists in prompt config")
-                    raise ClientException(
-                        message="Connector is already registered for prompt.",
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                    )
+        # 3. Check if an MCP tool config already exists and merge or create new
+        existing_mcp_tool_index = None
+        existing_mcp_tool = None
 
-        # 4. Append new tool to existing tools
-        updated_tools = existing_tools + [mcp_tool_dict]
-        logger.debug(f"Adding new connector {connector_id} configuration")
+        for index, tool in enumerate(existing_tools):
+            if tool.get("type") == "mcp":
+                existing_mcp_tool = tool
+                existing_mcp_tool_index = index
+                break
+
+        # 4. Handle merging or creating MCP tool config
+        if existing_mcp_tool:
+            # MCP tool exists - check for duplicate connector
+            gateway_config = existing_mcp_tool.get("gateway_config", {})
+            if connector_id in gateway_config:
+                logger.error(f"Connector {connector_id} already exists in prompt config")
+                raise ClientException(
+                    message="Connector is already registered for prompt.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Merge new connector into existing MCP tool config
+            gateway_config[connector_id] = gateway_id
+            existing_mcp_tool["gateway_config"] = gateway_config
+
+            # Also update server_config to maintain consistency
+            server_config = existing_mcp_tool.get("server_config", {})
+            # Note: server_config is updated separately when tools are added
+            existing_mcp_tool["server_config"] = server_config
+
+            # Update the existing tool in the array
+            existing_tools[existing_mcp_tool_index] = existing_mcp_tool
+            updated_tools = existing_tools
+
+            logger.debug(f"Merged connector {connector_id} into existing MCP tool config")
+        else:
+            # No MCP tool exists - create new entry
+            updated_tools = existing_tools + [mcp_tool_dict]
+            logger.debug(f"Created new MCP tool config with connector {connector_id}")
 
         # 5. Save updated config
-        # For existing configs: preserve all existing data and only update tools
-        # For new configs: only save tools
-
-        prompt_config_endpoint = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config"
-        )
-
         if config_exists:
             # Preserve all existing config data, only update tools field
             payload = {
@@ -1388,26 +1392,8 @@ class PromptService(SessionMixin):
                 "tools": updated_tools,
             }
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(prompt_config_endpoint, json=payload) as response:
-                    response_data = await response.json()
-
-                    if response.status != 200:
-                        logger.error(f"Failed to save MCP tool config: {response.status} {response_data}")
-                        raise ClientException(
-                            message="Failed to save MCP tool configuration",
-                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        )
-
-                    logger.debug(f"Successfully stored MCP tool config for connector {connector_id}")
-
-        except aiohttp.ClientError as e:
-            logger.exception(f"Network error saving MCP tool config: {e}")
-            raise ClientException(
-                message="Unable to save MCP tool configuration",
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
+        await self._save_prompt_config_to_redis(payload)
+        logger.debug(f"Successfully stored MCP tool config for connector {connector_id}")
 
     async def get_tools(
         self,
