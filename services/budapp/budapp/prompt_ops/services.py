@@ -421,11 +421,13 @@ class PromptService(SessionMixin):
 
         # Parse the configuration data
         config_data = PromptConfigurationData(**response_data.get("data", {}))
+        version = response_data.get("version")
 
         # Create and return response
         return PromptConfigGetResponse(
             prompt_id=response_data.get("prompt_id"),
             data=config_data,
+            version=version,
             message="Prompt configuration retrieved successfully",
             code=status.HTTP_200_OK,
         )
