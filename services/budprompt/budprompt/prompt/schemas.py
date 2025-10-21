@@ -479,6 +479,17 @@ class PromptConfigGetResponse(SuccessResponse):
     data: PromptConfigurationData = Field(..., description="The prompt configuration data")
 
 
+class PromptConfigGetRawResponse(SuccessResponse):
+    """Response model for getting raw prompt configuration from Redis.
+
+    Returns the raw JSON data without Pydantic processing or default values.
+    """
+
+    prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")
+    version: int = Field(..., description="The version number of the configuration retrieved")
+    data: Dict[str, Any] = Field(..., description="The raw prompt configuration data from Redis")
+
+
 class PromptConfigCopyRequest(BaseModel):
     """Request model for copying prompt configuration."""
 

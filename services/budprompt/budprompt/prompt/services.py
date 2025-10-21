@@ -48,6 +48,7 @@ from .schema_builder import ModelGeneratorFactory
 from .schemas import (
     PromptConfigCopyRequest,
     PromptConfigCopyResponse,
+    PromptConfigGetRawResponse,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -999,7 +1000,9 @@ class PromptService:
                 message="Failed to store prompt configuration",
             ) from e
 
-    async def get_prompt_config(self, prompt_id: str, version: Optional[int] = None) -> PromptConfigGetResponse:
+    async def get_prompt_config(
+        self, prompt_id: str, version: Optional[int] = None, raw_data: bool = False
+    ) -> Union[PromptConfigGetResponse, PromptConfigGetRawResponse]:
         """Get prompt configuration from Redis.
 
         This method retrieves the prompt configuration stored in Redis
@@ -1008,9 +1011,10 @@ class PromptService:
         Args:
             prompt_id: The unique identifier of the prompt configuration
             version: Optional version number to retrieve specific version
+            raw_data: If True, return raw Redis JSON without Pydantic processing
 
         Returns:
-            PromptConfigGetResponse with the configuration data
+            PromptConfigGetResponse with validated data or PromptConfigGetRawResponse with raw data
 
         Raises:
             ClientException: If configuration not found or Redis operation fails
@@ -1053,16 +1057,27 @@ class PromptService:
                     message=message,
                 )
 
-            # Parse and validate the data
-            config_data = PromptConfigurationData.model_validate_json(config_json)
-
-            return PromptConfigGetResponse(
-                code=200,
-                message="Prompt configuration retrieved successfully",
-                prompt_id=prompt_id,
-                version=retrieved_version,
-                data=config_data,
-            )
+            # Return raw data or validated data based on raw_data flag
+            if raw_data:
+                # Parse as raw dict without Pydantic validation
+                config_dict = json.loads(config_json)
+                return PromptConfigGetRawResponse(
+                    code=200,
+                    message="Raw prompt configuration retrieved successfully",
+                    prompt_id=prompt_id,
+                    version=retrieved_version,
+                    data=config_dict,
+                )
+            else:
+                # Parse and validate the data with Pydantic
+                config_data = PromptConfigurationData.model_validate_json(config_json)
+                return PromptConfigGetResponse(
+                    code=200,
+                    message="Prompt configuration retrieved successfully",
+                    prompt_id=prompt_id,
+                    version=retrieved_version,
+                    data=config_data,
+                )
 
         except ClientException:
             # Re-raise client exceptions as-is
