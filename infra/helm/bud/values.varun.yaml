@@ -1,4 +1,4 @@
-imagePullPolicy: "always"
+imagePullPolicy: "Always"
 
 ingress:
     hosts:
