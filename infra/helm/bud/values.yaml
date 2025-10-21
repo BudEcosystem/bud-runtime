@@ -286,6 +286,7 @@ microservices:
       IS_TOPIC_NOTIFICATION_ENABLED: "true"
       LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
       LOG_LEVEL: INFO
+      MCP_FOUNDRY_BASE_URL: https://mcp-foundry.bud.studio/
       MODEL_DOWNLOAD_DIR: /data/models-registry
       MODEL_DOWNLOAD_DIR_MAX_SIZE: "500"
       MODEL_REGISTRY_DIR: /data/models-registry
