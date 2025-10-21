@@ -1,3 +1,5 @@
+imagePullPolicy: "always"
+
 ingress:
     hosts:
         root: varun.bud.studio
