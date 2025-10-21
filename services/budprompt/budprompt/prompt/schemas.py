@@ -373,8 +373,8 @@ class PromptConfigurationData(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
-    tools: Optional[List[MCPToolConfig]] = Field(
-        None,
+    tools: List[MCPToolConfig] = Field(
+        default_factory=list,
         description="List of tool configurations (MCP tools) for this prompt",
     )
 
@@ -416,8 +416,8 @@ class PromptExecuteData(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
-    tools: Optional[List[MCPToolConfig]] = Field(
-        None,
+    tools: List[MCPToolConfig] = Field(
+        default_factory=list,
         description="List of tool configurations (MCP tools) for this prompt",
     )
 
@@ -455,8 +455,8 @@ class PromptConfigRequest(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
-    tools: Optional[List[MCPToolConfig]] = Field(
-        None,
+    tools: List[MCPToolConfig] = Field(
+        default_factory=list,
         description="List of tool configurations (MCP tools) to add/update",
     )
 

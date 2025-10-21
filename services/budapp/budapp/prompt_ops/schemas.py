@@ -575,7 +575,7 @@ class PromptConfigurationData(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
-    tools: Optional[List[MCPToolConfig]] = Field(None, description="MCP tool configurations")
+    tools: List[MCPToolConfig] = Field(default_factory=list, description="MCP tool configurations")
 
 
 class GetPromptVersionResponse(SuccessResponse):
