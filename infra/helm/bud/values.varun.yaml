@@ -15,3 +15,7 @@ microservices:
             LOG_LEVEL: DEBUG
     budgateway:
         image: vsrvarun/budgateway:vsr
+
+storage:
+    budevalDataset:
+        className: "nfs-csi"
