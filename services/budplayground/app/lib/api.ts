@@ -60,7 +60,7 @@ export const getPromptConfig = async (promptId: string, apiKey = "", accessKey =
   }
 
   try {
-    const result = await AppRequest.Get(`api/prompts/${promptId}`, {
+    const result = await AppRequest.Get(`/prompts/prompt-config/${promptId}`, {
       headers
     }).then((res) => {
       return res.data;

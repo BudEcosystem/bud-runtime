@@ -126,14 +126,22 @@ class DeviceExtractor:
     }
 
     @staticmethod
-    def parse_memory_size(memory_str: str) -> Optional[int]:
+    def parse_memory_size(memory_str: str, source_label: Optional[str] = None) -> Optional[int]:
         """Parse memory size from various formats to GB.
+
+        Args:
+            memory_str: Memory value string to parse (e.g., "40960 MiB", "40 GB", "46068")
+            source_label: Optional label name indicating the data source (e.g., "nvidia.com/gpu.memory")
+                         Used to determine the correct unit when no unit is specified.
 
         Examples:
             "40960 MiB" -> 40
             "40 GB" -> 40
             "81920 MB" -> 80
             "43008 MiB" -> 42
+            "46068" -> 45 (plain number from NVIDIA GFD label, always MB)
+            "128" -> 125 (plain number from NVIDIA GFD label, always MB)
+            "96" -> 96 (plain number from other source, heuristic: assume GB if <= 100)
         """
         if not memory_str:
             return None
@@ -146,7 +154,31 @@ class DeviceExtractor:
             return None
 
         value = float(match.group(1))
-        unit = match.group(2) or "B"
+        unit = match.group(2)  # Keep as None if no unit specified
+
+        # Handle plain numbers (no unit specified)
+        if unit is None:
+            # NVIDIA GFD labels (nvidia.com/gpu.memory) are ALWAYS in MB without unit
+            # This is reliable and documented behavior from NVIDIA GPU Feature Discovery
+            if source_label and "nvidia.com/gpu.memory" in source_label:
+                result_gb = round(value / 1024)
+                logger.debug(
+                    f"Parsed plain number '{memory_str}' from NVIDIA GFD label '{source_label}' as MB: {result_gb} GB"
+                )
+                return result_gb
+
+            # For other sources, use heuristic:
+            # If the number is large (> 100), assume MB
+            # If the number is small (≤ 100), assume GB
+            if value > 100:
+                # Round to nearest GB instead of truncating
+                result_gb = round(value / 1024)
+                logger.debug(f"Parsed plain number '{memory_str}' as MB (heuristic): {result_gb} GB")
+                return result_gb
+            else:
+                logger.debug(f"Parsed plain number '{memory_str}' as GB (heuristic): {int(value)} GB")
+                return int(value)
+
         unit = unit.upper()
 
         # Convert to GB
@@ -289,8 +321,14 @@ class DeviceExtractor:
             )
 
             # Extract memory
-            if "nvidia.com/gpu.memory" in labels:
-                gpu.memory_gb = self.parse_memory_size(labels["nvidia.com/gpu.memory"])
+            memory_label_value = labels.get("nvidia.com/gpu.memory", "")
+            if memory_label_value:
+                gpu.memory_gb = self.parse_memory_size(memory_label_value, source_label="nvidia.com/gpu.memory")
+                logger.debug(
+                    f"GPU {gpu.raw_name}: Parsed memory from NFD label '{memory_label_value}' -> {gpu.memory_gb} GB"
+                )
+            else:
+                logger.warning(f"GPU {gpu.raw_name}: NFD label 'nvidia.com/gpu.memory' is missing or empty")
 
             # Extract CUDA version
             cuda_major = labels.get("nvidia.com/cuda.runtime.major", "")
@@ -304,6 +342,15 @@ class DeviceExtractor:
             gpu.variant = parsed.get("variant")
             if not gpu.memory_gb and parsed.get("memory_gb"):
                 gpu.memory_gb = parsed["memory_gb"]
+                logger.debug(f"GPU {gpu.raw_name}: Extracted memory from product name -> {gpu.memory_gb} GB")
+
+            # Validate final memory value
+            if not gpu.memory_gb or gpu.memory_gb == 0:
+                logger.warning(
+                    f"GPU {gpu.raw_name}: Memory detection resulted in {gpu.memory_gb} GB. "
+                    f"NFD label value was '{memory_label_value}'. "
+                    f"This will cause simulation failures. Please verify GPU Feature Discovery is running correctly."
+                )
 
             # PCI device IDs not available from NFD for NVIDIA GPUs
             # NFD only provides vendor presence, not specific device IDs

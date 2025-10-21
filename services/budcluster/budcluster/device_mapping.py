@@ -49,7 +49,7 @@ class DeviceMappingRegistry:
         "RTX3090": ["NVIDIA-GeForce-RTX-3090"],
         "RTX3080": ["NVIDIA-GeForce-RTX-3080"],
         # L-series GPUs
-        "L40": ["NVIDIA-L40"],
+        "L40": ["NVIDIA-L40S", "NVIDIA-L40"],
         "L4": ["NVIDIA-L4"],
     }
 

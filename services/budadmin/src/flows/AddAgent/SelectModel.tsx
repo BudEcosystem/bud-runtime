@@ -32,12 +32,6 @@ export default function SelectModel() {
     getWorkflow
   } = useAddAgent();
 
-  // Get project data from localStorage (stored in SelectProject)
-  const getSelectedProject = () => {
-    const projectData = localStorage.getItem("addAgent_selectedProject");
-    return projectData ? JSON.parse(projectData) : null;
-  };
-
   // Load workflow on component mount if it exists
   useEffect(() => {
     if (currentWorkflow?.workflow_id) {
@@ -79,9 +73,6 @@ export default function SelectModel() {
     setIsSubmitting(true);
 
     try {
-      // Store selected model for later use in the flow
-      localStorage.setItem("addAgent_selectedModel", JSON.stringify(selectedModel));
-
       // Store in the Add Agent store
       setStoreSelectedModel(selectedModel);
 

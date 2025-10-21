@@ -61,7 +61,7 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
             </Checkbox>
             <div className="pt-[.8rem]">
               <Text_10_400_757575 className='leading-[140%]'>
-                This option allows hghcgjhkjhknj bhjvjfg hcvn mhbj,bnvnhfccnv hvbnvhcn
+                This option allows the agent to execute multiple function calls in a single response, enabling more complex and efficient task completion.
               </Text_10_400_757575>
             </div>
           </div>
