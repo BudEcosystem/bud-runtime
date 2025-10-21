@@ -46,10 +46,6 @@ microservices:
         image: budstudio/buddoc:nightly
     global:
         env:
-            OPENAI_API_KEY: <change_me>
-            # tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 64
-            PASSWORD_SALT: pL4eVOkzsLEKc25T69UCvjXvK0BxgghwzSpEE9wBbUMNezEODv0s7tWcrhEeQyCh
-
             SUPER_USER_EMAIL: root@example.com
             # tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32
             SUPER_USER_PASSWORD: LCMSaOh2M2zMtMim0JOD5ctmyPFeVVNG
