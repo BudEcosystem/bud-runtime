@@ -4,6 +4,7 @@ use crate::inference::types::{Latency, Usage};
 use futures::Stream;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
@@ -127,6 +128,10 @@ pub struct CompletionChunk {
     pub choices: Vec<CompletionChoiceChunk>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage: Option<Usage>,
+    /// Catch-all field for forward compatibility with vLLM API changes
+    /// This prevents deserialization failures when vLLM adds new fields
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 /// Choice chunk for streaming
@@ -138,6 +143,10 @@ pub struct CompletionChoiceChunk {
     pub logprobs: Option<CompletionLogProbs>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finish_reason: Option<String>,
+    /// Catch-all field for forward compatibility with vLLM API changes
+    /// This prevents deserialization failures when vLLM adds new fields
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 /// Stream type for completions
