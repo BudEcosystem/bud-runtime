@@ -207,6 +207,7 @@ class PromptExecutorService:
                 allow_multiple_calls=request.allow_multiple_calls,
                 system_prompt_role=request.system_prompt_role,
                 api_key=api_key,
+                tools=request.tools,
             )
 
             return result

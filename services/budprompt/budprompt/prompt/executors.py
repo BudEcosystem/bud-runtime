@@ -49,11 +49,12 @@ from .openai_response_formatter import OpenAIResponseFormatter
 from .openai_streaming_formatter import OpenAIStreamingFormatter
 from .revised_code.field_validation import ModelValidationEnhancer
 from .schema_builder import CustomModelGenerator, DataModelGenerator
-from .schemas import Message, ModelSettings
+from .schemas import MCPToolConfig, Message, ModelSettings
 from .streaming_executors import execute_streaming_validation
 from .streaming_validation import add_field_validator_to_model
 from .streaming_validation_executor import StreamingValidationExecutor
 from .template_renderer import render_template
+from .tool_loaders import ToolRegistry
 from .utils import contains_pydantic_model, validate_input_data_type
 from .validation import add_validator_to_model_async
 
@@ -574,6 +575,7 @@ class SimplePromptExecutor:
         allow_multiple_calls: bool = True,
         system_prompt_role: Optional[str] = None,
         api_key: Optional[str] = None,
+        tools: Optional[List[MCPToolConfig]] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt with structured or unstructured input and output.
 
@@ -592,6 +594,7 @@ class SimplePromptExecutor:
             allow_multiple_calls: Allow multiple LLM calls for retries and tools
             system_prompt_role: Role for system prompts (system/developer/user)
             api_key: Optional API key for authorization
+            tools: Optional list of tool configurations (MCP tools, etc.)
 
         Returns:
             Output data (Dict for structured, str for unstructured) or AsyncGenerator for streaming
@@ -625,6 +628,9 @@ class SimplePromptExecutor:
             # Handle output type and validation
             output_type = await self._get_output_type(output_schema, output_validation)
 
+            # Load toolsets from tools configuration (only if tools are present)
+            toolsets = await self._load_toolsets(tools)
+
             # Create AI agent with appropriate output type and retry configuration
             agent = await self._create_agent(
                 deployment_name,
@@ -634,6 +640,7 @@ class SimplePromptExecutor:
                 allow_multiple_calls,
                 system_prompt_role,
                 api_key=api_key,
+                toolsets=toolsets,
             )
 
             # Build message history from all messages
@@ -803,6 +810,34 @@ class SimplePromptExecutor:
         # Use the model generator to create Pydantic model from schema
         return await self.model_generator.from_json_schema(schema, model_name)
 
+    async def _load_toolsets(self, tools: Optional[List[MCPToolConfig]]) -> List[Any]:
+        """Load toolsets from tools configuration.
+
+        Args:
+            tools: List of tool configurations (MCP, custom, etc.)
+
+        Returns:
+            List of loaded toolset objects ready for Agent
+        """
+        if not tools:
+            logger.debug("No tools configuration provided, skipping toolset loading")
+            return []
+
+        try:
+            # Create tool registry (gets config from app_settings)
+            registry = ToolRegistry()
+
+            # Load all tools using registry
+            toolsets = await registry.load_all_tools(tools)
+
+            logger.info(f"Successfully loaded {len(toolsets)} toolsets for agent")
+            return toolsets
+
+        except Exception as e:
+            logger.error(f"Failed to load toolsets: {str(e)}")
+            # Don't fail execution if tools can't be loaded - continue without tools
+            return []
+
     def _convert_to_openai_settings(self, model_settings: ModelSettings) -> OpenAIModelSettings:
         """Convert ModelSettings to OpenAIModelSettings with automatic extra_body routing.
 
@@ -849,6 +884,7 @@ class SimplePromptExecutor:
         allow_multiple_calls: bool = True,
         system_prompt_role: Optional[str] = None,
         api_key: Optional[str] = None,
+        toolsets: Optional[List[Any]] = None,
     ) -> Agent:
         """Create Pydantic AI agent with automatic parameter routing.
 
@@ -860,6 +896,7 @@ class SimplePromptExecutor:
             allow_multiple_calls: Whether to allow multiple LLM calls
             system_prompt_role: Role for system prompts (system/developer/user)
             api_key: Optional API key for authorization
+            toolsets: Optional list of toolsets (e.g., MCP servers) for the agent
 
         Returns:
             Configured AI agent
@@ -883,6 +920,11 @@ class SimplePromptExecutor:
             "model": model,
             "output_type": output_type,
         }
+
+        # Add toolsets if provided
+        if toolsets:
+            agent_kwargs["toolsets"] = toolsets
+            logger.debug(f"Agent configured with {len(toolsets)} toolsets")
 
         # Add retries if validation is enabled
         if llm_retry_limit is not None:
