@@ -117,19 +117,19 @@ class MCPToolConfig(BaseModel):
     """MCP Tool configuration stored in prompt config."""
 
     type: Literal["mcp"] = "mcp"
-    server_label: Optional[str] = Field(..., description="Virtual server name")
+    server_label: Optional[str] = Field(None, description="Virtual server name")
     server_description: Optional[str] = Field(None, description="Server description")
     server_url: Optional[str] = Field(None, description="Server URL")
     require_approval: Literal["always", "never", "auto"] = Field(
         default="never", description="Tool approval requirement"
     )
     allowed_tools: List[str] = Field(default_factory=list, description="List of tool IDs allowed")
-    connector_id: Optional[str] = Field(..., description="Virtual server ID from MCP Foundry")
+    connector_id: Optional[str] = Field(None, description="Virtual server ID from MCP Foundry")
     gateway_config: Dict[str, str] = Field(
-        ..., description="Gateway configuration with connector_id as key and gateway_id as value"
+        default_factory=dict, description="Gateway configuration with connector_id as key and gateway_id as value"
     )
     server_config: Dict[str, str] = Field(
-        ..., description="Gateway configuration with connector_id as key and gateway_id as value"
+        default_factory=dict, description="Gateway configuration with connector_id as key and gateway_id as value"
     )
 
 

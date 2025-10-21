@@ -531,10 +531,10 @@ class MCPToolConfig(BaseModel):
     allowed_tools: List[str] = Field(default_factory=list, description="List of tool IDs allowed")
     connector_id: Optional[str] = Field(None, description="Virtual server ID from MCP Foundry")
     gateway_config: Dict[str, str] = Field(
-        ..., description="Gateway configuration with connector_id as key and gateway_id as value"
+        default_factory=dict, description="Gateway configuration with connector_id as key and gateway_id as value"
     )
     server_config: Dict[str, str] = Field(
-        ..., description="Gateway configuration with connector_id as key and gateway_id as value"
+        default_factory=dict, description="Gateway configuration with connector_id as key and gateway_id as value"
     )
 
 
