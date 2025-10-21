@@ -826,7 +826,6 @@ async def list_connectors(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[ConnectorFilter, Depends()],
-    prompt_id: Optional[str] = Query(None, description="Filter connectors connected to a specific prompt"),
     version: Optional[int] = Query(
         None, ge=1, description="Version of prompt config. If not specified, uses default version"
     ),
@@ -835,15 +834,18 @@ async def list_connectors(
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
     search: bool = False,
 ) -> Union[ConnectorListResponse, ErrorResponse]:
-    """List all connectors with optional filtering by prompt_id.
+    """List all connectors with optional filtering.
 
     This endpoint returns a list of available connectors. When prompt_id is provided,
-    it filters to show only connectors connected to that specific prompt.
+    you can also use is_registered to filter:
+    - is_registered=true: Show only registered connectors
+    - is_registered=false: Show only non-registered connectors
+    - is_registered not set: Show all connectors
 
     Args:
         current_user: The authenticated user
         session: Database session
-        prompt_id: Optional prompt ID to filter connectors for a specific prompt
+        filters: Filter parameters including prompt_id, is_registered, and name
         version: Optional version number. If not specified, uses default version
         page: Page number for pagination
         limit: Number of items per page
@@ -857,10 +859,15 @@ async def list_connectors(
     # Convert filter to dictionary
     filters_dict = filters.model_dump(exclude_none=True)
 
+    # Extract prompt_id and is_registered from filters
+    prompt_id = filters.prompt_id
+    is_registered = filters.is_registered
+
     try:
         # Get connectors from service
         connectors_list, count = await PromptService(session).get_connectors(
             prompt_id=prompt_id,
+            is_registered=is_registered,
             version=version,
             offset=offset,
             limit=limit,

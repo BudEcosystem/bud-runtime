@@ -645,6 +645,8 @@ class ConnectorFilter(BaseModel):
     """Filter schema for connector list API."""
 
     name: str | None = None
+    prompt_id: Optional[str] = Field(None, description="Prompt ID to filter registered/non-registered connectors")
+    is_registered: Optional[bool] = Field(None, description="Filter by registration status (requires prompt_id)")
 
 
 class Connector(BaseModel):

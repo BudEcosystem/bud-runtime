@@ -613,6 +613,7 @@ class PromptService(SessionMixin):
     async def get_connectors(
         self,
         prompt_id: Optional[str] = None,
+        is_registered: Optional[bool] = None,
         version: Optional[int] = None,
         offset: int = 0,
         limit: int = 10,
@@ -624,6 +625,10 @@ class PromptService(SessionMixin):
 
         Args:
             prompt_id: Optional prompt ID (UUID or draft ID) to filter connectors for a specific prompt
+            is_registered: Optional filter for registration status (only works with prompt_id)
+                - True: Show only registered connectors
+                - False: Show only non-registered connectors
+                - None: Show all connectors
             version: Optional version number. If not specified, uses default version
             offset: Pagination offset
             limit: Pagination limit
@@ -675,17 +680,61 @@ class PromptService(SessionMixin):
                 else:
                     raise
 
-            # Call MCP Foundry API
+            # Call MCP Foundry API based on is_registered filter
             try:
-                mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors_by_connector_ids(
-                    connector_ids=list(registered_connector_ids),
-                    show_registered_only=False,
-                    show_available_only=True,
-                    name=name_filter,
-                    offset=offset,
-                    limit=limit,
-                )
-                logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
+                if is_registered is True:
+                    # Show only registered connectors - use list_connectors_by_connector_ids
+                    logger.debug(f"Filtering to show only registered connectors for prompt {prompt_id}")
+                    mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors_by_connector_ids(
+                        connector_ids=list(registered_connector_ids),
+                        show_registered_only=False,
+                        show_available_only=True,
+                        name=name_filter,
+                        offset=offset,
+                        limit=limit,
+                    )
+                    logger.debug(f"Successfully fetched {total_count} registered connectors from MCP Foundry")
+
+                elif is_registered is False:
+                    # Show only non-registered connectors - use list_connectors and exclude registered IDs
+                    logger.debug(f"Filtering to show only non-registered connectors for prompt {prompt_id}")
+
+                    # Fetch all connectors from MCP Foundry
+                    all_connectors, all_count = await mcp_foundry_service.list_connectors(
+                        show_registered_only=False,
+                        show_available_only=True,
+                        name=name_filter,
+                        offset=offset,
+                        limit=limit,
+                    )
+
+                    # Filter out registered connector IDs
+                    filtered_connectors = [
+                        connector
+                        for connector in all_connectors
+                        if connector.get("id") not in registered_connector_ids
+                    ]
+
+                    # Apply pagination to filtered results
+                    total_count = len(filtered_connectors)
+                    mcp_foundry_response = filtered_connectors[offset : offset + limit]
+
+                    logger.debug(
+                        f"Filtered {total_count} non-registered connectors out of {all_count} total, "
+                        f"returning {len(mcp_foundry_response)} after pagination"
+                    )
+
+                else:
+                    # Show all connectors (current behavior when is_registered not specified)
+                    logger.debug(f"Showing all connectors for prompt {prompt_id}")
+                    mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors(
+                        show_registered_only=False,
+                        show_available_only=True,
+                        name=name_filter,
+                        offset=offset,
+                        limit=limit,
+                    )
+                    logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
             except MCPFoundryException as e:
                 logger.error(f"MCP Foundry API error: {e}")
                 mcp_foundry_response = []
