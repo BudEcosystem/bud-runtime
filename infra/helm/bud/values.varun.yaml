@@ -17,5 +17,7 @@ microservices:
         image: vsrvarun/budgateway:vsr
 
 storage:
+    budmodelRegistry:
+        className: nfs-csi
     budevalDataset:
         className: "nfs-csi"
