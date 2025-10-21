@@ -128,6 +128,9 @@ class MCPToolConfig(BaseModel):
     gateway_config: Dict[str, str] = Field(
         ..., description="Gateway configuration with connector_id as key and gateway_id as value"
     )
+    server_config: Dict[str, str] = Field(
+        ..., description="Gateway configuration with connector_id as key and gateway_id as value"
+    )
 
 
 class PromptExecuteRequest(BaseModel):
