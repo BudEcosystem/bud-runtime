@@ -77,9 +77,11 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   // Check URL parameter to show form (for testing/demo)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    // const showForm = 'true';
     const showForm = params.get('show_form');
-    if (showForm === 'true') {
+    const promptIdsParam = params.get('promptIds');
+
+    // Show form if either show_form=true OR promptIds exist in URL
+    if (showForm === 'true' || (promptIdsParam && promptIdsParam.trim().length > 0)) {
       setShowPromptForm(true);
     }
   }, []);
