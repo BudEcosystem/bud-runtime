@@ -1182,7 +1182,7 @@ class PromptService(SessionMixin):
         logger.debug(f"Disconnecting connector {connector_id} from prompt {budprompt_id}")
 
         # Step 1: Fetch prompt config from Redis
-        config_response = await self._perform_get_prompt_config_request(budprompt_id, version=version)
+        config_response = await self._perform_get_prompt_config_request(budprompt_id, version=version, raw_data=True)
         config_data = config_response.get("data", {})
         tools = config_data.get("tools", [])
         target_version = config_response.get("version", 1) if version is None else version
