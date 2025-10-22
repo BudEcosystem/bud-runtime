@@ -28,7 +28,9 @@ is_nixos() {
 
 dir_ensure() {
 	if [ -d "$bud_repo_local" ]; then
+		git -C "$bud_repo_local" stash push || exit 1
 		git -C "$bud_repo_local" pull || exit 1
+		git -C "$bud_repo_local" stash pop || exit 1
 	else
 		git clone "$bud_repo" "$bud_repo_local" || exit 1
 	fi
