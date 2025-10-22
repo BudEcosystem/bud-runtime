@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from "react";
-import { ConfigProvider, Dropdown, Tooltip } from "antd";
+import { Dropdown, Tooltip, Image } from "antd";
 import {
   CloseOutlined,
   CopyOutlined,
@@ -150,32 +150,6 @@ function AgentBoxInner({
     if (session) updateSession(session.id, { promptMessages: value });
   };
 
-  const handleDeletePromptMessage = (messageId: string) => {
-    if (!session) return;
-
-    // Parse current messages
-    let messages: any[] = [];
-    try {
-      if (session.promptMessages && typeof session.promptMessages === 'string') {
-        messages = JSON.parse(session.promptMessages);
-      }
-    } catch (e) {
-      console.error('Error parsing prompt messages:', e);
-      return;
-    }
-
-    // Keep at least one message
-    if (messages.length <= 1) return;
-
-    // Filter out the deleted message
-    const updatedMessages = messages.filter(msg => msg.id !== messageId);
-
-    // Update session with new messages
-    const updatedMessagesString = JSON.stringify(updatedMessages);
-    setLocalPromptMessages(updatedMessagesString);
-    updateSession(session.id, { promptMessages: updatedMessagesString });
-  };
-
   // Handler for when a flowgram card is clicked
   const handleNodeClick = (nodeType: string, nodeId: string, nodeData: any) => {
     // The openSettings function in context already handles the mapping
@@ -228,8 +202,8 @@ function AgentBoxInner({
     setIsSaving(true);
 
     try {
-      // Determine the type based on whether we have output variables
-      const type = session.outputVariables && session.outputVariables.length > 0 ? "output" : "input";
+      // This function is for saving input schema, so type should always be "input"
+      const type = "input";
 
       // Build the payload using the utility function with required parameters
       const payload = buildPromptSchemaFromSession(
@@ -651,6 +625,27 @@ function AgentBoxInner({
             </div>
           </button>
 
+          {/* config Button - Works as toggle */}
+          {/* <button
+            className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer ${isRightSidebarOpen ? 'bg-[#965CDE] bg-opacity-20' : ''
+              }`}
+            onClick={toggleSettings}
+          >
+            <div className={`w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group ${isRightSidebarOpen ? 'text-[#965CDE]' : 'text-[#B3B3B3] hover:text-[#FFFFFF]'
+              }`}>
+              <Tooltip title={isRightSidebarOpen ? "Close Settings" : "Settings"}>
+                <Image
+                  preview={false}
+                  src="images/looking.gif"
+                  alt="bud"
+                  width={"1150px"} // 750px
+                  // height={"150px"}
+                  className="relative z-9 mt-[-8.5rem]"
+                />
+              </Tooltip>
+            </div>
+          </button> */}
+
           {/* New Chat Window Button */}
           <Tooltip title="New chat window" placement="bottom">
             <button
@@ -673,51 +668,26 @@ function AgentBoxInner({
           </Tooltip>
 
           {/* More Options Dropdown */}
-          <ConfigProvider
-            theme={{
-              components: {
-                Dropdown: {
-                  colorBgElevated: '#161616',
-                  borderRadiusLG: 6,
-                  controlItemBgHover: '#1F1F1F',
-                  colorText: '#FFFFFF',
-                },
-              },
-            }}
-          >
-            <Dropdown
-              menu={{
-                items: menuItems,
-                style: {
-                  background: '#161616',
-                  border: '1px solid #1F1F1F',
-                  borderRadius: '6px',
-                  padding: '.7rem .6rem',
-                }
-              }}
-              trigger={["click"]}
-              placement="bottomRight"
-            >
-              <Tooltip title="Options" placement="bottom">
-                <button className="w-7 h-7 rounded-md flex justify-center items-center cursor-pointer hover:bg-[#1A1A1A] transition-colors">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    fill="none"
-                  >
-                    <path
-                      fill="currentColor"
-                      fillRule="evenodd"
-                      d="M10.453 3.226a1.226 1.226 0 1 1-2.453 0 1.226 1.226 0 0 1 2.453 0Zm0 5.45a1.226 1.226 0 1 1-2.453 0 1.226 1.226 0 0 1 2.453 0Zm-1.226 6.676a1.226 1.226 0 1 0 0-2.452 1.226 1.226 0 0 0 0 2.452Z"
-                      clipRule="evenodd"
-                      className="text-[#B3B3B3] hover:text-white"
-                    />
-                  </svg>
-                </button>
-              </Tooltip>
-            </Dropdown>
-          </ConfigProvider>
+          <Dropdown menu={{ items: menuItems }} trigger={["click"]} placement="bottomRight">
+            <Tooltip title="Options" placement="bottom">
+              <button className="w-7 h-7 rounded-md flex justify-center items-center cursor-pointer hover:bg-[#1A1A1A] transition-colors">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  fill="none"
+                >
+                  <path
+                    fill="currentColor"
+                    fillRule="evenodd"
+                    d="M10.453 3.226a1.226 1.226 0 1 1-2.453 0 1.226 1.226 0 0 1 2.453 0Zm0 5.45a1.226 1.226 0 1 1-2.453 0 1.226 1.226 0 0 1 2.453 0Zm-1.226 6.676a1.226 1.226 0 1 0 0-2.452 1.226 1.226 0 0 0 0 2.452Z"
+                    clipRule="evenodd"
+                    className="text-[#B3B3B3] hover:text-white"
+                  />
+                </svg>
+              </button>
+            </Tooltip>
+          </Dropdown>
 
           {/* Close Button */}
           {totalSessions > 1 && (
@@ -752,8 +722,6 @@ function AgentBoxInner({
               onSaveOutputSchema={handleSaveOutputSchema}
               onSaveSystemPrompt={handleSaveSystemPrompt}
               onSavePromptMessages={handleSavePromptMessages}
-              onDeleteVariable={handleDeleteVariable}
-              onDeletePromptMessage={handleDeletePromptMessage}
               isSaving={isSaving}
               isSavingOutput={isSavingOutput}
               isSavingSystemPrompt={isSavingSystemPrompt}
