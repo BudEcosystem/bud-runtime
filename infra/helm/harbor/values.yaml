@@ -7,7 +7,7 @@ harbor:
       enabled: true
     ingress:
       hosts:
-        core: temp.sinan.bud.studio
+        core: harbor.bud.studio
       annotations:
         kubernetes.io/tls-acme: "true"
   database:
