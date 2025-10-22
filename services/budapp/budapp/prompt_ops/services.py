@@ -1039,24 +1039,7 @@ class PromptService(SessionMixin):
         # Convert UUID tool_ids to hex strings for MCP Foundry and Redis storage
         tool_ids_str = [str(tool_id.hex) for tool_id in tool_ids]
 
-        # Step 1: Fetch tool details from MCP Foundry to get originalName
-        tool_original_names = []
-        for tool_id in tool_ids_str:
-            try:
-                tool_data = await mcp_foundry_service.get_tool_by_id(tool_id)
-                original_name = tool_data["originalName"]  # Direct access, will raise KeyError if missing
-                tool_original_names.append(original_name)
-            except MCPFoundryException as e:
-                logger.error(f"Failed to fetch tool {tool_id}: {e}")
-                raise ClientException(message="Tool not found", status_code=status.HTTP_404_NOT_FOUND)
-            except KeyError:
-                logger.error(f"Tool {tool_id} missing originalName field")
-                raise ClientException(
-                    message="Invalid tool data",
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-
-        # Step 2: Fetch existing prompt configuration (must exist)
+        # Step 1: Fetch existing prompt configuration (must exist)
         try:
             config_response = await self._perform_get_prompt_config_request(prompt_id, version=version, raw_data=True)
             config_data = config_response.get("data", {})
@@ -1066,7 +1049,7 @@ class PromptService(SessionMixin):
         except ClientException:
             raise
 
-        # Step 3: Find MCP tool and validate connector
+        # Step 2: Find MCP tool and validate connector
         mcp_tool = None
         mcp_tool_index = None
 
@@ -1091,7 +1074,35 @@ class PromptService(SessionMixin):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Step 4: Create or update virtual server based on server_url existence
+        # Step 3: Merge new tool IDs into existing server_config
+        existing_server_config = mcp_tool.get("server_config", {})
+        existing_server_config[connector_id] = tool_ids_str
+
+        # Step 4: Collect ALL tool IDs from ALL connectors
+        all_tool_ids = []
+        for _conn_id, conn_tool_ids in existing_server_config.items():
+            all_tool_ids.extend(conn_tool_ids)
+
+        logger.debug(f"Total tools across all connectors: {len(all_tool_ids)}")
+
+        # Step 5: Fetch original names for ALL tool IDs (not just newly added)
+        all_tool_original_names = []
+        for tool_id in all_tool_ids:
+            try:
+                tool_data = await mcp_foundry_service.get_tool_by_id(tool_id)
+                original_name = tool_data["originalName"]
+                all_tool_original_names.append(original_name)
+            except MCPFoundryException as e:
+                logger.error(f"Failed to fetch tool {tool_id}: {e}")
+                raise ClientException(message="Tool not found", status_code=status.HTTP_404_NOT_FOUND)
+            except KeyError:
+                logger.error(f"Tool {tool_id} missing originalName field")
+                raise ClientException(
+                    message="Invalid tool data",
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        # Step 6: Create or update virtual server with ALL tools
         virtual_server_id = mcp_tool.get("server_url")
 
         # Construct virtual server name: {prompt_id}__v{version}
@@ -1099,25 +1110,25 @@ class PromptService(SessionMixin):
 
         try:
             if virtual_server_id:
-                # Update existing virtual server
-                logger.debug(f"Updating existing virtual server {virtual_server_id}")
+                # Update existing virtual server with ALL tools from ALL connectors
+                logger.debug(f"Updating virtual server {virtual_server_id} with {len(all_tool_ids)} tools")
                 await mcp_foundry_service.update_virtual_server(
-                    server_id=virtual_server_id, associated_tools=tool_ids_str
+                    server_id=virtual_server_id, associated_tools=all_tool_ids
                 )
             else:
-                # Create new virtual server with version in name
-                logger.debug(f"Creating new virtual server for prompt {prompt_id} version {target_version}")
+                # Create new virtual server with ALL tools
+                logger.debug(f"Creating virtual server for prompt {prompt_id} version {target_version}")
                 vs_response = await mcp_foundry_service.create_virtual_server(
-                    name=virtual_server_name, associated_tools=tool_ids_str, visibility="public"
+                    name=virtual_server_name, associated_tools=all_tool_ids, visibility="public"
                 )
                 virtual_server_id = vs_response.get("id")
 
-            # Update MCP tool config (always happens)
+            # Update MCP tool config with merged data
             mcp_tool["server_label"] = virtual_server_name
             mcp_tool["server_url"] = virtual_server_id
-            mcp_tool["allowed_tools"] = tool_original_names
+            mcp_tool["allowed_tools"] = all_tool_original_names  # All tool original names
             mcp_tool["connector_id"] = virtual_server_id
-            mcp_tool["server_config"] = {connector_id: tool_ids_str}
+            mcp_tool["server_config"] = existing_server_config  # Merged server_config
             tools[mcp_tool_index] = mcp_tool
 
         except MCPFoundryException as e:
@@ -1127,7 +1138,7 @@ class PromptService(SessionMixin):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Step 5: Save updated configuration to Redis
+        # Step 7: Save updated configuration to Redis
         # Preserve all existing config data, only update tools field
         payload = {
             **config_data,  # Spread all existing fields
@@ -1140,7 +1151,7 @@ class PromptService(SessionMixin):
         # Save using helper method
         await self._save_prompt_config_to_redis(payload)
 
-        # Step 6: Return response
+        # Step 8: Return response
         return {
             "virtual_server_id": virtual_server_id,
             "virtual_server_name": virtual_server_name,
