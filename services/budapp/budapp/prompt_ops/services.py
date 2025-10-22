@@ -1450,7 +1450,7 @@ class PromptService(SessionMixin):
 
         # 1. Fetch prompt config from Redis
         try:
-            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version)
+            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version, raw_data=True)
             config_data = config_response.get("data", {})
             tools = config_data.get("tools", [])
         except ClientException as e:
@@ -1480,14 +1480,17 @@ class PromptService(SessionMixin):
 
         logger.debug(f"Found gateway_id={gateway_id} for connector={connector_id}, added_tool_ids={added_tool_ids}")
 
-        # 3. Call MCP Foundry API with server_id (gateway_id)
+        # 3. Fetch gateway with all tools from MCP Foundry
         try:
-            mcp_foundry_response, total_count = await mcp_foundry_service.list_tools(
-                server_id=gateway_id, offset=offset, limit=limit
-            )
-            logger.debug(
-                f"Successfully fetched {len(mcp_foundry_response)} tools from MCP Foundry for gateway {gateway_id}"
-            )
+            gateway_data = await mcp_foundry_service.get_gateway_by_id(gateway_id)
+            all_tools = gateway_data.get("tools", [])
+
+            logger.debug(f"Successfully fetched gateway {gateway_id} with {len(all_tools)} tools from MCP Foundry")
+
+            # Apply pagination in-memory
+            total_count = len(all_tools)
+            mcp_foundry_response = all_tools[offset : offset + limit]
+
         except MCPFoundryException as e:
             logger.error(f"MCP Foundry API error: {e}")
             return [], 0

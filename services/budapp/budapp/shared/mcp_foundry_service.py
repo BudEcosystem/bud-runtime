@@ -595,6 +595,42 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def get_gateway_by_id(self, gateway_id: str) -> Dict[str, Any]:
+        """Get a gateway by ID from MCP Foundry.
+
+        Returns gateway details including all associated tools in the 'tools' array.
+
+        Args:
+            gateway_id: The gateway ID to retrieve
+
+        Returns:
+            Dict containing gateway data with 'tools' array including:
+                - id, name, url, transport, visibility
+                - tools: List of tool objects with id, originalName, displayName, etc.
+
+        Raises:
+            MCPFoundryException: If gateway not found or request fails
+        """
+        try:
+            logger.debug(f"Fetching gateway with ID: {gateway_id}")
+
+            response = await self._make_request(
+                method="GET",
+                endpoint=f"/gateways/{gateway_id}",
+            )
+
+            logger.debug(f"Successfully retrieved gateway {gateway_id} with {len(response.get('tools', []))} tools")
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error getting gateway {gateway_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def create_virtual_server(
         self,
         name: str,
