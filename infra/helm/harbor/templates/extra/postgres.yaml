@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "studio.bud.fullname" . }}-postgres
+type: Opaque
+data:
+  {{ .Values.postgres.auth.secretKeys.passwordKey }}: {{ .Values.postgresExtra.password | b64enc | quote }}
