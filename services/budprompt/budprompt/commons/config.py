@@ -17,10 +17,12 @@
 """Manages application and secret configurations, utilizing environment variables and Dapr's configuration store for syncing."""
 
 from pathlib import Path
+from typing import Optional
 
 from budmicroframe.commons.config import (
     BaseAppConfig,
     BaseSecretsConfig,
+    enable_periodic_sync_from_store,
     register_settings,
 )
 from pydantic import DirectoryPath, Field
@@ -71,8 +73,8 @@ class SecretsConfig(BaseSecretsConfig):
     version: str = __version__.split("@")[-1]
 
     # MCP Foundry API Key
-    mcp_foundry_api_key: str = Field(
-        None, alias="MCP_FOUNDRY_API_KEY", description="API key for MCP Foundry authentication"
+    mcp_foundry_api_key: Optional[str] = Field(
+        None, alias="MCP_FOUNDRY_API_KEY", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
     )
 
     # Add any other secrets here that are not Redis-related
