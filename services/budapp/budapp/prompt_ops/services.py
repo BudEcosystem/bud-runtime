@@ -1535,7 +1535,7 @@ class PromptService(SessionMixin):
 
         # Fetch from MCP Foundry
         try:
-            mcp_foundry_response = await mcp_foundry_service.get_tool_by_id(str(tool_id.hex))
+            mcp_foundry_response = await mcp_foundry_service.get_tool_by_id(tool_id)
             logger.debug(f"Successfully fetched tool from MCP Foundry: {tool_id}")
 
         except MCPFoundryException as e:

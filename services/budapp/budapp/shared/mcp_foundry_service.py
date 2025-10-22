@@ -17,7 +17,8 @@
 """Service class for interacting with MCP Foundry API."""
 
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
+from uuid import UUID
 
 import aiohttp
 
@@ -257,11 +258,11 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
-    async def get_tool_by_id(self, tool_id: str) -> Dict[str, Any]:
+    async def get_tool_by_id(self, tool_id: Union[str, UUID]) -> Dict[str, Any]:
         """Get a single tool by its ID.
 
         Args:
-            tool_id: The ID of the tool to retrieve
+            tool_id: The ID of the tool to retrieve (UUID or string)
 
         Returns:
             Dict[str, Any]: Tool data from MCP Foundry
@@ -270,20 +271,23 @@ class MCPFoundryService(metaclass=SingletonMeta):
             MCPFoundryException: If the API call fails or tool not found
         """
         try:
-            logger.info(
+            # Convert UUID to hex string if needed
+            tool_id_str = str(tool_id.hex) if isinstance(tool_id, UUID) else tool_id
+
+            logger.debug(
                 "Fetching tool from MCP Foundry",
-                tool_id=tool_id,
+                tool_id=tool_id_str,
             )
 
             # Make the API call
             response = await self._make_request(
                 method="GET",
-                endpoint=f"/tools/{tool_id}",
+                endpoint=f"/tools/{tool_id_str}",
             )
 
-            logger.info(
+            logger.debug(
                 "Successfully fetched tool from MCP Foundry",
-                tool_id=tool_id,
+                tool_id=tool_id_str,
                 tool_name=response.get("displayName", "Unknown"),
             )
 
