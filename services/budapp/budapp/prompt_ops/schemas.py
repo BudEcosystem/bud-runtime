@@ -746,7 +746,7 @@ class AddToolResponse(SuccessResponse):
     model_config = ConfigDict(extra="ignore")
 
     virtual_server_id: str = Field(..., description="Virtual server ID from MCP Foundry")
-    virtual_server_name: str = Field(..., description="Virtual server name (same as prompt_id)")
+    virtual_server_name: str = Field(..., description="Virtual server name (format: {prompt_id}__v{version})")
     added_tools: List[str] = Field(..., description="List of added tool IDs")
 
 
@@ -754,7 +754,7 @@ class GatewayResponse(BaseModel):
     """Response from MCP Foundry gateway creation."""
 
     gateway_id: str = Field(..., description="Gateway ID from MCP Foundry")
-    name: str
+    name: str = Field(..., description="Gateway name (format: {prompt_id}__v{version}__{connector_id})")
     url: str
     transport: str
     visibility: str
@@ -762,7 +762,11 @@ class GatewayResponse(BaseModel):
 
 
 class RegisterConnectorResponse(SuccessResponse):
-    """Response schema for connector registration."""
+    """Response schema for connector registration.
+
+    Gateway name format: {prompt_id}__v{version}__{connector_id}
+    Each prompt version gets its own gateway for proper version isolation.
+    """
 
     gateway: GatewayResponse
     connector_id: str

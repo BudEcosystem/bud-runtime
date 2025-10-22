@@ -982,14 +982,17 @@ async def register_connector(
 
     This endpoint creates a gateway in MCP Foundry to connect the specified
     connector to the prompt. The gateway name will be in the format:
-    {budprompt_id}__{connector_id}
+    {budprompt_id}__v{version}__{connector_id}
+
+    Each prompt version gets its own gateway in MCP Foundry, ensuring proper
+    version isolation.
 
     Args:
         current_user: The authenticated user
         session: Database session
         budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
         connector_id: The connector ID to register
-        request: RegisterConnectorRequest containing credentials
+        request: RegisterConnectorRequest containing credentials and optional version
 
     Returns:
         RegisterConnectorResponse with gateway details or ErrorResponse on failure
@@ -1129,9 +1132,12 @@ async def add_tool(
     1. Validates that the prompt exists in Redis
     2. Checks if a virtual server already exists for the connector
     3. If exists: Updates the virtual server with new tools (replaces existing)
-    4. If not exists: Creates a new virtual server in MCP Foundry
+    4. If not exists: Creates a new virtual server in MCP Foundry with name format: {prompt_id}__v{version}
     5. Stores the updated configuration in Redis
     6. Returns virtual server details
+
+    Each prompt version gets its own virtual server in MCP Foundry, ensuring proper
+    version isolation.
 
     Args:
         current_user: The authenticated user
@@ -1139,7 +1145,8 @@ async def add_tool(
         request: AddToolRequest with prompt_id, connector_id, tool_ids, and optional version
 
     Returns:
-        AddToolResponse with virtual server details or ErrorResponse on failure
+        AddToolResponse with virtual server details (virtual_server_name format: {prompt_id}__v{version})
+        or ErrorResponse on failure
     """
     try:
         # Add tools via service

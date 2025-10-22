@@ -857,9 +857,9 @@ class PromptService(SessionMixin):
             version: Optional version to check. If None, checks default version
 
         Returns:
-            Tuple of (is_registered: bool, config_data: dict)
+            Tuple of (is_registered: bool, config_response: dict)
             - is_registered: True if connector already registered, False otherwise
-            - config_data: The prompt config data dict (empty dict if 404)
+            - config_response: The full prompt config response dict (empty dict if 404)
         """
         try:
             config_response = await self._perform_get_prompt_config_request(
@@ -873,9 +873,9 @@ class PromptService(SessionMixin):
                 if tool.get("type") == "mcp":
                     gateway_config = tool.get("gateway_config", {})
                     if connector_id in gateway_config:
-                        return True, config_data
+                        return True, config_response
 
-            return False, config_data
+            return False, config_response
 
         except ClientException as e:
             if e.status_code == 404:
@@ -904,10 +904,13 @@ class PromptService(SessionMixin):
         """
         logger.debug(f"Registering connector {connector_id} for prompt {budprompt_id}")
 
-        # Check if connector is already registered and get config data
-        is_registered, config_data = await self._check_connector_already_registered(
+        # Check if connector is already registered and get full config response
+        is_registered, config_response = await self._check_connector_already_registered(
             budprompt_id, connector_id, version
         )
+
+        # Extract config data from response
+        config_data = config_response.get("data", {})
 
         if is_registered:
             logger.error(f"Connector {connector_id} is already registered for prompt {budprompt_id}")
@@ -926,6 +929,22 @@ class PromptService(SessionMixin):
                     status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
+        # Determine target version based on priority:
+        # 1. User-specified version (highest priority)
+        # 2. Existing config version (medium priority)
+        # 3. Default to version 1 (lowest priority - new config)
+        existing_version = config_response.get("version")
+
+        if version:
+            # User explicitly specified version
+            target_version = version
+        elif existing_version:
+            # Use existing config version
+            target_version = existing_version
+        else:
+            # Default to version 1 for new configs
+            target_version = 1
+
         # Get connector details from MCP Foundry
         try:
             connector = await self.get_connector_by_id(connector_id)
@@ -933,9 +952,9 @@ class PromptService(SessionMixin):
             logger.error(f"Failed to retrieve connector {connector_id}: {e}")
             raise
 
-        # Construct gateway name: {budprompt_id}__{connector_id}
+        # Construct gateway name: {budprompt_id}__v{version}__{connector_id}
         # Using double underscore as separator (MCP Foundry only allows letters, numbers, _, -)
-        gateway_name = f"{budprompt_id}__{connector_id}"
+        gateway_name = f"{budprompt_id}__v{target_version}__{connector_id}"
 
         # Create gateway in MCP Foundry
         try:
@@ -983,13 +1002,14 @@ class PromptService(SessionMixin):
         """Add tools for a prompt by creating/updating virtual server in MCP Foundry.
 
         Args:
-            prompt_id: The prompt ID (UUID or draft ID) - also used as virtual server name
+            prompt_id: The prompt ID (UUID or draft ID)
             connector_id: The connector ID
             tool_ids: List of tool IDs to add (replaces existing tools)
             version: Optional version to update. If None, uses default version
 
         Returns:
             Dict with virtual_server_id, virtual_server_name, added_tools, and action
+            virtual_server_name format: {prompt_id}__v{version}
 
         Raises:
             ClientException: If prompt not found (404) or operation fails
@@ -1018,6 +1038,8 @@ class PromptService(SessionMixin):
             config_response = await self._perform_get_prompt_config_request(prompt_id, version=version)
             config_data = config_response.get("data", {})
             tools = config_data.get("tools", [])
+            # Determine target version for virtual server naming
+            target_version = config_response.get("version", 1) if version is None else version
         except ClientException:
             raise
 
@@ -1049,21 +1071,24 @@ class PromptService(SessionMixin):
         # Step 4: Create or update virtual server based on server_url existence
         virtual_server_id = mcp_tool.get("server_url")
 
+        # Construct virtual server name: {prompt_id}__v{version}
+        virtual_server_name = f"{prompt_id}__v{target_version}"
+
         try:
             if virtual_server_id:
                 # Update existing virtual server
                 logger.debug(f"Updating existing virtual server {virtual_server_id}")
                 await mcp_foundry_service.update_virtual_server(server_id=virtual_server_id, associated_tools=tool_ids)
             else:
-                # Create new virtual server
-                logger.debug(f"Creating new virtual server for prompt {prompt_id}")
+                # Create new virtual server with version in name
+                logger.debug(f"Creating new virtual server for prompt {prompt_id} version {target_version}")
                 vs_response = await mcp_foundry_service.create_virtual_server(
-                    name=prompt_id, associated_tools=tool_ids, visibility="public"
+                    name=virtual_server_name, associated_tools=tool_ids, visibility="public"
                 )
                 virtual_server_id = vs_response.get("id")
 
             # Update MCP tool config (always happens)
-            mcp_tool["server_label"] = f"{prompt_id}__{virtual_server_id}"
+            mcp_tool["server_label"] = virtual_server_name
             mcp_tool["server_url"] = virtual_server_id
             mcp_tool["allowed_tools"] = tool_original_names
             mcp_tool["connector_id"] = virtual_server_id
@@ -1078,9 +1103,6 @@ class PromptService(SessionMixin):
             )
 
         # Step 5: Save updated configuration to Redis
-        # Determine version to use
-        target_version = config_response.get("version", 1) if version is None else version
-
         prompt_config_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config"
         )
@@ -1117,7 +1139,7 @@ class PromptService(SessionMixin):
         # Step 6: Return response
         return {
             "virtual_server_id": virtual_server_id,
-            "virtual_server_name": prompt_id,
+            "virtual_server_name": virtual_server_name,
             "added_tools": tool_ids,
         }
 
