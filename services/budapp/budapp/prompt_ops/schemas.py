@@ -736,7 +736,9 @@ class AddToolRequest(BaseModel):
 
     prompt_id: str = Field(..., description="Prompt ID (must exist in Redis)")
     connector_id: str = Field(..., description="Connector ID")
-    tool_ids: List[UUID] = Field(..., min_items=1, description="Tool IDs to add (replaces existing)")
+    tool_ids: List[UUID] = Field(
+        ..., description="Tool IDs to add/update (empty list removes all tools for this connector)"
+    )
     version: Optional[int] = Field(None, ge=1, description="Prompt config version")
 
 
