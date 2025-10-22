@@ -15,9 +15,9 @@ minio:
         size: "1Ti"
 
 microservices:
-  budadmin:
-    env:
-        NEXT_PUBLIC_ENABLE_DEV_MODE: true
+    budadmin:
+        env:
+            NEXT_PUBLIC_ENABLE_DEV_MODE: "true"
 
 imagePullPolicy: "Always"
 deploymentAnnotations:

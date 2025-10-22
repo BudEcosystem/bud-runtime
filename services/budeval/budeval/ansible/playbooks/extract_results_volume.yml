@@ -1,0 +1,249 @@
+---
+- name: Extract evaluation results via shared volume (no pod logs access needed)
+  hosts: localhost
+  gather_facts: no
+  vars:
+    extraction_job_name: "extract-volume-{{ temp_id }}"
+
+  tasks:
+    - name: Create volume-based extraction job
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        state: present
+        definition:
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: "{{ extraction_job_name }}"
+            namespace: "{{ namespace }}"
+          spec:
+            ttlSecondsAfterFinished: 300
+            template:
+              spec:
+                containers:
+                  - name: extractor
+                    image: python:3.11-slim
+                    command: ["python", "-c"]
+                    args:
+                      - |
+                        import json
+                        import os
+                        import glob
+                        import csv
+                        from pathlib import Path
+
+                        def extract_results():
+                            run_ids = "{{ run_ids }}".split(",")
+                            results = []
+
+                            print(f"Extracting results for run_ids: {run_ids}")
+
+                            for run_id in run_ids:
+                                result = {
+                                    "run_id": run_id,
+                                    "eval_id": "{{ eval_id }}",
+                                    "status": "error",
+                                    "scores": [],
+                                    "error_message": ""
+                                }
+
+                                results_dir = f"/workspace/shared/results/{run_id}"
+                                print(f"Checking results directory: {results_dir}")
+
+                                if not os.path.exists(results_dir):
+                                    result["error_message"] = f"Results directory not found: {results_dir}"
+                                    print(f"Directory not found: {results_dir}")
+                                    results.append(result)
+                                    continue
+
+                                # Check job status
+                                status_file = f"{results_dir}/job_status.json"
+                                if os.path.exists(status_file):
+                                    try:
+                                        with open(status_file, 'r') as f:
+                                            status_data = json.load(f)
+                                        result["status"] = status_data.get("status", "unknown")
+                                        if "error_message" in status_data:
+                                            result["error_message"] = status_data["error_message"]
+                                        print(f"Job {run_id} status: {result['status']}")
+                                    except Exception as e:
+                                        print(f"Error reading status file for {run_id}: {e}")
+                                        result["error_message"] = f"Failed to read status: {e}"
+
+                                # Look for results summary
+                                summary_file = f"{results_dir}/results_summary.json"
+                                if os.path.exists(summary_file):
+                                    try:
+                                        with open(summary_file, 'r') as f:
+                                            summary_data = json.load(f)
+                                        result["scores"] = summary_data.get("scores", [])
+                                        if result["scores"]:
+                                            result["status"] = "success"
+                                        print(f"Found {len(result['scores'])} scores for {run_id}")
+                                    except Exception as e:
+                                        print(f"Error reading summary file for {run_id}: {e}")
+                                        result["error_message"] = f"Failed to read results: {e}"
+
+                                # If no summary, try to parse CSV files directly
+                                elif result["status"] in ["completed", "success"]:
+                                    print(f"No summary found, trying to parse CSV files for {run_id}")
+                                    csv_files = glob.glob(f"{results_dir}/*.csv")
+
+                                    for csv_file in csv_files:
+                                        try:
+                                            with open(csv_file, 'r') as f:
+                                                reader = csv.DictReader(f)
+                                                for row in reader:
+                                                    dataset = row.get('dataset', row.get('Dataset', ''))
+                                                    accuracy = row.get('accuracy', row.get('Accuracy', row.get('acc', '')))
+
+                                                    if dataset and accuracy:
+                                                        try:
+                                                            score_val = float(accuracy)
+                                                            # Convert to percentage if needed
+                                                            if score_val <= 1.0:
+                                                                score_val *= 100
+
+                                                            score = {
+                                                                "dataset": dataset,
+                                                                "metric": "accuracy",
+                                                                "score": score_val,
+                                                                "version": row.get('version', 'unknown')
+                                                            }
+                                                            result["scores"].append(score)
+                                                        except (ValueError, TypeError) as e:
+                                                            print(f"Failed to parse score '{accuracy}': {e}")
+                                        except Exception as e:
+                                            print(f"Error processing CSV {csv_file}: {e}")
+
+                                    if result["scores"]:
+                                        result["status"] = "success"
+                                        print(f"Extracted {len(result['scores'])} scores from CSV files")
+
+                                results.append(result)
+
+                            # Write results to output file in shared volume for retrieval
+                            output = {
+                                "success": True,
+                                "results": results,
+                                "extraction_time": "$(date -Iseconds)"
+                            }
+
+                            output_file = f"/workspace/shared/extraction_output_{{ temp_id }}.json"
+                            with open(output_file, "w") as f:
+                                json.dump(output, f, indent=2)
+
+                            print("EXTRACTION_COMPLETE")
+                            print(f"Results written to: {output_file}")
+                            print(json.dumps(output, indent=2))
+
+                        extract_results()
+                    volumeMounts:
+                      - name: shared-volume
+                        mountPath: /workspace/shared
+                volumes:
+                  - name: shared-volume
+                    persistentVolumeClaim:
+                      claimName: bud-dev-budeval-dataset
+                restartPolicy: Never
+
+    - name: Wait for extraction job to complete
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        api_version: batch/v1
+        kind: Job
+        name: "{{ extraction_job_name }}"
+        namespace: "{{ namespace }}"
+        wait: true
+        wait_condition:
+          type: Complete
+          status: "True"
+        wait_timeout: 300
+      register: extraction_job_result
+
+    - name: Copy extraction results from shared volume to temp file
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        state: present
+        definition:
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: "copy-results-{{ temp_id }}"
+            namespace: "{{ namespace }}"
+          spec:
+            ttlSecondsAfterFinished: 60
+            template:
+              spec:
+                containers:
+                  - name: copier
+                    image: python:3.11-slim
+                    command: ["python", "-c"]
+                    args:
+                      - |
+                        import json
+                        import os
+                        import shutil
+
+                        # Read results from shared volume
+                        input_file = "/workspace/shared/extraction_output_{{ temp_id }}.json"
+                        output_file = "/tmp/volume_extraction_results_{{ temp_id }}.json"
+
+                        if os.path.exists(input_file):
+                            shutil.copy2(input_file, output_file)
+                            print(f"Results copied from {input_file} to {output_file}")
+
+                            # Verify the copy
+                            with open(output_file, 'r') as f:
+                                results = json.load(f)
+                            print(f"Verified copy: {len(results.get('results', []))} results")
+                        else:
+                            # Create error result if no results found
+                            error_result = {
+                                "success": False,
+                                "results": [],
+                                "error": f"No extraction results found at {input_file}"
+                            }
+                            with open(output_file, "w") as f:
+                                json.dump(error_result, f)
+                            print(f"No results found, created error file: {output_file}")
+                    volumeMounts:
+                      - name: shared-volume
+                        mountPath: /workspace/shared
+                      - name: tmp-volume
+                        mountPath: /tmp
+                volumes:
+                  - name: shared-volume
+                    persistentVolumeClaim:
+                      claimName: bud-dev-budeval-dataset
+                  - name: tmp-volume
+                    hostPath:
+                      path: /tmp
+                      type: Directory
+                restartPolicy: Never
+
+    - name: Wait for copy job to complete
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        api_version: batch/v1
+        kind: Job
+        name: "copy-results-{{ temp_id }}"
+        namespace: "{{ namespace }}"
+        wait: true
+        wait_condition:
+          type: Complete
+          status: "True"
+        wait_timeout: 120
+
+    - name: Clean up extraction jobs
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+        state: absent
+        api_version: batch/v1
+        kind: Job
+        name: "{{ item }}"
+        namespace: "{{ namespace }}"
+      loop:
+        - "{{ extraction_job_name }}"
+        - "copy-results-{{ temp_id }}"
+      ignore_errors: true

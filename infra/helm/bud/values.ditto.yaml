@@ -2,11 +2,6 @@ ingress:
     hosts:
         root: ditto.bud.studio
 
-# disable keel
-deploymentAnnotations: null
-
-# imagePullPolicy: IfNotPresent
-
 microservices:
     budmodel:
         storageSize: "1Ti"

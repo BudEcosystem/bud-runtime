@@ -1,7 +1,7 @@
 import { Text_12_600_EEEEEE } from "@/lib/text";
 import { Button } from "antd";
 import { ChevronRight } from "lucide-react";
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 
 
 interface PrimaryButtonProps {
@@ -15,16 +15,24 @@ export function PrimaryButton({
   ...props
 }: PrimaryButtonProps) {
   const { disabled } = props;
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
     <Button
       {...props}
-      className={`flex justify-center items-center h-[2.3rem] !border-[.5px] !border-[#965CDE] font-normal !bg-[#1E0C34] hover:bg-[#965CDE] ${classNames}
-      ${disabled ? '!bg-[#1E0C34] hover:!bg-[#1E0C34] border-[#965CDE] text-[#888888] cursor-not-allowed' : '!bg-[#1E0C34] hover:!bg-[#965CDE]'} `}
+      onMouseEnter={() => !disabled && setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={`flex justify-center items-center !border-[.5px] font-normal ${classNames}
+      ${disabled ? 'border-[#965CDE] text-[#888888] cursor-not-allowed' : ''} `}
       disabled={disabled} // Ensures that the button is actually disabled
       style={{
         minWidth: '4rem',
         paddingLeft: '.7rem',
-        paddingRight: '.7rem'
+        paddingRight: '.7rem',
+        height: '2.3rem',
+        background: disabled ? '#1E0C34' : (isHovered ? '#965CDE' : '#1E0C34'),
+        borderColor: '#965CDE',
+
       }}
     >
       {Children}

@@ -39,3 +39,35 @@ export const getEndpoints = async (page = 1, limit = 25, apiKey = "", accessKey 
         return error;
       }
 }
+
+export const getPromptConfig = async (promptId: string, apiKey = "", accessKey = "") => {
+  const headers: any = {
+    'Content-Type': 'application/json'
+  };
+
+  // Check if accessKey is a JWT token
+  if (accessKey && isJWT(accessKey)) {
+    // Use access_key as Bearer token if it's a JWT
+    headers["Authorization"] = `Bearer ${accessKey}`;
+  } else {
+    // Regular API key authentication
+    if (apiKey) {
+      headers["api-key"] = apiKey;
+    }
+    if (accessKey) {
+      headers["access-key"] = accessKey;
+    }
+  }
+
+  try {
+    const result = await AppRequest.Get(`api/prompts/${promptId}`, {
+      headers
+    }).then((res) => {
+      return res.data;
+    });
+    return result;
+  } catch (error) {
+    console.error(`Failed to fetch prompt config for ${promptId}:`, error);
+    return null;
+  }
+}

@@ -4,25 +4,25 @@
   connection: local
   gather_facts: no
   collections:
-    - kubernetes.core
+      - kubernetes.core
 
   tasks:
-    - name: Ensure required namespace variable is provided
-      assert:
-        that:
-          - namespace is defined
-          - namespace | length > 0
-        fail_msg: "Parameter 'namespace' is required and must be non-empty"
+      - name: Ensure required namespace variable is provided
+        assert:
+            that:
+                - namespace is defined
+                - namespace | length > 0
+            fail_msg: "Parameter 'namespace' is required and must be non-empty"
 
-    - name: List Pods in target namespace to verify connectivity
-      kubernetes.core.k8s_info:
-        api_version: v1
-        kind: Pod
-        namespace: "{{ namespace }}"
-      register: pods
+      - name: List Pods in target namespace to verify connectivity
+        kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Pod
+            namespace: "{{ namespace }}"
+        register: pods
 
-    - name: Assert that pods were listed successfully
-      assert:
-        that:
-          - pods.resources is defined
-        fail_msg: "Failed to connect to Kubernetes cluster: unable to list pods in namespace {{ namespace }}"
+      - name: Assert that pods were listed successfully
+        assert:
+            that:
+                - pods.resources is defined
+            fail_msg: "Failed to connect to Kubernetes cluster: unable to list pods in namespace {{ namespace }}"

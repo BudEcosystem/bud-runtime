@@ -8,6 +8,10 @@ interface ChatStore {
   activeChatList: Session[];
   setActiveChatList: (chatList: Session[]) => void;
 
+  promptIds: string[];
+  setPromptIds: (ids: string[]) => void;
+  getPromptIds: () => string[];
+
   createChat: (chat: Session) => void;
   updateChat: (chat: Session) => void;
   getChat: (id: string) => Session | undefined;
@@ -187,6 +191,14 @@ export const useChatStore = create<ChatStore>()(
         set({ activeChatList: chatList });
         saveToStorage(get());
         get().syncWithServer();
+      },
+
+      promptIds: [],
+      setPromptIds: (ids: string[]) => {
+        set({ promptIds: ids });
+      },
+      getPromptIds: () => {
+        return get().promptIds;
       },
 
       getChat: (id: string): Session | undefined => {

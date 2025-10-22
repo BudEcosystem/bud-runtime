@@ -241,6 +241,17 @@ class SimulationWorkflows:
                             parallel_tasks.append(task)
 
             logger.info(f"Created {len(parallel_tasks)} tasks across {len(cluster_info)} clusters")
+
+            # Check if no tasks were created - this means no devices are available
+            if len(parallel_tasks) == 0:
+                raise ValueError(
+                    "No devices available for simulation. All devices were skipped because: "
+                    "(1) devices have 0 available_count (already in use or unavailable), "
+                    "(2) CPU devices are not supported for LLM inference, or "
+                    "(3) no compatible device types found for the selected model. "
+                    "Please check cluster health and device availability."
+                )
+
             results = yield wf.when_all(parallel_tasks)  # type: ignore
 
             notification_req.payload.content = NotificationContent(
@@ -275,11 +286,13 @@ class SimulationWorkflows:
                 fix_message = "Fix: Model requires more memory than available on devices"
             else:
                 fix_message = (
-                    f"Fix: {error_detail[:100]}" if len(error_detail) < 100 else "Fix: Check logs for details"
+                    f"Fix: {error_detail[:100]}"
+                    if len(error_detail) < 100
+                    else "Fix: use smaller model or add more devices."
                 )
 
             notification_req.payload.content = NotificationContent(
-                title="Failed to generate best configurations",
+                title="No suitable device found for deployment",
                 message=fix_message,
                 status=WorkflowStatus.FAILED,
                 primary_action="retry",
