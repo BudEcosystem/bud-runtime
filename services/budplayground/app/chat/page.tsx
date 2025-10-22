@@ -10,6 +10,7 @@ import { Session } from "../types/chat";
 import ChatWindow from "./components/ChatWindow";
 import { useAuth } from "../context/AuthContext";
 import { Endpoint } from "../types/deployment";
+import { tempApiBaseUrl } from "../lib/environment";
 
 export default function ChatPage() {
   const { activeChatList, createChat, setPromptIds, getPromptIds, setActiveChatList } = useChatStore();
@@ -63,7 +64,6 @@ export default function ChatPage() {
     if (promptIdsFromUrl.length === 0 && activeChatList.length > 0) return; // Don't interfere if no promptIds and chats exist
 
     hideLoader();
-
     // If promptIds exist, create chat sessions for them
     if (promptIdsFromUrl.length > 0) {
       console.log('Creating chat sessions for promptIds:', promptIdsFromUrl);
@@ -146,6 +146,11 @@ export default function ChatPage() {
       return; // Wait for auth to finish loading
     }
 
+    // ============================================================================
+    // TODO: TEMPORARY - AUTHENTICATION DISABLED FOR LOCAL DEVELOPMENT
+    // ============================================================================
+    // To re-enable authentication, uncomment the lines below:
+    //
     if (!apiKey && !isSessionValid) {
       // No authentication, redirect to login
       router.replace('/login');
@@ -153,6 +158,11 @@ export default function ChatPage() {
       // Authentication successful, hide loader
       hideLoader();
     }
+    // ============================================================================
+
+    // TEMPORARY: Always hide loader (skip auth check)
+    hideLoader();
+
   }, [apiKey, isSessionValid, isLoading, router, hideLoader]);
 
   return (
