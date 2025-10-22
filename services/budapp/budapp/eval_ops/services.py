@@ -770,21 +770,28 @@ class ExperimentService:
             List[ModelSummary]: List of model summaries with deployment names.
         """
         try:
-            # Query for unique models used in the experiment's runs
-            # Join with endpoints to get deployment names
+            # First, get unique model IDs from runs to avoid duplicates when joining with endpoints
+            # Since one model can have multiple endpoints, we need to ensure we return each model only once
+            unique_model_ids_subquery = (
+                self.session.query(RunModel.model_id.distinct())
+                .filter(
+                    RunModel.experiment_id == experiment_id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .subquery()
+            )
+
+            # Now join with models and endpoints, ensuring we get only one entry per model
+            # Using DISTINCT ON to get the first endpoint for each model
             models = (
                 self.session.query(
                     ModelTable.id,
                     ModelTable.name,
                     EndpointModel.namespace.label("deployment_name"),
                 )
-                .join(RunModel, RunModel.model_id == ModelTable.id)
+                .join(unique_model_ids_subquery, ModelTable.id == unique_model_ids_subquery.c.model_id)
                 .outerjoin(EndpointModel, EndpointModel.model_id == ModelTable.id)
-                .filter(
-                    RunModel.experiment_id == experiment_id,
-                    RunModel.status != RunStatusEnum.DELETED.value,
-                )
-                .distinct()
+                .distinct(ModelTable.id)
                 .all()
             )
 
