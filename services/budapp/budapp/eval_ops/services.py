@@ -1,6 +1,7 @@
 import random
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import aiohttp
@@ -3754,6 +3755,16 @@ class EvaluationWorkflowService:
 
             # Update the eval status
             evaluation.status = EvaluationStatusEnum.COMPLETED.value
+
+            # Calculate duration in seconds from created_at to now
+            completion_time = datetime.now(timezone.utc)
+            if evaluation.created_at:
+                duration_seconds = int((completion_time - evaluation.created_at).total_seconds())
+                evaluation.duration_in_seconds = duration_seconds
+                logger.info(
+                    f"::EvalResult:: Evaluation {eval_id} duration: {duration_seconds} seconds "
+                    f"({duration_seconds // 60} minutes)"
+                )
 
             # Dictionary to accumulate trait scores
             # Format: {trait_id_str: {"total_score": float, "count": int}}
