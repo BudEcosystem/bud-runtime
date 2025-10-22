@@ -1036,9 +1036,12 @@ class PromptService(SessionMixin):
         """
         logger.debug(f"Adding tools for prompt {prompt_id}, connector {connector_id}")
 
+        # Convert UUID tool_ids to hex strings for MCP Foundry and Redis storage
+        tool_ids_str = [str(tool_id.hex) for tool_id in tool_ids]
+
         # Step 1: Fetch tool details from MCP Foundry to get originalName
         tool_original_names = []
-        for tool_id in tool_ids:
+        for tool_id in tool_ids_str:
             try:
                 tool_data = await mcp_foundry_service.get_tool_by_id(tool_id)
                 original_name = tool_data["originalName"]  # Direct access, will raise KeyError if missing
@@ -1098,12 +1101,14 @@ class PromptService(SessionMixin):
             if virtual_server_id:
                 # Update existing virtual server
                 logger.debug(f"Updating existing virtual server {virtual_server_id}")
-                await mcp_foundry_service.update_virtual_server(server_id=virtual_server_id, associated_tools=tool_ids)
+                await mcp_foundry_service.update_virtual_server(
+                    server_id=virtual_server_id, associated_tools=tool_ids_str
+                )
             else:
                 # Create new virtual server with version in name
                 logger.debug(f"Creating new virtual server for prompt {prompt_id} version {target_version}")
                 vs_response = await mcp_foundry_service.create_virtual_server(
-                    name=virtual_server_name, associated_tools=tool_ids, visibility="public"
+                    name=virtual_server_name, associated_tools=tool_ids_str, visibility="public"
                 )
                 virtual_server_id = vs_response.get("id")
 
@@ -1112,7 +1117,7 @@ class PromptService(SessionMixin):
             mcp_tool["server_url"] = virtual_server_id
             mcp_tool["allowed_tools"] = tool_original_names
             mcp_tool["connector_id"] = virtual_server_id
-            mcp_tool["server_config"] = {connector_id: tool_ids}
+            mcp_tool["server_config"] = {connector_id: tool_ids_str}
             tools[mcp_tool_index] = mcp_tool
 
         except MCPFoundryException as e:
@@ -1139,7 +1144,7 @@ class PromptService(SessionMixin):
         return {
             "virtual_server_id": virtual_server_id,
             "virtual_server_name": virtual_server_name,
-            "added_tools": tool_ids,
+            "added_tools": tool_ids_str,
         }
 
     async def disconnect_connector_from_prompt(
