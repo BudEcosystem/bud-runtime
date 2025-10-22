@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from "react";
-import { Dropdown, Tooltip, Image } from "antd";
+import { Dropdown, Tooltip } from "antd";
 import {
   CloseOutlined,
   CopyOutlined,
