@@ -70,7 +70,7 @@ class MCPToolLoader(ToolLoader):
 
         try:
             # Construct full MCP endpoint URL
-            mcp_url = f"{self.base_url}/{tool_config.server_url}/mcp"
+            mcp_url = f"{self.base_url}{tool_config.server_url}/mcp"
 
             # Prepare headers with authorization if api_key is provided
             headers = {}
