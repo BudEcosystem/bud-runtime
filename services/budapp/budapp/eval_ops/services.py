@@ -770,39 +770,38 @@ class ExperimentService:
             List[ModelSummary]: List of model summaries with deployment names.
         """
         try:
-            # First, get unique model IDs from runs to avoid duplicates when joining with endpoints
-            # Since one model can have multiple endpoints, we need to ensure we return each model only once
-            unique_model_ids_subquery = (
-                self.session.query(RunModel.model_id.distinct())
-                .filter(
-                    RunModel.experiment_id == experiment_id,
-                    RunModel.status != RunStatusEnum.DELETED.value,
-                )
-                .subquery()
-            )
-
-            # Now join with models and endpoints, ensuring we get only one entry per model
-            # Using DISTINCT ON to get the first endpoint for each model
+            # Query for models used in the experiment's runs
+            # Join with endpoints to get deployment names
             models = (
                 self.session.query(
                     ModelTable.id,
                     ModelTable.name,
                     EndpointModel.namespace.label("deployment_name"),
                 )
-                .join(unique_model_ids_subquery, ModelTable.id == unique_model_ids_subquery.c.model_id)
+                .join(RunModel, RunModel.model_id == ModelTable.id)
                 .outerjoin(EndpointModel, EndpointModel.model_id == ModelTable.id)
-                .distinct(ModelTable.id)
+                .filter(
+                    RunModel.experiment_id == experiment_id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
                 .all()
             )
 
-            return [
-                ModelSummary(
-                    id=model.id,
-                    name=model.name,
-                    deployment_name=model.deployment_name,
-                )
-                for model in models
-            ]
+            # Filter out duplicate models by ID (keep first occurrence)
+            seen_model_ids = set()
+            unique_models = []
+            for model in models:
+                if model.id not in seen_model_ids:
+                    seen_model_ids.add(model.id)
+                    unique_models.append(
+                        ModelSummary(
+                            id=model.id,
+                            name=model.name,
+                            deployment_name=model.deployment_name,
+                        )
+                    )
+
+            return unique_models
         except Exception as e:
             logger.error(f"Failed to get models for experiment {experiment_id}: {e}")
             return []
