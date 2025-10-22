@@ -1,6 +1,7 @@
 # Main
 harbor:
   enabled: true
+  externalURL: https://harbor.bud.studio
   expose:
     type: ingress
     tls:
