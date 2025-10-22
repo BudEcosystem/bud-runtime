@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Input, InputNumber, Checkbox, Button, Slider } from 'antd';
-import { Image } from "antd";
+import { Input, InputNumber, Checkbox } from 'antd';
 import { PrimaryButton } from '@/app/components/uiComponents/inputs';
 import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
@@ -13,7 +12,7 @@ interface PromptFormProps {
   onClose?: () => void;
 }
 
-export default function PromptForm({ promptIds = [], onSubmit, onClose }: PromptFormProps) {
+export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose }: PromptFormProps) {
   const { apiKey, accessKey } = useAuth();
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [inputSchema, setInputSchema] = useState<any>(null);
@@ -28,18 +27,25 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
       }
 
       try {
-        // Fetch config for the first promptId (you can extend this to handle multiple)
         const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
 
         if (config && config.data) {
-          setInputSchema(config.data.input_schema || {});
+          // Handle JSON schema format - extract properties from $defs
+          let schemaToUse: any = config.data.input_schema || {};
+
+          // If it's a JSON schema with $defs, flatten it for the form
+          if (schemaToUse.$defs && schemaToUse.$defs.InputSchema) {
+            schemaToUse = schemaToUse.$defs.InputSchema.properties || {};
+          }
+
+          setInputSchema(schemaToUse);
 
           // Initialize form data with default values
           const initialData: Record<string, any> = {};
-          if (config.data.input_schema) {
-            Object.keys(config.data.input_schema).forEach(key => {
-              const field = config.data.input_schema[key];
-              initialData[key] = field.default || '';
+          if (schemaToUse && typeof schemaToUse === 'object') {
+            Object.keys(schemaToUse).forEach((key: string) => {
+              const field = schemaToUse[key];
+              initialData[key] = field?.default || '';
             });
           }
           setFormData(initialData);
@@ -67,7 +73,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
   };
 
   const renderInput = (fieldName: string, fieldSchema: any) => {
-    const { type, title, description, placeholder, minimum, maximum, enum: enumValues } = fieldSchema;
+    const { type, title, placeholder, minimum, maximum } = fieldSchema;
 
     const inputClassName = "bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] px-0 py-2";
 
@@ -77,7 +83,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
           <Input
             value={formData[fieldName] || ''}
             onChange={(e) => handleChange(fieldName, e.target.value)}
-            placeholder={placeholder || `Enter ${title || fieldName}`}
+            placeholder={placeholder || title || fieldName}
             className={inputClassName}
             style={{ boxShadow: 'none' }}
           />
@@ -89,7 +95,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
           <InputNumber
             value={formData[fieldName]}
             onChange={(value) => handleChange(fieldName, value)}
-            placeholder={placeholder || `Enter ${title || fieldName}`}
+            placeholder={placeholder || title || fieldName}
             min={minimum}
             max={maximum}
             className={inputClassName}
@@ -113,7 +119,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
           <Input
             value={formData[fieldName] || ''}
             onChange={(e) => handleChange(fieldName, e.target.value)}
-            placeholder={placeholder || `Enter ${title || fieldName}`}
+            placeholder={placeholder || title || fieldName}
             className={inputClassName}
             style={{ boxShadow: 'none' }}
           />
@@ -148,7 +154,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
             return (
               <div key={fieldName} className="space-y-2">
                 <label className="text-white text-[0.875rem] font-[400] block">
-                  {fieldSchema.title || fieldName}
+                  {fieldName}
                 </label>
                 {renderInput(fieldName, fieldSchema)}
                 {fieldSchema.description && (
@@ -163,12 +169,12 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
             <>
               <div className="space-y-2">
                 <label className="text-white text-[0.875rem] font-[400] block">
-                  First Name
+                  Unstructured Input
                 </label>
                 <Input
                   value={formData['firstName'] || ''}
                   onChange={(e) => handleChange('firstName', e.target.value)}
-                  placeholder="Enter first name"
+                  placeholder="Enter the details here"
                   className="bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] px-0 py-2"
                   style={{ boxShadow: 'none' }}
                 />
