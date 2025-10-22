@@ -10,6 +10,7 @@ import { Session } from "../types/chat";
 import ChatWindow from "./components/ChatWindow";
 import { useAuth } from "../context/AuthContext";
 import { Endpoint } from "../types/deployment";
+import { tempApiBaseUrl } from "../lib/environment";
 
 export default function ChatPage() {
   const { activeChatList, createChat, setPromptIds, getPromptIds, setActiveChatList } = useChatStore();
@@ -63,7 +64,7 @@ export default function ChatPage() {
     if (promptIdsFromUrl.length === 0 && activeChatList.length > 0) return; // Don't interfere if no promptIds and chats exist
 
     hideLoader();
-
+    console.log('tempApiBaseUrl', tempApiBaseUrl)
     // If promptIds exist, create chat sessions for them
     if (promptIdsFromUrl.length > 0) {
       console.log('Creating chat sessions for promptIds:', promptIdsFromUrl);
