@@ -1055,7 +1055,7 @@ class PromptService(SessionMixin):
 
         # Step 2: Fetch existing prompt configuration (must exist)
         try:
-            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version)
+            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version, raw_data=True)
             config_data = config_response.get("data", {})
             tools = config_data.get("tools", [])
             # Determine target version for virtual server naming
@@ -1123,10 +1123,6 @@ class PromptService(SessionMixin):
             )
 
         # Step 5: Save updated configuration to Redis
-        prompt_config_endpoint = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config"
-        )
-
         # Preserve all existing config data, only update tools field
         payload = {
             **config_data,  # Spread all existing fields
@@ -1136,25 +1132,8 @@ class PromptService(SessionMixin):
             "tools": tools,  # Override tools field
         }
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(prompt_config_endpoint, json=payload) as response:
-                    response_data = await response.json()
-
-                    if response.status != 200:
-                        logger.error(f"Failed to save prompt config: {response.status} {response_data}")
-                        raise ClientException(
-                            message="Failed to save prompt configuration",
-                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        )
-
-                    logger.debug(f"Successfully saved prompt config for {prompt_id}")
-
-        except aiohttp.ClientError as e:
-            logger.exception(f"Network error saving prompt config: {e}")
-            raise ClientException(
-                message="Unable to save prompt configuration", status_code=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
+        # Save using helper method
+        await self._save_prompt_config_to_redis(payload)
 
         # Step 6: Return response
         return {
@@ -1283,13 +1262,16 @@ class PromptService(SessionMixin):
             "deleted_gateway_id": gateway_id,
         }
 
-    async def _save_prompt_config_to_redis(self, payload: dict) -> None:
+    async def _save_prompt_config_to_redis(self, payload: dict) -> dict:
         """Save prompt configuration to Redis via budprompt service.
 
         Args:
             payload: Complete payload dictionary to send to budprompt service.
                     Must include: prompt_id, version, tools
                     Optional: set_default, allow_multiple_calls, and any other config fields
+
+        Returns:
+            dict: Response data from budprompt service
 
         Raises:
             ClientException: If save fails
@@ -1311,6 +1293,7 @@ class PromptService(SessionMixin):
                         )
 
                     logger.debug(f"Successfully saved prompt config for {payload.get('prompt_id')}")
+                    return response_data
 
         except aiohttp.ClientError as e:
             logger.exception(f"Network error saving prompt config: {e}")
