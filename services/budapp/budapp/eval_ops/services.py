@@ -576,12 +576,6 @@ class ExperimentService:
             models = self.session.query(ModelTable).filter(ModelTable.id.in_(list(model_ids))).all()
             models_dict = {model.id: model for model in models}
 
-        # Claculate The Averge Score Across All Datasete based on runs
-        overall_score = 0.0
-        if exp_data.current_metrics:
-            total_score = sum(metric["score_value"] for metric in exp_data.current_metrics)
-            overall_score = round(total_score / len(exp_data.current_metrics), 2)
-
         # Build progress overview with cached model data
         progress_overview = []
         for evaluation in evaluations_running:
@@ -597,6 +591,16 @@ class ExperimentService:
                     logger.warning(f"Model {eval_runs[0].model_id} not found in database")
                     current_model_name = "Unknown Model"
 
+            # Calculate average score for THIS specific evaluation
+            # Filter current_metrics to only include runs from this evaluation
+            eval_run_ids = {str(run.id) for run in eval_runs}
+            eval_metrics = [metric for metric in exp_data.current_metrics if metric.get("run_id") in eval_run_ids]
+
+            evaluation_avg_score = 0.0
+            if eval_metrics:
+                total_score = sum(metric["score_value"] for metric in eval_metrics)
+                evaluation_avg_score = round(total_score / len(eval_metrics), 2)
+
             progress_overview.append(
                 ProgressOverview(
                     run_id=str(evaluation.id),
@@ -607,7 +611,7 @@ class ExperimentService:
                     current_evaluation="",
                     current_model=current_model_name,
                     processing_rate_per_min=0,
-                    average_score_pct=overall_score,
+                    average_score_pct=evaluation_avg_score,
                     eta_minutes=25,
                     status=evaluation.status,
                     actions=None,
@@ -766,21 +770,28 @@ class ExperimentService:
             List[ModelSummary]: List of model summaries with deployment names.
         """
         try:
-            # Query for unique models used in the experiment's runs
-            # Join with endpoints to get deployment names
+            # First, get unique model IDs from runs to avoid duplicates when joining with endpoints
+            # Since one model can have multiple endpoints, we need to ensure we return each model only once
+            unique_model_ids_subquery = (
+                self.session.query(RunModel.model_id.distinct())
+                .filter(
+                    RunModel.experiment_id == experiment_id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .subquery()
+            )
+
+            # Now join with models and endpoints, ensuring we get only one entry per model
+            # Using DISTINCT ON to get the first endpoint for each model
             models = (
                 self.session.query(
                     ModelTable.id,
                     ModelTable.name,
                     EndpointModel.namespace.label("deployment_name"),
                 )
-                .join(RunModel, RunModel.model_id == ModelTable.id)
+                .join(unique_model_ids_subquery, ModelTable.id == unique_model_ids_subquery.c.model_id)
                 .outerjoin(EndpointModel, EndpointModel.model_id == ModelTable.id)
-                .filter(
-                    RunModel.experiment_id == experiment_id,
-                    RunModel.status != RunStatusEnum.DELETED.value,
-                )
-                .distinct()
+                .distinct(ModelTable.id)
                 .all()
             )
 
