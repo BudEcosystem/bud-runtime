@@ -135,6 +135,7 @@ export default function ChatPage() {
         setPromptIdsFromUrl(idsArray);
         setPromptIds(idsArray);
       }
+      console.log('Extracted promptIds from URL:', idsArray);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
