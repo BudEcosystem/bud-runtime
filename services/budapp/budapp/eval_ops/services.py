@@ -1,6 +1,7 @@
 import random
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import aiohttp
@@ -3755,6 +3756,20 @@ class EvaluationWorkflowService:
             # Update the eval status
             evaluation.status = EvaluationStatusEnum.COMPLETED.value
 
+            # Calculate duration in seconds from created_at to now
+            completion_time = datetime.now(timezone.utc)
+            if evaluation.created_at:
+                duration_seconds = int((completion_time - evaluation.created_at).total_seconds())
+                evaluation.duration_in_seconds = duration_seconds
+                logger.info(
+                    f"::EvalResult:: Evaluation {eval_id} duration: {duration_seconds} seconds "
+                    f"({duration_seconds // 60} minutes)"
+                )
+
+            # Dictionary to accumulate trait scores
+            # Format: {trait_id_str: {"total_score": float, "count": int}}
+            trait_score_accumulator = {}
+
             # Update runs
             for run in results:
                 # Fix 1: Access run_id from dictionary
@@ -3794,8 +3809,59 @@ class EvaluationWorkflowService:
                     )
                     self.session.add(metric)
 
+                    # Calculate trait scores for this run
+                    # Get the dataset for this run and find associated traits
+                    try:
+                        dataset_version = self.session.get(ExpDatasetVersion, dbrun.dataset_version_id)
+                        if dataset_version and dataset_version.dataset:
+                            dataset = dataset_version.dataset
+                            # Get all traits associated with this dataset
+                            traits = (
+                                self.session.query(TraitModel)
+                                .join(PivotModel, TraitModel.id == PivotModel.trait_id)
+                                .filter(PivotModel.dataset_id == dataset.id)
+                                .all()
+                            )
+
+                            # Accumulate scores for each trait
+                            for trait in traits:
+                                trait_id_str = str(trait.id)
+                                if trait_id_str not in trait_score_accumulator:
+                                    trait_score_accumulator[trait_id_str] = {"total_score": 0.0, "count": 0}
+
+                                trait_score_accumulator[trait_id_str]["total_score"] += final_acc
+                                trait_score_accumulator[trait_id_str]["count"] += 1
+                                logger.debug(
+                                    f"::EvalResult:: Accumulated score for trait {trait.name} ({trait_id_str}): "
+                                    f"{final_acc} (total: {trait_score_accumulator[trait_id_str]['total_score']}, "
+                                    f"count: {trait_score_accumulator[trait_id_str]['count']})"
+                                )
+                    except Exception as trait_err:
+                        logger.warning(
+                            f"::EvalResult:: Failed to calculate trait scores for run {run_id}: {trait_err}"
+                        )
+
                 self.session.commit()
                 logger.warning("::EvalResult:: Successfully updated evaluation runs with metrics")
+
+            # Calculate average scores for each trait and update evaluation.trait_scores
+            trait_scores_final = {}
+            for trait_id_str, accumulated in trait_score_accumulator.items():
+                if accumulated["count"] > 0:
+                    avg_score = accumulated["total_score"] / accumulated["count"]
+                    trait_scores_final[trait_id_str] = str(avg_score)
+                    logger.info(
+                        f"::EvalResult:: Trait {trait_id_str} average score: {avg_score} "
+                        f"(from {accumulated['count']} runs)"
+                    )
+
+            # Update evaluation with calculated trait scores
+            if trait_scores_final:
+                evaluation.trait_scores = trait_scores_final
+                self.session.commit()
+                logger.info(f"::EvalResult:: Updated evaluation {eval_id} with trait scores: {trait_scores_final}")
+            else:
+                logger.warning(f"::EvalResult:: No trait scores calculated for evaluation {eval_id}")
 
             # Send Success Notification
             try:
