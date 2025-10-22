@@ -703,17 +703,35 @@ class PromptService(SessionMixin):
                     logger.debug(f"Successfully fetched {total_count} registered connectors from MCP Foundry")
 
                 elif is_registered is False:
-                    # Show only non-registered connectors - use list_connectors and exclude registered IDs
+                    # Show only non-registered connectors - fetch all connectors then filter
                     logger.debug(f"Filtering to show only non-registered connectors for prompt {prompt_id}")
 
-                    # Fetch all connectors from MCP Foundry
-                    all_connectors, all_count = await mcp_foundry_service.list_connectors(
-                        show_registered_only=False,
-                        show_available_only=True,
-                        name=name_filter,
-                        offset=offset,
-                        limit=limit,
-                    )
+                    # Fetch ALL connectors using pagination loop
+                    all_connectors = []
+                    page_size = 100  # Fetch in batches of 100
+                    fetch_offset = 0
+
+                    while True:
+                        # Fetch a page of connectors
+                        batch_connectors, total = await mcp_foundry_service.list_connectors(
+                            show_registered_only=False,
+                            show_available_only=True,
+                            name=name_filter,
+                            offset=fetch_offset,
+                            limit=page_size,
+                        )
+
+                        # Add to our list
+                        all_connectors.extend(batch_connectors)
+
+                        # Update offset
+                        fetch_offset += page_size
+
+                        # Break if we've fetched all connectors
+                        if fetch_offset >= total or len(batch_connectors) == 0:
+                            break
+
+                    logger.debug(f"Fetched {len(all_connectors)} total connectors from MCP Foundry")
 
                     # Filter out registered connector IDs
                     filtered_connectors = [
@@ -722,13 +740,15 @@ class PromptService(SessionMixin):
                         if connector.get("id") not in registered_connector_ids
                     ]
 
-                    # Apply pagination to filtered results
+                    # Calculate total count of filtered connectors
                     total_count = len(filtered_connectors)
+
+                    # Apply pagination to filtered results
                     mcp_foundry_response = filtered_connectors[offset : offset + limit]
 
                     logger.debug(
-                        f"Filtered {total_count} non-registered connectors out of {all_count} total, "
-                        f"returning {len(mcp_foundry_response)} after pagination"
+                        f"Filtered to {total_count} non-registered connectors, "
+                        f"returning {len(mcp_foundry_response)} for page {(offset // limit) + 1}"
                     )
 
                 else:
