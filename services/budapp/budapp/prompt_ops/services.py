@@ -905,6 +905,21 @@ class PromptService(SessionMixin):
                 # Re-raise other errors
                 raise
 
+    def _detect_transport_from_url(self, url: str) -> str:
+        """Detect transport type from connector URL.
+
+        Args:
+            url: Connector URL
+
+        Returns:
+            "SSE" if URL ends with /sse, otherwise "STREAMABLEHTTP"
+        """
+        normalized_url = url.rstrip("/")
+        if normalized_url.endswith("/sse"):
+            return "SSE"
+        else:
+            return "STREAMABLEHTTP"
+
     async def register_connector_for_prompt(
         self, budprompt_id: str, connector_id: str, credentials: Dict[str, Any], version: Optional[int] = None
     ) -> GatewayResponse:
@@ -976,10 +991,13 @@ class PromptService(SessionMixin):
         # Using double underscore as separator (MCP Foundry only allows letters, numbers, _, -)
         gateway_name = f"{budprompt_id}__v{target_version}__{connector_id}"
 
+        # Detect transport from connector URL
+        transport = self._detect_transport_from_url(connector.url)
+
         # Create gateway in MCP Foundry
         try:
             gateway_response = await mcp_foundry_service.create_gateway(
-                name=gateway_name, url=connector.url, transport="SSE", visibility="public"
+                name=gateway_name, url=connector.url, transport=transport, visibility="public"
             )
 
             logger.debug(
