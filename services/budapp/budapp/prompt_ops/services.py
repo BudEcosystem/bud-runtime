@@ -25,12 +25,14 @@ import aiohttp
 from fastapi import status
 
 from ..commons import logging
-from ..commons.config import app_settings
+from ..commons.config import app_settings, secrets_settings
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
     BUD_PROMPT_API_KEY_LOCATION,
+    CONNECTOR_AUTH_CREDENTIALS_MAP,
     BudServeWorkflowStepEventName,
+    ConnectorAuthTypeEnum,
     EndpointStatusEnum,
     ModelEndpointEnum,
     ModelProviderTypeEnum,
@@ -44,7 +46,7 @@ from ..commons.constants import (
     WorkflowTypeEnum,
 )
 from ..commons.db_utils import SessionMixin
-from ..commons.exceptions import ClientException
+from ..commons.exceptions import ClientException, MCPFoundryException
 from ..core.schemas import NotificationPayload
 from ..credential_ops.services import CredentialService
 from ..endpoint_ops.crud import EndpointDataManager
@@ -54,6 +56,7 @@ from ..model_ops.crud import ProviderDataManager
 from ..model_ops.models import Provider as ProviderModel
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
+from ..shared.mcp_foundry_service import mcp_foundry_service
 from ..shared.redis_service import RedisService
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
@@ -64,8 +67,12 @@ from .models import Prompt as PromptModel
 from .models import PromptVersion as PromptVersionModel
 from .schemas import (
     BudPromptConfig,
+    Connector,
+    ConnectorListItem,
     CreatePromptWorkflowRequest,
     CreatePromptWorkflowSteps,
+    GatewayResponse,
+    MCPToolConfig,
     PromptConfigCopyRequest,
     PromptConfigGetResponse,
     PromptConfigRequest,
@@ -79,6 +86,8 @@ from .schemas import (
     PromptSchemaWorkflowSteps,
     PromptVersionListItem,
     PromptVersionResponse,
+    Tool,
+    ToolListItem,
 )
 
 
@@ -412,23 +421,26 @@ class PromptService(SessionMixin):
 
         # Parse the configuration data
         config_data = PromptConfigurationData(**response_data.get("data", {}))
+        version = response_data.get("version")
 
         # Create and return response
         return PromptConfigGetResponse(
             prompt_id=response_data.get("prompt_id"),
             data=config_data,
+            version=version,
             message="Prompt configuration retrieved successfully",
             code=status.HTTP_200_OK,
         )
 
     async def _perform_get_prompt_config_request(
-        self, prompt_id: str, version: Optional[int] = None
+        self, prompt_id: str, version: Optional[int] = None, raw_data: bool = False
     ) -> Dict[str, Any]:
         """Perform get prompt configuration request to budprompt service.
 
         Args:
             prompt_id: The prompt configuration identifier
             version: Optional version number
+            raw_data: If True, returns raw data from Redis without Pydantic processing
 
         Returns:
             Response data from budprompt service
@@ -436,12 +448,16 @@ class PromptService(SessionMixin):
         # Build the URL with optional version query parameter
         prompt_config_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config/{prompt_id}"
 
-        # Add version as query parameter if provided
+        # Add version and raw_data as query parameters if provided
         params = {}
         if version is not None:
             params["version"] = version
+        if raw_data:
+            params["raw_data"] = "true"
 
-        logger.debug(f"Retrieving prompt config from budprompt: prompt_id={prompt_id}, version={version}")
+        logger.debug(
+            f"Retrieving prompt config from budprompt: prompt_id={prompt_id}, version={version}, raw_data={raw_data}"
+        )
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -600,6 +616,988 @@ class PromptService(SessionMixin):
             raise ClientException(
                 message="Failed to delete prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
+
+    async def get_connectors(
+        self,
+        prompt_id: Optional[str] = None,
+        is_registered: Optional[bool] = None,
+        version: Optional[int] = None,
+        offset: int = 0,
+        limit: int = 10,
+        filters: dict = {},
+        order_by: list = [],
+        search: bool = False,
+    ) -> tuple[list[ConnectorListItem], int]:
+        """Get connectors list from MCP Foundry.
+
+        Args:
+            prompt_id: Optional prompt ID (UUID or draft ID) to filter connectors for a specific prompt
+            is_registered: Optional filter for registration status (only works with prompt_id)
+                - True: Show only registered connectors
+                - False: Show only non-registered connectors
+                - None: Show all connectors
+            version: Optional version number. If not specified, uses default version
+            offset: Pagination offset
+            limit: Pagination limit
+            filters: Additional filters
+            order_by: Ordering fields
+            search: Enable search functionality
+
+        Returns:
+            Tuple of (list of connectors, total count)
+        """
+        # Extract name filter if provided
+        name_filter = filters.get("name")
+
+        if prompt_id:
+            # Get registered connector IDs from Redis if prompt_id provided
+            registered_connector_ids = set()
+
+            # Fetch prompt configuration from Redis to get registered connectors
+            try:
+                # Pass version parameter (None for default version)
+                config_response = await self._perform_get_prompt_config_request(prompt_id, version=version)
+                config_data = config_response.get("data", {})
+                tools = config_data.get("tools", [])
+
+                # Get the actual version from response
+                actual_version = config_response.get("version", version or 1)
+
+                # Extract connector IDs from gateway_config in each tool
+                for tool in tools:
+                    if tool.get("type") == "mcp":
+                        gateway_config = tool.get("gateway_config", {})
+                        # gateway_config is {connector_id: gateway_id}
+                        registered_connector_ids.update(gateway_config.keys())
+
+                logger.debug(
+                    f"Found {len(registered_connector_ids)} registered connectors "
+                    f"for prompt {prompt_id} version {actual_version}"
+                )
+
+            except ClientException as e:
+                if e.status_code == 404:
+                    # No config found, no registered connectors
+                    logger.debug(
+                        f"No configuration found for prompt {prompt_id} "
+                        f"{'version ' + str(version) if version else '(default version)'}, "
+                        f"returning empty list"
+                    )
+                    registered_connector_ids = set()
+                else:
+                    raise
+
+            # Call MCP Foundry API based on is_registered filter
+            try:
+                if is_registered is True:
+                    # Show only registered connectors - use list_connectors_by_connector_ids
+                    logger.debug(f"Filtering to show only registered connectors for prompt {prompt_id}")
+                    mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors_by_connector_ids(
+                        connector_ids=list(registered_connector_ids),
+                        show_registered_only=False,
+                        show_available_only=True,
+                        name=name_filter,
+                        offset=offset,
+                        limit=limit,
+                    )
+                    logger.debug(f"Successfully fetched {total_count} registered connectors from MCP Foundry")
+
+                elif is_registered is False:
+                    # Show only non-registered connectors - fetch all connectors then filter
+                    logger.debug(f"Filtering to show only non-registered connectors for prompt {prompt_id}")
+
+                    # Fetch ALL connectors using pagination loop
+                    all_connectors = []
+                    page_size = 100  # Fetch in batches of 100
+                    fetch_offset = 0
+
+                    while True:
+                        # Fetch a page of connectors
+                        batch_connectors, total = await mcp_foundry_service.list_connectors(
+                            show_registered_only=False,
+                            show_available_only=True,
+                            name=name_filter,
+                            offset=fetch_offset,
+                            limit=page_size,
+                        )
+
+                        # Add to our list
+                        all_connectors.extend(batch_connectors)
+
+                        # Update offset
+                        fetch_offset += page_size
+
+                        # Break if we've fetched all connectors
+                        if fetch_offset >= total or len(batch_connectors) == 0:
+                            break
+
+                    logger.debug(f"Fetched {len(all_connectors)} total connectors from MCP Foundry")
+
+                    # Filter out registered connector IDs
+                    filtered_connectors = [
+                        connector
+                        for connector in all_connectors
+                        if connector.get("id") not in registered_connector_ids
+                    ]
+
+                    # Calculate total count of filtered connectors
+                    total_count = len(filtered_connectors)
+
+                    # Apply pagination to filtered results
+                    mcp_foundry_response = filtered_connectors[offset : offset + limit]
+
+                    logger.debug(
+                        f"Filtered to {total_count} non-registered connectors, "
+                        f"returning {len(mcp_foundry_response)} for page {(offset // limit) + 1}"
+                    )
+
+                else:
+                    # Show all connectors (current behavior when is_registered not specified)
+                    logger.debug(f"Showing all connectors for prompt {prompt_id}")
+                    mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors(
+                        show_registered_only=False,
+                        show_available_only=True,
+                        name=name_filter,
+                        offset=offset,
+                        limit=limit,
+                    )
+                    logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
+            except MCPFoundryException as e:
+                logger.error(f"MCP Foundry API error: {e}")
+                mcp_foundry_response = []
+                total_count = 0
+            except Exception as e:
+                logger.error(f"Unexpected error calling MCP Foundry: {e}")
+                mcp_foundry_response = []
+                total_count = 0
+        else:
+            logger.debug(
+                f"Fetching connectors from MCP Foundry{f' with name filter: {name_filter}' if name_filter else ''}"
+            )
+
+            # Call MCP Foundry API
+            try:
+                mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors(
+                    show_registered_only=False, show_available_only=True, name=name_filter, offset=offset, limit=limit
+                )
+                logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
+            except MCPFoundryException as e:
+                logger.error(f"MCP Foundry API error: {e}")
+                mcp_foundry_response = []
+                total_count = 0
+            except Exception as e:
+                logger.error(f"Unexpected error calling MCP Foundry: {e}")
+                mcp_foundry_response = []
+                total_count = 0
+
+        # Map MCP response to ConnectorListItem
+        connector_items = []
+        for item in mcp_foundry_response:
+            try:
+                connector_item = ConnectorListItem(
+                    id=item.get("id", ""),
+                    name=item.get("name", ""),
+                    icon=item.get("logo_url"),
+                    category=item.get("category"),
+                    url=item.get("url", ""),
+                    provider=item.get("provider", ""),
+                    description=item.get("description"),
+                    documentation_url=item.get("documentation_url"),
+                )
+                connector_items.append(connector_item)
+            except (ValueError, KeyError) as e:
+                logger.error(f"Found invalid connector item: {e}")
+                continue
+
+        return connector_items, total_count
+
+    async def get_connector_by_id(self, connector_id: str) -> Connector:
+        """Get a single connector by its ID from MCP Foundry.
+
+        Args:
+            connector_id: String ID of the connector (e.g., "github", "slack")
+
+        Returns:
+            Connector object with full details
+
+        Raises:
+            ClientException: If connector not found
+        """
+        logger.debug(f"Getting connector with ID: {connector_id}")
+
+        try:
+            # Use the new get_connector_by_id method which fetches all connectors with pagination
+            connector_data = await mcp_foundry_service.get_connector_by_id(connector_id)
+
+            # Map auth_type string to enum (no fallback - let ValueError propagate)
+            auth_type_str = connector_data.get("auth_type", "Open")
+            auth_type = ConnectorAuthTypeEnum(auth_type_str)
+
+            # Get credential schema based on auth type
+            credential_schema = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
+
+            # Build Connector object
+            connector = Connector(
+                id=connector_data.get("id", ""),
+                name=connector_data.get("name", ""),
+                icon=connector_data.get("logo_url"),
+                category=connector_data.get("category"),
+                url=connector_data.get("url", ""),
+                provider=connector_data.get("provider", ""),
+                description=connector_data.get("description"),
+                documentation_url=connector_data.get("documentation_url"),
+                auth_type=auth_type,
+                credential_schema=credential_schema,
+            )
+
+            logger.debug(f"Successfully retrieved connector: {connector.name}")
+            return connector
+
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry error getting connector {connector_id}: {e}")
+            raise ClientException(
+                message=f"Failed to retrieve connector: {str(e)}", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error getting connector {connector_id}: {e}")
+            raise ClientException(
+                message="Failed to retrieve connector", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    async def _check_connector_already_registered(
+        self, budprompt_id: str, connector_id: str, version: Optional[int] = None
+    ) -> tuple[bool, dict]:
+        """Check if a connector is already registered for a prompt.
+
+        Args:
+            budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
+            connector_id: The connector ID to check
+            version: Optional version to check. If None, checks default version
+
+        Returns:
+            Tuple of (is_registered: bool, config_response: dict)
+            - is_registered: True if connector already registered, False otherwise
+            - config_response: The full prompt config response dict (empty dict if 404)
+        """
+        try:
+            config_response = await self._perform_get_prompt_config_request(
+                budprompt_id, version=version, raw_data=True
+            )
+            config_data = config_response.get("data", {})
+            tools = config_data.get("tools", [])
+
+            # Check if connector_id exists in any tool's gateway_config
+            for tool in tools:
+                if tool.get("type") == "mcp":
+                    gateway_config = tool.get("gateway_config", {})
+                    if connector_id in gateway_config:
+                        return True, config_response
+
+            return False, config_response
+
+        except ClientException as e:
+            if e.status_code == 404:
+                # No config exists, connector not registered
+                return False, {}
+            else:
+                # Re-raise other errors
+                raise
+
+    def _detect_transport_from_url(self, url: str) -> str:
+        """Detect transport type from connector URL.
+
+        Args:
+            url: Connector URL
+
+        Returns:
+            "SSE" if URL ends with /sse, otherwise "STREAMABLEHTTP"
+        """
+        normalized_url = url.rstrip("/")
+        if normalized_url.endswith("/sse"):
+            return "SSE"
+        else:
+            return "STREAMABLEHTTP"
+
+    async def register_connector_for_prompt(
+        self, budprompt_id: str, connector_id: str, credentials: Dict[str, Any], version: Optional[int] = None
+    ) -> GatewayResponse:
+        """Register a connector for a prompt by creating gateway in MCP Foundry.
+
+        Args:
+            budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
+            connector_id: The connector ID to register
+            credentials: Connector credentials based on auth_type
+            version: Optional version to update. If None, updates default version
+
+        Returns:
+            gateway
+
+        Raises:
+            ClientException: If connector not found or gateway creation fails
+        """
+        logger.debug(f"Registering connector {connector_id} for prompt {budprompt_id}")
+
+        # Check if connector is already registered and get full config response
+        is_registered, config_response = await self._check_connector_already_registered(
+            budprompt_id, connector_id, version
+        )
+
+        # Extract config data from response
+        config_data = config_response.get("data", {})
+
+        if is_registered:
+            logger.error(f"Connector {connector_id} is already registered for prompt {budprompt_id}")
+            raise ClientException(
+                message="Connector is already registered for prompt",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate allow_multiple_calls if config exists (before creating gateway)
+        if config_data:  # Config exists
+            allow_multiple_calls = config_data.get("allow_multiple_calls", False)
+            if not allow_multiple_calls:
+                logger.error(f"Cannot register connector: allow_multiple_calls is disabled for prompt {budprompt_id}")
+                raise ClientException(
+                    message="Allow Multiple Calls must be enabled for MCP tool usage",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Determine target version based on priority:
+        # 1. User-specified version (highest priority)
+        # 2. Existing config version (medium priority)
+        # 3. Default to version 1 (lowest priority - new config)
+        existing_version = config_response.get("version")
+
+        if version:
+            # User explicitly specified version
+            target_version = version
+        elif existing_version:
+            # Use existing config version
+            target_version = existing_version
+        else:
+            # Default to version 1 for new configs
+            target_version = 1
+
+        # Get connector details from MCP Foundry
+        try:
+            connector = await self.get_connector_by_id(connector_id)
+        except ClientException as e:
+            logger.error(f"Failed to retrieve connector {connector_id}: {e}")
+            raise
+
+        # Construct gateway name: {budprompt_id}__v{version}__{connector_id}
+        # Using double underscore as separator (MCP Foundry only allows letters, numbers, _, -)
+        gateway_name = f"{budprompt_id}__v{target_version}__{connector_id}"
+
+        # Detect transport from connector URL
+        transport = self._detect_transport_from_url(connector.url)
+
+        # Create gateway in MCP Foundry
+        try:
+            gateway_response = await mcp_foundry_service.create_gateway(
+                name=gateway_name, url=connector.url, transport=transport, visibility="public"
+            )
+
+            logger.debug(
+                f"Successfully created gateway for connector {connector_id} and prompt {budprompt_id}",
+                gateway_id=gateway_response.get("id", gateway_response.get("gateway_id")),
+            )
+
+            # TODO: Validate credentials against CONNECTOR_AUTH_CREDENTIALS_MAP schema
+            # Pending implementation
+
+            # Create GatewayResponse object
+            gateway = GatewayResponse(
+                gateway_id=gateway_response.get("id", gateway_response.get("gateway_id")),
+                name=gateway_name,
+                url=connector.url,
+                transport="SSE",
+                visibility="public",
+            )
+
+            # Store MCP tool configuration in Redis via budprompt service
+            await self._store_mcp_tool_config(budprompt_id, connector_id, gateway.gateway_id, version)
+
+            return gateway
+
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry error creating gateway: {e}")
+            raise ClientException(
+                message="Failed to create mcp gateway.",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error registering connector: {e}")
+            raise ClientException(
+                message="Failed to register connector", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    async def add_tool_for_prompt(
+        self, prompt_id: str, connector_id: str, tool_ids: List[str], version: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Add tools for a prompt by creating/updating virtual server in MCP Foundry.
+
+        Args:
+            prompt_id: The prompt ID (UUID or draft ID)
+            connector_id: The connector ID
+            tool_ids: List of tool IDs to add (replaces existing tools)
+            version: Optional version to update. If None, uses default version
+
+        Returns:
+            Dict with virtual_server_id, virtual_server_name, added_tools, and action
+            virtual_server_name format: {prompt_id}__v{version}
+
+        Raises:
+            ClientException: If prompt not found (404) or operation fails
+        """
+        logger.debug(f"Adding tools for prompt {prompt_id}, connector {connector_id}")
+
+        # Convert UUID tool_ids to hex strings for MCP Foundry and Redis storage
+        tool_ids_str = [str(tool_id.hex) for tool_id in tool_ids]
+
+        # Step 1: Fetch existing prompt configuration (must exist)
+        try:
+            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version, raw_data=True)
+            config_data = config_response.get("data", {})
+            tools = config_data.get("tools", [])
+            # Determine target version for virtual server naming
+            target_version = config_response.get("version", 1) if version is None else version
+        except ClientException:
+            raise
+
+        # Step 2: Find MCP tool and validate connector
+        mcp_tool = None
+        mcp_tool_index = None
+
+        for index, tool in enumerate(tools):
+            if tool.get("type") == "mcp":
+                mcp_tool = tool
+                mcp_tool_index = index
+                break
+
+        if not mcp_tool:
+            logger.error(f"MCP tool configuration not found for prompt {prompt_id}")
+            raise ClientException(
+                message="MCP tool configuration not found for this prompt",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        gateway_config = mcp_tool.get("gateway_config", {})
+        if connector_id not in gateway_config:
+            logger.error(f"Connector {connector_id} not registered for prompt {prompt_id}")
+            raise ClientException(
+                message=f"Connector {connector_id} is not registered for this prompt",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Step 3: Merge new tool IDs into existing server_config
+        existing_server_config = mcp_tool.get("server_config", {})
+        existing_server_config[connector_id] = tool_ids_str
+
+        # Step 4: Collect ALL tool IDs from ALL connectors
+        all_tool_ids = []
+        for _conn_id, conn_tool_ids in existing_server_config.items():
+            all_tool_ids.extend(conn_tool_ids)
+
+        logger.debug(f"Total tools across all connectors: {len(all_tool_ids)}")
+
+        # Step 5: Fetch original names for ALL tool IDs (not just newly added)
+        all_tool_original_names = []
+        for tool_id in all_tool_ids:
+            try:
+                tool_data = await mcp_foundry_service.get_tool_by_id(tool_id)
+                original_name = tool_data["originalName"]
+                all_tool_original_names.append(original_name)
+            except MCPFoundryException as e:
+                logger.error(f"Failed to fetch tool {tool_id}: {e}")
+                raise ClientException(message="Tool not found", status_code=status.HTTP_404_NOT_FOUND)
+            except KeyError:
+                logger.error(f"Tool {tool_id} missing originalName field")
+                raise ClientException(
+                    message="Invalid tool data",
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        # Step 6: Create or update virtual server with ALL tools
+        virtual_server_id = mcp_tool.get("server_url")
+
+        # Construct virtual server name: {prompt_id}__v{version}
+        virtual_server_name = f"{prompt_id}__v{target_version}"
+
+        try:
+            if virtual_server_id:
+                # Update existing virtual server with ALL tools from ALL connectors
+                logger.debug(f"Updating virtual server {virtual_server_id} with {len(all_tool_ids)} tools")
+                await mcp_foundry_service.update_virtual_server(
+                    server_id=virtual_server_id, associated_tools=all_tool_ids
+                )
+            else:
+                # Create new virtual server with ALL tools
+                logger.debug(f"Creating virtual server for prompt {prompt_id} version {target_version}")
+                vs_response = await mcp_foundry_service.create_virtual_server(
+                    name=virtual_server_name, associated_tools=all_tool_ids, visibility="public"
+                )
+                virtual_server_id = vs_response.get("id")
+
+            # Update MCP tool config with merged data
+            mcp_tool["server_label"] = virtual_server_name
+            mcp_tool["server_url"] = virtual_server_id
+            mcp_tool["allowed_tools"] = all_tool_original_names  # All tool original names
+            mcp_tool["connector_id"] = virtual_server_id
+            mcp_tool["server_config"] = existing_server_config  # Merged server_config
+            tools[mcp_tool_index] = mcp_tool
+
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry error: {e}")
+            raise ClientException(
+                message="Failed to create/update virtual server",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Step 7: Save updated configuration to Redis
+        # Preserve all existing config data, only update tools field
+        payload = {
+            **config_data,  # Spread all existing fields
+            "prompt_id": prompt_id,
+            "version": target_version,
+            "set_default": False,  # Don't change default for existing configs
+            "tools": tools,  # Override tools field
+        }
+
+        # Save using helper method
+        await self._save_prompt_config_to_redis(payload)
+
+        # Step 8: Return response
+        return {
+            "virtual_server_id": virtual_server_id,
+            "virtual_server_name": virtual_server_name,
+            "added_tools": tool_ids_str,
+        }
+
+    async def disconnect_connector_from_prompt(
+        self, budprompt_id: str, connector_id: str, version: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Disconnect a connector from a prompt by deleting gateway and cleaning config.
+
+        Args:
+            budprompt_id: The bud prompt ID (UUID or draft ID)
+            connector_id: The connector ID to disconnect
+            version: Optional version to update. If None, updates default version
+
+        Returns:
+            Dict with deletion details
+
+        Raises:
+            ClientException: If prompt not found or connector not registered
+        """
+        logger.debug(f"Disconnecting connector {connector_id} from prompt {budprompt_id}")
+
+        # Step 1: Fetch prompt config from Redis
+        config_response = await self._perform_get_prompt_config_request(budprompt_id, version=version, raw_data=True)
+        config_data = config_response.get("data", {})
+        tools = config_data.get("tools", [])
+        target_version = config_response.get("version", 1) if version is None else version
+
+        # Step 2: Find MCP tool config and validate connector is registered
+        mcp_tool = None
+        mcp_tool_index = None
+
+        for index, tool in enumerate(tools):
+            if tool.get("type") == "mcp":
+                mcp_tool = tool
+                mcp_tool_index = index
+                break
+
+        if not mcp_tool:
+            raise ClientException(
+                message="No MCP connectors registered for this prompt",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        gateway_config = mcp_tool.get("gateway_config", {})
+        if connector_id not in gateway_config:
+            raise ClientException(
+                message=f"Connector {connector_id} is not registered for this prompt",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        gateway_id = gateway_config[connector_id]
+        server_config = mcp_tool.get("server_config", {})
+        tool_ids_to_remove = server_config.get(connector_id, [])
+
+        # Step 3: Fetch tool originalNames BEFORE deleting gateway
+        # (Once gateway is deleted, tools are removed from MCP Foundry)
+        tool_original_names_to_remove = []
+        for tool_id in tool_ids_to_remove:
+            try:
+                tool_data = await mcp_foundry_service.get_tool_by_id(tool_id)
+                original_name = tool_data["originalName"]
+                tool_original_names_to_remove.append(original_name)
+            except Exception as e:
+                logger.warning(f"Could not fetch tool {tool_id} to remove from allowed_tools: {e}")
+
+        # Step 4: Delete gateway in MCP Foundry (auto-removes tools from virtual server)
+        try:
+            await mcp_foundry_service.delete_gateway(gateway_id)
+            logger.debug(f"Successfully deleted gateway {gateway_id}")
+        except MCPFoundryException as e:
+            logger.error(f"Failed to delete gateway {gateway_id}: {e}")
+            # Continue with Redis cleanup even if gateway deletion fails
+
+        # Step 5: Update gateway_config - remove connector
+        del gateway_config[connector_id]
+
+        # Step 6: Update server_config - remove connector's tools
+        server_config.pop(connector_id, None)
+
+        # Step 7: Update allowed_tools - remove this connector's tool originalNames
+        allowed_tools = mcp_tool.get("allowed_tools", [])
+        updated_allowed_tools = [tool for tool in allowed_tools if tool not in tool_original_names_to_remove]
+
+        # Step 8: Determine if we should remove entire MCP config or update it
+        if not gateway_config:  # No more connectors - complete cleanup
+            # Delete virtual server from MCP Foundry
+            virtual_server_id = mcp_tool.get("server_url")
+            if virtual_server_id:
+                try:
+                    await mcp_foundry_service.delete_virtual_server(virtual_server_id)
+                    logger.debug(f"Successfully deleted virtual server {virtual_server_id}")
+                except MCPFoundryException as e:
+                    logger.error(f"Failed to delete virtual server {virtual_server_id}: {e}")
+                    # Continue with cleanup
+
+            # Remove entire MCP tool config from tools array
+            tools.pop(mcp_tool_index)
+            logger.debug("Removed entire MCP tool config (no connectors remaining)")
+        else:
+            # Update MCP tool config (connectors still remain)
+            mcp_tool["gateway_config"] = gateway_config
+            mcp_tool["server_config"] = server_config
+            mcp_tool["allowed_tools"] = updated_allowed_tools
+            tools[mcp_tool_index] = mcp_tool
+            logger.debug(f"Updated MCP tool config ({len(gateway_config)} connectors remaining)")
+
+        # Step 9: Save updated config to Redis
+        payload = {
+            **config_data,
+            "prompt_id": budprompt_id,
+            "version": target_version,
+            "set_default": False,
+            "tools": tools,
+        }
+        await self._save_prompt_config_to_redis(payload)
+
+        # Step 10: Return response
+        return {
+            "prompt_id": budprompt_id,
+            "connector_id": connector_id,
+            "deleted_gateway_id": gateway_id,
+        }
+
+    async def _save_prompt_config_to_redis(self, payload: dict) -> dict:
+        """Save prompt configuration to Redis via budprompt service.
+
+        Args:
+            payload: Complete payload dictionary to send to budprompt service.
+                    Must include: prompt_id, version, tools
+                    Optional: set_default, allow_multiple_calls, and any other config fields
+
+        Returns:
+            dict: Response data from budprompt service
+
+        Raises:
+            ClientException: If save fails
+        """
+        prompt_config_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-config"
+        )
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(prompt_config_endpoint, json=payload) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        logger.error(f"Failed to save prompt config: {response.status} {response_data}")
+                        raise ClientException(
+                            message="Failed to save prompt configuration",
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
+
+                    logger.debug(f"Successfully saved prompt config for {payload.get('prompt_id')}")
+                    return response_data
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Network error saving prompt config: {e}")
+            raise ClientException(
+                message="Unable to save prompt configuration",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+    async def _store_mcp_tool_config(
+        self, budprompt_id: str, connector_id: str, gateway_id: str, version: Optional[int] = None
+    ) -> None:
+        """Store MCP tool configuration in Redis via budprompt service.
+
+        Args:
+            budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
+            connector_id: The connector ID
+            gateway_id: The gateway ID from MCP Foundry
+            version: Optional version to update. If None, updates default version
+
+        Raises:
+            ClientException: If storing configuration fails
+        """
+        # 1. Create MCPToolConfig using Pydantic schema
+        mcp_tool = MCPToolConfig(
+            type="mcp",
+            server_label=None,
+            server_description=None,
+            server_url=None,
+            require_approval="never",
+            allowed_tools=[],
+            connector_id=None,  # Set to None as requested
+            gateway_config={connector_id: gateway_id},
+        )
+        mcp_tool_dict = mcp_tool.model_dump(exclude_none=True)
+
+        # 2. Fetch existing prompt configuration
+        config_exists = True
+        existing_config_data = {}
+
+        try:
+            config_response = await self._perform_get_prompt_config_request(
+                budprompt_id,
+                version=version,  # Use provided version or None for default
+                raw_data=True,
+            )
+            config_data = config_response.get("data", {})
+            existing_tools = config_data.get("tools", [])
+
+            # Store the entire existing config data to preserve it
+            existing_config_data = config_data
+
+            # Determine the version to use
+            target_version = config_response.get("version", 1) if version is None else version
+
+        except ClientException as e:
+            if e.status_code == 404:
+                # No existing config
+                config_exists = False
+                existing_tools = []
+                target_version = version if version else 1  # Default to 1 if not specified
+            else:
+                raise
+
+        # 3. Check if an MCP tool config already exists and merge or create new
+        existing_mcp_tool_index = None
+        existing_mcp_tool = None
+
+        for index, tool in enumerate(existing_tools):
+            if tool.get("type") == "mcp":
+                existing_mcp_tool = tool
+                existing_mcp_tool_index = index
+                break
+
+        # 4. Handle merging or creating MCP tool config
+        if existing_mcp_tool:
+            # MCP tool exists - check for duplicate connector
+            gateway_config = existing_mcp_tool.get("gateway_config", {})
+            if connector_id in gateway_config:
+                logger.error(f"Connector {connector_id} already exists in prompt config")
+                raise ClientException(
+                    message="Connector is already registered for prompt.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Merge new connector into existing MCP tool config
+            gateway_config[connector_id] = gateway_id
+            existing_mcp_tool["gateway_config"] = gateway_config
+
+            # Also update server_config to maintain consistency
+            server_config = existing_mcp_tool.get("server_config", {})
+            # Note: server_config is updated separately when tools are added
+            existing_mcp_tool["server_config"] = server_config
+
+            # Update the existing tool in the array
+            existing_tools[existing_mcp_tool_index] = existing_mcp_tool
+            updated_tools = existing_tools
+
+            logger.debug(f"Merged connector {connector_id} into existing MCP tool config")
+        else:
+            # No MCP tool exists - create new entry
+            updated_tools = existing_tools + [mcp_tool_dict]
+            logger.debug(f"Created new MCP tool config with connector {connector_id}")
+
+        # 5. Save updated config
+        if config_exists:
+            # Preserve all existing config data, only update tools field
+            payload = {
+                **existing_config_data,  # Spread all existing fields
+                "prompt_id": budprompt_id,
+                "version": target_version,
+                "set_default": False,  # Don't change default for existing configs
+                "tools": updated_tools,  # Override tools field
+            }
+        else:
+            # New config: set allow_multiple_calls=true for MCP support
+            payload = {
+                "prompt_id": budprompt_id,
+                "version": target_version,
+                "set_default": True,  # Set as default for new configs
+                "allow_multiple_calls": True,  # Enable for MCP tools
+                "tools": updated_tools,
+            }
+
+        await self._save_prompt_config_to_redis(payload)
+        logger.debug(f"Successfully stored MCP tool config for connector {connector_id}")
+
+    async def get_tools(
+        self,
+        prompt_id: str,
+        connector_id: str,
+        version: Optional[int] = None,
+        offset: int = 0,
+        limit: int = 10,
+        filters: dict = {},
+        order_by: list = [],
+        search: bool = False,
+    ) -> tuple[list[ToolListItem], int]:
+        """Get tools list from MCP Foundry for a specific prompt and connector.
+
+        Args:
+            prompt_id: Prompt ID (UUID or draft ID)
+            connector_id: Connector ID to get tools for
+            version: Optional version of prompt config
+            offset: Pagination offset
+            limit: Pagination limit
+            filters: Additional filters
+            order_by: Ordering fields
+            search: Enable search
+
+        Returns:
+            Tuple of (list of tools, total count)
+        """
+        logger.debug(f"Fetching tools for prompt_id={prompt_id}, connector_id={connector_id}, version={version}")
+
+        # 1. Fetch prompt config from Redis
+        try:
+            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version, raw_data=True)
+            config_data = config_response.get("data", {})
+            tools = config_data.get("tools", [])
+        except ClientException as e:
+            if e.status_code == 404:
+                # Prompt config not found - return empty
+                logger.debug(f"Prompt config not found for {prompt_id}")
+                return [], 0
+            raise
+
+        # 2. Find gateway_id and added tool IDs from gateway_config and server_config
+        gateway_id = None
+        added_tool_ids = []
+        for tool in tools:
+            if tool.get("type") == "mcp":
+                gateway_config = tool.get("gateway_config", {})
+                if connector_id in gateway_config:
+                    gateway_id = gateway_config[connector_id]
+                    # Extract added tool IDs from server_config
+                    server_config = tool.get("server_config", {})
+                    added_tool_ids = server_config.get(connector_id, [])
+                    break
+
+        if not gateway_id:
+            # Connector not registered for this prompt
+            logger.debug(f"Connector {connector_id} not found in prompt {prompt_id}")
+            return [], 0
+
+        logger.debug(f"Found gateway_id={gateway_id} for connector={connector_id}, added_tool_ids={added_tool_ids}")
+
+        # 3. Fetch gateway with all tools from MCP Foundry
+        try:
+            gateway_data = await mcp_foundry_service.get_gateway_by_id(gateway_id)
+            all_tools = gateway_data.get("tools", [])
+
+            logger.debug(f"Successfully fetched gateway {gateway_id} with {len(all_tools)} tools from MCP Foundry")
+
+            # Apply pagination in-memory
+            total_count = len(all_tools)
+            mcp_foundry_response = all_tools[offset : offset + limit]
+
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry API error: {e}")
+            return [], 0
+        except Exception as e:
+            logger.error(f"Unexpected error calling MCP Foundry: {e}")
+            return [], 0
+
+        # 4. Parse MCP Foundry response to ToolListItem
+        tool_items = []
+        for item in mcp_foundry_response:
+            try:
+                tool_id = item.get("id", "")
+                is_added = tool_id in added_tool_ids
+                tool_item = ToolListItem(
+                    id=UUID(tool_id),
+                    name=item.get("displayName", ""),
+                    type=item.get("originalName", ""),
+                    is_added=is_added,
+                )
+                tool_items.append(tool_item)
+            except (ValueError, KeyError) as e:
+                logger.error(f"Invalid tool item: {e}")
+                continue
+
+        logger.debug(f"Returning {len(tool_items)} tools out of {total_count} total")
+
+        return tool_items, total_count
+
+    async def get_tool_by_id(self, tool_id: UUID) -> Tool:
+        """Get a single tool by ID from MCP Foundry.
+
+        Args:
+            tool_id: Tool ID to retrieve
+
+        Returns:
+            Tool object with complete details
+
+        Raises:
+            ClientException: If tool not found or request fails
+        """
+        logger.debug(f"Getting tool with ID: {tool_id}")
+
+        # Fetch from MCP Foundry
+        try:
+            mcp_foundry_response = await mcp_foundry_service.get_tool_by_id(tool_id)
+            logger.debug(f"Successfully fetched tool from MCP Foundry: {tool_id}")
+
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry API error for tool {tool_id}: {e}")
+            raise ClientException(message="Tool not found", status_code=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Unexpected error getting tool {tool_id}: {e}")
+            raise ClientException(message="Tool not found", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Parse MCP response to Tool format
+        try:
+            tool = Tool(
+                id=UUID(mcp_foundry_response.get("id", str(tool_id))),
+                name=mcp_foundry_response.get("displayName", "Unknown Tool"),
+                description=mcp_foundry_response.get("description", ""),
+                type=mcp_foundry_response.get("originalName", "unknown"),
+                schema=mcp_foundry_response.get("inputSchema", {}),
+            )
+
+            logger.debug(f"Successfully retrieved tool: {tool.name} with ID: {tool_id}")
+            return tool
+
+        except (ValueError, KeyError) as e:
+            logger.error(f"Failed to parse tool response for {tool_id}: {e}")
+            raise ClientException(
+                message="Invalid tool data found",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     async def _perform_copy_prompt_config_request(self, request: PromptConfigCopyRequest) -> Dict[str, Any]:
         """Perform the actual copy-config request to budprompt service via Dapr.

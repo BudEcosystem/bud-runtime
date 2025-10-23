@@ -892,6 +892,26 @@ class PromptTypeEnum(StrEnum):
     SIMPLE_PROMPT = auto()
 
 
+class ConnectorAuthTypeEnum(StrEnum):
+    """Enumeration of connector authentication types from MCP registry.
+
+    Attributes:
+        API: API authentication.
+        API_KEY: API Key authentication.
+        OAUTH: OAuth authentication.
+        OAUTH2_1: OAuth 2.1 authentication.
+        OAUTH2_1_AND_API_KEY: OAuth 2.1 combined with API Key authentication.
+        OPEN: No authentication required (open access).
+    """
+
+    API = "API"
+    API_KEY = "API Key"
+    OAUTH = "OAuth"
+    OAUTH2_1 = "OAuth2.1"
+    OAUTH2_1_AND_API_KEY = "OAuth2.1 & API Key"
+    OPEN = "Open"
+
+
 class PromptStatusEnum(StrEnum):
     """Enumeration of prompt statuses.
 
@@ -2907,6 +2927,186 @@ EMOJIS = [
     "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
     "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
 ]
+
+# Connector Authentication Credentials Mapping
+CONNECTOR_AUTH_CREDENTIALS_MAP = {
+    ConnectorAuthTypeEnum.API: [
+        {
+            "type": "text",
+            "field": "api_endpoint",
+            "label": "API Endpoint",
+            "order": 1,
+            "required": True,
+            "description": "API endpoint URL",
+        },
+    ],
+    ConnectorAuthTypeEnum.API_KEY: [
+        {
+            "type": "password",
+            "field": "api_key",
+            "label": "API Key",
+            "order": 1,
+            "required": True,
+            "description": "Your API key for authentication",
+        }
+    ],
+    ConnectorAuthTypeEnum.OAUTH: [
+        {
+            "type": "dropdown",
+            "field": "grant_type",
+            "label": "Grant Type",
+            "order": 1,
+            "required": True,
+            "description": "OAuth grant type",
+            "options": ["client_credentials", "authorization_code"],
+        },
+        {
+            "type": "text",
+            "field": "client_id",
+            "label": "Client ID",
+            "order": 2,
+            "required": True,
+            "description": "Your OAuth client ID",
+        },
+        {
+            "type": "password",
+            "field": "client_secret",
+            "label": "Client Secret",
+            "order": 3,
+            "required": True,
+            "description": "Your OAuth client secret",
+        },
+        {
+            "type": "url",
+            "field": "token_url",
+            "label": "Token URL",
+            "order": 4,
+            "required": True,
+            "description": "OAuth token endpoint URL",
+        },
+        {
+            "type": "text",
+            "field": "scopes",
+            "label": "Scopes",
+            "order": 5,
+            "required": False,
+            "description": "Space-separated list of OAuth scopes",
+        },
+    ],
+    ConnectorAuthTypeEnum.OAUTH2_1: [
+        {
+            "type": "dropdown",
+            "field": "grant_type",
+            "label": "Grant Type",
+            "order": 1,
+            "required": True,
+            "description": "OAuth grant type",
+            "options": ["client_credentials", "authorization_code"],
+        },
+        {
+            "type": "text",
+            "field": "client_id",
+            "label": "Client ID",
+            "order": 2,
+            "required": True,
+            "description": "Your OAuth 2.1 client ID",
+        },
+        {
+            "type": "password",
+            "field": "client_secret",
+            "label": "Client Secret",
+            "order": 3,
+            "required": True,
+            "description": "Your OAuth 2.1 client secret",
+        },
+        {
+            "type": "url",
+            "field": "token_url",
+            "label": "Token URL",
+            "order": 4,
+            "required": True,
+            "description": "OAuth 2.1 token endpoint URL",
+        },
+        {
+            "type": "text",
+            "field": "scopes",
+            "label": "Scopes",
+            "order": 5,
+            "required": False,
+            "description": "Space-separated list of OAuth scopes",
+        },
+        {
+            "type": "dropdown",
+            "field": "code_challenge_method",
+            "label": "Code Challenge Method",
+            "order": 6,
+            "required": True,
+            "description": "PKCE code challenge method (S256 recommended)",
+            "options": ["S256", "plain"],
+        },
+    ],
+    ConnectorAuthTypeEnum.OAUTH2_1_AND_API_KEY: [
+        {
+            "type": "dropdown",
+            "field": "grant_type",
+            "label": "Grant Type",
+            "order": 1,
+            "required": True,
+            "description": "OAuth grant type",
+            "options": ["client_credentials", "authorization_code"],
+        },
+        {
+            "type": "text",
+            "field": "client_id",
+            "label": "Client ID",
+            "order": 2,
+            "required": True,
+            "description": "Your OAuth 2.1 client ID",
+        },
+        {
+            "type": "password",
+            "field": "client_secret",
+            "label": "Client Secret",
+            "order": 3,
+            "required": True,
+            "description": "Your OAuth 2.1 client secret",
+        },
+        {
+            "type": "url",
+            "field": "token_url",
+            "label": "Token URL",
+            "order": 4,
+            "required": True,
+            "description": "OAuth 2.1 token endpoint URL",
+        },
+        {
+            "type": "text",
+            "field": "scopes",
+            "label": "Scopes",
+            "order": 5,
+            "required": False,
+            "description": "Space-separated list of OAuth scopes",
+        },
+        {
+            "type": "dropdown",
+            "field": "code_challenge_method",
+            "label": "Code Challenge Method",
+            "order": 6,
+            "required": True,
+            "description": "PKCE code challenge method (S256 recommended)",
+            "options": ["S256", "plain"],
+        },
+        {
+            "type": "password",
+            "field": "api_key",
+            "label": "API Key",
+            "order": 7,
+            "required": False,
+            "description": "Your API key for additional authentication",
+        },
+    ],
+    ConnectorAuthTypeEnum.OPEN: [],
+}
 
 # Define success messages for different workflow types
 WORKFLOW_DELETE_MESSAGES = {

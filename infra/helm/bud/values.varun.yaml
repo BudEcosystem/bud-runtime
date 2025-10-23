@@ -1,3 +1,5 @@
+imagePullPolicy: "Always"
+
 ingress:
     hosts:
         root: varun.bud.studio
@@ -15,3 +17,9 @@ microservices:
             LOG_LEVEL: DEBUG
     budgateway:
         image: vsrvarun/budgateway:vsr
+
+storage:
+    budmodelRegistry:
+        className: nfs-csi
+    budevalDataset:
+        className: "nfs-csi"
