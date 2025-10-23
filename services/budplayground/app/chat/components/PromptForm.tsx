@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Input, InputNumber, Checkbox } from 'antd';
-import { PrimaryButton } from '@/app/components/uiComponents/inputs';
-import { getPromptConfig } from '@/app/lib/api';
+import { Input, InputNumber, Checkbox, Image } from 'antd';
+import { getPromptConfig, submitPromptResponse } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
 
 interface PromptFormProps {
@@ -17,6 +16,9 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [inputSchema, setInputSchema] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isHovered, setIsHovered] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch prompt configurations on mount
   useEffect(() => {
@@ -67,9 +69,61 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+
+    if (promptIds.length === 0) {
+      console.error('No prompt ID available');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const promptId = promptIds[0];
+      let payload: any;
+
+      // Check if it's structured or unstructured input
+      if (inputSchema && Object.keys(inputSchema).length > 0) {
+        // Structured input - send variables
+        const variables: Record<string, any> = {};
+        Object.keys(formData).forEach(key => {
+          if (formData[key] !== undefined && formData[key] !== '') {
+            variables[key] = formData[key];
+          }
+        });
+
+        payload = {
+          prompt: {
+            id: promptId,
+            variables: variables
+          }
+        };
+      } else {
+        // Unstructured input - send input field
+        payload = {
+          prompt: {
+            id: promptId
+          },
+          input: formData['unstructuredSchema'] || ''
+        };
+      }
+
+      // Make API call using the centralized API function
+      const response = await submitPromptResponse(payload, apiKey || '', accessKey || '');
+
+      console.log('API Response:', response);
+
+      // Only call onSubmit on success - this will close the form
+      onSubmit(response);
+    } catch (error: any) {
+      console.error('Error submitting prompt:', error);
+      // Show error message in the form instead of closing it
+      setError(error?.message || 'Failed to submit prompt. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const renderInput = (fieldName: string, fieldSchema: any) => {
@@ -165,6 +219,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
           })}
 
           {/* Fallback to default fields if no input schema */}
+
           {!inputSchema && (
             <>
               <div className="space-y-2">
@@ -172,8 +227,8 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
                   Unstructured Input
                 </label>
                 <Input
-                  value={formData['firstName'] || ''}
-                  onChange={(e) => handleChange('firstName', e.target.value)}
+                  value={formData['unstructuredSchema'] || ''}
+                  onChange={(e) => handleChange('unstructuredSchema', e.target.value)}
                   placeholder="Enter the details here"
                   className="bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] px-0 py-2"
                   style={{ boxShadow: 'none' }}
@@ -182,13 +237,31 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
             </>
           )}
 
+          {/* Error Message */}
+          {error && (
+            <div className="text-red-500 text-[0.75rem] mt-2">
+              {error}
+            </div>
+          )}
+
           {/* Next Button */}
           <div className="flex justify-end">
-            <PrimaryButton classNames='!h-[1.75rem] !px-[.75rem] !mr-0' htmlType="submit">
-              <div className='flex items-center'>
-                <span>Next</span>
+            <button
+              className="Open-Sans cursor-pointer text-[400] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF] flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF] disabled:opacity-50 disabled:cursor-not-allowed"
+              type="submit"
+              disabled={submitting}
+              onMouseEnter={() => !submitting && setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+            >
+              {submitting ? 'Submitting...' : 'Next'}
+              <div className="w-[1.25rem] h-[1.25rem]">
+                <Image
+                  src={isHovered && !submitting ? "icons/send-white.png" : "icons/send.png"}
+                  alt="send"
+                  preview={false}
+                />
               </div>
-            </PrimaryButton>
+            </button>
           </div>
         </form>
       </div>
