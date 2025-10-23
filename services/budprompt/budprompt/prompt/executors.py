@@ -24,7 +24,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Type, Union
 
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
-from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -712,7 +712,7 @@ class SimplePromptExecutor:
                 )
 
                 # Format to OpenAI response for non-streaming
-                return self.response_formatter.format_response(
+                return await self.response_formatter.format_response(
                     pydantic_result=result,
                     model_settings=model_settings,
                     messages=messages,
@@ -1060,6 +1060,10 @@ class SimplePromptExecutor:
             else:
                 logger.error(f"Unexpected model behavior: {error_msg}")
                 raise PromptExecutionException(f"Unexpected model behavior: {error_msg}") from e
+        except ModelHTTPError as e:
+            # HTTP errors from MCP servers or model providers
+            logger.error(f"Received error from model: {str(e)}")
+            raise PromptExecutionException(f"Received error from model: {e.message}") from e
         except Exception as e:
             logger.error(f"Agent execution failed: {str(e)}")
             raise PromptExecutionException("Agent execution failed") from e

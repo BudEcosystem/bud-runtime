@@ -22,6 +22,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
+from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field, ValidationError
 
 from .schemas import MCPToolConfig, Message, ModelSettings
@@ -148,6 +149,25 @@ class OpenAIMCPTool(BaseModel):
     headers: Optional[Dict[str, str]] = Field(None, description="Optional HTTP headers to send to the MCP server")
 
 
+class MCPToolSchema(BaseModel):
+    """Schema for an individual MCP tool definition."""
+
+    name: str = Field(..., description="The name of the tool")
+    description: str = Field(..., description="Description of what the tool does")
+    input_schema: Dict[str, Any] = Field(..., description="JSON schema defining the tool's input parameters")
+    annotations: Optional[ToolAnnotations] = Field(None, description="Optional annotations like read_only")
+
+
+class OpenAIMCPListTools(BaseModel):
+    """MCP list tools output item showing available tools from an MCP server."""
+
+    type: Literal["mcp_list_tools"] = "mcp_list_tools"
+    id: str = Field(..., description="Unique identifier for this list")
+    server_label: str = Field(..., description="The label of the MCP server")
+    tools: List[MCPToolSchema] = Field(..., description="The tools available on the server")
+    error: Optional[str] = Field(None, description="Error message if the server could not list tools")
+
+
 class OpenAIUsageDetails(BaseModel):
     """Token usage details."""
 
@@ -232,7 +252,7 @@ class OpenAIResponseSchema(BaseModel):
 class OpenAIResponseFormatter:
     """Formatter for converting pydantic-ai responses to OpenAI format."""
 
-    def format_response(
+    async def format_response(
         self,
         pydantic_result: Any,
         model_settings: Optional[ModelSettings] = None,
@@ -263,7 +283,7 @@ class OpenAIResponseFormatter:
             instructions = self._format_instructions(messages or [], all_messages)
 
             # Extract output items (includes MCP calls and message items)
-            output = self._format_output_with_tools(all_messages, response_id, tools)
+            output = await self._format_output_with_tools(all_messages, response_id, tools)
 
             # Get usage information
             usage = self._format_usage(pydantic_result.usage())
@@ -349,7 +369,7 @@ class OpenAIResponseFormatter:
 
         return instructions
 
-    def _format_output_with_tools(
+    async def _format_output_with_tools(
         self,
         all_messages: List[Dict],
         response_id: str,
@@ -358,9 +378,10 @@ class OpenAIResponseFormatter:
         """Format output items in chronological order.
 
         Processing logic:
-        1. Build lookup dict of tool returns by tool_call_id
-        2. Iterate through messages in order
-        3. For each part, add corresponding output item:
+        1. Fetch MCP tool lists and add to output first
+        2. Build lookup dict of tool returns by tool_call_id
+        3. Iterate through messages in order
+        4. For each part, add corresponding output item:
            - thinking → reasoning
            - text → message
            - tool-call → mcp_call (correlated with tool-return)
@@ -374,6 +395,11 @@ class OpenAIResponseFormatter:
             List of output items in chronological order
         """
         output_items = []
+
+        # Step 1: Fetch and add MCP tool lists at the beginning
+        mcp_list_items = await self._fetch_mcp_tool_lists(tools)
+        if mcp_list_items:
+            output_items.extend(mcp_list_items)
 
         # Build tool returns lookup
         tool_returns_lookup = self._build_tool_returns_lookup(all_messages)
@@ -499,6 +525,62 @@ class OpenAIResponseFormatter:
                 formatted_tools.append(openai_tool.model_dump(exclude_none=True))
 
         return formatted_tools
+
+    async def _fetch_mcp_tool_lists(self, tools: Optional[List[MCPToolConfig]]) -> List[Dict[str, Any]]:
+        """Fetch tool lists from all MCP servers.
+
+        Args:
+            tools: List of MCP tool configurations
+
+        Returns:
+            List of mcp_list_tools output items
+        """
+        if not tools:
+            return []
+
+        from .tool_loaders import MCPToolLoader
+
+        loader = MCPToolLoader()
+        mcp_list_items = []
+
+        for tool_config in tools:
+            if tool_config.type == "mcp":
+                # Load the MCP server
+                mcp_server = await loader.load_tools(tool_config)
+                if not mcp_server:
+                    continue
+
+                # Fetch tool list from server
+                tool_list_data = await loader.get_tool_list(mcp_server, tool_config.server_label or "unknown")
+
+                if tool_list_data:
+                    # Parse tools from MCP response
+                    tools_list = []
+                    for tool_info in tool_list_data.get("tools", []):
+                        # tool_info is a Pydantic Tool object from pydantic-ai
+                        # Access attributes directly, not via .get()
+                        tool_schema = MCPToolSchema(
+                            name=tool_info.name,
+                            description=tool_info.description,
+                            input_schema=tool_info.inputSchema
+                            if hasattr(tool_info, "inputSchema")
+                            else tool_info.input_schema,
+                            annotations=getattr(tool_info, "annotations", None),
+                        )
+                        tools_list.append(tool_schema)
+
+                    # Create mcp_list_tools output item
+                    mcp_list_tools = OpenAIMCPListTools(
+                        id=f"mcpl_{uuid.uuid4().hex}",
+                        type="mcp_list_tools",
+                        server_label=tool_list_data["server_label"],
+                        tools=tools_list,
+                        error=tool_list_data.get("error"),
+                    )
+
+                    mcp_list_items.append(mcp_list_tools.model_dump())
+
+        return mcp_list_items
 
     def _format_usage(self, usage_info: Any) -> Dict:
         """Format usage information."""
