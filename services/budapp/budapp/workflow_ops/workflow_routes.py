@@ -38,7 +38,7 @@ from .schemas import (
     WorkflowListResponse,
     WorkflowResponse,
 )
-from .services import WorkflowService
+from .services import WorkflowService, WorkflowStepService
 
 
 logger = logging.get_logger(__name__)
@@ -267,7 +267,7 @@ async def list_old_workflows(
     would be cleaned up before triggering manual cleanup.
     """
     try:
-        workflows, total_count = await WorkflowService(session).list_old_workflows(
+        workflows, total_count = await WorkflowStepService(session).list_old_workflows(
             retention_days=retention_days,
             page=page,
             limit=limit,
@@ -331,7 +331,7 @@ async def trigger_manual_cleanup(
     from the database. This is not recommended as it removes the audit trail.
     """
     try:
-        result = await WorkflowService(session).trigger_manual_cleanup(
+        result = await WorkflowStepService(session).trigger_manual_cleanup(
             retention_days=request.retention_days,
             batch_size=request.batch_size,
             delete_from_db=request.delete_from_db,

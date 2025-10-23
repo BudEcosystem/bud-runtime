@@ -206,9 +206,9 @@ class OldWorkflowItem(BaseModel):
     current_step: int
     total_steps: int
     created_at: datetime
-    updated_at: datetime
+    modified_at: datetime
     reason: str | None = None
-    age_days: int = Field(..., description="Number of days since last update")
+    age_days: int = Field(..., description="Number of days since last modification")
 
 
 class OldWorkflowsListRequest(BaseModel):

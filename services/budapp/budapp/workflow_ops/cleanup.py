@@ -23,7 +23,7 @@ from uuid import UUID
 import aiohttp
 
 from ..commons import logging
-from ..commons.config import app_settings
+from ..commons.config import app_settings, secrets_settings
 from ..commons.constants import WorkflowStatusEnum
 from ..commons.database import SessionLocal
 from .crud import WorkflowDataManager
@@ -74,11 +74,11 @@ class WorkflowCleanupScheduler:
         # Combine results
         all_workflows = workflows_completed + workflows_failed
 
-        # Filter by updated_at to get only old workflows
-        old_workflows = [w for w in all_workflows if w.updated_at and w.updated_at < cutoff_date]
+        # Filter by modified_at to get only old workflows
+        old_workflows = [w for w in all_workflows if w.modified_at and w.modified_at < cutoff_date]
 
-        # Sort by updated_at and limit to batch_size
-        old_workflows = sorted(old_workflows, key=lambda w: w.updated_at or datetime.min.replace(tzinfo=UTC))
+        # Sort by modified_at and limit to batch_size
+        old_workflows = sorted(old_workflows, key=lambda w: w.modified_at or datetime.min.replace(tzinfo=UTC))
         old_workflows = old_workflows[:batch_size]
 
         logger.debug(
@@ -112,8 +112,8 @@ class WorkflowCleanupScheduler:
         try:
             async with aiohttp.ClientSession() as session:
                 headers = {}
-                if app_settings.dapr_api_token:
-                    headers["dapr-api-token"] = app_settings.dapr_api_token
+                if secrets_settings.dapr_api_token:
+                    headers["dapr-api-token"] = secrets_settings.dapr_api_token
 
                 async with session.post(purge_url, headers=headers) as response:
                     if response.status == 204:
@@ -201,11 +201,11 @@ class WorkflowCleanupScheduler:
                     if purge_success:
                         result["purged_from_dapr"] += 1
                         logger.info(
-                            "Purged workflow %s (type=%s, status=%s, updated=%s)",
+                            "Purged workflow %s (type=%s, status=%s, modified=%s)",
                             workflow.id,
                             workflow.workflow_type,
                             workflow.status,
-                            workflow.updated_at,
+                            workflow.modified_at,
                         )
 
                         # Optionally delete from database

@@ -134,6 +134,7 @@ class AppConfig(BaseAppConfig):
         alias="BUD_DOC_API_KEY_LOCATION",
     )
     bud_prompt_service_url: str = Field(
+        default="http://budprompt:3015",
         description="BudPrompt service URL for prompt execution",
         alias="BUD_PROMPT_SERVICE_URL",
     )

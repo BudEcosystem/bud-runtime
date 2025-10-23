@@ -760,16 +760,16 @@ class WorkflowStepService(SessionMixin):
 
         # Combine and filter by date
         all_workflows = workflows_completed + workflows_failed
-        old_workflows = [w for w in all_workflows if w.updated_at and w.updated_at < cutoff_date]
+        old_workflows = [w for w in all_workflows if w.modified_at and w.modified_at < cutoff_date]
 
-        # Sort by updated_at (oldest first)
-        old_workflows = sorted(old_workflows, key=lambda w: w.updated_at or datetime.min.replace(tzinfo=UTC))
+        # Sort by modified_at (oldest first)
+        old_workflows = sorted(old_workflows, key=lambda w: w.modified_at or datetime.min.replace(tzinfo=UTC))
 
         # Calculate age in days for each workflow
         now = datetime.now(UTC)
         workflow_items = []
         for workflow in old_workflows:
-            age_days = (now - workflow.updated_at).days if workflow.updated_at else 0
+            age_days = (now - workflow.modified_at).days if workflow.modified_at else 0
             workflow_items.append(
                 {
                     "id": workflow.id,
@@ -779,7 +779,7 @@ class WorkflowStepService(SessionMixin):
                     "current_step": workflow.current_step,
                     "total_steps": workflow.total_steps,
                     "created_at": workflow.created_at,
-                    "updated_at": workflow.updated_at,
+                    "modified_at": workflow.modified_at,
                     "reason": workflow.reason,
                     "age_days": age_days,
                 }
@@ -834,7 +834,7 @@ class WorkflowStepService(SessionMixin):
             )
 
             all_workflows = workflows_completed + workflows_failed
-            old_workflows = [w for w in all_workflows if w.updated_at and w.updated_at < cutoff_date]
+            old_workflows = [w for w in all_workflows if w.modified_at and w.modified_at < cutoff_date]
             old_workflows = old_workflows[:batch_size]
 
             result = {
