@@ -329,13 +329,13 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
           />
         </Footer>
         {/* Prompt Form - Absolutely positioned at bottom */}
-        {/* {showPromptForm && getPromptIds().length > 0 && ( */}
+        {showPromptForm && getPromptIds().length > 0 && (
           <PromptForm
             promptIds={getPromptIds()}
             onSubmit={handlePromptFormSubmit}
             onClose={() => setShowPromptForm(false)}
           />
-        {/* )} */}
+        )}
       </Layout>
       <Sider
         width="280px"
