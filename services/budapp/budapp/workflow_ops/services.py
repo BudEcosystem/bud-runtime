@@ -723,3 +723,152 @@ class WorkflowStepService(SessionMixin):
             )
 
         return db_workflow_step
+
+    async def list_old_workflows(
+        self,
+        retention_days: int,
+        page: int = 1,
+        limit: int = 50,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """List workflows older than retention period.
+
+        Args:
+            retention_days: List workflows older than this many days
+            page: Page number for pagination
+            limit: Number of items per page
+
+        Returns:
+            Tuple of (workflows list, total count)
+        """
+        from datetime import UTC, datetime, timedelta
+
+        cutoff_date = datetime.now(UTC) - timedelta(days=retention_days)
+        offset = (page - 1) * limit
+
+        # Get workflows in terminal states
+        workflows_completed, count_completed = await WorkflowDataManager(self.session).get_all_workflows(
+            offset=0,
+            limit=10000,  # Get all to filter by date
+            filters={"status": WorkflowStatusEnum.COMPLETED},
+        )
+
+        workflows_failed, count_failed = await WorkflowDataManager(self.session).get_all_workflows(
+            offset=0,
+            limit=10000,
+            filters={"status": WorkflowStatusEnum.FAILED},
+        )
+
+        # Combine and filter by date
+        all_workflows = workflows_completed + workflows_failed
+        old_workflows = [w for w in all_workflows if w.updated_at and w.updated_at < cutoff_date]
+
+        # Sort by updated_at (oldest first)
+        old_workflows = sorted(old_workflows, key=lambda w: w.updated_at or datetime.min.replace(tzinfo=UTC))
+
+        # Calculate age in days for each workflow
+        now = datetime.now(UTC)
+        workflow_items = []
+        for workflow in old_workflows:
+            age_days = (now - workflow.updated_at).days if workflow.updated_at else 0
+            workflow_items.append(
+                {
+                    "id": workflow.id,
+                    "workflow_type": workflow.workflow_type,
+                    "title": workflow.title,
+                    "status": workflow.status,
+                    "current_step": workflow.current_step,
+                    "total_steps": workflow.total_steps,
+                    "created_at": workflow.created_at,
+                    "updated_at": workflow.updated_at,
+                    "reason": workflow.reason,
+                    "age_days": age_days,
+                }
+            )
+
+        # Apply pagination
+        total_count = len(workflow_items)
+        paginated_items = workflow_items[offset : offset + limit]
+
+        return paginated_items, total_count
+
+    async def trigger_manual_cleanup(
+        self,
+        retention_days: int,
+        batch_size: int,
+        delete_from_db: bool,
+        dry_run: bool,
+    ) -> Dict[str, Any]:
+        """Trigger manual cleanup of old workflows.
+
+        Args:
+            retention_days: Clean workflows older than this many days
+            batch_size: Maximum number of workflows to clean
+            delete_from_db: Whether to delete from database
+            dry_run: If True, only simulate without actual cleanup
+
+        Returns:
+            Dict with cleanup statistics
+        """
+        from datetime import UTC, datetime, timedelta
+        from uuid import uuid4
+
+        from .cleanup import WorkflowCleanupScheduler
+
+        cleanup_id = str(uuid4())
+        started_at = datetime.now(UTC)
+
+        if dry_run:
+            # Simulate cleanup - just count workflows
+            cutoff_date = datetime.now(UTC) - timedelta(days=retention_days)
+
+            workflows_completed, _ = await WorkflowDataManager(self.session).get_all_workflows(
+                offset=0,
+                limit=batch_size,
+                filters={"status": WorkflowStatusEnum.COMPLETED},
+            )
+
+            workflows_failed, _ = await WorkflowDataManager(self.session).get_all_workflows(
+                offset=0,
+                limit=batch_size,
+                filters={"status": WorkflowStatusEnum.FAILED},
+            )
+
+            all_workflows = workflows_completed + workflows_failed
+            old_workflows = [w for w in all_workflows if w.updated_at and w.updated_at < cutoff_date]
+            old_workflows = old_workflows[:batch_size]
+
+            result = {
+                "cleanup_id": cleanup_id,
+                "processed": len(old_workflows),
+                "purged_from_dapr": 0,
+                "failed_purge": 0,
+                "deleted_from_db": 0,
+                "retention_days": retention_days,
+                "batch_size": batch_size,
+                "dry_run": True,
+                "started_at": started_at,
+                "completed_at": datetime.now(UTC),
+            }
+        else:
+            # Actual cleanup
+            cleanup_scheduler = WorkflowCleanupScheduler()
+            cleanup_result = await cleanup_scheduler.cleanup_old_workflows(
+                retention_days=retention_days,
+                batch_size=batch_size,
+                delete_from_db=delete_from_db,
+            )
+
+            result = {
+                "cleanup_id": cleanup_id,
+                "processed": cleanup_result["processed"],
+                "purged_from_dapr": cleanup_result["purged_from_dapr"],
+                "failed_purge": cleanup_result["failed_purge"],
+                "deleted_from_db": cleanup_result["deleted_from_db"],
+                "retention_days": retention_days,
+                "batch_size": batch_size,
+                "dry_run": False,
+                "started_at": started_at,
+                "completed_at": datetime.now(UTC),
+            }
+
+        return result

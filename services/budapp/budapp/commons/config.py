@@ -205,6 +205,18 @@ class AppConfig(BaseAppConfig):
         default=False, description="Use local mode for evaluation data synchronization", alias="EVAL_SYNC_LOCAL_MODE"
     )
 
+    # Workflow Cleanup Settings
+    workflow_retention_days: int = Field(
+        default=30,
+        description="Number of days to retain completed/failed workflows before purging from Dapr state store",
+        alias="WORKFLOW_RETENTION_DAYS",
+    )
+    workflow_cleanup_batch_size: int = Field(
+        default=100,
+        description="Maximum number of workflows to cleanup in one scheduled run",
+        alias="WORKFLOW_CLEANUP_BATCH_SIZE",
+    )
+
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""
