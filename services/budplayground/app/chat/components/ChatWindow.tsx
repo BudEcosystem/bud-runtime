@@ -169,10 +169,13 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     append(message)
   }
 
-  const handlePromptFormSubmit = (data: { firstName: string; lastName: string; phoneNumber: string }) => {
-    console.log('Form submitted:', data);
-    // Handle form submission here
-    // You can store the data, send it to an API, etc.
+  const handlePromptFormSubmit = (data: any) => {
+    console.log('Prompt form submitted with API response:', data);
+
+    // Handle the API response - you can process it as needed
+    // For example, you might want to append it as a message or trigger the chat
+
+    // Close the form after successful submission
     setShowPromptForm(false);
   };
 
@@ -326,13 +329,13 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
           />
         </Footer>
         {/* Prompt Form - Absolutely positioned at bottom */}
-        {/* {showPromptForm && ( */}
+        {showPromptForm && getPromptIds().length > 0 && (
           <PromptForm
             promptIds={getPromptIds()}
             onSubmit={handlePromptFormSubmit}
             onClose={() => setShowPromptForm(false)}
           />
-        {/* )} */}
+        )}
       </Layout>
       <Sider
         width="280px"
