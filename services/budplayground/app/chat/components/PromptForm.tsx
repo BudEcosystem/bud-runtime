@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Input, InputNumber, Checkbox, Image } from 'antd';
-import { getPromptConfig } from '@/app/lib/api';
+import { getPromptConfig, submitPromptResponse } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
-import axios from 'axios';
 
 interface PromptFormProps {
   promptIds?: string[];
@@ -106,23 +105,13 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
         };
       }
 
-      // Make API call
-      const response = await axios.post(
-        'http://gateway.dev.bud.studio/v1/responses',
-        payload,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(apiKey && { 'X-API-Key': apiKey }),
-            ...(accessKey && { 'X-Access-Key': accessKey })
-          }
-        }
-      );
+      // Make API call using the centralized API function
+      const response = await submitPromptResponse(payload, apiKey || '', accessKey || '');
 
-      console.log('API Response:', response.data);
+      console.log('API Response:', response);
 
       // Call the original onSubmit callback with the response
-      onSubmit(response.data);
+      onSubmit(response);
     } catch (error) {
       console.error('Error submitting prompt:', error);
       // Still call onSubmit with formData in case of error to maintain flow
