@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Input, InputNumber, Checkbox } from 'antd';
-import { PrimaryButton } from '@/app/components/uiComponents/inputs';
 import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
 
@@ -184,11 +183,12 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
 
           {/* Next Button */}
           <div className="flex justify-end">
-            <PrimaryButton classNames='!h-[1.75rem] !px-[.75rem] !mr-0' htmlType="submit">
-              <div className='flex items-center'>
-                <span>Next</span>
-              </div>
-            </PrimaryButton>
+            <button
+              className="Open-Sans cursor-pointer text-[400] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] bg-[#965CDE] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF] flex items-center gap-[.5rem] px-[.8rem] py-[.15rem]"
+              type="submit"
+            >
+              Next
+            </button>
           </div>
         </form>
       </div>
