@@ -151,13 +151,13 @@ export default function ChatPage() {
     // ============================================================================
     // To re-enable authentication, uncomment the lines below:
     //
-    // if (!apiKey && !isSessionValid) {
-    //   // No authentication, redirect to login
-    //   router.replace('/login');
-    // } else {
-    //   // Authentication successful, hide loader
-    //   hideLoader();
-    // }
+    if (!apiKey && !isSessionValid) {
+      // No authentication, redirect to login
+      router.replace('/login');
+    } else {
+      // Authentication successful, hide loader
+      hideLoader();
+    }
     // ============================================================================
 
     // TEMPORARY: Always hide loader (skip auth check)
