@@ -717,6 +717,7 @@ class SimplePromptExecutor:
                     model_settings=model_settings,
                     messages=messages,
                     deployment_name=deployment_name,
+                    tools=tools,
                 )
 
         except (SchemaGenerationException, ValidationError, PromptExecutionException, TemplateRenderingException):
