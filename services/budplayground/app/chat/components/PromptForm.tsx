@@ -17,6 +17,8 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
   const [inputSchema, setInputSchema] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isHovered, setIsHovered] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch prompt configurations on mount
   useEffect(() => {
@@ -75,6 +77,9 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
       return;
     }
 
+    setSubmitting(true);
+    setError(null);
+
     try {
       const promptId = promptIds[0];
       let payload: any;
@@ -110,12 +115,14 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
 
       console.log('API Response:', response);
 
-      // Call the original onSubmit callback with the response
+      // Only call onSubmit on success - this will close the form
       onSubmit(response);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting prompt:', error);
-      // Still call onSubmit with formData in case of error to maintain flow
-      onSubmit(formData);
+      // Show error message in the form instead of closing it
+      setError(error?.message || 'Failed to submit prompt. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -212,6 +219,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
           })}
 
           {/* Fallback to default fields if no input schema */}
+          
           {!inputSchema && (
             <>
               <div className="space-y-2">
@@ -229,18 +237,26 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
             </>
           )}
 
+          {/* Error Message */}
+          {error && (
+            <div className="text-red-500 text-[0.75rem] mt-2">
+              {error}
+            </div>
+          )}
+
           {/* Next Button */}
           <div className="flex justify-end">
             <button
-              className="Open-Sans cursor-pointer text-[400] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF] flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
+              className="Open-Sans cursor-pointer text-[400] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF] flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF] disabled:opacity-50 disabled:cursor-not-allowed"
               type="submit"
-              onMouseEnter={() => setIsHovered(true)}
+              disabled={submitting}
+              onMouseEnter={() => !submitting && setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
             >
-              Next
+              {submitting ? 'Submitting...' : 'Next'}
               <div className="w-[1.25rem] h-[1.25rem]">
                 <Image
-                  src={isHovered ? "icons/send-white.png" : "icons/send.png"}
+                  src={isHovered && !submitting ? "icons/send-white.png" : "icons/send.png"}
                   alt="send"
                   preview={false}
                 />
