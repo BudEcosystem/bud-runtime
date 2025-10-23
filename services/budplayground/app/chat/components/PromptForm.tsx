@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Input, InputNumber, Checkbox } from 'antd';
+import { Input, InputNumber, Checkbox, Image } from 'antd';
 import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
 
@@ -16,6 +16,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [inputSchema, setInputSchema] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isHovered, setIsHovered] = useState<boolean>(false);
 
   // Fetch prompt configurations on mount
   useEffect(() => {
@@ -186,8 +187,17 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
             <button
               className="Open-Sans cursor-pointer text-[400] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF] flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
               type="submit"
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
             >
               Next
+              <div className="w-[1.25rem] h-[1.25rem]">
+                <Image
+                  src={isHovered ? "icons/send-white.png" : "icons/send.png"}
+                  alt="send"
+                  preview={false}
+                />
+              </div>
             </button>
           </div>
         </form>
