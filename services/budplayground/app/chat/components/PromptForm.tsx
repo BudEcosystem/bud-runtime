@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Input, InputNumber, Checkbox, Image } from 'antd';
 import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
+import axios from 'axios';
 
 interface PromptFormProps {
   promptIds?: string[];
@@ -67,9 +68,66 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+
+    if (promptIds.length === 0) {
+      console.error('No prompt ID available');
+      return;
+    }
+
+    try {
+      const promptId = promptIds[0];
+      let payload: any;
+
+      // Check if it's structured or unstructured input
+      if (inputSchema && Object.keys(inputSchema).length > 0) {
+        // Structured input - send variables
+        const variables: Record<string, any> = {};
+        Object.keys(formData).forEach(key => {
+          if (formData[key] !== undefined && formData[key] !== '') {
+            variables[key] = formData[key];
+          }
+        });
+
+        payload = {
+          prompt: {
+            id: promptId,
+            variables: variables
+          }
+        };
+      } else {
+        // Unstructured input - send input field
+        payload = {
+          prompt: {
+            id: promptId
+          },
+          input: formData['unstructuredSchema'] || ''
+        };
+      }
+
+      // Make API call
+      const response = await axios.post(
+        'http://gateway.dev.bud.studio/v1/responses',
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(apiKey && { 'X-API-Key': apiKey }),
+            ...(accessKey && { 'X-Access-Key': accessKey })
+          }
+        }
+      );
+
+      console.log('API Response:', response.data);
+
+      // Call the original onSubmit callback with the response
+      onSubmit(response.data);
+    } catch (error) {
+      console.error('Error submitting prompt:', error);
+      // Still call onSubmit with formData in case of error to maintain flow
+      onSubmit(formData);
+    }
   };
 
   const renderInput = (fieldName: string, fieldSchema: any) => {
@@ -172,8 +230,8 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
                   Unstructured Input
                 </label>
                 <Input
-                  value={formData['firstName'] || ''}
-                  onChange={(e) => handleChange('firstName', e.target.value)}
+                  value={formData['unstructuredSchema'] || ''}
+                  onChange={(e) => handleChange('unstructuredSchema', e.target.value)}
                   placeholder="Enter the details here"
                   className="bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] px-0 py-2"
                   style={{ boxShadow: 'none' }}
