@@ -219,7 +219,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
           })}
 
           {/* Fallback to default fields if no input schema */}
-          
+
           {!inputSchema && (
             <>
               <div className="space-y-2">
