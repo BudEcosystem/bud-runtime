@@ -245,7 +245,7 @@ jobs:
           # Create PR
           echo "📝 Creating pull request..."
           PR_URL=$(gh pr create \
-            --base main \
+            --base master \
             --head "$BRANCH_NAME" \
             --title "chore: update Helm chart to version $VERSION" \
             --body "$(cat <<EOF
