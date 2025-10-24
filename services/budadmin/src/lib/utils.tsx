@@ -194,13 +194,13 @@ export function formatStorageSize(
 
 export const mapTime = (time: number, selectedSegment: ClusterFilter) => {
   if (selectedSegment === "today") {
-    return format(new Date(time), "HH:mm");
+    return format(new Date(time * 1000), "HH:mm");
   }
   if (selectedSegment === "7days") {
-    return format(new Date(time), "dd/MM");
+    return format(new Date(time * 1000), "dd/MM");
   }
   if (selectedSegment === "month") {
-    return format(new Date(time), "dd/MM");
+    return format(new Date(time * 1000), "dd/MM");
   }
 };
 

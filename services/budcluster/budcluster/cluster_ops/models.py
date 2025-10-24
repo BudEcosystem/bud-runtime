@@ -47,6 +47,10 @@ class Cluster(PSQLBase, TimestampMixin):
     )
     reason: Mapped[str] = mapped_column(String, nullable=True)
 
+    # Metrics collection fields
+    last_metrics_collection: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    metrics_collection_status: Mapped[str] = mapped_column(String(50), nullable=True)
+
     nodes: Mapped[list["ClusterNodeInfo"]] = relationship(back_populates="cluster", cascade="all, delete-orphan")
     workers: Mapped[list["WorkerInfo"]] = relationship(back_populates="cluster", cascade="all, delete-orphan")
     benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="cluster")

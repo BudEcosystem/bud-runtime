@@ -473,8 +473,6 @@ class MetricTypeEnum(Enum):
     DISK = "disk"
     GPU = "gpu"
     HPU = "hpu"
-    NETWORK_IN = "network_in"
-    NETWORK_OUT = "network_out"
     NETWORK_BANDWIDTH = "network_bandwidth"
     POWER = "power"
 

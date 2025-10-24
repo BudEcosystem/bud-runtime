@@ -12,6 +12,11 @@ interface LineChartProps {
     label2?: string;
     color?: string;
     smooth?: boolean;
+    yAxisUnit?: string; // Unit to display on Y-axis (e.g., "%", "Mbps", "GB")
+    yAxisAutoScale?: boolean; // If true, auto-scale Y-axis based on data
+    yAxisMin?: number; // Minimum Y-axis value (ignored if yAxisAutoScale is true)
+    yAxisMax?: number; // Maximum Y-axis value (ignored if yAxisAutoScale is true)
+    yAxisInterval?: number; // Y-axis interval (ignored if yAxisAutoScale is true)
   };
 }
 
@@ -41,6 +46,35 @@ const LineChart: React.FC<LineChartProps> = ({ data }) => {
         useDirtyRect: false,
       });
 
+      // Calculate Y-axis range if auto-scale is enabled
+      let yAxisMin = lineChartData?.yAxisMin ?? 0;
+      let yAxisMax = lineChartData?.yAxisMax ?? 80;
+      let yAxisInterval = lineChartData?.yAxisInterval ?? 20;
+
+      if (lineChartData?.yAxisAutoScale && lineChartData?.data?.length > 0) {
+        const dataValues = lineChartData.data;
+        const minValue = Math.min(...dataValues);
+        const maxValue = Math.max(...dataValues);
+
+        // Add 10% padding to top and bottom for better visualization
+        const range = maxValue - minValue;
+        const padding = range * 0.1;
+        yAxisMin = Math.max(0, Math.floor(minValue - padding));
+        yAxisMax = Math.ceil(maxValue + padding);
+
+        // Calculate a nice interval (roughly 4-5 ticks)
+        const roughInterval = (yAxisMax - yAxisMin) / 4;
+        // Round to nearest "nice" number (1, 2, 5, 10, 20, 50, etc.)
+        const magnitude = Math.pow(10, Math.floor(Math.log10(roughInterval)));
+        const normalizedInterval = roughInterval / magnitude;
+        if (normalizedInterval <= 1) yAxisInterval = magnitude;
+        else if (normalizedInterval <= 2) yAxisInterval = 2 * magnitude;
+        else if (normalizedInterval <= 5) yAxisInterval = 5 * magnitude;
+        else yAxisInterval = 10 * magnitude;
+      }
+
+      const yAxisUnit = lineChartData?.yAxisUnit ?? "%";
+
       const option = {
         backgroundColor: "transparent",
         grid: {
@@ -67,11 +101,11 @@ const LineChart: React.FC<LineChartProps> = ({ data }) => {
         },
         yAxis: {
           type: "value",
-          min: 0,
-          max: 80,
-          interval: 20, // Adjust interval to ensure all custom labels are displayed
+          min: yAxisMin,
+          max: yAxisMax,
+          interval: yAxisInterval,
           axisLabel: {
-            formatter: (value: number) => `${value}%`,
+            formatter: (value: number) => `${value}${yAxisUnit}`,
             color: "#EEEEEE",
             fontSize: 13,
             fontWeight: 300,
