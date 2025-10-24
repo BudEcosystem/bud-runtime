@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Input, InputNumber, Checkbox, Image } from 'antd';
-import { getPromptConfig, submitPromptResponse } from '@/app/lib/api';
+import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
 
 interface PromptFormProps {
@@ -17,8 +17,6 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
   const [inputSchema, setInputSchema] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isHovered, setIsHovered] = useState<boolean>(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Fetch prompt configurations on mount
   useEffect(() => {
@@ -69,7 +67,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (promptIds.length === 0) {
@@ -77,54 +75,33 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
       return;
     }
 
-    setSubmitting(true);
-    setError(null);
+    const promptId = promptIds[0];
+    let promptData: any;
 
-    try {
-      const promptId = promptIds[0];
-      let payload: any;
+    // Check if it's structured or unstructured input
+    if (inputSchema && Object.keys(inputSchema).length > 0) {
+      // Structured input - send variables
+      const variables: Record<string, any> = {};
+      Object.keys(formData).forEach(key => {
+        if (formData[key] !== undefined && formData[key] !== '') {
+          variables[key] = formData[key];
+        }
+      });
 
-      // Check if it's structured or unstructured input
-      if (inputSchema && Object.keys(inputSchema).length > 0) {
-        // Structured input - send variables
-        const variables: Record<string, any> = {};
-        Object.keys(formData).forEach(key => {
-          if (formData[key] !== undefined && formData[key] !== '') {
-            variables[key] = formData[key];
-          }
-        });
-
-        payload = {
-          prompt: {
-            id: promptId,
-            variables: variables
-          }
-        };
-      } else {
-        // Unstructured input - send input field
-        payload = {
-          prompt: {
-            id: promptId
-          },
-          input: formData['unstructuredSchema'] || '',
-          version: "1"
-        };
-      }
-
-      // Make API call using the centralized API function
-      const response = await submitPromptResponse(payload, apiKey || '', accessKey || '');
-
-      console.log('API Response:', response);
-
-      // Only call onSubmit on success - this will close the form
-      onSubmit(response);
-    } catch (error: any) {
-      console.error('Error submitting prompt:', error);
-      // Show error message in the form instead of closing it
-      setError(error?.message || 'Failed to submit prompt. Please try again.');
-    } finally {
-      setSubmitting(false);
+      promptData = {
+        promptId,
+        variables
+      };
+    } else {
+      // Unstructured input - send input field
+      promptData = {
+        promptId,
+        input: formData['unstructuredSchema'] || ''
+      };
     }
+
+    // Pass the prompt data to parent to initiate chat
+    onSubmit(promptData);
   };
 
   const renderInput = (fieldName: string, fieldSchema: any) => {
@@ -238,26 +215,18 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
             </>
           )}
 
-          {/* Error Message */}
-          {error && (
-            <div className="text-red-500 text-[0.75rem] mt-2">
-              {error}
-            </div>
-          )}
-
           {/* Next Button */}
           <div className="flex justify-end">
             <button
-              className="Open-Sans cursor-pointer text-[400] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF] flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="Open-Sans cursor-pointer text-[400] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF] flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
               type="submit"
-              disabled={submitting}
-              onMouseEnter={() => !submitting && setIsHovered(true)}
+              onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
             >
-              {submitting ? 'Submitting...' : 'Next'}
+              Next
               <div className="w-[1.25rem] h-[1.25rem]">
                 <Image
-                  src={isHovered && !submitting ? "icons/send-white.png" : "icons/send.png"}
+                  src={isHovered ? "icons/send-white.png" : "icons/send.png"}
                   alt="send"
                   preview={false}
                 />

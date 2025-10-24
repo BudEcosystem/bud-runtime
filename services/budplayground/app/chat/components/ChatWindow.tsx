@@ -33,13 +33,16 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const lastMessageRef = useRef<string>("");
   const contentRef = useRef<HTMLDivElement>(null);
 
+  const promptIds = getPromptIds();
+  const [promptData, setPromptData] = useState<any>(null);
+
   const body = useMemo(() => {
     if (!chat) {
       return;
     }
     const params = new URLSearchParams(window.location.search);
     const baseUrl = params.get('base_url');
-    return {
+    const baseBody = {
       model: chat?.selectedDeployment?.name,
       metadata: {
         project_id: chat?.selectedDeployment?.project?.id,
@@ -47,11 +50,21 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       },
       settings: currentSettingPreset,
     };
-  }, [chat, currentSettingPreset]);
 
+    // If we have prompt data for the first message, include it
+    if (promptData) {
+      return {
+        ...baseBody,
+        ...promptData,
+      };
+    }
+
+    return baseBody;
+  }, [chat, currentSettingPreset, promptData]);
 
   const { messages, input, handleInputChange, handleSubmit, reload, error, stop, status, setMessages, append } = useChat({
     id: chat.id,
+    api: promptIds.length > 0 ? '/api/prompt-chat' : '/api/chat',
     headers: {
       Authorization: `Bearer ${apiKey ? apiKey : accessKey}`,
     },
@@ -170,12 +183,22 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   }
 
   const handlePromptFormSubmit = (data: any) => {
-    console.log('Prompt form submitted with API response:', data);
+    console.log('Prompt form submitted with data:', data);
 
-    // Handle the API response - you can process it as needed
-    // For example, you might want to append it as a message or trigger the chat
+    // Set the prompt data for the chat body
+    setPromptData(data);
 
-    // Close the form after successful submission
+    // Create a user message with the prompt input
+    const userMessage = data.input ||
+      (data.variables ? Object.entries(data.variables).map(([k, v]) => `${k}: ${v}`).join('\n') : '');
+
+    // Append the message to trigger the chat with prompt context
+    append({
+      role: 'user',
+      content: userMessage,
+    });
+
+    // Close the form
     setShowPromptForm(false);
   };
 
