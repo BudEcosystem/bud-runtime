@@ -1,16 +1,15 @@
 FROM python:3.11.0
 
 #dependency of GitPython
-RUN apt-get update && apt-get install -y curl aria2 && \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl aria2 clamav clamav-daemon firejail && \
     curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
-    apt-get install -y git-lfs && \
-    git-lfs
+    DEBIAN_FRONTEND=noninteractive apt-get install -y git-lfs && \
+    git-lfs && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN apt-get install -y clamav clamav-daemon
-
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y firejail
-# Update ClamAV virus database
-RUN freshclam
+# Update ClamAV virus database and clean temp files
+RUN freshclam && rm -rf /tmp/* /var/tmp/*
 
 RUN mkdir -p /var/run/clamav && \
     chown clamav:clamav /var/run/clamav && \
@@ -22,8 +21,8 @@ WORKDIR /app
 
 COPY requirements.txt .
 
-RUN pip install --upgrade pip
-RUN pip install -r ./requirements.txt
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir --prefer-binary -r ./requirements.txt
 
 # Install playwright
 RUN playwright install
@@ -33,7 +32,7 @@ RUN playwright install-deps
 
 COPY . .
 
-RUN pip install .
+RUN pip install --no-cache-dir .
 
 
 # Install dependencies for playwright
