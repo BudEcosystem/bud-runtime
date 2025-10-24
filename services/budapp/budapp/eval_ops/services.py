@@ -1897,7 +1897,7 @@ class ExperimentService:
             deployment_name=endpoint.namespace if endpoint else None,
         )
 
-    async def _get_first_active_project(self) -> uuid.UUID:
+    async def get_first_active_project(self) -> uuid.UUID:
         """Get the first active project in the system.
 
         This is used to generate temporary credentials for evaluation runs.
@@ -1908,15 +1908,19 @@ class ExperimentService:
         Raises:
             ClientException: If no active projects exist in the system
         """
+        from sqlalchemy import select
+
         from budapp.project_ops.models import Project as ProjectModel
 
-        # Get first active project ordered by creation date
-        project = (
-            self.session.query(ProjectModel)
+        # Get first active project ordered by creation date (async query)
+        stmt = (
+            select(ProjectModel)
             .filter(ProjectModel.status == ProjectStatusEnum.ACTIVE)
             .order_by(ProjectModel.created_at.asc())
-            .first()
+            .limit(1)
         )
+        result = await self.session.execute(stmt)
+        project = result.scalars().first()
 
         if not project:
             raise ClientException("No active project found in the system. Please create a project first.")
@@ -3712,14 +3716,18 @@ class EvaluationWorkflowService:
             # Get first run to determine model and endpoint
             first_run = runs[0]
 
-            # Get model details
-            model = self.session.query(ModelTable).filter(ModelTable.id == first_run.model_id).first()
+            # Get model details (async query)
+            from sqlalchemy import select
+
+            stmt = select(ModelTable).filter(ModelTable.id == first_run.model_id)
+            model = (await self.session.execute(stmt)).scalars().first()
 
             if not model:
                 raise ClientException(f"Model {first_run.model_id} not found")
 
-            # Get endpoint for the model
-            endpoint = self.session.query(EndpointModel).filter(EndpointModel.model_id == first_run.model_id).first()
+            # Get endpoint for the model (async query)
+            stmt = select(EndpointModel).filter(EndpointModel.model_id == first_run.model_id)
+            endpoint = (await self.session.execute(stmt)).scalars().first()
 
             if not endpoint:
                 raise ClientException(
@@ -3728,10 +3736,13 @@ class EvaluationWorkflowService:
                 )
 
             # Get first active project for credential generation
-            project_id = await self._get_first_active_project()
+            experiment_service = ExperimentService(self.session)
+            project_id = await experiment_service.get_first_active_project()
 
             # Generate temporary evaluation credential
-            api_key = await self._generate_temporary_evaluation_key(project_id=project_id, experiment_id=experiment_id)
+            api_key = await experiment_service._generate_temporary_evaluation_key(
+                project_id=project_id, experiment_id=experiment_id
+            )
 
             # Build evaluation request with dynamic values
             evaluation_request = {
@@ -3862,7 +3873,6 @@ class EvaluationWorkflowService:
             # Format: {trait_id_str: {"total_score": float, "count": int}}
             trait_score_accumulator = {}
 
-            updated_runs = []
             has_failures = False
 
             # Update runs
@@ -3872,8 +3882,6 @@ class EvaluationWorkflowService:
                 if not run_id:
                     logger.warning(f"::EvalResult:: Missing run_id in payload for workflow {db_workflow.id}")
                     continue
-
-                updated_runs.append(run_id)
 
                 logger.debug(f"::EvalResult:: Updating run from payload {run_id}")
 
