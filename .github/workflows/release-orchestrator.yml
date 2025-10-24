@@ -91,7 +91,7 @@ jobs:
             "budsim-release-image.yml"
           )
 
-          max_attempts=60  # 60 attempts * 30 seconds = 30 minutes max wait
+          max_attempts=120  # 60 attempts * 30 seconds = 30 minutes max wait
           attempt=0
 
           while [ $attempt -lt $max_attempts ]; do
