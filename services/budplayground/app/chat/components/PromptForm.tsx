@@ -106,7 +106,8 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
           prompt: {
             id: promptId
           },
-          input: formData['unstructuredSchema'] || ''
+          input: formData['unstructuredSchema'] || '',
+          version: "1"
         };
       }
 
