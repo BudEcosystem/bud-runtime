@@ -636,10 +636,18 @@ class ClickHouseMigration:
         """Create tables for cluster metrics collected via OTel."""
         logger.info("Creating cluster metrics tables...")
 
+        # Ensure metrics database exists (for cluster metrics tables)
+        try:
+            await self.client.execute_query("CREATE DATABASE IF NOT EXISTS metrics")
+            logger.info("Database 'metrics' created or already exists")
+        except Exception as e:
+            logger.error(f"Error creating metrics database: {e}")
+            raise
+
         # Main cluster metrics table (raw metrics from OTel)
         ttl_days = get_cluster_metrics_ttl_days()
         query_cluster_metrics = f"""
-        CREATE TABLE IF NOT EXISTS ClusterMetrics
+        CREATE TABLE IF NOT EXISTS metrics.ClusterMetrics
         (
             ts DateTime64(3) CODEC(Delta, ZSTD),
             cluster_id String,
@@ -662,7 +670,7 @@ class ClickHouseMigration:
 
             # Add indexes for ClusterMetrics (matching SQL file conventions)
             indexes = [
-                "ALTER TABLE ClusterMetrics ADD INDEX IF NOT EXISTS idx_cluster_metric_time (cluster_id, metric_name, ts) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE metrics.ClusterMetrics ADD INDEX IF NOT EXISTS idx_cluster_metric_time (cluster_id, metric_name, ts) TYPE minmax GRANULARITY 1",
             ]
 
             for index_query in indexes:
@@ -678,7 +686,7 @@ class ClickHouseMigration:
 
         # Node-level aggregated metrics
         query_node_metrics = f"""
-        CREATE TABLE IF NOT EXISTS NodeMetrics
+        CREATE TABLE IF NOT EXISTS metrics.NodeMetrics
         (
             ts DateTime64(3) CODEC(Delta, ZSTD),
             cluster_id String,
@@ -711,7 +719,7 @@ class ClickHouseMigration:
 
             # Add indexes for NodeMetrics (matching SQL file conventions)
             indexes = [
-                "ALTER TABLE NodeMetrics ADD INDEX IF NOT EXISTS idx_cluster_node_time (cluster_id, node_name, ts) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE metrics.NodeMetrics ADD INDEX IF NOT EXISTS idx_cluster_node_time (cluster_id, node_name, ts) TYPE minmax GRANULARITY 1",
             ]
 
             for index_query in indexes:
@@ -727,7 +735,7 @@ class ClickHouseMigration:
 
         # Pod/Container metrics
         query_pod_metrics = f"""
-        CREATE TABLE IF NOT EXISTS PodMetrics
+        CREATE TABLE IF NOT EXISTS metrics.PodMetrics
         (
             ts DateTime64(3) CODEC(Delta, ZSTD),
             cluster_id String,
@@ -757,7 +765,7 @@ class ClickHouseMigration:
 
             # Add indexes for PodMetrics (matching SQL file conventions)
             indexes = [
-                "ALTER TABLE PodMetrics ADD INDEX IF NOT EXISTS idx_cluster_ns_pod_time (cluster_id, namespace, pod_name, ts) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE metrics.PodMetrics ADD INDEX IF NOT EXISTS idx_cluster_ns_pod_time (cluster_id, namespace, pod_name, ts) TYPE minmax GRANULARITY 1",
             ]
 
             for index_query in indexes:
@@ -773,7 +781,7 @@ class ClickHouseMigration:
 
         # GPU metrics (optional)
         query_gpu_metrics = f"""
-        CREATE TABLE IF NOT EXISTS GPUMetrics
+        CREATE TABLE IF NOT EXISTS metrics.GPUMetrics
         (
             ts DateTime64(3) CODEC(Delta, ZSTD),
             cluster_id String,
@@ -800,7 +808,7 @@ class ClickHouseMigration:
 
             # Add indexes for GPUMetrics (matching SQL file conventions)
             indexes = [
-                "ALTER TABLE GPUMetrics ADD INDEX IF NOT EXISTS idx_cluster_gpu_time (cluster_id, node_name, gpu_index, ts) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE metrics.GPUMetrics ADD INDEX IF NOT EXISTS idx_cluster_gpu_time (cluster_id, node_name, gpu_index, ts) TYPE minmax GRANULARITY 1",
             ]
 
             for index_query in indexes:
@@ -818,7 +826,8 @@ class ClickHouseMigration:
 
     async def verify_tables(self):
         """Verify that tables were created successfully."""
-        tables_to_check = [
+        # Tables in budproxy database (or configured database)
+        budproxy_tables = [
             "ModelInferenceDetails",
             "EmbeddingInference",
             "AudioInference",
@@ -826,15 +835,21 @@ class ClickHouseMigration:
             "ModerationInference",
             "GatewayAnalytics",
             "GatewayBlockingEvents",
-            "ClusterMetrics",
-            "NodeMetrics",
-            "PodMetrics",
-            "GPUMetrics",
         ]
-        if self.include_model_inference:
-            tables_to_check.append("ModelInference")
+        # Cluster metrics tables in metrics database
+        metrics_tables = [
+            "metrics.ClusterMetrics",
+            "metrics.NodeMetrics",
+            "metrics.PodMetrics",
+            "metrics.GPUMetrics",
+        ]
 
-        for table in tables_to_check:
+        if self.include_model_inference:
+            budproxy_tables.append("ModelInference")
+
+        all_tables = budproxy_tables + metrics_tables
+
+        for table in all_tables:
             try:
                 result = await self.client.execute_query(f"EXISTS TABLE {table}")
                 if result and result[0][0]:
@@ -1036,20 +1051,26 @@ class ClickHouseMigration:
         """
         logger.info("Checking if NodeMetrics network columns migration is needed...")
 
-        # Check if NodeMetrics table exists
+        # Check if NodeMetrics table exists (check both budproxy and metrics databases)
         try:
-            table_exists = await self.client.execute_query("EXISTS TABLE NodeMetrics")
+            # Check in metrics database first (new location)
+            table_exists = await self.client.execute_query("EXISTS TABLE metrics.NodeMetrics")
+            database = "metrics"
             if not table_exists or not table_exists[0][0]:
-                logger.info("NodeMetrics table does not exist yet. Skipping network columns migration.")
-                return
+                # Fallback to budproxy database (legacy location)
+                table_exists = await self.client.execute_query("EXISTS TABLE NodeMetrics")
+                database = self.config.database
+                if not table_exists or not table_exists[0][0]:
+                    logger.info("NodeMetrics table does not exist yet. Skipping network columns migration.")
+                    return
         except Exception as e:
             logger.warning(f"Error checking if NodeMetrics table exists: {e}")
             return
 
         # Check which network columns are missing
-        check_columns_query = """
+        check_columns_query = f"""
         SELECT name FROM system.columns
-        WHERE database = currentDatabase()
+        WHERE database = '{database}'
         AND table = 'NodeMetrics'
         AND name IN ('network_receive_bytes_per_sec', 'network_transmit_bytes_per_sec')
         """
@@ -1066,7 +1087,8 @@ class ClickHouseMigration:
 
             if columns_to_add:
                 # Add the missing columns
-                alter_query = f"ALTER TABLE NodeMetrics {', '.join(columns_to_add)}"
+                table_ref = f"{database}.NodeMetrics" if database != self.config.database else "NodeMetrics"
+                alter_query = f"ALTER TABLE {table_ref} {', '.join(columns_to_add)}"
                 await self.client.execute_query(alter_query)
                 logger.info(
                     f"✓ Added network columns to NodeMetrics: {', '.join(col.split()[-3] for col in columns_to_add)}"
