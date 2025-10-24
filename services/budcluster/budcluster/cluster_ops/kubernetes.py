@@ -370,9 +370,19 @@ class KubernetesHandler(BaseClusterHandler):
                             f"Node {node.get('node_name')}: ready={is_ready}, schedulable={is_schedulable}, available={node_available}"
                         )
 
+                        # Extract internal IP from node addresses
+                        internal_ip = None
+                        addresses = node.get("addresses", [])
+                        if addresses:
+                            for addr in addresses:
+                                if addr.get("type") == "InternalIP":
+                                    internal_ip = addr.get("address")
+                                    break
+
                         node_formatted = {
                             "node_name": node.get("node_name"),
                             "node_id": node.get("node_id"),
+                            "internal_ip": internal_ip,
                             "node_status": node_available,  # Use boolean for consistency
                             "derived_status": "Ready" if node_available else "NotReady",
                             "devices": json.dumps(devices),

@@ -67,7 +67,7 @@ Bud Stack follows a microservices architecture built on Kubernetes with Dapr for
 - **Infrastructure**: Kubernetes, Helm, Terraform/OpenTofu, Ansible
 - **Authentication**: Keycloak with multi-tenant support
 - **Storage**: MinIO for object storage
-- **Observability**: Grafana LGTM stack (Loki, Tempo, Mimir)
+- **Observability**: ClickHouse for metrics
 
 ## 🛠️ Services
 

@@ -17,16 +17,19 @@
 
 """The cluster ops package, containing essential business logic, services, and routing configurations for the cluster ops."""
 
-from typing import List, Optional, Union
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
+import aiohttp
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from fastapi.exceptions import RequestValidationError
-from pydantic import AnyHttpUrl, ValidationError
+from pydantic import AnyHttpUrl, BaseModel, ValidationError
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
+from budapp.commons.config import app_settings
 from budapp.commons.dependencies import (
     get_current_active_user,
     get_session,
@@ -34,6 +37,7 @@ from budapp.commons.dependencies import (
 )
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
+from budapp.shared.dapr_service import DaprService
 from budapp.shared.grafana import Grafana
 from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
@@ -109,6 +113,214 @@ async def get_grafana_dashboard_url(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving Grafana dashboard URL",
+        ).to_http_response()
+
+
+@cluster_router.get(
+    "/clusters/{cluster_id}/metrics/summary",
+    response_model=None,
+    description="Get cluster metrics summary",
+)
+async def get_cluster_metrics_summary(
+    cluster_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Get cluster metrics summary from budmetrics service."""
+    try:
+        # Check cluster access
+        cluster_service = ClusterService(session)
+        cluster = await cluster_service.get_cluster_details(UUID(cluster_id))
+        if not cluster:
+            return ErrorResponse(
+                code=status.HTTP_404_NOT_FOUND,
+                message="Cluster not found",
+            ).to_http_response()
+
+        # Forward to budmetrics
+        result = await DaprService.invoke_service(
+            "budmetrics",
+            f"cluster-metrics/{cluster_id}/summary",
+            method="GET",
+        )
+        return result
+    except Exception as e:
+        logger.exception(f"Error getting cluster metrics summary: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving cluster metrics",
+        ).to_http_response()
+
+
+@cluster_router.get(
+    "/clusters/{cluster_id}/metrics/nodes",
+    response_model=None,
+    description="Get cluster node metrics",
+)
+async def get_cluster_node_metrics(
+    cluster_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+):
+    """Get cluster node metrics from budmetrics service."""
+    try:
+        # Check cluster access
+        cluster_service = ClusterService(session)
+        cluster = await cluster_service.get_cluster_details(UUID(cluster_id))
+        if not cluster:
+            return ErrorResponse(
+                code=status.HTTP_404_NOT_FOUND,
+                message="Cluster not found",
+            ).to_http_response()
+
+        # Build query params
+        params = {}
+        if start_time:
+            params["start_time"] = start_time
+        if end_time:
+            params["end_time"] = end_time
+
+        # Forward to budmetrics
+        result = await DaprService.invoke_service(
+            "budmetrics",
+            f"cluster-metrics/{cluster_id}/nodes",
+            method="GET",
+            params=params,
+        )
+        return result
+    except Exception as e:
+        logger.exception(f"Error getting cluster node metrics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving node metrics",
+        ).to_http_response()
+
+
+@cluster_router.get(
+    "/clusters/{cluster_id}/metrics/pods",
+    response_model=None,
+    description="Get cluster pod metrics",
+)
+async def get_cluster_pod_metrics(
+    cluster_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    namespace: Optional[str] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+):
+    """Get cluster pod metrics from budmetrics service."""
+    try:
+        # Check cluster access
+        cluster_service = ClusterService(session)
+        cluster = await cluster_service.get_cluster_details(UUID(cluster_id))
+        if not cluster:
+            return ErrorResponse(
+                code=status.HTTP_404_NOT_FOUND,
+                message="Cluster not found",
+            ).to_http_response()
+
+        # Build query params
+        params = {}
+        if namespace:
+            params["namespace"] = namespace
+        if start_time:
+            params["start_time"] = start_time
+        if end_time:
+            params["end_time"] = end_time
+
+        # Forward to budmetrics
+        result = await DaprService.invoke_service(
+            "budmetrics",
+            f"cluster-metrics/{cluster_id}/pods",
+            method="GET",
+            params=params,
+        )
+        return result
+    except Exception as e:
+        logger.exception(f"Error getting cluster pod metrics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving pod metrics",
+        ).to_http_response()
+
+
+@cluster_router.get(
+    "/clusters/{cluster_id}/metrics/health",
+    response_model=None,
+    description="Get cluster health status",
+)
+async def get_cluster_health_status(
+    cluster_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Get cluster health status from budmetrics service."""
+    try:
+        # Check cluster access
+        cluster_service = ClusterService(session)
+        cluster = await cluster_service.get_cluster_details(UUID(cluster_id))
+        if not cluster:
+            return ErrorResponse(
+                code=status.HTTP_404_NOT_FOUND,
+                message="Cluster not found",
+            ).to_http_response()
+
+        # Forward to budmetrics
+        result = await DaprService.invoke_service(
+            "budmetrics",
+            f"cluster-metrics/{cluster_id}/health",
+            method="GET",
+        )
+        return result
+    except Exception as e:
+        logger.exception(f"Error getting cluster health status: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving health status",
+        ).to_http_response()
+
+
+@cluster_router.post(
+    "/clusters/{cluster_id}/metrics/query",
+    response_model=None,
+    description="Query custom cluster metrics",
+)
+async def query_cluster_metrics(
+    cluster_id: str,
+    query: dict,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Query custom cluster metrics from budmetrics service."""
+    try:
+        # Check cluster access
+        cluster_service = ClusterService(session)
+        cluster = await cluster_service.get_cluster_details(UUID(cluster_id))
+        if not cluster:
+            return ErrorResponse(
+                code=status.HTTP_404_NOT_FOUND,
+                message="Cluster not found",
+            ).to_http_response()
+
+        # Ensure cluster_id is in the query data for budmetrics
+        query["cluster_id"] = cluster_id
+
+        # Forward to budmetrics
+        result = await DaprService.invoke_service(
+            "budmetrics",
+            "cluster-metrics/query",
+            method="POST",
+            data=query,
+        )
+        return result
+    except Exception as e:
+        logger.exception(f"Error querying cluster metrics: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error querying metrics",
         ).to_http_response()
 
 
@@ -530,15 +742,54 @@ async def get_cluster_metrics(
     cluster_id: UUID,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
-    time_range: str = Query("today", enum=["today", "7days", "month"]),
+    filter: str = Query("today", enum=["today", "7days", "month"]),
     metric_type: MetricTypeEnum = Query(MetricTypeEnum.ALL, description="Type of metrics to return"),
 ) -> Union[ClusterMetricsResponse, ErrorResponse]:
-    """Get cluster metrics."""
+    """Get cluster metrics from BudMetrics service via ClickHouse.
+
+    This endpoint queries the BudMetrics service which retrieves data from ClickHouse
+    instead of directly querying Prometheus. The data flows through:
+    Prometheus → BudCluster → OTel Collector → ClickHouse → BudMetrics → BudApp
+    """
     try:
-        metrics = await ClusterService(session).get_cluster_metrics(cluster_id, time_range, metric_type)
-        return ClusterMetricsResponse(
-            code=status.HTTP_200_OK, message="Successfully retrieved cluster metrics", **metrics
+        # Check cluster access
+        cluster_service = ClusterService(session)
+        cluster = await cluster_service.get_cluster_details(cluster_id)
+        if not cluster:
+            return ErrorResponse(
+                code=status.HTTP_404_NOT_FOUND,
+                message="Cluster not found",
+            ).to_http_response()
+
+        # Forward to budmetrics prometheus-compatible endpoint via Dapr sidecar
+        # This endpoint returns the same format as the old Prometheus-based implementation
+        metrics_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/"
+            f"method/cluster-metrics/{cluster.cluster_id}/prometheus-compatible"
         )
+
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.get(
+                metrics_endpoint,
+                params={
+                    "filter": filter,
+                    "metric_type": metric_type.value.lower(),
+                },
+            ) as response:
+                response_data = await response.json()
+
+                if response.status != status.HTTP_200_OK:
+                    logger.error(f"Cluster metrics request failed: status={response.status}, response={response_data}")
+                    error_detail = response_data.get("detail", "Failed to retrieve cluster metrics")
+                    raise ClientException(
+                        error_detail if isinstance(error_detail, str) else "Failed to retrieve cluster metrics",
+                        status_code=response.status,
+                    )
+
+                # Add required 'message' field for SuccessResponse validation
+                response_data["message"] = "Successfully retrieved cluster metrics"
+                return ClusterMetricsResponse(**response_data)
+
     except ClientException as e:
         return ErrorResponse(
             code=status.HTTP_400_BAD_REQUEST,
