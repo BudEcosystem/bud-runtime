@@ -1,4 +1,4 @@
-name: "BudPrompt: Build and Push Docker Image on Release"
+name: "BudEval: Build and Push Docker Image on Release"
 
 on:
   workflow_dispatch:
@@ -28,9 +28,9 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./services/budprompt
+          context: ./services/budeval
           push: true
-          file: ./services/budprompt/deploy/Dockerfile
+          file: ./services/budeval/deploy/Dockerfile
           tags: |
-            budstudio/budprompt:${{ inputs.release_tag }}
-            budstudio/budprompt:latest
+            budstudio/budeval:${{ inputs.release_tag }}
+            budstudio/budeval:latest

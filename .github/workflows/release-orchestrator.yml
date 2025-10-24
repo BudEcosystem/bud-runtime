@@ -1,0 +1,270 @@
+name: "Release Orchestrator: Build All Services and Update Helm"
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 0.25.0 or v0.25.0)'
+        required: true
+        type: string
+
+jobs:
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.extract_tag.outputs.release_tag }}
+      clean_tag: ${{ steps.extract_tag.outputs.clean_tag }}
+    steps:
+      - name: Extract and validate version tag
+        id: extract_tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RAW_TAG="${{ github.event.inputs.version }}"
+          else
+            RAW_TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          CLEAN_TAG="${RAW_TAG#v}"
+
+          echo "release_tag=$RAW_TAG" >> "$GITHUB_OUTPUT"
+          echo "clean_tag=$CLEAN_TAG" >> "$GITHUB_OUTPUT"
+
+          echo "📦 Release tag: $RAW_TAG"
+          echo "✨ Clean tag: $CLEAN_TAG"
+
+  trigger-builds:
+    name: Trigger All Service Builds
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Trigger all release image workflows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.prepare.outputs.clean_tag }}
+        run: |
+          echo "🚀 Triggering all service release workflows with version: $VERSION"
+
+          # Trigger all service release workflows
+          gh workflow run askbud-release-image.yml -f release_tag=$VERSION
+          gh workflow run budadmin-release-image.yml -f release_tag=$VERSION
+          gh workflow run budapp-release-image.yml -f release_tag=$VERSION
+          gh workflow run budcluster-release-image.yml -f release_tag=$VERSION
+          gh workflow run buddoc-release-image.yml -f release_tag=$VERSION
+          gh workflow run budeval-release-image.yml -f release_tag=$VERSION
+          gh workflow run budgateway-release-image.yml -f release_tag=$VERSION
+          gh workflow run budmetrics-release-image.yml -f release_tag=$VERSION
+          gh workflow run budmodel-release-image.yml -f release_tag=$VERSION
+          gh workflow run budnotify-release-image.yml -f release_tag=$VERSION
+          gh workflow run budplayground-release-image.yml -f release_tag=$VERSION
+          gh workflow run budprompt-release-image.yml -f release_tag=$VERSION
+          gh workflow run budsim-release-image.yml -f release_tag=$VERSION
+
+          echo "✅ All workflows triggered successfully"
+          echo "⏳ Waiting 30 seconds for workflows to start..."
+          sleep 30
+
+      - name: Wait for all workflows to complete
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "⏳ Monitoring workflow completion..."
+
+          # List of all workflows to monitor
+          workflows=(
+            "askbud-release-image.yml"
+            "budadmin-release-image.yml"
+            "budapp-release-image.yml"
+            "budcluster-release-image.yml"
+            "buddoc-release-image.yml"
+            "budeval-release-image.yml"
+            "budgateway-release-image.yml"
+            "budmetrics-release-image.yml"
+            "budmodel-release-image.yml"
+            "budnotify-release-image.yml"
+            "budplayground-release-image.yml"
+            "budprompt-release-image.yml"
+            "budsim-release-image.yml"
+          )
+
+          max_attempts=60  # 60 attempts * 30 seconds = 30 minutes max wait
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            all_completed=true
+            all_successful=true
+
+            echo ""
+            echo "🔍 Check #$((attempt + 1)) - Checking workflow statuses..."
+
+            for workflow in "${workflows[@]}"; do
+              # Get the most recent run for this workflow
+              run_status=$(gh run list --workflow="$workflow" --limit 1 --json status,conclusion --jq '.[0] | "\(.status):\(.conclusion)"')
+
+              status="${run_status%:*}"
+              conclusion="${run_status#*:}"
+
+              if [ "$status" != "completed" ]; then
+                echo "  ⏳ $workflow: $status"
+                all_completed=false
+              elif [ "$conclusion" != "success" ]; then
+                echo "  ❌ $workflow: $conclusion"
+                all_successful=false
+              else
+                echo "  ✅ $workflow: $conclusion"
+              fi
+            done
+
+            if [ "$all_completed" = true ]; then
+              if [ "$all_successful" = true ]; then
+                echo ""
+                echo "🎉 All workflows completed successfully!"
+                exit 0
+              else
+                echo ""
+                echo "❌ Some workflows failed! Check the logs above."
+                exit 1
+              fi
+            fi
+
+            attempt=$((attempt + 1))
+            if [ $attempt -lt $max_attempts ]; then
+              echo "⏳ Waiting 30 seconds before next check..."
+              sleep 30
+            fi
+          done
+
+          echo ""
+          echo "⏰ Timeout: Not all workflows completed within 30 minutes"
+          exit 1
+
+  update-helm:
+    name: Update Helm Chart
+    needs: [prepare, trigger-builds]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up yq
+        uses: mikefarah/yq@master
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update Chart.yaml appVersion
+        env:
+          VERSION: ${{ needs.prepare.outputs.clean_tag }}
+        run: |
+          echo "📝 Updating Chart.yaml appVersion to $VERSION"
+          yq -i ".appVersion = \"$VERSION\"" infra/helm/bud/Chart.yaml
+
+          echo "✅ Updated Chart.yaml:"
+          yq '.appVersion' infra/helm/bud/Chart.yaml
+
+      - name: Update values.yaml image tags
+        env:
+          VERSION: ${{ needs.prepare.outputs.clean_tag }}
+        run: |
+          echo "📝 Updating all service image tags to $VERSION"
+
+          # Update all microservice images
+          yq -i ".microservices.budadmin.image = \"budstudio/budadmin:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budcustomer.image = \"budstudio/budcustomer:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budplayground.image = \"budstudio/budplayground:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budgateway.image = \"budstudio/budgateway:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.askbud.image = \"budstudio/askbud:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budapp.image = \"budstudio/budapp:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budcluster.image = \"budstudio/budcluster:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budmetrics.image = \"budstudio/budmetrics:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budmodel.image = \"budstudio/budmodel:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budeval.image = \"budstudio/budeval:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budsim.image = \"budstudio/budsim:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.buddoc.image = \"budstudio/buddoc:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budnotify.image = \"budstudio/budnotify:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budprompt.image = \"budstudio/budprompt:$VERSION\"" infra/helm/bud/values.yaml
+
+          echo "✅ Updated all service images to version $VERSION"
+
+      - name: Show changes
+        run: |
+          echo "📋 Changes to be committed:"
+          echo ""
+          echo "=== Chart.yaml changes ==="
+          git diff infra/helm/bud/Chart.yaml
+          echo ""
+          echo "=== values.yaml changes ==="
+          git diff infra/helm/bud/values.yaml
+
+      - name: Commit and push changes
+        env:
+          VERSION: ${{ needs.prepare.outputs.clean_tag }}
+        run: |
+          git add infra/helm/bud/Chart.yaml infra/helm/bud/values.yaml
+
+          if git diff --staged --quiet; then
+            echo "⚠️  No changes to commit"
+          else
+            git commit -m "chore: update helm chart to version $VERSION"
+            git push origin HEAD:${{ github.ref_name }}
+            echo "✅ Helm chart updated and committed"
+          fi
+
+      - name: Create release summary
+        env:
+          VERSION: ${{ needs.prepare.outputs.clean_tag }}
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## 🚀 Release ${{ env.VERSION }} Complete!
+
+          ### ✅ Docker Images Published
+
+          All services have been built and pushed with tags:
+          - `${{ env.VERSION }}`
+          - `latest`
+
+          ### 📦 Helm Chart Updated
+
+          - `Chart.yaml` appVersion: `${{ env.VERSION }}`
+          - `values.yaml` image tags: `${{ env.VERSION }}`
+
+          ### 🎯 Services Released
+
+          **Backend Services (Python/FastAPI):**
+          - budapp
+          - budcluster
+          - budsim
+          - budmodel
+          - budmetrics
+          - budnotify
+          - askbud
+          - budeval
+          - buddoc
+          - budprompt
+
+          **Backend Services (Rust):**
+          - budgateway
+
+          **Frontend Services (Next.js):**
+          - budadmin
+          - budplayground
+
+          ### 📚 Next Steps
+
+          Deploy the updated Helm chart:
+          ```bash
+          helm upgrade bud infra/helm/bud/ --install --namespace bud-stack
+          ```
+
+          Verify images on DockerHub:
+          - https://hub.docker.com/u/budstudio
+          EOF
