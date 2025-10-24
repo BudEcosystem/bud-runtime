@@ -286,7 +286,7 @@ jobs:
           Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
           EOF
           )" \
-            --label "release,automated,helm")
+            --label "release")
 
           echo "✅ Pull request created: $PR_URL"
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
