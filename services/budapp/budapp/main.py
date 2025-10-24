@@ -210,6 +210,67 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         except Exception as e:
             logger.error("Failed to start billing cycle reset task: %s", e)
 
+    async def schedule_workflow_cleanup() -> None:
+        """Schedule weekly workflow cleanup on Sunday at 05:00 AM.
+
+        This scheduler purges old completed workflows from Dapr state store
+        to prevent unbounded Redis storage growth. It runs every Sunday at 05:00 AM.
+        """
+        from datetime import UTC, datetime, timedelta
+
+        from .workflow_ops.cleanup import WorkflowCleanupScheduler
+
+        # Wait for services to be ready
+        await asyncio.sleep(15)
+
+        def calculate_next_sunday_5am() -> float:
+            """Calculate seconds until next Sunday at 05:00 AM UTC.
+
+            Returns:
+                float: Seconds to sleep until next scheduled run
+            """
+            now = datetime.now(UTC)
+            # Calculate days until next Sunday (0=Monday, 6=Sunday)
+            days_until_sunday = (6 - now.weekday()) % 7
+            if days_until_sunday == 0:
+                # Today is Sunday - check if it's before 5 AM
+                target_time = now.replace(hour=5, minute=0, second=0, microsecond=0)
+                if now >= target_time:
+                    # Already past 5 AM today, schedule for next Sunday
+                    days_until_sunday = 7
+            else:
+                # Calculate target Sunday
+                days_until_sunday = days_until_sunday if days_until_sunday > 0 else 7
+
+            next_sunday = now + timedelta(days=days_until_sunday)
+            next_run = next_sunday.replace(hour=5, minute=0, second=0, microsecond=0)
+            seconds_until_run = (next_run - now).total_seconds()
+
+            logger.info("Next workflow cleanup scheduled for: %s (in %.2f hours)", next_run, seconds_until_run / 3600)
+            return seconds_until_run
+
+        cleanup_scheduler = WorkflowCleanupScheduler()
+
+        while True:
+            try:
+                # Wait until next Sunday at 05:00 AM
+                sleep_duration = calculate_next_sunday_5am()
+                await asyncio.sleep(sleep_duration)
+
+                # Run the cleanup
+                logger.info("Running scheduled workflow cleanup")
+                result = await cleanup_scheduler.cleanup_old_workflows(
+                    retention_days=app_settings.workflow_retention_days,
+                    batch_size=app_settings.workflow_cleanup_batch_size,
+                    delete_from_db=False,  # Keep database records for audit trail
+                )
+                logger.info("Scheduled workflow cleanup completed: %s", result)
+
+            except Exception as e:
+                logger.error("Failed to run scheduled workflow cleanup: %s", e)
+                # On error, wait 1 hour before retrying
+                await asyncio.sleep(3600)
+
     task = asyncio.create_task(schedule_secrets_and_config_sync())
 
     for seeder_name, seeder in seeders.items():
@@ -234,6 +295,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Start the billing cycle reset scheduler
     billing_reset_task = asyncio.create_task(schedule_billing_cycle_reset())
 
+    # Start the workflow cleanup scheduler (runs every Sunday at 05:00 AM)
+    workflow_cleanup_task = asyncio.create_task(schedule_workflow_cleanup())
+
     yield
 
     try:
@@ -243,6 +307,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         blocking_stats_task.cancel()
         hybrid_sync_task.cancel()
         billing_reset_task.cancel()
+        workflow_cleanup_task.cancel()
 
         # Stop the background tasks
         from .billing_ops.reset_usage import stop_billing_reset_task

@@ -189,3 +189,84 @@ class WorkflowUtilCreate(BaseModel):
     total_steps: int | None = None
     tag: str | None = None
     visibility: VisibilityEnum = VisibilityEnum.PUBLIC
+
+
+# Workflow Cleanup Schemas
+
+
+class OldWorkflowItem(BaseModel):
+    """Schema for a single old workflow item."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID4
+    workflow_type: WorkflowTypeEnum
+    title: str | None = None
+    status: WorkflowStatusEnum
+    current_step: int
+    total_steps: int
+    created_at: datetime
+    modified_at: datetime
+    reason: str | None = None
+    age_days: int = Field(..., description="Number of days since last modification")
+
+
+class OldWorkflowsListRequest(BaseModel):
+    """Request schema for listing old workflows."""
+
+    retention_days: int = Field(
+        default=30,
+        ge=1,
+        le=365,
+        description="List workflows older than this many days",
+    )
+    page: int = Field(default=1, ge=1, description="Page number")
+    limit: int = Field(default=50, ge=1, le=500, description="Items per page")
+
+
+class OldWorkflowsListResponse(PaginatedSuccessResponse):
+    """Response schema for listing old workflows."""
+
+    workflows: list[OldWorkflowItem]
+    retention_days: int = Field(..., description="Retention period used for filtering")
+    total_size_estimate: str | None = Field(None, description="Estimated storage size of old workflows in Redis")
+
+
+class ManualCleanupRequest(BaseModel):
+    """Request schema for manual cleanup trigger."""
+
+    retention_days: int = Field(
+        default=30,
+        ge=1,
+        le=365,
+        description="Clean workflows older than this many days",
+    )
+    batch_size: int = Field(
+        default=100,
+        ge=1,
+        le=1000,
+        description="Maximum number of workflows to clean in this run",
+    )
+    delete_from_db: bool = Field(
+        default=False,
+        description="Whether to also delete workflow records from database (not recommended)",
+    )
+    dry_run: bool = Field(
+        default=False,
+        description="If true, only simulate cleanup without actually purging",
+    )
+
+
+class ManualCleanupResponse(SuccessResponse):
+    """Response schema for manual cleanup trigger."""
+
+    cleanup_id: str = Field(..., description="Unique identifier for this cleanup operation")
+    processed: int = Field(..., description="Number of workflows processed")
+    purged_from_dapr: int = Field(..., description="Number of workflows purged from Dapr/Redis")
+    failed_purge: int = Field(..., description="Number of workflows that failed to purge")
+    deleted_from_db: int = Field(..., description="Number of workflows deleted from database")
+    retention_days: int = Field(..., description="Retention period used")
+    batch_size: int = Field(..., description="Batch size used")
+    dry_run: bool = Field(..., description="Whether this was a dry run")
+    started_at: datetime = Field(..., description="When the cleanup started")
+    completed_at: datetime = Field(..., description="When the cleanup completed")

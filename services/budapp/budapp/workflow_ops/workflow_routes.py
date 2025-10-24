@@ -29,8 +29,16 @@ from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 
-from .schemas import RetrieveWorkflowDataResponse, WorkflowFilter, WorkflowListResponse, WorkflowResponse
-from .services import WorkflowService
+from .schemas import (
+    ManualCleanupRequest,
+    ManualCleanupResponse,
+    OldWorkflowsListResponse,
+    RetrieveWorkflowDataResponse,
+    WorkflowFilter,
+    WorkflowListResponse,
+    WorkflowResponse,
+)
+from .services import WorkflowService, WorkflowStepService
 
 
 logger = logging.get_logger(__name__)
@@ -221,4 +229,139 @@ async def delete_workflow(
         logger.exception(f"Failed to delete workflow: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete workflow"
+        ).to_http_response()
+
+
+# Workflow Cleanup APIs
+
+
+@workflow_router.get(
+    "/cleanup/old-workflows",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": OldWorkflowsListResponse,
+            "description": "Successfully listed old workflows eligible for cleanup",
+        },
+    },
+    description="List old workflows that are eligible for cleanup based on retention period",
+)
+async def list_old_workflows(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    retention_days: int = Query(30, ge=1, le=365, description="List workflows older than this many days"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(50, ge=1, le=500, description="Items per page"),
+) -> Union[OldWorkflowsListResponse, ErrorResponse]:
+    """List old workflows eligible for cleanup.
+
+    This endpoint returns workflows in terminal states (COMPLETED, FAILED) that are
+    older than the specified retention period. Use this to preview what workflows
+    would be cleaned up before triggering manual cleanup.
+    """
+    try:
+        workflows, total_count = await WorkflowStepService(session).list_old_workflows(
+            retention_days=retention_days,
+            page=page,
+            limit=limit,
+        )
+
+        # Estimate storage size (rough estimate: 10KB per workflow in Redis)
+        estimated_size_kb = total_count * 10
+        size_estimate = f"{estimated_size_kb} KB" if estimated_size_kb < 1024 else f"{estimated_size_kb / 1024:.2f} MB"
+
+        return OldWorkflowsListResponse(
+            workflows=workflows,
+            total_record=total_count,
+            page=page,
+            limit=limit,
+            retention_days=retention_days,
+            total_size_estimate=size_estimate,
+            object="workflow.cleanup.old_workflows",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to list old workflows: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list old workflows: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list old workflows"
+        ).to_http_response()
+
+
+@workflow_router.post(
+    "/cleanup/trigger",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": ManualCleanupResponse,
+            "description": "Successfully triggered workflow cleanup",
+        },
+    },
+    description="Manually trigger cleanup of old workflows from Dapr state store",
+)
+async def trigger_manual_cleanup(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: ManualCleanupRequest,
+) -> Union[ManualCleanupResponse, ErrorResponse]:
+    """Trigger manual cleanup of old workflows.
+
+    This endpoint purges old workflow state from Dapr/Redis to prevent unbounded
+    storage growth. It only affects workflows in terminal states (COMPLETED, FAILED).
+
+    Use dry_run=true to simulate the cleanup without actually purging anything.
+
+    **Warning**: Setting delete_from_db=true will permanently delete workflow records
+    from the database. This is not recommended as it removes the audit trail.
+    """
+    try:
+        result = await WorkflowStepService(session).trigger_manual_cleanup(
+            retention_days=request.retention_days,
+            batch_size=request.batch_size,
+            delete_from_db=request.delete_from_db,
+            dry_run=request.dry_run,
+        )
+
+        message = "Workflow cleanup completed successfully"
+        if request.dry_run:
+            message = "Dry run completed - no workflows were actually purged"
+
+        return ManualCleanupResponse(
+            cleanup_id=result["cleanup_id"],
+            processed=result["processed"],
+            purged_from_dapr=result["purged_from_dapr"],
+            failed_purge=result["failed_purge"],
+            deleted_from_db=result["deleted_from_db"],
+            retention_days=result["retention_days"],
+            batch_size=result["batch_size"],
+            dry_run=result["dry_run"],
+            started_at=result["started_at"],
+            completed_at=result["completed_at"],
+            object="workflow.cleanup.trigger",
+            code=status.HTTP_200_OK,
+            message=message,
+        ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to trigger cleanup: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to trigger cleanup: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to trigger cleanup"
         ).to_http_response()
