@@ -1,7 +1,7 @@
 import random
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import aiohttp
@@ -15,6 +15,7 @@ from budapp.commons.config import app_settings
 from budapp.commons.constants import (
     BUD_INTERNAL_WORKFLOW,
     BudServeWorkflowStepEventName,
+    ProjectStatusEnum,
     WorkflowTypeEnum,
 )
 from budapp.commons.exceptions import ClientException
@@ -1896,6 +1897,79 @@ class ExperimentService:
             deployment_name=endpoint.namespace if endpoint else None,
         )
 
+    async def get_first_active_project(self) -> uuid.UUID:
+        """Get the first active project in the system.
+
+        This is used to generate temporary credentials for evaluation runs.
+
+        Returns:
+            UUID of the first active project
+
+        Raises:
+            ClientException: If no active projects exist in the system
+        """
+        from sqlalchemy import select
+
+        from budapp.project_ops.models import Project as ProjectModel
+
+        # Get first active project ordered by creation date (async query)
+        stmt = (
+            select(ProjectModel)
+            .filter(ProjectModel.status == ProjectStatusEnum.ACTIVE)
+            .order_by(ProjectModel.created_at.asc())
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        project = result.scalars().first()
+
+        if not project:
+            raise ClientException("No active project found in the system. Please create a project first.")
+
+        logger.info(f"Using project '{project.name}' (ID: {project.id}) for evaluation credential")
+
+        return project.id
+
+    async def _generate_temporary_evaluation_key(
+        self,
+        project_id: uuid.UUID,
+        experiment_id: uuid.UUID,
+    ) -> str:
+        """Generate temporary API key for evaluation (no DB storage).
+
+        The key is only cached in Redis with 24-hour TTL for automatic cleanup.
+
+        Args:
+            project_id: Project ID to associate the credential with
+            experiment_id: Experiment ID for logging purposes
+
+        Returns:
+            The generated API key string
+
+        Raises:
+            Exception: If credential generation or cache update fails
+        """
+        from budapp.credential_ops.helpers import generate_secure_api_key
+        from budapp.credential_ops.services import CredentialService
+
+        # Generate secure API key (format: bud_client_<random>)
+        api_key = generate_secure_api_key("client_app")
+
+        # Set 24-hour expiry
+        expiry = datetime.now(timezone.utc) + timedelta(hours=24)
+
+        # Update Redis cache directly (no DB storage)
+        await CredentialService(self.session).update_proxy_cache(
+            project_id=project_id,
+            api_key=api_key,
+            expiry=expiry,
+        )
+
+        logger.info(
+            f"Generated temporary evaluation key for experiment {experiment_id}, valid until {expiry.isoformat()}"
+        )
+
+        return api_key
+
     def get_traits_with_datasets_for_run(self, dataset_version_id: uuid.UUID) -> List["TraitWithDatasets"]:
         """Get traits with their datasets for a specific run.
 
@@ -3639,10 +3713,42 @@ class EvaluationWorkflowService:
 
             logger.info(f"Collected {len(all_datasets)} dataset configurations: {all_datasets}")
 
+            # Get first run to determine model and endpoint
+            first_run = runs[0]
+
+            # Get model details (async query)
+            from sqlalchemy import select
+
+            stmt = select(ModelTable).filter(ModelTable.id == first_run.model_id)
+            model = (await self.session.execute(stmt)).scalars().first()
+
+            if not model:
+                raise ClientException(f"Model {first_run.model_id} not found")
+
+            # Get endpoint for the model (async query)
+            stmt = select(EndpointModel).filter(EndpointModel.model_id == first_run.model_id)
+            endpoint = (await self.session.execute(stmt)).scalars().first()
+
+            if not endpoint:
+                raise ClientException(
+                    f"No active endpoint found for model '{model.name}'. "
+                    "Please deploy the model before running evaluations."
+                )
+
+            # Get first active project for credential generation
+            experiment_service = ExperimentService(self.session)
+            project_id = await experiment_service.get_first_active_project()
+
+            # Generate temporary evaluation credential
+            api_key = await experiment_service._generate_temporary_evaluation_key(
+                project_id=project_id, experiment_id=experiment_id
+            )
+
+            # Build evaluation request with dynamic values
             evaluation_request = {
-                "model_name": "gpt-oss-20b",
-                "endpoint": "http://20.66.97.208/v1",
-                "api_key": "sk-BudLiteLLMMasterKey_123",
+                "model_name": model.name,  # Dynamic from model table
+                "endpoint": "https://gateway.dev.bud.studio/v1",  # Dynamic from endpoint table
+                "api_key": api_key,  # Generated temporary credential
                 "extra_args": {},
                 "datasets": all_datasets,
                 "kubeconfig": "",  # TODO: Get actual kubeconfig
@@ -3763,22 +3869,11 @@ class EvaluationWorkflowService:
                 logger.error(f"::EvalResult:: Evaluation {eval_id} not found")
                 raise ClientException(f"Evaluation {eval_id} not found")
 
-            # Update the eval status
-            evaluation.status = EvaluationStatusEnum.COMPLETED.value
-
-            # Calculate duration in seconds from created_at to now
-            completion_time = datetime.now(timezone.utc)
-            if evaluation.created_at:
-                duration_seconds = int((completion_time - evaluation.created_at).total_seconds())
-                evaluation.duration_in_seconds = duration_seconds
-                logger.info(
-                    f"::EvalResult:: Evaluation {eval_id} duration: {duration_seconds} seconds "
-                    f"({duration_seconds // 60} minutes)"
-                )
-
             # Dictionary to accumulate trait scores
             # Format: {trait_id_str: {"total_score": float, "count": int}}
             trait_score_accumulator = {}
+
+            has_failures = False
 
             # Update runs
             for run in results:
@@ -3800,10 +3895,11 @@ class EvaluationWorkflowService:
 
                 # Update run status - Fix 3: Update dbrun, not run dict
                 run_status = run.get("status", "failed")
-                if run_status == "failed":
-                    dbrun.status = RunStatusEnum.FAILED.value
-                elif run_status == "success":
+                if run_status == "success":
                     dbrun.status = RunStatusEnum.COMPLETED.value
+                else:
+                    dbrun.status = RunStatusEnum.FAILED.value
+                    has_failures = True
 
                 # Update The Metrics
                 accuracy_score_ar = run.get("scores", [])
@@ -3828,7 +3924,10 @@ class EvaluationWorkflowService:
                             # Get all traits associated with this dataset
                             traits = (
                                 self.session.query(TraitModel)
-                                .join(PivotModel, TraitModel.id == PivotModel.trait_id)
+                                .join(
+                                    PivotModel,
+                                    TraitModel.id == PivotModel.trait_id,
+                                )
                                 .filter(PivotModel.dataset_id == dataset.id)
                                 .all()
                             )
@@ -3837,7 +3936,10 @@ class EvaluationWorkflowService:
                             for trait in traits:
                                 trait_id_str = str(trait.id)
                                 if trait_id_str not in trait_score_accumulator:
-                                    trait_score_accumulator[trait_id_str] = {"total_score": 0.0, "count": 0}
+                                    trait_score_accumulator[trait_id_str] = {
+                                        "total_score": 0.0,
+                                        "count": 0,
+                                    }
 
                                 trait_score_accumulator[trait_id_str]["total_score"] += final_acc
                                 trait_score_accumulator[trait_id_str]["count"] += 1
@@ -3853,6 +3955,21 @@ class EvaluationWorkflowService:
 
                 self.session.commit()
                 logger.warning("::EvalResult:: Successfully updated evaluation runs with metrics")
+
+            evaluation.status = EvaluationStatusEnum.COMPLETED.value
+            if has_failures:
+                # Update the eval status
+                evaluation.status = EvaluationStatusEnum.FAILED.value
+
+            # Calculate duration in seconds from created_at to now
+            completion_time = datetime.now(timezone.utc)
+            if evaluation.created_at:
+                duration_seconds = int((completion_time - evaluation.created_at).total_seconds())
+                evaluation.duration_in_seconds = duration_seconds
+                logger.info(
+                    f"::EvalResult:: Evaluation {eval_id} duration: {duration_seconds} seconds "
+                    f"({duration_seconds // 60} minutes)"
+                )
 
             # Calculate average scores for each trait and update evaluation.trait_scores
             trait_scores_final = {}
