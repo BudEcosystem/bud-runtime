@@ -1696,12 +1696,15 @@ class ClusterService(SessionMixin):
                 return gpu_count
 
             # Create node mapping from budcluster data
-            # Note: budmetrics returns IP addresses as node_name, but budcluster stores hostnames
-            # Without internal_ip field in budcluster schema, we can't directly map
-            # For now, create mapping by index if counts match, otherwise use defaults
+            # Use IP-based matching now that internal_ip field is available in budcluster schema
             budcluster_nodes = nodes_data.get("nodes", [])
-            node_info_list = [
-                {
+
+            # Create IP-to-node-info mapping for reliable matching
+            node_info_by_ip = {}
+            nodes_without_ip = []
+
+            for node in budcluster_nodes:
+                node_info = {
                     "id": node["id"],
                     "hostname": node["name"],
                     "devices": node["hardware_info"],
@@ -1709,28 +1712,40 @@ class ClusterService(SessionMixin):
                     "system_info": extract_system_info(node),
                     "gpu_count": extract_gpu_count(node["hardware_info"]),
                 }
-                for node in budcluster_nodes
-            ]
+
+                internal_ip = node.get("internal_ip")
+                if internal_ip:
+                    node_info_by_ip[internal_ip] = node_info
+                else:
+                    # Track nodes without IP for logging
+                    nodes_without_ip.append(node["name"])
+
+            # Log warning if some nodes don't have internal_ip (backwards compatibility)
+            if nodes_without_ip:
+                logger.warning(
+                    f"Nodes without internal_ip in cluster {db_cluster.cluster_id}: {nodes_without_ip}. "
+                    "Metrics may not be associated correctly. Please refresh node info."
+                )
 
             # Transform metrics data into the expected format
             nodes_status = {"nodes": {}}
 
             metrics_nodes = metrics_response.get("nodes", [])
 
-            # Match metrics to budcluster nodes
-            # If counts match, assume same order for now (imperfect but better than nothing)
-            # TODO: Add internal_ip field to budcluster schema for proper IP-based matching
-            for idx, node_metric in enumerate(metrics_nodes):
-                node_name_ip = node_metric["node_name"]  # This is the IP address from ClickHouse
+            # Match metrics to budcluster nodes using IP-based lookup
+            # This is reliable and ordering-independent
+            for node_metric in metrics_nodes:
+                node_ip = node_metric["node_name"]  # This is the IP address from ClickHouse
 
-                # Try to get corresponding budcluster node info
-                if idx < len(node_info_list):
-                    node_info = node_info_list[idx]
-                else:
-                    # Fallback to defaults if no match
+                # Try to get corresponding budcluster node info by IP
+                node_info = node_info_by_ip.get(node_ip)
+
+                if not node_info:
+                    # Fallback to defaults if no IP match found
+                    logger.debug(f"No node info found for IP {node_ip}, using defaults")
                     node_info = {
                         "id": "",
-                        "hostname": node_name_ip,
+                        "hostname": node_ip,
                         "devices": [],
                         "status": "Unknown",
                         "system_info": {"os": "N/A", "kernel": "N/A", "architecture": "N/A"},
@@ -1788,7 +1803,7 @@ class ClusterService(SessionMixin):
                         "capacity": gpu_count,
                     }
 
-                nodes_status["nodes"][node_name_ip] = node_response
+                nodes_status["nodes"][node_ip] = node_response
 
             return nodes_status
 

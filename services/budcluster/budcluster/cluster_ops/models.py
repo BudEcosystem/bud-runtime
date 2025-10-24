@@ -73,6 +73,7 @@ class ClusterNodeInfo(PSQLBase, TimestampMixin):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     cluster_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("cluster.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
+    internal_ip: Mapped[str] = mapped_column(String, nullable=True)
     type: Mapped[str] = mapped_column(
         Enum(
             ClusterNodeTypeEnum,

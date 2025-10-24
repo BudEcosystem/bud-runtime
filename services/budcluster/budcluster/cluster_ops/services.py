@@ -339,6 +339,7 @@ class ClusterOpsService:
                     ClusterNodeInfo(
                         cluster_id=cluster_id,
                         name=node["node_name"],
+                        internal_ip=node.get("internal_ip"),
                         type=device_type,
                         hardware_info=hardware_info,
                         status=node_status,
@@ -494,6 +495,7 @@ class ClusterOpsService:
                             ClusterNodeInfo(
                                 cluster_id=cluster_id,
                                 name=node_info["name"],
+                                internal_ip=node_info.get("internal_ip"),
                                 type=cls._determine_primary_device_type(node_info["devices"]),
                                 hardware_info=hardware_info,
                                 status=node_info["status"],
@@ -816,6 +818,7 @@ class ClusterOpsService:
             node_update = {
                 "cluster_id": cluster_id,
                 "name": node_info["name"],
+                "internal_ip": node_info.get("internal_ip"),
                 "type": cls._determine_primary_device_type(node_info["devices"]),
                 "hardware_info": hardware_info,
                 "status": node_info["status"],
@@ -1065,6 +1068,7 @@ class ClusterOpsService:
                     ClusterNodeInfo(
                         cluster_id=cluster_id,
                         name=node["node_name"],
+                        internal_ip=node.get("internal_ip"),
                         type=device_type,
                         hardware_info=hardware_info,
                         status=node_status,

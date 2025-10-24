@@ -140,7 +140,7 @@ async def get_cluster_metrics_summary(
         # Forward to budmetrics
         result = await DaprService.invoke_service(
             "budmetrics",
-            f"cluster-metrics/clusters/{cluster_id}/summary",
+            f"cluster-metrics/{cluster_id}/summary",
             method="GET",
         )
         return result
@@ -185,7 +185,7 @@ async def get_cluster_node_metrics(
         # Forward to budmetrics
         result = await DaprService.invoke_service(
             "budmetrics",
-            f"cluster-metrics/clusters/{cluster_id}/nodes",
+            f"cluster-metrics/{cluster_id}/nodes",
             method="GET",
             params=params,
         )
@@ -234,7 +234,7 @@ async def get_cluster_pod_metrics(
         # Forward to budmetrics
         result = await DaprService.invoke_service(
             "budmetrics",
-            f"cluster-metrics/clusters/{cluster_id}/pods",
+            f"cluster-metrics/{cluster_id}/pods",
             method="GET",
             params=params,
         )
@@ -271,7 +271,7 @@ async def get_cluster_health_status(
         # Forward to budmetrics
         result = await DaprService.invoke_service(
             "budmetrics",
-            f"cluster-metrics/clusters/{cluster_id}/health",
+            f"cluster-metrics/{cluster_id}/health",
             method="GET",
         )
         return result
@@ -305,10 +305,13 @@ async def query_cluster_metrics(
                 message="Cluster not found",
             ).to_http_response()
 
+        # Ensure cluster_id is in the query data for budmetrics
+        query["cluster_id"] = cluster_id
+
         # Forward to budmetrics
         result = await DaprService.invoke_service(
             "budmetrics",
-            f"cluster-metrics/clusters/{cluster_id}/query",
+            "cluster-metrics/query",
             method="POST",
             data=query,
         )
