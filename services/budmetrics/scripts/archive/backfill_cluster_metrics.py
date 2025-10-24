@@ -107,9 +107,7 @@ class ClusterMetricsBackfill:
         for table in ["NodeMetrics", "PodMetrics", "ClusterMetrics"]:
             result = await self.client.execute_query(f"EXISTS TABLE {table}")
             if not result or not result[0][0]:
-                raise Exception(
-                    f"{table} table does not exist. " "Run fix_cluster_metrics_materialized_views.sql first."
-                )
+                raise Exception(f"{table} table does not exist. Run fix_cluster_metrics_materialized_views.sql first.")
 
         # Check if materialized views exist
         mv_query = """
@@ -121,7 +119,7 @@ class ClusterMetricsBackfill:
         mvs = await self.client.execute_query(mv_query)
         if not mvs:
             logger.warning(
-                "No materialized views found. " "Run fix_cluster_metrics_materialized_views.sql to create them."
+                "No materialized views found. Run fix_cluster_metrics_materialized_views.sql to create them."
             )
 
         logger.info("✓ Prerequisites check passed")

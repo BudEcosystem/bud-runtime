@@ -209,6 +209,9 @@ microservices:
       CLICKHOUSE_DB_NAME: budproxy
       SECRETS_CLICKHOUSE_USER: "{{ .Values.clickhouse.auth.username }}"
       SECRETS_CLICKHOUSE_PASSWORD: "{{ .Values.clickhouse.auth.password }}"
+
+      # ClickHouse TTL configuration for cluster metrics (in days)
+      CLICKHOUSE_TTL_CLUSTER_METRICS: "30"
   budmodel:
     enabled: true
     image: budstudio/budmodel:nightly
@@ -531,7 +534,7 @@ otelCollector:
     database: metrics
     username: default
     password: ""
-    ttl: 2160h  # 90 days
+    ttl: 720h  # 30 days - retention for raw OTel metrics (otel_metrics_*)
 
 # best to be installed cluster wide, not as part of this chart
 dapr:

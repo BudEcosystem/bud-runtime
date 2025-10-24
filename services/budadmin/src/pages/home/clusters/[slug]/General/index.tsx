@@ -436,7 +436,7 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
       }),
     },
     // { name: "TFLOPs", bg: "/images/cluster/bg-flop.png", value: "0" }, // TODO: Change the value to actual data
-    
+
   ];
 
   const GeneralCards = ({ name, bg, value, tag }: GeneralCardsProps) => {

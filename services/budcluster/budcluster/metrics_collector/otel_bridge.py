@@ -144,7 +144,7 @@ class OTelBridge:
             # Update OTel configuration dynamically
             await self._update_otel_config(cluster_id, cluster_name, local_port)
 
-            logger.info(f"Successfully configured scraping for cluster {cluster_id} " f"on port {local_port}")
+            logger.info(f"Successfully configured scraping for cluster {cluster_id} on port {local_port}")
             return True, None
 
         except Exception as e:
@@ -399,7 +399,7 @@ class OTelBridge:
         self.scrape_configs[cluster_id]["port"] = port
         self.scrape_configs[cluster_id]["last_updated"] = datetime.utcnow()
 
-        logger.info(f"Updated scrape config for cluster {cluster_id}: " f"name={cluster_name}, port={port}")
+        logger.info(f"Updated scrape config for cluster {cluster_id}: name={cluster_name}, port={port}")
 
     async def scrape_and_forward_metrics(
         self,

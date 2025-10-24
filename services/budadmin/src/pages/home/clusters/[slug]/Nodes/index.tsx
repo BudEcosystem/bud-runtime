@@ -160,7 +160,7 @@ function CompareGraph({ data }: { data: SingleGuageChartData }) {
     <div className="flex flex-col justify-start items-center w-[12.2%]">
       <div className="max-w-[5.5rem]">
         <Text_12_400_757575 className="text-center">
-          {data.label1} 
+          {data.label1}
           {/* vs {data.label2} */}
         </Text_12_400_757575>
       </div>

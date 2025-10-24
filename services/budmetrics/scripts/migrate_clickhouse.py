@@ -23,6 +23,22 @@ from budmetrics.observability.models import ClickHouseClient, ClickHouseConfig
 logger = logging.get_logger(__name__)
 
 
+def get_cluster_metrics_ttl_days(default: int = 30) -> int:
+    """Get TTL in days for cluster metrics from environment variable.
+
+    Args:
+        default: Default TTL in days if env var is not set or invalid
+
+    Returns:
+        TTL value in days
+    """
+    try:
+        return int(os.getenv("CLICKHOUSE_TTL_CLUSTER_METRICS", default))
+    except ValueError:
+        logger.warning(f"Invalid CLICKHOUSE_TTL_CLUSTER_METRICS value, using default: {default} days")
+        return default
+
+
 def get_clickhouse_config() -> ClickHouseConfig:
     """Get ClickHouse configuration from environment variables."""
     # Check required environment variables
@@ -621,7 +637,8 @@ class ClickHouseMigration:
         logger.info("Creating cluster metrics tables...")
 
         # Main cluster metrics table (raw metrics from OTel)
-        query_cluster_metrics = """
+        ttl_days = get_cluster_metrics_ttl_days()
+        query_cluster_metrics = f"""
         CREATE TABLE IF NOT EXISTS ClusterMetrics
         (
             ts DateTime64(3) CODEC(Delta, ZSTD),
@@ -635,7 +652,7 @@ class ClickHouseMigration:
         ENGINE = ReplacingMergeTree()
         PARTITION BY toYYYYMM(ts)
         ORDER BY (cluster_id, metric_name, ts)
-        TTL ts + INTERVAL 90 DAY
+        TTL ts + INTERVAL {ttl_days} DAY
         SETTINGS index_granularity = 8192
         """
 
@@ -660,7 +677,7 @@ class ClickHouseMigration:
             raise
 
         # Node-level aggregated metrics
-        query_node_metrics = """
+        query_node_metrics = f"""
         CREATE TABLE IF NOT EXISTS NodeMetrics
         (
             ts DateTime64(3) CODEC(Delta, ZSTD),
@@ -684,7 +701,7 @@ class ClickHouseMigration:
         ENGINE = ReplacingMergeTree()
         PARTITION BY toYYYYMM(ts)
         ORDER BY (cluster_id, node_name, ts)
-        TTL ts + INTERVAL 90 DAY
+        TTL ts + INTERVAL {ttl_days} DAY
         SETTINGS index_granularity = 8192
         """
 
@@ -709,7 +726,7 @@ class ClickHouseMigration:
             raise
 
         # Pod/Container metrics
-        query_pod_metrics = """
+        query_pod_metrics = f"""
         CREATE TABLE IF NOT EXISTS PodMetrics
         (
             ts DateTime64(3) CODEC(Delta, ZSTD),
@@ -730,7 +747,7 @@ class ClickHouseMigration:
         ENGINE = ReplacingMergeTree()
         PARTITION BY toYYYYMM(ts)
         ORDER BY (cluster_id, namespace, pod_name, ts)
-        TTL ts + INTERVAL 30 DAY
+        TTL ts + INTERVAL {ttl_days} DAY
         SETTINGS index_granularity = 8192
         """
 
@@ -755,7 +772,7 @@ class ClickHouseMigration:
             raise
 
         # GPU metrics (optional)
-        query_gpu_metrics = """
+        query_gpu_metrics = f"""
         CREATE TABLE IF NOT EXISTS GPUMetrics
         (
             ts DateTime64(3) CODEC(Delta, ZSTD),
@@ -773,7 +790,7 @@ class ClickHouseMigration:
         ENGINE = ReplacingMergeTree()
         PARTITION BY toYYYYMM(ts)
         ORDER BY (cluster_id, node_name, gpu_index, ts)
-        TTL ts + INTERVAL 30 DAY
+        TTL ts + INTERVAL {ttl_days} DAY
         SETTINGS index_granularity = 8192
         """
 

@@ -186,12 +186,65 @@ kubectl -n pde-ditto describe pod <budapp-pod>
 kubectl -n pde-ditto logs <budapp-pod> -c budapp
 ```
 
+## Data Retention and Lifecycle
+
+All cluster metrics data has a **30-day retention policy** with automatic cleanup:
+
+### Retention Policy
+- **Raw OTel Metrics** (`otel_metrics_*`): 30 days
+- **ClusterMetrics** table: 30 days
+- **NodeMetrics** table: 30 days
+- **PodMetrics** table: 30 days
+- **GPUMetrics** table: 30 days
+
+### How It Works
+ClickHouse automatically deletes data older than 30 days using TTL (Time To Live) settings:
+- **Partition-based**: Data is partitioned by month (`PARTITION BY toYYYYMM(ts)`)
+- **Automatic cleanup**: ClickHouse background processes delete expired partitions
+- **Grace period**: Cleanup may take hours/days depending on merge frequency
+- **No manual intervention**: Once configured, data lifecycle is fully automated
+
+### Configuring Retention
+To change the retention period, update the following configurations:
+
+1. **For OTel raw metrics**: Update `otelCollector.clickhouse.ttl` in `infra/helm/bud/values.yaml`
+   ```yaml
+   otelCollector:
+     clickhouse:
+       ttl: 720h  # 30 days (in hours)
+   ```
+
+2. **For cluster metrics tables**: Update `CLICKHOUSE_TTL_CLUSTER_METRICS` in `infra/helm/bud/values.yaml`
+   ```yaml
+   budmetrics:
+     env:
+       CLICKHOUSE_TTL_CLUSTER_METRICS: "30"  # Retention in days
+   ```
+
+   This single configuration controls TTL for all cluster metrics tables:
+   - ClusterMetrics
+   - NodeMetrics
+   - PodMetrics
+   - GPUMetrics
+
+**For local development**: Set the environment variable in `services/budmetrics/.env`:
+```bash
+CLICKHOUSE_TTL_CLUSTER_METRICS=30
+```
+
+### Storage Impact
+30-day retention provides a good balance between storage costs and historical analysis:
+- **Recent data** (last 7 days): Ideal for troubleshooting and monitoring
+- **Medium-term data** (8-30 days): Useful for trend analysis and capacity planning
+- **Automatic cleanup**: Prevents unbounded storage growth
+
 ## Performance Considerations
 
 - Views aggregate data on-the-fly; for better performance, use materialized views
 - The 5-minute materialized view (`mv_node_metrics_5m`) pre-aggregates data
-- ClickHouse automatically drops old data based on TTL settings (90 days for nodes, 30 days for pods)
+- ClickHouse automatically drops old data based on TTL settings (30 days for all metrics)
 - Frontend refreshes every 30 seconds; adjust if needed for performance
+- Monthly partitioning enables efficient data pruning and query optimization
 
 ## Future Enhancements
 
