@@ -1919,7 +1919,7 @@ class ExperimentService:
             .order_by(ProjectModel.created_at.asc())
             .limit(1)
         )
-        result = await self.session.execute(stmt)
+        result = self.session.execute(stmt)
         project = result.scalars().first()
 
         if not project:
