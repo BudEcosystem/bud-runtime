@@ -1955,7 +1955,7 @@ class ExperimentService:
         api_key = generate_secure_api_key("client_app")
 
         # Set 24-hour expiry
-        expiry = datetime.now(timezone.utc) + timedelta(hours=24)
+        expiry = datetime.now() + timedelta(hours=24)
 
         # Update Redis cache directly (no DB storage)
         await CredentialService(self.session).update_proxy_cache(
