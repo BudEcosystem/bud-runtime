@@ -114,11 +114,35 @@ jobs:
             cd services/budCustomer && pnpm install && cd ../..
           fi
 
-      - name: Run pre-commit on changed files
+      - name: Fetch base branch
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1 || true
+          fi
+
+      - name: Run pre-commit on changed files (robust)
         run: |
           echo "::group::Running pre-commit checks"
-          pre-commit run --from-ref origin/${{ github.base_ref }} --to-ref HEAD --show-diff-on-failure
+          if git show-ref --verify --quiet "refs/remotes/origin/${GITHUB_BASE_REF:-}"; then
+            BASE_REF="origin/${GITHUB_BASE_REF}"
+          else
+            BASE_REF="$(git merge-base HEAD HEAD~1)"
+          fi
+          echo "Using BASE_REF=${BASE_REF}"
+          pre-commit run --from-ref "${BASE_REF}" --to-ref HEAD --show-diff-on-failure 2>&1 | tee pre-commit.log
+          PRE_COMMIT_EXIT=${PIPESTATUS[0]}
           echo "::endgroup::"
+          if [ $PRE_COMMIT_EXIT -ne 0 ]; then
+            exit $PRE_COMMIT_EXIT
+          fi
+
+      - name: Upload pre-commit logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-commit-log
+          path: pre-commit.log
+          if-no-files-found: ignore
 
   dependency-security:
     name: Python Dependency Security Check
