@@ -178,25 +178,31 @@ jobs:
 
     steps:
       - name: Check pre-commit results
+        if: ${{ needs.pre-commit.result == 'failure' }}
         run: |
-          if [[ "${{ needs.pre-commit.result }}" == "failure" ]]; then
-            echo "❌ Pre-commit checks failed"
-            exit 1
-          fi
+          echo "❌ Pre-commit checks failed"
+          exit 1
 
-          # Only check dependency-security if it was supposed to run (Python files changed)
-          if [[ "${{ needs.detect-changes.outputs.python }}" == "true" ]]; then
-            if [[ "${{ needs.dependency-security.result }}" == "failure" ]]; then
-              echo "❌ Dependency security check failed"
-              exit 1
-            elif [[ "${{ needs.dependency-security.result }}" == "skipped" ]]; then
-              echo "⚠️ Dependency security check was skipped unexpectedly"
-              exit 1
-            else
-              echo "✅ Dependency security check passed"
-            fi
-          else
-            echo "ℹ️ Dependency security check skipped (no Python files changed)"
-          fi
+      - name: Dependency security check failed
+        if: ${{ needs.detect-changes.outputs.python == 'true' && needs.dependency-security.result == 'failure' }}
+        run: |
+          echo "❌ Dependency security check failed"
+          exit 1
 
-          echo "✅ All required code quality checks passed!"
+      - name: Dependency security check skipped unexpectedly
+        if: ${{ needs.detect-changes.outputs.python == 'true' && needs.dependency-security.result == 'skipped' }}
+        run: |
+          echo "⚠️ Dependency security check was skipped unexpectedly"
+          exit 1
+
+      - name: Dependency security check passed
+        if: ${{ needs.detect-changes.outputs.python == 'true' && needs.dependency-security.result == 'success' }}
+        run: echo "✅ Dependency security check passed"
+
+      - name: Dependency security check skipped (no Python changes)
+        if: ${{ needs.detect-changes.outputs.python != 'true' }}
+        run: echo "ℹ️ Dependency security check skipped (no Python files changed)"
+
+      - name: All required code quality checks passed
+        if: ${{ needs.pre-commit.result == 'success' && (needs.detect-changes.outputs.python != 'true' || needs.dependency-security.result == 'success') }}
+        run: echo "✅ All required code quality checks passed!"
