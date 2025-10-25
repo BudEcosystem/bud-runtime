@@ -37,6 +37,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.openai import ModelSettings as OpenAIModelSettings
 from pydantic_ai.output import NativeOutput
+from pydantic_ai.run import AgentRunResult
 
 from budprompt.commons.exceptions import (
     PromptExecutionException,
@@ -55,7 +56,7 @@ from .streaming_validation import add_field_validator_to_model
 from .streaming_validation_executor import StreamingValidationExecutor
 from .template_renderer import render_template
 from .tool_loaders import ToolRegistry
-from .utils import contains_pydantic_model, validate_input_data_type
+from .utils import PydanticResultSerializer, contains_pydantic_model, validate_input_data_type
 from .validation import add_validator_to_model_async
 
 
@@ -711,6 +712,14 @@ class SimplePromptExecutor:
                     output_schema,
                 )
 
+                # NOTE: all_messages_json() method getting error when serialize data.
+                # Serialize and save result using the serializer
+                serializer = PydanticResultSerializer()
+                serialized_result = serializer.serialize(result)
+
+                with open("latest_pydantic.json", "w") as fp:
+                    fp.write(serialized_result.model_dump_json(indent=4))
+
                 # Format to OpenAI response for non-streaming
                 return await self.response_formatter.format_response(
                     pydantic_result=result,
@@ -1023,7 +1032,7 @@ class SimplePromptExecutor:
         user_prompt: Optional[str],
         message_history: List[ModelMessage],
         output_schema: Optional[Dict[str, Any]],
-    ) -> Any:
+    ) -> AgentRunResult[Any]:
         """Run the agent with message history and current prompt.
 
         Args:
