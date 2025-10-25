@@ -3720,14 +3720,14 @@ class EvaluationWorkflowService:
             from sqlalchemy import select
 
             stmt = select(ModelTable).filter(ModelTable.id == first_run.model_id)
-            model = (await self.session.execute(stmt)).scalars().first()
+            model = self.session.execute(stmt).scalars().first()
 
             if not model:
                 raise ClientException(f"Model {first_run.model_id} not found")
 
             # Get endpoint for the model (async query)
             stmt = select(EndpointModel).filter(EndpointModel.model_id == first_run.model_id)
-            endpoint = (await self.session.execute(stmt)).scalars().first()
+            endpoint = self.session.execute(stmt).scalars().first()
 
             if not endpoint:
                 raise ClientException(
