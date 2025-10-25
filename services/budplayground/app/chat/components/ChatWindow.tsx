@@ -189,8 +189,13 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     setPromptData(data);
 
     // Create a user message with the prompt input
-    const userMessage = data.input ||
-      (data.variables ? Object.entries(data.variables).map(([k, v]) => `${k}: ${v}`).join('\n') : '');
+    const userMessage =
+      data.input ||
+      (data.prompt?.variables
+        ? Object.entries(data.prompt.variables)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join('\n')
+        : '');
 
     // Append the message to trigger the chat with prompt context
     append({

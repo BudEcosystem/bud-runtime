@@ -3,7 +3,6 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { copyCodeApiBaseUrl } from '@/app/lib/environment';
 import { Settings } from '@/app/types/chat';
 import axios from 'axios';
-
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 300;
 
@@ -74,6 +73,56 @@ function buildInitialMessages(promptConfig: any, variables?: Record<string, any>
   return messages;
 }
 
+const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
+  if (!headers) {
+    return {};
+  }
+  if (headers instanceof Headers) {
+    return Object.fromEntries(headers.entries());
+  }
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers);
+  }
+  return { ...(headers as Record<string, string>) };
+};
+
+interface ResponseFormatConfig {
+  schema?: Record<string, any>;
+  name: string;
+  description?: string;
+}
+
+const buildResponseFormat = (settings?: Settings): ResponseFormatConfig | undefined => {
+  if (!settings?.enable_structured_json_schema || !settings?.is_valid_json_schema) {
+    return undefined;
+  }
+
+  if (!settings.structured_json_schema) {
+    return {
+      name: 'structured_response',
+    };
+  }
+
+  try {
+    const schema = typeof settings.structured_json_schema === 'string'
+      ? JSON.parse(settings.structured_json_schema)
+      : settings.structured_json_schema;
+
+    if (!schema || typeof schema !== 'object') {
+      return undefined;
+    }
+
+    return {
+      schema,
+      name: (schema as { title?: string }).title || 'structured_response',
+      description: (schema as { description?: string }).description,
+    };
+  } catch (error) {
+    console.error('Invalid structured_json_schema supplied to response format:', error);
+    return undefined;
+  }
+};
+
 export async function POST(req: Request) {
   const body = await req.json();
   const {
@@ -81,11 +130,17 @@ export async function POST(req: Request) {
     id,
     model,
     metadata,
-    // For initial prompt submission
+    // Legacy fields
     promptId,
     variables,
-    input: unstructuredInput
+    input,
   } = body;
+
+  const promptEnvelope = body.prompt ?? null;
+  const effectivePromptId = promptEnvelope?.id ?? promptId;
+  const promptVariables = promptEnvelope?.variables ?? variables;
+  const promptVersion = promptEnvelope?.version;
+  const unstructuredInput = input ?? body.unstructuredInput ?? null;
 
   const settings: Settings = body.settings;
   const authorization = req.headers.get('authorization');
@@ -117,16 +172,17 @@ export async function POST(req: Request) {
   // Determine the messages to use
   let finalMessages = messages;
   let deploymentModel = model;
+  let responseFormat = buildResponseFormat(settings);
 
   // If this is an initial prompt submission, fetch config and build messages
-  if (promptId) {
+  if (effectivePromptId) {
     try {
-      const promptConfig = await getPromptConfig(promptId, authorization, apiKey);
+      const promptConfig = await getPromptConfig(effectivePromptId, authorization, apiKey);
 
       // Build initial messages from prompt config
       finalMessages = buildInitialMessages(
         promptConfig,
-        variables,
+        promptVariables,
         unstructuredInput
       );
 
@@ -144,6 +200,8 @@ export async function POST(req: Request) {
           repeat_penalty: promptSettings.frequency_penalty ?? settings?.repeat_penalty,
           stop_strings: promptSettings.stop_sequences ?? settings?.stop_strings,
         });
+
+        responseFormat = buildResponseFormat(settings);
       }
     } catch (error) {
       return new Response(
@@ -156,42 +214,61 @@ export async function POST(req: Request) {
   const proxyOpenAI = createOpenAI({
     baseURL: metadata?.base_url || copyCodeApiBaseUrl,
     fetch: (input, init) => {
-      const request = {
-        ...init,
-        method: "POST",
-        headers: {
-          ...init?.headers,
+      let baseBody: Record<string, any> = {};
+      if (init?.body && typeof init.body === 'string') {
+        try {
+          baseBody = JSON.parse(init.body);
+        } catch (error) {
+          console.error('Failed to parse OpenAI request body:', error);
+        }
+      }
+
+      const requestHeaders = {
+        ...normalizeHeaders(init?.headers),
           'project-id': metadata?.project_id,
           ...(authorization && { 'Authorization': authorization }),
           ...(apiKey && { 'api-key': apiKey }),
           'X-Forwarded-For': clientIp,
           'X-Real-IP': xRealIp || clientIp,
           'X-Original-Client-IP': clientIp,
-          'X-Playground-Client-IP': xForwardedFor || xRealIp || cfConnectingIp || trueClientIp || 'unknown'
+          'X-Playground-Client-IP': xForwardedFor || xRealIp || cfConnectingIp || trueClientIp || 'unknown',
+          'Content-Type': 'application/json',
+        };
+
+      const requestBody: Record<string, any> = {
+        ...baseBody,
+        id,
+        session_id: id,
+        stream_options: {
+          include_usage: true,
         },
-        body: JSON.stringify({
-          id,
-          messages: finalMessages,
-          model: deploymentModel,
-          session_id: id,
-          "stream_options": {
-            "include_usage": true
-          },
-          "stream": true,
-          max_completion_tokens: settings?.limit_response_length ? settings?.sequence_length : undefined,
-          frequency_penalty: settings?.repeat_penalty ? settings.repeat_penalty : undefined,
-          stop: settings?.stop_strings ? settings.stop_strings : undefined,
-          temperature: settings?.temperature ? settings.temperature : undefined,
-          extra_body: {
-            "guided_json": settings?.enable_structured_json_schema && settings?.is_valid_json_schema ? settings?.structured_json_schema : undefined,
-            "guided_decoding_backend": "outlines"
-          }
-        })
       };
-      return fetch(input, request);
+
+      if (responseFormat) {
+        requestBody.text = {
+          ...(requestBody.text || {}),
+          format: responseFormat.schema ? {
+            type: 'json_schema',
+            strict: true,
+            name: responseFormat.name,
+            description: responseFormat.description,
+            schema: responseFormat.schema,
+          } : { type: 'json_object' }
+        };
+      }
+
+      return fetch(input, {
+        ...init,
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify(requestBody),
+      });
     }
   });
 
+  const maxTokens = settings?.limit_response_length ? settings?.sequence_length : undefined;
+  const temperature = typeof settings?.temperature === 'number' ? settings.temperature : undefined;
+  const topP = typeof settings?.top_p_sampling === 'number' ? settings.top_p_sampling : undefined;
   const startTime = Date.now();
   let ttft = 0;
   const itls: number[] = [];
@@ -199,9 +276,18 @@ export async function POST(req: Request) {
 
   return createDataStreamResponse({
     execute: dataStream => {
+      console.log('[prompt-chat] invoking OpenAI responses API', {
+        deploymentModel,
+        messageCount: finalMessages?.length ?? 0,
+        hasResponseFormat: Boolean(responseFormat),
+      });
+
       const result = streamText({
-        model: proxyOpenAI(deploymentModel),
+        model: proxyOpenAI.responses(deploymentModel),
         messages: finalMessages,
+        maxTokens,
+        temperature,
+        topP,
         experimental_transform: smoothStream({ delayInMs: 50 }),
         onChunk({ chunk }) {
           const current_time = Date.now();
