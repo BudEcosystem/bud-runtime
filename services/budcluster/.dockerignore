@@ -30,6 +30,7 @@ docs/
 # Development
 .env
 .env.*
+.venv
 !.env.sample
 *.log
 .vscode

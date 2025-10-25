@@ -367,6 +367,258 @@
       when: aibrix_needs_deployment | default(true)
       ignore_errors: true
 
+    # Prometheus Stack Deployment Section
+    - name: Check if Prometheus is already deployed
+      kubernetes.core.helm_info:
+        name: "{{ prometheus_release_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: prometheus_helm_info
+      ignore_errors: true
+
+    - name: Check Prometheus pods status
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - app.kubernetes.io/name=prometheus
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: prometheus_pods_check
+      ignore_errors: true
+      when: prometheus_helm_info is succeeded
+
+    - name: Determine Prometheus deployment action
+      set_fact:
+        prometheus_needs_deployment: >-
+          {{ prometheus_helm_info.failed or
+             prometheus_helm_info.status is not defined or
+             prometheus_helm_info.status.status | default('') != 'deployed' or
+             prometheus_pods_check.resources | default([]) | selectattr('status.phase', 'ne', 'Running') | list | length > 0 or
+             force_reinstall_components or
+             update_existing_components }}
+
+    - name: Skip Prometheus if already deployed and healthy
+      debug:
+        msg: "Prometheus stack is already deployed and healthy. Skipping deployment."
+      when:
+        - not prometheus_needs_deployment | default(false)
+        - skip_healthy_components
+
+    - name: Update Prometheus chart dependencies
+      shell: helm dependency update "{{ prometheus_chart_path }}"
+      when: prometheus_needs_deployment | default(true)
+
+    - name: Deploy Prometheus Stack from local chart
+      kubernetes.core.helm:
+        release_name: "{{ prometheus_release_name }}"
+        chart_ref: "{{ prometheus_chart_path }}"
+        release_namespace: "{{ namespace }}"
+        create_namespace: true
+        atomic: true
+        wait: true
+        wait_timeout: "{{ helm_timeout }}"
+        force: "{{ force_reinstall_components | default(false) }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        values:
+          kube-prometheus-stack:
+            prometheus:
+              enabled: true
+              prometheusSpec:
+                externalLabels:
+                  cluster: "{{ cluster_id | default('unknown-cluster') }}"
+                  cluster_name: "{{ cluster_name | default('') }}"
+                # Remote write disabled - metrics collected via pull mechanism
+                # remoteWrite: []
+                retention: "{{ prometheus_retention | default('24h') }}"
+                resources:
+                  requests:
+                    memory: "{{ prometheus_memory_request | default('1Gi') }}"
+                    cpu: "{{ prometheus_cpu_request | default('250m') }}"
+                  limits:
+                    memory: "{{ prometheus_memory_limit | default('2Gi') }}"
+                    cpu: "{{ prometheus_cpu_limit | default('500m') }}"
+                storageSpec:
+                  volumeClaimTemplate:
+                    spec:
+                      accessModes: ["ReadWriteOnce"]
+                      resources:
+                        requests:
+                          storage: "{{ prometheus_storage_size | default('20Gi') }}"
+                serviceMonitorSelectorNilUsesHelmValues: false
+                podMonitorSelectorNilUsesHelmValues: false
+                ruleSelectorNilUsesHelmValues: false
+            prometheus-node-exporter:
+              enabled: true
+              service:
+                port: 9100
+                targetPort: 9100
+              resources:
+                requests:
+                  memory: "32Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "64Mi"
+                  cpu: "100m"
+            kube-state-metrics:
+              enabled: true
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "200m"
+            grafana:
+              enabled: false
+            alertmanager:
+              enabled: false
+      when: prometheus_needs_deployment | default(true)
+
+    - name: Wait for Prometheus StatefulSet to be ready
+      kubernetes.core.k8s_info:
+        kind: StatefulSet
+        namespace: "{{ namespace }}"
+        name: "prometheus-{{ prometheus_release_name }}-kube-prometheu-prometheus"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: prometheus_statefulset
+      retries: 6
+      delay: 10
+      until: >
+        prometheus_statefulset.resources is defined and
+        prometheus_statefulset.resources | length > 0 and
+        prometheus_statefulset.resources[0].status.readyReplicas is defined and
+        prometheus_statefulset.resources[0].status.readyReplicas > 0
+      when: prometheus_needs_deployment | default(true)
+      ignore_errors: true
+
+    - name: Check Prometheus StatefulSet status
+      debug:
+        msg: >
+          Prometheus status:
+          {{ 'Ready' if (prometheus_statefulset.resources[0].status.readyReplicas | default(0)) > 0 else 'Not Ready - check pod events for details' }}
+      when: prometheus_needs_deployment | default(true)
+
+    - name: Wait for node-exporter DaemonSet to be ready
+      kubernetes.core.k8s_info:
+        kind: DaemonSet
+        namespace: "{{ namespace }}"
+        name: "{{ prometheus_release_name }}-prometheus-node-exporter"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: node_exporter_daemonset
+      retries: 6
+      delay: 10
+      until: >
+        node_exporter_daemonset.resources is defined and
+        node_exporter_daemonset.resources | length > 0 and
+        node_exporter_daemonset.resources[0].status.numberReady is defined and
+        node_exporter_daemonset.resources[0].status.numberReady > 0
+      when: prometheus_needs_deployment | default(true)
+      ignore_errors: true
+
+    - name: Check node-exporter status
+      debug:
+        msg: >
+          Node Exporter status:
+          {{ 'Ready on ' + (node_exporter_daemonset.resources[0].status.numberReady | string) + ' nodes' if (node_exporter_daemonset.resources[0].status.numberReady | default(0)) > 0 else 'Not Ready - check pod events for details' }}
+      when: prometheus_needs_deployment | default(true)
+
+    # Deploy DCGM Exporter for GPU metrics if GPUs are detected
+    - name: Deploy DCGM Exporter for GPU metrics
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: dcgm-exporter
+            namespace: "{{ namespace }}"
+            labels:
+              app: dcgm-exporter
+          spec:
+            type: ClusterIP
+            ports:
+              - name: metrics
+                port: 9400
+                targetPort: 9400
+                protocol: TCP
+            selector:
+              app: dcgm-exporter
+      when:
+        - has_nvidia_gpus | default(false)
+        - prometheus_needs_deployment | default(true)
+
+    - name: Create DCGM Exporter DaemonSet
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: DaemonSet
+          metadata:
+            name: dcgm-exporter
+            namespace: "{{ namespace }}"
+          spec:
+            selector:
+              matchLabels:
+                app: dcgm-exporter
+            template:
+              metadata:
+                labels:
+                  app: dcgm-exporter
+              spec:
+                nodeSelector:
+                  nvidia.com/gpu.present: "true"
+                containers:
+                  - name: dcgm-exporter
+                    image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.0-3.2.0-ubuntu20.04
+                    ports:
+                      - name: metrics
+                        containerPort: 9400
+                    securityContext:
+                      runAsNonRoot: false
+                      runAsUser: 0
+                      capabilities:
+                        add:
+                          - SYS_ADMIN
+                    volumeMounts:
+                      - name: pod-gpu-resources
+                        mountPath: /var/lib/kubelet/pod-resources
+                        readOnly: true
+                volumes:
+                  - name: pod-gpu-resources
+                    hostPath:
+                      path: /var/lib/kubelet/pod-resources
+      when:
+        - has_nvidia_gpus | default(false)
+        - prometheus_needs_deployment | default(true)
+
+    - name: Create ServiceMonitor for DCGM Exporter
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: monitoring.coreos.com/v1
+          kind: ServiceMonitor
+          metadata:
+            name: dcgm-exporter
+            namespace: "{{ namespace }}"
+            labels:
+              app: dcgm-exporter
+          spec:
+            selector:
+              matchLabels:
+                app: dcgm-exporter
+            endpoints:
+              - port: metrics
+                interval: 30s
+                path: /metrics
+      when:
+        - has_nvidia_gpus | default(false)
+        - prometheus_needs_deployment | default(true)
+
     # Wait for NFD to label nodes
     - name: Wait for NFD to label nodes
       kubernetes.core.k8s_info:
@@ -397,11 +649,20 @@
           - GPU Operator: {{ 'Deployed' if has_nvidia_gpus | default(false) else 'Not needed' }}
           - Intel Device Plugin: {{ 'Deployed' if has_intel_hpus | default(false) else 'Not needed' }}
           - Aibrix Components: {{ 'Deployed' if aibrix_needs_deployment | default(true) else 'Already exists' }}
+          - Prometheus Stack: {{ 'Deployed' if prometheus_needs_deployment | default(true) else 'Already exists' }}
+          - DCGM Exporter: {{ 'Deployed' if (has_nvidia_gpus | default(false) and prometheus_needs_deployment | default(true)) else 'Not needed' }}
+
+          Monitoring Status:
+          - Prometheus collecting metrics from all nodes
+          - Node Exporter monitoring hardware resources
+          - Prometheus endpoint available for metrics collection
+          {{ '- GPU metrics collection enabled via DCGM Exporter' if has_nvidia_gpus | default(false) else '' }}
 
           Next Steps:
           - Use get_node_info.yaml to retrieve hardware information
           - NFD labels will be automatically updated every 60 seconds
           - Aibrix autoscaler and model adapters are ready for use
+          - Hardware metrics are being collected by Prometheus for pull-based collection
 
   post_tasks:
     - name: Cleanup kubeconfig file

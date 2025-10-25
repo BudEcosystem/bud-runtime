@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "antd";
+import { Button, Flex } from "antd";
 import * as echarts from "echarts";
 
 import {
   Text_10_400_EEEEEE,
   Text_12_400_757575,
   Text_12_400_EEEEEE,
+  Text_13_400_tag,
   Text_14_400_757575,
   Text_14_400_EEEEEE,
   Text_16_400_EEEEEE,
@@ -142,7 +143,7 @@ const SingleGuageChart = ({ data }: { data: SingleGuageChartData }) => {
       {/* <Text className='block absolute m-auto bottom-3 left-[50%] top-auto p-0 text-xs text-[#6A6E76] font-light h-[1rem] leading-[100%]'>{barChartData?.label2}</Text> */}
       <div className="absolute flex justify-between items-center w-full px-[6%] mt-[-0.35rem]">
         <Text_12_400_EEEEEE>0</Text_12_400_EEEEEE>
-        <Text_12_400_EEEEEE>99</Text_12_400_EEEEEE>
+        <Text_12_400_EEEEEE>100</Text_12_400_EEEEEE>
       </div>
       <div className="absolute flex flex-col justify-center items-center w-full px-[14%] mt-[-2.15rem]">
         <Text_12_400_EEEEEE>{data.data?.toFixed(2)} %</Text_12_400_EEEEEE>
@@ -159,7 +160,8 @@ function CompareGraph({ data }: { data: SingleGuageChartData }) {
     <div className="flex flex-col justify-start items-center w-[12.2%]">
       <div className="max-w-[5.5rem]">
         <Text_12_400_757575 className="text-center">
-          {data.label1} vs {data.label2}
+          {data.label1}
+          {/* vs {data.label2} */}
         </Text_12_400_757575>
       </div>
       <div className="w-full h-[60px] 1680px:h-[72px] 1920px:h-[80px] 4k:h-[100px]">
@@ -177,36 +179,48 @@ const NodeRow = ({ ip, data }: { data: Node; ip: string }) => {
     { name: "HPU", color: "#D1B854", hide: !data?.gpu },
     { name: "GPU", color: "#D1B854", hide: !data?.gpu },
     { name: ip, color: "#965CDE" },
-    {
-      name: data?.events_count > 1 ? "High" : "Low",
-      color: data?.events_count > 1 ? "#EC7575" : "#479D5F",
-    },
+    // {
+    //   name: data?.events_count > 1 ? "High" : "Low",
+    //   color: data?.events_count > 1 ? "#EC7575" : "#479D5F",
+    // },
   ]?.filter((item) => !item.hide);
   const chartData: SingleGuageChartData[] = [
-    {
-      barColor: "#479D5F",
-      text: data.pods.current + " Pods",
-      data: (data.pods.current / data.pods.max) * 100,
-      label1: "Available",
-      label2: "Allocatable",
-    },
+    // {
+    //   barColor: "#479D5F",
+    //   text: data.pods.current + " Pods",
+    //   data: (data.pods.current / data.pods.max) * 100,
+    //   label1: "Available",
+    //   label2: "Allocatable",
+    // },
     {
       barColor: "#D1B854",
       text: data.cpu.current + " CPU",
       data: (data.cpu.current / data.cpu.capacity) * 100,
-      label1: "Requests",
-      label2: "Allocatable",
+      label1: "CPU",
+      label2: "",
     },
     {
       barColor: "#479D5F",
       text: data.memory.current + " GiB",
       data: (data.memory.current / data.memory.capacity) * 100,
-      label1: "Memory Req.",
-      label2: "Allocatable",
+      label1: "Memory",
+      label2: "",
     },
+    // Add GPU gauge
+    ...(data.gpu ? [{
+      barColor: "#965CDE",  // Purple color for GPU
+      text: data.gpu.capacity + " GPU" + (data.gpu.capacity !== 1 ? "s" : ""),
+      data: data.gpu.capacity > 0 ? 100 : 0,  // Show full bar if GPUs exist
+      label1: "GPU",
+      label2: "",
+    }] : [{
+      barColor: "#666666",  // Gray color for N/A
+      text: "N/A",
+      data: 0,
+      label1: "GPU",
+      label2: "",
+    }]),
   ];
-
-  const statusProgress = data.status === "Ready" ? 100 : 0;
 
   return (
     <div className="group flex justify-start items-start border-b-[2px] border-b-[#111111] border-t-[2px] border-t-[transparent] hover:border-t-[#3e3e3e] hover:border-b-[#3e3e3e] pt-[1rem]  pb-[.65rem]">
@@ -214,9 +228,9 @@ const NodeRow = ({ ip, data }: { data: Node; ip: string }) => {
         <div className="flex justify-start items-center">
           <div>
             <Text_16_400_EEEEEE>{data.hostname}</Text_16_400_EEEEEE>
-            <Text_14_400_757575 className="mt-[.1rem]">
+            {/* <Text_14_400_757575 className="mt-[.1rem]">
               {data.system_info.os}
-            </Text_14_400_757575>
+            </Text_14_400_757575> */}
           </div>
         </div>
         <div className="flex flex-wrap justify-start items-start gap-x-[.4rem] gap-y-[.4rem] mt-[.6rem] ">
@@ -231,24 +245,26 @@ const NodeRow = ({ ip, data }: { data: Node; ip: string }) => {
           ))}
         </div>
       </div>
-      <div className="flex flex-col justify-between items-center w-[8%]">
-        <div className="max-w-[5rem]">
+      <div className="flex flex-col justify-start items-center w-[8%]">
+        <div className="max-w-[5rem] mb-2">
           <Text_12_400_757575 className="text-center">
-            Node {data.status} Status
+            Node Status
           </Text_12_400_757575>
         </div>
-        <div className="flex justify-center items-baseline mt-[.6rem] mb-[.7rem]">
-          <Text_14_400_EEEEEE>{statusProgress}</Text_14_400_EEEEEE>
-          <Text_10_400_EEEEEE>%</Text_10_400_EEEEEE>
-        </div>
-        <div className="flex justify-start items-start gap-[.25rem]">
-          {Array.from({ length: statusProgress / 10 }).map((_, index) => (
-            <div
-              key={index}
-              className="h-[1.5rem] w-[0.25rem] bg-[#479D5F]"
-            ></div>
-          ))}
-        </div>
+        <Flex
+          style={{
+            backgroundColor: data.status === "Ready" ? "#122F1140" : "#861A1A33"
+          }}
+          className="rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]"
+        >
+          <Text_13_400_tag
+            style={{
+              color: data.status === "Ready" ? "#479D5F" : "#EC7575"
+            }}
+          >
+            {data.status}
+          </Text_13_400_tag>
+        </Flex>
       </div>
       {chartData.map((item, index) => (
         <CompareGraph key={index} data={item} />

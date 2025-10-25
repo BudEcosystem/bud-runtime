@@ -10,7 +10,7 @@ import {
   Text_20_400_FFFFFF,
 } from "@/components/ui/text";
 import { Image } from "antd";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Tags from "../components/DrawerTags";
 import CustomDropDown from "../components/CustomDropDown";
 import { ChevronDown } from "lucide-react";
@@ -20,6 +20,246 @@ import CustomPopover from "../components/customPopover";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useDrawer } from "src/hooks/useDrawer";
+
+type EndpointTemplate = {
+  id: string;
+  label: string;
+  defaultPath: string;
+  requiresFileUpload?: boolean;
+  buildPayload: (modelName?: string) => Record<string, unknown>;
+};
+
+type EndpointConfig = {
+  key: string;
+  label: string;
+  path: string;
+  payload: Record<string, unknown>;
+  requiresFileUpload?: boolean;
+};
+
+const ensureLeadingSlash = (path: string) => {
+  if (!path) {
+    return "";
+  }
+
+  return path.startsWith("/") ? path : `/${path}`;
+};
+
+const stripLeadingSlash = (path: string) =>
+  path.startsWith("/") ? path.slice(1) : path;
+
+const createLabelFromPath = (path: string) => {
+  const cleanPath = stripLeadingSlash(path);
+
+  if (!cleanPath) {
+    return "Endpoint";
+  }
+
+  return cleanPath
+    .split("/")
+    .map((segment) =>
+      segment
+        .replace(/[_-]/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase())
+    )
+    .join(" / ");
+};
+
+const documentsTemplate: EndpointTemplate = {
+  id: "documents",
+  label: "Documents",
+  defaultPath: "/v1/documents",
+  buildPayload: (modelName = "MODEL_NAME") => ({
+    model: modelName,
+    document: {
+      type: "document_url",
+      document_url: "https://example.com/document.pdf",
+    }
+    // prompt: "Summarize the document and extract key facts",
+  }),
+};
+
+const endpointTemplates: Record<string, EndpointTemplate> = {
+  chat: {
+    id: "chat",
+    label: "Chat Completions",
+    defaultPath: "/v1/chat/completions",
+    buildPayload: (modelName = "MODEL_NAME") => ({
+      model: modelName,
+      max_tokens: 256,
+      messages: [{ role: "user", content: "Summarize the given text" }],
+    }),
+  },
+  completions: {
+    id: "completions",
+    label: "Completions",
+    defaultPath: "/v1/completions",
+    buildPayload: (modelName = "MODEL_NAME") => ({
+      model: modelName,
+      prompt: "Once upon a time",
+      max_tokens: 256,
+    }),
+  },
+  embedding: {
+    id: "embedding",
+    label: "Embeddings",
+    defaultPath: "/v1/embeddings",
+    buildPayload: (modelName = "MODEL_NAME") => ({
+      model: modelName,
+      input: "Your text to embed",
+    }),
+  },
+  audio_transcription: {
+    id: "audio_transcription",
+    label: "Audio Transcriptions",
+    defaultPath: "/v1/audio/transcriptions",
+    requiresFileUpload: true,
+    buildPayload: (modelName = "MODEL_NAME") => ({
+      model: modelName,
+      file: "@/path/to/audio.mp3",
+      response_format: "json",
+    }),
+  },
+  audio_speech: {
+    id: "audio_speech",
+    label: "Text To Speech",
+    defaultPath: "/v1/audio/speech",
+    buildPayload: (modelName = "MODEL_NAME") => ({
+      model: modelName,
+      input: "Text to convert to speech",
+      voice: "alloy",
+    }),
+  },
+  image_generation: {
+    id: "image_generation",
+    label: "Image Generations",
+    defaultPath: "/v1/images/generations",
+    buildPayload: (modelName = "MODEL_NAME") => ({
+      model: modelName,
+      prompt: "A cute baby sea otter",
+      n: 1,
+      size: "1024x1024",
+    }),
+  },
+  documents: documentsTemplate,
+  document: documentsTemplate,
+};
+
+const templateList = Array.from(new Set(Object.values(endpointTemplates)));
+
+const getTemplateByPath = (path: string) => {
+  const normalized = ensureLeadingSlash(path);
+
+  return templateList.find(
+    (template) => ensureLeadingSlash(template.defaultPath) === normalized
+  );
+};
+
+const joinBaseWithPath = (base: string, path: string) => {
+  if (!base) {
+    return stripLeadingSlash(path);
+  }
+
+  const normalizedBase = base.endsWith("/") ? base : `${base}/`;
+  const normalizedPath = stripLeadingSlash(path);
+
+  return `${normalizedBase}${normalizedPath}`;
+};
+
+const generateCurlCommand = (apiUrl: string, config?: EndpointConfig) => {
+  if (!config) {
+    return "";
+  }
+
+  if (config.requiresFileUpload || config.path.includes("audio/transcriptions")) {
+    const payload = config.payload;
+    const fileValue = payload.file;
+    const filePath =
+      typeof fileValue === "string"
+        ? fileValue.replace(/^@/, "")
+        : "/path/to/audio.mp3";
+    const restEntries = Object.entries(payload).filter(
+      ([key]) => key !== "file"
+    );
+    const restLines = restEntries
+      .map(([key, value], index) => {
+        const formattedValue =
+          value === undefined || value === null
+            ? ""
+            : typeof value === "string"
+            ? value
+            : JSON.stringify(value);
+        const continuation = index === restEntries.length - 1 ? "" : " \\\n";
+
+        return `  --form '${key}="${formattedValue}"'${continuation}`;
+      })
+      .join("");
+    const restSection = restLines ? ` \\\n${restLines}` : "";
+
+    return `curl --location '${apiUrl}' \\\n  --header 'Authorization: Bearer {API_KEY_HERE}' \\\n  --form 'file=@"${filePath}"'${restSection}`;
+  }
+
+  return `curl --location '${apiUrl}' \\\n  --header 'Authorization: Bearer {API_KEY_HERE}' \\\n  --header 'Content-Type: application/json' \\\n  --data '${JSON.stringify(config.payload, null, 2)}'`;
+};
+
+const generatePythonCode = (apiUrl: string, config?: EndpointConfig) => {
+  if (!config) {
+    return "";
+  }
+
+  if (config.requiresFileUpload || config.path.includes("audio/transcriptions")) {
+    const payload = config.payload;
+    const fileValue = payload.file;
+    const filePath =
+      typeof fileValue === "string"
+        ? fileValue.replace(/^@/, "")
+        : "/path/to/audio.mp3";
+    const formEntries = Object.entries(payload).filter(
+      ([key]) => key !== "file"
+    );
+    const dataBlock = formEntries.length
+      ? `{\n${formEntries
+          .map(
+            ([key, value]) => `  '${key}': ${JSON.stringify(value)}`
+          )
+          .join(",\n")}\n}`
+      : "{}";
+
+    return `import requests\n\nurl = "${apiUrl}"\nfiles = {'file': open('${filePath}', 'rb')}\ndata = ${dataBlock}\nheaders = {\n  'Authorization': 'Bearer {API_KEY_HERE}'\n}\n\nresponse = requests.post(url, headers=headers, files=files, data=data)\nprint(response.text)`;
+  }
+
+  return `import requests\nimport json\n\nurl = "${apiUrl}"\npayload = json.dumps(${JSON.stringify(
+    config.payload,
+    null,
+    2
+  )})\nheaders = {\n  'Authorization': 'Bearer {API_KEY_HERE}',\n  'Content-Type': 'application/json'\n}\n\nresponse = requests.post(url, headers=headers, data=payload)\nprint(response.text)`;
+};
+
+const generateJavaScriptCode = (apiUrl: string, config?: EndpointConfig) => {
+  if (!config) {
+    return "";
+  }
+
+  if (config.requiresFileUpload || config.path.includes("audio/transcriptions")) {
+    const payload = config.payload;
+    const formEntries = Object.entries(payload).filter(
+      ([key]) => key !== "file"
+    );
+    const additionalFormLines = formEntries
+      .map(
+        ([key, value]) =>
+          `formData.append('${key}', ${JSON.stringify(value)});`
+      )
+      .join("\n");
+    const additionalSection = additionalFormLines
+      ? `${additionalFormLines}\n`
+      : "";
+
+    return `const formData = new FormData();\nformData.append('file', fileInput.files[0]); // fileInput is your file input element\n${additionalSection}\nfetch('${apiUrl}', {\n  method: 'POST',\n  headers: {\n    'Authorization': 'Bearer {API_KEY_HERE}'\n  },\n  body: formData\n})\n.then(response => response.json())\n.then(data => console.log(data))\n.catch(error => console.error('Error:', error));`;
+  }
+
+  return `const data = ${JSON.stringify(config.payload, null, 2)};\n\nfetch('${apiUrl}', {\n  method: 'POST',\n  headers: {\n    'Authorization': 'Bearer {API_KEY_HERE}',\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify(data)\n})\n.then(response => response.json())\n.then(data => console.log(data))\n.catch(error => console.error('Error:', error));`;
+};
 
 export default function UseModel() {
   const { drawerProps } = useDrawer();
@@ -42,262 +282,209 @@ export default function UseModel() {
     },
   ];
 
-  // Function to get the appropriate endpoint and payload based on model type
-  const getEndpointConfig = () => {
-    // Get model name from various sources
-    const modelName =
-      drawerProps?.endpoint?.name || drawerProps?.name || clusterDetails?.name;
+  const modelNameForPayload =
+    drawerProps?.endpoint?.model?.name ||
+    drawerProps?.endpoint?.name ||
+    drawerProps?.name ||
+    clusterDetails?.model?.name ||
+    clusterDetails?.name ||
+    "MODEL_NAME";
 
-    // Get supported endpoints from drawerProps.endpoint (from endpoints list API) or fallback to model supported_endpoints
-    const endpointSupportedEndpoints =
-      drawerProps?.endpoint?.supported_endpoints; // This is an array from the endpoints API
-    const modelSupportedEndpoints =
-      drawerProps?.endpoint?.model?.supported_endpoints ||
-      clusterDetails?.model?.supported_endpoints; // This is an object from model data
+  const endpointSupportedEndpoints = drawerProps?.endpoint?.supported_endpoints;
+  const modelSupportedEndpoints =
+    drawerProps?.endpoint?.model?.supported_endpoints ||
+    clusterDetails?.model?.supported_endpoints;
 
-    // Default to chat endpoint
-    let endpoint = "v1/chat/completions";
-    let payloadExample: any = {
-      model: modelName,
-      max_tokens: 256,
-      messages: [{ role: "user", content: "Summarize the given text" }],
+  const endpointConfigs = useMemo<EndpointConfig[]>(() => {
+    const configsMap = new Map<string, EndpointConfig>();
+
+    const registerTemplate = (
+      template: EndpointTemplate,
+      overridePath?: string | null
+    ) => {
+      const targetPath = overridePath || template.defaultPath;
+      const normalizedPath = ensureLeadingSlash(`${targetPath}`);
+
+      if (!normalizedPath || configsMap.has(normalizedPath)) {
+        return;
+      }
+
+      configsMap.set(normalizedPath, {
+        key: normalizedPath,
+        label: template.label,
+        path: normalizedPath,
+        payload: template.buildPayload(modelNameForPayload),
+        requiresFileUpload: template.requiresFileUpload,
+      });
     };
 
-    // First check the endpoints array from the API response
-    if (
-      endpointSupportedEndpoints &&
-      Array.isArray(endpointSupportedEndpoints)
-    ) {
-      // The API returns an array of endpoint paths like ["/v1/embeddings", "/v1/chat/completions"]
-      if (endpointSupportedEndpoints.includes("/v1/embeddings")) {
-        endpoint = "v1/embeddings";
-        payloadExample = {
-          model: modelName,
-          input: "Your text to embed",
-        };
-      } else if (
-        endpointSupportedEndpoints.includes("/v1/audio/transcriptions")
-      ) {
-        endpoint = "v1/audio/transcriptions";
-        payloadExample = {
-          model: modelName,
-          file: "@/path/to/audio.mp3",
-          response_format: "json",
-        };
-      } else if (endpointSupportedEndpoints.includes("/v1/audio/speech")) {
-        endpoint = "v1/audio/speech";
-        payloadExample = {
-          model: modelName,
-          input: "Text to convert to speech",
-          voice: "alloy",
-        };
-      } else if (
-        endpointSupportedEndpoints.includes("/v1/images/generations")
-      ) {
-        endpoint = "v1/images/generations";
-        payloadExample = {
-          model: modelName,
-          prompt: "A cute baby sea otter",
-          n: 1,
-          size: "1024x1024",
-        };
-      } else if (endpointSupportedEndpoints.includes("/v1/completions")) {
-        endpoint = "v1/completions";
-        payloadExample = {
-          model: modelName,
-          prompt: "Once upon a time",
-          max_tokens: 256,
-        };
-      } else if (endpointSupportedEndpoints.includes("/v1/chat/completions")) {
-        endpoint = "v1/chat/completions";
+    const registerPath = (pathValue?: unknown) => {
+      if (!pathValue) {
+        return;
       }
-    }
-    // Fallback to model supported endpoints object structure
-    else if (modelSupportedEndpoints) {
-      // Check for embedding endpoint
-      if (modelSupportedEndpoints.embedding?.enabled) {
-        endpoint = modelSupportedEndpoints.embedding.path || "v1/embeddings";
-        payloadExample = {
-          model: modelName,
-          input: "Your text to embed",
-        };
+
+      const normalizedPath = ensureLeadingSlash(`${pathValue}`);
+
+      if (!normalizedPath || configsMap.has(normalizedPath)) {
+        return;
       }
-      // Check for audio transcription endpoint
-      else if (modelSupportedEndpoints.audio_transcription?.enabled) {
-        endpoint =
-          modelSupportedEndpoints.audio_transcription.path ||
-          "v1/audio/transcriptions";
-        payloadExample = {
-          model: modelName,
-          file: "@/path/to/audio.mp3",
-          response_format: "json",
-        };
-      }
-      // Check for text-to-speech endpoint
-      else if (modelSupportedEndpoints.audio_speech?.enabled) {
-        endpoint =
-          modelSupportedEndpoints.audio_speech.path || "v1/audio/speech";
-        payloadExample = {
-          model: modelName,
-          input: "Text to convert to speech",
-          voice: "alloy",
-        };
-      }
-      // Check for image generation endpoint
-      else if (modelSupportedEndpoints.image_generation?.enabled) {
-        endpoint =
-          modelSupportedEndpoints.image_generation.path ||
-          "v1/images/generations";
-        payloadExample = {
-          model: modelName,
-          prompt: "A cute baby sea otter",
-          n: 1,
-          size: "1024x1024",
-        };
-      }
-      // Default to chat if it's enabled
-      else if (modelSupportedEndpoints.chat?.enabled) {
-        endpoint = modelSupportedEndpoints.chat.path || "v1/chat/completions";
-      }
+
+      const template = getTemplateByPath(normalizedPath);
+
+      configsMap.set(normalizedPath, {
+        key: normalizedPath,
+        label: template?.label ?? createLabelFromPath(normalizedPath),
+        path: normalizedPath,
+        payload:
+          template?.buildPayload(modelNameForPayload) ?? {
+            model: modelNameForPayload,
+          },
+        requiresFileUpload: template?.requiresFileUpload,
+      });
+    };
+
+    if (Array.isArray(endpointSupportedEndpoints)) {
+      endpointSupportedEndpoints.forEach((pathValue) => {
+        registerPath(pathValue);
+      });
     }
 
-    return { endpoint, payloadExample };
-  };
+    if (modelSupportedEndpoints && typeof modelSupportedEndpoints === "object") {
+      Object.entries(modelSupportedEndpoints).forEach(([key, value]) => {
+        if (!value) {
+          return;
+        }
 
-  const { endpoint, payloadExample } = getEndpointConfig();
-  // Use the base URL from environment variable, not the one with /v1/chat/completions appended
+        const template = endpointTemplates[key];
+
+        if (
+          typeof value === "object" &&
+          value !== null &&
+          ("path" in value || "enabled" in value)
+        ) {
+          const typedValue = value as { enabled?: boolean; path?: string | null };
+          const isEnabled =
+            typedValue.enabled === undefined ? true : Boolean(typedValue.enabled);
+
+          if (!isEnabled) {
+            return;
+          }
+
+          if (template) {
+            registerTemplate(template, typedValue.path ?? undefined);
+          } else if (typedValue.path) {
+            registerPath(typedValue.path);
+          }
+        } else if (template) {
+          registerTemplate(template);
+        }
+      });
+    }
+
+    if (!configsMap.size) {
+      registerTemplate(endpointTemplates.chat);
+    }
+
+    return Array.from(configsMap.values());
+  }, [
+    endpointSupportedEndpoints,
+    modelSupportedEndpoints,
+    modelNameForPayload,
+  ]);
+
+  const [selectedEndpointKey, setSelectedEndpointKey] = useState<string>(
+    endpointConfigs[0]?.key || ""
+  );
+
+  useEffect(() => {
+    if (!endpointConfigs.length) {
+      setSelectedEndpointKey("");
+      return;
+    }
+
+    const hasCurrent = endpointConfigs.some(
+      (config) => config.key === selectedEndpointKey
+    );
+
+    if (!hasCurrent) {
+      setSelectedEndpointKey(endpointConfigs[0].key);
+    }
+  }, [endpointConfigs, selectedEndpointKey]);
+
+  const selectedEndpoint = useMemo(
+    () =>
+      endpointConfigs.find((config) => config.key === selectedEndpointKey) ||
+      endpointConfigs[0],
+    [endpointConfigs, selectedEndpointKey]
+  );
+
   const baseUrl =
     process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL ||
     process.env.NEXT_PUBLIC_BASE_URL ||
     "";
-  const apiUrl = `${baseUrl.replace( /\/+$/, '')}/${endpoint}`;
+  const apiUrl = selectedEndpoint
+    ? joinBaseWithPath(baseUrl, selectedEndpoint.path)
+    : baseUrl;
 
-  const generateCurlCommand = () => {
-    // Special handling for audio transcription (file upload)
-    if (endpoint.includes("audio/transcriptions")) {
-      return `curl --location '${apiUrl}' \\
-  --header 'Authorization: Bearer {API_KEY_HERE}' \\
-  --form 'file=@"/path/to/audio.mp3"' \\
-  --form 'model="${payloadExample.model}"' \\
-  --form 'response_format="json"'`;
-    }
-
-    // Standard JSON payload
-    return `curl --location '${apiUrl}' \\
-  --header 'Authorization: Bearer {API_KEY_HERE}' \\
-  --header 'Content-Type: application/json' \\
-  --data '${JSON.stringify(payloadExample, null, 2)}'`;
-  };
-
-  const generatePythonCode = () => {
-    // Special handling for audio transcription (file upload)
-    if (endpoint.includes("audio/transcriptions")) {
-      return `import requests
-
-url = "${apiUrl}"
-files = {'file': open('/path/to/audio.mp3', 'rb')}
-data = {
-  'model': '${payloadExample.model}',
-  'response_format': 'json'
-}
-headers = {
-  'Authorization': 'Bearer {API_KEY_HERE}'
-}
-
-response = requests.post(url, headers=headers, files=files, data=data)
-print(response.text)`;
-    }
-
-    // Standard JSON payload
-    return `import requests
-import json
-
-url = "${apiUrl}"
-payload = json.dumps(${JSON.stringify(payloadExample, null, 2)})
-headers = {
-  'Authorization': 'Bearer {API_KEY_HERE}',
-  'Content-Type': 'application/json'
-}
-
-response = requests.post(url, headers=headers, data=payload)
-print(response.text)`;
-  };
-
-  const generateJavaScriptCode = () => {
-    // Special handling for audio transcription (file upload)
-    if (endpoint.includes("audio/transcriptions")) {
-      return `const formData = new FormData();
-formData.append('file', fileInput.files[0]); // fileInput is your file input element
-formData.append('model', '${payloadExample.model}');
-formData.append('response_format', 'json');
-
-fetch('${apiUrl}', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer {API_KEY_HERE}'
-  },
-  body: formData
-})
-.then(response => response.json())
-.then(data => console.log(data))
-.catch(error => console.error('Error:', error));`;
-    }
-
-    // Standard JSON payload
-    return `const data = ${JSON.stringify(payloadExample, null, 2)};
-
-fetch('${apiUrl}', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer {API_KEY_HERE}',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify(data)
-})
-.then(response => response.json())
-.then(data => console.log(data))
-.catch(error => console.error('Error:', error));`;
-  };
-
-  const codeSnippets = {
-    curl: generateCurlCommand(),
-    python: generatePythonCode(),
-    javascript: generateJavaScriptCode(),
-  };
+  const codeSnippets = useMemo(
+    () => ({
+      curl: generateCurlCommand(apiUrl, selectedEndpoint),
+      python: generatePythonCode(apiUrl, selectedEndpoint),
+      javascript: generateJavaScriptCode(apiUrl, selectedEndpoint),
+    }),
+    [apiUrl, selectedEndpoint]
+  );
 
   const [selectedCode, setSelectedCode] = useState("curl");
-  const [selectedText, setSelectedText] = useState(codeSnippets[selectedCode]);
+  const [selectedText, setSelectedText] = useState(
+    codeSnippets["curl"] ?? ""
+  );
   const [copyText, setCopiedText] = useState<string>("Copy");
 
-  // Update selected text when endpoint changes
   useEffect(() => {
-    setSelectedText(codeSnippets[selectedCode]);
-  }, [endpoint, selectedCode]);
+    setSelectedText(codeSnippets[selectedCode] ?? "");
+  }, [codeSnippets, selectedCode]);
 
   const selectType = async (type: string) => {
-    const text = codeSnippets[type];
     setSelectedCode(type);
-    setSelectedText(text);
+    setSelectedText(codeSnippets[type] ?? "");
   };
 
   const handleCopy = (text: string) => {
     navigator.clipboard
       .writeText(text)
       .then(() => {
-        // message.success('Text copied to clipboard!');
         setCopiedText("Copied..");
       })
       .catch(() => {
-        // message.error('Failed to copy text.');
         setCopiedText("Failed to copy");
       });
   };
 
   useEffect(() => {
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       setCopiedText("Copy");
     }, 3000);
+
+    return () => clearTimeout(timeout);
   }, [copyText]);
+
+  const endpointDropdownItems = endpointConfigs.map((config) => ({
+    key: config.key,
+    label: (
+      <div className="flex flex-col">
+        {/* <Text_12_400_EEEEEE>{config.label}</Text_12_400_EEEEEE> */}
+        <Text_12_400_EEEEEE>{(config.path)}</Text_12_400_EEEEEE>
+      </div>
+    ),
+    onClick: () => setSelectedEndpointKey(config.key),
+  }));
+
+  const selectedEndpointLabel =
+    selectedEndpoint?.label ?? endpointTemplates.chat.label;
+  const selectedEndpointPath =
+    selectedEndpoint?.path ?? endpointTemplates.chat.defaultPath;
+  const selectedEndpointPathDisplay = selectedEndpointPath;
 
   return (
     <BudForm data={{}}>
@@ -312,7 +499,7 @@ fetch('${apiUrl}', {
                     clusterDetails?.name}
                 </div>
               </div>
-              <div className="flex items-center justify-start gap-[.5rem] mt-[.3rem] flex-wrap	">
+              <div className="flex items-center justify-start gap-[.5rem] mt-[.3rem] flex-wrap">
                 {tags.map((item, index) => (
                   <Tags key={index} name={item.name} color={item.color} />
                 ))}
@@ -330,36 +517,58 @@ fetch('${apiUrl}', {
                 Copy the code below and use it for deployment
               </Text_12_400_757575>
             </div>
-            <div className="pt-[1.4rem]">
-              <CustomDropDown
-                Placement="bottomLeft"
-                buttonContent={
-                  <div className="border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[1.75rem] flex items-center justify-center px-[.6rem]">
-                    <Text_12_600_EEEEEE className="flex items-center justify-center">
-                      {selectedCode.charAt(0).toUpperCase() +
-                        selectedCode.slice(1)}
-                    </Text_12_600_EEEEEE>
-                    <ChevronDown className="w-[1rem] text-[#EEEEEE] text-[.75rem] ml-[.15rem]" />
-                  </div>
-                }
-                items={[
-                  {
-                    key: "1",
-                    label: <Text_12_400_EEEEEE>Curl</Text_12_400_EEEEEE>,
-                    onClick: () => selectType("curl"),
-                  },
-                  {
-                    key: "2",
-                    label: <Text_12_400_EEEEEE>Python</Text_12_400_EEEEEE>,
-                    onClick: () => selectType("python"),
-                  },
-                  {
-                    key: "3",
-                    label: <Text_12_400_EEEEEE>JavaScript</Text_12_400_EEEEEE>,
-                    onClick: () => selectType("javascript"),
-                  },
-                ]}
-              />
+            <div className="pt-[1.4rem] flex flex-row gap-[1rem] items-start">
+              <div className="flex-1">
+                <CustomDropDown
+                  isDisabled={endpointConfigs.length <= 1}
+                  Placement="bottomLeft"
+                  buttonContent={
+                    <div className="border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-h-[2.25rem] flex items-center justify-between w-full px-[.75rem] py-[.5rem]">
+                      <div className="flex flex-col items-start text-left">
+                        {/* <Text_12_600_EEEEEE className="leading-[1.1]">
+                          {selectedEndpointLabel}
+                        </Text_12_600_EEEEEE> */}
+                        <Text_12_600_EEEEEE className="leading-[1.1]">
+                          {selectedEndpointPathDisplay}
+                        </Text_12_600_EEEEEE>
+                      </div>
+                      <ChevronDown className="w-[1rem] text-[#EEEEEE] text-[.75rem]" />
+                    </div>
+                  }
+                  items={endpointDropdownItems}
+                />
+              </div>
+              <div className="flex-shrink-0">
+                <CustomDropDown
+                  Placement="bottomLeft"
+                  buttonContent={
+                    <div className="border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[2.25rem] flex items-center justify-center px-[.75rem] py-[.5rem]">
+                      <Text_12_600_EEEEEE className="flex items-center justify-center">
+                        {selectedCode.charAt(0).toUpperCase() +
+                          selectedCode.slice(1)}
+                      </Text_12_600_EEEEEE>
+                      <ChevronDown className="w-[1rem] text-[#EEEEEE] text-[.75rem] ml-[.15rem]" />
+                    </div>
+                  }
+                  items={[
+                    {
+                      key: "1",
+                      label: <Text_12_400_EEEEEE>Curl</Text_12_400_EEEEEE>,
+                      onClick: () => selectType("curl"),
+                    },
+                    {
+                      key: "2",
+                      label: <Text_12_400_EEEEEE>Python</Text_12_400_EEEEEE>,
+                      onClick: () => selectType("python"),
+                    },
+                    {
+                      key: "3",
+                      label: <Text_12_400_EEEEEE>JavaScript</Text_12_400_EEEEEE>,
+                      onClick: () => selectType("javascript"),
+                    },
+                  ]}
+                />
+              </div>
             </div>
             <div className="custom-code rounded-[8px] relative bg-[#FFFFFF08] mt-[1.5rem] w-full overflow-hidden">
               <CustomPopover
@@ -379,19 +588,9 @@ fetch('${apiUrl}', {
                   />
                 </div>
               </CustomPopover>
-              {/* <MemoizedMarkdown content={selectedText} id={"code-block"} /> */}
-              {/* <pre className="ibm text-[.75rem] text-[#EEEEEE] whitespace-pre-wrap">
-                {selectedText}
-              </pre> */}
               <div className="markdown-body">
                 {" "}
-                {/* optional styling */}
-                <SyntaxHighlighter
-                  language="bash"
-                  // dark, oneDark, dracula, atomDark, coldarkDark, materialDark, vs, vscDarkPlus
-                  style={oneDark}
-                  showLineNumbers
-                >
+                <SyntaxHighlighter language="bash" style={oneDark} showLineNumbers>
                   {selectedText.replace(/^```[\w]*\n/, "").replace(/```$/, "")}
                 </SyntaxHighlighter>
               </div>

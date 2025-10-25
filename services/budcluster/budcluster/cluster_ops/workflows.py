@@ -277,8 +277,6 @@ class RegisterClusterWorkflow:
             # Update cluster status to NOT_AVAILABLE on configuration failure
             try:
                 from ..commons.constants import ClusterStatusEnum
-                from ..db.crud import ClusterDataManager
-                from ..db.session import DBSession
 
                 workflow_data = get_workflow_data_from_statestore(str(workflow_id))
                 cluster_id = workflow_data.get("cluster_id") if workflow_data else None
@@ -1347,8 +1345,8 @@ class RegisterClusterWorkflow:
                 ),
             ]
 
-            # Set standard ETA for on-prem deployments (3 minutes)
-            eta = 600  # 60 seconds = 1 minute
+            # Set standard ETA for on-prem deployments (10 minutes)
+            eta = 10
         # Schedule the workflow
         response = await dapr_workflows.schedule_workflow(
             workflow_name="register_cluster",

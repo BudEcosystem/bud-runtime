@@ -2,8 +2,11 @@ name: "BudPrompt: Build and Push Docker Image on Release"
 
 on:
   workflow_dispatch:
-  release:
-    types: [created]
+    inputs:
+      release_tag:
+        description: 'Release version (e.g., 0.25.0)'
+        required: true
+        type: string
 
 jobs:
   build-and-push:
@@ -22,17 +25,12 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract tag name
-        id: extract_tag
-        run: |
-          RAW_TAG="${GITHUB_REF#refs/tags/}"
-          CLEAN_TAG="${RAW_TAG#v}"
-          echo "RELEASE_TAG=$CLEAN_TAG" >> "$GITHUB_ENV"
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./services/budprompt
           push: true
           file: ./services/budprompt/deploy/Dockerfile
-          tags: budstudio/budprompt:${{ env.RELEASE_TAG }}
+          tags: |
+            budstudio/budprompt:${{ inputs.release_tag }}
+            budstudio/budprompt:latest

@@ -3,6 +3,7 @@ import { Table, Popover } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { Text_12_400_EEEEEE } from "@/components/ui/text";
 import ProjectTags from "src/flows/components/ProjectTags";
+import { formatDate } from "@/utils/formatDate";
 
 interface CurrentMetricItem {
     evaluation: string;
@@ -130,7 +131,7 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
                         year: "numeric",
                     },
                 );
-                return <Text_12_400_EEEEEE>{formattedDate}</Text_12_400_EEEEEE>;
+                return <Text_12_400_EEEEEE>{formatDate(date)}</Text_12_400_EEEEEE>;
             },
             sorter: (a, b) =>
                 new Date(a.last_run).getTime() - new Date(b.last_run).getTime(),
