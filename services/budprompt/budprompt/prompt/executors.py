@@ -712,22 +712,23 @@ class SimplePromptExecutor:
                     output_schema,
                 )
 
-                # NOTE: all_messages_json() method getting error when serialize data.
-                # Serialize and save result using the serializer
+                # Serialize to debug file using custom serializer (for debugging)
                 serializer = PydanticResultSerializer()
                 serialized_result = serializer.serialize(result)
-
                 with open("latest_pydantic.json", "w") as fp:
                     fp.write(serialized_result.model_dump_json(indent=4))
 
-                # Format to OpenAI response for non-streaming
-                return await self.response_formatter.format_response(
+                # Format to official OpenAI Response
+                openai_response = await self.response_formatter.format_response(
                     pydantic_result=result,
                     model_settings=model_settings,
                     messages=messages,
                     deployment_name=deployment_name,
                     tools=tools,
+                    output_schema=output_schema,
                 )
+
+                return openai_response
 
         except (SchemaGenerationException, ValidationError, PromptExecutionException, TemplateRenderingException):
             raise
