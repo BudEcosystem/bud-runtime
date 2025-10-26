@@ -17,6 +17,8 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
   const [inputSchema, setInputSchema] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isHovered, setIsHovered] = useState<boolean>(false);
+  const [promptVersion, setPromptVersion] = useState<string | undefined>();
+  const [promptDeployment, setPromptDeployment] = useState<string | undefined>();
 
   // Fetch prompt configurations on mount
   useEffect(() => {
@@ -30,12 +32,32 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
         const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
 
         if (config && config.data) {
+          const version =
+            config.data?.version ?? config.data?.prompt?.version ?? undefined;
+          setPromptVersion(
+            version !== undefined && version !== null ? String(version) : undefined
+          );
+
+          setPromptDeployment(
+            typeof config.data?.deployment_name === 'string'
+              ? config.data.deployment_name
+              : undefined
+          );
+
           // Handle JSON schema format - extract properties from $defs
-          let schemaToUse: any = config.data.input_schema || {};
+          let schemaToUse: any = config.data.input_schema ?? null;
 
           // If it's a JSON schema with $defs, flatten it for the form
-          if (schemaToUse.$defs && schemaToUse.$defs.InputSchema) {
+          if (schemaToUse && schemaToUse.$defs && schemaToUse.$defs.InputSchema) {
             schemaToUse = schemaToUse.$defs.InputSchema.properties || {};
+          }
+
+          if (
+            schemaToUse &&
+            typeof schemaToUse === 'object' &&
+            Object.keys(schemaToUse).length === 0
+          ) {
+            schemaToUse = null;
           }
 
           setInputSchema(schemaToUse);
@@ -47,11 +69,21 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
               const field = schemaToUse[key];
               initialData[key] = field?.default || '';
             });
+          } else {
+            initialData['unstructuredSchema'] = '';
           }
           setFormData(initialData);
+        } else {
+          setInputSchema(null);
+          setFormData({ unstructuredSchema: '' });
+          setPromptVersion(undefined);
         }
       } catch (error) {
         console.error('Error fetching prompt config:', error);
+        setInputSchema(null);
+        setFormData({ unstructuredSchema: '' });
+        setPromptVersion(undefined);
+        setPromptDeployment(undefined);
       } finally {
         setLoading(false);
       }
@@ -76,7 +108,30 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
     }
 
     const promptId = promptIds[0];
-    let promptData: any;
+
+    const payload: {
+      prompt: {
+        id: string;
+        version?: string;
+        variables?: Record<string, any>;
+      };
+      input?: string;
+      model?: string;
+      promptId?: string;
+      variables?: Record<string, any>;
+    } = {
+      prompt: {
+        id: promptId,
+      },
+      promptId,
+    };
+
+    if (promptVersion) {
+      payload.prompt.version = promptVersion;
+    }
+    if (promptDeployment) {
+      payload.model = promptDeployment;
+    }
 
     // Check if it's structured or unstructured input
     if (inputSchema && Object.keys(inputSchema).length > 0) {
@@ -88,20 +143,17 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
         }
       });
 
-      promptData = {
-        promptId,
-        variables
-      };
+      if (Object.keys(variables).length > 0) {
+        payload.prompt.variables = variables;
+        payload.variables = variables;
+      }
     } else {
       // Unstructured input - send input field
-      promptData = {
-        promptId,
-        input: formData['unstructuredSchema'] || ''
-      };
+      payload.input = formData['unstructuredSchema'] || '';
     }
 
     // Pass the prompt data to parent to initiate chat
-    onSubmit(promptData);
+    onSubmit(payload);
   };
 
   const renderInput = (fieldName: string, fieldSchema: any) => {

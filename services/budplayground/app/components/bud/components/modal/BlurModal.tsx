@@ -27,7 +27,6 @@ export default function BlurModal(props: BlurModalProps) {
       <Modal
         rootClassName=""
         open={props.open}
-        onClose={props.onClose}
         classNames={{
         content: "!p-0 !bg-transparent border-0",
       }}
