@@ -32,11 +32,16 @@ from openai.types.responses.response_input_item import (
     FunctionCallOutput,
 )
 from openai.types.responses.response_input_item import (
+    McpCall as ResponseInputMcpCall,  # MCP tool call/return for instructions field
+)
+from openai.types.responses.response_input_item import (
     Message as ResponseInputMessage,  # Use alias to avoid conflict with local Message class
 )
 from openai.types.responses.response_input_text import ResponseInputText
 from openai.types.responses.response_output_item import (
-    McpCall,
+    McpCall as ResponseOutputMcpCall,  # MCP tool call for output field
+)
+from openai.types.responses.response_output_item import (
     McpListTools,
     McpListToolsTool,
 )
@@ -78,6 +83,10 @@ __all__ = [
 class OpenAIResponseFormatter:
     """Formatter for converting pydantic-ai responses to OpenAI format."""
 
+    def __init__(self) -> None:
+        """Initialize the formatter with tool call arguments mapper."""
+        self._tool_call_args_map: Dict[str, str] = {}
+
     async def format_response(
         self,
         pydantic_result: AgentRunResult[Any],
@@ -106,11 +115,12 @@ class OpenAIResponseFormatter:
             # Get messages from pydantic-ai result
             all_messages = pydantic_result.all_messages()
 
-            # Extract output items using official types
-            output_items = await self._format_output_items(all_messages, tools)
+            # Extract output items using official types and get MCP tool call IDs
+            output_items, mcp_tool_call_ids = await self._format_output_items(all_messages, tools)
 
             # Extract input items (system prompts, user prompts, tool returns, retry prompts)
-            input_items = await self._format_input_items(all_messages)
+            # Pass MCP tool call IDs to identify MCP tool returns
+            input_items = await self._format_input_items(all_messages, mcp_tool_call_ids, tools)
 
             # Get usage information
             usage = self._format_usage(pydantic_result.usage())
@@ -157,7 +167,7 @@ class OpenAIResponseFormatter:
         self,
         all_messages: List[ModelMessage],
         tools: Optional[List[MCPToolConfig]] = None,
-    ) -> List[Any]:
+    ) -> tuple[List[Any], set]:
         """Convert pydantic-ai messages to OpenAI ResponseOutputItem list.
 
         Args:
@@ -165,16 +175,20 @@ class OpenAIResponseFormatter:
             tools: MCP tool configurations for server_label mapping
 
         Returns:
-            List of ResponseOutputItem (union of message, tool calls, reasoning, etc.)
+            Tuple of (List of ResponseOutputItem, set of MCP tool call IDs)
         """
         output_items: List[Any] = []
+        mcp_tool_call_ids: set = set()
 
         # Step 1: Fetch and add MCP tool lists at the beginning
         mcp_list_items = await self._fetch_mcp_tool_lists(tools)
         if mcp_list_items:
             output_items.extend(mcp_list_items)
 
-        # Step 2: Build tool returns lookup
+        # Step 2: Build MCP tool names set for efficient lookup
+        mcp_tool_names = self._build_mcp_tool_names_set(tools)
+
+        # Step 3: Build tool returns lookup
         tool_returns = self._build_tool_returns_lookup(all_messages)
 
         # Step 3: Process messages in chronological order
@@ -218,20 +232,24 @@ class OpenAIResponseFormatter:
                                 )
                             )
 
-                    # ToolCallPart → McpCall or ResponseFunctionToolCall
+                    # ToolCallPart → ResponseOutputMcpCall or ResponseFunctionToolCall
                     elif isinstance(part, ToolCallPart):
-                        # Check if this is an MCP tool
-                        server_label = self._get_server_label_for_tool(part.tool_name, tools)
+                        # Store tool call arguments for later use (ALL tool calls - MCP and regular)
+                        self._tool_call_args_map[part.tool_call_id] = part.args_as_json_str()
 
-                        if server_label:
-                            # MCP tool call
+                        # Check if this is an MCP tool using the tool names set
+                        if part.tool_name in mcp_tool_names:
+                            # MCP tool call - track ID and get server label
+                            mcp_tool_call_ids.add(part.tool_call_id)
+                            server_label = self._get_server_label_for_tool(part.tool_name, tools)
                             return_data = tool_returns.get(part.tool_call_id)
+
                             output_items.append(
-                                McpCall(
+                                ResponseOutputMcpCall(
                                     id=part.tool_call_id,
                                     type="mcp_call",
                                     name=part.tool_name,
-                                    server_label=server_label,
+                                    server_label=server_label or "unknown",
                                     arguments=part.args_as_json_str(),
                                     status="completed" if return_data else "in_progress",
                                     output=return_data.get("content") if return_data else None,
@@ -250,11 +268,13 @@ class OpenAIResponseFormatter:
                                 )
                             )
 
-        return output_items
+        return output_items, mcp_tool_call_ids
 
     async def _format_input_items(
         self,
         all_messages: List[ModelMessage],
+        mcp_tool_call_ids: set,
+        tools: Optional[List[MCPToolConfig]] = None,
     ) -> List[Any]:
         """Convert pydantic-ai ModelRequest messages to OpenAI ResponseInputItem list.
 
@@ -262,6 +282,8 @@ class OpenAIResponseFormatter:
 
         Args:
             all_messages: All messages from pydantic-ai result (ModelMessage objects)
+            mcp_tool_call_ids: Set of tool call IDs that are MCP tools
+            tools: MCP tool configurations for server_label mapping
 
         Returns:
             List of ResponseInputItem (system prompts, user prompts, tool returns, retry prompts)
@@ -305,19 +327,38 @@ class OpenAIResponseFormatter:
                             )
                         )
 
-                    # ToolReturnPart → FunctionCallOutput
+                    # ToolReturnPart → ResponseInputMcpCall or FunctionCallOutput
                     elif isinstance(part, ToolReturnPart):
                         if not part.tool_call_id:
                             logger.warning(f"ToolReturnPart missing tool_call_id, skipping: {part.tool_name}")
                             continue
 
-                        input_items.append(
-                            FunctionCallOutput(
-                                type="function_call_output",
-                                call_id=part.tool_call_id,
-                                output=part.model_response_str(),
+                        # Check if this is an MCP tool return by checking tool_call_id
+                        if part.tool_call_id in mcp_tool_call_ids:
+                            # MCP tool return - get server label from tool name
+                            server_label = self._get_server_label_for_tool(part.tool_name, tools)
+                            # Get arguments from mapper (populated during _format_output_items)
+                            arguments = self._tool_call_args_map.get(part.tool_call_id, "{}")
+                            input_items.append(
+                                ResponseInputMcpCall(
+                                    id=part.tool_call_id,
+                                    type="mcp_call",
+                                    name=part.tool_name,
+                                    server_label=server_label or "unknown",
+                                    arguments=arguments,
+                                    output=part.model_response_str(),
+                                    status="completed",
+                                )
                             )
-                        )
+                        else:
+                            # Regular function call output
+                            input_items.append(
+                                FunctionCallOutput(
+                                    type="function_call_output",
+                                    call_id=part.tool_call_id,
+                                    output=part.model_response_str(),
+                                )
+                            )
 
                     # RetryPromptPart → ResponseInputMessage or FunctionCallOutput
                     elif isinstance(part, RetryPromptPart):
@@ -373,6 +414,25 @@ class OpenAIResponseFormatter:
 
         return tool_returns
 
+    def _build_mcp_tool_names_set(self, tools: Optional[List[MCPToolConfig]]) -> set:
+        """Build a set of all MCP tool names for fast lookup.
+
+        Args:
+            tools: List of MCP tool configurations
+
+        Returns:
+            Set of tool names that are MCP tools
+        """
+        if not tools:
+            return set()
+
+        mcp_tool_names = set()
+        for tool_config in tools:
+            if tool_config.type == "mcp":
+                mcp_tool_names.update(tool_config.allowed_tool_names)
+
+        return mcp_tool_names
+
     def _get_server_label_for_tool(self, tool_name: str, tools: Optional[List[MCPToolConfig]] = None) -> Optional[str]:
         """Get server_label for a tool if it's an MCP tool.
 
@@ -387,7 +447,7 @@ class OpenAIResponseFormatter:
             return None
 
         for tool_config in tools:
-            if tool_config.type == "mcp" and tool_name in tool_config.allowed_tools:
+            if tool_config.type == "mcp" and tool_name in tool_config.allowed_tool_names:
                 return tool_config.server_label
 
         return None
