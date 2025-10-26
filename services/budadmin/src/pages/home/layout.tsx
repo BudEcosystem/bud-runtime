@@ -179,6 +179,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       icon: '/icons/guard.png',
       iconWhite: '/icons/guardWhite.png',
       cmd: "10",
+      hide: !enableDevMode,
     },
   ]
 
