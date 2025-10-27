@@ -368,6 +368,29 @@ class EvaluationWorkflow:
 
             return
 
+        # Look if all the jobs are failed
+        if (
+            (not monitoring_result.get("completed_jobs") or len(monitoring_result.get("completed_jobs", [])) == 0)
+            and monitoring_result.get("failed_jobs")
+            and len(monitoring_result.get("failed_jobs", [])) > 0
+        ):
+            # All jobs failed - no successful completions
+            failed_job_ids = monitoring_result.get("failed_jobs", [])
+            notification_req.payload.event = "monitor_eval_job_progress"
+            notification_req.payload.content = NotificationContent(
+                title="All Evaluation Jobs Failed",
+                message=f"All {len(failed_job_ids)} evaluation job(s) failed. Failed job IDs: {', '.join(failed_job_ids)}",
+                status=WorkflowStatus.FAILED,
+            )
+            dapr_workflows.publish_notification(
+                workflow_id=instance_id,
+                notification=notification_req,
+                target_topic_name=evaluate_model_request_json.source_topic,
+                target_name=evaluate_model_request_json.source,
+            )
+
+            return
+
         # Notify that all jobs are completed
         notification_req.payload.event = "monitor_eval_job_progress"
         notification_req.payload.content = NotificationContent(
@@ -412,7 +435,10 @@ class EvaluationWorkflow:
         if extraction_result.get("success"):
             update_workflow_data_in_statestore(
                 instance_id,
-                {"extraction_results": extraction_result.get("results", []), "extraction_status": "completed"},
+                {
+                    "extraction_results": extraction_result.get("results", []),
+                    "extraction_status": "completed",
+                },
             )
 
             # Build results summary for notification
