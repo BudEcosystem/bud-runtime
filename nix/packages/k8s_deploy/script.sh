@@ -28,9 +28,12 @@ is_nixos() {
 
 dir_ensure() {
 	if [ -d "$bud_repo_local" ]; then
-		git -C "$bud_repo_local" stash push || exit 1
+		output="$(git -C "$bud_repo_local" stash push)" || exit 1
 		git -C "$bud_repo_local" pull || exit 1
-		git -C "$bud_repo_local" stash pop || exit 1
+
+		if ! echo "$output" | grep -q 'No local changes to save'; then
+			git -C "$bud_repo_local" stash pop || exit 1
+		fi
 	else
 		git clone "$bud_repo" "$bud_repo_local" || exit 1
 	fi
@@ -54,6 +57,9 @@ k8s_is_installed() {
 k3s_install() {
 	curl -sfL https://get.k3s.io | sh -
 	export KUBECONFIG="$k3s_kubeconfig_path"
+}
+k8s_clusterrole_exists() {
+	kubectl get clusterrole "$1" >/dev/null 2>&1
 }
 k8s_ensure() {
 	if ! k8s_is_installed; then
@@ -89,8 +95,13 @@ helm_install() {
 		"$@"
 }
 helm_ensure() {
-	helm_install keel -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
-	helm_install dapr
+	if ! k8s_clusterrole_exists keel; then
+		helm_install keel -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
+	fi
+
+	if ! k8s_clusterrole_exists dapr-placement; then
+		helm_install dapr
+	fi
 
 	vim "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
 	helm_install bud \
@@ -99,6 +110,10 @@ helm_ensure() {
 }
 
 nvidia_ensure() {
+	if k8s_clusterrole_exists nvidia-operator-validator; then
+		return
+	fi
+
 	if ! lspci | grep NVIDIA -q >/dev/null 2>&1; then
 		die "No Nvidia devices detected"
 	fi
@@ -124,6 +139,18 @@ nvidia_ensure() {
 		$flags
 }
 
+traefik_ensure() {
+	if k8s_clusterrole_exists traefik-kube-system; then
+		return
+	fi
+
+	helm repo add traefik https://traefik.github.io/charts
+	helm upgrade \
+		--install \
+		-n traefik --create-namespace \
+		traefik traefik/traefik
+}
+
 ##########
 ## MAIN ##
 ##########
@@ -132,6 +159,7 @@ case "$1" in
 runtime)
 	dir_ensure
 	k8s_ensure
+	traefik_ensure
 	helm_ensure
 	;;
 nvidia)
