@@ -139,6 +139,18 @@ nvidia_ensure() {
 		$flags
 }
 
+traefik_ensure() {
+	if k8s_clusterrole_exists traefik-kube-system; then
+		return
+	fi
+
+	helm repo add traefik https://traefik.github.io/charts
+	helm upgrade \
+		--install \
+		-n traefik --create-namespace \
+		traefik traefik/traefik
+}
+
 ##########
 ## MAIN ##
 ##########
@@ -147,6 +159,7 @@ case "$1" in
 runtime)
 	dir_ensure
 	k8s_ensure
+	traefik_ensure
 	helm_ensure
 	;;
 nvidia)
