@@ -3859,10 +3859,10 @@ class EvaluationWorkflowService:
                 raise ClientException(f"No runs found for evaluation {eval_id}")
             # Update the status of all runs to failed
             for run in runs:
-                run.status = RunStatus.FAILED
+                run.status = RunStatusEnum.FAILED.value
 
             # Update the eval status to failed
-            evaluation.status = EvaluationStatus.FAILED
+            evaluation.status = EvaluationStatusEnum.FAILED.value
 
             self.session.commit()
 
