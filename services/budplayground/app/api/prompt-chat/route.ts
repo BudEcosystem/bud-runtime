@@ -1,6 +1,6 @@
 import { smoothStream, streamText, createDataStreamResponse } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { apiBaseUrl, copyCodeApiBaseUrl, tempApiBaseUrl } from '@/app/lib/environment';
+import { resolveGatewayBaseUrl } from '@/app/lib/gateway';
 import { Settings } from '@/app/types/chat';
 import axios from 'axios';
 // Allow streaming responses up to 30 seconds
@@ -84,23 +84,6 @@ const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
     return Object.fromEntries(headers);
   }
   return { ...(headers as Record<string, string>) };
-};
-
-const resolveBaseUrl = (metadataBase?: string | null) => {
-  const fallback =
-    process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL ||
-    process.env.NEXT_PUBLIC_TEMP_API_BASE_URL ||
-    process.env.NEXT_PUBLIC_BASE_URL ||
-    process.env.BUD_GATEWAY_BASE_URL ||
-    'http://localhost:8000';
-
-  return (
-    metadataBase ||
-    copyCodeApiBaseUrl ||
-    tempApiBaseUrl ||
-    apiBaseUrl ||
-    fallback
-  );
 };
 
 interface ResponseFormatConfig {
@@ -229,7 +212,7 @@ export async function POST(req: Request) {
   }
 
   const proxyOpenAI = createOpenAI({
-    baseURL: resolveBaseUrl(metadata?.base_url),
+    baseURL: resolveGatewayBaseUrl(metadata?.base_url),
     fetch: (input, init) => {
       let baseBody: Record<string, any> = {};
       if (init?.body && typeof init.body === 'string') {
