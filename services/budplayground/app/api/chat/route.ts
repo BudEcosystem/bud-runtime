@@ -1,7 +1,7 @@
 // import { openai } from '@ai-sdk/openai';
 import { smoothStream, streamText, createDataStreamResponse, generateId } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { copyCodeApiBaseUrl, tempApiBaseUrl } from '@/app/lib/environment';
+import { resolveGatewayBaseUrl } from '@/app/lib/gateway';
 import { Settings } from '@/app/types/chat';
 
 // Allow streaming responses up to 30 seconds
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
 
   const proxyOpenAI = createOpenAI({
     // custom settings, e.g.
-    baseURL: metadata.base_url || copyCodeApiBaseUrl,
+    baseURL: resolveGatewayBaseUrl(metadata.base_url),
     fetch: (input, init) => {
       let baseBody: Record<string, any> = {};
       if (init?.body && typeof init.body === 'string') {
