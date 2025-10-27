@@ -34,3 +34,5 @@ jobs:
           tags: |
             budstudio/budadmin:${{ inputs.release_tag }}
             budstudio/budadmin:latest
+          # Note: NEXT_PUBLIC_ENABLE_DEV_MODE defaults to false for production releases
+          # Dev features (Prompts, Evaluations, Guard Rails) will be hidden
