@@ -28,9 +28,12 @@ is_nixos() {
 
 dir_ensure() {
 	if [ -d "$bud_repo_local" ]; then
-		git -C "$bud_repo_local" stash push || exit 1
+		output="$(git -C "$bud_repo_local" stash push)" || exit 1
 		git -C "$bud_repo_local" pull || exit 1
-		git -C "$bud_repo_local" stash pop || exit 1
+
+		if ! echo "$output" | grep -q 'No local changes to save'; then
+			git -C "$bud_repo_local" stash pop || exit 1
+		fi
 	else
 		git clone "$bud_repo" "$bud_repo_local" || exit 1
 	fi
