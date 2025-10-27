@@ -22,6 +22,12 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional, Type, Union
 
+from openai.types.responses import (
+    ResponseCompletedEvent,
+    ResponseCreatedEvent,
+    ResponseFailedEvent,
+    ResponseInProgressEvent,
+)
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
@@ -31,13 +37,11 @@ from pydantic_ai.messages import (
     ModelResponse,
     SystemPromptPart,
     TextPart,
-    ThinkingPart,
-    ToolCallPart,
     UserPromptPart,
 )
 from pydantic_ai.models.openai import ModelSettings as OpenAIModelSettings
 from pydantic_ai.output import NativeOutput
-from pydantic_ai.run import AgentRunResult
+from pydantic_ai.run import AgentRunResult, AgentRunResultEvent
 
 from budprompt.commons.exceptions import (
     PromptExecutionException,
@@ -702,6 +706,7 @@ class SimplePromptExecutor:
                         deployment_name,
                         model_settings,
                         messages,
+                        tools,
                     )
             else:
                 # Execute the agent with both history and current prompt
@@ -1087,8 +1092,12 @@ class SimplePromptExecutor:
         deployment_name: str,
         model_settings: ModelSettings,
         messages: List[Message],
+        tools: Optional[List[MCPToolConfig]] = None,
     ) -> AsyncGenerator[str, None]:
-        """Run agent with OpenAI-compatible streaming.
+        """Run agent with OpenAI-compatible streaming using run_stream_events().
+
+        This implementation uses pydantic-ai's run_stream_events() which executes
+        the agent to completion (including all tool calls) while streaming events.
 
         Args:
             agent: Configured AI agent
@@ -1098,98 +1107,143 @@ class SimplePromptExecutor:
             deployment_name: Model deployment name for response metadata
             model_settings: Model settings for response metadata
             messages: Original input messages for response metadata
+            tools: Optional list of tool configurations (MCP, etc.)
 
         Yields:
             SSE-formatted string chunks matching OpenAI Responses API format
         """
-        # Initialize OpenAI streaming formatter
+        # Initialize OpenAI streaming formatter (handles all event mapping and response building)
         formatter = OpenAIStreamingFormatter(
-            deployment_name=deployment_name, model_settings=model_settings, messages=messages
+            deployment_name=deployment_name,
+            model_settings=model_settings,
+            messages=messages,
+            tools=tools,
         )
 
         try:
+            # Build instructions from messages
+            instructions = formatter.build_instructions_from_messages(messages)
+
             # EVENT 1: response.created (sequence 0)
-            yield formatter.format_response_created()
+            yield formatter.format_sse_from_event(
+                ResponseCreatedEvent(
+                    type="response.created",
+                    sequence_number=formatter._next_sequence(),
+                    response=formatter.build_response_object(
+                        status="in_progress",
+                        instructions=instructions,
+                    ),
+                )
+            )
 
             # EVENT 2: response.in_progress (sequence 1)
-            yield formatter.format_response_in_progress()
+            yield formatter.format_sse_from_event(
+                ResponseInProgressEvent(
+                    type="response.in_progress",
+                    sequence_number=formatter._next_sequence(),
+                    response=formatter.build_response_object(
+                        status="in_progress",
+                        instructions=instructions,
+                    ),
+                )
+            )
 
-            # EVENT 3: response.output_item.added (sequence 2)
-            yield formatter.format_output_item_added()
+            # EVENTS 3+: MCP tool lists (if any MCP tools configured)
+            if tools:
+                async for mcp_event in formatter.fetch_and_emit_mcp_tool_lists():
+                    yield mcp_event
 
-            # EVENT 4: response.content_part.added (sequence 3)
-            yield formatter.format_content_part_added()
+            # Track final result for usage
+            final_result = None
 
-            # Track final usage
+            # Stream events using run_stream_events()
+            async for event in agent.run_stream_events(user_prompt=user_prompt, message_history=message_history):
+                logger.debug(f"Received pydantic-ai event: {type(event).__name__}")
+
+                # Check if this is the final result event
+                if isinstance(event, AgentRunResultEvent):
+                    final_result = event.result
+                    logger.debug("Received final AgentRunResultEvent")
+                    continue  # Don't map this event, we'll handle completion separately
+
+                # Map pydantic-ai event to OpenAI events
+                openai_events = await formatter.map_event(event)
+
+                # Emit each OpenAI event as SSE
+                for openai_event in openai_events:
+                    yield formatter.format_sse_from_event(openai_event)
+
+            # Get final usage
             final_usage = None
+            if final_result and final_result.usage():
+                usage_info = final_result.usage()
+                request_tokens = getattr(usage_info, "request_tokens", 0)
+                response_tokens = getattr(usage_info, "response_tokens", 0)
+                total_tokens = getattr(usage_info, "total_tokens", 0)
+                details = getattr(usage_info, "details", {})
+                reasoning_tokens = details.get("reasoning_tokens", 0) if isinstance(details, dict) else 0
 
-            # Stream pydantic-ai responses
-            async with agent.run_stream(user_prompt=user_prompt, message_history=message_history) as stream_result:
-                logger.debug("Starting OpenAI-compatible streaming...")
+                final_usage = {
+                    "input_tokens": request_tokens,
+                    "input_tokens_details": {"cached_tokens": 0},
+                    "output_tokens": response_tokens,
+                    "output_tokens_details": {"reasoning_tokens": reasoning_tokens},
+                    "total_tokens": total_tokens,
+                }
 
-                async for message, last_message in stream_result.stream_structured():
-                    logger.debug(f"Received message type: {type(message)}, last_message: {last_message}")
+            # Explicit finalization before response.completed
+            # Since pydantic-ai only sends AgentRunResultEvent (not FinalResultEvent),
+            # we must explicitly finalize any in-progress outputs here.
 
-                    if isinstance(message, ModelResponse):
-                        # Update model name if available
-                        if message.model_name:
-                            formatter.update_model_name(message.model_name)
+            # Check if there's an active text output that needs finalization
+            # Even if text_part_started is False, we should finalize if current_text_item_id exists
+            if formatter.current_text_item_id and not formatter.text_part_started:
+                formatter.text_part_started = True  # Temporarily set to allow finalization
 
-                        # Process each part in the ModelResponse
-                        for part in message.parts:
-                            if isinstance(part, TextPart):
-                                # EVENTS 5+: response.output_text.delta (multiple)
-                                if part.content:
-                                    delta_event = formatter.format_output_text_delta(part.content)
-                                    if delta_event:  # Only yield if there's new content
-                                        yield delta_event
+            if formatter.text_part_started:
+                finalization_events = await formatter._finalize_text_output()
+                for event in finalization_events:
+                    yield formatter.format_sse_from_event(event)
 
-                            elif isinstance(part, ThinkingPart):
-                                # Handle reasoning/thinking streaming
-                                if part.content:
-                                    # First time seeing thinking? Emit .added event
-                                    if not formatter.reasoning_started:
-                                        yield formatter.format_reasoning_summary_part_added()
-                                        formatter.reasoning_started = True
+            # Same check for reasoning output
+            if formatter.current_reasoning_item_id and not formatter.reasoning_part_started:
+                formatter.reasoning_part_started = True
 
-                                    # Emit delta event for thinking content
-                                    delta_event = formatter.format_reasoning_summary_text_delta(part.content)
-                                    if delta_event:
-                                        yield delta_event
+            if formatter.reasoning_part_started:
+                finalization_events = await formatter._finalize_reasoning_output()
+                for event in finalization_events:
+                    yield formatter.format_sse_from_event(event)
 
-                                    # Also accumulate for final response.completed summary
-                                    formatter.add_thinking_content(part.content)
+            # Build complete output array from final result (includes MCP tools, calls, text)
+            if final_result:
+                output_items = await formatter.build_final_output_items_from_result(final_result, tools)
+            else:
+                output_items = formatter.build_final_output_items()  # Fallback to accumulated state
 
-                            elif isinstance(part, ToolCallPart):
-                                # TODO: Handle tool calls in future
-                                # Would emit response.function_call_arguments.delta
-                                logger.debug(f"Tool call detected: {part.tool_name} (not yet streamed)")
-
-                        # Capture final usage from last message
-                        if last_message and message.usage:
-                            final_usage = message.usage
-
-            # If we had reasoning, emit done events
-            if formatter.reasoning_started:
-                # REASONING EVENT 1: response.reasoning_summary_text.done
-                yield formatter.format_reasoning_summary_text_done()
-
-                # REASONING EVENT 2: response.reasoning_summary_part.done
-                yield formatter.format_reasoning_summary_part_done()
-
-            # EVENT N+1: response.output_text.done
-            yield formatter.format_output_text_done()
-
-            # EVENT N+2: response.content_part.done
-            yield formatter.format_content_part_done()
-
-            # EVENT N+3: response.output_item.done
-            yield formatter.format_output_item_done()
-
-            # EVENT N+4: response.completed (with usage)
-            yield formatter.format_response_completed(final_usage)
+            # FINAL EVENT: response.completed (with usage and complete response)
+            yield formatter.format_sse_from_event(
+                ResponseCompletedEvent(
+                    type="response.completed",
+                    sequence_number=formatter._next_sequence(),
+                    response=formatter.build_response_object(
+                        status="completed",
+                        instructions=instructions,
+                        output_items=output_items,
+                        usage=final_usage,
+                    ),
+                )
+            )
 
         except Exception as e:
             logger.error(f"Error during streaming: {str(e)}")
             # ERROR EVENT: response.failed
-            yield formatter.format_response_failed(str(e))
+            yield formatter.format_sse_from_event(
+                ResponseFailedEvent(
+                    type="response.failed",
+                    sequence_number=formatter._next_sequence(),
+                    response=formatter.build_response_object(
+                        status="failed",
+                        error={"code": "server_error", "message": str(e)},
+                    ),
+                )
+            )
