@@ -308,7 +308,7 @@ export async function POST(req: Request) {
             throughput: Number((response.usage.completionTokens / duration).toFixed(2)),
             itl: Math.round((itls.reduce((a, b) => a + b, 0) / itls.length)),
           });
-
+          console.log("console.complete")
           dataStream.writeData('call completed');
         },
       });
