@@ -3814,7 +3814,85 @@ class EvaluationWorkflowService:
             raise ClientException(f"Failed to trigger evaluations for experiment {experiment_id}: {e}")
 
     async def update_eval_run_status_from_notification(self, payload) -> None:
-        pass
+        from sqlalchemy import select
+
+        from budapp.commons.constants import NotificationTypeEnum
+        from budapp.core.schemas import NotificationResult
+        from budapp.shared.notification_service import (
+            BudNotifyService,
+            NotificationBuilder,
+        )
+
+        logger.warning("Evaluation Error")
+
+        try:
+            # Get workflow and steps
+            workflow_id = payload.workflow_id
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": workflow_id}
+            )
+            if not db_workflow:
+                logger.error(f"::EvalResult:: Workflow {workflow_id} not found for evaluation completion")
+                raise ClientException(f"Workflow {workflow_id} not found")
+
+            db_workflow = cast(WorkflowModel, db_workflow)
+            logger.warning(f"::EvalResult:: Workflow {db_workflow.id} found")
+
+            # Get the result from payload
+            eval_raw = payload.content.result.get("evaluation_id", None)
+
+            if not eval_raw:
+                logger.error(f"::EvalResult:: Evaluation ID not found for workflow {db_workflow.id}")
+                raise ClientException("Evaluation ID not found")  # if empty
+
+            eval_id = uuid.UUID(eval_raw)
+            # from one of the run , get the evaluation
+            evaluation = self.session.get(EvaluationModel, eval_id)
+            if not evaluation:
+                logger.error(f"::EvalResult:: Evaluation {eval_id} not found")
+                raise ClientException(f"Evaluation {eval_id} not found")
+
+            # Get all the runs associated with the evaluation
+            runs = self.session.query(RunModel).filter(RunModel.evaluation_id == eval_id).all()
+            if not runs:
+                logger.error(f"::EvalResult:: No runs found for evaluation {eval_id}")
+                raise ClientException(f"No runs found for evaluation {eval_id}")
+            # Update the status of all runs to failed
+            for run in runs:
+                run.status = RunStatus.FAILED
+
+            # Update the eval status to failed
+            evaluation.status = EvaluationStatus.FAILED
+
+            self.session.commit()
+
+            try:
+                notification_request = (
+                    NotificationBuilder()
+                    .set_content(
+                        title=evaluation.name,
+                        message=f"Evaluation {evaluation.status}",
+                        icon=None,
+                        result=NotificationResult(
+                            target_id=db_workflow.id,
+                            target_type="workflow",
+                        ).model_dump(exclude_none=True, exclude_unset=True),
+                    )
+                    .set_payload(
+                        workflow_id=str(db_workflow.id),
+                        type=NotificationTypeEnum.EVALUATION_FAILED.value,
+                    )
+                    .set_notification_request(subscriber_ids=[str(db_workflow.created_by)])
+                    .build()
+                )
+                await BudNotifyService().send_notification(notification_request)
+            except Exception as e:
+                logger.warning(f"::EvalResult:: Failed to send notification: {e}")
+
+        except Exception as e:
+            self.session.rollback()
+            logger.exception(f"::EvalResult:: Failed to handle evaluation completion event: {e}")
+            raise ClientException(f"::EvalResult:: Failed to process evaluation completion: {str(e)}")
 
     async def create_evaluation_from_notification_event(self, payload) -> None:
         """Create/update evaluation records from notification event.
