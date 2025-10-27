@@ -15,6 +15,7 @@ import NormalEditor from '@/app/components/bud/components/input/NormalEditor';
 import { useChatStore } from '@/app/store/chat';
 import SettingsList from './Settings';
 import PromptForm from './PromptForm';
+import { apiBaseUrl, copyCodeApiBaseUrl, tempApiBaseUrl } from '@/app/lib/environment';
 
 
 
@@ -42,11 +43,17 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     }
     const params = new URLSearchParams(window.location.search);
     const baseUrl = params.get('base_url');
+    const resolvedBaseUrl =
+      baseUrl ||
+      copyCodeApiBaseUrl ||
+      tempApiBaseUrl ||
+      apiBaseUrl ||
+      undefined;
     const baseBody = {
       model: chat?.selectedDeployment?.name,
       metadata: {
         project_id: chat?.selectedDeployment?.project?.id,
-        base_url: baseUrl,
+        base_url: resolvedBaseUrl,
       },
       settings: currentSettingPreset,
     };
