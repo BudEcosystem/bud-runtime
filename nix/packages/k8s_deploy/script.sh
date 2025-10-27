@@ -58,6 +58,9 @@ k3s_install() {
 	curl -sfL https://get.k3s.io | sh -
 	export KUBECONFIG="$k3s_kubeconfig_path"
 }
+k8s_clusterrole_exists() {
+	kubectl get clusterrole "$1" >/dev/null 2>&1
+}
 k8s_ensure() {
 	if ! k8s_is_installed; then
 		if is_nixos; then
@@ -92,8 +95,13 @@ helm_install() {
 		"$@"
 }
 helm_ensure() {
-	helm_install keel -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
-	helm_install dapr
+	if ! k8s_clusterrole_exists keel; then
+		helm_install keel -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
+	fi
+
+	if ! k8s_clusterrole_exists dapr-placement; then
+		helm_install dapr
+	fi
 
 	vim "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
 	helm_install bud \
@@ -102,6 +110,10 @@ helm_ensure() {
 }
 
 nvidia_ensure() {
+	if k8s_clusterrole_exists nvidia-operator-validator; then
+		return
+	fi
+
 	if ! lspci | grep NVIDIA -q >/dev/null 2>&1; then
 		die "No Nvidia devices detected"
 	fi
