@@ -21,6 +21,7 @@ from budapp.commons.constants import (
 from budapp.commons.exceptions import ClientException
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.eval_ops.models import (
+    EvalTag,
     Evaluation,
     EvaluationStatusEnum,
     ExpDatasetVersion,
@@ -101,6 +102,159 @@ from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 logger = logging.get_logger(__name__)
 
 
+class EvalTagService:
+    """Service layer for EvalTag operations.
+
+    Handles tag creation, searching, and management for experiments.
+    Tags are global and shared across all users.
+    """
+
+    def __init__(self, session: Session):
+        """Initialize EvalTagService with database session.
+
+        Args:
+            session: SQLAlchemy session for database operations
+        """
+        self.session = session
+
+    def create_tag(self, name: str, description: Optional[str] = None) -> EvalTag:
+        """Create a new tag or return existing tag (case-insensitive check).
+
+        Args:
+            name: Tag name (1-20 chars, alphanumeric + hyphens/underscores)
+            description: Optional tag description
+
+        Returns:
+            EvalTag: The created or existing tag object
+
+        Raises:
+            ValueError: If tag name format is invalid
+        """
+        # Validate and clean name
+        name = name.strip()
+        if not re.match(r"^[a-zA-Z0-9\-_]+$", name):
+            raise ValueError("Tag name can only contain letters, numbers, hyphens, and underscores")
+        if len(name) > 20:
+            raise ValueError("Tag name must not exceed 20 characters")
+        if len(name) < 1:
+            raise ValueError("Tag name must be at least 1 character")
+
+        # Check if tag exists (case-insensitive)
+        from sqlalchemy import select
+
+        stmt = select(EvalTag).where(func.lower(EvalTag.name) == func.lower(name))
+        existing = self.session.execute(stmt).scalar_one_or_none()
+
+        if existing:
+            return existing
+
+        # Create new tag
+        tag = EvalTag(name=name, description=description)
+        self.session.add(tag)
+        self.session.flush()  # Get ID without committing
+        return tag
+
+    def create_tags_from_names(self, tag_names: List[str]) -> List[EvalTag]:
+        """Create or get existing tags from a list of names.
+
+        This is useful for backward compatibility when tags are provided as strings.
+
+        Args:
+            tag_names: List of tag names to create or retrieve
+
+        Returns:
+            List[EvalTag]: List of tag objects
+        """
+        tags = []
+        for name in tag_names:
+            if name and name.strip():  # Skip empty strings
+                tag = self.create_tag(name.strip())
+                tags.append(tag)
+        return tags
+
+    def search_tags(self, query: str, limit: int = 10) -> Tuple[List[EvalTag], int]:
+        """Search tags by name with case-insensitive prefix matching.
+
+        This enables character-by-character autocomplete functionality.
+
+        Args:
+            query: Search query string
+            limit: Maximum number of results to return
+
+        Returns:
+            Tuple[List[EvalTag], int]: (List of matching tags, Total count of matches)
+        """
+        from sqlalchemy import select
+
+        # Search with prefix match
+        stmt = (
+            select(EvalTag)
+            .where(func.lower(EvalTag.name).like(func.lower(f"{query}%")))
+            .order_by(EvalTag.name)
+            .limit(limit)
+        )
+        tags = self.session.execute(stmt).scalars().all()
+
+        # Get total count
+        count_stmt = select(func.count(EvalTag.id)).where(func.lower(EvalTag.name).like(func.lower(f"{query}%")))
+        total = self.session.execute(count_stmt).scalar() or 0
+
+        return list(tags), total
+
+    def list_tags(self, offset: int, limit: int) -> Tuple[List[EvalTag], int]:
+        """List all tags with pagination, ordered alphabetically.
+
+        Args:
+            offset: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            Tuple[List[EvalTag], int]: (List of tags, Total count)
+        """
+        from sqlalchemy import select
+
+        # Get tags with pagination
+        stmt = select(EvalTag).order_by(EvalTag.name).offset(offset).limit(limit)
+        tags = self.session.execute(stmt).scalars().all()
+
+        # Get total count
+        total = self.session.execute(select(func.count(EvalTag.id))).scalar() or 0
+
+        return list(tags), total
+
+    def get_tags_by_ids(self, tag_ids: List[uuid.UUID]) -> List[EvalTag]:
+        """Fetch tags by their IDs.
+
+        Args:
+            tag_ids: List of tag UUIDs to retrieve
+
+        Returns:
+            List[EvalTag]: List of tag objects found
+        """
+        from sqlalchemy import select
+
+        if not tag_ids:
+            return []
+
+        stmt = select(EvalTag).where(EvalTag.id.in_(tag_ids))
+        tags = self.session.execute(stmt).scalars().all()
+        return list(tags)
+
+    def get_tag_by_id(self, tag_id: uuid.UUID) -> Optional[EvalTag]:
+        """Fetch a single tag by ID.
+
+        Args:
+            tag_id: Tag UUID to retrieve
+
+        Returns:
+            Optional[EvalTag]: Tag object if found, None otherwise
+        """
+        from sqlalchemy import select
+
+        stmt = select(EvalTag).where(EvalTag.id == tag_id)
+        return self.session.execute(stmt).scalar_one_or_none()
+
+
 class ExperimentService:
     """Service layer for Experiment operations.
 
@@ -161,6 +315,18 @@ class ExperimentService:
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Handle tags - support both new tag_ids and legacy tags
+        tag_service = EvalTagService(self.session)
+        tag_ids = []
+
+        # Priority 1: Use tag_ids if provided
+        if req.tag_ids:
+            tag_ids = req.tag_ids
+        # Priority 2: Convert legacy tags (strings) to tag IDs
+        elif req.tags:
+            created_tags = tag_service.create_tags_from_names(req.tags)
+            tag_ids = [tag.id for tag in created_tags]
+
         # Create experiment without project_id initially
         ev = ExperimentModel(
             name=req.name,
@@ -168,7 +334,8 @@ class ExperimentService:
             # project_id=req.project_id,  # Commented out - made optional
             created_by=user_id,
             status=ExperimentStatusEnum.ACTIVE.value,
-            tags=req.tags or [],
+            tags=req.tags or [],  # Keep for backward compatibility
+            tag_ids=tag_ids,
         )
 
         # Only set project_id if provided
@@ -191,6 +358,11 @@ class ExperimentService:
         exp_data.models = []
         exp_data.traits = []
         exp_data.status = "no_runs"  # New experiment has no runs
+
+        # Populate tag objects if tag_ids exist
+        if ev.tag_ids:
+            exp_data.tag_objects = tag_service.get_tags_by_ids(ev.tag_ids)
+
         return exp_data
 
     def configure_runs(
@@ -329,7 +501,20 @@ class ExperimentService:
         experiment_ids = [exp.id for exp in evs]
         statuses = self.get_experiment_statuses_batch(experiment_ids)
 
-        # Enrich each experiment with models, traits, and status
+        # Batch fetch tags for all experiments to avoid N+1 queries
+        tag_service = EvalTagService(self.session)
+        all_tag_ids = set()
+        for exp in evs:
+            if exp.tag_ids:
+                all_tag_ids.update(exp.tag_ids)
+
+        # Fetch all tags at once
+        tags_dict = {}
+        if all_tag_ids:
+            all_tags = tag_service.get_tags_by_ids(list(all_tag_ids))
+            tags_dict = {tag.id: tag for tag in all_tags}
+
+        # Enrich each experiment with models, traits, status, and tags
         enriched_experiments = []
         for exp in evs:
             exp_data = ExperimentSchema.from_orm(exp)
@@ -338,6 +523,9 @@ class ExperimentService:
             exp_data.traits = self.get_traits_for_experiment(exp.id)
             # Add computed status
             exp_data.status = statuses.get(exp.id, "unknown")
+            # Add tag objects
+            if exp.tag_ids:
+                exp_data.tag_objects = [tags_dict[tag_id] for tag_id in exp.tag_ids if tag_id in tags_dict]
             enriched_experiments.append(exp_data)
 
         return enriched_experiments, total_count
@@ -621,6 +809,11 @@ class ExperimentService:
 
         # Final Response
         exp_data.progress_overview = progress_overview
+
+        # Populate tag objects if tag_ids exist
+        if ev.tag_ids:
+            tag_service = EvalTagService(self.session)
+            exp_data.tag_objects = tag_service.get_tags_by_ids(ev.tag_ids)
 
         return exp_data
 
