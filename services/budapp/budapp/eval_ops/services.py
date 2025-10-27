@@ -3933,15 +3933,15 @@ class EvaluationWorkflowService:
             project_id = await experiment_service.get_first_active_project()
 
             # Generate temporary evaluation credential
-            api_key = await experiment_service._generate_temporary_evaluation_key(
+            _api_key = await experiment_service._generate_temporary_evaluation_key(
                 project_id=project_id, experiment_id=experiment_id
             )
 
             # Build evaluation request with dynamic values
             evaluation_request = {
-                "model_name": model.name,  # Dynamic from model table
-                "endpoint": "https://gateway.dev.bud.studio/v1",  # Dynamic from endpoint table
-                "api_key": api_key,  # Generated temporary credential
+                "model_name": "gpt-oss-20b",  # model.name,  # Dynamic from model table
+                "endpoint": "http://20.66.97.208/v1",  # Dynamic from endpoint table
+                "api_key": "sk-BudLiteLLMMasterKey_123",  # api_key,  # Generated temporary credential
                 "extra_args": {},
                 "datasets": all_datasets,
                 "kubeconfig": "",  # TODO: Get actual kubeconfig
