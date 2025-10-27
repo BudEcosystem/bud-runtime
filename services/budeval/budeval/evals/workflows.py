@@ -381,6 +381,9 @@ class EvaluationWorkflow:
                 title="All Evaluation Jobs Failed",
                 message=f"All {len(failed_job_ids)} evaluation job(s) failed. Failed job IDs: {', '.join(failed_job_ids)}",
                 status=WorkflowStatus.FAILED,
+                result={
+                    "evaluation_id": str(evaluate_model_request_json.eval_id),
+                },
             )
             dapr_workflows.publish_notification(
                 workflow_id=instance_id,
