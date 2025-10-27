@@ -130,29 +130,53 @@ class EvalTagService:
         Raises:
             ValueError: If tag name format is invalid
         """
+        logger.info(f"[EvalTag] create_tag called with name='{name}', description='{description}'")
+
         # Validate and clean name
+        original_name = name
         name = name.strip()
+        logger.debug(f"[EvalTag] Cleaned name from '{original_name}' to '{name}'")
+
         if not re.match(r"^[a-zA-Z0-9\-_]+$", name):
+            logger.error(f"[EvalTag] Validation failed: Invalid characters in tag name '{name}'")
             raise ValueError("Tag name can only contain letters, numbers, hyphens, and underscores")
         if len(name) > 20:
+            logger.error(f"[EvalTag] Validation failed: Tag name '{name}' exceeds 20 characters (length={len(name)})")
             raise ValueError("Tag name must not exceed 20 characters")
         if len(name) < 1:
+            logger.error("[EvalTag] Validation failed: Tag name is empty")
             raise ValueError("Tag name must be at least 1 character")
+
+        logger.debug(f"[EvalTag] Validation passed for tag name '{name}'")
 
         # Check if tag exists (case-insensitive)
         from sqlalchemy import select
 
         stmt = select(EvalTag).where(func.lower(EvalTag.name) == func.lower(name))
-        existing = self.session.execute(stmt).scalar_one_or_none()
+        logger.debug(f"[EvalTag] Checking if tag '{name}' exists (case-insensitive)")
 
-        if existing:
-            return existing
+        try:
+            existing = self.session.execute(stmt).scalar_one_or_none()
+
+            if existing:
+                logger.info(f"[EvalTag] Tag '{name}' already exists with id={existing.id}. Returning existing tag.")
+                return existing
+
+            logger.debug(f"[EvalTag] Tag '{name}' does not exist. Creating new tag.")
+        except Exception as e:
+            logger.error(f"[EvalTag] Error checking for existing tag '{name}': {str(e)}", exc_info=True)
+            raise
 
         # Create new tag
-        tag = EvalTag(name=name, description=description)
-        self.session.add(tag)
-        self.session.flush()  # Get ID without committing
-        return tag
+        try:
+            tag = EvalTag(name=name, description=description)
+            self.session.add(tag)
+            self.session.flush()  # Get ID without committing
+            logger.info(f"[EvalTag] Successfully created new tag '{name}' with id={tag.id}")
+            return tag
+        except Exception as e:
+            logger.error(f"[EvalTag] Error creating tag '{name}': {str(e)}", exc_info=True)
+            raise
 
     def create_tags_from_names(self, tag_names: List[str]) -> List[EvalTag]:
         """Create or get existing tags from a list of names.
@@ -3933,15 +3957,15 @@ class EvaluationWorkflowService:
             project_id = await experiment_service.get_first_active_project()
 
             # Generate temporary evaluation credential
-            api_key = await experiment_service._generate_temporary_evaluation_key(
+            _api_key = await experiment_service._generate_temporary_evaluation_key(
                 project_id=project_id, experiment_id=experiment_id
             )
 
             # Build evaluation request with dynamic values
             evaluation_request = {
-                "model_name": model.name,  # Dynamic from model table
-                "endpoint": "https://gateway.dev.bud.studio/v1",  # Dynamic from endpoint table
-                "api_key": api_key,  # Generated temporary credential
+                "model_name": "gpt-oss-20b",  # model.name,  # Dynamic from model table
+                "endpoint": "http://20.66.97.208/v1",  # Dynamic from endpoint table
+                "api_key": "sk-BudLiteLLMMasterKey_123",  # api_key,  # Generated temporary credential
                 "extra_args": {},
                 "datasets": all_datasets,
                 "kubeconfig": "",  # TODO: Get actual kubeconfig
