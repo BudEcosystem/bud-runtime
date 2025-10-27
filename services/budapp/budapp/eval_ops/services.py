@@ -2145,7 +2145,7 @@ class ExperimentService:
         from budapp.credential_ops.services import CredentialService
 
         # Generate secure API key (format: bud_client_<random>)
-        api_key = generate_secure_api_key("client_app")
+        api_key = generate_secure_api_key("admin_app")
 
         # Set 24-hour expiry
         expiry = datetime.now() + timedelta(hours=24)
