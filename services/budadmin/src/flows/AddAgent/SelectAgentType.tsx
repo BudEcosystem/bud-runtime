@@ -102,9 +102,6 @@ export default function SelectAgentType() {
     setIsSubmitting(true);
 
     try {
-      // Store the selected type in local storage for reference
-      localStorage.setItem("addAgent_selectedType", selectedType);
-
       // Store in the Add Agent store
       const selectedAgentOption = agentTypes.find(t => t.value === selectedType);
       if (selectedAgentOption) {

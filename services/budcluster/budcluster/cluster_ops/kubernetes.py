@@ -50,15 +50,22 @@ class KubernetesHandler(BaseClusterHandler):
         self.ansible_executor = AnsibleExecutor()
 
     def _load_kube_config(self) -> None:
-        """Load kubernetes config file."""
+        """Load kubernetes config file and create instance-specific configuration."""
         try:
-            config.load_kube_config_from_dict(self.config)
-            # Get the default configuration
-            configuration = client.Configuration.get_default_copy()
+            # Create a new instance-specific configuration instead of using global default
+            # This prevents race conditions when multiple clusters are monitored concurrently
+            self.api_configuration = client.Configuration()
+
+            # Load the kubeconfig into the instance configuration
+            config.load_kube_config_from_dict(self.config, client_configuration=self.api_configuration)
+
             # Disable SSL cert validation and hostname verification
-            configuration.verify_ssl = app_settings.validate_certs
-            # Set this configuration as the default
-            client.Configuration.set_default(configuration)
+            self.api_configuration.verify_ssl = app_settings.validate_certs
+
+            # Store an API client instance for this configuration
+            self.api_client = client.ApiClient(self.api_configuration)
+
+            logger.debug("Loaded instance-specific kubernetes configuration for cluster")
         except config.ConfigException as err:
             logger.error(f"Found error while loading Kubernetes config file. {err}")
             raise KubernetesException("Invalid Kubernetes config file") from err
@@ -155,7 +162,7 @@ class KubernetesHandler(BaseClusterHandler):
             KubernetesException: If there is an error while verifying the connection.
         """
         try:
-            v1 = client.CoreV1Api()
+            v1 = client.CoreV1Api(api_client=self.api_client)
             v1.list_namespace()
             return True
         except client.ApiException as err:
@@ -191,7 +198,7 @@ class KubernetesHandler(BaseClusterHandler):
             str: The IP address of the NFS service if found, None otherwise.
         """
         try:
-            v1 = client.CoreV1Api()
+            v1 = client.CoreV1Api(api_client=self.api_client)
             for attempt in range(30):  # Retry up to 30 times with a 2-second interval
                 try:
                     svc = v1.read_namespaced_service(service_name, namespace)
@@ -231,7 +238,7 @@ class KubernetesHandler(BaseClusterHandler):
 
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-            v1 = client.CoreV1Api()
+            v1 = client.CoreV1Api(api_client=self.api_client)
 
             # Get node to find total GPUs
             node = v1.read_node(node_name)
@@ -363,9 +370,19 @@ class KubernetesHandler(BaseClusterHandler):
                             f"Node {node.get('node_name')}: ready={is_ready}, schedulable={is_schedulable}, available={node_available}"
                         )
 
+                        # Extract internal IP from node addresses
+                        internal_ip = None
+                        addresses = node.get("addresses", [])
+                        if addresses:
+                            for addr in addresses:
+                                if addr.get("type") == "InternalIP":
+                                    internal_ip = addr.get("address")
+                                    break
+
                         node_formatted = {
                             "node_name": node.get("node_name"),
                             "node_id": node.get("node_id"),
+                            "internal_ip": internal_ip,
                             "node_status": node_available,  # Use boolean for consistency
                             "derived_status": "Ready" if node_available else "NotReady",
                             "devices": json.dumps(devices),
@@ -607,38 +624,14 @@ class KubernetesHandler(BaseClusterHandler):
     ) -> dict:
         """Get logs from a pod and check for error patterns."""
         try:
-            import tempfile
-
-            import yaml
-            from kubernetes import client
-            from kubernetes import config as k8s_config
-
-            # Write kubeconfig to temporary file
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-                yaml.dump(self.config, f)
-                kubeconfig_file = f.name
-
-            # Load kubeconfig
-            k8s_config.load_kube_config(config_file=kubeconfig_file)
-            v1 = client.CoreV1Api()
+            v1 = client.CoreV1Api(api_client=self.api_client)
 
             # Get pod logs
             try:
                 logs = v1.read_namespaced_pod_log(name=pod_name, namespace=namespace, tail_lines=tail_lines)
-
-                # Clean up temp file
-                import os
-
-                os.unlink(kubeconfig_file)
-
                 return {"status": "success", "logs": logs, "error_indicators": self._check_log_errors(logs)}
             except Exception as e:
                 logger.error(f"Failed to get pod logs: {e}")
-                # Clean up temp file
-                import os
-
-                if os.path.exists(kubeconfig_file):
-                    os.unlink(kubeconfig_file)
                 return {"status": "failed", "error": str(e)}
         except Exception as e:
             logger.error(f"Failed to initialize Kubernetes client: {e}")
@@ -1275,7 +1268,7 @@ class KubernetesHandler(BaseClusterHandler):
             str: The logs of the pod.
         """
         try:
-            v1 = client.CoreV1Api()
+            v1 = client.CoreV1Api(api_client=self.api_client)
 
             logger.debug(f"::WORKER::Fetching logs for pod {pod_name} in namespace {namespace}")
 
@@ -1313,7 +1306,7 @@ class KubernetesHandler(BaseClusterHandler):
             KubernetesException: If there is an error while fetching node events.
         """
         try:
-            v1 = client.CoreV1Api()
+            v1 = client.CoreV1Api(api_client=self.api_client)
 
             # Get all nodes
             nodes = v1.list_node()
@@ -1358,7 +1351,7 @@ class KubernetesHandler(BaseClusterHandler):
         """
         try:
             # Initialize the API client
-            v1 = client.CoreV1Api()
+            v1 = client.CoreV1Api(api_client=self.api_client)
 
             # Get events for the specific node
             field_selector = f"involvedObject.kind=Node,involvedObject.name={node_hostname}"
@@ -1496,7 +1489,7 @@ class KubernetesHandler(BaseClusterHandler):
                 "default": "ReadWriteOnce",
             }
 
-            storage_v1 = client.StorageV1Api()
+            storage_v1 = client.StorageV1Api(api_client=self.api_client)
             storage_classes = storage_v1.list_storage_class()
 
             storage_class_list = []

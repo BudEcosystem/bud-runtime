@@ -11,6 +11,11 @@ interface MultiSeriesLineChartProps {
     }[];
     label1?: string;
     label2?: string;
+    yAxisUnit?: string; // Unit to display on Y-axis (e.g., "%", "Mbps", "GB")
+    yAxisAutoScale?: boolean; // If true, auto-scale Y-axis based on data
+    yAxisMin?: number; // Minimum Y-axis value (ignored if yAxisAutoScale is true)
+    yAxisMax?: number; // Maximum Y-axis value (ignored if yAxisAutoScale is true)
+    yAxisInterval?: number; // Y-axis interval (ignored if yAxisAutoScale is true)
   };
 }
 
@@ -20,7 +25,7 @@ const MultiSeriesLineChart: React.FC<MultiSeriesLineChartProps> = ({
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!chartRef.current) return;
+    if (!chartRef.current || !data) return;
 
     const chart = echarts.init(chartRef.current, "dark");
 
@@ -37,6 +42,39 @@ const MultiSeriesLineChart: React.FC<MultiSeriesLineChartProps> = ({
       "#FF8CC6",
       "#95E1D3",
     ];
+
+    // Calculate Y-axis range if auto-scale is enabled
+    let yAxisMin = data.yAxisMin ?? undefined;
+    let yAxisMax = data.yAxisMax ?? undefined;
+    let yAxisInterval = data.yAxisInterval ?? undefined;
+
+    if (data.yAxisAutoScale && data.series && data.series.length > 0) {
+      // Collect all data values from all series
+      const allValues = data.series.flatMap((serie) => serie.data || []);
+
+      if (allValues.length > 0) {
+        const minValue = Math.min(...allValues);
+        const maxValue = Math.max(...allValues);
+
+        // Add 10% padding to top and bottom for better visualization
+        const range = maxValue - minValue;
+        const padding = range * 0.1;
+        yAxisMin = Math.max(0, Math.floor(minValue - padding));
+        yAxisMax = Math.ceil(maxValue + padding);
+
+        // Calculate a nice interval (roughly 4-5 ticks)
+        const roughInterval = (yAxisMax - yAxisMin) / 4;
+        // Round to nearest "nice" number (1, 2, 5, 10, 20, 50, etc.)
+        const magnitude = Math.pow(10, Math.floor(Math.log10(roughInterval)));
+        const normalizedInterval = roughInterval / magnitude;
+        if (normalizedInterval <= 1) yAxisInterval = magnitude;
+        else if (normalizedInterval <= 2) yAxisInterval = 2 * magnitude;
+        else if (normalizedInterval <= 5) yAxisInterval = 5 * magnitude;
+        else yAxisInterval = 10 * magnitude;
+      }
+    }
+
+    const yAxisUnit = data.yAxisUnit ?? "";
 
     const option: echarts.EChartsOption = {
       backgroundColor: "transparent",
@@ -71,12 +109,12 @@ const MultiSeriesLineChart: React.FC<MultiSeriesLineChartProps> = ({
       },
       xAxis: {
         type: "category",
-        data: data.categories,
+        data: data.categories || [],
         axisLabel: {
           color: "#B3B3B3",
           fontSize: 10,
           rotate: 45,
-          interval: Math.floor(data.categories.length / 8), // Show ~8 labels
+          interval: Math.floor((data.categories?.length || 0) / 8), // Show ~8 labels
         },
         axisLine: {
           lineStyle: {
@@ -86,9 +124,13 @@ const MultiSeriesLineChart: React.FC<MultiSeriesLineChartProps> = ({
       },
       yAxis: {
         type: "value",
+        min: yAxisMin,
+        max: yAxisMax,
+        interval: yAxisInterval,
         axisLabel: {
           color: "#B3B3B3",
           fontSize: 10,
+          formatter: (value: number) => `${value}${yAxisUnit}`,
         },
         splitLine: {
           lineStyle: {
@@ -101,7 +143,7 @@ const MultiSeriesLineChart: React.FC<MultiSeriesLineChartProps> = ({
           },
         },
       },
-      series: data.series.map((serie, index) => ({
+      series: (data.series || []).map((serie, index) => ({
         name: serie.name,
         type: "line",
         data: serie.data,

@@ -31,7 +31,7 @@ const CardWithBgAndTag: React.FC<GeneralCardsProps> = ({
     <div
       className={`relative rounded-[8px] px-[1.6rem] border-[1.5px] border-[#1c1c1c] bg-[#101010] ${ClassNames}`}
       style={{
-        width: "24%",
+        width: "32%",
         minHeight: "172px",
         paddingTop: "2rem",
         paddingBottom: "1.5rem",
@@ -53,7 +53,7 @@ const CardWithBgAndTag: React.FC<GeneralCardsProps> = ({
         <div
           className={`${valueClassNames}`}
           style={{
-            paddingTop: "3.2rem",
+            paddingTop: "2.2rem",
           }}
         >
           <Text_38_400_EEEEEE>{value}</Text_38_400_EEEEEE>

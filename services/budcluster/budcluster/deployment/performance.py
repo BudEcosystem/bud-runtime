@@ -5,7 +5,7 @@ from budmicroframe.commons.logging import get_logger
 from llm_benchmark.benchmark import tools as benchmark_tools
 from llm_benchmark.benchmark.litellm_proxy.utils import compute_latency_factors
 
-from ..commons.config import secrets_settings
+from ..commons.config import app_settings, secrets_settings
 from .utils import format_litellm_error_message
 
 
@@ -109,6 +109,8 @@ class DeploymentPerformance:
                 self.output_tokens,
                 self.concurrency,
                 self.benchmark_script,
+                tokenizer=app_settings.model_registry_path + self.model,
+                endpoint="/completions",
                 env_values=env_values,
                 latency_factors=latency_factors,
                 datasets=self.datasets,

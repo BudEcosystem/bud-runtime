@@ -1028,8 +1028,10 @@ impl CompletionProvider for DummyProvider {
                         index: 0,
                         logprobs: None,
                         finish_reason: if i == 5 { Some("stop".to_string()) } else { None },
+                        extra: HashMap::new(),
                     }],
                     usage: None,
+                    extra: HashMap::new(),
                 })
             })
             .throttle(Duration::from_millis(10));

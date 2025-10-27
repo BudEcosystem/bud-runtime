@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -o xtrace
+set +o nounset
 
 bud_config_dir="${XDG_DATA_HOME:-$HOME/.config}/bud"
 bud_share_dir="${XDG_DATA_HOME:-$HOME/.local/share}/bud"
@@ -9,16 +10,27 @@ bud_repo="https://github.com/BudEcosystem/bud-runtime.git"
 bud_repo_local="$bud_share_dir/bud-runtime"
 k3s_kubeconfig_path="/etc/rancher/k3s/k3s.yaml"
 
+print_usage() {
+	printf "%s (runtime|nvidia)" "${0##*/}"
+}
+
 die() {
 	printf "\033[31;1mErr: %b\033[0m\n" "${1:-no args for die()}" 1>&2
 	exit "${2:-1}"
 }
+
+is_k3s() {
+	[ -f "$k3s_kubeconfig_path" ]
+}
 is_nixos() {
 	grep -q 'DISTRIB_ID=nixos' /etc/lsb-release >/dev/null 2>&1
 }
+
 dir_ensure() {
 	if [ -d "$bud_repo_local" ]; then
+		git -C "$bud_repo_local" stash push || exit 1
 		git -C "$bud_repo_local" pull || exit 1
+		git -C "$bud_repo_local" stash pop || exit 1
 	else
 		git clone "$bud_repo" "$bud_repo_local" || exit 1
 	fi
@@ -86,10 +98,51 @@ helm_ensure() {
 		-f "$bud_repo_local/infra/helm/bud/example.secrets.yaml"
 }
 
+nvidia_ensure() {
+	if ! lspci | grep NVIDIA -q >/dev/null 2>&1; then
+		die "No Nvidia devices detected"
+	fi
+
+	flags=""
+	if lsmod | grep -q nvidia >/dev/null 2>&1; then
+		flags="$flags --set driver.enabled=false"
+	fi
+	if is_k3s; then
+		flags="$flags --set toolkit.env[0].name=CONTAINERD_CONFIG"
+		flags="$flags --set toolkit.env[0].value=/var/lib/rancher/k3s/agent/etc/containerd/config.toml"
+		flags="$flags --set toolkit.env[1].name=CONTAINERD_SOCKET"
+		flags="$flags --set toolkit.env[1].value=/run/k3s/containerd/containerd.sock"
+	fi
+
+	helm repo add gpu-operator https://helm.ngc.nvidia.com/nvidia
+	# shellcheck disable=SC2086
+	helm upgrade \
+		--install \
+		-n gpu-operator --create-namespace \
+		gpu-operator gpu-operator/gpu-operator \
+		--version 25.3.4 \
+		$flags
+}
+
 ##########
 ## MAIN ##
 ##########
 
-dir_ensure
-k8s_ensure
-helm_ensure
+case "$1" in
+runtime)
+	dir_ensure
+	k8s_ensure
+	helm_ensure
+	;;
+nvidia)
+	k8s_ensure
+	nvidia_ensure
+	;;
+"")
+	print_usage
+	exit 0
+	;;
+*)
+	die "Invalid command: $1"
+	;;
+esac
