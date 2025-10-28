@@ -97,11 +97,24 @@ export async function POST(req: Request) {
       text: result.text,
       usage: result.usage,
     });
-  } catch (error) {
-    console.error('prompt-chat failure', error);
+  } catch (error: any) {
+    const upstreamStatus = error?.response?.status;
+    const upstreamData = error?.response?.data;
+
+    console.error('prompt-chat failure', {
+      message: error?.message,
+      baseURL,
+      projectId: body.metadata?.project_id,
+      upstreamStatus,
+      upstreamData,
+    });
+
     return Response.json(
-      { error: 'Failed to generate response' },
-      { status: 500 }
+      {
+        error: upstreamData?.error ?? upstreamData?.message ?? 'Failed to generate response',
+        details: upstreamData,
+      },
+      { status: upstreamStatus ?? 500 }
     );
   }
 }
