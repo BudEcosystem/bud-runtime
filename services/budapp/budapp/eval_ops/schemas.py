@@ -508,7 +508,7 @@ class EvalTag(EvalTagBase):
 
     id: UUID4 = Field(..., description="The UUID of the tag.")
     created_at: datetime = Field(..., description="Timestamp when the tag was created")
-    updated_at: datetime = Field(..., description="Last update timestamp")
+    modified_at: datetime = Field(..., description="Last modification timestamp")
 
     class Config:
         """Pydantic model configuration."""
