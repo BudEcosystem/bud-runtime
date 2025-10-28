@@ -31,6 +31,8 @@ microservices:
         image: budstudio/budapp:nightly
     budcluster:
         image: budstudio/budcluster:nightly
+        env:
+            VOLUME_TYPE: nfs
     budmetrics:
         image: budstudio/budmetrics:nightly
     budmodel:
