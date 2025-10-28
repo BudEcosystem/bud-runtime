@@ -1,322 +1,176 @@
-import { smoothStream, streamText, createDataStreamResponse } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
-import { resolveGatewayBaseUrl } from '@/app/lib/gateway';
-import { Settings } from '@/app/types/chat';
-import axios from 'axios';
-// Allow streaming responses up to 30 seconds
-export const maxDuration = 300;
-
-/**
- * Fetches prompt configuration from the gateway
- */
-async function getPromptConfig(promptId: string, authHeader: string | null, apiKey: string | null) {
-  try {
-    const headers: any = {
-      'Content-Type': 'application/json',
-    };
-
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-    if (apiKey) {
-      headers['api-key'] = apiKey;
-    }
-
-    const response = await axios.get(
-      `https://app.dev.bud.studio/prompts/prompt-config/${promptId}`,
-      { headers }
-    );
-
-    return response.data;
-  } catch (error) {
-    console.error('Failed to fetch prompt config:', error);
-    throw error;
-  }
+interface PromptBody {
+  input?: string | null;
+  prompt?: {
+    id?: string;
+    version?: string | null;
+    variables?: Record<string, string>;
+  } | null;
+  metadata?: {
+    project_id?: string;
+    base_url?: string | null;
+  } | null;
+  model?: string | null;
+  settings?: {
+    temperature?: number;
+  } | null;
 }
 
-/**
- * Builds initial messages from prompt config and user variables
- */
-function buildInitialMessages(promptConfig: any, variables?: Record<string, any>, unstructuredInput?: string) {
-  const messages: any[] = [];
+const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
-  // Add system message if present in prompt config
-  if (promptConfig.data?.messages) {
-    for (const msg of promptConfig.data.messages) {
-      if (msg.role === 'system') {
-        messages.push({
-          role: 'system',
-          content: msg.content
-        });
-      }
-    }
-  }
+const resolveGatewayBase = (preferred?: string | null) => {
+  const fallbackHosts = [
+    { name: 'NEXT_PUBLIC_BUD_GATEWAY_BASE_URL', value: process.env.NEXT_PUBLIC_BUD_GATEWAY_BASE_URL },
+    { name: 'BUD_GATEWAY_BASE_URL', value: process.env.BUD_GATEWAY_BASE_URL },
+    { name: 'NEXT_PUBLIC_COPY_CODE_API_BASE_URL', value: process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL },
+    { name: 'NEXT_PUBLIC_TEMP_API_BASE_URL', value: process.env.NEXT_PUBLIC_TEMP_API_BASE_URL },
+    { name: 'NEXT_PUBLIC_BASE_URL', value: process.env.NEXT_PUBLIC_BASE_URL },
+    { name: 'hardcoded', value: 'https://gateway.dev.bud.studio' },
+  ];
 
-  // Add user message
-  if (unstructuredInput) {
-    // Unstructured input - use as-is
-    messages.push({
-      role: 'user',
-      content: unstructuredInput
-    });
-  } else if (variables) {
-    // Structured input - format variables
-    const variableText = Object.entries(variables)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join('\n');
-    messages.push({
-      role: 'user',
-      content: variableText
-    });
+  const selected = [{ name: 'preferred', value: preferred }, ...fallbackHosts].find(
+    (item) => typeof item.value === 'string' && item.value.trim().length > 0,
+  );
+
+  console.log('[Responses API] Selected base URL source:', selected?.name);
+  console.log('[Responses API] Selected base URL value:', selected?.value);
+
+  let baseUrl = trimTrailingSlash(selected?.value || 'https://gateway.dev.bud.studio');
+
+  // IMPORTANT: Responses API is only available on gateway, not on app
+  // Replace app.dev.bud.studio with gateway.dev.bud.studio
+  if (baseUrl.includes('app.dev.bud.studio')) {
+    console.log('[Responses API] Detected app.dev.bud.studio, redirecting to gateway.dev.bud.studio');
+    baseUrl = baseUrl.replace('app.dev.bud.studio', 'gateway.dev.bud.studio');
   }
 
-  return messages;
-}
+  // Remove /openai/v1 or /v1 suffix if present, since we'll add /v1/responses
+  baseUrl = baseUrl.replace(/\/openai\/v1$/, '');
+  baseUrl = baseUrl.replace(/\/v1$/, '');
 
-const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
-  if (!headers) {
-    return {};
-  }
-  if (headers instanceof Headers) {
-    return Object.fromEntries(headers.entries());
-  }
-  if (Array.isArray(headers)) {
-    return Object.fromEntries(headers);
-  }
-  return { ...(headers as Record<string, string>) };
+  console.log('[Responses API] Final base URL after cleanup:', baseUrl);
+
+  return baseUrl;
 };
 
-interface ResponseFormatConfig {
-  schema?: Record<string, any>;
-  name: string;
-  description?: string;
-}
-
-const buildResponseFormat = (settings?: Settings): ResponseFormatConfig | undefined => {
-  if (!settings?.enable_structured_json_schema || !settings?.is_valid_json_schema) {
-    return undefined;
+const buildPromptInput = (body: PromptBody) => {
+  if (body.input && body.input.trim().length > 0) {
+    return body.input;
   }
 
-  if (!settings.structured_json_schema) {
-    return {
-      name: 'structured_response',
-    };
+  if (body.prompt?.variables) {
+    return Object.entries(body.prompt.variables)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join('\n');
   }
 
-  try {
-    const schema = typeof settings.structured_json_schema === 'string'
-      ? JSON.parse(settings.structured_json_schema)
-      : settings.structured_json_schema;
-
-    if (!schema || typeof schema !== 'object') {
-      return undefined;
-    }
-
-    return {
-      schema,
-      name: (schema as { title?: string }).title || 'structured_response',
-      description: (schema as { description?: string }).description,
-    };
-  } catch (error) {
-    console.error('Invalid structured_json_schema supplied to response format:', error);
-    return undefined;
-  }
+  return '';
 };
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const {
-    messages, // For ongoing chat
-    id,
-    model,
-    metadata,
-    // Legacy fields
-    promptId,
-    variables,
-    input,
-  } = body;
+  const body: PromptBody = await req.json();
 
-  const promptEnvelope = body.prompt ?? null;
-  const effectivePromptId = promptEnvelope?.id ?? promptId;
-  const promptVariables = promptEnvelope?.variables ?? variables;
-  const promptVersion = promptEnvelope?.version;
-  const unstructuredInput = input ?? body.unstructuredInput ?? null;
-
-  const settings: Settings = body.settings;
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
 
-  // Extract client IP from headers
-  const xForwardedFor = req.headers.get('x-forwarded-for');
-  const xRealIp = req.headers.get('x-real-ip');
-  const cfConnectingIp = req.headers.get('cf-connecting-ip');
-  const trueClientIp = req.headers.get('true-client-ip');
-
-  let clientIp = 'unknown';
-
-  if (xForwardedFor) {
-    clientIp = xForwardedFor;
-  } else if (cfConnectingIp) {
-    clientIp = cfConnectingIp;
-  } else if (trueClientIp) {
-    clientIp = trueClientIp;
-  } else if (xRealIp) {
-    clientIp = xRealIp;
-  }
-
-  // Accept either JWT (Bearer token) or API key
   if (!authorization && !apiKey) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  // Determine the messages to use
-  let finalMessages = messages;
-  let deploymentModel = model;
-  let responseFormat = buildResponseFormat(settings);
+  const promptInput = buildPromptInput(body);
 
-  // If this is an initial prompt submission, fetch config and build messages
-  if (effectivePromptId) {
-    try {
-      const promptConfig = await getPromptConfig(effectivePromptId, authorization, apiKey);
-
-      // Build initial messages from prompt config
-      finalMessages = buildInitialMessages(
-        promptConfig,
-        promptVariables,
-        unstructuredInput
-      );
-
-      // Use deployment from prompt config if available
-      if (promptConfig.data?.deployment_name) {
-        deploymentModel = promptConfig.data.deployment_name;
-      }
-
-      // Merge settings from prompt config if available
-      if (promptConfig.data?.model_settings) {
-        const promptSettings = promptConfig.data.model_settings;
-        Object.assign(settings, {
-          temperature: promptSettings.temperature ?? settings?.temperature,
-          sequence_length: promptSettings.max_tokens ?? settings?.sequence_length,
-          repeat_penalty: promptSettings.frequency_penalty ?? settings?.repeat_penalty,
-          stop_strings: promptSettings.stop_sequences ?? settings?.stop_strings,
-        });
-
-        responseFormat = buildResponseFormat(settings);
-      }
-    } catch (error) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch prompt configuration' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+  if (!promptInput) {
+    return Response.json(
+      { error: 'Missing prompt input' },
+      { status: 400 },
+    );
   }
 
-  const proxyOpenAI = createOpenAI({
-    baseURL: resolveGatewayBaseUrl(metadata?.base_url),
-    fetch: (input, init) => {
-      let baseBody: Record<string, any> = {};
-      if (init?.body && typeof init.body === 'string') {
-        try {
-          baseBody = JSON.parse(init.body);
-        } catch (error) {
-          console.error('Failed to parse OpenAI request body:', error);
-        }
+  const baseURL = resolveGatewayBase(body.metadata?.base_url ?? null);
+  const responsesEndpoint = `${baseURL}/v1/responses`;
+
+  // Build request body matching gateway's expected format
+  const requestBody: {
+    prompt: {
+      id: string;
+      version?: string;
+    };
+    input: string;
+    model?: string;
+    temperature?: number;
+  } = {
+    prompt: {
+      id: body.prompt?.id || '',
+    },
+    input: promptInput,
+  };
+
+  // Add optional fields
+  if (body.prompt?.version) {
+    requestBody.prompt.version = body.prompt.version;
+  }
+  if (body.model) {
+    requestBody.model = body.model;
+  }
+  if (body.settings?.temperature !== undefined) {
+    requestBody.temperature = body.settings.temperature;
+  }
+
+  // Build headers
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (authorization) {
+    headers['Authorization'] = authorization;
+  }
+  if (apiKey) {
+    headers['api-key'] = apiKey;
+  }
+  if (body.metadata?.project_id) {
+    headers['project-id'] = body.metadata.project_id;
+  }
+
+  // Log the request
+  console.log('[Responses API] Endpoint:', responsesEndpoint);
+  console.log('[Responses API] Request body:', JSON.stringify(requestBody, null, 2));
+  console.log('[Responses API] Request headers:', headers);
+
+  try {
+    const response = await fetch(responsesEndpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log('[Responses API] Response status:', response.status);
+    console.log('[Responses API] Response statusText:', response.statusText);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Responses API] Error response:', errorText);
+
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText || 'Failed to generate response' };
       }
 
-      const requestHeaders = {
-        ...normalizeHeaders(init?.headers),
-          'project-id': metadata?.project_id,
-          ...(authorization && { 'Authorization': authorization }),
-          ...(apiKey && { 'api-key': apiKey }),
-          'X-Forwarded-For': clientIp,
-          'X-Real-IP': xRealIp || clientIp,
-          'X-Original-Client-IP': clientIp,
-          'X-Playground-Client-IP': xForwardedFor || xRealIp || cfConnectingIp || trueClientIp || 'unknown',
-          'Content-Type': 'application/json',
-        };
-
-      const requestBody: Record<string, any> = {
-        ...baseBody,
-        id,
-        session_id: id,
-        stream_options: {
-          include_usage: true,
-        },
-      };
-
-      if (responseFormat) {
-        requestBody.text = {
-          ...(requestBody.text || {}),
-          format: responseFormat.schema ? {
-            type: 'json_schema',
-            strict: true,
-            name: responseFormat.name,
-            description: responseFormat.description,
-            schema: responseFormat.schema,
-          } : { type: 'json_object' }
-        };
-      }
-
-      return fetch(input, {
-        ...init,
-        method: "POST",
-        headers: requestHeaders,
-        body: JSON.stringify(requestBody),
-      });
+      return Response.json(errorData, { status: response.status });
     }
-  });
 
-  const maxTokens = settings?.limit_response_length ? settings?.sequence_length : undefined;
-  const temperature = typeof settings?.temperature === 'number' ? settings.temperature : undefined;
-  const topP = typeof settings?.top_p_sampling === 'number' ? settings.top_p_sampling : undefined;
-  const startTime = Date.now();
-  let ttft = 0;
-  const itls: number[] = [];
-  let most_recent_time = startTime;
+    const data = await response.json();
+    console.log('[Responses API] Success response:', JSON.stringify(data, null, 2));
 
-  return createDataStreamResponse({
-    execute: dataStream => {
-      console.log('[prompt-chat] invoking OpenAI responses API', {
-        deploymentModel,
-        messageCount: finalMessages?.length ?? 0,
-        hasResponseFormat: Boolean(responseFormat),
-      });
+    return Response.json(data);
+  } catch (error: any) {
+    console.error('[Responses API] Request error:', error);
 
-      const result = streamText({
-        model: proxyOpenAI.responses(deploymentModel),
-        messages: finalMessages,
-        maxTokens,
-        temperature,
-        topP,
-        experimental_transform: smoothStream({ delayInMs: 50 }),
-        onChunk({ chunk }) {
-          const current_time = Date.now();
-          if (ttft === 0) {
-            ttft = current_time - startTime;
-          } else {
-            itls.push(current_time - most_recent_time);
-            most_recent_time = current_time;
-          }
-        },
-        onFinish(response) {
-          const endTime = Date.now();
-          const duration = (endTime - startTime) / 1000;
-          dataStream.writeMessageAnnotation({
-            type: 'metrics',
-            e2e_latency: Number(duration.toFixed(2)),
-            ttft,
-            throughput: Number((response.usage.completionTokens / duration).toFixed(2)),
-            itl: Math.round((itls.reduce((a, b) => a + b, 0) / itls.length)),
-          });
-
-          dataStream.writeData('call completed');
-        },
-      });
-
-      result.mergeIntoDataStream(dataStream);
-    },
-    onError: error => {
-      return error instanceof Error ? error.message : String(error);
-    },
-  });
+    return Response.json(
+      {
+        error: error?.message ?? 'Failed to generate response',
+      },
+      { status: 500 },
+    );
+  }
 }

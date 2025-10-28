@@ -1,61 +1,11 @@
 // import { openai } from '@ai-sdk/openai';
 import { smoothStream, streamText, createDataStreamResponse, generateId } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { resolveGatewayBaseUrl } from '@/app/lib/gateway';
+import { copyCodeApiBaseUrl, tempApiBaseUrl } from '@/app/lib/environment';
 import { Settings } from '@/app/types/chat';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 300;
-
-interface ResponseFormatConfig {
-  schema?: Record<string, any>;
-  name: string;
-  description?: string;
-}
-
-const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
-  if (!headers) {
-    return {};
-  }
-  if (headers instanceof Headers) {
-    return Object.fromEntries(headers.entries());
-  }
-  if (Array.isArray(headers)) {
-    return Object.fromEntries(headers);
-  }
-  return { ...(headers as Record<string, string>) };
-};
-
-const buildResponseFormat = (settings?: Settings): ResponseFormatConfig | undefined => {
-  if (!settings?.enable_structured_json_schema || !settings?.is_valid_json_schema) {
-    return undefined;
-  }
-
-  if (!settings.structured_json_schema) {
-    return {
-      name: 'structured_response',
-    };
-  }
-
-  try {
-    const schema = typeof settings.structured_json_schema === 'string'
-      ? JSON.parse(settings.structured_json_schema)
-      : settings.structured_json_schema;
-
-    if (!schema || typeof schema !== 'object') {
-      return undefined;
-    }
-
-    return {
-      schema,
-      name: (schema as { title?: string }).title || 'structured_response',
-      description: (schema as { description?: string }).description,
-    };
-  } catch (error) {
-    console.error('Invalid structured_json_schema supplied to response format:', error);
-    return undefined;
-  }
-};
 
 export async function POST(req: Request) {
   // Extract the `messages` from the body of the request
@@ -76,8 +26,6 @@ export async function POST(req: Request) {
   let clientIp = 'unknown';
   let forwardedChain = '';
 
-  const responseFormat = buildResponseFormat(settings);
-
   if (xForwardedFor) {
     // Pass the entire chain, budgateway will extract the public IP
     forwardedChain = xForwardedFor;
@@ -92,24 +40,18 @@ export async function POST(req: Request) {
 
   // Accept either JWT (Bearer token) or API key
   if (!authorization && !apiKey) {
-   return new Response('Unauthorized', { status: 401 });
+    return new Response('Unauthorized', { status: 401 });
   }
 
   const proxyOpenAI = createOpenAI({
     // custom settings, e.g.
-    baseURL: resolveGatewayBaseUrl(metadata.base_url),
+    baseURL: metadata.base_url || copyCodeApiBaseUrl,
     fetch: (input, init) => {
-      let baseBody: Record<string, any> = {};
-      if (init?.body && typeof init.body === 'string') {
-        try {
-          baseBody = JSON.parse(init.body);
-        } catch (error) {
-          console.error('Failed to parse OpenAI request body:', error);
-        }
-      }
-
-      const requestHeaders = {
-        ...normalizeHeaders(init?.headers),
+      const request = {
+        ...init,
+        method: "POST",
+        headers: {
+          ...init?.headers,
           'project-id': metadata.project_id,
           // Pass through the authorization header (JWT Bearer token)
           ...(authorization && { 'Authorization': authorization }),
@@ -122,44 +64,33 @@ export async function POST(req: Request) {
           'X-Real-IP': xRealIp || clientIp,
           // Add custom headers that won't be modified by intermediate proxies
           'X-Original-Client-IP': clientIp,
-          'X-Playground-Client-IP': xForwardedFor || xRealIp || cfConnectingIp || trueClientIp || 'unknown',
-          'Content-Type': 'application/json',
-        };
-
-      const requestBody: Record<string, any> = {
-        ...baseBody,
-        id,
-        session_id: id,
-        stream_options: {
-          include_usage: true,
+          'X-Playground-Client-IP': xForwardedFor || xRealIp || cfConnectingIp || trueClientIp || 'unknown'
         },
-      };
-
-      if (responseFormat) {
-        requestBody.text = {
-          ...(requestBody.text || {}),
-          format: responseFormat.schema ? {
-            type: 'json_schema',
-            strict: true,
-            name: responseFormat.name,
-            description: responseFormat.description,
-            schema: responseFormat.schema,
-          } : { type: 'json_object' }
-        };
+        body: JSON.stringify({
+          id,
+          messages,
+          model,
+          session_id: id,
+          "stream_options": {
+            "include_usage": true
+          },
+          "stream": true,
+          // ...settings,
+          // max_tokens: 3000,
+          max_completion_tokens: settings?.limit_response_length ? settings?.sequence_length : undefined,
+          frequency_penalty: settings?.repeat_penalty ? settings.repeat_penalty : undefined,
+          stop: settings?.stop_strings ? settings.stop_strings : undefined,
+          temperature: settings?.temperature ? settings.temperature : undefined,
+          // top_p: settings?.top_p_sampling ? settings.top_p_sampling : undefined,
+          extra_body:{
+            "guided_json": settings?.enable_structured_json_schema && settings?.is_valid_json_schema ? settings?.structured_json_schema : undefined,
+            "guided_decoding_backend": "outlines"
+          }
+        })
       }
-
-      return fetch(input, {
-        ...init,
-        method: "POST",
-        headers: requestHeaders,
-        body: JSON.stringify(requestBody),
-      });
+      return fetch(input, request);
     }
   });
-
-  const maxTokens = settings?.limit_response_length ? settings?.sequence_length : undefined;
-  const temperature = typeof settings?.temperature === 'number' ? settings.temperature : undefined;
-  const topP = typeof settings?.top_p_sampling === 'number' ? settings.top_p_sampling : undefined;
 
   const startTime = Date.now();
   let ttft = 0;
@@ -169,11 +100,8 @@ export async function POST(req: Request) {
   return createDataStreamResponse({
     execute: dataStream => {
       const result = streamText({
-        model: proxyOpenAI.responses(model),
+        model: proxyOpenAI(model),
         messages,
-        maxTokens,
-        temperature,
-        topP,
         experimental_transform: smoothStream({delayInMs: 50}),
         onChunk({ chunk }) {
           // dataStream.writeMessageAnnotation({ chunk });
