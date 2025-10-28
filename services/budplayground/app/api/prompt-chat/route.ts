@@ -1,6 +1,4 @@
-import { generateText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
-import { resolveGatewayBaseUrl, resolveResponsesBaseUrl } from '@/app/lib/gateway';
+import { resolveResponsesBaseUrl } from '@/app/lib/gateway';
 
 interface PromptBody {
   input?: string | null;
@@ -17,19 +15,6 @@ interface PromptBody {
     temperature?: number;
   } | null;
 }
-
-const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
-  if (!headers) {
-    return {};
-  }
-  if (headers instanceof Headers) {
-    return Object.fromEntries(headers.entries());
-  }
-  if (Array.isArray(headers)) {
-    return Object.fromEntries(headers);
-  }
-  return { ...(headers as Record<string, string>) };
-};
 
 export async function POST(req: Request) {
   const body: PromptBody = await req.json();
@@ -62,59 +47,54 @@ export async function POST(req: Request) {
     );
   }
 
-  const baseURL = resolveResponsesBaseUrl(body.metadata?.base_url ?? undefined);
+  const baseURL = resolveResponsesBaseUrl(body.metadata?.base_url ?? 'https://gateway.dev.bud.studio');
+  const url = `${baseURL}/responses`;
 
-  const proxyOpenAI = createOpenAI({
-    baseURL,
-    fetch: (input, init) => {
-      const headers = {
-        ...normalizeHeaders(init?.headers),
+  console.debug('[prompt-chat] prepared request', {
+    url,
+    projectId: body.metadata?.project_id,
+    promptPreview: promptInput.slice(0, 120),
+    promptLength: promptInput.length,
+  });
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
         ...(body.metadata?.project_id && {
           'project-id': body.metadata.project_id,
         }),
         ...(authorization && { Authorization: authorization }),
         ...(apiKey && { 'api-key': apiKey }),
-      };
-
-      return fetch(input, {
-        ...init,
-        headers,
-      });
-    },
-  });
-
-  try {
-    const result = await generateText({
-      model: proxyOpenAI.responses(body.model || 'gpt-4o'),
-      prompt: promptInput,
-      temperature:
-        typeof body.settings?.temperature === 'number'
-          ? body.settings.temperature
+      },
+      body: JSON.stringify({
+        prompt: body.prompt?.id
+          ? {
+              id: body.prompt.id,
+              version: '1',
+            }
           : undefined,
+        input: promptInput,
+        model: body.model,
+      }),
     });
 
-    return Response.json({
-      text: result.text,
-      usage: result.usage,
-    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('prompt-chat failure', { status: response.status, data });
+      return Response.json(data, { status: response.status });
+    }
+
+    return Response.json(data);
   } catch (error: any) {
-    const upstreamStatus = error?.response?.status;
-    const upstreamData = error?.response?.data;
-
-    console.error('prompt-chat failure', {
-      message: error?.message,
-      baseURL,
-      projectId: body.metadata?.project_id,
-      upstreamStatus,
-      upstreamData,
-    });
-
+    console.error('prompt-chat network failure', error);
     return Response.json(
       {
-        error: upstreamData?.error ?? upstreamData?.message ?? 'Failed to generate response',
-        details: upstreamData,
+        error: error?.message ?? 'Failed to generate response',
       },
-      { status: upstreamStatus ?? 500 }
+      { status: 500 }
     );
   }
 }
