@@ -1,9 +1,8 @@
-import { resolveResponsesBaseUrl } from '@/app/lib/gateway';
-
 interface PromptBody {
   input?: string | null;
   prompt?: {
     id?: string;
+    version?: string | null;
     variables?: Record<string, string>;
   } | null;
   metadata?: {
@@ -47,15 +46,13 @@ export async function POST(req: Request) {
     );
   }
 
-  const baseURL = resolveResponsesBaseUrl(body.metadata?.base_url ?? 'https://gateway.dev.bud.studio');
-  const url = `${baseURL}/responses`;
+  const defaultGateway =
+    process.env.NEXT_PUBLIC_BUD_GATEWAY_BASE_URL ||
+    process.env.BUD_GATEWAY_BASE_URL ||
+    'https://gateway.dev.bud.studio';
 
-  console.debug('[prompt-chat] prepared request', {
-    url,
-    projectId: body.metadata?.project_id,
-    promptPreview: promptInput.slice(0, 120),
-    promptLength: promptInput.length,
-  });
+  const host = (body.metadata?.base_url || defaultGateway).replace(/\/+$/, '');
+  const url = `${host}/v1/responses`;
 
   try {
     const response = await fetch(url, {
@@ -72,7 +69,7 @@ export async function POST(req: Request) {
         prompt: body.prompt?.id
           ? {
               id: body.prompt.id,
-              version: '1',
+              version: body.prompt?.version ?? '1',
             }
           : undefined,
         input: promptInput,
@@ -83,13 +80,11 @@ export async function POST(req: Request) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('prompt-chat failure', { status: response.status, data });
       return Response.json(data, { status: response.status });
     }
 
     return Response.json(data);
   } catch (error: any) {
-    console.error('prompt-chat network failure', error);
     return Response.json(
       {
         error: error?.message ?? 'Failed to generate response',

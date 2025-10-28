@@ -1,42 +1,15 @@
-import { apiBaseUrl, copyCodeApiBaseUrl, tempApiBaseUrl } from './environment';
-
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
-const ensureOpenAIPath = (value: string, options?: { ensureVersion?: boolean }) => {
-  const trimmed = trimTrailingSlash(value);
-  if (/\/openai\/v1(\/|$)/.test(trimmed)) {
-    if (options?.ensureVersion === false) {
-      return trimmed.replace(/\/openai\/v1(\/|$)/, '/openai$1');
-    }
-    return trimmed;
-  }
-
-  if (/\/openai(\/|$)/.test(trimmed)) {
-    if (options?.ensureVersion === false) {
-      return trimmed;
-    }
-    return `${trimmed}/v1`;
-  }
-
-  return options?.ensureVersion === false
-    ? `${trimmed}/openai`
-    : `${trimmed}/openai/v1`;
-};
-
-const stripOpenAIPath = (value: string) => value.replace(/\/openai(\/v1)?$/, '');
-
 const candidateEnvValues = () => [
+  process.env.NEXT_PUBLIC_BUD_GATEWAY_BASE_URL,
   process.env.BUD_GATEWAY_BASE_URL,
-  copyCodeApiBaseUrl,
-  tempApiBaseUrl,
-  apiBaseUrl,
   process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL,
   process.env.NEXT_PUBLIC_TEMP_API_BASE_URL,
   process.env.NEXT_PUBLIC_BASE_URL,
 ];
 
 const resolveBaseHost = (preferred?: string | null): string => {
-  const candidates = [preferred, ...candidateEnvValues(), 'http://localhost:8000'];
+  const candidates = [preferred, ...candidateEnvValues(), 'https://gateway.dev.bud.studio'];
 
   for (const candidate of candidates) {
     if (candidate && typeof candidate === 'string') {
@@ -47,17 +20,24 @@ const resolveBaseHost = (preferred?: string | null): string => {
     }
   }
 
-  return 'http://localhost:8000';
+  return 'https://gateway.dev.bud.studio';
 };
 
-export const resolveGatewayBaseUrl = (
-  preferred?: string | null,
-  options?: { ensureVersion?: boolean }
-): string => {
-  return ensureOpenAIPath(resolveBaseHost(preferred), options);
+export const resolveChatBaseUrl = (preferred?: string | null): string => {
+  const host = resolveBaseHost(preferred);
+  if (/\/openai\/v1$/.test(host)) {
+    return host;
+  }
+  if (/\/openai$/.test(host)) {
+    return `${host}/v1`;
+  }
+  return `${host}/openai/v1`;
 };
 
 export const resolveResponsesBaseUrl = (preferred?: string | null): string => {
-  const base = stripOpenAIPath(resolveBaseHost(preferred));
-  return `${trimTrailingSlash(base)}/v1`;
+  const host = resolveBaseHost(preferred);
+  if (/\/v1$/.test(host)) {
+    return host;
+  }
+  return `${host}/v1`;
 };
