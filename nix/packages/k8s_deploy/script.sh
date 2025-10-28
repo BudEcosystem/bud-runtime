@@ -74,12 +74,15 @@ k8s_ensure() {
 helm_install() {
 	name="$1"
 	shift
+	namespace="$2"
 
 	chart_path="$bud_repo_local/infra/helm/$name"
 	values_path="$chart_path/values.yaml"
 	scid_path="$chart_path/scid.toml"
 
-	namespace="$(tq -f "$scid_path" '.namespace')"
+	if [ "$namespace" = "" ]; then
+		namespace="$(tq -f "$scid_path" '.namespace')"
+	fi
 	release_name="$(tq -f "$scid_path" '.release_name')"
 	if tq -f "$scid_path" '.chart_path_override' >/dev/null 2>&1; then
 		chart_path="$chart_path/$(tq -f "$scid_path" '.chart_path_override')"
@@ -96,15 +99,15 @@ helm_install() {
 }
 helm_ensure() {
 	if ! k8s_clusterrole_exists keel; then
-		helm_install keel -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
+		helm_install keel "" -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
 	fi
 
 	if ! k8s_clusterrole_exists dapr-placement; then
-		helm_install dapr
+		helm_install dapr ""
 	fi
 
 	vim "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
-	helm_install bud \
+	helm_install bud bud \
 		-f "$bud_repo_local/infra/helm/bud/example.standalone.yaml" \
 		-f "$bud_repo_local/infra/helm/bud/example.secrets.yaml"
 }
