@@ -26,13 +26,13 @@ const ensureOpenAIPath = (value: string, options?: { ensureVersion?: boolean }) 
 const stripOpenAIPath = (value: string) => value.replace(/\/openai(\/v1)?$/, '');
 
 const candidateEnvValues = () => [
+  process.env.BUD_GATEWAY_BASE_URL,
   copyCodeApiBaseUrl,
   tempApiBaseUrl,
   apiBaseUrl,
   process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL,
   process.env.NEXT_PUBLIC_TEMP_API_BASE_URL,
   process.env.NEXT_PUBLIC_BASE_URL,
-  process.env.BUD_GATEWAY_BASE_URL,
 ];
 
 const resolveBaseHost = (preferred?: string | null): string => {
