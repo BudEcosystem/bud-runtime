@@ -62,9 +62,11 @@ export async function POST(req: Request) {
     );
   }
 
-  const baseURL = resolveGatewayBaseUrl(body.metadata?.base_url ?? undefined, {
+  const rawBase = resolveGatewayBaseUrl(body.metadata?.base_url ?? undefined, {
     ensureVersion: false,
   });
+
+  const baseURL = rawBase.replace(/\/?openai(?:\/v1)?$/, '');
 
   const proxyOpenAI = createOpenAI({
     baseURL,
