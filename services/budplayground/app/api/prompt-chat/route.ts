@@ -62,7 +62,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const baseURL = resolveGatewayBaseUrl(body.metadata?.base_url ?? undefined);
+  const baseURL = resolveGatewayBaseUrl(body.metadata?.base_url ?? undefined, {
+    ensureVersion: false,
+  });
 
   const proxyOpenAI = createOpenAI({
     baseURL,

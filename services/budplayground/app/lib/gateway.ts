@@ -2,9 +2,25 @@ import { apiBaseUrl, copyCodeApiBaseUrl, tempApiBaseUrl } from './environment';
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
-const ensureOpenAIPath = (value: string) => {
+const ensureOpenAIPath = (value: string, options?: { ensureVersion?: boolean }) => {
   const trimmed = trimTrailingSlash(value);
-  return /\/openai(\/|$)/.test(trimmed) ? trimmed : `${trimmed}/openai/v1`;
+  if (/\/openai\/v1(\/|$)/.test(trimmed)) {
+    if (options?.ensureVersion === false) {
+      return trimmed.replace(/\/openai\/v1(\/|$)/, '/openai$1');
+    }
+    return trimmed;
+  }
+
+  if (/\/openai(\/|$)/.test(trimmed)) {
+    if (options?.ensureVersion === false) {
+      return trimmed;
+    }
+    return `${trimmed}/v1`;
+  }
+
+  return options?.ensureVersion === false
+    ? `${trimmed}/openai`
+    : `${trimmed}/openai/v1`;
 };
 
 const candidateEnvValues = () => [
@@ -17,17 +33,20 @@ const candidateEnvValues = () => [
   process.env.BUD_GATEWAY_BASE_URL,
 ];
 
-export const resolveGatewayBaseUrl = (preferred?: string | null): string => {
+export const resolveGatewayBaseUrl = (
+  preferred?: string | null,
+  options?: { ensureVersion?: boolean }
+): string => {
   const candidates = [preferred, ...candidateEnvValues(), 'http://localhost:8000'];
 
   for (const candidate of candidates) {
     if (candidate && typeof candidate === 'string') {
       const trimmed = candidate.trim();
       if (trimmed.length > 0) {
-        return ensureOpenAIPath(trimmed);
+        return ensureOpenAIPath(trimmed, options);
       }
     }
   }
 
-  return 'http://localhost:8000/openai/v1';
+  return ensureOpenAIPath('http://localhost:8000', options);
 };
