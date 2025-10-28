@@ -1118,6 +1118,7 @@ class SimplePromptExecutor:
             model_settings=model_settings,
             messages=messages,
             tools=tools,
+            output_schema=output_schema,
         )
 
         try:

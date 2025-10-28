@@ -52,10 +52,12 @@ from openai.types.responses import (
     ResponseReasoningSummaryTextDeltaEvent,
     ResponseReasoningSummaryTextDoneEvent,
     ResponseStreamEvent,
+    ResponseTextConfig,
     ResponseTextDeltaEvent,
     ResponseTextDoneEvent,
     ResponseUsage,
 )
+from openai.types.responses.response_format_text_json_schema_config import ResponseFormatTextJSONSchemaConfig
 from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
 from openai.types.responses.response_input_item import Message as ResponseInputMessage
 from openai.types.responses.response_input_text import ResponseInputText
@@ -108,6 +110,7 @@ class OpenAIStreamingFormatter:
         model_settings: Optional[ModelSettings],
         messages: List[Message],
         tools: Optional[List[MCPToolConfig]] = None,
+        output_schema: Optional[Dict[str, Any]] = None,
     ):
         """Initialize streaming formatter with request context.
 
@@ -116,6 +119,7 @@ class OpenAIStreamingFormatter:
             model_settings: Model configuration settings
             messages: Original input messages
             tools: Optional list of tool configurations (MCP, etc.)
+            output_schema: Optional JSON schema for structured output
         """
         # Generate unique IDs
         self.response_id = f"resp_{uuid.uuid4().hex}"
@@ -128,6 +132,7 @@ class OpenAIStreamingFormatter:
         self.model_settings = model_settings
         self.messages = messages
         self.tools_config = tools or []
+        self.output_schema = output_schema
 
         # State tracking for SSE formatting
         self.sequence_number = -1  # Start at -1 so first increment returns 0
@@ -146,6 +151,28 @@ class OpenAIStreamingFormatter:
         self.current_reasoning_item_id: Optional[str] = None
         self.text_part_started = False
         self.reasoning_part_started = False
+
+    def _format_text_config(self) -> Optional[ResponseTextConfig]:
+        """Format text configuration based on output schema.
+
+        Returns:
+            ResponseTextConfig with json_schema format if structured output,
+            or text format if unstructured output
+        """
+        if self.output_schema:
+            # Structured output with JSON schema
+            json_schema_config = ResponseFormatTextJSONSchemaConfig.model_validate(
+                {
+                    "type": "json_schema",
+                    "name": self.output_schema.get("title", "response_schema"),
+                    "schema": self.output_schema,
+                    "strict": True,
+                }
+            )
+            return ResponseTextConfig(format=json_schema_config, verbosity="medium")
+        else:
+            # Plain text output
+            return ResponseTextConfig(format=ResponseFormatText(type="text"), verbosity="medium")
 
     def _build_mcp_tool_names_set(self, tools: Optional[List[MCPToolConfig]]) -> Set[str]:
         """Build set of MCP tool names from tools configuration.
@@ -1009,6 +1036,9 @@ class OpenAIStreamingFormatter:
         if usage:
             usage_obj = ResponseUsage(**usage)
 
+        # Format text config based on output schema
+        text_config = self._format_text_config()
+
         return Response(
             id=self.response_id,
             object="response",
@@ -1031,7 +1061,7 @@ class OpenAIStreamingFormatter:
             service_tier="default",
             store=True,
             temperature=self.model_settings.temperature if self.model_settings else None,
-            text={"format": ResponseFormatText(type="text"), "verbosity": "medium"},
+            text=text_config,
             tool_choice="auto",
             tools=formatted_tools,
             top_logprobs=0,
