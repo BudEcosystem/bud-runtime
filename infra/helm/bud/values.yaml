@@ -108,7 +108,15 @@ microservices:
   budadmin:
     enabled: true
     image: budstudio/budadmin:0.4.0
-    env: {}
+    # Branding configuration - customize logos per customer deployment
+    # Leave empty to use default Bud logos
+    env:
+      # Main logo for dashboard sidebar and header
+      # NEXT_PUBLIC_LOGO_URL: "/images/customer-logo.svg"
+      # Logo for auth pages (login/register)
+      # NEXT_PUBLIC_LOGO_AUTH_URL: "/images/customer-logo-auth.png"
+      # Favicon for browser tab
+      # NEXT_PUBLIC_FAVICON_URL: "/favicon-customer.ico"
   budcustomer:
     enabled: true
     image: budstudio/budcustomer:0.4.0

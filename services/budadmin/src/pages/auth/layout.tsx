@@ -3,6 +3,7 @@
 import React, { ReactNode } from "react";
 import { Image } from "antd";
 import GameOfLifeBackground from "@/components/ui/GameOfLifeBg";
+import { branding } from "@/components/environment";
 
 interface LayoutProps {
   children: ReactNode;
@@ -22,7 +23,7 @@ const AuthLayout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex flex-col justify-between w-[100%] 2xl:max-w-[500px] 1680px:max-w-[650px] h-full px-[3.5rem] pt-[3rem] pb-[2.9rem]">
               <Image
                 alt=""
-                src="/images/BudLogo.png"
+                src={branding.logoAuthUrl}
                 preview={false}
                 className="w-[6.6em] h-auto"
               />
