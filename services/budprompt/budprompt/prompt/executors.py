@@ -57,7 +57,6 @@ from .schema_builder import CustomModelGenerator, DataModelGenerator
 from .schemas import MCPToolConfig, Message, ModelSettings
 from .streaming_executors import execute_streaming_validation
 from .streaming_validation import add_field_validator_to_model
-from .streaming_validation_executor import StreamingValidationExecutor
 from .template_renderer import render_template
 from .tool_loaders import ToolRegistry
 from .utils import PydanticResultSerializer, contains_pydantic_model, validate_input_data_type
@@ -656,58 +655,16 @@ class SimplePromptExecutor:
 
             # Check if streaming is requested
             if stream:
-                # Check if streaming validation is needed
-                if output_validation and output_schema and contains_pydantic_model(output_type):
-                    logger.debug("Performing streaming with validation")
-
-                    # # Use streaming validation executor with the enhanced model
-                    # # The model already has field validators added in _get_output_type
-                    # NOTE: Commented out older implementation (Non openai format)
-                    # return execute_streaming_validation(
-                    #     enhanced_model=output_type,  # Pass the already enhanced model
-                    #     pydantic_schema=output_schema,
-                    #     prompt=user_prompt or "",
-                    #     validation_prompt=output_validation,
-                    #     deployment_name=deployment_name,
-                    #     model_settings=model_settings.model_dump(exclude_none=True) if model_settings else None,
-                    #     llm_retry_limit=llm_retry_limit or 3,
-                    #     messages=message_history,
-                    #     system_prompt_role=system_prompt_role,
-                    #     api_key=api_key,
-                    # )
-
-                    # Extract model from NativeOutput wrapper
-                    model_with_validators = output_type.outputs if hasattr(output_type, "outputs") else output_type
-
-                    # Use new clean streaming validation executor
-                    executor = StreamingValidationExecutor(
-                        output_model=model_with_validators,
-                        prompt=user_prompt or "",
-                        deployment_name=deployment_name,
-                        model_settings=model_settings.model_dump(exclude_none=True) if model_settings else None,
-                        validation_prompt=output_validation,
-                        retry_limit=llm_retry_limit or 3,
-                        messages=messages,
-                        message_history=message_history,
-                        api_key=api_key,
-                    )
-
-                    return executor.stream()
-                else:
-                    # Regular streaming without validation
-                    logger.debug(
-                        f"Using regular streaming - validation={bool(output_validation)}, schema={bool(output_schema)}, contains_pydantic={contains_pydantic_model(output_type) if output_type else False}"
-                    )
-                    return self._run_agent_stream(
-                        agent,
-                        user_prompt,
-                        message_history,
-                        output_schema,
-                        deployment_name,
-                        model_settings,
-                        messages,
-                        tools,
-                    )
+                return self._run_agent_stream(
+                    agent,
+                    user_prompt,
+                    message_history,
+                    output_schema,
+                    deployment_name,
+                    model_settings,
+                    messages,
+                    tools,
+                )
             else:
                 # Execute the agent with both history and current prompt
                 result = await self._run_agent(
@@ -1151,8 +1108,9 @@ class SimplePromptExecutor:
 
             # EVENTS 3+: MCP tool lists (if any MCP tools configured)
             if tools:
-                async for mcp_event in formatter.fetch_and_emit_mcp_tool_lists():
-                    yield mcp_event
+                mcp_events = await formatter.emit_mcp_tool_list_events()
+                for mcp_event in mcp_events:
+                    yield formatter.format_sse_from_event(mcp_event)
 
             # Track final result for usage
             final_result = None
@@ -1192,34 +1150,20 @@ class SimplePromptExecutor:
                     "total_tokens": total_tokens,
                 }
 
-            # Explicit finalization before response.completed
-            # Since pydantic-ai only sends AgentRunResultEvent (not FinalResultEvent),
-            # we must explicitly finalize any in-progress outputs here.
-
-            # Check if there's an active text output that needs finalization
-            # Even if text_part_started is False, we should finalize if current_text_item_id exists
-            if formatter.current_text_item_id and not formatter.text_part_started:
-                formatter.text_part_started = True  # Temporarily set to allow finalization
-
-            if formatter.text_part_started:
-                finalization_events = await formatter._finalize_text_output()
-                for event in finalization_events:
-                    yield formatter.format_sse_from_event(event)
-
-            # Same check for reasoning output
-            if formatter.current_reasoning_item_id and not formatter.reasoning_part_started:
-                formatter.reasoning_part_started = True
-
-            if formatter.reasoning_part_started:
-                finalization_events = await formatter._finalize_reasoning_output()
-                for event in finalization_events:
-                    yield formatter.format_sse_from_event(event)
+            # Finalize all unfinalized parts before response.completed
+            # This handles any text, reasoning, or tool parts that were streaming but not completed
+            finalization_events = await formatter.finalize_all_parts()
+            for event in finalization_events:
+                yield formatter.format_sse_from_event(event)
 
             # Build complete output array from final result (includes MCP tools, calls, text)
             if final_result:
                 output_items = await formatter.build_final_output_items_from_result(final_result, tools)
+                # Build complete instructions from final result (includes tool returns, retry prompts)
+                final_instructions = await formatter.build_final_instructions_from_result(final_result, tools)
             else:
                 output_items = formatter.build_final_output_items()  # Fallback to accumulated state
+                final_instructions = instructions  # Use initial instructions as fallback
 
             # FINAL EVENT: response.completed (with usage and complete response)
             yield formatter.format_sse_from_event(
@@ -1228,7 +1172,7 @@ class SimplePromptExecutor:
                     sequence_number=formatter._next_sequence(),
                     response=formatter.build_response_object(
                         status="completed",
-                        instructions=instructions,
+                        instructions=final_instructions,
                         output_items=output_items,
                         usage=final_usage,
                     ),
