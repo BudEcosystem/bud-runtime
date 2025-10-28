@@ -24,6 +24,7 @@ class DeploymentPerformance:
     def __init__(
         self,
         deployment_url: str,
+        deployment_name: str,
         model: str,
         concurrency: int,
         input_tokens: Optional[int],
@@ -50,6 +51,7 @@ class DeploymentPerformance:
         else:
             self.benchmark_script = "vllm" if provider_type == "local" else "litellm_proxy"
         self.deployment_url = deployment_url
+        self.deployment_name = deployment_name
         self.model = model
         self.target_ttft = target_ttft
         self.target_e2e_latency = target_e2e_latency
@@ -93,7 +95,7 @@ class DeploymentPerformance:
                     "api_base": self.deployment_url + "/v1",
                 }
                 try:
-                    latency_factors = compute_latency_factors(self.model, request_metadata, llm_api="openai")
+                    latency_factors = compute_latency_factors(self.deployment_name, request_metadata, llm_api="openai")
                     print(f"Latency factors: {latency_factors}")
                 except Exception as e:
                     print(f"Error computing latency factors: {e}")
@@ -103,7 +105,7 @@ class DeploymentPerformance:
                     raise e
 
             result = benchmark_tools.run_benchmark(
-                self.model,
+                self.deployment_name,
                 self.deployment_url + "/v1",
                 self.input_tokens,
                 self.output_tokens,
