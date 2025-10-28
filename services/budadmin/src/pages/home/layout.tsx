@@ -349,7 +349,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                   className="mainLogo"
                   style={{ width: 'auto', height: '1.4rem' }}
                   src={branding.logoUrl}
-                  alt="Logo"
+                  alt="Bud Logo"
                 />
               </div>
               <div className="px-[.75rem] mb-[7%]">
