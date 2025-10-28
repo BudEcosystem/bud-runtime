@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { getEndpoints } from "@/app/lib/api";
-import { useAuth } from '@/app/context/AuthContext';
+import { useAuthContext } from '@/app/context/AuthContext';
 
 interface FetchParams {
   page?: number;
@@ -13,7 +13,8 @@ interface FetchParams {
 
 export function useEndPoints() {
   const [endpoints, setEndpoints] = useState<any[]>([]);
-  const { isSessionValid, accessToken, apiKey: sessionApiKey } = useAuth();
+  const auth = useAuthContext();
+  const isSessionValid = auth?.isSessionValid ?? false;
 
   const getEndPoints = useCallback(async ({
     page = 1,
@@ -27,8 +28,19 @@ export function useEndPoints() {
       return null;
     }
 
-    const resolvedAccessKey = accessKey || accessToken || localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('access_key') || '';
-    const resolvedApiKey = apiKey || sessionApiKey || (localStorage.getItem('token')?.startsWith('budserve_') ? localStorage.getItem('token') : '') || '';
+    const resolvedAccessKey =
+      accessKey ||
+      auth?.accessToken ||
+      (typeof window !== 'undefined' ?
+        (localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('access_key') || '') :
+        '');
+
+    const resolvedApiKey =
+      apiKey ||
+      auth?.apiKey ||
+      (typeof window !== 'undefined'
+        ? (localStorage.getItem('token')?.startsWith('budserve_') ? localStorage.getItem('token') : '') || ''
+        : '');
 
     const result = await getEndpoints(page, limit, resolvedApiKey, resolvedAccessKey);
     if (Array.isArray(result)) {
@@ -36,7 +48,7 @@ export function useEndPoints() {
       return result;
     }
     return result;
-  }, [isSessionValid, accessToken, sessionApiKey]);
+  }, [auth?.isSessionValid, auth?.accessToken, auth?.apiKey]);
 
-  return { getEndPoints, endpoints, isReady: isSessionValid };
+  return { getEndPoints, endpoints, isReady: auth?.isSessionValid ?? false };
 }
