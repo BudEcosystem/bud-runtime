@@ -2,13 +2,10 @@
 global:
   security:
     allowInsecureImages: true
-
 imagePullSecrets: []
-
 # NOTE: support for https://keel.sh/
 imagePullPolicy: "IfNotPresent"
 deploymentAnnotations: {}
-
 storage:
   budmodelRegistry:
     className: ""
@@ -22,7 +19,6 @@ storage:
   budappStaticDir:
     className: ""
     size: 20Gi
-
 externalServices:
   minio:
     endpoint: ""
@@ -76,22 +72,21 @@ externalServices:
         name: "budprompt"
         username: "budprompt"
         password: "budprompt"
-  # TODO: map all external service through here
-  # monogodb:
-  #   endpoint: ""
-  #   database:
-  #   auth:
-  #     username:
-  #     password:
-  # keycloak:
-  #   endpoint: ""
-  # valkey:
-  #   endpoint: ""
-  # clickhouse:
-  #   endpoint: ""
-  # kafka:
-  #   endpoint: ""
-
+        # TODO: map all external service through here
+        # monogodb:
+        #   endpoint: ""
+        #   database:
+        #   auth:
+        #     username:
+        #     password:
+        # keycloak:
+        #   endpoint: ""
+        # valkey:
+        #   endpoint: ""
+        # clickhouse:
+        #   endpoint: ""
+        # kafka:
+        #   endpoint: ""
 ingress:
   enabled: true
   # NOTE: used to derive public urls for client side services: (external|internal|disabled)
@@ -108,30 +103,28 @@ ingress:
     novuapi: ""
     novuws: ""
     s3: ""
-
 microservices:
   # frontend services
   budadmin:
     enabled: true
-    image: budstudio/budadmin:nightly
+    image: budstudio/budadmin:0.4.0
     env: {}
   budcustomer:
     enabled: true
-    image: budstudio/budcustomer:nightly
+    image: budstudio/budcustomer:0.4.0
     env: {}
   budplayground:
     enabled: true
-    image: budstudio/budplayground:nightly
+    image: budstudio/budplayground:0.4.0
     env: {}
-
   # backend exposed services
   budgateway:
     enabled: true
-    image: budstudio/budgateway:nightly
+    image: budstudio/budgateway:0.4.0
     env: {}
   askbud:
     enabled: true
-    image: budstudio/askbud:nightly
+    image: budstudio/askbud:0.4.0
     daprid: askbud
     model: qwen3-32b
     env:
@@ -139,7 +132,7 @@ microservices:
       INFERENCE_URL: http://20.66.97.208/v1/
   budapp:
     enabled: true
-    image: budstudio/budapp:nightly
+    image: budstudio/budapp:0.4.0
     daprid: budapp
     corsOrigins:
       - "http://localhost:3000"
@@ -147,33 +140,28 @@ microservices:
     env:
       GRAFANA_SCHEME: http
       GRAFANA_URL: "{{ $.Release.Name }}-grafana"
-
       KEYCLOAK_SERVER_URL: http://{{ $.Release.Name }}-keycloak/
       KEYCLOAK_REALM_NAME: "{{ .Values.keycloak.adminRealm }}"
       KEYCLOAK_ADMIN_USERNAME: "{{ .Values.keycloak.auth.adminUser }}"
       KEYCLOAK_ADMIN_PASSWORD: "{{ .Values.keycloak.auth.adminPassword }}"
       KEYCLOAK_VERIFY_SSL: "false"
       DEFAULT_REALM_NAME: bud-keycloak
-
       CLOUD_MODEL_SEEDER_ENGINE: tensorzero
       BUD_CONNECT_BASE_URL: https://budconnect.bud.studio
       BUD_DOC_SERVICE_URL: "http://{{ $.Release.Name }}-buddoc:9081"
       BUD_PROMPT_SERVICE_URL: "http://{{ $.Release.Name }}-budprompt:3015/v1/"
-
   # backend internal services
   budcluster:
     enabled: true
-    image: budstudio/budcluster:nightly
+    image: budstudio/budcluster:0.4.0
     daprid: budcluster
     env:
       LOG_LEVEL: INFO
       RSA_KEY_NAME: rsa-private-key.pem
       VOLUME_TYPE: nfs
-
       CONFIGSTORE_NAME: "{{ .Release.Name }}-configstore"
       SECRETSTORE_SECRET_NAME: "{{ .Release.Name }}-secretstore"
       STATESTORE_NAME: "{{ .Release.Name }}-dapr-statestore"
-
       VALIDATE_CERTS: "false"
       NODE_INFO_COLLECTOR_IMAGE_CPU: budstudio/node-info-collector-cpu:0.1.0
       NODE_INFO_COLLECTOR_IMAGE_CUDA: budimages.azurecr.io/budecosystem/node-info-collector-cuda:latest
@@ -183,15 +171,12 @@ microservices:
       ENGINE_CONTAINER_PORT: "8000"
       REGISTRY_SERVER: https://budimages.azurecr.io
       LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
-
       # Metrics collection configuration
       METRICS_COLLECTION_ENABLED: "true"
       METRICS_COLLECTION_TIMEOUT: "30"
       METRICS_BATCH_SIZE: "20000"
-
       # OpenTelemetry Collector configuration
       OTEL_COLLECTOR_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
-
       # Prometheus configuration
       PROMETHEUS_SERVICE_NAME: "bud-metrics-kube-prometheu-prometheus"
       PROMETHEUS_NAMESPACE: "bud-system"
@@ -199,22 +184,20 @@ microservices:
   budmetrics:
     enabled: true
     daprid: budmetrics
-    image: budstudio/budmetrics:nightly
+    image: budstudio/budmetrics:0.4.0
     env:
       #deadlink
       INFERENCE_URL: http://172.184.137.177:8502/classify
-
       CLICKHOUSE_HOST: "{{ .Release.Name }}-clickhouse"
       CLICKHOUSE_PORT: "9000"
       CLICKHOUSE_DB_NAME: budproxy
       SECRETS_CLICKHOUSE_USER: "{{ .Values.clickhouse.auth.username }}"
       SECRETS_CLICKHOUSE_PASSWORD: "{{ .Values.clickhouse.auth.password }}"
-
       # ClickHouse TTL configuration for cluster metrics (in days)
       CLICKHOUSE_TTL_CLUSTER_METRICS: "30"
   budmodel:
     enabled: true
-    image: budstudio/budmodel:nightly
+    image: budstudio/budmodel:0.4.0
     daprid: budmodel
     storageClassName: nfs-csi
     storageSize: "32Gi"
@@ -222,19 +205,19 @@ microservices:
       LOG_LEVEL: INFO
   budeval:
     enabled: true
-    image: budstudio/budeval:nightly
+    image: budstudio/budeval:0.4.0
     daprid: budeval
     storageClassName: nfs-csi
     env: {}
   budsim:
     enabled: true
-    image: budstudio/budsim:nightly
+    image: budstudio/budsim:0.4.0
     daprid: budsim
     env:
       LOG_LEVEL: INFO
   buddoc:
     enabled: true
-    image: budstudio/buddoc:nightly
+    image: budstudio/buddoc:0.4.0
     daprid: buddoc
     env:
       LOG_LEVEL: INFO
@@ -244,18 +227,17 @@ microservices:
       TEMP_UPLOAD_DIR: /tmp/buddoc_uploads
   budnotify:
     enabled: true
-    image: budstudio/budnotify:nightly
+    image: budstudio/budnotify:0.4.0
     daprid: budnotify
     pubsubTopic: notificationMessages
   budprompt:
     enabled: true
     daprid: budprompt
-    image: budstudio/budprompt:nightly
+    image: budstudio/budprompt:0.4.0
     env:
       LOG_LEVEL: INFO
       BUD_GATEWAY_BASE_URL: http://{{ .Release.Name }}-budgateway:3000/v1
       BUD_DEFAULT_MODEL_NAME: qwen3-32b
-
       REDIS_HOST: "{{ .Release.Name }}-valkey-primary"
       REDIS_PORT: "6379"
       REDIS_DB_INDEX: "10"
@@ -417,7 +399,6 @@ postgresqlExtra:
     - budeval
     - buddoc
     - budprompt
-
 keycloak:
   image:
     repository: bitnamilegacy/keycloak
@@ -507,7 +488,6 @@ minio:
       - name: novu-local
       - name: models-registry
       - name: model-info
-
 # OpenTelemetry Collector for metrics collection
 otelCollector:
   enabled: true
@@ -529,13 +509,12 @@ otelCollector:
       memory: 512Mi
       cpu: 100m
   clickhouse:
-    host: clickhouse  # Will be templated in the deployment
+    host: clickhouse # Will be templated in the deployment
     port: 9000
     database: metrics
     username: default
     password: ""
-    ttl: 720h  # 30 days - retention for raw OTel metrics (otel_metrics_*)
-
+    ttl: 720h # 30 days - retention for raw OTel metrics (otel_metrics_*)
 # best to be installed cluster wide, not as part of this chart
 dapr:
   enabled: false
