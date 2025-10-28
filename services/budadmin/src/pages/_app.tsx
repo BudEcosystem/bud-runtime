@@ -28,6 +28,7 @@ import {
 } from "@novu/notification-center";
 import {
   apiBaseUrl,
+  branding,
   novuAppId,
   novuBackendUrl,
   novuSocketUrl,
@@ -266,6 +267,7 @@ function MyApp({ Component, pageProps }: AppProps) {
               content="width=device-width, initial-scale=1.0"
             />
             <title>Bud Serve</title>
+            <link rel="icon" type="image/x-icon" href={branding.faviconUrl} />
           </Head>
           <App Component={Component} pageProps={pageProps} />
         </LoaderProvider>
