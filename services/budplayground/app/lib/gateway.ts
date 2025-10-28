@@ -23,6 +23,8 @@ const ensureOpenAIPath = (value: string, options?: { ensureVersion?: boolean }) 
     : `${trimmed}/openai/v1`;
 };
 
+const stripOpenAIPath = (value: string) => value.replace(/\/openai(\/v1)?$/, '');
+
 const candidateEnvValues = () => [
   copyCodeApiBaseUrl,
   tempApiBaseUrl,
@@ -33,20 +35,29 @@ const candidateEnvValues = () => [
   process.env.BUD_GATEWAY_BASE_URL,
 ];
 
-export const resolveGatewayBaseUrl = (
-  preferred?: string | null,
-  options?: { ensureVersion?: boolean }
-): string => {
+const resolveBaseHost = (preferred?: string | null): string => {
   const candidates = [preferred, ...candidateEnvValues(), 'http://localhost:8000'];
 
   for (const candidate of candidates) {
     if (candidate && typeof candidate === 'string') {
       const trimmed = candidate.trim();
       if (trimmed.length > 0) {
-        return ensureOpenAIPath(trimmed, options);
+        return trimTrailingSlash(trimmed);
       }
     }
   }
 
-  return ensureOpenAIPath('http://localhost:8000', options);
+  return 'http://localhost:8000';
+};
+
+export const resolveGatewayBaseUrl = (
+  preferred?: string | null,
+  options?: { ensureVersion?: boolean }
+): string => {
+  return ensureOpenAIPath(resolveBaseHost(preferred), options);
+};
+
+export const resolveResponsesBaseUrl = (preferred?: string | null): string => {
+  const base = stripOpenAIPath(resolveBaseHost(preferred));
+  return `${trimTrailingSlash(base)}/v1`;
 };

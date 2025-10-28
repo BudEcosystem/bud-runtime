@@ -1,6 +1,6 @@
 import { generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { resolveGatewayBaseUrl } from '@/app/lib/gateway';
+import { resolveGatewayBaseUrl, resolveResponsesBaseUrl } from '@/app/lib/gateway';
 
 interface PromptBody {
   input?: string | null;
@@ -62,11 +62,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const rawBase = resolveGatewayBaseUrl(body.metadata?.base_url ?? undefined, {
-    ensureVersion: false,
-  });
-
-  const baseURL = rawBase.replace(/\/?openai(?:\/v1)?$/, '');
+  const baseURL = resolveResponsesBaseUrl(body.metadata?.base_url ?? undefined);
 
   const proxyOpenAI = createOpenAI({
     baseURL,
