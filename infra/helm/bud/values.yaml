@@ -158,7 +158,7 @@ microservices:
     env:
       LOG_LEVEL: INFO
       RSA_KEY_NAME: rsa-private-key.pem
-      VOLUME_TYPE: nfs
+      VOLUME_TYPE: local
       CONFIGSTORE_NAME: "{{ .Release.Name }}-configstore"
       SECRETSTORE_SECRET_NAME: "{{ .Release.Name }}-secretstore"
       STATESTORE_NAME: "{{ .Release.Name }}-dapr-statestore"
