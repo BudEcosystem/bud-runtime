@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Input, InputNumber, Checkbox, Image } from 'antd';
+import { Input, InputNumber, Checkbox, Image, message } from 'antd';
 import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
 
@@ -17,6 +17,8 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
   const [inputSchema, setInputSchema] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isHovered, setIsHovered] = useState<boolean>(false);
+  const [isTestHovered, setIsTestHovered] = useState<boolean>(false);
+  const [testLoading, setTestLoading] = useState<boolean>(false);
   const [promptVersion, setPromptVersion] = useState<string | undefined>();
   const [promptDeployment, setPromptDeployment] = useState<string | undefined>();
 
@@ -97,6 +99,59 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
       ...prev,
       [fieldName]: value
     }));
+  };
+
+  const handleTestOpenAIResponses = async () => {
+    setTestLoading(true);
+
+    try {
+      // Hardcoded test data
+      const testData = {
+        prompt: 'Explain the concept of quantum entanglement in simple terms.',
+        model: 'gpt-4o',
+        metadata: {
+          project_id: 'test-project-id',
+        },
+      };
+
+      console.log('[PromptForm] Testing OpenAI Responses with data:', testData);
+
+      // Build headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (accessKey) {
+        headers['Authorization'] = `Bearer ${accessKey}`;
+      }
+      if (apiKey) {
+        headers['api-key'] = apiKey;
+      }
+
+      const response = await fetch('/api/test-openai-responses', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(testData),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        message.success('OpenAI Responses test successful!');
+        console.log('[PromptForm] Test result:', result);
+        console.log('[PromptForm] Generated text:', result.text);
+        console.log('[PromptForm] Usage:', result.usage);
+        console.log('[PromptForm] Provider metadata:', result.providerMetadata);
+      } else {
+        message.error(`Test failed: ${result.error || 'Unknown error'}`);
+        console.error('[PromptForm] Test failed:', result);
+      }
+    } catch (error: any) {
+      message.error(`Test error: ${error?.message || 'Unknown error'}`);
+      console.error('[PromptForm] Test error:', error);
+    } finally {
+      setTestLoading(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -267,8 +322,21 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
             </>
           )}
 
-          {/* Next Button */}
-          <div className="flex justify-end">
+          {/* Buttons */}
+          <div className="flex justify-between items-center">
+            {/* Test OpenAI Responses Button */}
+            <button
+              className="Open-Sans cursor-pointer text-[400] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF] flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#4CAF50] hover:text-[#FFFFFF] disabled:opacity-50 disabled:cursor-not-allowed"
+              type="button"
+              onClick={handleTestOpenAIResponses}
+              disabled={testLoading}
+              onMouseEnter={() => setIsTestHovered(true)}
+              onMouseLeave={() => setIsTestHovered(false)}
+            >
+              {testLoading ? 'Testing...' : 'Test OpenAI Responses'}
+            </button>
+
+            {/* Next Button */}
             <button
               className="Open-Sans cursor-pointer text-[400] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF] flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
               type="submit"
