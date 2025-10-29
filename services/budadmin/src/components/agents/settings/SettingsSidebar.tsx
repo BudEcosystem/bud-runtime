@@ -24,6 +24,7 @@ interface SettingsSidebarProps {
   onAddOutputVariable: () => void;
   onVariableChange: (variableId: string, field: keyof AgentVariable, value: string) => void;
   onDeleteVariable: (variableId: string) => void;
+  onStructuredInputEnabledChange?: (enabled: boolean) => void;
   // System prompt and messages props
   onSystemPromptChange: (value: string) => void;
   onPromptMessagesChange: (value: string) => void;
@@ -49,6 +50,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   onAddOutputVariable,
   onVariableChange,
   onDeleteVariable,
+  onStructuredInputEnabledChange,
   onSystemPromptChange,
   onPromptMessagesChange,
   localSystemPrompt,
@@ -74,6 +76,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             onDeleteVariable={onDeleteVariable}
             onSavePromptSchema={onSavePromptSchema}
             isSaving={isSaving}
+            onStructuredInputEnabledChange={onStructuredInputEnabledChange}
           />
         );
       case SettingsType.SYSTEM_PROMPT:
@@ -120,6 +123,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               onDeleteVariable={onDeleteVariable}
               onSavePromptSchema={onSavePromptSchema}
               isSaving={isSaving}
+              onStructuredInputEnabledChange={onStructuredInputEnabledChange}
             />
             <SystemPromptSettings
               sessionId={session.id}

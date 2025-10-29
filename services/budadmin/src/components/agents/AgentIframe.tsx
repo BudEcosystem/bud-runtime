@@ -8,11 +8,13 @@ interface AgentIframeProps {
 
 const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [] }) => {
   const [refreshToken, setRefreshToken] = useState("");
+  const playGroundUrl = "https://playground.dev.bud.studio";
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Build iframe URL for agent playground with promptIds
   const promptIdsParam = promptIds.filter(id => id).join(',');
-  const iframeUrl = `${playGroundUrl}/chat?embedded=true&refresh_token=${refreshToken}&agent_session=${sessionId || ''}${promptIdsParam ? `&promptIds=${promptIdsParam}` : ''}`;
+  // const iframeUrl = `${playGroundUrl}/chat?embedded=true&refresh_token=${refreshToken}&is_single_chat=false${promptIdsParam ? `&promptIds=${promptIdsParam}` : ''}`;
+  const iframeUrl = `http://localhost:3000/chat?embedded=true&refresh_token=${refreshToken}&agent_session=${sessionId || ''}${promptIdsParam ? `&promptIds=${promptIdsParam}` : ''}`;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -33,26 +35,21 @@ const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [] }) 
 
   if (!refreshToken) {
     return (
-      <div className="flex items-center justify-center w-full h-full">
-        <div className="text-center">
-          <h1 className="text-[#EEEEEE] text-xl font-semibold mb-2">
-            Access Denied
-          </h1>
-          <p className="text-[#808080] text-sm">
-            Please login to access the agent playground.
-          </p>
-        </div>
+      <div style={{ width: "100%", height: "100%", border: "none" }}>
+        <h1 className="text-[#000000] text-2xl font-bold">
+          Access Denied. Please login to access the playground.
+        </h1>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full border-none">
+    <div style={{ width: "100%", height: "100%", border: "none" }}>
       <iframe
         ref={iframeRef}
         src={iframeUrl}
         style={{ width: "100%", height: "100%", border: "none" }}
-        title="Agent Playground"
+        title="AgentPlayground"
         allowFullScreen={false}
       />
     </div>

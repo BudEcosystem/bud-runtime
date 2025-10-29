@@ -9,7 +9,9 @@ import { useAgentStore } from "@/stores/useAgentStore";
 import { useDrawer } from "@/hooks/useDrawer";
 import AgentBoxWrapper from "./AgentBoxWrapper";
 import AgentSelector from "./AgentSelector";
-import AgentIframe from "./AgentIframe";
+import dynamic from "next/dynamic";
+
+const AgentIframe = dynamic(() => import("./AgentIframe"), { ssr: false });
 
 const AgentDrawer: React.FC = () => {
   const {
@@ -173,12 +175,12 @@ const AgentDrawer: React.FC = () => {
             </div>
             <div></div>
           </div>
-          <div className="w-full">
+          <div className="flex-1">
             {/* Content */}
-            <div className="h-full bg-[transparent] relative">
+            <div className="h-full w-full bg-[transparent] relative">
               {showPlayground ? (
                 /* Playground/Iframe View */
-                <div className="flex justify-center items-center h-full w-full">
+                <div className="h-full w-full">
                   <AgentIframe
                     sessionId={activeSessions[0]?.id}
                     promptIds={activeSessions.map(session => session.promptId).filter(Boolean) as string[]}

@@ -67,6 +67,7 @@ function AgentBoxInner({
   const [isSavingSystemPrompt, setIsSavingSystemPrompt] = useState(false);
   const [isSavingPromptMessages, setIsSavingPromptMessages] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
+  const [structuredInputEnabled, setStructuredInputEnabled] = useState(false);
 
   // Custom hook to create workflow handlers with consistent behavior
   const useWorkflowHandler = (name: string, workflowId?: string) => {
@@ -206,8 +207,13 @@ function AgentBoxInner({
       const type = "input";
 
       // Build the payload using the utility function with required parameters
+      // If structured input is not enabled, use empty input variables
+      const sessionForPayload = structuredInputEnabled
+        ? session
+        : { ...session, inputVariables: [] };
+
       const payload = buildPromptSchemaFromSession(
-        session,
+        sessionForPayload,
         type,
         1,     // step_number
         0,     // workflow_total_steps (0 for single step save)
@@ -553,15 +559,10 @@ function AgentBoxInner({
 
   const menuItems = [
     {
-      key: 'duplicate',
-      icon: <CopyOutlined />,
-      label: 'Duplicate',
-      onClick: () => session && duplicateSession(session.id)
-    },
-    {
       key: 'delete',
-      icon: <DeleteOutlined />,
-      label: 'Delete',
+      icon: '',
+      // icon: <DeleteOutlined />,
+      label: 'Close',
       danger: true,
       onClick: () => session && deleteSession(session.id)
     }
@@ -745,6 +746,7 @@ function AgentBoxInner({
             onAddOutputVariable={handleAddOutputVariable}
             onVariableChange={handleVariableChange}
             onDeleteVariable={handleDeleteVariable}
+            onStructuredInputEnabledChange={setStructuredInputEnabled}
             onSystemPromptChange={handleSystemPromptChange}
             onPromptMessagesChange={handlePromptMessagesChange}
             localSystemPrompt={localSystemPrompt}
