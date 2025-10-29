@@ -143,15 +143,16 @@ class TestEndpointAccessControl:
         user_id = mock_user.id
         user_project_ids = [uuid4(), uuid4(), uuid4()]
 
-        with patch.object(
-            ProjectDataManager, "get_user_project_ids", new_callable=AsyncMock
-        ) as mock_get_user_projects:
-            with patch.object(
-                EndpointDataManager, "get_all_active_endpoints", new_callable=AsyncMock
-            ) as mock_get_endpoints:
-                mock_get_user_projects.return_value = user_project_ids
-                mock_get_endpoints.return_value = ([], 0)
+        # Create mock instances
+        mock_project_manager = Mock(spec=ProjectDataManager)
+        mock_project_manager.get_user_project_ids = AsyncMock(return_value=user_project_ids)
 
+        mock_endpoint_manager = Mock(spec=EndpointDataManager)
+        mock_endpoint_manager.get_all_active_endpoints = AsyncMock(return_value=([], 0))
+
+        # Patch the manager constructors to return our mocks
+        with patch('budapp.endpoint_ops.services.ProjectDataManager', return_value=mock_project_manager):
+            with patch('budapp.endpoint_ops.services.EndpointDataManager', return_value=mock_endpoint_manager):
                 # Act
                 result, count = await service.get_all_endpoints(
                     current_user_id=user_id,
@@ -167,9 +168,9 @@ class TestEndpointAccessControl:
                 # Assert
                 assert result == []
                 assert count == 0
-                mock_get_user_projects.assert_called_once_with(user_id)
+                mock_project_manager.get_user_project_ids.assert_called_once_with(user_id)
                 # Verify that get_all_active_endpoints was called with the list of project IDs
-                call_args = mock_get_endpoints.call_args
+                call_args = mock_endpoint_manager.get_all_active_endpoints.call_args
                 assert call_args[0][0] == user_project_ids  # First positional argument
 
     @pytest.mark.asyncio
@@ -181,15 +182,16 @@ class TestEndpointAccessControl:
         service = EndpointService(mock_session)
         user_id = mock_user.id
 
-        with patch.object(
-            ProjectDataManager, "get_user_project_ids", new_callable=AsyncMock
-        ) as mock_get_user_projects:
-            with patch.object(
-                EndpointDataManager, "get_all_active_endpoints", new_callable=AsyncMock
-            ) as mock_get_endpoints:
-                mock_get_user_projects.return_value = []
-                mock_get_endpoints.return_value = ([], 0)
+        # Create mock instances
+        mock_project_manager = Mock(spec=ProjectDataManager)
+        mock_project_manager.get_user_project_ids = AsyncMock(return_value=[])
 
+        mock_endpoint_manager = Mock(spec=EndpointDataManager)
+        mock_endpoint_manager.get_all_active_endpoints = AsyncMock(return_value=([], 0))
+
+        # Patch the manager constructors to return our mocks
+        with patch('budapp.endpoint_ops.services.ProjectDataManager', return_value=mock_project_manager):
+            with patch('budapp.endpoint_ops.services.EndpointDataManager', return_value=mock_endpoint_manager):
                 # Act
                 result, count = await service.get_all_endpoints(
                     current_user_id=user_id,
@@ -205,7 +207,7 @@ class TestEndpointAccessControl:
                 # Assert
                 assert result == []
                 assert count == 0
-                mock_get_user_projects.assert_called_once_with(user_id)
+                mock_project_manager.get_user_project_ids.assert_called_once_with(user_id)
 
     @pytest.mark.asyncio
     async def test_get_all_endpoints_superuser_with_project_id(
@@ -258,14 +260,16 @@ class TestEndpointAccessControl:
         service = EndpointService(mock_session)
         user_id = mock_user.id
 
-        with patch.object(
-            ProjectDataManager, "get_user_project_ids", new_callable=AsyncMock
-        ) as mock_get_user_projects:
-            with patch.object(
-                EndpointDataManager, "get_all_active_endpoints", new_callable=AsyncMock
-            ) as mock_get_endpoints:
-                mock_get_endpoints.return_value = ([], 0)
+        # Create mock instances
+        mock_project_manager = Mock(spec=ProjectDataManager)
+        mock_project_manager.get_user_project_ids = AsyncMock()
 
+        mock_endpoint_manager = Mock(spec=EndpointDataManager)
+        mock_endpoint_manager.get_all_active_endpoints = AsyncMock(return_value=([], 0))
+
+        # Patch the manager constructors to return our mocks
+        with patch('budapp.endpoint_ops.services.ProjectDataManager', return_value=mock_project_manager):
+            with patch('budapp.endpoint_ops.services.EndpointDataManager', return_value=mock_endpoint_manager):
                 # Act
                 result, count = await service.get_all_endpoints(
                     current_user_id=user_id,
@@ -282,9 +286,9 @@ class TestEndpointAccessControl:
                 assert result == []
                 assert count == 0
                 # Superuser should not query user's project IDs
-                mock_get_user_projects.assert_not_called()
+                mock_project_manager.get_user_project_ids.assert_not_called()
                 # Should call get_all_active_endpoints with None (all projects)
-                call_args = mock_get_endpoints.call_args
+                call_args = mock_endpoint_manager.get_all_active_endpoints.call_args
                 assert call_args[0][0] is None  # First positional argument should be None
 
 
