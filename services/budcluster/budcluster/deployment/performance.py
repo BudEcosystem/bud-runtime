@@ -96,7 +96,7 @@ class DeploymentPerformance:
                 }
                 try:
                     latency_factors = compute_latency_factors(self.deployment_name, request_metadata, llm_api="openai")
-                    print(f"Latency factors: {latency_factors}")
+                    logger.info(f"Latency factors: {latency_factors}")
                 except Exception as e:
                     print(f"Error computing latency factors: {e}")
                     import traceback
