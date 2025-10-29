@@ -143,11 +143,29 @@ export async function POST(req: Request) {
     console.error('[Test OpenAI Responses] Error message:', error?.message);
     console.error('[Test OpenAI Responses] Error stack:', error?.stack);
 
+    // Extract the actual error message from the gateway response
+    let actualError = error?.message ?? 'Failed to generate response';
+    let errorDetails = error?.stack;
+
+    // Check if there's a responseBody with the actual error from the gateway
+    if (error?.responseBody) {
+      console.error('[Test OpenAI Responses] Response body:', error.responseBody);
+      try {
+        const parsedError = JSON.parse(error.responseBody);
+        if (parsedError?.error) {
+          actualError = parsedError.error;
+        }
+      } catch (parseError) {
+        // If parsing fails, use the raw responseBody
+        actualError = error.responseBody;
+      }
+    }
+
     return Response.json(
       {
         success: false,
-        error: error?.message ?? 'Failed to generate response',
-        details: error?.stack,
+        error: actualError,
+        details: errorDetails,
       },
       { status: 500 },
     );
