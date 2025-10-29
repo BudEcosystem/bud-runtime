@@ -25,7 +25,7 @@ module "azure" {
     primary      = 512
     primary_data = 4095
     ingress      = 256
-    worker      = 256
+    worker       = 256
   }
 }
 

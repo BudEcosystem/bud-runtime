@@ -15,3 +15,31 @@
 #  -----------------------------------------------------------------------------
 
 """Initialization module for the `commons` subpackage. Contains common utilities, configurations, constants, and helper functions that are shared across the project."""
+
+# SQL validation utilities for preventing SQL injection
+from .sql_validators import (
+    ClusterUUID,
+    ClusterUUIDList,
+    OptionalSafeIdentifierList,
+    SafeIdentifier,
+    SafeIdentifierList,
+    safe_sql_list,
+    validate_cluster_id,
+    validate_identifier,
+    validate_identifiers,
+)
+
+
+__all__ = [
+    # SQL validation functions
+    "validate_identifier",
+    "validate_identifiers",
+    "validate_cluster_id",
+    "safe_sql_list",
+    # Pydantic validated types
+    "SafeIdentifier",
+    "SafeIdentifierList",
+    "ClusterUUID",
+    "ClusterUUIDList",
+    "OptionalSafeIdentifierList",
+]

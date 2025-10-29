@@ -27,7 +27,8 @@ export async function GET(
 
   try {
     const result = await axios
-      .get(`${tempApiBaseUrl}/prompts/prompt-config/${prompt_id}`, {
+      .get(`https://app.dev.bud.studio/prompts/prompt-config/${prompt_id}`, {
+      // .get(`${tempApiBaseUrl}/prompts/prompt-config/${prompt_id}`, {
         headers,
       })
       .then((response) => {

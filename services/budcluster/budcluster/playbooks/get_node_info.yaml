@@ -61,6 +61,7 @@
           labels: "{{ labels }}"
           capacity: "{{ status.capacity | default({}) }}"
           allocatable: "{{ status.allocatable | default({}) }}"
+          addresses: "{{ status.addresses | default([]) }}"
           gpu_info:
             nvidia_present: "{{ labels.get('nvidia.com/gpu.present', 'false') == 'true' or labels.get('feature.node.kubernetes.io/pci-10de.present', 'false') == 'true' }}"
             nvidia_gpus: "{{ labels.get('nvidia.com/gpu.count', '0') | int }}"

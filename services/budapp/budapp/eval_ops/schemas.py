@@ -144,7 +144,8 @@ class CreateExperimentRequest(BaseModel):
     )
     description: Optional[str] = Field(None, max_length=500, description="The description of the experiment.")
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment (optional).")
-    tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
+    tags: Optional[List[str]] = Field(None, description="DEPRECATED: List of tag names. Use tag_ids instead.")
+    tag_ids: Optional[List[UUID4]] = Field(None, description="List of EvalTag IDs to associate with experiment.")
 
     @field_validator("name")
     @classmethod
@@ -213,7 +214,9 @@ class Experiment(BaseModel):
     name: str = Field(..., description="The name of the experiment.")
     description: Optional[str] = Field(None, description="The description of the experiment.")
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment.")
-    tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
+    tags: Optional[List[str]] = Field(None, description="DEPRECATED: List of tag names. Use tag_objects instead.")
+    tag_ids: Optional[List[UUID4]] = Field(None, description="List of EvalTag IDs.")
+    tag_objects: Optional[List["EvalTag"]] = Field(None, description="Complete tag objects with details.")
     status: Optional[str] = Field(
         None,
         description="Computed status based on runs (running/failed/completed/pending/no_runs).",
@@ -479,6 +482,73 @@ class Trait(BaseModel):
         """Pydantic model configuration."""
 
         from_attributes = True
+
+
+# ------------------------ EvalTag Schemas ------------------------
+
+
+class EvalTagBase(BaseModel):
+    """Base schema for EvalTag."""
+
+    name: str = Field(..., min_length=1, max_length=20, description="Tag name (alphanumeric, hyphens, underscores)")
+    description: Optional[str] = Field(None, max_length=255, description="Tag description")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate tag name format."""
+        v = v.strip()
+        if not re.match(r"^[a-zA-Z0-9\-_]+$", v):
+            raise ValueError("Tag name can only contain letters, numbers, hyphens, and underscores")
+        return v
+
+
+class EvalTag(EvalTagBase):
+    """Complete EvalTag schema with ID and timestamps."""
+
+    id: UUID4 = Field(..., description="The UUID of the tag.")
+    created_at: datetime = Field(..., description="Timestamp when the tag was created")
+    modified_at: datetime = Field(..., description="Last modification timestamp")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class EvalTagCreate(BaseModel):
+    """Schema for creating a new EvalTag."""
+
+    name: str = Field(..., min_length=1, max_length=20, description="Tag name")
+    description: Optional[str] = Field(None, max_length=255, description="Tag description")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate tag name format."""
+        v = v.strip()
+        if not re.match(r"^[a-zA-Z0-9\-_]+$", v):
+            raise ValueError("Tag name can only contain letters, numbers, hyphens, and underscores")
+        return v
+
+
+class EvalTagSearchResponse(SuccessResponse):
+    """Response schema for tag search."""
+
+    tags: List[EvalTag] = Field(..., description="List of matching tags")
+    total: int = Field(..., description="Total number of matches")
+
+
+class EvalTagListResponse(PaginatedSuccessResponse):
+    """Response schema for listing tags with pagination."""
+
+    tags: List[EvalTag] = Field(..., description="List of tags")
+
+
+class CreateEvalTagResponse(SuccessResponse):
+    """Response schema for creating a tag."""
+
+    tag: EvalTag = Field(..., description="The created tag")
 
 
 class ListTraitsResponse(SuccessResponse):

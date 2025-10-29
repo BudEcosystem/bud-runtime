@@ -172,7 +172,7 @@ const ExperimentDetailsPage = () => {
                                 experimentDetails?.name || "Experiment",
                             ]}
                             data={[
-                                "experiments",
+                                "Experiments",
                                 experimentDetails?.name || "Experiment",
                             ]}
                         />
