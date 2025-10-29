@@ -72,56 +72,57 @@ export async function POST(req: Request) {
   console.log('[Test OpenAI Responses] Using model:', model);
   console.log('[Test OpenAI Responses] Using baseURL:', baseURL);
 
-  try {
-    // Create OpenAI instance following the same pattern as chat route
-    // DO NOT pass apiKey to createOpenAI - pass auth headers in custom fetch instead
-    const openai = createOpenAI({
-      baseURL,
-      fetch: (input, init) => {
-        console.log('[Test OpenAI Responses] ===== FETCH DETAILS =====');
-        console.log('[Test OpenAI Responses] Full URL:', input);
-        console.log('[Test OpenAI Responses] Method:', init?.method);
+  // Extract the token
+  let token = '';
+  if (authorization) {
+    token = authorization.replace(/^Bearer\s+/i, '');
+  } else if (apiKey) {
+    token = apiKey;
+  }
 
-        // Build request with proper headers - following chat route pattern
-        const request = {
-          ...init,
-          method: 'POST',
-          headers: {
-            ...init?.headers,
-            // Pass through the authorization header (JWT Bearer token)
-            ...(authorization && { 'Authorization': authorization }),
-            // Pass through the API key header if present
-            ...(apiKey && { 'api-key': apiKey }),
-            // Add project-id if provided
-            ...(body.metadata?.project_id && { 'project-id': body.metadata.project_id }),
-          },
+  console.log('[Test OpenAI Responses] Token length:', token.length);
+
+  try {
+    // CRITICAL: Pass apiKey to createOpenAI so it adds proper Authorization header
+    const proxyOpenAI = createOpenAI({
+      baseURL,
+      apiKey: token, // 🔥 THIS IS THE KEY - SDK will add "Authorization: Bearer <token>"
+      fetch: (input, init) => {
+        console.log('[Test OpenAI Responses] ========== CUSTOM FETCH ==========');
+        console.log('[Test OpenAI Responses] URL:', input);
+        console.log('[Test OpenAI Responses] Headers from SDK:', JSON.stringify(init?.headers, null, 2));
+
+        // Only add additional headers like project-id
+        const additionalHeaders: Record<string, string> = {};
+        if (body.metadata?.project_id) {
+          additionalHeaders['project-id'] = body.metadata.project_id;
+        }
+
+        // Merge SDK headers with additional headers
+        const finalHeaders = {
+          ...init?.headers,
+          ...additionalHeaders,
         };
 
-        console.log('[Test OpenAI Responses] Final headers:', JSON.stringify(request.headers, null, 2));
-        console.log('[Test OpenAI Responses] ===========================');
+        console.log('[Test OpenAI Responses] Final headers:', JSON.stringify(finalHeaders, null, 2));
+        console.log('[Test OpenAI Responses] =====================================');
 
-        const response = fetch(input, request);
-
-        response.then(res => {
-          console.log('[Test OpenAI Responses] Response status:', res.status);
-          if (!res.ok) {
-            res.clone().text().then(errorText => {
-              console.error('[Test OpenAI Responses] Error response:', errorText);
-            });
-          }
-        });
-
-        return response;
+        const request: RequestInit = {
+          method: init?.method || 'POST',
+          headers: finalHeaders,
+          body: init?.body,
+        };
+        
+        return fetch(input, request);
       },
     });
 
     console.log('[Test OpenAI Responses] Calling generateText with openai.responses()...');
-    console.log('[Test OpenAI Responses] Base URL configured:', baseURL);
     console.log('[Test OpenAI Responses] Using Responses API endpoint: POST /v1/responses');
 
     // Use the Responses API
     const result = await generateText({
-      model: openai.responses(model),
+      model: proxyOpenAI.responses(model),
       prompt,
     });
 

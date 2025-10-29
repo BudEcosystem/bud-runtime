@@ -1,3 +1,9 @@
+import { generateText } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
+
+// Allow streaming responses up to 30 seconds
+export const maxDuration = 300;
+
 interface PromptBody {
   input?: string | null;
   prompt?: {
@@ -31,23 +37,27 @@ const resolveGatewayBase = (preferred?: string | null) => {
     (item) => typeof item.value === 'string' && item.value.trim().length > 0,
   );
 
-  console.log('[Responses API] Selected base URL source:', selected?.name);
-  console.log('[Responses API] Selected base URL value:', selected?.value);
+  console.log('[Prompt Chat] Selected base URL source:', selected?.name);
+  console.log('[Prompt Chat] Selected base URL value:', selected?.value);
 
   let baseUrl = trimTrailingSlash(selected?.value || 'https://gateway.dev.bud.studio');
 
   // IMPORTANT: Responses API is only available on gateway, not on app
   // Replace app.dev.bud.studio with gateway.dev.bud.studio
   if (baseUrl.includes('app.dev.bud.studio')) {
-    console.log('[Responses API] Detected app.dev.bud.studio, redirecting to gateway.dev.bud.studio');
+    console.log('[Prompt Chat] Detected app.dev.bud.studio, redirecting to gateway.dev.bud.studio');
     baseUrl = baseUrl.replace('app.dev.bud.studio', 'gateway.dev.bud.studio');
   }
 
-  // Remove /openai/v1 or /v1 suffix if present, since we'll add /v1/responses
+  // Remove /openai/v1 suffix if present, but keep /v1
   baseUrl = baseUrl.replace(/\/openai\/v1$/, '');
-  baseUrl = baseUrl.replace(/\/v1$/, '');
 
-  console.log('[Responses API] Final base URL after cleanup:', baseUrl);
+  // Ensure baseURL ends with /v1 for OpenAI SDK compatibility
+  if (!baseUrl.endsWith('/v1')) {
+    baseUrl = `${baseUrl}/v1`;
+  }
+
+  console.log('[Prompt Chat] Final base URL after cleanup:', baseUrl);
 
   return baseUrl;
 };
@@ -85,90 +95,71 @@ export async function POST(req: Request) {
     );
   }
 
+  const model = body.model || 'gpt-4o';
   const baseURL = resolveGatewayBase(body.metadata?.base_url ?? null);
-  const responsesEndpoint = `${baseURL}/v1/responses`;
 
-  // Build request body matching gateway's expected format
-  const requestBody: {
-    prompt: {
-      id: string;
-      version?: string;
-    };
-    input: string;
-    model?: string;
-    temperature?: number;
-  } = {
-    prompt: {
-      id: body.prompt?.id || '',
-    },
-    input: promptInput,
-  };
-
-  // Add optional fields
-  if (body.prompt?.version) {
-    requestBody.prompt.version = body.prompt.version;
-  }
-  if (body.model) {
-    requestBody.model = body.model;
-  }
-  if (body.settings?.temperature !== undefined) {
-    requestBody.temperature = body.settings.temperature;
-  }
-
-  // Build headers
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  if (authorization) {
-    headers['Authorization'] = authorization;
-  }
-  if (apiKey) {
-    headers['api-key'] = apiKey;
-  }
-  if (body.metadata?.project_id) {
-    headers['project-id'] = body.metadata.project_id;
-  }
-
-  // Log the request
-  console.log('[Responses API] Endpoint:', responsesEndpoint);
-  console.log('[Responses API] Request body:', JSON.stringify(requestBody, null, 2));
-  console.log('[Responses API] Request headers:', headers);
+  console.log('[Prompt Chat] Using prompt input:', promptInput);
+  console.log('[Prompt Chat] Using model:', model);
+  console.log('[Prompt Chat] Using baseURL:', baseURL);
+  console.log('[Prompt Chat] Prompt ID:', body.prompt?.id);
+  console.log('[Prompt Chat] Prompt version:', body.prompt?.version);
 
   try {
-    const response = await fetch(responsesEndpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
+    // Create OpenAI instance following the same pattern as chat route
+    // DO NOT pass apiKey to createOpenAI - pass auth headers in custom fetch instead
+    const proxyOpenAI = createOpenAI({
+      baseURL,
+      fetch: (input, init) => {
+        const request = {
+          ...init,
+          method: 'POST',
+          headers: {
+            ...init?.headers,
+            // Pass through the authorization header (JWT Bearer token)
+            ...(authorization && { 'Authorization': authorization }),
+            // Pass through the API key header if present
+            ...(apiKey && { 'api-key': apiKey }),
+            // Add project-id if provided
+            ...(body.metadata?.project_id && { 'project-id': body.metadata.project_id }),
+          },
+        };
+        return fetch(input, request);
+      },
     });
 
-    console.log('[Responses API] Response status:', response.status);
-    console.log('[Responses API] Response statusText:', response.statusText);
+    console.log('[Prompt Chat] Calling generateText with openai.responses()...');
+    console.log('[Prompt Chat] Base URL configured:', baseURL);
+    console.log('[Prompt Chat] Using Responses API endpoint: POST /v1/responses');
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Responses API] Error response:', errorText);
+    // Use the Responses API
+    const result = await generateText({
+      model: proxyOpenAI.responses(model),
+      prompt: promptInput,
+      ...(body.settings?.temperature !== undefined && { temperature: body.settings.temperature }),
+    });
 
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { error: errorText || 'Failed to generate response' };
-      }
+    console.log('[Prompt Chat] Success!');
+    console.log('[Prompt Chat] Text:', result.text);
+    console.log('[Prompt Chat] Usage:', result.usage);
+    console.log('[Prompt Chat] Provider metadata:', JSON.stringify(result.providerMetadata, null, 2));
 
-      return Response.json(errorData, { status: response.status });
-    }
-
-    const data = await response.json();
-    console.log('[Responses API] Success response:', JSON.stringify(data, null, 2));
-
-    return Response.json(data);
+    return Response.json({
+      success: true,
+      text: result.text,
+      usage: result.usage,
+      finishReason: result.finishReason,
+      providerMetadata: result.providerMetadata,
+    });
   } catch (error: any) {
-    console.error('[Responses API] Request error:', error);
+    console.error('[Prompt Chat] Error:', error);
+    console.error('[Prompt Chat] Error message:', error?.message);
+    console.error('[Prompt Chat] Error stack:', error?.stack);
 
     return Response.json(
       {
+        success: false,
         error: error?.message ?? 'Failed to generate response',
+        details: error?.stack,
       },
       { status: 500 },
     );
