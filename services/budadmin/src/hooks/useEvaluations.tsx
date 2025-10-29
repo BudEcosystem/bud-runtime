@@ -71,6 +71,11 @@ export interface TraitSimple {
   exps_ids: string[];
 }
 
+export interface ExperimentTags {
+  name: string;
+  color: string;
+}
+
 export interface MetaLinks {
   manifest_id: string;
   github?: string;
@@ -122,6 +127,7 @@ export const useEvaluations = create<{
   traitsList: TraitSimple[];
   experimentsList: ExperimentData[];
   experimentsListTotal: number;
+  experimentTags: ExperimentTags[];
   experimentDetails: any;
   experimentMetrics: any;
   experimentBenchmarks: any;
@@ -136,6 +142,7 @@ export const useEvaluations = create<{
   getEvaluationDetails: (datasetId: string) => Promise<any>;
   getTraits: (payload?: any) => Promise<any>;
   getExperiments: (payload?: GetExperimentsPayload) => Promise<any>;
+  getExperimentTags: () => Promise<any>;
   getExperimentDetails: (id: string) => Promise<any>;
   getExperimentRuns: (id: string) => Promise<any>;
   createExperiment: (payload: any) => Promise<any>;
@@ -153,6 +160,7 @@ export const useEvaluations = create<{
   evaluationsListTotal: 0,
   experimentsList: [],
   experimentsListTotal: 0,
+  experimentTags: [],
   experimentDetails: null,
   experimentMetrics: null,
   experimentBenchmarks: null,
@@ -278,6 +286,22 @@ export const useEvaluations = create<{
       // Return empty data on error
       set({ experimentsList: [], experimentsListTotal: 0 });
       throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  getExperimentTags: async () => {
+    const url = `${tempApiBaseUrl}/experiments/tags`;
+    set({ loading: true });
+    try {
+      const response: any = await AppRequest.Get(url);
+      console.log("experiment tags response", response);
+      set({
+        experimentTags: response.data.tags,
+      });
+    } catch (error) {
+      console.error("Error fetching experiment tags:", error);
     } finally {
       set({ loading: false });
     }
