@@ -110,7 +110,7 @@ async def list_all_endpoints(
 
     try:
         db_endpoints, count = await EndpointService(session).get_all_endpoints(
-            project_id, offset, limit, filters_dict, order_by, search
+            current_user.id, current_user.is_superuser, project_id, offset, limit, filters_dict, order_by, search
         )
     except ClientException as e:
         logger.exception(f"Failed to get all endpoints: {e}")
