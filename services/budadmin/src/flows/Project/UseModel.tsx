@@ -20,6 +20,7 @@ import CustomPopover from "../components/customPopover";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useDrawer } from "src/hooks/useDrawer";
+import { copyToClipboard } from "@/utils/clipboard";
 
 type EndpointTemplate = {
   id: string;
@@ -448,15 +449,11 @@ export default function UseModel() {
     setSelectedText(codeSnippets[type] ?? "");
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        setCopiedText("Copied..");
-      })
-      .catch(() => {
-        setCopiedText("Failed to copy");
-      });
+  const handleCopy = async (text: string) => {
+    await copyToClipboard(text, {
+      onSuccess: () => setCopiedText("Copied.."),
+      onError: () => setCopiedText("Failed to copy"),
+    });
   };
 
   useEffect(() => {

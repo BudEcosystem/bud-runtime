@@ -21,6 +21,7 @@ import {
   QuestionCircleOutlined,
 } from "@ant-design/icons";
 import { ClientInfo as ClientInfoType } from "@/stores/useInferences";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const { Text, Title } = Typography;
 
@@ -34,11 +35,11 @@ const ClientInfo: React.FC<ClientInfoProps> = ({ data, onCopy }) => {
     return <Empty description="No client information available" />;
   }
 
-  const handleCopy = (content: string, label: string) => {
+  const handleCopy = async (content: string, label: string) => {
     if (onCopy) {
       onCopy(content, label);
     } else {
-      navigator.clipboard.writeText(content);
+      await copyToClipboard(content);
     }
   };
 

@@ -23,6 +23,7 @@ import { AppRequest } from "src/pages/api/requests";
 import DashBoardLayout from "src/pages/home/layout";
 import lArrowIcn from "./../../../../../../../../public/icons/l-arrow.png";
 import { errorToast, successToast } from "@/components/toast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const setScoreTypeTitle = (scoreType) => {
   switch (scoreType) {
@@ -206,12 +207,10 @@ const PromptScoreDetail = () => {
       text = `Prompt: ${item.prompt}\nResponse: ${item.response}`;
     }
 
-    try {
-      await navigator.clipboard.writeText(text);
-      successToast("Copied..");
-    } catch (err) {
-      errorToast("Failed to copy");
-    }
+    await copyToClipboard(text, {
+      onSuccess: () => successToast("Copied.."),
+      onError: () => errorToast("Failed to copy"),
+    });
   };
 
   const HeaderContent = () => {
