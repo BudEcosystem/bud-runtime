@@ -150,7 +150,7 @@ async def list_all_endpoints(
     },
     description="Delete an endpoint by ID",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW, PermissionEnum.ENDPOINT_MANAGE])
 async def delete_endpoint(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
