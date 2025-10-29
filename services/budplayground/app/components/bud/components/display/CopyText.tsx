@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { copyToClipboard } from "../../../../utils/clipboard";
 
 
 export function CopyText(props: { text: string }) {
@@ -6,29 +7,10 @@ export function CopyText(props: { text: string }) {
     const [copied, setCopied] = useState(false);
 
     const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(props.text);
-            setCopied(true);
-        } catch (err) {
-            // Fallback for when Clipboard API is blocked
-            const textArea = document.createElement("textarea");
-            textArea.value = props.text;
-            textArea.style.position = "fixed";
-            textArea.style.left = "-999999px";
-            textArea.style.top = "-999999px";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                // @ts-ignore - Using deprecated API as fallback when Clipboard API is blocked
-                document.execCommand('copy');
-                setCopied(true);
-            } catch (fallbackErr) {
-                console.error('Failed to copy:', fallbackErr);
-            } finally {
-                textArea.remove();
-            }
-        }
+        await copyToClipboard(props.text, {
+            onSuccess: () => setCopied(true),
+            onError: (error: Error) => console.error('Failed to copy:', error),
+        });
     }
 
     useEffect(() => {

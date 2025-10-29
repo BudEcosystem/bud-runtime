@@ -3,7 +3,8 @@ import { Model } from "@/hooks/useModels";
 import Tags from "./DrawerTags";
 import { LinkOutlined } from "@ant-design/icons";
 import { Image, Popover } from "antd";
-import { successToast } from "@/components/toast";
+import { successToast, errorToast } from "@/components/toast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 type ModelTagsProps = {
   model: Model;
@@ -82,15 +83,17 @@ function ModelTags(props: ModelTagsProps) {
 
           {props.model?.uri && !props.hideLink && (
             <Tags
-              onTagClick={() => {
+              onTagClick={async () => {
                 if (props.model?.provider_type == "hugging_face") {
                   window.open(
                     "https://huggingface.co/" + props.model?.uri,
                     "_blank",
                   );
                 } else {
-                  navigator.clipboard.writeText(props.model?.uri);
-                  successToast("Copied to clipboard");
+                  await copyToClipboard(props.model?.uri, {
+                    onSuccess: () => successToast("Copied to clipboard"),
+                    onError: () => errorToast("Failed to copy to clipboard"),
+                  });
                 }
               }}
               tooltipText={

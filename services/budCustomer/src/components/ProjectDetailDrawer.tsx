@@ -18,7 +18,8 @@ import {
   UserOutlined,
   FolderOutlined,
 } from "@ant-design/icons";
-import { successToast } from "@/components/toast";
+import { successToast, errorToast } from "@/components/toast";
+import { copyToClipboard } from "@/utils/clipboard";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
@@ -94,9 +95,11 @@ export const ProjectDetailContent: React.FC<{
     }
   }, [projectId]);
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    successToast("Copied to clipboard");
+  const handleCopyToClipboard = async (text: string) => {
+    await copyToClipboard(text, {
+      onSuccess: () => successToast("Copied to clipboard"),
+      onError: () => errorToast("Failed to copy to clipboard"),
+    });
   };
 
   const getProjectTypeLabel = (type: string) => {

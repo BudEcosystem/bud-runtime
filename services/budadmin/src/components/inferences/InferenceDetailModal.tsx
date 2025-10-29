@@ -18,6 +18,7 @@ import {
 import { CopyOutlined, DownloadOutlined } from "@ant-design/icons";
 import { format } from "date-fns";
 import { formatTimestamp, formatTimestampWithTZ } from "@/utils/formatDate";
+import { copyToClipboard as copyText } from "@/utils/clipboard";
 import { useInferences } from "@/stores/useInferences";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { monokai } from "react-syntax-highlighter/dist/cjs/styles/hljs";
@@ -69,9 +70,11 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
     clearSelectedInference,
   ]);
 
-  const copyToClipboard = (text: string, label: string = "Content") => {
-    navigator.clipboard.writeText(text);
-    message.success(`${label} copied to clipboard`);
+  const copyToClipboard = async (text: string, label: string = "Content") => {
+    await copyText(text, {
+      onSuccess: () => message.success(`${label} copied to clipboard`),
+      onError: () => message.error(`Failed to copy ${label}`),
+    });
   };
 
   const downloadAsFile = (content: string, filename: string) => {

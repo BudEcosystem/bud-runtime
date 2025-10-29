@@ -57,6 +57,7 @@ import ProjectTags from "src/flows/components/ProjectTags";
 import { SortIcon } from "@/components/ui/bud/table/SortIcon";
 import { formatDate } from "src/utils/formatDate";
 import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
+import { copyToClipboard as copyText } from "@/utils/clipboard";
 import DashBoardLayout from "../layout";
 import PageHeader from "@/components/ui/pageHeader";
 import { ClientTimestamp } from "@/components/ui/ClientTimestamp";
@@ -120,9 +121,11 @@ const ObservabilityPage: React.FC = () => {
   }, [searchValue, fetchInferences]);
 
   // Copy inference ID to clipboard
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    message.success("Copied to clipboard");
+  const copyToClipboard = async (text: string) => {
+    await copyText(text, {
+      onSuccess: () => message.success("Copied to clipboard"),
+      onError: () => message.error("Failed to copy to clipboard"),
+    });
   };
 
   // Handle time range change
