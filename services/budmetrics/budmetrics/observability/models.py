@@ -1106,6 +1106,7 @@ class QueryBuilder:
         cte_clauses = []
 
         # Add topk CTE if needed (only when group_by is specified)
+        topk_join_clause = ""
         if topk and group_fields:
             topk_cte = self._build_topk_cte(
                 metric_definitions,
@@ -1119,14 +1120,14 @@ class QueryBuilder:
             if topk_cte:
                 cte_clauses.append(topk_cte)
 
-                # Add condition to filter by topk entities
-                topk_conditions = []
+                # Build JOIN clause instead of WHERE subquery to avoid asynch driver issues
+                # The asynch library cannot handle nested subqueries in WHERE clauses
+                topk_join_conditions = []
                 for group_field in group_by:
                     col = self._MAPPING_COLUMNS[group_field]
-                    # Extract just the column name without alias for the subquery
                     col_name = col.split(".")[-1]
-                    topk_conditions.append(f"{col} IN (SELECT {col_name} FROM topk_entities)")
-                conditions.append(f"({' AND '.join(topk_conditions)})")
+                    topk_join_conditions.append(f"{col} = te.{col_name}")
+                topk_join_clause = f"INNER JOIN topk_entities te ON {' AND '.join(topk_join_conditions)}"
 
         if cte_registry:
             for cte_name, cte_def in cte_registry.items():
@@ -1147,6 +1148,7 @@ class QueryBuilder:
         SELECT
             {", ".join(select_parts)}
         {self._get_table_join_clause(required_tables, cte_registry, group_fields)}
+        {topk_join_clause}
         WHERE {" AND ".join(conditions)}
         GROUP BY {", ".join(group_by_parts)}
         ORDER BY {time_bucket_alias} DESC
