@@ -162,7 +162,7 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
 
   const handleSelectModel = (endpoint: ModelWrapper | Model) => {
     // Handle both direct model object and wrapped model object
-    const modelData = 'model' in endpoint ? endpoint.model : endpoint;
+    const modelData = 'model' in endpoint ? endpoint : endpoint;
     // Get the endpoint ID from the root level (for wrapped objects)
     const endpointId = 'model' in endpoint ? endpoint.id : endpoint.id;
 

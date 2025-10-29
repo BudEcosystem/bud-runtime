@@ -16,6 +16,7 @@ interface InputSettingsProps {
   onDeleteVariable: (variableId: string) => void;
   onSavePromptSchema?: () => void;
   isSaving?: boolean;
+  onStructuredInputEnabledChange?: (enabled: boolean) => void;
 }
 
 export const InputSettings: React.FC<InputSettingsProps> = ({
@@ -25,7 +26,8 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
   onVariableChange,
   onDeleteVariable,
   onSavePromptSchema,
-  isSaving
+  isSaving,
+  onStructuredInputEnabledChange
 }) => {
   const [isOpen, setIsOpen] = React.useState(true);
   const [structuredInputEnabled, setStructuredInputEnabled] = React.useState(false);
@@ -42,6 +44,11 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
     });
     setValidationEnabled(prev => ({ ...prev, ...newValidationEnabled }));
   }, [inputVariables]);
+
+  // Notify parent when structuredInputEnabled changes
+  React.useEffect(() => {
+    onStructuredInputEnabledChange?.(structuredInputEnabled);
+  }, [structuredInputEnabled, onStructuredInputEnabledChange]);
 
   return (
     <div className="flex flex-col justify-between h-full w-full">
