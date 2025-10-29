@@ -26,6 +26,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
+from budapp.commons.config import app_settings
 from budapp.commons.constants import (
     APP_ICONS,
     EndpointStatusEnum,
@@ -773,6 +774,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             providers["bud_sentinel"] = {
                 "type": "bud_sentinel",
                 "probe_config": {},
+                "endpoint": app_settings.bud_sentinel_base_url,
                 "api_key_location": "none",  # Bud sentinel doesn't require credentials
             }
 

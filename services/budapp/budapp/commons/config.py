@@ -205,6 +205,9 @@ class AppConfig(BaseAppConfig):
         default=False, description="Use local mode for evaluation data synchronization", alias="EVAL_SYNC_LOCAL_MODE"
     )
 
+    # Bud Sentinel
+    bud_sentinel_base_url: AnyHttpUrl = Field(alias="BUD_SENTINEL_BASE_URL")
+
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""
