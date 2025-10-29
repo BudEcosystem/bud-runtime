@@ -4,15 +4,18 @@ import { useState, useEffect } from 'react';
 import { Input, InputNumber, Checkbox, Image, message } from 'antd';
 import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
+import { useChatStore } from '@/app/store/chat';
 
 interface PromptFormProps {
   promptIds?: string[];
+  chatId?: string;
   onSubmit: (data: any) => void;
   onClose?: () => void;
 }
 
-export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose }: PromptFormProps) {
+export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: _onClose }: PromptFormProps) {
   const { apiKey, accessKey } = useAuth();
+  const getChat = useChatStore((state) => state.getChat);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [inputSchema, setInputSchema] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -105,16 +108,33 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose: _onClose
     setTestLoading(true);
 
     try {
-      // Hardcoded test data
+      // Get the selected deployment from chat store
+      let modelToUse = 'gpt-4o'; // fallback
+
+      if (chatId) {
+        const chat = getChat(chatId);
+        if (chat?.selectedDeployment) {
+          // Use the deployment name (which is the model identifier)
+          modelToUse = chat.selectedDeployment.name;
+          console.log('[PromptForm] Using selected deployment:', chat.selectedDeployment);
+        }
+      }
+
+      // Fallback to prompt deployment if no chat deployment selected
+      if (!chatId && promptDeployment) {
+        modelToUse = promptDeployment;
+      }
+
       const testData = {
         prompt: 'Explain the concept of quantum entanglement in simple terms.',
-        model: 'gpt-4o',
+        model: modelToUse,
         metadata: {
           project_id: 'test-project-id',
         },
       };
 
       console.log('[PromptForm] Testing OpenAI Responses with data:', testData);
+      console.log('[PromptForm] Using model/deployment:', modelToUse);
 
       // Build headers
       const headers: Record<string, string> = {

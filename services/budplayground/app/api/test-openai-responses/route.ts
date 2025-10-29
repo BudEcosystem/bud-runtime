@@ -41,9 +41,13 @@ const resolveGatewayBase = (preferred?: string | null) => {
     baseUrl = baseUrl.replace('app.dev.bud.studio', 'gateway.dev.bud.studio');
   }
 
-  // Remove /openai/v1 or /v1 suffix if present
+  // Remove /openai/v1 suffix if present, but keep /v1
   baseUrl = baseUrl.replace(/\/openai\/v1$/, '');
-  baseUrl = baseUrl.replace(/\/v1$/, '');
+
+  // Ensure baseURL ends with /v1 for OpenAI SDK compatibility
+  if (!baseUrl.endsWith('/v1')) {
+    baseUrl = `${baseUrl}/v1`;
+  }
 
   console.log('[Test OpenAI Responses] Final base URL after cleanup:', baseUrl);
 
@@ -68,44 +72,54 @@ export async function POST(req: Request) {
   console.log('[Test OpenAI Responses] Using model:', model);
   console.log('[Test OpenAI Responses] Using baseURL:', baseURL);
 
-  // Build headers for the custom fetch
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  if (authorization) {
-    headers['Authorization'] = authorization;
-  }
-  if (apiKey) {
-    headers['api-key'] = apiKey;
-  }
-  if (body.metadata?.project_id) {
-    headers['project-id'] = body.metadata.project_id;
-  }
-
-  console.log('[Test OpenAI Responses] Request headers:', headers);
-
   try {
-    // Create OpenAI instance with custom base URL
+    // Create OpenAI instance following the same pattern as chat route
+    // DO NOT pass apiKey to createOpenAI - pass auth headers in custom fetch instead
     const openai = createOpenAI({
       baseURL,
-      fetch: async (input, init) => {
-        console.log('[Test OpenAI Responses] Fetch input:', input);
-        console.log('[Test OpenAI Responses] Fetch init:', JSON.stringify(init, null, 2));
+      fetch: (input, init) => {
+        console.log('[Test OpenAI Responses] ===== FETCH DETAILS =====');
+        console.log('[Test OpenAI Responses] Full URL:', input);
+        console.log('[Test OpenAI Responses] Method:', init?.method);
 
-        return fetch(input, {
+        // Build request with proper headers - following chat route pattern
+        const request = {
           ...init,
+          method: 'POST',
           headers: {
             ...init?.headers,
-            ...headers,
+            // Pass through the authorization header (JWT Bearer token)
+            ...(authorization && { 'Authorization': authorization }),
+            // Pass through the API key header if present
+            ...(apiKey && { 'api-key': apiKey }),
+            // Add project-id if provided
+            ...(body.metadata?.project_id && { 'project-id': body.metadata.project_id }),
           },
+        };
+
+        console.log('[Test OpenAI Responses] Final headers:', JSON.stringify(request.headers, null, 2));
+        console.log('[Test OpenAI Responses] ===========================');
+
+        const response = fetch(input, request);
+
+        response.then(res => {
+          console.log('[Test OpenAI Responses] Response status:', res.status);
+          if (!res.ok) {
+            res.clone().text().then(errorText => {
+              console.error('[Test OpenAI Responses] Error response:', errorText);
+            });
+          }
         });
+
+        return response;
       },
     });
 
     console.log('[Test OpenAI Responses] Calling generateText with openai.responses()...');
+    console.log('[Test OpenAI Responses] Base URL configured:', baseURL);
+    console.log('[Test OpenAI Responses] Using Responses API endpoint: POST /v1/responses');
 
-    // Use openai.responses() according to the SDK documentation
+    // Use the Responses API
     const result = await generateText({
       model: openai.responses(model),
       prompt,

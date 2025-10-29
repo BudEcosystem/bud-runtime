@@ -362,6 +362,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         {showPromptForm && getPromptIds().length > 0 && (
           <PromptForm
             promptIds={getPromptIds()}
+            chatId={chat.id}
             onSubmit={handlePromptFormSubmit}
             onClose={() => setShowPromptForm(false)}
           />
