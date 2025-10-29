@@ -73,8 +73,8 @@ k8s_ensure() {
 
 helm_install() {
 	name="$1"
-	shift
 	namespace="$2"
+	shift 2
 
 	chart_path="$bud_repo_local/infra/helm/$name"
 	values_path="$chart_path/values.yaml"
