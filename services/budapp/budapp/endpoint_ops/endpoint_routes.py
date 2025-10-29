@@ -86,7 +86,7 @@ endpoint_router = APIRouter(prefix="/endpoints", tags=["endpoint"])
     },
     description="List all endpoints. \n\n order_by fields are: name, status, created_at, modified_at, cluster_name, model_name, modality, is_published, published_date",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW, PermissionEnum.ENDPOINT_VIEW])
 async def list_all_endpoints(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -150,7 +150,7 @@ async def list_all_endpoints(
     },
     description="Delete an endpoint by ID",
 )
-@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW, PermissionEnum.ENDPOINT_MANAGE])
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def delete_endpoint(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
