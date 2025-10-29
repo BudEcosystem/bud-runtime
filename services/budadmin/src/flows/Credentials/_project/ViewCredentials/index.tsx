@@ -101,17 +101,53 @@ export default function ViewProjectCredential() {
 
     fetchDecryptedKey();
   }, [selectedCredential]);
-  const handleCopy = (text: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        // message.success('Text copied to clipboard!');
-        setCopiedText("Copied");
-      })
-      .catch(() => {
-        // message.error('Failed to copy text.');
+  const handleCopy = async (text: string) => {
+    // Validate the text before attempting to copy
+    if (!text || text === "Loading..." || text.trim() === "") {
+      console.error("Cannot copy: Invalid or empty key");
+      setCopiedText("Failed to copy");
+      return;
+    }
+
+    // Check if clipboard API is available (requires HTTPS or localhost)
+    if (!navigator.clipboard) {
+      console.warn("Clipboard API not available (HTTP context), using fallback");
+
+      // Fallback for HTTP environments using document.execCommand
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textArea);
+
+        if (successful) {
+          setCopiedText("Copied");
+        } else {
+          console.error("Fallback copy failed: execCommand returned false");
+          setCopiedText("Failed to copy");
+        }
+      } catch (err) {
+        console.error("Fallback copy error:", err);
         setCopiedText("Failed to copy");
-      });
+      }
+      return;
+    }
+
+    // Modern clipboard API for HTTPS environments
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedText("Copied");
+    } catch (err) {
+      console.error("Clipboard API error:", err);
+      setCopiedText("Failed to copy");
+    }
   };
 
   useEffect(() => {

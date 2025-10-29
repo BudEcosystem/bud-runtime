@@ -268,9 +268,9 @@ export default function UseModel() {
   const tags = [
     {
       name:
-        drawerProps?.endpoint?.model?.name ||
+        drawerProps?.endpoint?.name ||
         drawerProps?.name ||
-        clusterDetails?.model?.name,
+        clusterDetails?.name,
       color: "#D1B854",
     },
     {
@@ -283,10 +283,8 @@ export default function UseModel() {
   ];
 
   const modelNameForPayload =
-    drawerProps?.endpoint?.model?.name ||
     drawerProps?.endpoint?.name ||
     drawerProps?.name ||
-    clusterDetails?.model?.name ||
     clusterDetails?.name ||
     "MODEL_NAME";
 
