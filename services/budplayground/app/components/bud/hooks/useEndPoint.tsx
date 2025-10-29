@@ -24,10 +24,7 @@ export function useEndPoints() {
   }: FetchParams = {}) => {
     const providedCredentials = Boolean(apiKey || accessKey);
 
-    if (!isSessionValid && !providedCredentials) {
-      return null;
-    }
-
+    // Resolve tokens first
     const resolvedAccessKey =
       accessKey ||
       auth?.accessToken ||
@@ -42,13 +39,24 @@ export function useEndPoints() {
         ? (localStorage.getItem('token')?.startsWith('budserve_') ? localStorage.getItem('token') : '') || ''
         : '');
 
+    // Check if we have valid credentials to proceed
+    const hasResolvedCredentials = Boolean(resolvedAccessKey || resolvedApiKey);
+
+    if (!isSessionValid && !providedCredentials && !hasResolvedCredentials) {
+      return null;
+    }
+
     const result = await getEndpoints(page, limit, resolvedApiKey, resolvedAccessKey);
     if (Array.isArray(result)) {
       setEndpoints(result);
       return result;
     }
     return result;
-  }, [auth?.isSessionValid, auth?.accessToken, auth?.apiKey]);
+  }, [isSessionValid, auth?.accessToken, auth?.apiKey]);
 
-  return { getEndPoints, endpoints, isReady: auth?.isSessionValid ?? false };
+  // Only consider ready when we have a valid session AND actual tokens to use
+  const hasTokens = Boolean(auth?.accessToken || auth?.apiKey);
+  const isReady = (auth?.isSessionValid && hasTokens) ?? false;
+
+  return { getEndPoints, endpoints, isReady };
 }
