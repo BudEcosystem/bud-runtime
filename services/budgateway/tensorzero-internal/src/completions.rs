@@ -383,7 +383,6 @@ mod tests {
         assert!(request.validate().is_ok());
     }
 
-
     #[test]
     fn test_validation_n_zero() {
         let mut request = create_test_request();
@@ -409,7 +408,10 @@ mod tests {
         request.best_of = Some(3);
         let result = request.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("best_of (3) must be >= n (5)"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("best_of (3) must be >= n (5)"));
     }
 
     #[test]
@@ -430,7 +432,10 @@ mod tests {
         request.best_of = Some(129);
         let result = request.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("best_of must be <= 128"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("best_of must be <= 128"));
     }
 
     #[test]
@@ -439,12 +444,18 @@ mod tests {
         request.temperature = Some(-0.1);
         let result = request.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("temperature must be between 0.0 and 2.0"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("temperature must be between 0.0 and 2.0"));
 
         request.temperature = Some(2.1);
         let result = request.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("temperature must be between 0.0 and 2.0"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("temperature must be between 0.0 and 2.0"));
     }
 
     #[test]
@@ -466,12 +477,18 @@ mod tests {
         request.top_p = Some(-0.1);
         let result = request.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("top_p must be between 0.0 and 1.0"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("top_p must be between 0.0 and 1.0"));
 
         request.top_p = Some(1.1);
         let result = request.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("top_p must be between 0.0 and 1.0"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("top_p must be between 0.0 and 1.0"));
     }
 
     #[test]
@@ -499,7 +516,10 @@ mod tests {
         ]));
         let result = request.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("stop array must contain at most 4 sequences"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("stop array must contain at most 4 sequences"));
     }
 
     #[test]
@@ -523,7 +543,10 @@ mod tests {
         request.repetition_penalty = Some(0.0);
         let result = request.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("repetition_penalty must be greater than 0.0"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("repetition_penalty must be greater than 0.0"));
     }
 
     #[test]
@@ -532,7 +555,10 @@ mod tests {
         request.repetition_penalty = Some(-1.0);
         let result = request.validate();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("repetition_penalty must be greater than 0.0"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("repetition_penalty must be greater than 0.0"));
     }
 
     #[test]

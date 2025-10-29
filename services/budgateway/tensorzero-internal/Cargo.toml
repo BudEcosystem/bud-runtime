@@ -126,6 +126,9 @@ dashmap = "6.1.0"
 # Analytics dependencies
 maxminddb = "0.24"
 uaparser = "0.6"
+tonic = { version = "0.12.3", features = ["transport", "tls", "tls-roots", "gzip"] }
+prost = "0.13.2"
+prost-types = "0.13.2"
 
 
 [dev-dependencies]
@@ -146,3 +149,4 @@ anyhow = { workspace = true }
 
 [build-dependencies]
 built = { version = "0.8.0", features = ["git2"] }
+tonic-build = { version = "0.12.3", features = ["prost"] }

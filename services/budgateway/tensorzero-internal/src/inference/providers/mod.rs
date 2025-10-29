@@ -7,6 +7,7 @@ pub mod azure;
 pub mod azure_content_safety;
 pub mod base;
 pub mod batch;
+pub mod bud_sentinel;
 pub mod buddoc;
 pub mod budprompt;
 pub mod deepseek;

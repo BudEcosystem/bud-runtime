@@ -24,9 +24,7 @@ impl BudDocProvider {
         api_key_location: Option<CredentialLocation>,
     ) -> Result<Self, Error> {
         let credentials = if let Some(location) = api_key_location {
-            BudDocCredentials::try_from(
-                Credential::try_from((location, "BudDoc"))?,
-            )?
+            BudDocCredentials::try_from(Credential::try_from((location, "BudDoc"))?)?
         } else {
             BudDocCredentials::None
         };

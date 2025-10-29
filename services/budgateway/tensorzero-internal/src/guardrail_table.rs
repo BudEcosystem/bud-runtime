@@ -159,7 +159,7 @@ pub struct ProviderGuardrailResult {
 impl GuardrailConfig {
     /// Validate that all provider types are supported
     pub fn validate(&self) -> Result<(), crate::error::Error> {
-        const SUPPORTED_PROVIDERS: &[&str] = &["azure_content_safety", "openai"];
+        const SUPPORTED_PROVIDERS: &[&str] = &["azure_content_safety", "openai", "bud_sentinel"];
 
         for provider in &self.providers {
             if !SUPPORTED_PROVIDERS.contains(&provider.provider_type.as_str()) {
@@ -235,6 +235,8 @@ pub fn merge_moderation_results(
         merged_categories.insult |= result.categories.insult;
         merged_categories.toxicity |= result.categories.toxicity;
         merged_categories.malicious |= result.categories.malicious;
+        merged_categories.pii |= result.categories.pii;
+        merged_categories.secrets |= result.categories.secrets;
         merged_categories.ip_violation |= result.categories.ip_violation;
         merged_categories.hallucination |= result.categories.hallucination;
 
@@ -274,6 +276,11 @@ pub fn merge_moderation_results(
             .max(result.category_scores.profanity);
         merged_scores.insult = merged_scores.insult.max(result.category_scores.insult);
         merged_scores.toxicity = merged_scores.toxicity.max(result.category_scores.toxicity);
+        merged_scores.malicious = merged_scores
+            .malicious
+            .max(result.category_scores.malicious);
+        merged_scores.pii = merged_scores.pii.max(result.category_scores.pii);
+        merged_scores.secrets = merged_scores.secrets.max(result.category_scores.secrets);
 
         // Merge category applied input types
         if let Some(applied_types) = result.category_applied_input_types {
@@ -313,6 +320,8 @@ pub fn merge_moderation_results(
                 applied_types.violence_graphic,
             );
             merge_string_vec(&mut merged_types.malicious, applied_types.malicious);
+            merge_string_vec(&mut merged_types.pii, applied_types.pii);
+            merge_string_vec(&mut merged_types.secrets, applied_types.secrets);
             merge_string_vec(&mut merged_types.ip_violation, applied_types.ip_violation);
             merge_string_vec(&mut merged_types.hallucination, applied_types.hallucination);
         }
