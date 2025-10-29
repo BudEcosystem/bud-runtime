@@ -73,17 +73,21 @@ k8s_ensure() {
 
 helm_install() {
 	name="$1"
-	namespace="$2"
+	namespace_and_releasename="$2"
 	shift 2
 
 	chart_path="$bud_repo_local/infra/helm/$name"
 	values_path="$chart_path/values.yaml"
 	scid_path="$chart_path/scid.toml"
 
-	if [ "$namespace" = "" ]; then
+	if [ -z "$namespace_and_releasename" ]; then
 		namespace="$(tq -f "$scid_path" '.namespace')"
+		release_name="$(tq -f "$scid_path" '.release_name')"
+	else
+		namespace="$namespace_and_releasename"
+		release_name="$namespace_and_releasename"
 	fi
-	release_name="$(tq -f "$scid_path" '.release_name')"
+
 	if tq -f "$scid_path" '.chart_path_override' >/dev/null 2>&1; then
 		chart_path="$chart_path/$(tq -f "$scid_path" '.chart_path_override')"
 	fi
