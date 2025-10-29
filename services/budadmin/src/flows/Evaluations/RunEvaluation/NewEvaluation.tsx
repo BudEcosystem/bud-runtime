@@ -33,9 +33,6 @@ export default function NewEvaluation() {
   return (
     <BudForm
       data={""}
-      onBack={async () => {
-        openDrawerWithStep("select-use-case");
-      }}
       onNext={async (values) => {
         try {
           // Check if experimentId is available
@@ -54,10 +51,7 @@ export default function NewEvaluation() {
           };
 
           // Call the API
-          const response = await createWorkflow(
-            experimentId,
-            payload,
-          );
+          await createWorkflow(experimentId, payload);
 
           // Navigate to next step
           openDrawerWithStep("select-model-new-evaluation");
@@ -71,7 +65,7 @@ export default function NewEvaluation() {
         <BudDrawerLayout>
           <DrawerTitleCard
             title={"New Evaluation"}
-            description="Description for New Evaluation"
+            description="Create a new evaluation to assess and measure your model's performance within this experiment"
           />
           <DrawerCard classNames="">
             <TextInput

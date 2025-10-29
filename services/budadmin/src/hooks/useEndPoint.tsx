@@ -44,6 +44,8 @@ export type Endpoint = {
   };
   created_at: string;
   modified_at: string;
+  model?: Model;
+  cluster?: Cluster;
 };
 
 export interface IAdapter {
