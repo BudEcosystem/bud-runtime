@@ -94,6 +94,26 @@ const extractTextFromInput = (input: any): string => {
   return '';
 };
 
+// Extract text from gateway response
+const extractTextFromGatewayResponse = (response: any): string => {
+  if (!response.output || !Array.isArray(response.output)) {
+    return '';
+  }
+
+  // Find the assistant message in output
+  const assistantMessage = response.output.find((item: any) => 
+    item.type === 'message' && item.role === 'assistant'
+  );
+
+  if (assistantMessage?.content && Array.isArray(assistantMessage.content)) {
+    const textContent = assistantMessage.content.find((c: any) => 
+      c.type === 'output_text' || c.type === 'text'
+    );
+    return textContent?.text || '';
+  }
+
+  return '';
+};
 
 export async function POST(req: Request) {
   const body: PromptBody = await req.json();
@@ -117,14 +137,12 @@ export async function POST(req: Request) {
   const model = body.model || 'gpt-4o';
   const baseURL = resolveGatewayBase(body.metadata?.base_url ?? null);
 
-  console.log('[Prompt Chat] ===== REQUEST INFO =====');
-  console.log('[Prompt Chat] Prompt input:', promptInput);
-  console.log('[Prompt Chat] Model:', model);
-  console.log('[Prompt Chat] Base URL:', baseURL);
-  console.log('[Prompt Chat] Prompt ID:', body.prompt?.id);
-  console.log('[Prompt Chat] Prompt version:', body.prompt?.version);
-  console.log('[Prompt Chat] Prompt variables:', body.prompt?.variables);
-  console.log('[Prompt Chat] =======================');
+  console.log('[Prompt Chat] Using prompt input:', promptInput);
+  console.log('[Prompt Chat] Using model:', model);
+  console.log('[Prompt Chat] Using baseURL:', baseURL);
+
+  // Store the raw response for manual parsing if SDK fails
+  let rawResponseBody: any = null;
 
   try {
     const proxyOpenAI = createOpenAI({
@@ -141,37 +159,27 @@ export async function POST(req: Request) {
 
             const requestBody = JSON.parse(bodyStr);
 
-            console.log('[Prompt Chat] ===== ORIGINAL SDK BODY =====');
-            console.log(JSON.stringify(requestBody, null, 2));
-            console.log('[Prompt Chat] ================================');
+            console.log('[Prompt Chat] Original SDK body:', JSON.stringify(requestBody, null, 2));
 
-            // Remove the model field
+            // Delete the model field (as required by your gateway)
             delete requestBody.model;
 
             // Convert input array to string
             if (requestBody.input) {
               const textInput = extractTextFromInput(requestBody.input);
               requestBody.input = textInput;
-              console.log('[Prompt Chat] Converted input to string:', textInput);
             }
 
-            // Add the prompt object with proper structure
+            // Add the prompt object
             if (body.prompt?.id) {
               requestBody.prompt = {
                 id: body.prompt.id,
-                version: body.prompt.version || '1', // ← Make sure version has a default
-                variables: body.prompt.variables || {}, // ← Make sure variables is always an object
-                // deployment_name: 'qwen3-4b',
+                version: body.prompt.version || '1',
+                variables: body.prompt.variables || {},
               };
-              console.log('[Prompt Chat] Added prompt object:', JSON.stringify(requestBody.prompt, null, 2));
             }
 
-            // ✅ ADD THIS: deployment_name is required by gateway
-            // requestBody.deployment_name = 'qwen3-4b'; // or body.model, or a specific deployment name
-
-            console.log('[Prompt Chat] ===== FINAL REQUEST BODY SENT TO GATEWAY =====');
-            console.log(JSON.stringify(requestBody, null, 2));
-            console.log('[Prompt Chat] =============================================');
+            console.log('[Prompt Chat] Final request body:', JSON.stringify(requestBody, null, 2));
 
             modifiedInit.body = JSON.stringify(requestBody);
           }
@@ -189,7 +197,20 @@ export async function POST(req: Request) {
             ...(body.metadata?.project_id && { 'project-id': body.metadata.project_id }),
           },
         };
-        return fetch(input, request);
+
+        // Intercept the response to capture raw body before SDK tries to parse it
+        return fetch(input, request).then(async (response) => {
+          const clonedResponse = response.clone();
+          
+          try {
+            rawResponseBody = await clonedResponse.json();
+            console.log('[Prompt Chat] Raw response captured:', JSON.stringify(rawResponseBody, null, 2));
+          } catch (e) {
+            console.error('[Prompt Chat] Failed to capture response:', e);
+          }
+
+          return response;
+        });
       },
     });
 
@@ -201,9 +222,9 @@ export async function POST(req: Request) {
       ...(body.settings?.temperature !== undefined && { temperature: body.settings.temperature }),
     });
 
-    console.log('[Prompt Chat] Success!');
+    // If we got here, SDK parsed successfully
+    console.log('[Prompt Chat] Success via SDK!');
     console.log('[Prompt Chat] Text:', result.text);
-    console.log('[Prompt Chat] Usage:', result.usage);
 
     return Response.json({
       success: true,
@@ -212,8 +233,33 @@ export async function POST(req: Request) {
       finishReason: result.finishReason,
       providerMetadata: result.providerMetadata,
     });
+
   } catch (error: any) {
-    console.error('[Prompt Chat] Error:', error);
+    console.error('[Prompt Chat] SDK Error:', error);
+    console.error('[Prompt Chat] Error name:', error?.name);
+
+    // Check if it's a parsing error and we have the raw response
+    if (error?.name === 'AI_InvalidResponseDataError' && rawResponseBody) {
+      console.log('[Prompt Chat] SDK parsing failed, using manual extraction...');
+      
+      // Extract text manually from the raw response
+      const text = extractTextFromGatewayResponse(rawResponseBody);
+
+      if (text) {
+        console.log('[Prompt Chat] Success via manual parsing!');
+        console.log('[Prompt Chat] Extracted text:', text);
+
+        return Response.json({
+          success: true,
+          text: text,
+          usage: rawResponseBody.usage,
+          finishReason: rawResponseBody.status,
+          response: rawResponseBody,
+        });
+      }
+    }
+
+    // If manual parsing also failed, return error
     console.error('[Prompt Chat] Error message:', error?.message);
 
     let actualError = error?.message ?? 'Failed to generate response';
