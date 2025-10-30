@@ -121,7 +121,7 @@ class Run(Base, TimestampMixin):
         ForeignKey("evaluations.id"), nullable=True
     )  # Nullable for backward compatibility
     run_index: Mapped[int] = mapped_column(Integer, nullable=False)  # Auto-incrementing index per experiment
-    model_id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    endpoint_id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     dataset_version_id: Mapped[uuid4] = mapped_column(ForeignKey("exp_dataset_versions.id"), nullable=False)
     status: Mapped[str] = mapped_column(
         PG_ENUM(*[e.value for e in RunStatusEnum], name="run_status_enum"),
