@@ -42,17 +42,13 @@ const resolveGatewayBase = (preferred?: string | null) => {
 
   let baseUrl = trimTrailingSlash(selected?.value || 'https://gateway.dev.bud.studio');
 
-  // IMPORTANT: Responses API is only available on gateway, not on app
-  // Replace app.dev.bud.studio with gateway.dev.bud.studio
   if (baseUrl.includes('app.dev.bud.studio')) {
     console.log('[Prompt Chat] Detected app.dev.bud.studio, redirecting to gateway.dev.bud.studio');
     baseUrl = baseUrl.replace('app.dev.bud.studio', 'gateway.dev.bud.studio');
   }
 
-  // Remove /openai/v1 suffix if present, but keep /v1
   baseUrl = baseUrl.replace(/\/openai\/v1$/, '');
 
-  // Ensure baseURL ends with /v1 for OpenAI SDK compatibility
   if (!baseUrl.endsWith('/v1')) {
     baseUrl = `${baseUrl}/v1`;
   }
@@ -76,6 +72,29 @@ const buildPromptInput = (body: PromptBody) => {
   return '';
 };
 
+// Helper function to extract text from SDK's input array format
+const extractTextFromInput = (input: any): string => {
+  if (typeof input === 'string') {
+    return input;
+  }
+
+  if (Array.isArray(input)) {
+    const userMessage = input.find((msg: any) => msg.role === 'user');
+    if (userMessage?.content) {
+      if (Array.isArray(userMessage.content)) {
+        const textContent = userMessage.content.find((c: any) => c.type === 'input_text' || c.type === 'text');
+        return textContent?.text || '';
+      }
+      if (typeof userMessage.content === 'string') {
+        return userMessage.content;
+      }
+    }
+  }
+
+  return '';
+};
+
+
 export async function POST(req: Request) {
   const body: PromptBody = await req.json();
 
@@ -98,28 +117,75 @@ export async function POST(req: Request) {
   const model = body.model || 'gpt-4o';
   const baseURL = resolveGatewayBase(body.metadata?.base_url ?? null);
 
-  console.log('[Prompt Chat] Using prompt input:', promptInput);
-  console.log('[Prompt Chat] Using model:', model);
-  console.log('[Prompt Chat] Using baseURL:', baseURL);
+  console.log('[Prompt Chat] ===== REQUEST INFO =====');
+  console.log('[Prompt Chat] Prompt input:', promptInput);
+  console.log('[Prompt Chat] Model:', model);
+  console.log('[Prompt Chat] Base URL:', baseURL);
   console.log('[Prompt Chat] Prompt ID:', body.prompt?.id);
   console.log('[Prompt Chat] Prompt version:', body.prompt?.version);
+  console.log('[Prompt Chat] Prompt variables:', body.prompt?.variables);
+  console.log('[Prompt Chat] =======================');
 
   try {
-    // Create OpenAI instance following the same pattern as chat route
-    // DO NOT pass apiKey to createOpenAI - pass auth headers in custom fetch instead
     const proxyOpenAI = createOpenAI({
       baseURL,
       fetch: (input, init) => {
+        const modifiedInit = { ...init };
+
+        try {
+          if (modifiedInit?.body) {
+            const bodyStr =
+              typeof modifiedInit.body === 'string'
+                ? modifiedInit.body
+                : JSON.stringify(modifiedInit.body);
+
+            const requestBody = JSON.parse(bodyStr);
+
+            console.log('[Prompt Chat] ===== ORIGINAL SDK BODY =====');
+            console.log(JSON.stringify(requestBody, null, 2));
+            console.log('[Prompt Chat] ================================');
+
+            // Remove the model field
+            delete requestBody.model;
+
+            // Convert input array to string
+            if (requestBody.input) {
+              const textInput = extractTextFromInput(requestBody.input);
+              requestBody.input = textInput;
+              console.log('[Prompt Chat] Converted input to string:', textInput);
+            }
+
+            // Add the prompt object with proper structure
+            if (body.prompt?.id) {
+              requestBody.prompt = {
+                id: body.prompt.id,
+                version: body.prompt.version || '1', // ← Make sure version has a default
+                variables: body.prompt.variables || {}, // ← Make sure variables is always an object
+                // deployment_name: 'qwen3-4b',
+              };
+              console.log('[Prompt Chat] Added prompt object:', JSON.stringify(requestBody.prompt, null, 2));
+            }
+
+            // ✅ ADD THIS: deployment_name is required by gateway
+            // requestBody.deployment_name = 'qwen3-4b'; // or body.model, or a specific deployment name
+
+            console.log('[Prompt Chat] ===== FINAL REQUEST BODY SENT TO GATEWAY =====');
+            console.log(JSON.stringify(requestBody, null, 2));
+            console.log('[Prompt Chat] =============================================');
+
+            modifiedInit.body = JSON.stringify(requestBody);
+          }
+        } catch (err) {
+          console.error('[Prompt Chat] Error modifying body:', err);
+        }
+
         const request = {
-          ...init,
+          ...modifiedInit,
           method: 'POST',
           headers: {
-            ...init?.headers,
-            // Pass through the authorization header (JWT Bearer token)
+            ...modifiedInit?.headers,
             ...(authorization && { 'Authorization': authorization }),
-            // Pass through the API key header if present
             ...(apiKey && { 'api-key': apiKey }),
-            // Add project-id if provided
             ...(body.metadata?.project_id && { 'project-id': body.metadata.project_id }),
           },
         };
@@ -128,10 +194,7 @@ export async function POST(req: Request) {
     });
 
     console.log('[Prompt Chat] Calling generateText with openai.responses()...');
-    console.log('[Prompt Chat] Base URL configured:', baseURL);
-    console.log('[Prompt Chat] Using Responses API endpoint: POST /v1/responses');
 
-    // Use the Responses API
     const result = await generateText({
       model: proxyOpenAI.responses(model),
       prompt: promptInput,
@@ -141,7 +204,6 @@ export async function POST(req: Request) {
     console.log('[Prompt Chat] Success!');
     console.log('[Prompt Chat] Text:', result.text);
     console.log('[Prompt Chat] Usage:', result.usage);
-    console.log('[Prompt Chat] Provider metadata:', JSON.stringify(result.providerMetadata, null, 2));
 
     return Response.json({
       success: true,
@@ -153,13 +215,9 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error('[Prompt Chat] Error:', error);
     console.error('[Prompt Chat] Error message:', error?.message);
-    console.error('[Prompt Chat] Error stack:', error?.stack);
 
-    // Extract the actual error message from the gateway response
     let actualError = error?.message ?? 'Failed to generate response';
-    let errorDetails = error?.stack;
 
-    // Check if there's a responseBody with the actual error from the gateway
     if (error?.responseBody) {
       console.error('[Prompt Chat] Response body:', error.responseBody);
       try {
@@ -168,7 +226,6 @@ export async function POST(req: Request) {
           actualError = parsedError.error;
         }
       } catch (parseError) {
-        // If parsing fails, use the raw responseBody
         actualError = error.responseBody;
       }
     }
@@ -177,7 +234,6 @@ export async function POST(req: Request) {
       {
         success: false,
         error: actualError,
-        details: errorDetails,
       },
       { status: 500 },
     );
