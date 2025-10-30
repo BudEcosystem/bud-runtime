@@ -164,7 +164,10 @@ class EvalTagService:
 
             logger.debug(f"[EvalTag] Tag '{name}' does not exist. Creating new tag.")
         except Exception as e:
-            logger.error(f"[EvalTag] Error checking for existing tag '{name}': {str(e)}", exc_info=True)
+            logger.error(
+                f"[EvalTag] Error checking for existing tag '{name}': {str(e)}",
+                exc_info=True,
+            )
             raise
 
         # Create new tag
@@ -175,7 +178,10 @@ class EvalTagService:
             logger.info(f"[EvalTag] Successfully created new tag '{name}' with id={tag.id}")
             return tag
         except Exception as e:
-            logger.error(f"[EvalTag] Error creating tag '{name}': {str(e)}", exc_info=True)
+            logger.error(
+                f"[EvalTag] Error creating tag '{name}': {str(e)}",
+                exc_info=True,
+            )
             raise
 
     def create_tags_from_names(self, tag_names: List[str]) -> List[EvalTag]:
@@ -399,7 +405,7 @@ class ExperimentService:
 
         Parameters:
             experiment_id (uuid.UUID): ID of the experiment to configure runs for.
-            req (ConfigureRunsRequest): Payload containing model_ids, dataset_ids, evaluation_config.
+            req (ConfigureRunsRequest): Payload containing endpoint_ids, dataset_ids, evaluation_config.
             user_id (uuid.UUID): ID of the user configuring the runs.
 
         Returns:
@@ -431,7 +437,7 @@ class ExperimentService:
             created_runs = []
 
             # Create runs for each model-dataset combination
-            for model_id in req.model_ids:
+            for endpoint_id in req.endpoint_ids:
                 for dataset_id in req.dataset_ids:
                     # Get the latest version of the dataset
                     dataset_version = (
@@ -450,7 +456,7 @@ class ExperimentService:
                     run = RunModel(
                         experiment_id=experiment_id,
                         run_index=next_run_index,
-                        model_id=model_id,
+                        endpoint_id=endpoint_id,
                         dataset_version_id=dataset_version.id,
                         status=RunStatusEnum.RUNNING.value,
                         config=req.evaluation_config or {},
@@ -630,7 +636,7 @@ class ExperimentService:
         # Batch fetch all related data to avoid N+1 queries
         run_ids = [run.id for run in all_experiment_runs]
         evaluation_ids = [run.evaluation_id for run in all_experiment_runs if run.evaluation_id]
-        model_ids = [run.model_id for run in all_experiment_runs if run.model_id]
+        endpoint_ids = [run.endpoint_id for run in all_experiment_runs if run.endpoint_id]
         dataset_version_ids = [run.dataset_version_id for run in all_experiment_runs if run.dataset_version_id]
 
         # Batch fetch evaluations
@@ -639,17 +645,21 @@ class ExperimentService:
             evaluations_batch = self.session.query(Evaluation).filter(Evaluation.id.in_(evaluation_ids)).all()
             evaluations_dict = {eval.id: eval for eval in evaluations_batch}
 
+        # Batch fetch endpoints
+        endpoints_dict = {}
+        endpoints_batch = []
+        if endpoint_ids:
+            endpoints_batch = self.session.query(EndpointModel).filter(EndpointModel.id.in_(endpoint_ids)).all()
+            endpoints_dict = {endpoint.id: endpoint for endpoint in endpoints_batch}
+
+        # Extract model_ids from endpoints
+        model_ids = [ep.model_id for ep in endpoints_batch if ep.model_id]
+
         # Batch fetch models
         models_dict = {}
         if model_ids:
             models_batch = self.session.query(ModelTable).filter(ModelTable.id.in_(model_ids)).all()
             models_dict = {model.id: model for model in models_batch}
-
-        # Batch fetch endpoints
-        endpoints_dict = {}
-        if model_ids:
-            endpoints_batch = self.session.query(EndpointModel).filter(EndpointModel.model_id.in_(model_ids)).all()
-            endpoints_dict = {endpoint.model_id: endpoint for endpoint in endpoints_batch}
 
         # Batch fetch dataset versions and datasets
         datasets_dict = {}
@@ -698,10 +708,11 @@ class ExperimentService:
             # Get model details from batched data
             model_name = "Unknown Model"
             deployment_name = None
-            if run.model_id and run.model_id in models_dict:
-                model_name = models_dict[run.model_id].name
-                if run.model_id in endpoints_dict:
-                    deployment_name = endpoints_dict[run.model_id].namespace
+            if run.endpoint_id and run.endpoint_id in endpoints_dict:
+                endpoint = endpoints_dict[run.endpoint_id]
+                if endpoint.model_id in models_dict:
+                    model_name = models_dict[endpoint.model_id].name
+                deployment_name = endpoint.name
 
             # Get dataset and its traits from batched data
             dataset_name = "Unknown Dataset"
@@ -776,18 +787,24 @@ class ExperimentService:
                 evaluation_runs_map[run.evaluation_id] = []
             evaluation_runs_map[run.evaluation_id].append(run)
 
-        # Collect all unique model IDs from runs
-        model_ids = set()
+        # Collect all unique endpoint IDs from runs
+        endpoint_ids = set()
         for runs in evaluation_runs_map.values():
             for run in runs:
-                if run.model_id:
-                    model_ids.add(run.model_id)
+                if run.endpoint_id:
+                    endpoint_ids.add(run.endpoint_id)
 
-        # Batch fetch all models at once
+        # Batch fetch endpoints and models
+        endpoints_dict = {}
         models_dict = {}
-        if model_ids:
-            models = self.session.query(ModelTable).filter(ModelTable.id.in_(list(model_ids))).all()
-            models_dict = {model.id: model for model in models}
+        if endpoint_ids:
+            endpoints = self.session.query(EndpointModel).filter(EndpointModel.id.in_(list(endpoint_ids))).all()
+            endpoints_dict = {endpoint.id: endpoint for endpoint in endpoints}
+
+            model_ids = [ep.model_id for ep in endpoints if ep.model_id]
+            if model_ids:
+                models = self.session.query(ModelTable).filter(ModelTable.id.in_(model_ids)).all()
+                models_dict = {model.id: model for model in models}
 
         # Build progress overview with cached model data
         progress_overview = []
@@ -795,13 +812,18 @@ class ExperimentService:
             eval_runs = evaluation_runs_map.get(evaluation.id, [])
             current_model_name = ""
 
-            if eval_runs and eval_runs[0].model_id:
-                model = models_dict.get(eval_runs[0].model_id)
-                if model:
-                    current_model_name = model.name
+            if eval_runs and eval_runs[0].endpoint_id:
+                endpoint = endpoints_dict.get(eval_runs[0].endpoint_id)
+                if endpoint:
+                    model = models_dict.get(endpoint.model_id)
+                    if model:
+                        current_model_name = model.name
+                    else:
+                        logger.warning(f"Model {endpoint.model_id} not found in database")
+                        current_model_name = "Unknown Model"
                 else:
-                    # Log missing model but don't fail
-                    logger.warning(f"Model {eval_runs[0].model_id} not found in database")
+                    # Log missing endpoint but don't fail
+                    logger.warning(f"Endpoint {eval_runs[0].endpoint_id} not found in database")
                     current_model_name = "Unknown Model"
 
             # Calculate average score for THIS specific evaluation
@@ -988,16 +1010,9 @@ class ExperimentService:
             List[ModelSummary]: List of model summaries with deployment names.
         """
         try:
-            # Query for models used in the experiment's runs
-            # Join with endpoints to get deployment names
-            models = (
-                self.session.query(
-                    ModelTable.id,
-                    ModelTable.name,
-                    EndpointModel.namespace.label("deployment_name"),
-                )
-                .join(RunModel, RunModel.model_id == ModelTable.id)
-                .outerjoin(EndpointModel, EndpointModel.model_id == ModelTable.id)
+            # Step 1: Get all runs for this experiment
+            runs = (
+                self.session.query(RunModel)
                 .filter(
                     RunModel.experiment_id == experiment_id,
                     RunModel.status != RunStatusEnum.DELETED.value,
@@ -1005,23 +1020,47 @@ class ExperimentService:
                 .all()
             )
 
-            # Filter out duplicate models by ID (keep first occurrence)
+            # Step 2: Collect unique endpoint_ids from runs
+            endpoint_ids = list({run.endpoint_id for run in runs})
+            if not endpoint_ids:
+                return []
+
+            # Step 3: Query endpoints by IDs
+            endpoints = self.session.query(EndpointModel).filter(EndpointModel.id.in_(endpoint_ids)).all()
+            _endpoints_dict = {endpoint.id: endpoint for endpoint in endpoints}
+
+            # Step 4: Extract unique model_ids from endpoints
+            model_ids = list({ep.model_id for ep in endpoints if ep.model_id})
+            if not model_ids:
+                return []
+
+            # Step 5: Query models by IDs
+            models = self.session.query(ModelTable).filter(ModelTable.id.in_(model_ids)).all()
+
+            # Step 6: Build result with deployment names from endpoints
+            result = []
             seen_model_ids = set()
-            unique_models = []
             for model in models:
                 if model.id not in seen_model_ids:
                     seen_model_ids.add(model.id)
-                    unique_models.append(
+                    # Find an endpoint that uses this model
+                    deployment_name = None
+                    for endpoint in endpoints:
+                        if endpoint.model_id == model.id:
+                            deployment_name = endpoint.name  # ← Using endpoint.name here
+                            break
+
+                    result.append(
                         ModelSummary(
                             id=model.id,
                             name=model.name,
-                            deployment_name=model.deployment_name,
+                            deployment_name=deployment_name,
                         )
                     )
 
-            return unique_models
+            return result
         except Exception as e:
-            logger.error(f"Failed to get models for experiment {experiment_id}: {e}")
+            logger.error(f"Error getting models for experiment {experiment_id}: {str(e)}")
             return []
 
     def get_traits_for_experiment(self, experiment_id: uuid.UUID) -> List[TraitSummary]:
@@ -1226,8 +1265,12 @@ class ExperimentService:
             first_run = runs[0]
 
             # 4. Get model details and name
-            model = self.session.query(ModelTable).filter(ModelTable.id == first_run.model_id).first()
-            model_name = model.name if model else "Unknown Model"
+            endpoint = self.session.query(EndpointModel).filter(EndpointModel.id == first_run.endpoint_id).first()
+
+            model_name = "Unknown Model"
+            if endpoint:
+                model = self.session.query(ModelTable).filter(ModelTable.id == endpoint.model_id).first()
+                model_name = model.name if model else "Unknown Model"
 
             # 2. Identify associated traits from evaluation.trait_ids
             trait_ids = evaluation.trait_ids if evaluation.trait_ids else []
@@ -1340,7 +1383,7 @@ class ExperimentService:
             id=run.id,
             experiment_id=run.experiment_id,
             run_index=run.run_index,
-            model_id=run.model_id,
+            endpoint_id=run.endpoint_id,
             dataset_version_id=run.dataset_version_id,
             status=RunStatusEnum(run.status),
             config=run.config,
@@ -1387,18 +1430,18 @@ class ExperimentService:
 
         # Get model details
         model_details = None
-        if run.model_id:
-            model = self.session.query(ModelTable).filter(ModelTable.id == run.model_id).first()
-            if model:
-                # Get deployment name from endpoint if exists
-                endpoint = self.session.query(EndpointModel).filter(EndpointModel.model_id == run.model_id).first()
-                model_details = {
-                    "id": str(model.id),
-                    "name": model.name,
-                    "display_name": model.display_name,
-                    "deployment_name": endpoint.namespace if endpoint else None,
-                    "description": model.description,
-                }
+        if run.endpoint_id:
+            endpoint = self.session.query(EndpointModel).filter(EndpointModel.id == run.endpoint_id).first()
+            if endpoint:
+                model = self.session.query(ModelTable).filter(ModelTable.id == endpoint.model_id).first()
+                if model:
+                    model_details = {
+                        "id": str(model.id),
+                        "name": model.name,
+                        "display_name": model.display_name,
+                        "deployment_name": endpoint.name,
+                        "description": model.description,
+                    }
 
         # Get dataset details with version information
         dataset_details = None
@@ -2013,7 +2056,7 @@ class ExperimentService:
 
         for run in runs:
             # Get model details
-            model = self.get_model_details(run.model_id)
+            model = self.get_endpoint_model_details(run.endpoint_id)
 
             # Get traits with datasets
             traits = self.get_traits_with_datasets_for_run(run.dataset_version_id)
@@ -2087,11 +2130,11 @@ class ExperimentService:
             "evaluations": evaluation_results,
         }
 
-    def get_model_details(self, model_id: uuid.UUID) -> "ModelDetail":
-        """Get detailed model information.
+    def get_endpoint_model_details(self, endpoint_id: uuid.UUID) -> "ModelDetail":
+        """Get detailed model information from endpoint.
 
         Parameters:
-            model_id (uuid.UUID): ID of the model.
+            endpoint_id (uuid.UUID): ID of the endpoint.
 
         Returns:
             ModelDetail: Model details with deployment information.
@@ -2099,19 +2142,27 @@ class ExperimentService:
         from budapp.endpoint_ops.models import Endpoint as EndpointModel
         from budapp.eval_ops.schemas import ModelDetail
 
-        # Get model from models table
-        model = self.session.query(ModelTable).filter(ModelTable.id == model_id).first()
-        if not model:
-            # Return placeholder if model not found
-            return ModelDetail(id=model_id, name="Unknown Model", deployment_name=None)
+        # Get endpoint first
+        endpoint = self.session.query(EndpointModel).filter(EndpointModel.id == endpoint_id).first()
 
-        # Try to get deployment name from endpoints
-        endpoint = self.session.query(EndpointModel).filter(EndpointModel.model_id == model_id).first()
+        if not endpoint:
+            # Return placeholder if endpoint not found
+            return ModelDetail(id=endpoint_id, name="Unknown Model", deployment_name=None)
+
+        # Get model from endpoint
+        model = self.session.query(ModelTable).filter(ModelTable.id == endpoint.model_id).first()
+
+        if not model:
+            return ModelDetail(
+                id=endpoint_id,
+                name="Unknown Model",
+                deployment_name=endpoint.name,
+            )
 
         return ModelDetail(
             id=model.id,
             name=model.name,
-            deployment_name=endpoint.namespace if endpoint else None,
+            deployment_name=endpoint.name,
         )
 
     async def get_first_active_project(self) -> uuid.UUID:
@@ -2280,7 +2331,7 @@ class ExperimentService:
             for run in runs:
                 try:
                     # Get model details with validation
-                    model_detail = self.get_model_details(run.model_id)
+                    model_detail = self.get_endpoint_model_details(run.endpoint_id)
                     if not model_detail or not hasattr(model_detail, "name") or not model_detail.name:
                         logger.warning(f"Invalid model details for run {run.id}, skipping")
                         continue
@@ -2513,11 +2564,11 @@ class ExperimentWorkflowService:
                             detail="Each tag must be a string",
                         )
         elif step_number == 2:
-            # Model Selection validation
-            if "model_ids" not in stage_data or not stage_data["model_ids"]:
+            # Endpoint Selection validation
+            if "endpoint_ids" not in stage_data or not stage_data["endpoint_ids"]:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="At least one model must be selected in step 2",
+                    detail="At least one endpoint must be selected in step 2",
                 )
         elif step_number == 3:
             # Traits Selection validation
@@ -2726,7 +2777,7 @@ class ExperimentWorkflowService:
                 combined_data.project_id = step_data.get("project_id")
                 combined_data.tags = step_data.get("tags")
             elif step.step_number == 2:
-                combined_data.model_ids = step_data.get("model_ids", [])
+                combined_data.endpoint_ids = step_data.get("endpoint_ids", [])
             elif step.step_number == 3:
                 combined_data.trait_ids = step_data.get("trait_ids", [])
                 combined_data.dataset_ids = step_data.get("dataset_ids", [])
@@ -2783,15 +2834,15 @@ class ExperimentWorkflowService:
             dataset_ids_to_use = [str(dataset_id[0]) for dataset_id in dataset_ids_from_traits]
             logger.info(f"Found {len(dataset_ids_to_use)} datasets from {len(combined_data.trait_ids)} traits")
 
-        # Create runs for each model-dataset combination
-        if combined_data.model_ids and dataset_ids_to_use:
+        # Create runs for each endpoint-dataset combination
+        if combined_data.endpoint_ids and dataset_ids_to_use:
             run_index = 1
-            for model_id in combined_data.model_ids:
-                # Convert model_id to UUID if it's a string
+            for endpoint_id in combined_data.endpoint_ids:
+                # Convert endpoint_id to UUID if it's a string
                 try:
-                    model_uuid = uuid.UUID(str(model_id))
+                    endpoint_id = uuid.UUID(str(endpoint_id))
                 except (ValueError, TypeError):
-                    logger.warning(f"Invalid model ID format: {model_id}, skipping")
+                    logger.warning(f"Invalid endpoint ID format: {endpoint_id}, skipping")
                     continue
 
                 for dataset_id in dataset_ids_to_use:
@@ -2810,7 +2861,7 @@ class ExperimentWorkflowService:
                     run = RunModel(
                         experiment_id=experiment.id,
                         run_index=run_index,
-                        model_id=model_uuid,
+                        endpoint_id=endpoint_id,
                         dataset_version_id=dataset_version.id,
                         status=RunStatusEnum.RUNNING.value,
                         config=combined_data.evaluation_config,
@@ -3164,29 +3215,45 @@ class EvaluationWorkflowService:
         for step in steps:
             step_data = step.data.copy()
 
-            # Enrich step 2 data with model details
-            if step.step_number == 2 and "model_id" in step_data:
-                model_id = step_data.get("model_id")
-                if model_id:
+            # Enrich step 2 data with endpoint and model details
+            if step.step_number == 2 and "endpoint_id" in step_data:
+                endpoint_id = step_data.get("endpoint_id")
+                if endpoint_id:
                     try:
-                        model_uuid = uuid.UUID(str(model_id))
-                        model_row = self.session.query(ModelTable).filter(ModelTable.id == model_uuid).first()
-                        if model_row:
-                            step_data["model_details"] = {
-                                "id": str(model_row.id),
-                                "name": model_row.name,
-                                "description": model_row.description,
-                                "modality": list(model_row.modality) if model_row.modality is not None else None,
-                                "provider_type": model_row.provider_type,
-                                "source": model_row.source,
-                                "uri": model_row.uri,
-                                "icon": model_row.icon,
-                            }
+                        endpoint_uuid = uuid.UUID(str(endpoint_id))
+                        # Query endpoint first
+                        endpoint_row = (
+                            self.session.query(EndpointModel).filter(EndpointModel.id == endpoint_uuid).first()
+                        )
+                        if endpoint_row:
+                            # Query model from endpoint
+                            model_row = (
+                                self.session.query(ModelTable).filter(ModelTable.id == endpoint_row.model_id).first()
+                            )
+                            if model_row:
+                                step_data["model_details"] = {
+                                    "id": str(model_row.id),
+                                    "name": model_row.name,
+                                    "description": model_row.description,
+                                    "modality": list(model_row.modality) if model_row.modality is not None else None,
+                                    "provider_type": model_row.provider_type,
+                                    "source": model_row.source,
+                                    "uri": model_row.uri,
+                                    "icon": model_row.icon,
+                                    "deployment_name": endpoint_row.name,
+                                }
+                            else:
+                                # Fallback if model not found
+                                step_data["model_details"] = {
+                                    "id": str(endpoint_uuid),
+                                    "name": f"Endpoint {str(endpoint_uuid)[:8]}",
+                                    "deployment_name": endpoint_row.name,
+                                }
                         else:
-                            # Fallback to minimal info if model row is not found
+                            # Fallback to minimal info if endpoint not found
                             step_data["model_details"] = {
-                                "id": str(model_uuid),
-                                "name": f"Model {str(model_uuid)[:8]}",
+                                "id": str(endpoint_uuid),
+                                "name": f"Endpoint {str(endpoint_uuid)[:8]}",
                             }
                     except (ValueError, TypeError):
                         pass
@@ -3325,7 +3392,7 @@ class EvaluationWorkflowService:
         """
         # Get accumulated data
         all_data = await self._get_accumulated_step_data(workflow_id)
-        model_id = all_data.get("step_2", {}).get("model_id")
+        endpoint_id = all_data.get("step_2", {}).get("endpoint_id")
         dataset_ids = all_data.get("step_4", {}).get("dataset_ids", [])
         trait_ids = all_data.get("step_3", {}).get("trait_ids", [])
 
@@ -3333,10 +3400,10 @@ class EvaluationWorkflowService:
         evaluation_name = all_data.get("step_1", {}).get("name", "Evaluation")
         evaluation_description = all_data.get("step_1", {}).get("description")
 
-        if not model_id:
+        if not endpoint_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No model selected",
+                detail="No endpoint selected",
             )
 
         if not dataset_ids:
@@ -3353,13 +3420,13 @@ class EvaluationWorkflowService:
                 detail="Experiment not found",
             )
 
-        # Convert model_id to UUID if it's a string
+        # Convert endpoint_id to UUID if it's a string
         try:
-            model_uuid = uuid.UUID(str(model_id))
+            endpoint_uuid = uuid.UUID(str(endpoint_id))
         except (ValueError, TypeError):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid model ID format: {model_id}",
+                detail=f"Invalid endpoint ID format: {endpoint_id}",
             )
 
         # Convert trait_ids to strings for JSONB storage
@@ -3407,10 +3474,10 @@ class EvaluationWorkflowService:
                 continue
 
             run = RunModel(
-                experiment_id=experiment_id,
-                run_index=next_run_index,
+                experiment_id=experiment.id,
+                run_index=1,
                 evaluation_id=evaluation.id,
-                model_id=model_uuid,
+                endpoint_id=endpoint_uuid,
                 dataset_version_id=dataset_version.id,
                 status=RunStatusEnum.RUNNING.value,
                 config={},
@@ -3454,43 +3521,53 @@ class EvaluationWorkflowService:
 
             if not existing_runs:
                 return {
-                    "available_models": [],
-                    "message": "No models found in experiment. Please create runs first.",
+                    "available_endpoints": [],
+                    "message": "No endpoints found in experiment. Please create runs first.",
                 }
 
-            unique_model_ids = list({run.model_id for run in existing_runs})
+            # Collect unique endpoint_ids from existing runs
+            unique_endpoint_ids = list({run.endpoint_id for run in existing_runs})
 
-            # Fetch model details for these IDs
-            models = self.session.query(ModelTable).filter(ModelTable.id.in_(unique_model_ids)).all()
+            # Query endpoints
+            endpoints = self.session.query(EndpointModel).filter(EndpointModel.id.in_(unique_endpoint_ids)).all()
+            endpoint_id_to_row = {row.id: row for row in endpoints}
+
+            # Query models
+            model_ids = [ep.model_id for ep in endpoints]
+            models = self.session.query(ModelTable).filter(ModelTable.id.in_(model_ids)).all()
             model_id_to_row = {row.id: row for row in models}
 
-            available_models = []
-            for model_id in unique_model_ids:
-                row = model_id_to_row.get(model_id)
-                if row:
-                    available_models.append(
+            # Build response list
+            available_endpoints = []
+            for endpoint_id in unique_endpoint_ids:
+                endpoint_row = endpoint_id_to_row.get(endpoint_id)
+                model_row = model_id_to_row.get(endpoint_row.model_id) if endpoint_row else None
+                if endpoint_row and model_row:
+                    available_endpoints.append(
                         {
-                            "id": str(row.id),
-                            "name": row.name,
-                            "description": row.description,
-                            "modality": list(row.modality) if row.modality is not None else None,
-                            "provider_type": row.provider_type,
-                            "source": row.source,
-                            "uri": row.uri,
-                            "icon": row.icon,
+                            "id": str(endpoint_id),
+                            "name": model_row.name,
+                            "deployment_name": endpoint_row.name,
+                            "description": model_row.description,
+                            "modality": list(model_row.modality) if model_row.modality is not None else None,
+                            "provider_type": model_row.provider_type,
+                            "source": model_row.source,
+                            "uri": model_row.uri,
+                            "icon": model_row.icon,
                         }
                     )
                 else:
-                    available_models.append(
+                    available_endpoints.append(
                         {
-                            "id": str(model_id),
-                            "name": f"Model {str(model_id)[:8]}",
+                            "id": str(endpoint_id),
+                            "name": f"Endpoint {str(endpoint_id)[:8]}",
+                            "deployment_name": endpoint_row.name if endpoint_row else None,
                         }
                     )
 
             return {
-                "available_models": available_models,
-                "message": "Select a model for evaluation",
+                "available_endpoints": available_endpoints,
+                "message": "Select an endpoint for evaluation",
             }
 
         elif next_step == 3:
@@ -3530,27 +3607,31 @@ class EvaluationWorkflowService:
 
         elif next_step == 5:
             # Return summary data for final confirmation
-            model_id = accumulated_data.get("step_2", {}).get("model_id")
+            endpoint_id = accumulated_data.get("step_2", {}).get("endpoint_id")
             trait_ids = accumulated_data.get("step_3", {}).get("trait_ids", [])
             dataset_ids = accumulated_data.get("step_4", {}).get("dataset_ids", [])
 
             # Prepare model details
             model_details = accumulated_data.get("step_2", {}).get("model_details")
-            if not model_details and model_id:
+            if not model_details and endpoint_id:
                 try:
-                    model_uuid = uuid.UUID(str(model_id))
-                    model_row = self.session.query(ModelTable).filter(ModelTable.id == model_uuid).first()
-                    if model_row:
-                        model_details = {
-                            "id": str(model_row.id),
-                            "name": model_row.name,
-                            "description": model_row.description,
-                            "modality": list(model_row.modality) if model_row.modality is not None else None,
-                            "provider_type": model_row.provider_type,
-                            "source": model_row.source,
-                            "uri": model_row.uri,
-                            "icon": model_row.icon,
-                        }
+                    endpoint_id_uuid = uuid.UUID(str(endpoint_id))
+                    # Query endpoint and model details
+                    endpoint = self.session.query(EndpointModel).filter(EndpointModel.id == endpoint_id_uuid).first()
+                    if endpoint:
+                        model = self.session.query(ModelTable).filter(ModelTable.id == endpoint.model_id).first()
+                        if model:
+                            model_details = {
+                                "id": str(model.id),
+                                "name": model.name,
+                                "description": model.description,
+                                "modality": list(model.modality) if model.modality is not None else None,
+                                "provider_type": model.provider_type,
+                                "source": model.source,
+                                "uri": model.uri,
+                                "icon": model.icon,
+                                "deployment_name": endpoint.name,
+                            }
                 except (ValueError, TypeError):
                     model_details = None
 
@@ -3604,7 +3685,7 @@ class EvaluationWorkflowService:
             return {
                 "summary": {
                     # Keep existing fields for backward compatibility
-                    "model_selected": str(model_id) if model_id else "None",
+                    "endpoint_selected": str(endpoint_id) if endpoint_id else "None",
                     "traits_selected": len(trait_ids),
                     "datasets_selected": len(dataset_ids),
                     # New detailed fields
@@ -3933,24 +4014,21 @@ class EvaluationWorkflowService:
             # Get first run to determine model and endpoint
             first_run = runs[0]
 
-            # Get model details (async query)
+            # Get endpoint details (async query)
             from sqlalchemy import select
 
-            stmt = select(ModelTable).filter(ModelTable.id == first_run.model_id)
-            model = self.session.execute(stmt).scalars().first()
-
-            if not model:
-                raise ClientException(f"Model {first_run.model_id} not found")
-
-            # Get endpoint for the model (async query)
-            stmt = select(EndpointModel).filter(EndpointModel.model_id == first_run.model_id)
+            stmt = select(EndpointModel).filter(EndpointModel.id == first_run.endpoint_id)
             endpoint = self.session.execute(stmt).scalars().first()
 
             if not endpoint:
-                raise ClientException(
-                    f"No active endpoint found for model '{model.name}'. "
-                    "Please deploy the model before running evaluations."
-                )
+                raise ClientException(f"Endpoint {first_run.endpoint_id} not found")
+
+            # Get model from endpoint (async query)
+            stmt = select(ModelTable).filter(ModelTable.id == endpoint.model_id)
+            model = self.session.execute(stmt).scalars().first()
+
+            if not model:
+                raise ClientException(f"Model {endpoint.model_id} not found for endpoint '{endpoint.name}'")
 
             # Get first active project for credential generation
             experiment_service = ExperimentService(self.session)
@@ -3963,9 +4041,9 @@ class EvaluationWorkflowService:
 
             # Build evaluation request with dynamic values
             evaluation_request = {
-                "model_name": "gpt-oss-20b",  # model.name,  # Dynamic from model table
-                "endpoint": "http://20.66.97.208/v1",  # Dynamic from endpoint table
-                "api_key": "sk-BudLiteLLMMasterKey_123",  # api_key,  # Generated temporary credential
+                "model_name": endpoint.name,  # Endpoint name for identification
+                "endpoint": endpoint.url,  # Dynamic from endpoint table (endpoint.url contains the actual endpoint URL)
+                "api_key": _api_key,  # Generated temporary credential
                 "extra_args": {},
                 "datasets": all_datasets,
                 "kubeconfig": "",  # TODO: Get actual kubeconfig
