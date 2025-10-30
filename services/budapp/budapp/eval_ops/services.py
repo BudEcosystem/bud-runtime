@@ -4041,8 +4041,8 @@ class EvaluationWorkflowService:
 
             # Build evaluation request with dynamic values
             evaluation_request = {
-                "model_name": endpoint.name,  # Endpoint name for identification
-                "endpoint": endpoint.url,  # Dynamic from endpoint table (endpoint.url contains the actual endpoint URL)
+                "model_name": endpoint.namespace,  # Endpoint name for identification
+                "endpoint": f"{endpoint.url}/v1",  # Dynamic from endpoint table (endpoint.url contains the actual endpoint URL)
                 "api_key": _api_key,  # Generated temporary credential
                 "extra_args": {},
                 "datasets": all_datasets,
