@@ -250,9 +250,9 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
             onSavePromptSchema?.();
           }}
           loading={isSaving}
-          disabled={isSaving}
+          disabled={isSaving || !structuredInputEnabled}
           style={{
-            cursor: isSaving ? 'not-allowed' : 'pointer',
+            cursor: (isSaving || !structuredInputEnabled) ? 'not-allowed' : 'pointer',
           }}
           classNames="h-[1.375rem] rounded-[0.375rem]"
           textClass="!text-[0.625rem] !font-[400]"
