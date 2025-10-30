@@ -80,6 +80,7 @@ function AgentsPromptsListTable() {
         if (projectId) {
             getData();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectId]);
 
     useEffect(() => {
@@ -95,6 +96,7 @@ function AgentsPromptsListTable() {
             }, projectId as string);
         }, 500);
         return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchValue, order, orderBy]);
 
     const confirmDelete = (record: DataType) => {

@@ -36,7 +36,7 @@ export const usePrompts = create<{
   createPrompt: (data: any, projectId?: string) => Promise<any>;
   deletePrompt: (promptId: string, projectId?: string) => Promise<any>;
   updatePrompt: (promptId: string, data: any, projectId?: string) => Promise<any>;
-}>((set, get) => ({
+}>((set) => ({
   prompts: [],
   totalRecords: 0,
   loading: true,
