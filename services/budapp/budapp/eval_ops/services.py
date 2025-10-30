@@ -3475,7 +3475,7 @@ class EvaluationWorkflowService:
 
             run = RunModel(
                 experiment_id=experiment.id,
-                run_index=1,
+                run_index=next_run_index,
                 evaluation_id=evaluation.id,
                 endpoint_id=endpoint_uuid,
                 dataset_version_id=dataset_version.id,
