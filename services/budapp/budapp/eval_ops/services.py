@@ -485,6 +485,7 @@ class ExperimentService:
         user_id: uuid.UUID,
         project_id: Optional[uuid.UUID] = None,
         experiment_id: Optional[uuid.UUID] = None,
+        search_query: Optional[str] = None,
         offset: int = 0,
         limit: int = 10,
     ) -> Tuple[List[ExperimentSchema], int]:
@@ -494,6 +495,7 @@ class ExperimentService:
             user_id (uuid.UUID): ID of the user whose experiments to list.
             project_id (Optional[uuid.UUID]): Filter by project ID.
             experiment_id (Optional[uuid.UUID]): Filter by experiment ID.
+            search_query (Optional[str]): Search query to filter by experiment name (case-insensitive).
             offset (int): Number of records to skip.
             limit (int): Maximum number of records to return.
 
@@ -514,6 +516,10 @@ class ExperimentService:
 
             if experiment_id is not None:
                 q = q.filter(ExperimentModel.id == experiment_id)
+
+            if search_query is not None and search_query.strip():
+                search_pattern = f"%{search_query.strip()}%"
+                q = q.filter(ExperimentModel.name.ilike(search_pattern))
 
             # Get total count before pagination
             total_count = q.count()
