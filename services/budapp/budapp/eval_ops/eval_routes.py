@@ -525,8 +525,8 @@ async def experiment_workflow_step(
     - Required: name, project_id
     - Optional: description
 
-    **Step 2: Model Selection**
-    - Required: model_ids (list of model UUIDs)
+    **Step 2: Endpoint Selection**
+    - Required: endpoint_ids (list of endpoint UUIDs)
 
     **Step 3: Traits Selection**
     - Required: trait_ids (list of trait UUIDs)
@@ -707,7 +707,7 @@ def configure_runs(
     """Configure runs for an experiment by creating model-dataset combinations.
 
     - **experiment_id**: UUID of the experiment to configure runs for.
-    - **request**: Payload containing model_ids, dataset_ids, and optional evaluation_config.
+    - **request**: Payload containing endpoint_ids, dataset_ids, and optional evaluation_config.
     - **session**: Database session dependency.
     - **current_user**: The authenticated user.
 
@@ -908,8 +908,8 @@ async def evaluation_workflow_step(
     - `workflow_id` should be null for first step
     - `workflow_total_steps` should be 5
 
-    **Step 2: Model Selection**
-    - Provide `model_id` in `stage_data` (select one model from experiment's existing runs)
+    **Step 2: Endpoint Selection**
+    - Provide `endpoint_id` in `stage_data` (select one endpoint from experiment's existing runs)
     - `workflow_id` from step 1 response required
 
     **Step 3: Trait Selection**
