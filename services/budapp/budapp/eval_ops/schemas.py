@@ -214,7 +214,10 @@ class Experiment(BaseModel):
     name: str = Field(..., description="The name of the experiment.")
     description: Optional[str] = Field(None, description="The description of the experiment.")
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment.")
-    tags: Optional[List[str]] = Field(None, description="DEPRECATED: List of tag names. Use tag_objects instead.")
+    tags: Optional[List[str]] = Field(
+        None,
+        description="DEPRECATED: List of tag names. Use tag_objects instead.",
+    )
     tag_ids: Optional[List[UUID4]] = Field(None, description="List of EvalTag IDs.")
     tag_objects: Optional[List["EvalTag"]] = Field(None, description="Complete tag objects with details.")
     status: Optional[str] = Field(
@@ -312,7 +315,7 @@ class Run(BaseModel):
     id: UUID4 = Field(..., description="The UUID of the run.")
     experiment_id: UUID4 = Field(..., description="The UUID of the parent experiment.")
     run_index: int = Field(..., description="Auto-incrementing index within the experiment.")
-    model_id: UUID4 = Field(..., description="The UUID of the model being evaluated.")
+    endpoint_id: UUID4 = Field(..., description="The UUID of the endpoint being evaluated.")
     dataset_version_id: UUID4 = Field(..., description="The UUID of the dataset version.")
     status: RunStatusEnum = Field(..., description="Current status of the run.")
     config: Optional[dict] = Field(None, description="Run-specific configuration.")
@@ -331,7 +334,8 @@ class RunWithResults(BaseModel):
     id: UUID4 = Field(..., description="The UUID of the run.")
     experiment_id: UUID4 = Field(..., description="The UUID of the parent experiment.")
     run_index: int = Field(..., description="Auto-incrementing index within the experiment.")
-    model_id: UUID4 = Field(..., description="The UUID of the model being evaluated.")
+    endpoint_id: UUID4 = Field(..., description="The UUID of the endpoint being evaluated.")
+
     dataset_version_id: UUID4 = Field(..., description="The UUID of the dataset version.")
     status: RunStatusEnum = Field(..., description="Current status of the run.")
     config: Optional[dict] = Field(None, description="Run-specific configuration.")
@@ -416,7 +420,8 @@ class DeleteRunResponse(SuccessResponse):
 class ConfigureRunsRequest(BaseModel):
     """Request to configure runs for an experiment."""
 
-    model_ids: List[UUID4] = Field(..., description="List of model IDs to evaluate.")
+    endpoint_ids: List[UUID4] = Field(..., description="List of endpoint IDs to evaluate.")
+
     dataset_ids: List[UUID4] = Field(..., description="List of dataset IDs to evaluate against.")
     evaluation_config: Optional[dict] = Field(None, description="Default evaluation configuration for runs.")
 
@@ -490,7 +495,12 @@ class Trait(BaseModel):
 class EvalTagBase(BaseModel):
     """Base schema for EvalTag."""
 
-    name: str = Field(..., min_length=1, max_length=20, description="Tag name (alphanumeric, hyphens, underscores)")
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=20,
+        description="Tag name (alphanumeric, hyphens, underscores)",
+    )
     description: Optional[str] = Field(None, max_length=255, description="Tag description")
 
     @field_validator("name")
@@ -724,7 +734,7 @@ class ExperimentWorkflowStepData(BaseModel):
     tags: Optional[List[str]] = None
 
     # Step 2 data - Model Selection
-    model_ids: Optional[List[UUID4]] = None
+    endpoint_ids: Optional[List[UUID4]] = None
 
     # Step 3 data - Traits Selection
     trait_ids: Optional[List[UUID4]] = None

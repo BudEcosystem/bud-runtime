@@ -23,6 +23,7 @@ import {
 } from "@ant-design/icons";
 import { format } from "date-fns";
 import { formatTimestampWithTZ } from "@/utils/formatDate";
+import { copyToClipboard as copyText } from "@/utils/clipboard";
 import { AppRequest } from "src/pages/api/requests";
 import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
 import {
@@ -128,12 +129,16 @@ const InferenceDetailPage: React.FC = () => {
     }
   };
 
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => {
-      setCopiedId(null);
-    }, 2000);
+  const copyToClipboard = async (text: string, id: string) => {
+    await copyText(text, {
+      onSuccess: () => {
+        setCopiedId(id);
+        setTimeout(() => {
+          setCopiedId(null);
+        }, 2000);
+      },
+      onError: () => message.error("Failed to copy to clipboard"),
+    });
   };
 
   const downloadJson = (data: any, filename: string) => {

@@ -86,7 +86,7 @@ endpoint_router = APIRouter(prefix="/endpoints", tags=["endpoint"])
     },
     description="List all endpoints. \n\n order_by fields are: name, status, created_at, modified_at, cluster_name, model_name, modality, is_published, published_date",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+@require_permissions(permissions=[PermissionEnum.PROJECT_VIEW, PermissionEnum.ENDPOINT_VIEW])
 async def list_all_endpoints(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -110,7 +110,7 @@ async def list_all_endpoints(
 
     try:
         db_endpoints, count = await EndpointService(session).get_all_endpoints(
-            project_id, offset, limit, filters_dict, order_by, search
+            current_user.id, current_user.is_superuser, project_id, offset, limit, filters_dict, order_by, search
         )
     except ClientException as e:
         logger.exception(f"Failed to get all endpoints: {e}")

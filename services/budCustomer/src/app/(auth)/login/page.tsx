@@ -253,7 +253,7 @@ function LoginContent() {
         setIsLoggingIn(false);
 
         if (response.data.is_reset_password) {
-          router.replace("/auth/resetPassword");
+          router.replace("/resetPassword");
         } else {
           // Use replace to avoid history stack issues and window.location for clean redirect
           window.location.href = "/models";

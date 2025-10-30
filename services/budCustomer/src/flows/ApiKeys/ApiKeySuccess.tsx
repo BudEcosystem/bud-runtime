@@ -12,6 +12,7 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import { successToast } from "@/components/toast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const ApiKeySuccess = () => {
   const { closeDrawer } = useDrawer();
@@ -28,12 +29,19 @@ const ApiKeySuccess = () => {
     }
   }, []);
 
-  const handleCopyKey = () => {
+  const handleCopyKey = async () => {
     if (apiKey) {
-      navigator.clipboard.writeText(apiKey);
-      setCopied(true);
-      successToast("API key copied to clipboard!");
-      setTimeout(() => setCopied(false), 2000);
+      await copyToClipboard(apiKey, {
+        onSuccess: () => {
+          setCopied(true);
+          successToast("API key copied to clipboard!");
+          setTimeout(() => setCopied(false), 2000);
+        },
+        onError: () => {
+          setCopied(false);
+          successToast("Failed to copy API key");
+        },
+      });
     }
   };
 

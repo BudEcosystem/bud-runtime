@@ -20,6 +20,7 @@ import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
 import NoDataFount from "@/components/ui/noChartData";
 import dayjs from "dayjs";
 import { errorToast, successToast } from "@/components/toast";
+import { copyToClipboard } from "@/utils/clipboard";
 const { RangePicker } = DatePicker;
 
 interface APIKey {
@@ -270,10 +271,12 @@ export default function APIKeysPage() {
           <Text className="font-mono text-xs text-bud-text-primary">{key}</Text>
           <button
             className="text-bud-purple hover:text-bud-purple-hover text-xs"
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              navigator.clipboard.writeText(key);
-              successToast("API key copied to clipboard.");
+              await copyToClipboard(key, {
+                onSuccess: () => successToast("API key copied to clipboard."),
+                onError: () => errorToast("Failed to copy API key."),
+              });
             }}
           >
             Copy

@@ -48,7 +48,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       model: chat?.selectedDeployment?.name,
       metadata: {
         project_id: chat?.selectedDeployment?.project?.id,
-        base_url: resolvedBaseUrl,
+        base_url: baseUrl, //reverting as it's causing issue with chat
       },
       settings: currentSettingPreset,
     };
