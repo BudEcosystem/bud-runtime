@@ -25,6 +25,16 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- $nodeSelector := include "bud.nodeSelector" (dict "service" .Values.microservices.budmetrics "global" .Values.global "context" $) }}
+      {{- if $nodeSelector }}
+      nodeSelector:
+        {{- $nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- $affinity := include "bud.affinity" (dict "service" .Values.microservices.budmetrics "global" .Values.global "context" $) }}
+      {{- if $affinity }}
+      affinity:
+        {{- $affinity | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budmetrics
         image: {{ .Values.microservices.budmetrics.image }}

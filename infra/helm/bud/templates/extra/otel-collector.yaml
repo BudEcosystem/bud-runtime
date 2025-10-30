@@ -108,6 +108,14 @@ spec:
         checksum/config: {{ .Values.otelCollector | toYaml | sha256sum }}
     spec:
       serviceAccountName: {{ .Release.Name }}-otel-collector
+      {{- with .Values.otelCollector.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.otelCollector.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: otel-collector
         image: {{ .Values.otelCollector.image.repository }}:{{ .Values.otelCollector.image.tag }}

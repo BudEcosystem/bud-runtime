@@ -157,3 +157,35 @@
 {{- printf "%s-postgresql.%s" .Release.Name .Release.Namespace }}
 {{- end }}
 {{- end }}
+
+{{/*
+Node selector for microservices
+Replaces global nodeSelector with per-service nodeSelector (per-service takes precedence)
+Only applies non-empty nodeSelector values
+Usage: {{ include "bud.nodeSelector" (dict "service" .Values.microservices.budapp "global" .Values.global "context" $) }}
+*/}}
+{{- define "bud.nodeSelector" -}}
+{{- $service := .service -}}
+{{- $global := .global -}}
+{{- if and $service.nodeSelector (gt (len $service.nodeSelector) 0) -}}
+{{- toYaml $service.nodeSelector }}
+{{- else if and $global.nodeSelector (gt (len $global.nodeSelector) 0) -}}
+{{- toYaml $global.nodeSelector }}
+{{- end }}
+{{- end }}
+
+{{/*
+Affinity for microservices
+Replaces global affinity with per-service affinity (per-service takes precedence)
+Only applies non-empty affinity values
+Usage: {{ include "bud.affinity" (dict "service" .Values.microservices.budapp "global" .Values.global "context" $) }}
+*/}}
+{{- define "bud.affinity" -}}
+{{- $service := .service -}}
+{{- $global := .global -}}
+{{- if and $service.affinity (gt (len $service.affinity) 0) -}}
+{{- toYaml $service.affinity }}
+{{- else if and $global.affinity (gt (len $global.affinity) 0) -}}
+{{- toYaml $global.affinity }}
+{{- end }}
+{{- end }}
