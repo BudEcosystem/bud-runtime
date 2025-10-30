@@ -107,32 +107,32 @@ microservices:
   # frontend services
   budadmin:
     enabled: true
-    image: budstudio/budadmin:0.4.0
+    image: budstudio/budadmin:0.4.2
     # Branding configuration - customize logos per customer deployment
     # Leave empty to use default Bud logos
     env:
-      # Main logo for dashboard sidebar and header
-      # NEXT_PUBLIC_LOGO_URL: "/images/customer-logo.svg"
-      # Logo for auth pages (login/register)
-      # NEXT_PUBLIC_LOGO_AUTH_URL: "/images/customer-logo-auth.png"
-      # Favicon for browser tab
-      # NEXT_PUBLIC_FAVICON_URL: "/favicon-customer.ico"
+    # Main logo for dashboard sidebar and header
+    # NEXT_PUBLIC_LOGO_URL: "/images/customer-logo.svg"
+    # Logo for auth pages (login/register)
+    # NEXT_PUBLIC_LOGO_AUTH_URL: "/images/customer-logo-auth.png"
+    # Favicon for browser tab
+    # NEXT_PUBLIC_FAVICON_URL: "/favicon-customer.ico"
   budcustomer:
     enabled: true
-    image: budstudio/budcustomer:0.4.0
+    image: budstudio/budcustomer:0.4.2
     env: {}
   budplayground:
     enabled: true
-    image: budstudio/budplayground:0.4.0
+    image: budstudio/budplayground:0.4.2
     env: {}
   # backend exposed services
   budgateway:
     enabled: true
-    image: budstudio/budgateway:0.4.0
+    image: budstudio/budgateway:0.4.2
     env: {}
   askbud:
     enabled: true
-    image: budstudio/askbud:0.4.0
+    image: budstudio/askbud:0.4.2
     daprid: askbud
     model: qwen3-32b
     env:
@@ -140,7 +140,7 @@ microservices:
       INFERENCE_URL: http://20.66.97.208/v1/
   budapp:
     enabled: true
-    image: budstudio/budapp:0.4.0
+    image: budstudio/budapp:0.4.2
     daprid: budapp
     corsOrigins:
       - "http://localhost:3000"
@@ -161,7 +161,7 @@ microservices:
   # backend internal services
   budcluster:
     enabled: true
-    image: budstudio/budcluster:0.4.0
+    image: budstudio/budcluster:0.4.2
     daprid: budcluster
     env:
       LOG_LEVEL: INFO
@@ -192,7 +192,7 @@ microservices:
   budmetrics:
     enabled: true
     daprid: budmetrics
-    image: budstudio/budmetrics:0.4.0
+    image: budstudio/budmetrics:0.4.2
     env:
       #deadlink
       INFERENCE_URL: http://172.184.137.177:8502/classify
@@ -205,7 +205,7 @@ microservices:
       CLICKHOUSE_TTL_CLUSTER_METRICS: "30"
   budmodel:
     enabled: true
-    image: budstudio/budmodel:0.4.0
+    image: budstudio/budmodel:0.4.2
     daprid: budmodel
     storageClassName: nfs-csi
     storageSize: "32Gi"
@@ -213,19 +213,19 @@ microservices:
       LOG_LEVEL: INFO
   budeval:
     enabled: true
-    image: budstudio/budeval:0.4.0
+    image: budstudio/budeval:0.4.2
     daprid: budeval
     storageClassName: nfs-csi
     env: {}
   budsim:
     enabled: true
-    image: budstudio/budsim:0.4.0
+    image: budstudio/budsim:0.4.2
     daprid: budsim
     env:
       LOG_LEVEL: INFO
   buddoc:
     enabled: true
-    image: budstudio/buddoc:0.4.0
+    image: budstudio/buddoc:0.4.2
     daprid: buddoc
     env:
       LOG_LEVEL: INFO
@@ -235,13 +235,13 @@ microservices:
       TEMP_UPLOAD_DIR: /tmp/buddoc_uploads
   budnotify:
     enabled: true
-    image: budstudio/budnotify:0.4.0
+    image: budstudio/budnotify:0.4.2
     daprid: budnotify
     pubsubTopic: notificationMessages
   budprompt:
     enabled: true
     daprid: budprompt
-    image: budstudio/budprompt:0.4.0
+    image: budstudio/budprompt:0.4.2
     env:
       LOG_LEVEL: INFO
       BUD_GATEWAY_BASE_URL: http://{{ .Release.Name }}-budgateway:3000/v1
