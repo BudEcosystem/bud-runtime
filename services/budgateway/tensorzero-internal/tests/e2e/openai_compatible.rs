@@ -946,7 +946,8 @@ async fn test_openai_compatible_streaming() {
                 .as_str()
                 .unwrap();
         }
-        assert_eq!(parsed_chunk["service_tier"].as_str().unwrap(), "");
+        assert!(parsed_chunk.get("service_tier").is_none());
+        assert!(parsed_chunk.get("system_fingerprint").is_none());
         assert!(parsed_chunk["choices"][0]["logprobs"].is_null());
         if let Some(finish_reason) = parsed_chunk["choices"][0]["delta"]["finish_reason"].as_str() {
             assert_eq!(finish_reason, "stop");
