@@ -70,7 +70,7 @@ class MCPToolLoader(ToolLoader):
 
         try:
             # Construct full MCP endpoint URL
-            mcp_url = f"{self.base_url}{tool_config.server_url}/mcp"
+            mcp_url = f"{self.base_url}servers/{tool_config.server_url}/mcp"
 
             # Prepare headers with authorization if api_key is provided
             headers = {}
@@ -90,6 +90,30 @@ class MCPToolLoader(ToolLoader):
         except Exception as e:
             logger.error(f"Failed to load MCP tool '{tool_config.server_label}': {str(e)}")
             return None
+
+    async def get_tool_list(self, mcp_server: MCPServerStreamableHTTP, server_label: str) -> Optional[Dict]:
+        """Fetch the list of available tools from an MCP server.
+
+        Args:
+            mcp_server: The MCP server instance
+            server_label: Label for the server (for logging)
+
+        Returns:
+            Dictionary with tools list or None on error
+        """
+        try:
+            # Use the MCP server's list_tools method
+            # This is provided by pydantic-ai's MCPServerStreamableHTTP
+            tools_list = await mcp_server.list_tools()
+
+            logger.debug(f"Retrieved {len(tools_list)} tools from MCP server '{server_label}'")
+
+            return {"server_label": server_label, "tools": tools_list, "error": None}
+
+        except Exception as e:
+            error_msg = f"Failed to list tools from MCP server '{server_label}': {str(e)}"
+            logger.error(error_msg)
+            return {"server_label": server_label, "tools": [], "error": error_msg}
 
 
 class ToolRegistry:
