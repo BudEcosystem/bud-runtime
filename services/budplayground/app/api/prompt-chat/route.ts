@@ -1,6 +1,3 @@
-import { generateText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
-
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 300;
 
@@ -72,28 +69,6 @@ const buildPromptInput = (body: PromptBody) => {
   return '';
 };
 
-// Helper function to extract text from SDK's input array format
-const extractTextFromInput = (input: any): string => {
-  if (typeof input === 'string') {
-    return input;
-  }
-
-  if (Array.isArray(input)) {
-    const userMessage = input.find((msg: any) => msg.role === 'user');
-    if (userMessage?.content) {
-      if (Array.isArray(userMessage.content)) {
-        const textContent = userMessage.content.find((c: any) => c.type === 'input_text' || c.type === 'text');
-        return textContent?.text || '';
-      }
-      if (typeof userMessage.content === 'string') {
-        return userMessage.content;
-      }
-    }
-  }
-
-  return '';
-};
-
 // Extract text from gateway response
 const extractTextFromGatewayResponse = (response: any): string => {
   if (!response.output || !Array.isArray(response.output)) {
@@ -118,6 +93,10 @@ const extractTextFromGatewayResponse = (response: any): string => {
 export async function POST(req: Request) {
   const body: PromptBody = await req.json();
 
+  console.log('[Prompt Chat] ===== INCOMING REQUEST BODY =====');
+  console.log(JSON.stringify(body, null, 2));
+  console.log('[Prompt Chat] ================================');
+
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
 
@@ -127,6 +106,10 @@ export async function POST(req: Request) {
 
   const promptInput = buildPromptInput(body);
 
+  console.log('[Prompt Chat] Built prompt input:', promptInput);
+  console.log('[Prompt Chat] body.input:', body.input);
+  console.log('[Prompt Chat] body.prompt?.variables:', body.prompt?.variables);
+
   if (!promptInput) {
     return Response.json(
       { error: 'Missing prompt input' },
@@ -134,152 +117,112 @@ export async function POST(req: Request) {
     );
   }
 
-  const model = body.model || 'gpt-4o';
+  const model = body.model || 'qwen-4b-tools';
   const baseURL = resolveGatewayBase(body.metadata?.base_url ?? null);
 
   console.log('[Prompt Chat] Using prompt input:', promptInput);
   console.log('[Prompt Chat] Using model:', model);
   console.log('[Prompt Chat] Using baseURL:', baseURL);
-
-  // Store the raw response for manual parsing if SDK fails
-  let rawResponseBody: any = null;
+  console.log('[Prompt Chat] Prompt ID:', body.prompt?.id);
 
   try {
-    const proxyOpenAI = createOpenAI({
-      baseURL,
-      fetch: (input, init) => {
-        const modifiedInit = { ...init };
+    // Build the request body
+    const requestBody: any = {
+      model: model,
+      input: promptInput,
+      temperature: body.settings?.temperature ?? 1,
+    };
 
-        try {
-          if (modifiedInit?.body) {
-            const bodyStr =
-              typeof modifiedInit.body === 'string'
-                ? modifiedInit.body
-                : JSON.stringify(modifiedInit.body);
+    // Add prompt object if provided
+    if (body.prompt?.id) {
+      requestBody.prompt = {
+        id: body.prompt.id,
+        version: body.prompt.version || '1',
+        variables: body.prompt.variables || {},
+      };
+    }
 
-            const requestBody = JSON.parse(bodyStr);
+    console.log('[Prompt Chat] Request body:', JSON.stringify(requestBody, null, 2));
 
-            console.log('[Prompt Chat] Original SDK body:', JSON.stringify(requestBody, null, 2));
+    // Extract token
+    let token = '';
+    if (authorization) {
+      console.log('[Prompt Chat] Authorization header received:', authorization);
+      token = authorization.replace(/^Bearer\s+/i, '');
+      console.log('[Prompt Chat] Extracted token from authorization:', token.substring(0, 20) + '...');
+    } else if (apiKey) {
+      console.log('[Prompt Chat] API key header received:', apiKey);
+      token = apiKey;
+      console.log('[Prompt Chat] Using api-key as token:', token.substring(0, 20) + '...');
+    } else {
+      console.log('[Prompt Chat] WARNING: No authorization or api-key header found!');
+    }
 
-            // Delete the model field (as required by your gateway)
-            delete requestBody.model;
+    // Make direct fetch call to gateway
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
 
-            // Convert input array to string
-            if (requestBody.input) {
-              const textInput = extractTextFromInput(requestBody.input);
-              requestBody.input = textInput;
-            }
+    if (body.metadata?.project_id) {
+      headers['project-id'] = body.metadata.project_id;
+    }
 
-            // Add the prompt object
-            if (body.prompt?.id) {
-              requestBody.prompt = {
-                id: body.prompt.id,
-                version: body.prompt.version || '1',
-                variables: body.prompt.variables || {},
-              };
-            }
+    console.log('[Prompt Chat] Headers being sent to gateway:', {
+      ...headers,
+      Authorization: headers.Authorization.substring(0, 27) + '...' // Only show "Bearer " + first 20 chars
+    });
+    console.log('[Prompt Chat] Request URL:', `${baseURL}/responses`);
 
-            console.log('[Prompt Chat] Final request body:', JSON.stringify(requestBody, null, 2));
-
-            modifiedInit.body = JSON.stringify(requestBody);
-          }
-        } catch (err) {
-          console.error('[Prompt Chat] Error modifying body:', err);
-        }
-
-        const request = {
-          ...modifiedInit,
-          method: 'POST',
-          headers: {
-            ...modifiedInit?.headers,
-            ...(authorization && { 'Authorization': authorization }),
-            ...(apiKey && { 'api-key': apiKey }),
-            ...(body.metadata?.project_id && { 'project-id': body.metadata.project_id }),
-          },
-        };
-
-        // Intercept the response to capture raw body before SDK tries to parse it
-        return fetch(input, request).then(async (response) => {
-          const clonedResponse = response.clone();
-          
-          try {
-            rawResponseBody = await clonedResponse.json();
-            console.log('[Prompt Chat] Raw response captured:', JSON.stringify(rawResponseBody, null, 2));
-          } catch (e) {
-            console.error('[Prompt Chat] Failed to capture response:', e);
-          }
-
-          return response;
-        });
-      },
+    const response = await fetch(`${baseURL}/responses`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
     });
 
-    console.log('[Prompt Chat] Calling generateText with openai.responses()...');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Prompt Chat] Error response:', errorText);
+      
+      let errorMessage = 'Failed to generate response';
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error || errorMessage;
+      } catch (e) {
+        errorMessage = errorText;
+      }
 
-    const result = await generateText({
-      model: proxyOpenAI.responses(model),
-      prompt: promptInput,
-      ...(body.settings?.temperature !== undefined && { temperature: body.settings.temperature }),
-    });
+      return Response.json(
+        { success: false, error: errorMessage },
+        { status: response.status }
+      );
+    }
 
-    // If we got here, SDK parsed successfully
-    console.log('[Prompt Chat] Success via SDK!');
-    console.log('[Prompt Chat] Text:', result.text);
+    const result = await response.json();
+    console.log('[Prompt Chat] Gateway response:', JSON.stringify(result, null, 2));
+
+    // Extract text from the gateway response
+    const text = extractTextFromGatewayResponse(result);
+
+    console.log('[Prompt Chat] Success!');
+    console.log('[Prompt Chat] Extracted text:', text);
+    console.log('[Prompt Chat] Usage:', result.usage);
 
     return Response.json({
       success: true,
-      text: result.text,
+      text: text,
       usage: result.usage,
-      finishReason: result.finishReason,
-      providerMetadata: result.providerMetadata,
+      finishReason: result.status,
+      response: result, // Include full response for debugging
     });
-
   } catch (error: any) {
-    console.error('[Prompt Chat] SDK Error:', error);
-    console.error('[Prompt Chat] Error name:', error?.name);
-
-    // Check if it's a parsing error and we have the raw response
-    if (error?.name === 'AI_InvalidResponseDataError' && rawResponseBody) {
-      console.log('[Prompt Chat] SDK parsing failed, using manual extraction...');
-      
-      // Extract text manually from the raw response
-      const text = extractTextFromGatewayResponse(rawResponseBody);
-
-      if (text) {
-        console.log('[Prompt Chat] Success via manual parsing!');
-        console.log('[Prompt Chat] Extracted text:', text);
-
-        return Response.json({
-          success: true,
-          text: text,
-          usage: rawResponseBody.usage,
-          finishReason: rawResponseBody.status,
-          response: rawResponseBody,
-        });
-      }
-    }
-
-    // If manual parsing also failed, return error
+    console.error('[Prompt Chat] Error:', error);
     console.error('[Prompt Chat] Error message:', error?.message);
-
-    let actualError = error?.message ?? 'Failed to generate response';
-
-    if (error?.responseBody) {
-      console.error('[Prompt Chat] Response body:', error.responseBody);
-      try {
-        const parsedError = JSON.parse(error.responseBody);
-        if (parsedError?.error) {
-          actualError = parsedError.error;
-        }
-      } catch (parseError) {
-        actualError = error.responseBody;
-      }
-    }
 
     return Response.json(
       {
         success: false,
-        error: actualError,
+        error: error?.message ?? 'Failed to generate response',
       },
       { status: 500 },
     );
