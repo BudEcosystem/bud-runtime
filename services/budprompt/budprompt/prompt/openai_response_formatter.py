@@ -16,58 +16,13 @@
 
 """OpenAI Response Formatter for converting pydantic-ai responses to OpenAI format."""
 
+import json
 import logging
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from openai.types.responses import (
-    Response,
-    ResponseTextConfig,
-    ResponseUsage,
-)
-from openai.types.responses.response_format_text_json_schema_config import ResponseFormatTextJSONSchemaConfig
-from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
-from openai.types.responses.response_input_item import (
-    FunctionCallOutput,
-)
-from openai.types.responses.response_input_item import (
-    McpCall as ResponseInputMcpCall,  # MCP tool call/return for instructions field
-)
-from openai.types.responses.response_input_item import (
-    Message as ResponseInputMessage,  # Use alias to avoid conflict with local Message class
-)
-from openai.types.responses.response_input_text import ResponseInputText
-from openai.types.responses.response_output_item import (
-    McpCall as ResponseOutputMcpCall,  # MCP tool call for output field
-)
-from openai.types.responses.response_output_item import (
-    McpListTools,
-    McpListToolsTool,
-)
-from openai.types.responses.response_output_message import ResponseOutputMessage
-from openai.types.responses.response_output_text import ResponseOutputText
-from openai.types.responses.response_reasoning_item import (
-    ResponseReasoningItem,
-    Summary,
-)
-from openai.types.responses.tool import Tool
-from openai.types.shared.reasoning import Reasoning
-from openai.types.shared.response_format_text import ResponseFormatText
-from pydantic import ValidationError
-from pydantic_ai.messages import (
-    ModelMessage,
-    ModelRequest,
-    ModelResponse,
-    RetryPromptPart,
-    SystemPromptPart,
-    TextPart,
-    ThinkingPart,
-    ToolCallPart,
-    ToolReturnPart,
-    UserPromptPart,
-)
-from pydantic_ai.run import AgentRunResult
+from pydantic import BaseModel, Field, ValidationError
 
 from .schemas import MCPToolConfig, Message, ModelSettings
 
@@ -75,514 +30,11 @@ from .schemas import MCPToolConfig, Message, ModelSettings
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "OpenAIResponseSchema",
+    "OpenAIPromptInfo",
     "OpenAIResponseFormatter",
     "extract_validation_error_details",
 ]
-
-
-class OpenAIResponseFormatter:
-    """Formatter for converting pydantic-ai responses to OpenAI format."""
-
-    def __init__(self) -> None:
-        """Initialize the formatter with tool call arguments mapper."""
-        self._tool_call_args_map: Dict[str, str] = {}
-
-    async def format_response(
-        self,
-        pydantic_result: AgentRunResult[Any],
-        model_settings: Optional[ModelSettings] = None,
-        messages: Optional[List[Message]] = None,
-        deployment_name: Optional[str] = None,
-        tools: Optional[List[MCPToolConfig]] = None,
-        output_schema: Optional[Dict[str, Any]] = None,
-    ) -> Response:
-        """Format pydantic-ai result to OpenAI Response structure.
-
-        Args:
-            pydantic_result: The result from pydantic-ai agent.run()
-            model_settings: Model configuration settings
-            messages: Original input messages
-            deployment_name: Model deployment name
-            tools: MCP tool configurations for server_label mapping
-
-        Returns:
-            Response object matching official OpenAI Responses API structure
-        """
-        try:
-            # Generate unique response ID
-            response_id = f"resp_{uuid.uuid4().hex}"
-
-            # Get messages from pydantic-ai result
-            all_messages = pydantic_result.all_messages()
-
-            # Extract output items using official types and get MCP tool call IDs
-            output_items, mcp_tool_call_ids = await self._format_output_items(all_messages, tools)
-
-            # Extract input items (system prompts, user prompts, tool returns, retry prompts)
-            # Pass MCP tool call IDs to identify MCP tool returns
-            input_items = await self._format_input_items(all_messages, mcp_tool_call_ids, tools)
-
-            # Get usage information
-            usage = self._format_usage(pydantic_result.usage())
-
-            # Get model name from last response or use deployment_name
-            model_name = deployment_name or "unknown"
-            for msg in all_messages:
-                if isinstance(msg, ModelResponse) and msg.model_name:
-                    model_name = msg.model_name
-                    break
-
-            # Format tools array (returns List[Tool])
-            formatted_tools = self._format_tools(tools)
-
-            # Format text configuration based on output schema
-            text_config = self._format_text_config(output_schema)
-
-            # Build response using official Response type
-            return Response(
-                id=response_id,
-                object="response",
-                created_at=int(time.time()),
-                model=model_name,
-                output=output_items,
-                instructions=input_items if input_items else None,
-                usage=usage,
-                status="completed",
-                parallel_tool_calls=True,
-                tool_choice="auto",
-                tools=formatted_tools,
-                temperature=model_settings.temperature if model_settings else None,
-                top_p=model_settings.top_p if model_settings else None,
-                max_output_tokens=model_settings.max_tokens if model_settings else None,
-                background=False,
-                reasoning=Reasoning(),
-                text=text_config,
-            )
-
-        except Exception as e:
-            logger.error(f"Error formatting OpenAI response: {str(e)}")
-            raise
-
-    async def _format_output_items(
-        self,
-        all_messages: List[ModelMessage],
-        tools: Optional[List[MCPToolConfig]] = None,
-    ) -> tuple[List[Any], set]:
-        """Convert pydantic-ai messages to OpenAI ResponseOutputItem list.
-
-        Args:
-            all_messages: All messages from pydantic-ai result (ModelMessage objects)
-            tools: MCP tool configurations for server_label mapping
-
-        Returns:
-            Tuple of (List of ResponseOutputItem, set of MCP tool call IDs)
-        """
-        output_items: List[Any] = []
-        mcp_tool_call_ids: set = set()
-
-        # Step 1: Fetch and add MCP tool lists at the beginning
-        mcp_list_items = await self._fetch_mcp_tool_lists(tools)
-        if mcp_list_items:
-            output_items.extend(mcp_list_items)
-
-        # Step 2: Build MCP tool names set for efficient lookup
-        mcp_tool_names = self._build_mcp_tool_names_set(tools)
-
-        # Step 3: Build tool returns lookup
-        tool_returns = self._build_tool_returns_lookup(all_messages)
-
-        # Step 3: Process messages in chronological order
-        for message in all_messages:
-            if isinstance(message, ModelResponse):
-                for part in message.parts:
-                    # TextPart → ResponseOutputMessage
-                    if isinstance(part, TextPart):
-                        output_items.append(
-                            ResponseOutputMessage(
-                                id=part.id or f"msg_{uuid.uuid4().hex}",
-                                type="message",
-                                status="completed",
-                                content=[
-                                    ResponseOutputText(
-                                        type="output_text",
-                                        text=part.content,
-                                        annotations=[],
-                                    )
-                                ],
-                                role="assistant",
-                            )
-                        )
-
-                    # ThinkingPart → ResponseReasoningItem
-                    # Setting summary based on referring .venv/lib/python3.11/site-packages/pydantic_ai/models/openai.py L1562 (pydantic_ai==1.4.0)
-                    elif isinstance(part, ThinkingPart):
-                        if part.content:  # Only add if there's actual content
-                            output_items.append(
-                                ResponseReasoningItem(
-                                    id=part.id or f"rs_{uuid.uuid4().hex}",
-                                    type="reasoning",
-                                    summary=[
-                                        Summary(
-                                            type="summary_text",
-                                            text=part.content,
-                                        )
-                                    ],
-                                    encrypted_content=part.signature if hasattr(part, "signature") else None,
-                                    status="completed",
-                                )
-                            )
-
-                    # ToolCallPart → ResponseOutputMcpCall or ResponseFunctionToolCall
-                    elif isinstance(part, ToolCallPart):
-                        # Store tool call arguments for later use (ALL tool calls - MCP and regular)
-                        self._tool_call_args_map[part.tool_call_id] = part.args_as_json_str()
-
-                        # Check if this is an MCP tool using the tool names set
-                        if part.tool_name in mcp_tool_names:
-                            # MCP tool call - track ID and get server label
-                            mcp_tool_call_ids.add(part.tool_call_id)
-                            server_label = self._get_server_label_for_tool(part.tool_name, tools)
-                            return_data = tool_returns.get(part.tool_call_id)
-
-                            output_items.append(
-                                ResponseOutputMcpCall(
-                                    id=part.tool_call_id,
-                                    type="mcp_call",
-                                    name=part.tool_name,
-                                    server_label=server_label or "unknown",
-                                    arguments=part.args_as_json_str(),
-                                    status="completed" if return_data else "in_progress",
-                                    output=return_data.get("content") if return_data else None,
-                                    error=None,
-                                )
-                            )
-                        else:
-                            # Regular function call
-                            output_items.append(
-                                ResponseFunctionToolCall(
-                                    type="function_call",
-                                    call_id=part.tool_call_id,
-                                    name=part.tool_name,
-                                    arguments=part.args_as_json_str(),
-                                    id=part.id if hasattr(part, "id") and part.id else None,
-                                )
-                            )
-
-        return output_items, mcp_tool_call_ids
-
-    async def _format_input_items(
-        self,
-        all_messages: List[ModelMessage],
-        mcp_tool_call_ids: set,
-        tools: Optional[List[MCPToolConfig]] = None,
-    ) -> List[Any]:
-        """Convert pydantic-ai ModelRequest messages to OpenAI ResponseInputItem list.
-
-        Text-only implementation for LLM interactions.
-
-        Args:
-            all_messages: All messages from pydantic-ai result (ModelMessage objects)
-            mcp_tool_call_ids: Set of tool call IDs that are MCP tools
-            tools: MCP tool configurations for server_label mapping
-
-        Returns:
-            List of ResponseInputItem (system prompts, user prompts, tool returns, retry prompts)
-        """
-        input_items: List[Any] = []
-
-        for message in all_messages:
-            if isinstance(message, ModelRequest):
-                for part in message.parts:
-                    # SystemPromptPart → ResponseInputMessage with role='system'
-                    if isinstance(part, SystemPromptPart):
-                        input_items.append(
-                            ResponseInputMessage(
-                                role="system",
-                                content=[
-                                    ResponseInputText(
-                                        type="input_text",
-                                        text=part.content,
-                                    )
-                                ],
-                                type="message",
-                                status="completed",
-                            )
-                        )
-
-                    # UserPromptPart → ResponseInputMessage with role='user'
-                    elif isinstance(part, UserPromptPart):
-                        # Convert to string if needed (text-only for now)
-                        content_str = part.content if isinstance(part.content, str) else str(part.content)
-                        input_items.append(
-                            ResponseInputMessage(
-                                role="user",
-                                content=[
-                                    ResponseInputText(
-                                        type="input_text",
-                                        text=content_str,
-                                    )
-                                ],
-                                type="message",
-                                status="completed",
-                            )
-                        )
-
-                    # ToolReturnPart → ResponseInputMcpCall or FunctionCallOutput
-                    elif isinstance(part, ToolReturnPart):
-                        if not part.tool_call_id:
-                            logger.warning(f"ToolReturnPart missing tool_call_id, skipping: {part.tool_name}")
-                            continue
-
-                        # Check if this is an MCP tool return by checking tool_call_id
-                        if part.tool_call_id in mcp_tool_call_ids:
-                            # MCP tool return - get server label from tool name
-                            server_label = self._get_server_label_for_tool(part.tool_name, tools)
-                            # Get arguments from mapper (populated during _format_output_items)
-                            arguments = self._tool_call_args_map.get(part.tool_call_id, "{}")
-                            input_items.append(
-                                ResponseInputMcpCall(
-                                    id=part.tool_call_id,
-                                    type="mcp_call",
-                                    name=part.tool_name,
-                                    server_label=server_label or "unknown",
-                                    arguments=arguments,
-                                    output=part.model_response_str(),
-                                    status="completed",
-                                )
-                            )
-                        else:
-                            # Regular function call output
-                            input_items.append(
-                                FunctionCallOutput(
-                                    type="function_call_output",
-                                    call_id=part.tool_call_id,
-                                    output=part.model_response_str(),
-                                )
-                            )
-
-                    # RetryPromptPart → ResponseInputMessage or FunctionCallOutput
-                    elif isinstance(part, RetryPromptPart):
-                        # Always use model_response() to get string (handles str and list[ErrorDetails])
-                        retry_text = part.model_response()
-
-                        if part.tool_name is None:
-                            # Retry without tool → user message
-                            input_items.append(
-                                ResponseInputMessage(
-                                    role="user",
-                                    content=[
-                                        ResponseInputText(
-                                            type="input_text",
-                                            text=retry_text,
-                                        )
-                                    ],
-                                    type="message",
-                                    status="completed",
-                                )
-                            )
-                        else:
-                            # Retry with tool → function call output
-                            input_items.append(
-                                FunctionCallOutput(
-                                    type="function_call_output",
-                                    call_id=part.tool_call_id,
-                                    output=retry_text,
-                                )
-                            )
-
-        return input_items
-
-    def _build_tool_returns_lookup(self, all_messages: List[ModelMessage]) -> Dict[str, Dict]:
-        """Build a lookup dictionary of tool returns by tool_call_id.
-
-        Args:
-            all_messages: All messages from pydantic-ai result
-
-        Returns:
-            Dictionary mapping tool_call_id to return data
-        """
-        tool_returns = {}
-
-        for msg in all_messages:
-            if isinstance(msg, ModelRequest):
-                for part in msg.parts:
-                    if isinstance(part, ToolReturnPart):
-                        tool_returns[part.tool_call_id] = {
-                            "content": part.model_response_str(),
-                            "tool_name": part.tool_name,
-                        }
-
-        return tool_returns
-
-    def _build_mcp_tool_names_set(self, tools: Optional[List[MCPToolConfig]]) -> set:
-        """Build a set of all MCP tool names for fast lookup.
-
-        Args:
-            tools: List of MCP tool configurations
-
-        Returns:
-            Set of tool names that are MCP tools
-        """
-        if not tools:
-            return set()
-
-        mcp_tool_names = set()
-        for tool_config in tools:
-            if tool_config.type == "mcp":
-                mcp_tool_names.update(tool_config.allowed_tool_names)
-
-        return mcp_tool_names
-
-    def _get_server_label_for_tool(self, tool_name: str, tools: Optional[List[MCPToolConfig]] = None) -> Optional[str]:
-        """Get server_label for a tool if it's an MCP tool.
-
-        Args:
-            tool_name: Name of the tool
-            tools: MCP tool configurations
-
-        Returns:
-            Server label if MCP tool, None otherwise
-        """
-        if not tools:
-            return None
-
-        for tool_config in tools:
-            if tool_config.type == "mcp" and tool_name in tool_config.allowed_tool_names:
-                return tool_config.server_label
-
-        return None
-
-    def _format_tools(self, tools: Optional[List[MCPToolConfig]]) -> List[Tool]:
-        """Convert MCPToolConfig objects to OpenAI Tool format.
-
-        Args:
-            tools: List of MCP tool configurations from prompt config
-
-        Returns:
-            List of Tool objects (currently returns empty list as we handle MCP via output items)
-        """
-        # Note: In OpenAI Responses API, tools are typically defined at request time
-        # and MCP tool calls appear in the output items, not in the tools array.
-        # For now, return empty list. Can be extended if needed.
-        return []
-
-    async def _fetch_mcp_tool_lists(self, tools: Optional[List[MCPToolConfig]]) -> List[McpListTools]:
-        """Fetch tool lists from all MCP servers.
-
-        Args:
-            tools: List of MCP tool configurations
-
-        Returns:
-            List of McpListTools output items (official type)
-        """
-        if not tools:
-            return []
-
-        from .tool_loaders import MCPToolLoader
-
-        loader = MCPToolLoader()
-        mcp_list_items: List[McpListTools] = []
-
-        for tool_config in tools:
-            if tool_config.type == "mcp":
-                # Load the MCP server
-                mcp_server = await loader.load_tools(tool_config)
-                if not mcp_server:
-                    continue
-
-                # Fetch tool list from server
-                tool_list_data = await loader.get_tool_list(mcp_server, tool_config.server_label or "unknown")
-
-                if tool_list_data:
-                    # Parse tools from MCP response
-                    tools_list: List[McpListToolsTool] = []
-                    for tool_info in tool_list_data.get("tools", []):
-                        # tool_info is a Pydantic Tool object from pydantic-ai
-                        # Access attributes directly
-                        tools_list.append(
-                            McpListToolsTool(
-                                name=tool_info.name,
-                                description=getattr(tool_info, "description", None),
-                                input_schema=tool_info.inputSchema
-                                if hasattr(tool_info, "inputSchema")
-                                else tool_info.input_schema,
-                                annotations=getattr(tool_info, "annotations", None),
-                            )
-                        )
-
-                    # Create mcp_list_tools output item using official type
-                    mcp_list_items.append(
-                        McpListTools(
-                            id=f"mcpl_{uuid.uuid4().hex}",
-                            type="mcp_list_tools",
-                            server_label=tool_list_data["server_label"],
-                            tools=tools_list,
-                            error=tool_list_data.get("error"),
-                        )
-                    )
-
-        return mcp_list_items
-
-    def _format_usage(self, usage_info: Any) -> ResponseUsage:
-        """Format usage information to official ResponseUsage type.
-
-        Args:
-            usage_info: Usage information from pydantic-ai result
-
-        Returns:
-            ResponseUsage object with token counts
-        """
-        if not usage_info:
-            return ResponseUsage(
-                input_tokens=0,
-                output_tokens=0,
-                total_tokens=0,
-            )
-
-        # Extract token counts from pydantic-ai usage object
-        request_tokens = getattr(usage_info, "request_tokens", 0)
-        response_tokens = getattr(usage_info, "response_tokens", 0)
-        total_tokens = getattr(usage_info, "total_tokens", 0)
-
-        # Extract reasoning tokens from details if available
-        details = getattr(usage_info, "details", {})
-        reasoning_tokens = details.get("reasoning_tokens", 0) if isinstance(details, dict) else 0
-
-        return ResponseUsage(
-            input_tokens=request_tokens,
-            output_tokens=response_tokens,
-            total_tokens=total_tokens,
-            input_tokens_details={"cached_tokens": 0},
-            output_tokens_details={"reasoning_tokens": reasoning_tokens},
-        )
-
-    def _format_text_config(
-        self,
-        output_schema: Optional[Dict[str, Any]],
-    ) -> Optional[ResponseTextConfig]:
-        """Format text configuration based on output schema.
-
-        Args:
-            output_schema: Output schema from prompt config
-
-        Returns:
-            ResponseTextConfig with appropriate format (text or json_schema)
-        """
-        if output_schema:
-            # Structured output with JSON schema
-            # Use model_validate to properly handle the aliased field
-            json_schema_config = ResponseFormatTextJSONSchemaConfig.model_validate(
-                {
-                    "type": "json_schema",
-                    "name": output_schema.get("title", "response_schema"),
-                    "schema": output_schema,  # Use alias name "schema" in dict
-                    "strict": True,
-                }
-            )
-            return ResponseTextConfig(format=json_schema_config)
-        else:
-            # Plain text output
-            return ResponseTextConfig(format=ResponseFormatText(type="text"))
 
 
 # Error Mapping Utilities
@@ -636,3 +88,450 @@ def extract_validation_error_details(e: ValidationError) -> Tuple[str, Optional[
 
     # Fallback if no errors found
     return str(e), None, "validation_error"
+
+
+# OpenAI Response Models
+class OpenAIContentPart(BaseModel):
+    """Content part for OpenAI messages."""
+
+    type: Literal["input_text", "output_text", "thinking"]
+    text: str
+    annotations: Optional[List[Any]] = Field(default_factory=list)
+    logprobs: Optional[List[Any]] = Field(default_factory=list)
+
+
+class OpenAIInstructionMessage(BaseModel):
+    """Instruction message structure for system/user messages."""
+
+    type: Literal["message"] = "message"
+    content: List[OpenAIContentPart]
+    role: Literal["system", "developer", "user", "assistant"]
+
+
+class OpenAIOutputMessage(BaseModel):
+    """Output message structure for assistant responses."""
+
+    id: str
+    type: Literal["message"] = "message"
+    status: Literal["completed", "failed", "in_progress"] = "completed"
+    content: List[OpenAIContentPart]
+    role: Literal["assistant"] = "assistant"
+
+
+class OpenAIMCPCall(BaseModel):
+    """MCP tool call output item."""
+
+    type: Literal["mcp_call"] = "mcp_call"
+    id: str  # tool_call_id from pydantic-ai
+    name: str  # actual tool name (parsed from tool_name)
+    server_label: str  # from MCPToolConfig
+    arguments: str  # JSON string from tool-call args
+    status: Literal["in_progress", "completed", "incomplete", "calling", "failed"]
+    output: Optional[str] = None  # from tool-return content
+    error: Optional[str] = None
+    approval_request_id: Optional[str] = None
+
+
+class OpenAIMCPTool(BaseModel):
+    """OpenAI MCP tool configuration format."""
+
+    type: Literal["mcp"] = "mcp"
+    server_label: str = Field(..., description="A label for this MCP server, used to identify it in tool calls")
+    allowed_tools: List[str] = Field(..., description="List of allowed tool names")
+    connector_id: Optional[str] = Field(None, description="Identifier for service connectors")
+    server_url: Optional[str] = Field(None, description="The URL for the MCP server")
+    server_description: Optional[str] = Field(None, description="Optional description of the MCP server")
+    require_approval: Literal["always", "never", "auto"] = Field(
+        default="never", description="Specify which tools require approval"
+    )
+    authorization: Optional[str] = Field(None, description="OAuth access token for the MCP server")
+    headers: Optional[Dict[str, str]] = Field(None, description="Optional HTTP headers to send to the MCP server")
+
+
+class OpenAIUsageDetails(BaseModel):
+    """Token usage details."""
+
+    cached_tokens: int = 0
+    reasoning_tokens: int = 0
+
+
+class OpenAIUsage(BaseModel):
+    """Token usage information."""
+
+    input_tokens: int
+    input_tokens_details: OpenAIUsageDetails
+    output_tokens: int
+    output_tokens_details: OpenAIUsageDetails
+    total_tokens: int
+
+
+class OpenAITextFormat(BaseModel):
+    """Text format configuration."""
+
+    type: Literal["text", "json"] = "text"
+
+
+class OpenAITextConfig(BaseModel):
+    """Text configuration."""
+
+    format: OpenAITextFormat
+    verbosity: Optional[Literal["low", "medium", "high"]] = "medium"
+
+
+class OpenAIReasoning(BaseModel):
+    """Reasoning configuration."""
+
+    effort: Optional[Literal["low", "medium", "high"]] = None
+    summary: Optional[str] = None
+
+
+class OpenAIPromptInfo(BaseModel):
+    """Prompt template information."""
+
+    id: str
+    variables: Optional[Dict[str, Any]] = None
+    version: Optional[str] = None
+
+
+class OpenAIResponseSchema(BaseModel):
+    """Complete OpenAI response structure."""
+
+    id: str
+    object: Literal["response"] = "response"
+    created_at: int
+    status: Literal["completed", "failed", "in_progress", "cancelled", "queued", "incomplete"] = "completed"
+    background: bool = False
+    billing: Optional[Dict[str, str]] = None
+    error: Optional[Dict[str, Any]] = None
+    incomplete_details: Optional[Dict[str, Any]] = None
+    instructions: List[OpenAIInstructionMessage]
+    max_output_tokens: Optional[int] = None
+    max_tool_calls: Optional[int] = None
+    model: str
+    output: List[Union[OpenAIMCPCall, OpenAIOutputMessage, Dict[str, Any]]]
+    parallel_tool_calls: bool = True
+    previous_response_id: Optional[str] = None
+    prompt: Optional[OpenAIPromptInfo] = None
+    prompt_cache_key: Optional[str] = None
+    reasoning: OpenAIReasoning
+    safety_identifier: Optional[str] = None
+    service_tier: Literal["auto", "default", "flex", "priority"] = "default"
+    store: bool = True
+    temperature: float = 1.0
+    text: OpenAITextConfig
+    tool_choice: Union[Literal["auto", "none", "required"], Dict[str, Any]] = "auto"
+    tools: List[Dict[str, Any]] = Field(default_factory=list)
+    top_logprobs: int = 0
+    top_p: float = 1.0
+    truncation: Literal["auto", "disabled"] = "disabled"
+    usage: OpenAIUsage
+    user: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class OpenAIResponseFormatter:
+    """Formatter for converting pydantic-ai responses to OpenAI format."""
+
+    def format_response(
+        self,
+        pydantic_result: Any,
+        model_settings: Optional[ModelSettings] = None,
+        messages: Optional[List[Message]] = None,
+        deployment_name: Optional[str] = None,
+        tools: Optional[List[MCPToolConfig]] = None,
+    ) -> OpenAIResponseSchema:
+        """Format pydantic-ai result to OpenAI response structure.
+
+        Args:
+            pydantic_result: The result from pydantic-ai agent.run()
+            model_settings: Model configuration settings
+            messages: Original input messages
+            deployment_name: Model deployment name
+            tools: MCP tool configurations for server_label mapping
+
+        Returns:
+            OpenAIResponseSchema object matching OpenAI response structure
+        """
+        try:
+            # Generate unique response ID
+            response_id = f"resp_{uuid.uuid4().hex}"
+
+            # Parse messages from result
+            all_messages = json.loads(pydantic_result.all_messages_json())
+
+            # Extract instructions from input messages
+            instructions = self._format_instructions(messages or [], all_messages)
+
+            # Extract output items (includes MCP calls and message items)
+            output = self._format_output_with_tools(all_messages, response_id, tools)
+
+            # Get usage information
+            usage = self._format_usage(pydantic_result.usage())
+
+            # Get model name
+            model_name = deployment_name or "unknown"
+            # Try to get from all_messages if available
+            if all_messages and len(all_messages) > 1:
+                for msg in all_messages:
+                    if msg.get("kind") == "response" and msg.get("model_name"):
+                        model_name = msg["model_name"]
+                        break
+
+            # Build reasoning object (request-level config, always null for us)
+            reasoning = OpenAIReasoning(effort=None, summary=None)
+
+            # Format tools array
+            formatted_tools = self._format_tools(tools)
+
+            # Build response
+            response = OpenAIResponseSchema(
+                id=response_id,
+                created_at=int(time.time()),
+                instructions=instructions,
+                model=model_name,
+                output=output,
+                temperature=model_settings.temperature if model_settings else 1.0,
+                top_p=model_settings.top_p if model_settings else 1.0,
+                max_output_tokens=model_settings.max_tokens if model_settings else None,
+                text=OpenAITextConfig(
+                    format=OpenAITextFormat(type="json" if self._is_json_output(pydantic_result) else "text")
+                ),
+                reasoning=reasoning,
+                usage=usage,
+                tools=formatted_tools,
+            )
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Error formatting OpenAI response: {str(e)}")
+            raise
+
+    def _format_instructions(self, messages: List[Message], all_messages: List[Dict]) -> List[Dict]:
+        """Format instruction messages from input."""
+        instructions = []
+
+        # Always extract ALL messages from pydantic-ai messages (they contain everything)
+        if all_messages:
+            for msg in all_messages:
+                if msg.get("kind") == "request":
+                    parts = msg.get("parts", [])
+                    for part in parts:
+                        part_kind = part.get("part_kind", "")
+                        if part_kind == "system-prompt":
+                            instructions.append(
+                                {
+                                    "type": "message",
+                                    "content": [{"type": "input_text", "text": part.get("content", "")}],
+                                    "role": "system",
+                                }
+                            )
+                        elif part_kind == "user-prompt":
+                            instructions.append(
+                                {
+                                    "type": "message",
+                                    "content": [{"type": "input_text", "text": part.get("content", "")}],
+                                    "role": "user",
+                                }
+                            )
+
+        # Fallback to original messages only if no pydantic-ai messages available
+        if not instructions and messages:
+            for msg in messages:
+                if msg.role in ["system", "developer", "user"]:
+                    instructions.append(
+                        {
+                            "type": "message",
+                            "content": [{"type": "input_text", "text": msg.content}],
+                            "role": msg.role,
+                        }
+                    )
+
+        return instructions
+
+    def _format_output_with_tools(
+        self,
+        all_messages: List[Dict],
+        response_id: str,
+        tools: Optional[List[MCPToolConfig]] = None,
+    ) -> List[Dict]:
+        """Format output items in chronological order.
+
+        Processing logic:
+        1. Build lookup dict of tool returns by tool_call_id
+        2. Iterate through messages in order
+        3. For each part, add corresponding output item:
+           - thinking → reasoning
+           - text → message
+           - tool-call → mcp_call (correlated with tool-return)
+
+        Args:
+            all_messages: All messages from pydantic-ai result
+            response_id: The response ID
+            tools: MCP tool configurations for server_label
+
+        Returns:
+            List of output items in chronological order
+        """
+        output_items = []
+
+        # Build tool returns lookup
+        tool_returns_lookup = self._build_tool_returns_lookup(all_messages)
+
+        # Get server_label from MCP tool config
+        server_label = "unknown"
+        if tools:
+            for tool_config in tools:
+                if tool_config.type == "mcp":
+                    server_label = tool_config.server_label
+                    break
+
+        # Process messages in chronological order
+        for msg in all_messages:
+            kind = msg.get("kind")
+            parts = msg.get("parts", [])
+
+            # Skip request messages (system-prompt, user-prompt, tool-return are not output)
+            if kind == "request":
+                continue
+
+            # Process response messages
+            if kind == "response":
+                for part in parts:
+                    part_kind = part.get("part_kind")
+
+                    # Add reasoning for thinking parts
+                    if part_kind == "thinking":
+                        content = part.get("content", "")
+                        if content:
+                            reasoning_item = {
+                                "type": "reasoning",
+                                "id": f"rs_{uuid.uuid4().hex}",
+                                "status": "completed",
+                                "content": [{"type": "reasoning_text", "text": content}],
+                                "summary": [{"type": "summary_text", "text": None}],
+                            }
+                            output_items.append(reasoning_item)
+
+                    # Add message for text parts
+                    elif part_kind == "text":
+                        content = part.get("content", "")
+                        message_item = {
+                            "id": f"msg_{uuid.uuid4().hex}",
+                            "type": "message",
+                            "status": "completed",
+                            "content": [{"type": "output_text", "text": content, "annotations": [], "logprobs": []}],
+                            "role": "assistant",
+                        }
+                        output_items.append(message_item)
+
+                    # Add mcp_call for tool-call parts
+                    elif part_kind == "tool-call":
+                        tool_call_id = part.get("tool_call_id")
+                        tool_name = part.get("tool_name")
+                        args = part.get("args")
+
+                        # Get correlated tool return
+                        return_data = tool_returns_lookup.get(tool_call_id)
+
+                        mcp_call = {
+                            "type": "mcp_call",
+                            "id": tool_call_id,
+                            "name": tool_name,
+                            "server_label": server_label,
+                            "arguments": args,
+                            "status": "completed" if return_data else "in_progress",
+                            "output": return_data["content"] if return_data else None,
+                            "error": None,
+                            "approval_request_id": None,
+                        }
+                        output_items.append(mcp_call)
+
+        return output_items
+
+    def _build_tool_returns_lookup(self, all_messages: List[Dict]) -> Dict[str, Dict]:
+        """Build a lookup dictionary of tool returns by tool_call_id.
+
+        Args:
+            all_messages: All messages from pydantic-ai result
+
+        Returns:
+            Dictionary mapping tool_call_id to return data
+        """
+        tool_returns = {}
+
+        for msg in all_messages:
+            if msg.get("kind") == "request":
+                for part in msg.get("parts", []):
+                    if part.get("part_kind") == "tool-return":
+                        tool_call_id = part.get("tool_call_id")
+                        tool_returns[tool_call_id] = {
+                            "content": part.get("content"),
+                            "tool_name": part.get("tool_name"),
+                        }
+
+        return tool_returns
+
+    def _format_tools(self, tools: Optional[List[MCPToolConfig]]) -> List[Dict[str, Any]]:
+        """Convert MCPToolConfig objects to OpenAI MCP tool format.
+
+        Args:
+            tools: List of MCP tool configurations from prompt config
+
+        Returns:
+            List of tool dictionaries in OpenAI format
+        """
+        if not tools:
+            return []
+
+        formatted_tools = []
+        for tool in tools:
+            if tool.type == "mcp":
+                openai_tool = OpenAIMCPTool(
+                    type="mcp",
+                    server_label=tool.server_label or "unknown",
+                    allowed_tools=tool.allowed_tools,
+                    connector_id=tool.connector_id,
+                    server_url=tool.server_url,
+                    server_description=tool.server_description,
+                    require_approval=tool.require_approval,
+                )
+                formatted_tools.append(openai_tool.model_dump(exclude_none=True))
+
+        return formatted_tools
+
+    def _format_usage(self, usage_info: Any) -> Dict:
+        """Format usage information."""
+        if not usage_info:
+            return {
+                "input_tokens": 0,
+                "input_tokens_details": {"cached_tokens": 0},
+                "output_tokens": 0,
+                "output_tokens_details": {"reasoning_tokens": 0},
+                "total_tokens": 0,
+            }
+
+        # Handle dict-like usage info
+        usage_dict = usage_info if isinstance(usage_info, dict) else usage_info.__dict__
+
+        return {
+            "input_tokens": usage_dict.get("request_tokens", 0),
+            "input_tokens_details": {"cached_tokens": 0},
+            "output_tokens": usage_dict.get("response_tokens", 0),
+            "output_tokens_details": {"reasoning_tokens": 0},
+            "total_tokens": usage_dict.get("total_tokens", 0),
+        }
+
+    def _is_json_output(self, result: Any) -> bool:
+        """Check if the output is JSON formatted."""
+        try:
+            if hasattr(result, "output"):
+                output = result.output
+                if hasattr(output, "model_dump"):
+                    # It's a Pydantic model, so it's structured/JSON
+                    return True
+                elif isinstance(output, dict):
+                    return True
+            return False
+        except Exception:
+            return False

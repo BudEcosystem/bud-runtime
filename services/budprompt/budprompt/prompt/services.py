@@ -42,7 +42,7 @@ from ..commons.exceptions import (
 from ..commons.helpers import run_async
 from ..commons.security import HashManager
 from ..shared.redis_service import RedisService
-from .executors import SimplePromptExecutor
+from .executors import SimplePromptExecutor_V1
 from .revised_code.field_validation import generate_validation_function
 from .schema_builder import ModelGeneratorFactory
 from .schemas import (
@@ -75,7 +75,7 @@ class PromptExecutorService:
 
     def __init__(self):
         """Initialize the PromptExecutorService."""
-        self.executor = SimplePromptExecutor()
+        self.executor = SimplePromptExecutor_V1()
 
     async def execute_prompt_deprecated(
         self, request: PromptExecuteRequest
