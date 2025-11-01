@@ -134,6 +134,7 @@ class AppConfig(BaseAppConfig):
         alias="BUD_DOC_API_KEY_LOCATION",
     )
     bud_prompt_service_url: str = Field(
+        default="http://budprompt:3015",
         description="BudPrompt service URL for prompt execution",
         alias="BUD_PROMPT_SERVICE_URL",
     )
@@ -207,6 +208,18 @@ class AppConfig(BaseAppConfig):
     )
     eval_sync_local_mode: bool = Field(
         default=False, description="Use local mode for evaluation data synchronization", alias="EVAL_SYNC_LOCAL_MODE"
+    )
+
+    # Workflow Cleanup Settings
+    workflow_retention_days: int = Field(
+        default=30,
+        description="Number of days to retain completed/failed workflows before purging from Dapr state store",
+        alias="WORKFLOW_RETENTION_DAYS",
+    )
+    workflow_cleanup_batch_size: int = Field(
+        default=100,
+        description="Maximum number of workflows to cleanup in one scheduled run",
+        alias="WORKFLOW_CLEANUP_BATCH_SIZE",
     )
 
     @computed_field
