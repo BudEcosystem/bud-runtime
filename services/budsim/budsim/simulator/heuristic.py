@@ -244,7 +244,7 @@ class HeuristicCalculator:
             model_params: Dictionary containing model and system parameters
 
         Returns:
-            float: KV cache memory in GB per GPU
+            float: KV cache memory in bytes per GPU (matches ModelAnalysis convention)
         """
         if not self.use_llm_calc:
             logger.warning("llm-memory-calculator not available - returning 0 for KV cache memory")
@@ -258,8 +258,18 @@ class HeuristicCalculator:
                 return 0.0
 
             batch_size = model_params.get("concurrent_requests")
+            input_tokens = model_params.get("mean_input_tokens")
+            output_tokens = model_params.get("mean_output_tokens")
+
+            if batch_size is None or input_tokens is None or output_tokens is None:
+                logger.warning(
+                    "Missing required parameters (concurrent_requests, mean_input_tokens, or mean_output_tokens) "
+                    "- returning 0 for KV cache memory"
+                )
+                return 0.0
+
             # Add 10% safety margin to match deployment configuration
-            seq_length = int((model_params.get("mean_input_tokens") + model_params.get("mean_output_tokens")) * 1.1)
+            seq_length = int((input_tokens + output_tokens) * 1.1)
 
             # Account for parallelism
             tp_size = model_params.get("tensor_parallel_size", 1)
@@ -294,10 +304,14 @@ class HeuristicCalculator:
                 # Cache the result
                 self._memory_cache[cache_key] = memory_report
 
-            # Return KV cache memory per GPU (already per-device from calculate_memory with TP)
+            # Return KV cache memory per GPU in bytes (to match ModelAnalysis convention)
             kv_cache_gb = memory_report.kv_cache_gb
-            logger.debug(f"KV cache memory: {kv_cache_gb:.2f}GB per GPU for TP={tp_size}, PP={pp_size}")
-            return kv_cache_gb
+            kv_cache_bytes = kv_cache_gb * (1024**3)  # Convert GB to bytes
+            logger.debug(
+                f"KV cache memory: {kv_cache_gb:.2f}GB ({kv_cache_bytes:.0f} bytes) "
+                f"per GPU for TP={tp_size}, PP={pp_size}"
+            )
+            return kv_cache_bytes
 
         except Exception as e:
             logger.warning(f"Error calculating KV cache memory: {e}, returning 0")
