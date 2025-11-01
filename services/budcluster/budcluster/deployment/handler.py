@@ -256,18 +256,21 @@ class DeploymentHandler:
 
         full_node_list = copy.deepcopy(node_list)
 
-        max_loras = 1 if not adapters else max(1, len(adapters))
+        # TODO: To be enabled
+        # max_loras = 1 if not adapters else max(1, len(adapters))
 
         for idx, node in enumerate(node_list):
             node["args"]["gpu-memory-utilization"] = 0.95
-            node["args"]["max-loras"] = max_loras
-            node["args"]["max-lora-rank"] = 256
+            # TODO: To be enabled
+            # node["args"]["max-loras"] = max_loras
+            # node["args"]["max-lora-rank"] = 256
             # node["args"]["pipeline-parallel-size"] = 2
             # node["pp_size"] = 2
 
             node["args"] = self._prepare_args(node["args"])
             node["args"].append(f"--served-model-name={namespace}")
-            node["args"].append("--enable-lora")
+            # TODO: To be enabled
+            # node["args"].append("--enable-lora")
 
             # Calculate max_model_len dynamically
             if input_tokens and output_tokens:
@@ -298,7 +301,8 @@ class DeploymentHandler:
             # node["envs"]["VLLM_CPU_OMP_THREADS_BIND"] = thread_bind
             node["envs"]["VLLM_LOGGING_LEVEL"] = "INFO"
             # node["envs"]["VLLM_SKIP_WARMUP"] = "true"
-            node["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
+            # TODO: To be enabled
+            # node["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
             # node["core_count"] = core_count if device["type"] == "cpu" else 1
             node["memory"] = node["memory"] / (1024**3)
             node["name"] = self._to_k8s_label(node["name"])
