@@ -13,7 +13,7 @@ use super::provider_trait::InferenceProvider;
 
 use crate::cache::ModelProviderRequest;
 use crate::completions::{
-    CompletionChoice, CompletionChunk, CompletionChoiceChunk, CompletionProvider,
+    CompletionChoice, CompletionChoiceChunk, CompletionChunk, CompletionProvider,
     CompletionProviderResponse, CompletionRequest, CompletionStream,
 };
 use crate::embeddings::{EmbeddingProvider, EmbeddingProviderResponse, EmbeddingRequest};
@@ -1027,7 +1027,11 @@ impl CompletionProvider for DummyProvider {
                         text: chunk.to_string(),
                         index: 0,
                         logprobs: None,
-                        finish_reason: if i == 5 { Some("stop".to_string()) } else { None },
+                        finish_reason: if i == 5 {
+                            Some("stop".to_string())
+                        } else {
+                            None
+                        },
                         extra: HashMap::new(),
                     }],
                     usage: None,
@@ -1185,7 +1189,10 @@ impl ResponseProvider for DummyProvider {
             instructions: request.instructions.clone(),
             max_output_tokens: request.max_output_tokens,
             max_tool_calls: request.max_tool_calls,
-            model: request.model.clone().unwrap_or_else(|| "dummy-model".to_string()),
+            model: request
+                .model
+                .clone()
+                .unwrap_or_else(|| "dummy-model".to_string()),
             output: vec![json!({
                 "id": format!("msg_{}", Uuid::now_v7()),
                 "type": "message",

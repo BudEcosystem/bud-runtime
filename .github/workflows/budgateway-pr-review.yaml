@@ -51,7 +51,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsasl2-dev
+          sudo apt-get install -y libsasl2-dev libssl-dev protobuf-compiler libopenblas-dev
 
       - name: Install cargo-nextest, cargo-deny, and cargo-hack
         run: |
@@ -117,7 +117,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsasl2-dev
+          sudo apt-get install -y libsasl2-dev libssl-dev protobuf-compiler libopenblas-dev
 
       - name: Install cargo-nextest
         run: |
@@ -203,7 +203,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsasl2-dev
+          sudo apt-get install -y libsasl2-dev libssl-dev protobuf-compiler libopenblas-dev
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -298,7 +298,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsasl2-dev jq netcat-openbsd
+          sudo apt-get install -y libsasl2-dev jq netcat-openbsd libssl-dev protobuf-compiler libopenblas-dev
 
       - name: Install vegeta
         run: |

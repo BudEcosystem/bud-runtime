@@ -178,8 +178,12 @@ mod tests {
         assert!(!result.is_authenticated);
 
         // Function name with prefix
-        let result =
-            resolve_model_name(Some("tensorzero::function_name::my_function"), &headers, false).unwrap();
+        let result = resolve_model_name(
+            Some("tensorzero::function_name::my_function"),
+            &headers,
+            false,
+        )
+        .unwrap();
         assert_eq!(result.function_name, Some("my_function".to_string()));
         assert_eq!(result.model_name, None);
         assert_eq!(
@@ -320,7 +324,8 @@ mod tests {
         let headers = HeaderMap::new();
 
         // Empty function name after prefix
-        let result = resolve_model_name(Some("tensorzero::function_name::"), &headers, false).unwrap();
+        let result =
+            resolve_model_name(Some("tensorzero::function_name::"), &headers, false).unwrap();
         assert_eq!(result.function_name, Some("".to_string()));
         assert_eq!(result.model_name, None);
 
@@ -330,7 +335,8 @@ mod tests {
         assert_eq!(result.function_name, None);
 
         // Model name that looks like a prefix but isn't
-        let result = resolve_model_name(Some("my-model-tensorzero::something"), &headers, false).unwrap();
+        let result =
+            resolve_model_name(Some("my-model-tensorzero::something"), &headers, false).unwrap();
         assert_eq!(
             result.model_name,
             Some("my-model-tensorzero::something".to_string())

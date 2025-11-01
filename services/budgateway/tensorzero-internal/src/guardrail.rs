@@ -13,7 +13,12 @@ use crate::guardrail_table::{
     merge_moderation_results, ExecutionMode, FailureMode, GuardType, GuardrailConfig,
     GuardrailResult, GuardrailTable, ProviderGuardrailResult,
 };
+use crate::inference::providers::bud_sentinel::{
+    generated::Profile as BudSentinelProfile, BudSentinelProvider,
+};
+use crate::model::CredentialLocation;
 use crate::moderation::{ModerationInput, ModerationProvider, ModerationRequest, ModerationResult};
+use tonic::Code;
 
 /// Execute a guardrail configuration against input text
 /// This version creates separate provider instances for each probe
@@ -23,12 +28,13 @@ pub async fn execute_guardrail<'a>(
     guard_type: GuardType,
     clients: &InferenceClients<'a>,
     provider_params: Option<serde_json::Value>,
+    skip_guard_type_validation: bool,
 ) -> Result<GuardrailResult, Error> {
     // Validate the guardrail configuration
     guardrail_config.validate()?;
 
     // Check if this guardrail supports the requested guard type
-    if !guardrail_config.guard_types.contains(&guard_type) {
+    if !skip_guard_type_validation && !guardrail_config.guard_types.contains(&guard_type) {
         return Ok(GuardrailResult {
             guardrail_id: guardrail_config.id.clone(),
             flagged: false,
@@ -119,6 +125,10 @@ pub async fn execute_guardrail<'a>(
 /// Represents a single probe execution task
 struct ProbeTask {
     provider_type: String,
+    guardrail_id: String,
+    guardrail_severity: f64,
+    provider_enabled_probes: Vec<String>,
+    provider_enabled_rules: HashMap<String, Vec<String>>,
     probe_id: String,
     rules: Vec<String>,
     provider_config: serde_json::Value,
@@ -132,6 +142,28 @@ fn create_probe_tasks(
     let mut tasks = Vec::new();
 
     for provider_config in &guardrail_config.providers {
+        if provider_config.provider_type == "bud_sentinel" {
+            tasks.push(ProbeTask {
+                provider_type: provider_config.provider_type.clone(),
+                guardrail_id: guardrail_config.id.clone(),
+                guardrail_severity: guardrail_config.severity_threshold,
+                provider_enabled_probes: provider_config.enabled_probes.clone(),
+                provider_enabled_rules: provider_config.enabled_rules.clone(),
+                probe_id: provider_config
+                    .enabled_probes
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "bud_sentinel".to_string()),
+                rules: provider_config
+                    .enabled_rules
+                    .values()
+                    .flat_map(|r| r.clone())
+                    .collect(),
+                provider_config: provider_config.provider_config.clone(),
+            });
+            continue;
+        }
+
         for probe_id in &provider_config.enabled_probes {
             let rules = provider_config
                 .enabled_rules
@@ -153,6 +185,10 @@ fn create_probe_tasks(
 
                     tasks.push(ProbeTask {
                         provider_type: provider_config.provider_type.clone(),
+                        guardrail_id: guardrail_config.id.clone(),
+                        guardrail_severity: guardrail_config.severity_threshold,
+                        provider_enabled_probes: provider_config.enabled_probes.clone(),
+                        provider_enabled_rules: provider_config.enabled_rules.clone(),
                         probe_id: specific_probe_id,
                         rules: vec![rule.clone()], // Single rule for this specific probe
                         provider_config: provider_config.provider_config.clone(),
@@ -162,6 +198,10 @@ fn create_probe_tasks(
                 // Normal probe task creation
                 tasks.push(ProbeTask {
                     provider_type: provider_config.provider_type.clone(),
+                    guardrail_id: guardrail_config.id.clone(),
+                    guardrail_severity: guardrail_config.severity_threshold,
+                    provider_enabled_probes: provider_config.enabled_probes.clone(),
+                    provider_enabled_rules: provider_config.enabled_rules.clone(),
                     probe_id: probe_id.clone(),
                     rules,
                     provider_config: provider_config.provider_config.clone(),
@@ -184,13 +224,7 @@ async fn execute_parallel<'a>(
     let mut futures = FuturesUnordered::new();
 
     for task in probe_tasks {
-        let future = execute_single_probe(
-            task,
-            guardrail_config.severity_threshold,
-            input.clone(),
-            clients,
-            provider_params.clone(),
-        );
+        let future = execute_single_probe(task, input.clone(), clients, provider_params.clone());
 
         futures.push(future);
     }
@@ -221,15 +255,7 @@ async fn execute_sequential<'a>(
     let mut results = Vec::new();
 
     for task in probe_tasks {
-        match execute_single_probe(
-            task,
-            guardrail_config.severity_threshold,
-            input.clone(),
-            clients,
-            provider_params.clone(),
-        )
-        .await
-        {
+        match execute_single_probe(task, input.clone(), clients, provider_params.clone()).await {
             Ok(provider_result) => {
                 let should_stop = provider_result.flagged
                     && guardrail_config.execution_mode == ExecutionMode::Sequential;
@@ -256,7 +282,6 @@ async fn execute_sequential<'a>(
 /// Execute a single probe
 async fn execute_single_probe<'a>(
     task: ProbeTask,
-    severity_threshold: f64,
     input: ModerationInput,
     clients: &InferenceClients<'a>,
     request_provider_params: Option<serde_json::Value>,
@@ -267,7 +292,7 @@ async fn execute_single_probe<'a>(
                 task.probe_id.clone(),
                 task.rules,
                 task.provider_config,
-                severity_threshold,
+                task.guardrail_severity,
                 input,
                 clients,
                 request_provider_params.clone(),
@@ -279,12 +304,15 @@ async fn execute_single_probe<'a>(
                 task.probe_id.clone(),
                 task.rules,
                 task.provider_config,
-                severity_threshold,
+                task.guardrail_severity,
                 input,
                 clients,
                 request_provider_params.clone(),
             )
             .await
+        }
+        "bud_sentinel" => {
+            execute_bud_sentinel_probe(task, input, clients, request_provider_params.clone()).await
         }
         _ => Err(Error::new(ErrorDetails::Config {
             message: format!("Unsupported provider type: {}", task.provider_type),
@@ -584,6 +612,372 @@ fn build_azure_probe_params(
     params
 }
 
+/// Build Bud Sentinel provider params by merging guardrail defaults and request overrides
+fn build_bud_sentinel_params(
+    provider_config: &serde_json::Value,
+    request_provider_params: Option<serde_json::Value>,
+) -> serde_json::Value {
+    use serde_json::Value;
+
+    let mut params = serde_json::Map::new();
+
+    if let Some(profile_id) = provider_config.get("profile_id") {
+        params.insert("profile_id".to_string(), profile_id.clone());
+    }
+
+    if let Some(severity) = provider_config.get("severity_threshold") {
+        params.insert("severity_threshold".to_string(), severity.clone());
+    }
+
+    if let Some(Value::Object(overrides)) = request_provider_params {
+        for (key, value) in overrides {
+            params.insert(key, value);
+        }
+    }
+
+    Value::Object(params)
+}
+
+pub(crate) fn build_bud_sentinel_profile(
+    guardrail_id: &str,
+    guardrail_severity: f64,
+    enabled_probes: &[String],
+    enabled_rules_map: &HashMap<String, Vec<String>>,
+    provider_config: &serde_json::Map<String, serde_json::Value>,
+) -> Result<BudSentinelProfile, Error> {
+    let profile_id = provider_config
+        .get("profile_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("{guardrail_id}-bud-sentinel"));
+
+    let strategy_id = provider_config
+        .get("strategy_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| guardrail_id.to_string());
+
+    let description = provider_config
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("Bud Sentinel profile for guardrail {guardrail_id}"));
+
+    let version = provider_config
+        .get("version")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "1".to_string());
+
+    let metadata_json = provider_config
+        .get("metadata_json")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+
+    let rule_overrides_json = provider_config
+        .get("rule_overrides_json")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+
+    let mut enabled_rules: Vec<String> = enabled_rules_map
+        .values()
+        .flat_map(|rules| rules.clone())
+        .collect();
+    enabled_rules.sort();
+    enabled_rules.dedup();
+
+    let provider_severity = provider_config
+        .get("severity_threshold")
+        .and_then(|v| v.as_f64())
+        .map(|v| v as f32);
+
+    let profile_severity = provider_config
+        .get("profile_severity_threshold")
+        .and_then(|v| v.as_f64())
+        .map(|v| v as f32)
+        .or(provider_severity)
+        .or(Some(guardrail_severity as f32));
+
+    Ok(BudSentinelProfile {
+        id: profile_id,
+        strategy_id,
+        description,
+        version,
+        enabled_rules,
+        enabled_probes: enabled_probes.to_vec(),
+        severity_threshold: profile_severity,
+        metadata_json,
+        rule_overrides_json,
+    })
+}
+
+fn build_enabled_rules_map(probe_id: &str, rules: &[String]) -> HashMap<String, Vec<String>> {
+    if rules.is_empty() {
+        return HashMap::new();
+    }
+
+    let mut enabled = HashMap::new();
+    enabled.insert(probe_id.to_string(), rules.to_vec());
+    enabled
+}
+
+fn bud_sentinel_error_metadata(error: &Error) -> Option<(Code, String)> {
+    match error.get_details() {
+        ErrorDetails::InferenceServer {
+            provider_type,
+            raw_response,
+            ..
+        } if provider_type == "bud_sentinel" => {
+            if let Some(raw) = raw_response {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) {
+                    if let Some(code) = value.get("code").and_then(|v| v.as_i64()) {
+                        let message = value
+                            .get("message")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or_default()
+                            .to_string();
+                        return Some((Code::from_i32(code as i32), message));
+                    }
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+/// Execute Bud Sentinel probe
+async fn execute_bud_sentinel_probe<'a>(
+    task: ProbeTask,
+    input: ModerationInput,
+    clients: &InferenceClients<'a>,
+    request_provider_params: Option<serde_json::Value>,
+) -> Result<ProviderGuardrailResult, Error> {
+    let ProbeTask {
+        provider_type: _,
+        guardrail_id,
+        guardrail_severity,
+        provider_enabled_probes,
+        provider_enabled_rules,
+        provider_config,
+        probe_id,
+        rules,
+    } = task;
+
+    let provider_config_obj = provider_config.as_object().ok_or_else(|| {
+        Error::new(ErrorDetails::Config {
+            message: format!(
+                "Bud Sentinel provider configuration for guardrail '{guardrail_id}' must be a JSON object"
+            ),
+        })
+    })?;
+
+    let endpoint = provider_config_obj
+        .get("endpoint")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| {
+            Error::new(ErrorDetails::Config {
+                message: format!(
+                    "Missing 'endpoint' in Bud Sentinel provider configuration for guardrail '{guardrail_id}'"
+                ),
+            })
+        })?;
+
+    let endpoint_url = url::Url::parse(endpoint).map_err(|e| {
+        Error::new(ErrorDetails::Config {
+            message: format!("Invalid Bud Sentinel endpoint URL: {e}"),
+        })
+    })?;
+
+    let api_key_location = provider_config_obj
+        .get("api_key_location")
+        .cloned()
+        .and_then(|value| serde_json::from_value::<CredentialLocation>(value).ok());
+
+    let provider_default_severity = provider_config_obj
+        .get("severity_threshold")
+        .and_then(|v| v.as_f64())
+        .map(|v| v as f32);
+
+    let mut profile = build_bud_sentinel_profile(
+        &guardrail_id,
+        guardrail_severity,
+        &provider_enabled_probes,
+        &provider_enabled_rules,
+        provider_config_obj,
+    )?;
+
+    let provider = BudSentinelProvider::new(
+        endpoint_url,
+        api_key_location,
+        Some(profile.id.clone()),
+        provider_default_severity,
+    )?;
+
+    let mut provider_params = build_bud_sentinel_params(&provider_config, request_provider_params);
+
+    if provider_config_obj
+        .get("profile_sync_pending")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        match provider
+            .ensure_profile(profile.clone(), clients.credentials)
+            .await
+        {
+            Ok(updated_profile) => {
+                profile = updated_profile;
+                if let Some(params) = provider_params.as_object_mut() {
+                    params.insert(
+                        "profile_id".to_string(),
+                        serde_json::Value::String(profile.id.clone()),
+                    );
+                }
+            }
+            Err(err) => {
+                tracing::warn!(
+                    guardrail_id = guardrail_id.as_str(),
+                    probe_id = probe_id.as_str(),
+                    "Bud Sentinel profile synchronization retry failed during guardrail execution: {err}"
+                );
+            }
+        }
+    }
+
+    let mut moderation_request = ModerationRequest {
+        input: input.clone(),
+        model: None,
+        provider_params: Some(provider_params.clone()),
+    };
+
+    let mut attempts = 0usize;
+    loop {
+        match provider
+            .moderate(
+                &moderation_request,
+                clients.http_client,
+                clients.credentials,
+            )
+            .await
+        {
+            Ok(response) => {
+                let result =
+                    response
+                        .results
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| ModerationResult {
+                            flagged: false,
+                            categories: crate::moderation::ModerationCategories::default(),
+                            category_scores: crate::moderation::ModerationCategoryScores::default(),
+                            category_applied_input_types: None,
+                            hallucination_details: None,
+                            ip_violation_details: None,
+                        });
+
+                let flagged = if result.category_scores.has_non_zero_scores() {
+                    let max_score = get_max_score(&result.category_scores);
+                    max_score >= guardrail_severity
+                } else {
+                    result.flagged
+                };
+
+                return Ok(ProviderGuardrailResult {
+                    provider_type: "bud_sentinel".to_string(),
+                    flagged,
+                    executed_probes: vec![probe_id.clone()],
+                    enabled_rules: build_enabled_rules_map(&probe_id, &rules),
+                    raw_result: result,
+                    error: None,
+                });
+            }
+            Err(err) => {
+                let error_info = bud_sentinel_error_metadata(&err);
+                let code_opt = error_info.as_ref().map(|(code, _)| *code);
+                let message = error_info
+                    .as_ref()
+                    .map(|(_, msg)| msg.as_str())
+                    .unwrap_or_default()
+                    .to_ascii_lowercase();
+                let fallback_message = err.to_string().to_ascii_lowercase();
+
+                let missing_profile = message.contains("profile not found")
+                    || (message.contains("profile '") && message.contains("not found"))
+                    || fallback_message.contains("profile not found")
+                    || (fallback_message.contains("profile '")
+                        && fallback_message.contains("not found"))
+                    || matches!(code_opt, Some(Code::NotFound));
+
+                let transient_error = matches!(
+                    code_opt,
+                    Some(Code::Unavailable | Code::Unknown | Code::DeadlineExceeded)
+                );
+
+                if attempts == 0 && missing_profile {
+                    match provider.get_profile(&profile.id, clients.credentials).await {
+                        Ok(Some(_)) => {
+                            // Profile exists; no corrective action required.
+                        }
+                        Ok(None) => match provider
+                            .ensure_profile(profile.clone(), clients.credentials)
+                            .await
+                        {
+                            Ok(ensured_profile) => {
+                                profile = ensured_profile;
+                                if let Some(params) = provider_params.as_object_mut() {
+                                    params.insert(
+                                        "profile_id".to_string(),
+                                        serde_json::Value::String(profile.id.clone()),
+                                    );
+                                }
+                                moderation_request.provider_params = Some(provider_params.clone());
+                                attempts += 1;
+                                continue;
+                            }
+                            Err(sync_err) => {
+                                tracing::warn!(
+                                    guardrail_id = guardrail_id.as_str(),
+                                    probe_id = probe_id.as_str(),
+                                    "Failed to re-register Bud Sentinel profile: {sync_err}"
+                                );
+                            }
+                        },
+                        Err(fetch_err) => {
+                            tracing::warn!(
+                                guardrail_id = guardrail_id.as_str(),
+                                probe_id = probe_id.as_str(),
+                                "Failed to fetch Bud Sentinel profile state: {fetch_err}"
+                            );
+                        }
+                    }
+                } else if attempts == 0 && transient_error {
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    attempts += 1;
+                    continue;
+                }
+
+                return Ok(ProviderGuardrailResult {
+                    provider_type: "bud_sentinel".to_string(),
+                    flagged: false,
+                    executed_probes: vec![probe_id.clone()],
+                    enabled_rules: build_enabled_rules_map(&probe_id, &rules),
+                    raw_result: ModerationResult {
+                        flagged: false,
+                        categories: crate::moderation::ModerationCategories::default(),
+                        category_scores: crate::moderation::ModerationCategoryScores::default(),
+                        category_applied_input_types: None,
+                        hallucination_details: None,
+                        ip_violation_details: None,
+                    },
+                    error: Some(err.to_string()),
+                });
+            }
+        }
+    }
+}
+
 /// Get the maximum score from ModerationCategoryScores
 fn get_max_score(scores: &crate::moderation::ModerationCategoryScores) -> f64 {
     vec![
@@ -603,6 +997,9 @@ fn get_max_score(scores: &crate::moderation::ModerationCategoryScores) -> f64 {
         scores.profanity,
         scores.insult,
         scores.toxicity,
+        scores.malicious,
+        scores.pii,
+        scores.secrets,
     ]
     .into_iter()
     .fold(0.0_f64, |max, val| max.max(val as f64))
@@ -633,6 +1030,9 @@ fn get_max_score_for_categories(
             "profanity" => scores.profanity,
             "insult" => scores.insult,
             "toxicity" => scores.toxicity,
+            "malicious" => scores.malicious,
+            "pii" => scores.pii,
+            "secrets" => scores.secrets,
             _ => 0.0,
         };
         max_score = max_score.max(score as f64);
@@ -665,7 +1065,7 @@ pub async fn execute_guardrail_by_id<'a>(
             })
         })?;
 
-    execute_guardrail(&guardrail_config, input, guard_type, clients, None).await
+    execute_guardrail(&guardrail_config, input, guard_type, clients, None, false).await
 }
 
 // ================== Observability Types ==================

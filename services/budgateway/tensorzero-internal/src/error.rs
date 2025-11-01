@@ -1139,11 +1139,17 @@ impl IntoResponse for Error {
                 }
                 ErrorDetails::ModelProvidersExhausted { provider_errors } => {
                     // Recursively check nested errors
-                    provider_errors.iter().next().and_then(|(_, e)| extract_provider_error(e))
+                    provider_errors
+                        .iter()
+                        .next()
+                        .and_then(|(_, e)| extract_provider_error(e))
                 }
                 ErrorDetails::ModelChainExhausted { model_errors } => {
                     // Recursively check nested errors
-                    model_errors.iter().next().and_then(|(_, e)| extract_provider_error(e))
+                    model_errors
+                        .iter()
+                        .next()
+                        .and_then(|(_, e)| extract_provider_error(e))
                 }
                 _ => None,
             }
@@ -1184,7 +1190,9 @@ impl IntoResponse for Error {
             I: Iterator<Item = (&'a String, &'a Error)>,
         {
             if let Some((_, nested_error)) = errors_iter.next() {
-                if let Some((provider_error, provider_status)) = extract_provider_error(nested_error) {
+                if let Some((provider_error, provider_status)) =
+                    extract_provider_error(nested_error)
+                {
                     return build_provider_error_response(error, provider_error, provider_status);
                 }
             }

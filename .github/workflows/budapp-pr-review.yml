@@ -120,6 +120,7 @@ jobs:
           sed -i 's|BUD_CONNECT_BASE_URL=.*|BUD_CONNECT_BASE_URL=http://localhost:8081|' .env
           sed -i 's|KEYCLOAK_SERVER_URL=.*|KEYCLOAK_SERVER_URL=http://localhost:8080/|' .env
           sed -i 's|MINIO_ENDPOINT=.*|MINIO_ENDPOINT=localhost:9000|' .env
+          sed -i 's|BUD_SENTINEL_BASE_URL=.*|BUD_SENTINEL_BASE_URL=http://localhost:8082|' .env
 
           # Set required secrets for testing
           sed -i 's/PSQL_USER=.*/PSQL_USER=postgres/' .env

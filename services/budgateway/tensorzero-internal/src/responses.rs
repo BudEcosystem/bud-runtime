@@ -435,7 +435,10 @@ mod tests {
         assert_eq!(params.input, deserialized.input);
         assert_eq!(params.instructions, deserialized.instructions);
         assert_eq!(params.temperature, deserialized.temperature);
-        assert_eq!(params.prompt.as_ref().map(|p| &p.id), deserialized.prompt.as_ref().map(|p| &p.id));
+        assert_eq!(
+            params.prompt.as_ref().map(|p| &p.id),
+            deserialized.prompt.as_ref().map(|p| &p.id)
+        );
     }
 
     #[test]
