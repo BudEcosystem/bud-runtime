@@ -18,6 +18,7 @@ const MODEL_TABLE_KEY_PREFIX: &str = "model_table:";
 const API_KEY_KEY_PREFIX: &str = "api_key:";
 const PUBLISHED_MODEL_INFO_KEY: &str = "published_model_info";
 const GUARDRAIL_KEY_PREFIX: &str = "guardrail_table:";
+const DEFAULT_CONFIG_GET_RETRIES: u32 = 3;
 
 pub struct RedisClient {
     pub(crate) client: redis::Client,
@@ -50,31 +51,25 @@ impl RedisClient {
         max_retries: u32,
     ) -> Result<T, redis::RedisError> {
         let mut delay_ms = 10;
-        let mut last_error = None;
 
-        for attempt in 0..=max_retries {
-            match conn.get::<_, T>(key).await {
-                Ok(value) => return Ok(value),
-                Err(e) => {
-                    last_error = Some(e);
-
-                    // If this isn't the last attempt, wait and retry
-                    if attempt < max_retries {
-                        tracing::debug!(
-                            "Redis GET failed for key '{}' (attempt {}/{}), retrying in {}ms",
-                            key,
-                            attempt + 1,
-                            max_retries + 1,
-                            delay_ms
-                        );
-                        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
-                        delay_ms *= 2; // Exponential backoff: 10ms, 20ms, 40ms
-                    }
-                }
+        for attempt in 0..max_retries {
+            if let Ok(value) = conn.get::<_, T>(key).await {
+                return Ok(value);
             }
+
+            tracing::debug!(
+                "Redis GET failed for key '{}' (attempt {}/{}), retrying in {}ms",
+                key,
+                attempt + 1,
+                max_retries + 1,
+                delay_ms
+            );
+            tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+            delay_ms *= 2; // Exponential backoff: 10ms, 20ms, 40ms
         }
 
-        Err(last_error.unwrap())
+        // Final attempt
+        conn.get::<_, T>(key).await
     }
 
     async fn init_conn(url: &str) -> Result<(redis::Client, MultiplexedConnection), Error> {
@@ -313,11 +308,15 @@ impl RedisClient {
     ) -> Result<(), Error> {
         match key {
             k if k.starts_with(API_KEY_KEY_PREFIX) => {
-                let value = Self::get_with_retry::<String>(conn, key, 3).await.map_err(|e| {
-                    Error::new(ErrorDetails::Config {
-                        message: format!("Failed to get value for key {key} from Redis after retries: {e}"),
-                    })
-                })?;
+                let value = Self::get_with_retry::<String>(conn, key, DEFAULT_CONFIG_GET_RETRIES)
+                    .await
+                    .map_err(|e| {
+                        Error::new(ErrorDetails::Config {
+                            message: format!(
+                                "Failed to get value for key {key} from Redis after retries: {e}"
+                            ),
+                        })
+                    })?;
 
                 match Self::parse_api_keys(&value).await {
                     Ok((api_config, metadata)) => {
@@ -338,11 +337,15 @@ impl RedisClient {
                 }
             }
             k if k.starts_with(MODEL_TABLE_KEY_PREFIX) => {
-                let value = Self::get_with_retry::<String>(conn, key, 3).await.map_err(|e| {
-                    Error::new(ErrorDetails::Config {
-                        message: format!("Failed to get value for key {key} from Redis after retries: {e}"),
-                    })
-                })?;
+                let value = Self::get_with_retry::<String>(conn, key, DEFAULT_CONFIG_GET_RETRIES)
+                    .await
+                    .map_err(|e| {
+                        Error::new(ErrorDetails::Config {
+                            message: format!(
+                                "Failed to get value for key {key} from Redis after retries: {e}"
+                            ),
+                        })
+                    })?;
 
                 match Self::parse_models(&value, &app_state.config.provider_types, app_state).await
                 {
@@ -357,11 +360,15 @@ impl RedisClient {
                 }
             }
             k if k == PUBLISHED_MODEL_INFO_KEY => {
-                let value = Self::get_with_retry::<String>(conn, key, 3).await.map_err(|e| {
-                    Error::new(ErrorDetails::Config {
-                        message: format!("Failed to get value for key {key} from Redis after retries: {e}"),
-                    })
-                })?;
+                let value = Self::get_with_retry::<String>(conn, key, DEFAULT_CONFIG_GET_RETRIES)
+                    .await
+                    .map_err(|e| {
+                        Error::new(ErrorDetails::Config {
+                            message: format!(
+                                "Failed to get value for key {key} from Redis after retries: {e}"
+                            ),
+                        })
+                    })?;
 
                 match Self::parse_published_model_info(&value).await {
                     Ok(model_info) => {
@@ -374,11 +381,15 @@ impl RedisClient {
                 }
             }
             k if k.starts_with(GUARDRAIL_KEY_PREFIX) => {
-                let value = Self::get_with_retry::<String>(conn, key, 3).await.map_err(|e| {
-                    Error::new(ErrorDetails::Config {
-                        message: format!("Failed to get value for key {key} from Redis after retries: {e}"),
-                    })
-                })?;
+                let value = Self::get_with_retry::<String>(conn, key, DEFAULT_CONFIG_GET_RETRIES)
+                    .await
+                    .map_err(|e| {
+                        Error::new(ErrorDetails::Config {
+                            message: format!(
+                                "Failed to get value for key {key} from Redis after retries: {e}"
+                            ),
+                        })
+                    })?;
 
                 // Extract the guardrail ID from Redis key format "guardrail_table:id"
                 let guardrail_id = key.strip_prefix(GUARDRAIL_KEY_PREFIX).unwrap_or(key);
@@ -609,7 +620,6 @@ impl RedisClient {
         let client = self.client.clone();
         let app_state = self.app_state.clone();
         let auth = self.auth.clone();
-        let mut conn = self.conn.clone();
 
         // Spawn pub-sub event loop with automatic reconnection
         tokio::spawn(async move {
@@ -618,6 +628,24 @@ impl RedisClient {
 
             loop {
                 tracing::info!("Establishing Redis pub-sub connection...");
+
+                // Acquire fresh multiplexed connection for GET operations
+                let mut conn = match client.get_multiplexed_async_connection().await {
+                    Ok(c) => {
+                        tracing::debug!("Redis multiplexed connection acquired for GET operations");
+                        c
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "Failed to get Redis multiplexed connection: {}, retrying in {}s",
+                            e,
+                            backoff_seconds
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_secs(backoff_seconds)).await;
+                        backoff_seconds = (backoff_seconds * 2).min(max_backoff_seconds);
+                        continue;
+                    }
+                };
 
                 // Attempt to create pub-sub connection
                 let pubsub_result = client.get_async_pubsub().await;
@@ -640,36 +668,27 @@ impl RedisClient {
                 };
 
                 // Subscribe to keyspace events
-                if let Err(e) = pubsub_conn.psubscribe("__keyevent@*__:set").await {
-                    tracing::error!(
-                        "Failed to subscribe to Redis set events: {}, reconnecting in {}s",
-                        e,
-                        backoff_seconds
-                    );
-                    tokio::time::sleep(tokio::time::Duration::from_secs(backoff_seconds)).await;
-                    backoff_seconds = (backoff_seconds * 2).min(max_backoff_seconds);
-                    continue;
+                let patterns = &[
+                    "__keyevent@*__:set",
+                    "__keyevent@*__:del",
+                    "__keyevent@*__:expired",
+                ];
+                let mut all_subscribed = true;
+                for pattern in patterns {
+                    if let Err(e) = pubsub_conn.psubscribe(pattern).await {
+                        tracing::error!(
+                            "Failed to subscribe to Redis '{}' events: {}, reconnecting in {}s",
+                            pattern,
+                            e,
+                            backoff_seconds
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_secs(backoff_seconds)).await;
+                        backoff_seconds = (backoff_seconds * 2).min(max_backoff_seconds);
+                        all_subscribed = false;
+                        break;
+                    }
                 }
-
-                if let Err(e) = pubsub_conn.psubscribe("__keyevent@*__:del").await {
-                    tracing::error!(
-                        "Failed to subscribe to Redis del events: {}, reconnecting in {}s",
-                        e,
-                        backoff_seconds
-                    );
-                    tokio::time::sleep(tokio::time::Duration::from_secs(backoff_seconds)).await;
-                    backoff_seconds = (backoff_seconds * 2).min(max_backoff_seconds);
-                    continue;
-                }
-
-                if let Err(e) = pubsub_conn.psubscribe("__keyevent@*__:expired").await {
-                    tracing::error!(
-                        "Failed to subscribe to Redis expired events: {}, reconnecting in {}s",
-                        e,
-                        backoff_seconds
-                    );
-                    tokio::time::sleep(tokio::time::Duration::from_secs(backoff_seconds)).await;
-                    backoff_seconds = (backoff_seconds * 2).min(max_backoff_seconds);
+                if !all_subscribed {
                     continue;
                 }
 
