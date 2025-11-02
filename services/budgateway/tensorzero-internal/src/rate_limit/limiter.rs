@@ -846,8 +846,8 @@ impl DistributedRateLimiter {
             loop {
                 match Self::run_pubsub_listener(&redis_client, &local_limiters, &cache).await {
                     Ok(()) => {
-                        debug!("Pub/sub listener completed normally");
-                        break;
+                        warn!("Pub/sub listener stream ended, reconnecting in 5 seconds");
+                        tokio::time::sleep(Duration::from_secs(5)).await;
                     }
                     Err(e) => {
                         warn!("Pub/sub listener error: {}, retrying in 5 seconds", e);
