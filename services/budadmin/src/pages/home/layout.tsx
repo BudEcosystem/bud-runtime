@@ -28,6 +28,7 @@ import {
   Text_15_400_B3B3B3,
 } from "@/components/ui/text";
 import { Icon } from "@iconify/react";
+import { branding } from "@/components/environment";
 import { useShortCut } from "../../hooks/useShortCut";
 import { useRouter } from "next/router";
 import { useDrawer } from "src/hooks/useDrawer";
@@ -179,6 +180,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       icon: '/icons/guard.png',
       iconWhite: '/icons/guardWhite.png',
       cmd: "10",
+      hide: !enableDevMode,
     },
   ]
 
@@ -346,9 +348,8 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                   preview={false}
                   className="mainLogo"
                   style={{ width: 'auto', height: '1.4rem' }}
-                  src="/images/logo.svg"
-                  // src="/images/BudLogo.png"
-                  alt="Logo"
+                  src={branding.logoUrl}
+                  alt="Bud Logo"
                 />
               </div>
               <div className="px-[.75rem] mb-[7%]">

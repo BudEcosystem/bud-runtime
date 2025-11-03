@@ -11,8 +11,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `yarn lint` - Run Next.js linting (note: no ESLint config file exists)
 
 ### Docker
-- `docker build -t bud-serve-dashboard .` - Build Docker image
-- `docker run -p 3000:3000 --env-file .env bud-serve-dashboard` - Run container with environment variables
+
+**IMPORTANT: Dev Mode Configuration**
+
+The `NEXT_PUBLIC_ENABLE_DEV_MODE` flag controls visibility of dev-only features (Prompts, Evaluations, Guard Rails menu items). This **MUST** be set at Docker **BUILD TIME**, not runtime, because Next.js performs tree-shaking during build that eliminates unreachable code.
+
+Build commands:
+- **Production**: `docker build -t budadmin:prod .` - Dev features hidden (default)
+- **Development**: `docker build -t budadmin:dev --build-arg NEXT_PUBLIC_ENABLE_DEV_MODE=true .` - Dev features visible
+
+Other commands:
+- `docker run -p 3000:3000 --env-file .env budadmin:dev` - Run container with environment variables
+
+**Why build-time?**: Other `NEXT_PUBLIC_*` variables (URLs, keys) use runtime replacement via `entrypoint.sh`, but boolean feature flags cause Next.js/Webpack to eliminate code at build time. Setting `NEXT_PUBLIC_ENABLE_DEV_MODE=true` at runtime won't restore code that was already tree-shaken.
 
 ## Architecture Overview
 
@@ -74,7 +85,10 @@ Critical environment variables that must be set:
 - `NEXT_PUBLIC_PASSWORD` - Authentication password
 - `NEXT_PUBLIC_PRIVATE_KEY` - Encryption key
 - `NEXT_PUBLIC_PLAYGROUND_URL` - Playground URL
+- `NEXT_PUBLIC_ENABLE_DEV_MODE` - **Build-time only** flag to enable dev features (Prompts, Evaluations, Guard Rails)
 - Various `NEXT_PUBLIC_NOVU_*` for notifications
+
+**Note**: Most `NEXT_PUBLIC_*` variables are set at runtime via Helm/environment, but `NEXT_PUBLIC_ENABLE_DEV_MODE` must be set at Docker build time to prevent tree-shaking.
 
 ### TypeScript Path Aliases
 The project uses these path aliases configured in tsconfig.json:

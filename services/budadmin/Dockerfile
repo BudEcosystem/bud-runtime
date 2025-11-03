@@ -1,3 +1,20 @@
+# ============================================================================
+# Multi-stage Dockerfile for budadmin Next.js application
+#
+# IMPORTANT: NEXT_PUBLIC_ENABLE_DEV_MODE Build Configuration
+# ----------------------------------------------------------
+# This flag controls dev-mode features (Prompts, Evaluations, Guard Rails menu items).
+# It MUST be set at BUILD TIME, not runtime, because Next.js performs tree-shaking
+# during build that removes unreachable code.
+#
+# Build examples:
+#   Production:  docker build -t budadmin:prod .
+#   Development: docker build -t budadmin:dev --build-arg NEXT_PUBLIC_ENABLE_DEV_MODE=true .
+#
+# Note: Other NEXT_PUBLIC_* variables use runtime replacement via entrypoint.sh,
+# but ENABLE_DEV_MODE must be set at build time to prevent code elimination.
+# ============================================================================
+
 # Stage 1: Install dependencies
 FROM node:lts-alpine AS deps
 
@@ -9,6 +26,10 @@ RUN yarn install --frozen-lockfile
 
 # Stage 2: Build the application
 FROM node:lts-alpine AS builder
+
+# Build argument for NEXT_PUBLIC_ENABLE_DEV_MODE (passed at build time)
+# Default to false for production builds
+ARG NEXT_PUBLIC_ENABLE_DEV_MODE=false
 
 WORKDIR /usr/bin/src
 
@@ -31,7 +52,12 @@ ENV NEXT_PUBLIC_COPY_CODE_API_BASE_URL=NEXT_PUBLIC_COPY_CODE_API_BASE_URL
 ENV NEXT_PUBLIC_PLAYGROUND_URL=NEXT_PUBLIC_PLAYGROUND_URL
 ENV NEXT_PUBLIC_ASK_BUD_URL=NEXT_PUBLIC_ASK_BUD_URL
 ENV NEXT_PUBLIC_ASK_BUD_MODEL=NEXT_PUBLIC_ASK_BUD_MODEL
-ENV NEXT_PUBLIC_ENABLE_DEV_MODE=NEXT_PUBLIC_ENABLE_DEV_MODE
+# Branding variables
+ENV NEXT_PUBLIC_LOGO_URL=NEXT_PUBLIC_LOGO_URL
+ENV NEXT_PUBLIC_LOGO_AUTH_URL=NEXT_PUBLIC_LOGO_AUTH_URL
+ENV NEXT_PUBLIC_FAVICON_URL=NEXT_PUBLIC_FAVICON_URL
+# Use ARG value for ENABLE_DEV_MODE so it's available during build
+ENV NEXT_PUBLIC_ENABLE_DEV_MODE=$NEXT_PUBLIC_ENABLE_DEV_MODE
 
 
 # Create a .env file from the ENV variables
@@ -47,6 +73,9 @@ RUN echo "NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL" >> .env && \
     echo "NEXT_PUBLIC_PLAYGROUND_URL=$NEXT_PUBLIC_PLAYGROUND_URL" >> .env && \
     echo "NEXT_PUBLIC_ASK_BUD_URL=$NEXT_PUBLIC_ASK_BUD_URL" >> .env && \
     echo "NEXT_PUBLIC_ASK_BUD_MODEL=$NEXT_PUBLIC_ASK_BUD_MODEL" >> .env && \
+    echo "NEXT_PUBLIC_LOGO_URL=$NEXT_PUBLIC_LOGO_URL" >> .env && \
+    echo "NEXT_PUBLIC_LOGO_AUTH_URL=$NEXT_PUBLIC_LOGO_AUTH_URL" >> .env && \
+    echo "NEXT_PUBLIC_FAVICON_URL=$NEXT_PUBLIC_FAVICON_URL" >> .env && \
     echo "NEXT_PUBLIC_ENABLE_DEV_MODE=$NEXT_PUBLIC_ENABLE_DEV_MODE" >> .env
 
 # Build the Next.js app

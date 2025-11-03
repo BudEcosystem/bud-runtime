@@ -632,7 +632,7 @@ const General: React.FC<GeneralProps> = ({ data, goToAdapter }) => {
         )}
         <div className="hR"></div>
 
-        {data?.provider_type !== "cloud_model" && (
+        {data?.provider_type !== "cloud_model" && enableDevMode && (
           <div className="mt-[1.4rem] mb-[1.4rem]" ref={containerRef}>
             <div
               className="w-full mb-[1rem] py-[1.5rem] px-[1rem] cursor-pointer bg-[#101010] hover:bg-[#1F1F1F]  border border-[#1F1F1F] rounded-[8px]"

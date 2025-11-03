@@ -1070,7 +1070,8 @@ pub async fn inference_handler(
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Default)]
 pub struct OpenAICompatibleFunctionCall {
-    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     pub arguments: String,
 }
 
@@ -1688,8 +1689,9 @@ impl TryFrom<Vec<OpenAICompatibleMessage>> for Input {
                     }
                     if let Some(tool_calls) = msg.tool_calls {
                         for tool_call in tool_calls {
-                            tool_call_id_to_name
-                                .insert(tool_call.id.clone(), tool_call.function.name.clone());
+                            if let Some(name) = &tool_call.function.name {
+                                tool_call_id_to_name.insert(tool_call.id.clone(), name.clone());
+                            }
                             message_content.push(InputMessageContent::ToolCall(tool_call.into()));
                         }
                     }
@@ -1889,7 +1891,7 @@ impl From<OpenAICompatibleToolCall> for ToolCall {
     fn from(tool_call: OpenAICompatibleToolCall) -> Self {
         ToolCall {
             id: tool_call.id,
-            name: tool_call.function.name,
+            name: tool_call.function.name.unwrap_or_default(),
             arguments: tool_call.function.arguments,
         }
     }
@@ -2005,7 +2007,7 @@ impl From<ToolCallOutput> for OpenAICompatibleToolCall {
             id: tool_call.id,
             r#type: "function".to_string(),
             function: OpenAICompatibleFunctionCall {
-                name: tool_call.raw_name,
+                name: Some(tool_call.raw_name),
                 arguments: tool_call.raw_arguments,
             },
         }
@@ -2141,7 +2143,7 @@ fn process_chat_content_chunk(
                     index: *index,
                     r#type: "function".to_string(),
                     function: OpenAICompatibleFunctionCall {
-                        name: tool_call.raw_name,
+                        name: if is_new { Some(tool_call.raw_name) } else { None },
                         arguments: tool_call.raw_arguments,
                     },
                 });
@@ -2355,7 +2357,7 @@ impl From<ToolCallChunk> for OpenAICompatibleToolCall {
             id: tool_call.id,
             r#type: "function".to_string(),
             function: OpenAICompatibleFunctionCall {
-                name: tool_call.raw_name,
+                name: Some(tool_call.raw_name),
                 arguments: tool_call.raw_arguments,
             },
         }
@@ -6824,7 +6826,7 @@ mod tests {
                     id: "1".to_string(),
                     r#type: "function".to_string(),
                     function: OpenAICompatibleFunctionCall {
-                        name: "test_tool".to_string(),
+                        name: Some("test_tool".to_string()),
                         arguments: "{}".to_string(),
                     },
                 }]),
@@ -6997,7 +6999,7 @@ mod tests {
         assert_eq!(content_str, Some("Hello, world!".to_string()));
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].id, "1");
-        assert_eq!(tool_calls[0].function.name, "test_tool");
+        assert_eq!(tool_calls[0].function.name, Some("test_tool".to_string()));
         assert_eq!(tool_calls[0].function.arguments, "{}");
         assert_eq!(reasoning_content, None);
         let content: Vec<ContentBlockChatOutput> = vec![];
@@ -7034,7 +7036,7 @@ mod tests {
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(reasoning_content, None);
         assert_eq!(tool_calls[0].id, "123");
-        assert_eq!(tool_calls[0].function.name, "middle_tool");
+        assert_eq!(tool_calls[0].function.name, Some("middle_tool".to_string()));
         assert_eq!(tool_calls[0].function.arguments, "{\"key\": \"value\"}");
     }
 
@@ -7062,7 +7064,7 @@ mod tests {
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].id, Some("1".to_string()));
         assert_eq!(tool_calls[0].index, 0);
-        assert_eq!(tool_calls[0].function.name, "test_tool");
+        assert_eq!(tool_calls[0].function.name, Some("test_tool".to_string()));
         assert_eq!(tool_calls[0].function.arguments, "{}");
         assert_eq!(reasoning_content, None);
 
@@ -7111,11 +7113,11 @@ mod tests {
         assert_eq!(reasoning_content, None);
         assert_eq!(tool_calls[0].id, Some("123".to_string()));
         assert_eq!(tool_calls[0].index, 0);
-        assert_eq!(tool_calls[0].function.name, "middle_tool");
+        assert_eq!(tool_calls[0].function.name, Some("middle_tool".to_string()));
         assert_eq!(tool_calls[0].function.arguments, "{\"key\": \"value\"}");
         assert_eq!(tool_calls[1].id, Some("5".to_string()));
         assert_eq!(tool_calls[1].index, 1);
-        assert_eq!(tool_calls[1].function.name, "last_tool");
+        assert_eq!(tool_calls[1].function.name, Some("last_tool".to_string()));
         assert_eq!(tool_calls[1].function.arguments, "{\"key\": \"value\"}");
     }
 

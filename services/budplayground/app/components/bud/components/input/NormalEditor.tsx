@@ -50,7 +50,7 @@ function NormalEditor({
              style={{
               cursor: disabled ? "not-allowed" : "auto",
             }}
-            className=" w-full  p-2 border border-gray-300 rounded shadow-xl placeholder-[#757575] placeholder-[.625rem] text-[1rem] bg-transparent  border-[#e5e5e5] outline-none border-none text-[#FFFFFF] z-10"
+            className=" w-full  p-2 border border-gray-300 rounded shadow-xl placeholder-[#757575] placeholder-[.625rem] text-[1rem] bg-transparent  border-[#e5e5e5] outline-none border-none text-[#FFFFFF] z-10 !shadow-none"
             value={input}
             rows={2}
             placeholder={disabled ? "Select a deployment to chat"

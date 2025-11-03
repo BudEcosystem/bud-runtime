@@ -2,21 +2,36 @@ ingress:
     hosts:
         root: ditto.bud.studio
 
+# disable keel
+deploymentAnnotations: null
+
+imagePullPolicy: Always
+
 microservices:
     budmodel:
         storageSize: "1Ti"
     buddoc:
         image: dittops/buddoc:nightly
     budapp:
-        image: dittops/budapp:nightly
+        image: budstudio/budapp:nightly
     budgateway:
-        image: dittops/budgateway:nightly
+        image: budstudio/budgateway:nightly
     budsim:
-        image: dittops/budsim:nightly
+        image: budstudio/budsim:nightly
     budcluster:
         image: dittops/budcluster:nightly
+        env:
+            # Update OTel endpoint for ditto environment
+            OTEL_COLLECTOR_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
     askbud:
         image: dittops/ask-bud:nightly
     global:
         env:
             LOG_LEVEL: DEBUG
+
+storage:
+    budmodelRegistry:
+        className: "nfs-csi"
+        size: "1Ti"
+    budevalDataset:
+        className: "nfs-csi"

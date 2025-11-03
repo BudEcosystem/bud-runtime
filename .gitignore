@@ -11,3 +11,4 @@ logs/
 GeoLite2-*.tar.gz
 services/budapp/vr/app.yaml
 services/budapp/vr/*
+.worktrees/

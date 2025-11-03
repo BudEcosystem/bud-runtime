@@ -18,14 +18,12 @@ module "azure" {
   ingress_sku = {
     Standard_D32als_v6 = 2
   }
-  worker_sku = {
-    Standard_D32als_v6 = 1
-  }
+  worker_sku = {}
   disk_size = {
     primary      = 512
     primary_data = 4095
     ingress      = 256
-    worker      = 256
+    worker       = 256
   }
 }
 

@@ -512,7 +512,8 @@ class CreateDeploymentWorkflow:
                     benchmark_id = db_benchmark.id
             deployment_performance = DeploymentPerformance(
                 provider_type=workflow_run_benchmark_request_json.provider_type,
-                model=namespace,
+                deployment_name=namespace,
+                model=run_benchmark_request_json.model,
                 deployment_url=run_benchmark_request_json.deployment_url,
                 concurrency=run_benchmark_request_json.concurrency,
                 input_tokens=run_benchmark_request_json.input_tokens,

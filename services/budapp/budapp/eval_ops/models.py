@@ -69,7 +69,10 @@ class Experiment(Base, TimestampMixin):
     )
     created_by: Mapped[uuid4] = mapped_column(ForeignKey("user.id"), nullable=False)
     project_id: Mapped[uuid4] = mapped_column(ForeignKey("project.id"), nullable=True)
-    tags: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True, default=list)
+    tags: Mapped[list[str]] = mapped_column(PG_ARRAY(String), nullable=True, default=list)  # DEPRECATED - use tag_ids
+    tag_ids: Mapped[Optional[list[uuid4]]] = mapped_column(
+        PG_ARRAY(PG_UUID(as_uuid=True)), nullable=True, default=list
+    )  # NEW - array of EvalTag IDs
 
     # Relationships
     runs = relationship("Run", back_populates="experiment", cascade="all, delete-orphan")
@@ -118,7 +121,7 @@ class Run(Base, TimestampMixin):
         ForeignKey("evaluations.id"), nullable=True
     )  # Nullable for backward compatibility
     run_index: Mapped[int] = mapped_column(Integer, nullable=False)  # Auto-incrementing index per experiment
-    model_id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    endpoint_id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     dataset_version_id: Mapped[uuid4] = mapped_column(ForeignKey("exp_dataset_versions.id"), nullable=False)
     status: Mapped[str] = mapped_column(
         PG_ENUM(*[e.value for e in RunStatusEnum], name="run_status_enum"),
@@ -165,6 +168,18 @@ class ExpTrait(Base, TimestampMixin):
         back_populates="traits",
         lazy="select",
     )
+
+
+class EvalTag(Base, TimestampMixin):
+    """Tags for organizing experiments. Global scope - shared across all users."""
+
+    __tablename__ = "eval_tags"
+
+    id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Note: Unique constraint on LOWER(name) will be added via migration for case-insensitive uniqueness
 
 
 class ExpDataset(Base, TimestampMixin):

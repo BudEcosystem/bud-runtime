@@ -1,18 +1,14 @@
 apiVersion: v2
-
 name: bud
 description: Bud Helm chart for Kubernetes
 type: application
 icon: https://budecosystem.com/logo.svg
-
 version: 0.1.0
-appVersion: "0.24.0"
-
+appVersion: "0.4.2"
 maintainers:
   - name: "sinanmohd"
     email: "sinan@sinanmohd.com"
     url: "https://www.sinanmohd.com"
-
 dependencies:
   - name: postgresql
     version: 16.7.18

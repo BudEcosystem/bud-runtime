@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Table, Tooltip, message } from 'antd';
+import { copyToClipboard as copyText } from '@/utils/clipboard';
 import { EyeOutlined, DownloadOutlined, CopyOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useRouter } from 'next/router';
@@ -56,9 +57,11 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
   }, [searchValue, projectId, fetchInferences]);
 
   // Copy inference ID to clipboard
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    message.success('Copied to clipboard');
+  const copyToClipboard = async (text: string) => {
+    await copyText(text, {
+      onSuccess: () => message.success('Copied to clipboard'),
+      onError: () => message.error('Failed to copy'),
+    });
   };
 
   // Table columns definition

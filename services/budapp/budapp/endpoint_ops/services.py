@@ -137,6 +137,8 @@ class EndpointService(SessionMixin):
 
     async def get_all_endpoints(
         self,
+        current_user_id: UUID,
+        is_superuser: bool,
         project_id: Optional[UUID],
         offset: int = 0,
         limit: int = 10,
@@ -144,15 +146,54 @@ class EndpointService(SessionMixin):
         order_by: List = [],
         search: bool = False,
     ) -> Tuple[List[EndpointModel], int]:
-        """Get all active endpoints."""
+        """Get all active endpoints.
+
+        Args:
+            current_user_id: The ID of the current user making the request
+            is_superuser: Whether the current user is a superuser
+            project_id: Optional project ID to filter endpoints
+            offset: Pagination offset
+            limit: Pagination limit
+            filters: Additional filters to apply
+            order_by: Ordering fields
+            search: Whether to perform search
+
+        Returns:
+            Tuple of endpoint list and total count
+        """
         if search:
             # Only include name, exclude other filters
             # Otherwise it will perform global search on all fields
             filters.pop("status", None)
 
-        if project_id:
-            # Validate project_id if provided
-            await ProjectDataManager(self.session).retrieve_by_fields(ProjectModel, {"id": project_id})
+        # Superusers can access all endpoints without project restrictions
+        if is_superuser:
+            # If project_id is provided, validate it exists but don't check user association
+            if project_id:
+                await ProjectDataManager(self.session).retrieve_by_fields(ProjectModel, {"id": project_id})
+            # For superusers, project_id remains as-is (None for all, or specific UUID)
+        else:
+            # Non-superuser access control
+            if project_id:
+                # Validate project_id if provided and check user has access
+                await ProjectDataManager(self.session).retrieve_by_fields(ProjectModel, {"id": project_id})
+
+                # Check if user is associated with the project
+                is_user_in_project = await ProjectDataManager(self.session).is_user_in_project(
+                    current_user_id, project_id
+                )
+                if not is_user_in_project:
+                    from ..commons.exceptions import ClientException
+
+                    raise ClientException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        message="Access denied: You are not authorized to access this project",
+                    )
+            else:
+                # If no project_id provided, get all projects user has access to
+                user_project_ids = await ProjectDataManager(self.session).get_user_project_ids(current_user_id)
+                # Set project_id to user_project_ids to filter endpoints
+                project_id = user_project_ids
 
         return await EndpointDataManager(self.session).get_all_active_endpoints(
             project_id, offset, limit, filters, order_by, search

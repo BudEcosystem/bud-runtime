@@ -160,11 +160,22 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
     }
   }, [currentPage, totalPages, isLoadingMore, searchValue, fetchModels]);
 
-  const handleSelectModel = (endpoint: ModelWrapper | Model) => {
+  const handleSelectModel = async (endpoint: ModelWrapper | Model) => {
     // Handle both direct model object and wrapped model object
-    const modelData = 'model' in endpoint ? endpoint.model : endpoint;
+    const modelData = 'model' in endpoint ? endpoint : endpoint;
     // Get the endpoint ID from the root level (for wrapped objects)
     const endpointId = 'model' in endpoint ? endpoint.id : endpoint.id;
+
+    try {
+      // Call the prompt-config API with the deployment name and prompt_id
+      await AppRequest.Post(`${tempApiBaseUrl}/prompts/prompt-config`, {
+        prompt_id: session?.promptId,
+        deployment_name: modelData.name
+      });
+    } catch (error) {
+      console.error("Error calling prompt-config API:", error);
+      errorToast("Failed to configure prompt for selected deployment");
+    }
 
     updateSession(sessionId, {
       modelId: modelData.id,

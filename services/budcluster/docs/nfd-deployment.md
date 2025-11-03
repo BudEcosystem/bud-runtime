@@ -7,7 +7,7 @@
 Cluster setup is integrated into the provisioning process. When you provision a new cluster or run the setup playbook, NFD, GPU operators, and Aibrix components will be automatically deployed.
 
 ```bash
-# Cluster setup with NFD, GPU operators, and Aibrix components
+# Cluster setup with NFD, GPU operators, Prometheus, and Aibrix components
 ansible-playbook budcluster/playbooks/setup_cluster.yaml \
   -e cluster_id=<cluster-uuid> \
   -e namespace=bud-runtime
@@ -19,6 +19,9 @@ This playbook will:
 3. Detect and install Intel Device Plugin if HPUs are present
 4. Configure NFD to extract CPU model names
 5. Install Aibrix dependencies and core components for model autoscaling
+6. Deploy Prometheus stack for hardware metrics collection
+7. Configure Prometheus for metrics collection (forwarded to OTel Collector → ClickHouse)
+8. Deploy DCGM Exporter for GPU metrics (if GPUs are detected)
 
 ### Manual Deployment
 

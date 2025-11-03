@@ -24,6 +24,8 @@ interface SettingsSidebarProps {
   onAddOutputVariable: () => void;
   onVariableChange: (variableId: string, field: keyof AgentVariable, value: string) => void;
   onDeleteVariable: (variableId: string) => void;
+  onStructuredInputEnabledChange?: (enabled: boolean) => void;
+  onStructuredOutputEnabledChange?: (enabled: boolean) => void;
   // System prompt and messages props
   onSystemPromptChange: (value: string) => void;
   onPromptMessagesChange: (value: string) => void;
@@ -49,6 +51,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   onAddOutputVariable,
   onVariableChange,
   onDeleteVariable,
+  onStructuredInputEnabledChange,
+  onStructuredOutputEnabledChange,
   onSystemPromptChange,
   onPromptMessagesChange,
   localSystemPrompt,
@@ -74,6 +78,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             onDeleteVariable={onDeleteVariable}
             onSavePromptSchema={onSavePromptSchema}
             isSaving={isSaving}
+            onStructuredInputEnabledChange={onStructuredInputEnabledChange}
           />
         );
       case SettingsType.SYSTEM_PROMPT:
@@ -106,6 +111,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             onDeleteVariable={onDeleteVariable}
             onSaveOutputSchema={onSaveOutputSchema}
             isSavingOutput={isSavingOutput}
+            onStructuredOutputEnabledChange={onStructuredOutputEnabledChange}
           />
         );
       default:
@@ -120,6 +126,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               onDeleteVariable={onDeleteVariable}
               onSavePromptSchema={onSavePromptSchema}
               isSaving={isSaving}
+              onStructuredInputEnabledChange={onStructuredInputEnabledChange}
             />
             <SystemPromptSettings
               sessionId={session.id}
@@ -143,6 +150,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               onDeleteVariable={onDeleteVariable}
               onSaveOutputSchema={onSaveOutputSchema}
               isSavingOutput={isSavingOutput}
+              onStructuredOutputEnabledChange={onStructuredOutputEnabledChange}
             />
           </>
         );

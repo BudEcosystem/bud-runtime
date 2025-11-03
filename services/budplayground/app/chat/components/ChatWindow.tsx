@@ -15,6 +15,7 @@ import NormalEditor from '@/app/components/bud/components/input/NormalEditor';
 import { useChatStore } from '@/app/store/chat';
 import SettingsList from './Settings';
 import PromptForm from './PromptForm';
+import { resolveChatBaseUrl } from '@/app/lib/gateway';
 
 
 
@@ -33,25 +34,39 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const lastMessageRef = useRef<string>("");
   const contentRef = useRef<HTMLDivElement>(null);
 
+  const promptIds = getPromptIds();
+  const [promptData, setPromptData] = useState<any>(null);
+
   const body = useMemo(() => {
     if (!chat) {
       return;
     }
     const params = new URLSearchParams(window.location.search);
     const baseUrl = params.get('base_url');
-    return {
+    const resolvedBaseUrl = resolveChatBaseUrl(baseUrl);
+    const baseBody = {
       model: chat?.selectedDeployment?.name,
       metadata: {
         project_id: chat?.selectedDeployment?.project?.id,
-        base_url: baseUrl,
+        base_url: baseUrl, //reverting as it's causing issue with chat
       },
       settings: currentSettingPreset,
     };
-  }, [chat, currentSettingPreset]);
 
+    // If we have prompt data for the first message, include it
+    if (promptData) {
+      return {
+        ...baseBody,
+        ...promptData,
+      };
+    }
+
+    return baseBody;
+  }, [chat, currentSettingPreset, promptData]);
 
   const { messages, input, handleInputChange, handleSubmit, reload, error, stop, status, setMessages, append } = useChat({
     id: chat.id,
+    api: promptIds.length > 0 ? '/api/prompt-chat' : '/api/chat',
     headers: {
       Authorization: `Bearer ${apiKey ? apiKey : accessKey}`,
     },
@@ -77,9 +92,11 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   // Check URL parameter to show form (for testing/demo)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const showForm = 'true';
-    // const showForm = params.get('show_form');
-    if (showForm === 'true') {
+    const showForm = params.get('show_form');
+    const promptIdsParam = params.get('promptIds');
+
+    // Show form if either show_form=true OR promptIds exist in URL
+    if (showForm === 'true' || (promptIdsParam && promptIdsParam.trim().length > 0)) {
       setShowPromptForm(true);
     }
   }, []);
@@ -167,10 +184,28 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     append(message)
   }
 
-  const handlePromptFormSubmit = (data: { firstName: string; lastName: string; phoneNumber: string }) => {
-    console.log('Form submitted:', data);
-    // Handle form submission here
-    // You can store the data, send it to an API, etc.
+  const handlePromptFormSubmit = (data: any) => {
+    console.log('Prompt form submitted with data:', data);
+
+    // Set the prompt data for the chat body
+    setPromptData(data);
+
+    // Create a user message with the prompt input
+    const userMessage =
+      data.input ||
+      (data.prompt?.variables
+        ? Object.entries(data.prompt.variables)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join('\n')
+        : '');
+
+    // Append the message to trigger the chat with prompt context
+    append({
+      role: 'user',
+      content: userMessage,
+    });
+
+    // Close the form
     setShowPromptForm(false);
   };
 
@@ -324,7 +359,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
           />
         </Footer>
         {/* Prompt Form - Absolutely positioned at bottom */}
-        {showPromptForm && (
+        {showPromptForm && getPromptIds().length > 0 && (
           <PromptForm
             promptIds={getPromptIds()}
             onSubmit={handlePromptFormSubmit}

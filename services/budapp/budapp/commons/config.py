@@ -144,6 +144,10 @@ class AppConfig(BaseAppConfig):
     # Prometheus URL
     prometheus_url: str = Field(alias="PROMETHEUS_URL", default="https://metrics.fmops.in")
 
+    # Metrics backend configuration
+    use_budmetrics_backend: bool = Field(alias="USE_BUDMETRICS_BACKEND", default=False)
+    budmetrics_app_id: str = Field(alias="BUDMETRICS_APP_ID", default="budmetrics")
+
     # Add model directory
     add_model_dir: DirectoryPath = Field(os.path.expanduser("~/.cache"), alias="ADD_MODEL_DIR")
 
