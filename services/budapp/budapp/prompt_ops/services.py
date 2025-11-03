@@ -1122,6 +1122,48 @@ class PromptService(SessionMixin):
             # Store MCP tool configuration in Redis via budprompt service
             await self._store_mcp_tool_config(budprompt_id, connector_id, gateway.gateway_id, version)
 
+            # Update PromptVersion metadata with gateway_id (if prompt and version exist in DB)
+            try:
+                # Check if prompt exists by name (budprompt_id is the prompt name)
+                db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+                    PromptModel,
+                    fields={"name": budprompt_id, "status": PromptStatusEnum.ACTIVE},
+                    missing_ok=True,
+                )
+
+                if db_prompt:
+                    # Check if prompt_version exists
+                    db_prompt_version = await PromptVersionDataManager(self.session).retrieve_by_fields(
+                        PromptVersionModel,
+                        fields={"prompt_id": db_prompt.id, "version": int(target_version)},
+                        missing_ok=True,
+                    )
+
+                    if db_prompt_version:
+                        # Get existing metadata (default is empty dict from migration)
+                        existing_metadata = db_prompt_version.version_metadata or {}
+
+                        # Initialize gateway_ids array if not present
+                        if "gateway_ids" not in existing_metadata:
+                            existing_metadata["gateway_ids"] = []
+
+                        # Append newly created gateway_id (avoid duplicates)
+                        if gateway.gateway_id not in existing_metadata["gateway_ids"]:
+                            existing_metadata["gateway_ids"].append(gateway.gateway_id)
+
+                        # Update the prompt_version record
+                        db_prompt_version.version_metadata = existing_metadata
+                        await PromptVersionDataManager(self.session).update_one(db_prompt_version)
+
+                        logger.debug(
+                            f"Updated prompt_version metadata with gateway_id {gateway.gateway_id}",
+                            prompt_id=db_prompt.id,
+                            version=int(target_version),
+                        )
+            except Exception as e:
+                # Silent failure - don't block connector registration if DB update fails
+                logger.warning(f"Failed to update prompt_version metadata: {e}", exc_info=True)
+
             return gateway
 
         except MCPFoundryException as e:

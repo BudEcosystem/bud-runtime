@@ -19,7 +19,7 @@
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, UniqueConstraint, Uuid
+from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, UniqueConstraint, Uuid, text
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -109,6 +109,7 @@ class PromptVersion(Base, TimestampMixin):
         default=PromptVersionStatusEnum.ACTIVE,
     )
     created_by: Mapped[UUID] = mapped_column(ForeignKey("user.id"), nullable=False)
+    version_metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
 
     prompt: Mapped["Prompt"] = relationship("Prompt", back_populates="versions", foreign_keys=[prompt_id])
     endpoint: Mapped["Endpoint"] = relationship("Endpoint", foreign_keys=[endpoint_id])
