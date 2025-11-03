@@ -2809,6 +2809,84 @@ struct OpenAICompatibleEmbeddingResponse {
     usage: OpenAICompatibleEmbeddingUsage,
 }
 
+/// Response for a single model in the list
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ModelObject {
+    pub id: String,
+    pub created: u64,
+    pub object: &'static str,
+    pub owned_by: &'static str,
+}
+
+/// Response for the /v1/models endpoint
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ListModelsResponse {
+    pub object: &'static str,
+    pub data: Vec<ModelObject>,
+}
+
+/// A handler for the OpenAI-compatible list models endpoint
+#[debug_handler(state = AppStateData)]
+pub async fn list_models(
+    State(AppStateData {
+        config,
+        ..
+    }): AppState,
+    headers: HeaderMap,
+) -> Result<Json<ListModelsResponse>, Error> {
+    // Check if the request is authenticated by looking for the auth metadata header
+    let is_authenticated = headers.contains_key("x-tensorzero-endpoint-id");
+
+    // Get all models
+    let models = config.models.read().await;
+
+    // Filter models based on authentication
+    let model_list: Vec<ModelObject> = if is_authenticated {
+        // Authenticated: return all models available to this API key
+        // The auth middleware provides these as a comma-separated list
+        headers
+            .get("x-tensorzero-available-models")
+            .and_then(|header| header.to_str().ok())
+            .map(|models_str| {
+                models_str
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|model_name| ModelObject {
+                        id: model_name.to_string(),
+                        created: 0,
+                        object: "model",
+                        owned_by: "bud",
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|| {
+                // No available models header or failed to parse
+                tracing::warn!(
+                    "Authenticated /v1/models request missing x-tensorzero-available-models header"
+                );
+                vec![]
+            })
+    } else {
+        // Unauthenticated (when auth is disabled): return all models
+        models
+            .iter_static_models()
+            .map(|(model_id, _model_config)| ModelObject {
+                id: model_id.to_string(),
+                created: 0,
+                object: "model",
+                owned_by: "bud",
+            })
+            .collect()
+    };
+
+    let response = ListModelsResponse {
+        object: "list",
+        data: model_list,
+    };
+
+    Ok(Json(response))
+}
+
 /// A handler for the OpenAI-compatible embedding endpoint
 #[debug_handler(state = AppStateData)]
 pub async fn embedding_handler(
