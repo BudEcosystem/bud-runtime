@@ -2811,18 +2811,18 @@ struct OpenAICompatibleEmbeddingResponse {
 
 /// Response for a single model in the list
 #[derive(Clone, Debug, PartialEq, Serialize)]
-struct ModelObject {
-    id: String,
-    created: u64,
-    object: String,
-    owned_by: String,
+pub struct ModelObject {
+    pub id: String,
+    pub created: u64,
+    pub object: &'static str,
+    pub owned_by: &'static str,
 }
 
 /// Response for the /v1/models endpoint
 #[derive(Clone, Debug, PartialEq, Serialize)]
-struct ListModelsResponse {
-    object: String,
-    data: Vec<ModelObject>,
+pub struct ListModelsResponse {
+    pub object: &'static str,
+    pub data: Vec<ModelObject>,
 }
 
 /// A handler for the OpenAI-compatible list models endpoint
@@ -2833,7 +2833,7 @@ pub async fn list_models(
         ..
     }): AppState,
     headers: HeaderMap,
-) -> Result<Response<Body>, Error> {
+) -> Result<Json<ListModelsResponse>, Error> {
     // Check if the request is authenticated by looking for the auth metadata header
     let is_authenticated = headers.contains_key("x-tensorzero-endpoint-id");
 
@@ -2844,27 +2844,28 @@ pub async fn list_models(
     let model_list: Vec<ModelObject> = if is_authenticated {
         // Authenticated: return all models available to this API key
         // The auth middleware provides these as a comma-separated list
-        if let Some(available_models_header) = headers.get("x-tensorzero-available-models") {
-            if let Ok(models_str) = available_models_header.to_str() {
-                // Split the comma-separated model names
+        headers
+            .get("x-tensorzero-available-models")
+            .and_then(|header| header.to_str().ok())
+            .map(|models_str| {
                 models_str
                     .split(',')
                     .filter(|s| !s.is_empty())
                     .map(|model_name| ModelObject {
                         id: model_name.to_string(),
                         created: 0,
-                        object: "model".to_string(),
-                        owned_by: "bud".to_string(),
+                        object: "model",
+                        owned_by: "bud",
                     })
                     .collect()
-            } else {
-                // Failed to parse header, return empty list
+            })
+            .unwrap_or_else(|| {
+                // No available models header or failed to parse
+                tracing::warn!(
+                    "Authenticated /v1/models request missing x-tensorzero-available-models header"
+                );
                 vec![]
-            }
-        } else {
-            // No available models header (shouldn't happen with proper auth), return empty
-            vec![]
-        }
+            })
     } else {
         // Unauthenticated (when auth is disabled): return all models
         models
@@ -2872,36 +2873,18 @@ pub async fn list_models(
             .map(|(model_id, _model_config)| ModelObject {
                 id: model_id.to_string(),
                 created: 0,
-                object: "model".to_string(),
-                owned_by: "bud".to_string(),
+                object: "model",
+                owned_by: "bud",
             })
             .collect()
     };
 
     let response = ListModelsResponse {
-        object: "list".to_string(),
+        object: "list",
         data: model_list,
     };
 
-    // Convert response to JSON
-    let json_response = serde_json::to_string(&response).map_err(|e| {
-        Error::new(ErrorDetails::Serialization {
-            message: format!("Failed to serialize models list response: {}", e),
-        })
-    })?;
-
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", "application/json")
-        .body(Body::from(json_response))
-        .map_err(|e| {
-            Error::new(ErrorDetails::InferenceServer {
-                message: format!("Failed to build response: {}", e),
-                provider_type: "Gateway".to_string(),
-                raw_request: None,
-                raw_response: None,
-            })
-        })?)
+    Ok(Json(response))
 }
 
 /// A handler for the OpenAI-compatible embedding endpoint

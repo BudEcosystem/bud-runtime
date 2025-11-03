@@ -193,7 +193,7 @@ pub async fn require_api_key(
     if is_models_list_endpoint {
         // We already checked that api_config is Ok in the if statement above
         #[expect(clippy::unwrap_used)]
-        let api_config = api_config.unwrap();
+        let api_config = api_config.as_ref().unwrap();
 
         // Get all model names (keys) available to this API key
         let model_names: Vec<String> = api_config
@@ -210,12 +210,13 @@ pub async fn require_api_key(
                 .insert("x-tensorzero-available-models", header_value);
         }
 
-        // Mark as authenticated
-        if let Ok(header_value) = "authenticated".parse() {
-            request
-                .headers_mut()
-                .insert("x-tensorzero-endpoint-id", header_value);
-        }
+        // Mark as authenticated - use from_static for known static string
+        request
+            .headers_mut()
+            .insert(
+                "x-tensorzero-endpoint-id",
+                axum::http::HeaderValue::from_static("models_list"),
+            );
 
         return Ok(next.run(request).await);
     }
