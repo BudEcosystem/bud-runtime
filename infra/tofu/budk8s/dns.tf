@@ -33,6 +33,7 @@ locals {
 
   services_standalone = [
     "harbor",
+    "connect.dev"
   ]
 
   services_with_envs = toset(concat(
