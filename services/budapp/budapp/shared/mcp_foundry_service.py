@@ -771,7 +771,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             Response from MCP Foundry (may be empty dict on success)
 
         Raises:
-            MCPFoundryException: If deletion fails (except 404)
+            MCPFoundryException: If deletion fails (except 404 or 400 with "Gateway not found")
         """
         try:
             response = await self._make_request(
@@ -782,9 +782,10 @@ class MCPFoundryService(metaclass=SingletonMeta):
             return response
 
         except MCPFoundryException as e:
-            if e.status_code == 404:
-                # Gateway already deleted - this is okay
-                logger.warning(f"Gateway {gateway_id} not found (already deleted)")
+            # Handle both 404 and 400 with "Gateway not found" message
+            if e.status_code == 404 or (e.status_code == 400 and "Gateway not found" in e.message):
+                # Gateway already deleted or doesn't exist - this is okay
+                logger.warning(f"Gateway {gateway_id} not found (already deleted): {e.message}")
                 return {}
             raise
 

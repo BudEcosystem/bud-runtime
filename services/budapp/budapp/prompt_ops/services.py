@@ -244,6 +244,32 @@ class PromptService(SessionMixin):
             logger.error(f"Failed to update credential proxy cache: {e}")
             # Continue - cache cleanup is non-critical
 
+        # Delete MCP Foundry gateways from all versions before soft-deleting
+        # Query all active versions of this prompt via CRUD layer
+        all_versions = await PromptVersionDataManager(self.session).get_active_versions_by_prompt_id(prompt_id)
+
+        # Collect and delete all gateway IDs from all versions
+        total_gateways = 0
+        for version in all_versions:
+            if version.version_metadata and isinstance(version.version_metadata, dict):
+                gateway_ids = version.version_metadata.get("gateway_ids", [])
+
+                if gateway_ids:
+                    total_gateways += len(gateway_ids)
+                    logger.debug(
+                        f"Deleting {len(gateway_ids)} MCP Foundry gateways from version {version.version}",
+                        gateway_ids=gateway_ids,
+                    )
+
+                    for gateway_id in gateway_ids:
+                        # delete_gateway already handles 404 gracefully
+                        # Any other errors will be raised and propagated
+                        await mcp_foundry_service.delete_gateway(gateway_id)
+                        logger.debug(f"Successfully deleted MCP Foundry gateway {gateway_id}")
+
+        if total_gateways > 0:
+            logger.debug(f"Deleted {total_gateways} total MCP Foundry gateways for prompt {prompt_id}")
+
         # Update prompt status to DELETED
         await PromptDataManager(self.session).update_by_fields(db_prompt, {"status": PromptStatusEnum.DELETED})
 
@@ -1141,7 +1167,11 @@ class PromptService(SessionMixin):
 
                     if db_prompt_version:
                         # Get existing metadata (default is empty dict from migration)
-                        existing_metadata = db_prompt_version.version_metadata or {}
+                        existing_metadata = (
+                            db_prompt_version.version_metadata
+                            if isinstance(db_prompt_version.version_metadata, dict)
+                            else {}
+                        )
 
                         # Initialize gateway_ids array if not present
                         if "gateway_ids" not in existing_metadata:
@@ -1152,6 +1182,7 @@ class PromptService(SessionMixin):
                             existing_metadata["gateway_ids"].append(gateway.gateway_id)
 
                         # Update the prompt_version record using async pattern
+                        self.session.refresh(db_prompt_version)
                         db_prompt_version = await PromptVersionDataManager(self.session).update_by_fields(
                             db_prompt_version, {"version_metadata": existing_metadata}
                         )
@@ -1466,7 +1497,11 @@ class PromptService(SessionMixin):
 
                 if db_prompt_version:
                     # Get existing metadata
-                    existing_metadata = db_prompt_version.version_metadata or {}
+                    existing_metadata = (
+                        db_prompt_version.version_metadata
+                        if isinstance(db_prompt_version.version_metadata, dict)
+                        else {}
+                    )
 
                     # Remove gateway_id from gateway_ids array if present
                     if "gateway_ids" in existing_metadata and isinstance(existing_metadata["gateway_ids"], list):
@@ -1478,6 +1513,7 @@ class PromptService(SessionMixin):
                             existing_metadata["gateway_ids"] = gateway_ids
 
                             # Update the prompt_version record using async pattern
+                            self.session.refresh(db_prompt_version)
                             db_prompt_version = await PromptVersionDataManager(self.session).update_by_fields(
                                 db_prompt_version, {"version_metadata": existing_metadata}
                             )
@@ -2745,6 +2781,22 @@ class PromptVersionService(SessionMixin):
                     f"Failed to delete Redis configuration for prompt {db_prompt.name} version {db_version.version}: {str(e)}"
                 )
                 raise
+
+        # Delete MCP Foundry gateways if present in version metadata
+        if db_version.version_metadata and isinstance(db_version.version_metadata, dict):
+            gateway_ids = db_version.version_metadata.get("gateway_ids", [])
+
+            if gateway_ids:
+                logger.debug(
+                    f"Deleting {len(gateway_ids)} MCP Foundry gateways for version {version_id}",
+                    gateway_ids=gateway_ids,
+                )
+
+                for gateway_id in gateway_ids:
+                    # delete_gateway already handles 404 gracefully, so we can call directly
+                    # Any other errors will be raised and propagated
+                    await mcp_foundry_service.delete_gateway(gateway_id)
+                    logger.debug(f"Successfully deleted MCP Foundry gateway {gateway_id}")
 
         # Soft delete the version by updating its status
         await PromptVersionDataManager(self.session).update_by_fields(
