@@ -31,6 +31,7 @@ from ..commons.constants import (
     BUD_INTERNAL_WORKFLOW,
     BUD_PROMPT_API_KEY_LOCATION,
     CONNECTOR_AUTH_CREDENTIALS_MAP,
+    MCP_AUTH_TYPE_MAPPING,
     BudServeWorkflowStepEventName,
     ConnectorAuthTypeEnum,
     EndpointStatusEnum,
@@ -829,9 +830,9 @@ class PromptService(SessionMixin):
             # Use the new get_connector_by_id method which fetches all connectors with pagination
             connector_data = await mcp_foundry_service.get_connector_by_id(connector_id)
 
-            # Map auth_type string to enum (no fallback - let ValueError propagate)
+            # Map MCP Foundry auth_type to our enum using mapping table
             auth_type_str = connector_data.get("auth_type", "Open")
-            auth_type = ConnectorAuthTypeEnum(auth_type_str)
+            auth_type = MCP_AUTH_TYPE_MAPPING.get(auth_type_str, ConnectorAuthTypeEnum.OPEN)
 
             # Get credential schema based on auth type
             credential_schema = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
