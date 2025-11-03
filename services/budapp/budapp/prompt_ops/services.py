@@ -1205,18 +1205,21 @@ class PromptService(SessionMixin):
 
         logger.debug(f"Total tools across all connectors: {len(all_tool_ids)}")
 
-        # Step 5: Fetch original names for ALL tool IDs (not just newly added)
+        # Step 5: Fetch original names and names for ALL tool IDs (not just newly added)
         all_tool_original_names = []
+        all_tool_names = []
         for tool_id in all_tool_ids:
             try:
                 tool_data = await mcp_foundry_service.get_tool_by_id(tool_id)
                 original_name = tool_data["originalName"]
+                tool_name = tool_data["name"]
                 all_tool_original_names.append(original_name)
+                all_tool_names.append(tool_name)
             except MCPFoundryException as e:
                 logger.error(f"Failed to fetch tool {tool_id}: {e}")
                 raise ClientException(message="Tool not found", status_code=status.HTTP_404_NOT_FOUND)
-            except KeyError:
-                logger.error(f"Tool {tool_id} missing originalName field")
+            except KeyError as e:
+                logger.error(f"Tool {tool_id} missing required field: {e}")
                 raise ClientException(
                     message="Invalid tool data",
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1247,6 +1250,7 @@ class PromptService(SessionMixin):
             mcp_tool["server_label"] = virtual_server_name
             mcp_tool["server_url"] = virtual_server_id
             mcp_tool["allowed_tools"] = all_tool_original_names  # All tool original names
+            mcp_tool["allowed_tool_names"] = all_tool_names  # All tool names
             mcp_tool["connector_id"] = virtual_server_id
             mcp_tool["server_config"] = existing_server_config  # Merged server_config
             tools[mcp_tool_index] = mcp_tool
@@ -1329,16 +1333,21 @@ class PromptService(SessionMixin):
         server_config = mcp_tool.get("server_config", {})
         tool_ids_to_remove = server_config.get(connector_id, [])
 
-        # Step 3: Fetch tool originalNames BEFORE deleting gateway
+        # Step 3: Fetch tool originalNames and names BEFORE deleting gateway
         # (Once gateway is deleted, tools are removed from MCP Foundry)
         tool_original_names_to_remove = []
+        tool_names_to_remove = []
         for tool_id in tool_ids_to_remove:
             try:
                 tool_data = await mcp_foundry_service.get_tool_by_id(tool_id)
                 original_name = tool_data["originalName"]
+                tool_name = tool_data["name"]
                 tool_original_names_to_remove.append(original_name)
+                tool_names_to_remove.append(tool_name)
             except Exception as e:
-                logger.warning(f"Could not fetch tool {tool_id} to remove from allowed_tools: {e}")
+                logger.warning(
+                    f"Could not fetch tool {tool_id} to remove from allowed_tools and allowed_tool_names: {e}"
+                )
 
         # Step 4: Delete gateway in MCP Foundry (auto-removes tools from virtual server)
         try:
@@ -1354,9 +1363,12 @@ class PromptService(SessionMixin):
         # Step 6: Update server_config - remove connector's tools
         server_config.pop(connector_id, None)
 
-        # Step 7: Update allowed_tools - remove this connector's tool originalNames
+        # Step 7: Update allowed_tools and allowed_tool_names - remove this connector's tools
         allowed_tools = mcp_tool.get("allowed_tools", [])
         updated_allowed_tools = [tool for tool in allowed_tools if tool not in tool_original_names_to_remove]
+
+        allowed_tool_names = mcp_tool.get("allowed_tool_names", [])
+        updated_allowed_tool_names = [tool for tool in allowed_tool_names if tool not in tool_names_to_remove]
 
         # Step 8: Determine if we should remove entire MCP config or update it
         if not gateway_config:  # No more connectors - complete cleanup
@@ -1378,6 +1390,7 @@ class PromptService(SessionMixin):
             mcp_tool["gateway_config"] = gateway_config
             mcp_tool["server_config"] = server_config
             mcp_tool["allowed_tools"] = updated_allowed_tools
+            mcp_tool["allowed_tool_names"] = updated_allowed_tool_names
             tools[mcp_tool_index] = mcp_tool
             logger.debug(f"Updated MCP tool config ({len(gateway_config)} connectors remaining)")
 
