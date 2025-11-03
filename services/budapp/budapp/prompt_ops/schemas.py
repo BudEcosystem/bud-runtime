@@ -717,18 +717,62 @@ class ToolResponse(SuccessResponse):
     tool: Tool
 
 
-class RegisterConnectorRequest(BaseModel):
-    """Request schema for registering a connector to a prompt."""
+class PassthroughHeadersMixin(BaseModel):
+    """Mixin for passthrough_headers field (common across all auth types)."""
 
-    credentials: Dict[str, Any] = Field(
-        default_factory=dict, description="Connector credentials based on auth_type. Empty for OPEN auth type."
+    passthrough_headers: Optional[List[str]] = Field(
+        None, description="List of headers to pass through (e.g., ['Authorization', 'X-Tenant-Id'])"
+    )
+
+
+class OAuthCredentials(PassthroughHeadersMixin):
+    """OAuth authentication credentials."""
+
+    grant_type: Literal["client_credentials", "authorization_code"] = Field(..., description="OAuth grant type")
+    client_id: str = Field(..., min_length=1, description="OAuth client ID")
+    client_secret: str = Field(..., min_length=1, description="OAuth client secret")
+    token_url: str = Field(..., description="OAuth token endpoint URL")
+    authorization_url: str = Field(..., description="OAuth authorization endpoint URL")
+    redirect_uri: str = Field(..., description="OAuth callback/redirect URI")
+    scopes: Optional[List[str]] = Field(None, description="List of OAuth scopes (e.g., ['repo', 'read:user'])")
+
+
+class HeadersCredentials(PassthroughHeadersMixin):
+    """Headers-based authentication credentials."""
+
+    auth_headers: List[Dict[str, str]] = Field(
+        ...,
+        min_length=1,
+        description="Authentication headers as list of dicts with 'key' and 'value' (e.g., [{'key': 'Authorization', 'value': 'Bearer token'}])",
+    )
+
+    @field_validator("auth_headers")
+    @classmethod
+    def validate_auth_headers(cls, v: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """Validate each header has 'key' and 'value' fields."""
+        for i, header in enumerate(v):
+            if "key" not in header or "value" not in header:
+                raise ValueError(f"Header at index {i} must have 'key' and 'value' fields")
+            if not header["key"] or not header["value"]:
+                raise ValueError(f"Header at index {i} must have non-empty 'key' and 'value'")
+        return v
+
+
+class OpenCredentials(PassthroughHeadersMixin):
+    """Open authentication (no auth required)."""
+
+    pass  # Only inherits passthrough_headers
+
+
+class RegisterConnectorRequest(BaseModel):
+    """Request schema for registering a connector to a prompt with auth type-specific credentials."""
+
+    credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials] = Field(
+        ..., description="Credentials matching connector's auth_type"
     )
     version: Optional[int] = Field(
-        None, ge=1, description="Version to update. If not specified, updates default version."
+        None, ge=1, description="Optional version number. If not specified, updates default version."
     )
-
-    # TODO: Add credential validation in service layer against CONNECTOR_AUTH_CREDENTIALS_MAP
-    # This should validate that provided credentials match the connector's auth_type schema
 
 
 class AddToolRequest(BaseModel):

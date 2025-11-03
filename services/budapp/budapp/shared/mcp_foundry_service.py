@@ -543,6 +543,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         url: str,
         transport: str = "SSE",
         visibility: str = "public",
+        auth_config: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Create a gateway in MCP Foundry.
 
@@ -551,6 +552,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             url: MCP server URL from connector details
             transport: Transport type (SSE, stdio) - default SSE
             visibility: Gateway visibility (public, private) - default public
+            auth_config: Optional authentication configuration (OAuth, Headers, etc.)
 
         Returns:
             Dict[str, Any]: Gateway creation response with gateway_id
@@ -565,6 +567,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 url=url,
                 transport=transport,
                 visibility=visibility,
+                has_auth_config=auth_config is not None,
             )
 
             # Prepare request payload
@@ -574,6 +577,10 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 "transport": transport,
                 "visibility": visibility,
             }
+
+            # Merge auth_config if provided
+            if auth_config:
+                payload.update(auth_config)
 
             # Make the API call
             response = await self._make_request(

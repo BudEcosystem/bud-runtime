@@ -73,7 +73,10 @@ from .schemas import (
     CreatePromptWorkflowRequest,
     CreatePromptWorkflowSteps,
     GatewayResponse,
+    HeadersCredentials,
     MCPToolConfig,
+    OAuthCredentials,
+    OpenCredentials,
     PromptConfigCopyRequest,
     PromptConfigGetResponse,
     PromptConfigRequest,
@@ -921,8 +924,89 @@ class PromptService(SessionMixin):
         else:
             return "STREAMABLEHTTP"
 
+    def _transform_credentials_to_mcp_format(
+        self, credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials]
+    ) -> Dict[str, Any]:
+        """Transform credentials to MCP Foundry gateway payload format.
+
+        Args:
+            credentials: Typed credentials object
+
+        Returns:
+            Dictionary with auth configuration for MCP Foundry API
+
+        Raises:
+            ClientException: If transformation fails or unsupported auth type
+        """
+        auth_config: Dict[str, Any] = {}
+
+        if isinstance(credentials, OAuthCredentials):
+            # Build OAuth configuration
+            oauth_config = {
+                "grant_type": credentials.grant_type,
+                "client_id": credentials.client_id,
+                "client_secret": credentials.client_secret,
+                "token_url": credentials.token_url,
+                "authorization_url": credentials.authorization_url,
+                "redirect_uri": credentials.redirect_uri,
+                # Add token management inside oauth_config
+                "token_management": {
+                    "store_tokens": True,
+                    "auto_refresh": True,
+                    "refresh_threshold_seconds": 300,
+                },
+            }
+
+            # Add optional scopes if provided
+            if credentials.scopes:
+                oauth_config["scopes"] = credentials.scopes
+
+            # Set auth_type and oauth_config at root level
+            auth_config["auth_type"] = "oauth"
+            auth_config["oauth_config"] = oauth_config
+
+            # Add passthrough headers if provided
+            if credentials.passthrough_headers:
+                auth_config["passthrough_headers"] = credentials.passthrough_headers
+
+        elif isinstance(credentials, HeadersCredentials):
+            # Headers authentication uses "authheaders" type in MCP Foundry
+            auth_config["auth_type"] = "authheaders"
+            auth_config["auth_headers"] = credentials.auth_headers
+
+            # Add OAuth-related fields required by MCP Foundry
+            auth_config["oauth_grant_type"] = "client_credentials"
+            auth_config["oauth_store_tokens"] = True
+            auth_config["oauth_auto_refresh"] = True
+
+            # Add passthrough headers if provided
+            if credentials.passthrough_headers:
+                auth_config["passthrough_headers"] = credentials.passthrough_headers
+
+        elif isinstance(credentials, OpenCredentials):
+            # Open authentication - add OAuth fields required by MCP Foundry
+            auth_config["oauth_grant_type"] = "client_credentials"
+            auth_config["oauth_store_tokens"] = True
+            auth_config["oauth_auto_refresh"] = True
+
+            # Add passthrough headers if provided
+            if credentials.passthrough_headers:
+                auth_config["passthrough_headers"] = credentials.passthrough_headers
+
+        else:
+            raise ClientException(
+                message=f"Unsupported credential type: {type(credentials).__name__}",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return auth_config
+
     async def register_connector_for_prompt(
-        self, budprompt_id: str, connector_id: str, credentials: Dict[str, Any], version: Optional[int] = None
+        self,
+        budprompt_id: str,
+        connector_id: str,
+        credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials],
+        version: Optional[int] = None,
     ) -> GatewayResponse:
         """Register a connector for a prompt by creating gateway in MCP Foundry.
 
@@ -988,6 +1072,23 @@ class PromptService(SessionMixin):
             logger.error(f"Failed to retrieve connector {connector_id}: {e}")
             raise
 
+        # Validate credentials match connector's auth_type
+        if isinstance(credentials, OAuthCredentials) and connector.auth_type != ConnectorAuthTypeEnum.OAUTH:
+            raise ClientException(
+                message=f"Credential type mismatch: connector '{connector_id}' requires '{connector.auth_type.value}' authentication but 'OAuth' credentials provided",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        elif isinstance(credentials, HeadersCredentials) and connector.auth_type != ConnectorAuthTypeEnum.HEADERS:
+            raise ClientException(
+                message=f"Credential type mismatch: connector '{connector_id}' requires '{connector.auth_type.value}' authentication but 'Headers' credentials provided",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        elif isinstance(credentials, OpenCredentials) and connector.auth_type != ConnectorAuthTypeEnum.OPEN:
+            raise ClientException(
+                message=f"Credential type mismatch: connector '{connector_id}' requires '{connector.auth_type.value}' authentication but 'Open' credentials provided",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Construct gateway name: {budprompt_id}__v{version}__{connector_id}
         # Using double underscore as separator (MCP Foundry only allows letters, numbers, _, -)
         gateway_name = f"{budprompt_id}__v{target_version}__{connector_id}"
@@ -995,19 +1096,19 @@ class PromptService(SessionMixin):
         # Detect transport from connector URL
         transport = self._detect_transport_from_url(connector.url)
 
+        # Transform credentials to MCP Foundry format
+        auth_config = self._transform_credentials_to_mcp_format(credentials)
+
         # Create gateway in MCP Foundry
         try:
             gateway_response = await mcp_foundry_service.create_gateway(
-                name=gateway_name, url=connector.url, transport=transport, visibility="public"
+                name=gateway_name, url=connector.url, transport=transport, visibility="public", auth_config=auth_config
             )
 
             logger.debug(
                 f"Successfully created gateway for connector {connector_id} and prompt {budprompt_id}",
                 gateway_id=gateway_response.get("id", gateway_response.get("gateway_id")),
             )
-
-            # TODO: Validate credentials against CONNECTOR_AUTH_CREDENTIALS_MAP schema
-            # Pending implementation
 
             # Create GatewayResponse object
             gateway = GatewayResponse(
