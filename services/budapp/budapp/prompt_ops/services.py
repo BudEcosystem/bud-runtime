@@ -1151,9 +1151,10 @@ class PromptService(SessionMixin):
                         if gateway.gateway_id not in existing_metadata["gateway_ids"]:
                             existing_metadata["gateway_ids"].append(gateway.gateway_id)
 
-                        # Update the prompt_version record
-                        db_prompt_version.version_metadata = existing_metadata
-                        await PromptVersionDataManager(self.session).update_one(db_prompt_version)
+                        # Update the prompt_version record using async pattern
+                        db_prompt_version = await PromptVersionDataManager(self.session).update_by_fields(
+                            db_prompt_version, {"version_metadata": existing_metadata}
+                        )
 
                         logger.debug(
                             f"Updated prompt_version metadata with gateway_id {gateway.gateway_id}",
@@ -1445,6 +1446,50 @@ class PromptService(SessionMixin):
             "tools": tools,
         }
         await self._save_prompt_config_to_redis(payload)
+
+        # Remove gateway_id from PromptVersion metadata (if prompt and version exist in DB)
+        try:
+            # Check if prompt exists by name (budprompt_id is the prompt name)
+            db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+                PromptModel,
+                fields={"name": budprompt_id, "status": PromptStatusEnum.ACTIVE},
+                missing_ok=True,
+            )
+
+            if db_prompt:
+                # Check if prompt_version exists
+                db_prompt_version = await PromptVersionDataManager(self.session).retrieve_by_fields(
+                    PromptVersionModel,
+                    fields={"prompt_id": db_prompt.id, "version": int(target_version)},
+                    missing_ok=True,
+                )
+
+                if db_prompt_version:
+                    # Get existing metadata
+                    existing_metadata = db_prompt_version.version_metadata or {}
+
+                    # Remove gateway_id from gateway_ids array if present
+                    if "gateway_ids" in existing_metadata and isinstance(existing_metadata["gateway_ids"], list):
+                        gateway_ids = existing_metadata["gateway_ids"]
+
+                        # Remove the gateway_id
+                        if gateway_id in gateway_ids:
+                            gateway_ids.remove(gateway_id)
+                            existing_metadata["gateway_ids"] = gateway_ids
+
+                            # Update the prompt_version record using async pattern
+                            db_prompt_version = await PromptVersionDataManager(self.session).update_by_fields(
+                                db_prompt_version, {"version_metadata": existing_metadata}
+                            )
+
+                            logger.debug(
+                                f"Removed gateway_id {gateway_id} from prompt_version metadata",
+                                prompt_id=db_prompt.id,
+                                version=target_version,
+                            )
+        except Exception as e:
+            # Silent failure - don't block connector disconnection if DB update fails
+            logger.warning(f"Failed to update prompt_version metadata during disconnect: {e}", exc_info=True)
 
         # Step 10: Return response
         return {
