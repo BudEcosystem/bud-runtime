@@ -33,6 +33,7 @@ export const usePrompts = create<{
   totalRecords: number;
   loading: boolean;
   getPrompts: (params: GetPromptsParams, projectId?: string) => void;
+  getPromptById: (promptId: string, projectId?: string) => Promise<any>;
   createPrompt: (data: any, projectId?: string) => Promise<any>;
   deletePrompt: (promptId: string, projectId?: string) => Promise<any>;
   updatePrompt: (promptId: string, data: any, projectId?: string) => Promise<any>;
@@ -80,6 +81,24 @@ export const usePrompts = create<{
       set({ totalRecords: 0 });
     } finally {
       set({ loading: false });
+    }
+  },
+
+  getPromptById: async (promptId: string, projectId?): Promise<any> => {
+    try {
+      const url = `${tempApiBaseUrl}/prompts/${promptId}`;
+      const headers: any = {};
+      if (projectId) {
+        headers["x-resource-type"] = "project";
+        headers["x-entity-id"] = projectId;
+      }
+
+      const response: any = await AppRequest.Get(url, { headers });
+      successToast(response.message || "Prompt details fetched successfully");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching prompt by ID:", error);
+      throw error;
     }
   },
 
