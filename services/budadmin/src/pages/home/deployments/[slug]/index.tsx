@@ -133,8 +133,8 @@ const ProjectDetailsPage = () => {
       key: "1",
       children: <GeneralDeploymentInfo switchTab={switchTab} />,
     },
-    // Hide Adapters tab for cloud models
-    ...(clusterDetails?.model?.provider_type === "cloud_model"
+    // Hide Adapters tab for cloud models or when dev mode is disabled
+    ...(clusterDetails?.model?.provider_type === "cloud_model" || !enableDevMode
       ? []
       : [
           {

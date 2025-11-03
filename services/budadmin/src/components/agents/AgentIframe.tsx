@@ -8,7 +8,6 @@ interface AgentIframeProps {
 
 const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [] }) => {
   const [refreshToken, setRefreshToken] = useState("");
-  const playGroundUrl = "https://playground.dev.bud.studio";
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Build iframe URL for agent playground with promptIds

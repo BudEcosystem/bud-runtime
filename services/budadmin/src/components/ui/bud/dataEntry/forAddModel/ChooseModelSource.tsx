@@ -110,7 +110,7 @@ export function ChooseModalitySource() {
 
   return (
     <div className="addModelSelect">
-      {modalityTypeList.map((modality, index) => (
+      {modalityTypeList.filter((modality) => !modality.hide).map((modality, index) => (
         <ModelCard
           key={index}
           data={modality}
