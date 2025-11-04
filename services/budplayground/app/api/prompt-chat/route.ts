@@ -16,6 +16,10 @@ interface PromptBody {
   settings?: {
     temperature?: number;
   } | null;
+  messages?: Array<{
+    role: string;
+    content: string;
+  }>;
 }
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
@@ -73,11 +77,16 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  // Check if this is a follow-up message in a conversation
+  const isFollowUpMessage = body.messages && body.messages.length > 1;
+
   const promptInput = buildPromptInput(body);
 
-  if (!promptInput) {
+  // For initial prompt submission, we need prompt input
+  // For follow-up messages, we rely on the messages array
+  if (!promptInput && !isFollowUpMessage) {
     return Response.json(
-      { error: 'Missing prompt input' },
+      { error: 'Missing prompt input or messages' },
       { status: 400 },
     );
   }
@@ -86,6 +95,8 @@ export async function POST(req: Request) {
   const baseURL = resolveGatewayBase(body.metadata?.base_url ?? null);
 
   console.log('[Prompt Chat] Using model:', model);
+  console.log('[Prompt Chat] Is follow-up message:', isFollowUpMessage);
+  console.log('[Prompt Chat] Messages count:', body.messages?.length || 0);
   console.log('[Prompt Chat] Prompt input:', promptInput);
   console.log('[Prompt Chat] Base URL:', baseURL);
 
@@ -101,27 +112,45 @@ export async function POST(req: Request) {
       // stream: false, // Gateway doesn't actually stream despite accepting this param
     };
 
-    // Only include input field for unstructured prompts
-    if (!hasStructuredInput) {
-      requestBody.input = promptInput;
-    }
+    if (isFollowUpMessage) {
+      // For follow-up messages, include the conversation history
+      console.log('[Prompt Chat] Building request for follow-up message');
 
-    // Add prompt object if provided
-    if (body.prompt?.id) {
-      // Transform variable keys: replace spaces with underscores
-      const transformedVariables: Record<string, string> = {};
-      if (body.prompt.variables) {
-        Object.entries(body.prompt.variables).forEach(([key, value]) => {
-          const transformedKey = key.replace(/\s+/g, '_');
-          transformedVariables[transformedKey] = value;
-        });
+      requestBody.messages = body.messages;
+
+      // Still include prompt context (id and version) but NOT variables
+      if (body.prompt?.id) {
+        requestBody.prompt = {
+          id: body.prompt.id,
+          version: body.prompt.version || '1',
+        };
+      }
+    } else {
+      // For initial prompt submission, use the original approach
+      console.log('[Prompt Chat] Building request for initial prompt submission');
+
+      // Only include input field for unstructured prompts
+      if (!hasStructuredInput && promptInput) {
+        requestBody.input = promptInput;
       }
 
-      requestBody.prompt = {
-        id: body.prompt.id,
-        version: body.prompt.version || '1',
-        variables: transformedVariables,
-      };
+      // Add prompt object with variables if provided
+      if (body.prompt?.id) {
+        // Transform variable keys: replace spaces with underscores
+        const transformedVariables: Record<string, string> = {};
+        if (body.prompt.variables) {
+          Object.entries(body.prompt.variables).forEach(([key, value]) => {
+            const transformedKey = key.replace(/\s+/g, '_');
+            transformedVariables[transformedKey] = String(value);
+          });
+        }
+
+        requestBody.prompt = {
+          id: body.prompt.id,
+          version: body.prompt.version || '1',
+          variables: transformedVariables,
+        };
+      }
     }
 
     console.log('[Prompt Chat] Request body:', JSON.stringify(requestBody, null, 2));

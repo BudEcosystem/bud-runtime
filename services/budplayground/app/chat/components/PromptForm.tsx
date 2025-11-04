@@ -163,7 +163,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
   const renderInput = (fieldName: string, fieldSchema: any) => {
     const { type, title, placeholder, minimum, maximum } = fieldSchema;
 
-    const inputClassName = "bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] px-0 py-2";
+    const inputClassName = "bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] !px-0 py-2";
 
     switch (type) {
       case 'string':
@@ -227,8 +227,8 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-50 flex items-end justify-center p-[0.9375rem] pb-[.5rem]">
-      <div className="w-full max-w-[800px] bg-[#0c0c0d] rounded-[1rem] border border-[#1F1F1F] p-8 shadow-2xl">
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="chat-message-form p-[2.5rem] pb-[1.5rem]  w-full  flex items-center justify-center  border-t-2 hover:border-[#333333] rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden max-w-5xl">
+        <form onSubmit={handleSubmit} className="space-y-6 w-full">
           {/* Title */}
           <h2 className="text-white text-[1.25rem] font-[400] mb-6">
             {inputSchema?.title || 'Please enter the following details'}
@@ -264,7 +264,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
                   value={formData['unstructuredSchema'] || ''}
                   onChange={(e) => handleChange('unstructuredSchema', e.target.value)}
                   placeholder="Enter the details here"
-                  className="bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] px-0 py-2"
+                  className="bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] !px-0 py-2"
                   style={{ boxShadow: 'none' }}
                 />
               </div>

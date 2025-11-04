@@ -33,7 +33,7 @@ function NormalEditor({
     }}
     >
       <form
-        className="chat-message-form   w-full  flex items-center justify-center  border-t-2 hover:border-[#333333] rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden max-w-5xl px-[1rem]"
+        className="chat-message-form w-full  flex items-center justify-center  border-t-2 hover:border-[#333333] rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden max-w-5xl px-[1rem]"
         onSubmit={handleSubmit}
       >
         <div className="blur-[0.5rem] absolute top-0 left-0 right-0 bottom-0 bg-[#FFFFFF03] rounded-[0.5rem] " />
