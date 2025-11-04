@@ -234,6 +234,10 @@ class SimulationWorkflows:
                                         "reasoning_parser_type": engine_device_combo.get("reasoning_parser_type"),
                                         "architecture_family": engine_device_combo.get("architecture_family"),
                                         "chat_template": engine_device_combo.get("chat_template"),
+                                        "supports_lora": engine_device_combo.get("supports_lora", False),
+                                        "supports_pipeline_parallelism": engine_device_combo.get(
+                                            "supports_pipeline_parallelism", False
+                                        ),
                                         "simulation_method": simulation_method.value,
                                     }
                                 ),

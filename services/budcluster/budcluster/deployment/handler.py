@@ -256,21 +256,20 @@ class DeploymentHandler:
 
         full_node_list = copy.deepcopy(node_list)
 
-        # TODO: To be enabled
-        # max_loras = 1 if not adapters else max(1, len(adapters))
-
-        for idx, node in enumerate(node_list):
-            node["args"]["gpu-memory-utilization"] = 0.95
-            # TODO: To be enabled
-            # node["args"]["max-loras"] = max_loras
-            # node["args"]["max-lora-rank"] = 256
-            # node["args"]["pipeline-parallel-size"] = 2
-            # node["pp_size"] = 2
-
+        for _idx, node in enumerate(node_list):
             node["args"] = self._prepare_args(node["args"])
             node["args"].append(f"--served-model-name={namespace}")
-            # TODO: To be enabled
-            # node["args"].append("--enable-lora")
+
+            node["args"].append("--gpu-memory-utilization=0.95")
+
+            # Enable LoRA configuration if engine supports it
+            supports_lora = node.get("supports_lora", False)
+            if supports_lora:
+                max_loras = 1 if not adapters else max(1, len(adapters))
+                node["args"].append(f"--max-loras={max_loras}")
+                node["args"].append("--max-lora-rank=256")
+                node["args"].append("--enable-lora")
+                logger.info(f"LoRA enabled: max-loras={max_loras}, max-lora-rank=256")
 
             # Calculate max_model_len dynamically
             if input_tokens and output_tokens:
@@ -295,14 +294,18 @@ class DeploymentHandler:
                 # Add other reasoning parser configurations as needed
 
             # Update the full_node_list with the modified args
-            full_node_list[idx]["args"] = node["args"].copy()
+            # full_node_list[idx]["args"] = node["args"].copy()
 
             # thread_bind, core_count = self._get_cpu_affinity(device["tp_size"])
             # node["envs"]["VLLM_CPU_OMP_THREADS_BIND"] = thread_bind
             node["envs"]["VLLM_LOGGING_LEVEL"] = "INFO"
             # node["envs"]["VLLM_SKIP_WARMUP"] = "true"
-            # TODO: To be enabled
-            # node["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
+
+            # Enable runtime LoRA updating if supported
+            if supports_lora:
+                node["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
+                logger.info("Enabled runtime LoRA updating")
+
             # node["core_count"] = core_count if device["type"] == "cpu" else 1
             node["memory"] = node["memory"] / (1024**3)
             node["name"] = self._to_k8s_label(node["name"])

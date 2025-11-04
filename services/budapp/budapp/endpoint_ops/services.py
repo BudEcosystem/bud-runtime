@@ -118,6 +118,7 @@ class EndpointService(SessionMixin):
         "chat_template": "",
         "enable_tool_calling": False,
         "enable_reasoning": False,
+        "supports_lora": False,
     }
 
     @classmethod
@@ -512,6 +513,7 @@ class EndpointService(SessionMixin):
             "chat_template",
             "enable_tool_calling",
             "enable_reasoning",
+            "supports_lora",
         ]
 
         # from workflow steps extract necessary information
@@ -586,6 +588,7 @@ class EndpointService(SessionMixin):
             "chat_template",
             "enable_tool_calling",
             "enable_reasoning",
+            "supports_lora",
         ):
             if k in required_data:
                 engine_cfg_input[k] = required_data[k]

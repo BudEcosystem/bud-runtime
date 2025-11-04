@@ -572,6 +572,9 @@ class RecommendedCluster(BaseModel):
     tool_calling_parser_type: str | None = None
     reasoning_parser_type: str | None = None
     chat_template: str | None = None
+    # Engine capability flags from simulator
+    supports_lora: bool | None = None
+    supports_pipeline_parallelism: bool | None = None
 
 
 class RecommendedClusterResponse(SuccessResponse):

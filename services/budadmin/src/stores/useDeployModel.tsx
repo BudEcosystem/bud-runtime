@@ -209,6 +209,8 @@ export const useDeployModel = create<{
     enable_reasoning: boolean;
     available_tool_parser: string | null;
     available_reasoning_parser: string | null;
+    supports_lora: boolean | null;
+    supports_pipeline_parallelism: boolean | null;
   };
   cloudModelDetails: {
     name: string;
@@ -376,6 +378,8 @@ export const useDeployModel = create<{
     enable_reasoning: false,
     available_tool_parser: null,
     available_reasoning_parser: null,
+    supports_lora: false,
+    supports_pipeline_parallelism: false,
   },
   cloudModelDetails: {
     name: "",
@@ -455,6 +459,8 @@ export const useDeployModel = create<{
         enable_reasoning: false,
         available_tool_parser: null,
         available_reasoning_parser: null,
+        supports_lora: false,
+        supports_pipeline_parallelism: false,
       },
       deploymentCluster: {},
       status: {},
@@ -1074,6 +1080,8 @@ export const useDeployModel = create<{
           tool_calling_parser_type: cluster?.tool_calling_parser_type,
           reasoning_parser_type: cluster?.reasoning_parser_type,
           chat_template: cluster?.chat_template,
+          supports_lora: cluster?.supports_lora ?? false,
+          supports_pipeline_parallelism: cluster?.supports_pipeline_parallelism ?? false,
         },
         {
           headers: {

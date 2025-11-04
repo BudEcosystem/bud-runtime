@@ -158,6 +158,9 @@ class ClusterMetrics(BaseModel):
     reasoning_parser_type: Optional[str] = None
     architecture_family: Optional[str] = None
     chat_template: Optional[str] = None
+    # Engine capability flags from BudConnect API
+    supports_lora: Optional[bool] = None
+    supports_pipeline_parallelism: Optional[bool] = None
 
     def reset(self):
         """Reset cluster metrics."""
@@ -244,6 +247,9 @@ class NodeGroupConfiguration(BaseModel):
     reasoning_parser_type: Optional[str] = None
     architecture_family: Optional[str] = None
     chat_template: Optional[str] = None
+    # Engine capability flags from BudConnect API
+    supports_lora: Optional[bool] = None
+    supports_pipeline_parallelism: Optional[bool] = None
 
     @model_validator(mode="after")
     def validate_parallelism_config(self):
@@ -282,6 +288,9 @@ class DeploymentConfigurationResponse(ResponseBase):
     reasoning_parser_type: Optional[str] = None
     architecture_family: Optional[str] = None
     chat_template: Optional[str] = None
+    # Engine capability flags from BudConnect API
+    supports_lora: Optional[bool] = None
+    supports_pipeline_parallelism: Optional[bool] = None
 
     def reset(self):
         """Reset the simulation state by clearing nodes and replica count."""

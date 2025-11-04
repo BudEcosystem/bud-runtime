@@ -151,6 +151,9 @@ export type Cluster = {
   tool_calling_parser_type?: string | null;
   reasoning_parser_type?: string | null;
   chat_template?: string | null;
+  // Engine capability flags from simulator
+  supports_lora?: boolean | null;
+  supports_pipeline_parallelism?: boolean | null;
   required_devices?: {
     device_type: string;
     num_replicas: number;

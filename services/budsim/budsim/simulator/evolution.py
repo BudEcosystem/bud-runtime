@@ -53,6 +53,7 @@ class Evolution:
         error_threshold: float = 0.01,
         convergence_generations: int = 10,
         use_heuristic: bool = False,
+        supports_pipeline_parallelism: bool = False,
     ):
         """Initialize the Evolution class.
 
@@ -92,6 +93,7 @@ class Evolution:
         self.convergence_generations = convergence_generations
         self.error_threshold = error_threshold
         self.use_heuristic = use_heuristic
+        self.supports_pipeline_parallelism = supports_pipeline_parallelism
 
         self.engine_config = get_engine_properties(self.engine_name, {"model": self.model})
         self.optimizer_params = self._get_optimizer_params()
@@ -388,13 +390,18 @@ class Evolution:
             max_val=node_device_count,  # Node limit, not cluster limit
         )
 
-        # PP constraint: Depends on configuration type
+        # PP constraint: Depends on configuration type and engine capability
         if "node_distribution" in self.device_config:
             # Cluster-wide config: PP limited by nodes with this device type
             max_pp_size = self.device_config.get("total_nodes_with_device", 1)
         else:
             # Legacy config: PP limited by total cluster nodes
             max_pp_size = cluster_topology.get("max_pp_size", 1)
+
+        # Override max_pp_size to 1 if engine doesn't support pipeline parallelism
+        if not self.supports_pipeline_parallelism:
+            logger.info("Engine does not support pipeline parallelism - constraining PP to 1")
+            max_pp_size = 1
 
         if "pipeline_parallel_size" not in engine_config_dict:
             # Add PP parameter if not already present (for engines that support it)
