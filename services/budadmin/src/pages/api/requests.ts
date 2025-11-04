@@ -243,7 +243,7 @@ const handleErrorResponse = (err) => {
     console.log(err);
     if (err && localStorage.getItem("access_token")) {
       console.log(err.response?.data?.message);
-      errorToast(err.response?.data?.message);
+      errorToast(err.response?.data?.message || err.response?.data?.detail );
     }
     return false;
   }
