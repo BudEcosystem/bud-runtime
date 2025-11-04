@@ -4,10 +4,10 @@ import React, { useEffect, useRef, useState } from "react";
 interface AgentIframeProps {
   sessionId?: string;
   promptIds?: string[];
-  typeFormTrigger?: boolean;
+  typeFormMessage?: { timestamp: number; value: boolean } | null;
 }
 
-const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], typeFormTrigger = false }) => {
+const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], typeFormMessage = null }) => {
   const [refreshToken, setRefreshToken] = useState("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -33,19 +33,19 @@ const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], ty
     }
   }, []);
 
-  // Send typeForm message to iframe when trigger changes
+  // Send typeForm message to iframe when message changes
   useEffect(() => {
-    if (typeFormTrigger && iframeRef.current && iframeRef.current.contentWindow) {
+    if (typeFormMessage && iframeRef.current && iframeRef.current.contentWindow) {
       const message = {
         type: 'SET_TYPE_FORM',
-        typeForm: false
+        typeForm: typeFormMessage.value
       };
 
       // Send message to iframe
       iframeRef.current.contentWindow.postMessage(message, '*');
       console.log('Sent typeForm message to iframe:', message);
     }
-  }, [typeFormTrigger]);
+  }, [typeFormMessage]);
 
   if (!refreshToken) {
     return (

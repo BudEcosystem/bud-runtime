@@ -35,7 +35,7 @@ export function PrimaryButton({
           <div className="relative inline-block">
             <Button
               {...props}
-              className={`pointer-events-none opacity-60 flex justify-center items-center !border-[.5px] !border-[#965CDE] font-normal !bg-[#1E0C34] ${classNames}`}
+              className={`pointer-events-none opacity-60 flex justify-center items-center !border-[.5px] font-normal ${classNames}`}
               disabled={true} // keep enabled so events can bubble
               style={{
                 minWidth: "4rem",
@@ -44,6 +44,8 @@ export function PrimaryButton({
                 cursor: "not-allowed",
                 borderRadius: "0.3rem",
                 height: "1.75rem",
+                borderColor: "#965CDE !important",
+                background: "#1E0C34 !important",
               }}
             >
               {Children}

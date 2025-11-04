@@ -28,8 +28,9 @@ const AgentDrawer: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [drawerWidth, setDrawerWidth] = useState<string>('100%');
   const [showPlayground, setShowPlayground] = useState(false);
+  const [showChatHistory, setShowChatHistory] = useState(false);
   const [activeBoxId, setActiveBoxId] = useState<string | null>(null);
-  const [typeFormTrigger, setTypeFormTrigger] = useState<boolean>(false);
+  const [typeFormMessage, setTypeFormMessage] = useState<{ timestamp: number; value: boolean } | null>(null);
 
   // Get active sessions
   const activeSessions = sessions.filter((session) =>
@@ -50,19 +51,38 @@ const AgentDrawer: React.FC = () => {
       // Just close the drawer
       closeAgentDrawer();
     }
-    // Reset playground view when drawer closes
+    // Reset views when drawer closes
     setShowPlayground(false);
+    setShowChatHistory(false);
   };
 
   // Handle Play button click
   const handlePlayClick = () => {
-    setShowPlayground(!showPlayground);
+    if (!showPlayground) {
+      // If playground is closed, open it
+      setShowPlayground(true);
+      setShowChatHistory(false);
+    } else {
+      // If playground is already open, send typeForm=true message
+      setTypeFormMessage({ timestamp: Date.now(), value: true });
+    }
   };
 
   // Handle Settings button click
   const handleSettingsClick = () => {
-    if (showPlayground) {
+    if (showPlayground || showChatHistory) {
       setShowPlayground(false);
+      setShowChatHistory(false);
+    }
+  };
+
+  // Handle Chat History button click
+  const handleChatHistoryClick = () => {
+    // Only allow click if playground is enabled
+    if (showPlayground || showChatHistory) {
+      setShowChatHistory(true);
+      // setShowPlayground(false);
+      setTypeFormMessage({ timestamp: Date.now(), value: false });
     }
   };
 
@@ -148,40 +168,43 @@ const AgentDrawer: React.FC = () => {
             </div>
             <div>
               {/* Settings Icon - Now opens settings for individual agent boxes */}
-              <Tooltip title={showPlayground ? "Back to Agent Settings" : "Use settings icon in each agent box"} placement="right">
+              <Tooltip title={(showPlayground || showChatHistory) ? "Back to Agent Settings" : "Use settings icon in each agent box"} placement="right">
                 <button
                   onClick={handleSettingsClick}
-                  className={`control-bar-icon w-8 h-8 flex items-center justify-center rounded-md  transition-colors mb-3 ${
-                    showPlayground
+                  className={`control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors mb-3 ${
+                    (showPlayground || showChatHistory)
                       ? 'cursor-pointer'
                       : activeSessions.length > 0
                         ? 'cursor-not-allowed'
                         : 'opacity-50 cursor-not-allowed'
                   }`}
-                  disabled={!showPlayground}
+                  disabled={!showPlayground && !showChatHistory}
                 >
-                  <SettingOutlined className={`text-lg ${activeSessions.length > 0 && !showPlayground ? 'text-[#EEEEEE]' : 'text-[#808080]'}`} />
+                  <SettingOutlined className={`text-lg ${activeSessions.length > 0 && !showPlayground && !showChatHistory ? 'text-[#EEEEEE]' : 'text-[#808080]'}`} />
                 </button>
               </Tooltip>
 
 
               {/* Play/Run Icon */}
-              <Tooltip title={showPlayground ? "Back to Agent" : "Run Agent"} placement="right">
+              <Tooltip title={showPlayground ? "Switch to Type Mode" : "Run Agent"} placement="right">
                 <button
                   onClick={handlePlayClick}
-                  className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md  transition-colors mb-3"
+                  className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors mb-3"
                 >
                   <PlayCircleOutlined className={`text-lg ${showPlayground ? 'text-[#EEEEEE]' : 'text-[#808080] hover:text-[#EEEEEE]'}`} />
                 </button>
               </Tooltip>
 
               {/* Chat/Message Icon */}
-              <Tooltip title="Chat History" placement="right">
+              <Tooltip title={(showPlayground || showChatHistory) ? "Chat History" : "Enable playground first"} placement="right">
                 <button
-                  onClick={() => setTypeFormTrigger(prev => !prev)}
-                  className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors"
+                  onClick={handleChatHistoryClick}
+                  className={`control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors ${
+                    (showPlayground || showChatHistory) ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                  }`}
+                  disabled={!showPlayground && !showChatHistory}
                 >
-                  <MessageOutlined className="text-[#808080] hover:text-[#965CDE] text-lg" />
+                  <MessageOutlined className={`text-lg ${showChatHistory ? 'text-[#EEEEEE]' : (showPlayground ? 'text-[#808080] hover:text-[#EEEEEE]' : 'text-[#808080]')}`} />
                 </button>
               </Tooltip>
             </div>
@@ -190,13 +213,13 @@ const AgentDrawer: React.FC = () => {
           <div className="flex-1" style={{ width: "calc(100% - 4rem)" }}>
             {/* Content */}
             <div className="h-full w-[100%] bg-[transparent] relative">
-              {showPlayground ? (
-                /* Playground/Iframe View */
+              {(showPlayground || showChatHistory) ? (
+                /* Playground/Iframe View or Chat History View */
                 <div className="h-full w-full">
                   <AgentIframe
                     sessionId={activeSessions[0]?.id}
                     promptIds={activeSessions.map(session => session.promptId).filter(Boolean) as string[]}
-                    typeFormTrigger={typeFormTrigger}
+                    typeFormMessage={typeFormMessage}
                   />
                 </div>
               ) : (
