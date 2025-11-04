@@ -119,9 +119,9 @@ const AgentDrawer: React.FC = () => {
           },
         }}
       >
-        <div className="flex h-full relative justify-between">
+        <div className="flex h-full relative">
           {/* Control Bar - Vertical icon bar on the left */}
-          <div className="control-bar left-0 bg-[transparent] h-full flex flex-col items-center justify-between py-4 px-[1rem] z-[1045]">
+          <div className="control-bar left-0 bg-[transparent] h-full flex flex-col items-center justify-between py-4 px-[1rem] z-[1045] w-[4rem]">
             <div className="this-back mb-3">
               <Tooltip title="Back" placement="right">
                 <button
@@ -175,9 +175,9 @@ const AgentDrawer: React.FC = () => {
             </div>
             <div></div>
           </div>
-          <div className="flex-1">
+          <div className="flex-1" style={{ width: "calc(100% - 4rem)" }}>
             {/* Content */}
-            <div className="h-full w-full bg-[transparent] relative">
+            <div className="h-full w-[100%] bg-[transparent] relative">
               {showPlayground ? (
                 /* Playground/Iframe View */
                 <div className="h-full w-full">
@@ -199,19 +199,31 @@ const AgentDrawer: React.FC = () => {
                       }}
                     >
                       {/* Agent Boxes */}
-                      {activeSessions.map((session, index) => (
-                        <div
-                          key={session.id}
-                          className={activeSessions.length === 1 ? "flex-1" : "flex-shrink-0"}
-                          style={{ scrollSnapAlign: "start" }}
-                        >
-                          <AgentBoxWrapper
-                            session={session}
-                            index={index}
-                            totalSessions={activeSessions.length}
-                          />
-                        </div>
-                      ))}
+                      {activeSessions.slice(0, 3).map((session, index) => {
+                        const numBoxes = Math.min(activeSessions.length, 3);
+                        const boxWidth = numBoxes === 1
+                          ? "100%"
+                          : `calc(${100 / numBoxes}% - ${(numBoxes - 1) * 16 / numBoxes}px)`;
+
+                        return (
+                          <div
+                            key={session.id}
+                            className="flex-shrink-0"
+                            style={{
+                              width: boxWidth,
+                              scrollSnapAlign: "start",
+                              transition: "width 0.3s ease",
+                              minWidth: "600px",
+                            }}
+                          >
+                            <AgentBoxWrapper
+                              session={session}
+                              index={index}
+                              totalSessions={numBoxes}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-full">

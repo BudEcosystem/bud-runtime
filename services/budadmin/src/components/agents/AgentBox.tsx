@@ -608,13 +608,10 @@ function AgentBoxInner({
     }
   ];
 
-  // Dynamic width: full width for single session, 600px for multiple sessions
-  const boxWidth = totalSessions === 1 ? "100%" : "600px";
-
   return (
     <div
-      className="agent-box flex flex-col bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg min-w-[400px] h-full overflow-hidden"
-      style={{ width: boxWidth, transition: "width 0.3s ease" }}
+      className="agent-box flex flex-col bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg h-full overflow-hidden w-full"
+      style={{ transition: "width 0.3s ease" }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
