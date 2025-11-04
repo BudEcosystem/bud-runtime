@@ -128,6 +128,25 @@ async fn convert_stream_error(e: reqwest_eventsource::Error) -> Error {
     })
 }
 
+/// Deserializes OpenAIResponse with compatibility fixes for BudPrompt
+/// BudPrompt may return timestamps as floats (1762247380.0) instead of integers
+fn deserialize_openai_response(raw_response: &str) -> Result<OpenAIResponse, serde_json::Error> {
+    // Parse to JSON Value first (same pattern as redis_client.rs:189)
+    let mut value: serde_json::Value = serde_json::from_str(raw_response)?;
+
+    // Fix created_at if it's a float
+    if let Some(obj) = value.as_object_mut() {
+        if let Some(created_at) = obj.get_mut("created_at") {
+            if let Some(float_val) = created_at.as_f64() {
+                *created_at = serde_json::Value::Number(serde_json::Number::from(float_val as i64));
+            }
+        }
+    }
+
+    // Deserialize to OpenAIResponse
+    serde_json::from_value(value)
+}
+
 #[async_trait::async_trait]
 impl ResponseProvider for BudPromptProvider {
     async fn create_response(
@@ -178,7 +197,7 @@ impl ResponseProvider for BudPromptProvider {
                 })
             })?;
 
-            let response: OpenAIResponse = serde_json::from_str(&raw_response).map_err(|e| {
+            let response: OpenAIResponse = deserialize_openai_response(&raw_response).map_err(|e| {
                 Error::new(ErrorDetails::InferenceServer {
                     message: format!(
                         "Error parsing JSON response: {}",
@@ -367,7 +386,7 @@ impl ResponseProvider for BudPromptProvider {
                 })
             })?;
 
-            let response: OpenAIResponse = serde_json::from_str(&raw_response).map_err(|e| {
+            let response: OpenAIResponse = deserialize_openai_response(&raw_response).map_err(|e| {
                 Error::new(ErrorDetails::InferenceServer {
                     message: format!(
                         "Error parsing JSON response: {}",
@@ -511,7 +530,7 @@ impl ResponseProvider for BudPromptProvider {
                 })
             })?;
 
-            let response: OpenAIResponse = serde_json::from_str(&raw_response).map_err(|e| {
+            let response: OpenAIResponse = deserialize_openai_response(&raw_response).map_err(|e| {
                 Error::new(ErrorDetails::InferenceServer {
                     message: format!(
                         "Error parsing JSON response: {}",
@@ -778,7 +797,7 @@ impl ResponseProvider for BudPromptProvider {
                 })
             })?;
 
-            let response: OpenAIResponse = serde_json::from_str(&raw_response).map_err(|e| {
+            let response: OpenAIResponse = deserialize_openai_response(&raw_response).map_err(|e| {
                 Error::new(ErrorDetails::InferenceServer {
                     message: format!(
                         "Error parsing JSON response: {}",
