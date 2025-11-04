@@ -90,19 +90,37 @@ export async function POST(req: Request) {
   console.log('[Prompt Chat] Base URL:', baseURL);
 
   try {
+    // Check if this is a structured prompt (has variables)
+    const hasStructuredInput = body.prompt?.variables && Object.keys(body.prompt.variables).length > 0;
+
+    console.log('[Prompt Chat] Has structured input:', hasStructuredInput);
+
     // Build request body for gateway
     const requestBody: any = {
-      input: promptInput,
       temperature: body.settings?.temperature ?? 1,
-      stream: false, // Gateway doesn't actually stream despite accepting this param
+      // stream: false, // Gateway doesn't actually stream despite accepting this param
     };
+
+    // Only include input field for unstructured prompts
+    if (!hasStructuredInput) {
+      requestBody.input = promptInput;
+    }
 
     // Add prompt object if provided
     if (body.prompt?.id) {
+      // Transform variable keys: replace spaces with underscores
+      const transformedVariables: Record<string, string> = {};
+      if (body.prompt.variables) {
+        Object.entries(body.prompt.variables).forEach(([key, value]) => {
+          const transformedKey = key.replace(/\s+/g, '_');
+          transformedVariables[transformedKey] = value;
+        });
+      }
+
       requestBody.prompt = {
         id: body.prompt.id,
         version: body.prompt.version || '1',
-        variables: body.prompt.variables || {},
+        variables: transformedVariables,
       };
     }
 
@@ -125,6 +143,7 @@ export async function POST(req: Request) {
     });
 
     console.log('[Prompt Chat] Response status:', response.status);
+    console.log('[Prompt Chat] Response content-type:', response.headers.get('content-type'));
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -141,24 +160,89 @@ export async function POST(req: Request) {
       throw new Error(errorMessage);
     }
 
-    const result = await response.json();
-    console.log('[Prompt Chat] Gateway response received');
+    // Get the response as text first
+    const responseText = await response.text();
+    console.log('[Prompt Chat] Response text preview:', responseText.substring(0, 200));
 
-    // Extract text from gateway's response format
     let text = '';
-    if (result.output && Array.isArray(result.output)) {
-      for (const item of result.output) {
-        if (item.content && Array.isArray(item.content)) {
-          for (const content of item.content) {
-            if (content.text) {
-              text += content.text;
+    let usage: any = null;
+    let finishReason = 'completed';
+
+    // Check if it's SSE format (starts with "event:")
+    if (responseText.startsWith('event:')) {
+      console.log('[Prompt Chat] Parsing SSE format response');
+
+      // Parse SSE stream
+      const lines = responseText.split('\n');
+      let currentEvent = '';
+
+      for (const line of lines) {
+        if (line.startsWith('event:')) {
+          currentEvent = line.substring(6).trim();
+        } else if (line.startsWith('data:')) {
+          const data = line.substring(5).trim();
+
+          try {
+            const parsed = JSON.parse(data);
+
+            // Extract text from content deltas
+            if (currentEvent === 'content_delta' || currentEvent === 'output') {
+              if (parsed.delta) {
+                text += parsed.delta;
+              } else if (parsed.content && Array.isArray(parsed.content)) {
+                for (const content of parsed.content) {
+                  if (content.text) {
+                    text += content.text;
+                  }
+                }
+              }
             }
+
+            // Extract usage and finish reason from response_end
+            if (currentEvent === 'response_end' || currentEvent === 'done') {
+              if (parsed.usage) {
+                usage = parsed.usage;
+              }
+              if (parsed.status) {
+                finishReason = parsed.status;
+              }
+            }
+          } catch (e) {
+            console.warn('[Prompt Chat] Failed to parse SSE data:', data);
           }
         }
       }
+
+      console.log('[Prompt Chat] Extracted text from SSE:', text.substring(0, 100));
+    } else {
+      // Try to parse as JSON (fallback)
+      console.log('[Prompt Chat] Parsing JSON format response');
+
+      try {
+        const result = JSON.parse(responseText);
+
+        // Extract text from gateway's response format
+        if (result.output && Array.isArray(result.output)) {
+          for (const item of result.output) {
+            if (item.content && Array.isArray(item.content)) {
+              for (const content of item.content) {
+                if (content.text) {
+                  text += content.text;
+                }
+              }
+            }
+          }
+        }
+
+        usage = result.usage;
+        finishReason = result.status || 'completed';
+      } catch (e) {
+        console.error('[Prompt Chat] Failed to parse response as JSON:', e);
+        throw new Error('Failed to parse gateway response');
+      }
     }
 
-    console.log('[Prompt Chat] Extracted text length:', text.length);
+    console.log('[Prompt Chat] Final extracted text length:', text.length);
 
     // Create a streaming response for useChat
     const encoder = new TextEncoder();
@@ -168,10 +252,10 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(`0:${JSON.stringify(text)}\n`));
 
         // Send usage metadata if available
-        if (result.usage) {
+        if (usage) {
           controller.enqueue(encoder.encode(`d:${JSON.stringify({
-            finishReason: result.status,
-            usage: result.usage
+            finishReason: finishReason,
+            usage: usage
           })}\n`));
         }
 

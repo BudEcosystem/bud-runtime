@@ -29,6 +29,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
   const [showPromptForm, setShowPromptForm] = useState<boolean>(false);
+  const [promptFormSubmitted, setPromptFormSubmitted] = useState<boolean>(false);
 
   const promptRef = useRef("");
   const lastMessageRef = useRef<string>("");
@@ -190,6 +191,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     // Set the prompt data for the chat body
     setPromptData(data);
 
+    // Mark that the prompt form has been submitted (enables textarea for subsequent messages)
+    setPromptFormSubmitted(true);
+
     // Create a user message with the prompt input
     const userMessage =
       data.input ||
@@ -338,7 +342,12 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
           <NormalEditor
             isLoading={status === "submitted" || status === "streaming"}
             error={error}
-            disabled={!chat?.selectedDeployment?.name}
+            disabled={
+              promptIds.length > 0
+                ? !promptFormSubmitted
+                : !chat?.selectedDeployment?.name
+            }
+            isPromptMode={promptIds.length > 0}
             stop={stop}
             handleInputChange={handleChange}
             handleSubmit={(e) => {

@@ -10,6 +10,7 @@ export interface EditorProps {
   disabled?: boolean;
   stop?: () => void;
   handleInputChange: (e: any) => void;
+  isPromptMode?: boolean; // Indicates if we're using prompt IDs (don't show "Select deployment" message)
 }
 
 function NormalEditor({
@@ -20,6 +21,7 @@ function NormalEditor({
   stop,
   error,
   handleInputChange,
+  isPromptMode = false,
 }: EditorProps) {
   const [toggleFormat, setToggleFormat] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState<boolean>(false);
@@ -53,8 +55,11 @@ function NormalEditor({
             className=" w-full  p-2 border border-gray-300 rounded shadow-xl placeholder-[#757575] placeholder-[.625rem] text-[1rem] bg-transparent  border-[#e5e5e5] outline-none border-none text-[#FFFFFF] z-10 !shadow-none"
             value={input}
             rows={2}
-            placeholder={disabled ? "Select a deployment to chat"
-              : "Type a message and press Enter to send"}
+            placeholder={
+              disabled && !isPromptMode
+                ? "Select a deployment to chat"
+                : "Type a message and press Enter to send"
+            }
             onChange={(e) => handleInputChange(e)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
