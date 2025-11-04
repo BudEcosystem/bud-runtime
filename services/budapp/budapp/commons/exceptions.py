@@ -208,3 +208,28 @@ class BudNotifyException(Exception):
 
     def __init__(self, message: str = "Error found from budnotify server"):
         self.message = message
+
+
+class MCPFoundryException(Exception):
+    """Exception raised when there is an error with MCP Foundry service.
+
+    This exception can be raised when MCP Foundry API calls fail or encounter issues.
+
+    Attributes:
+        message (str): A human-readable string describing the MCP Foundry error.
+        status_code (int): HTTP status code from the MCP Foundry response.
+
+    Args:
+        message (str): The error message describing the MCP Foundry issue.
+        status_code (int): HTTP status code (default 500).
+    """
+
+    def __init__(self, message: str, status_code: int = 500):
+        """Initialize the MCPFoundryException with a message and status code."""
+        self.message = message
+        self.status_code = status_code
+        super().__init__(self.message)
+
+    def __str__(self):
+        """Return a string representation of the MCP Foundry exception."""
+        return f"MCPFoundryException (status={self.status_code}): {self.message}"

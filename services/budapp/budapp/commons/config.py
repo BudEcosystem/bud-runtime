@@ -209,6 +209,10 @@ class AppConfig(BaseAppConfig):
         default=False, description="Use local mode for evaluation data synchronization", alias="EVAL_SYNC_LOCAL_MODE"
     )
 
+    # MCP Foundry
+    mcp_foundry_base_url: AnyHttpUrl = Field(alias="MCP_FOUNDRY_BASE_URL")
+    mcp_foundry_api_key: str = Field(alias="MCP_FOUNDRY_API_KEY")
+
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""

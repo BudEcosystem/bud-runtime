@@ -98,6 +98,8 @@ spec:
             value: {{ .Values.externalServices.minio.buckets.modelInfo }}
           - name: MINIO_SECURE
             value: "false"
+          - name: MCP_FOUNDRY_API_KEY
+            value: {{ .Values.microservices.keys.mcpFoundryApi }}
         {{- $root := . }}
         {{- range $key, $value := .Values.microservices.budapp.env }}
           - name: {{ $key }}

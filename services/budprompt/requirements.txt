@@ -17,7 +17,7 @@ python-dotenv >= 1.0.0
 email-validator==2.3.0
 
 # AI & Schema Generation
-pydantic-ai == 0.4.4
+pydantic-ai==1.4.0
 datamodel-code-generator == 0.32.0
 
 # Database

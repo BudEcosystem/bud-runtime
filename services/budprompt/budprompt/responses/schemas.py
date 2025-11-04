@@ -19,7 +19,29 @@
 from typing import Any, Dict, Literal, Optional, Union
 
 from budmicroframe.commons.schemas import SuccessResponse
-from pydantic import BaseModel, Field
+from openai.types.responses import Response
+from pydantic import BaseModel, Field, field_serializer
+
+
+class OpenAIResponse(Response):
+    """Custom Response that serializes created_at as int instead of float.
+
+    This extends OpenAI's official Response type and overrides the created_at
+    field serialization to output integers instead of floats, providing a
+    cleaner API response format while maintaining internal compatibility.
+    """
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: float) -> int:
+        """Convert created_at from float to int during JSON serialization.
+
+        Args:
+            value: The created_at timestamp as float (Unix timestamp)
+
+        Returns:
+            Integer representation of the timestamp
+        """
+        return int(value)
 
 
 class ResponseInputTextParam(BaseModel):

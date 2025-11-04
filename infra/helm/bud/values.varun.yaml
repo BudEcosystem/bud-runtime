@@ -1,17 +1,29 @@
+imagePullPolicy: "Always"
+
 ingress:
     hosts:
         root: varun.bud.studio
 
 microservices:
     budprompt:
-        image: vsrvarun/budprompt:vsr
+        image: dittops/budprompt:vsr
         env:
             REDIS_DB_INDEX: "2"
             BUD_GATEWAY_BASE_URL: https://gateway.varun.bud.studio/v1
             LOG_LEVEL: DEBUG
     budapp:
-        image: vsrvarun/budapp:vsr
+        image: dittops/budapp:vsr
         env:
             LOG_LEVEL: DEBUG
+    budcluster:
+        image: budstudio/budcluster:nightly
+        env:
+            VOLUME_TYPE: nfs
     budgateway:
-        image: vsrvarun/budgateway:vsr
+        image: budstudio/budgateway:nightly
+
+storage:
+    budmodelRegistry:
+        className: nfs-csi
+    budevalDataset:
+        className: "nfs-csi"

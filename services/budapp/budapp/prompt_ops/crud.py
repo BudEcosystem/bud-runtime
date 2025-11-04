@@ -291,6 +291,23 @@ class PromptVersionDataManager(DataManagerUtils):
         )
         return self.scalars_all(stmt)
 
+    async def get_active_versions_by_prompt_id(self, prompt_id: UUID) -> List[PromptVersionModel]:
+        """Get all active versions for a given prompt.
+
+        Args:
+            prompt_id: The ID of the prompt to get versions for
+
+        Returns:
+            List of active prompt versions
+        """
+        stmt = select(PromptVersionModel).where(
+            and_(
+                PromptVersionModel.prompt_id == prompt_id,
+                PromptVersionModel.status != PromptVersionStatusEnum.DELETED,
+            )
+        )
+        return self.scalars_all(stmt)
+
     async def soft_delete_by_prompt_id(self, prompt_id: UUID) -> int:
         """Soft delete all prompt versions for a given prompt."""
         stmt = (
