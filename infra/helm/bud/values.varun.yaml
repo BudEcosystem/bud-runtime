@@ -15,6 +15,10 @@ microservices:
         image: dittops/budapp:vsr
         env:
             LOG_LEVEL: DEBUG
+    budcluster:
+        image: budstudio/budcluster:nightly
+        env:
+            VOLUME_TYPE: nfs
 
 storage:
     budmodelRegistry:
