@@ -1342,6 +1342,10 @@ class ClickHouseClient:
                 await cursor.execute(query, params or {})
                 result = await cursor.fetchall()
 
+                # Clean up any remaining cursor state to prevent "records not fetched" errors
+                # when connection is returned to pool and reused for next query
+                await self._cleanup_cursor_state(cursor)
+
                 if with_column_types:
                     return result, cursor.description
                 else:
