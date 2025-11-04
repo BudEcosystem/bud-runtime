@@ -24,12 +24,16 @@ interface AgentBoxProps {
   session: AgentSession;
   index: number;
   totalSessions: number;
+  isActive: boolean;
+  onActivate: () => void;
 }
 
 function AgentBoxInner({
   session,
   index,
-  totalSessions
+  totalSessions,
+  isActive,
+  onActivate
 }: AgentBoxProps) {
   // All hooks must be called before any conditional returns
   const {
@@ -610,16 +614,27 @@ function AgentBoxInner({
 
   return (
     <div
-      className="agent-box flex flex-col bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg h-full overflow-hidden w-full"
+      className="agent-box flex flex-col bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg h-full overflow-hidden w-full relative"
       style={{ transition: "width 0.3s ease" }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
+      {/* Overlay for inactive boxes - prevents scroll capture by flowgram */}
+      {!isActive && (
+        <div
+          className="absolute inset-0 z-50 cursor-pointer bg-transparent"
+          onClick={onActivate}
+          title="Click to activate this agent box"
+        />
+      )}
+
       {/* Navigation Bar */}
       <div className="topBg text-white p-4 flex justify-between items-center h-[3.625rem] relative sticky top-0 z-10 bg-[#101010] border-b border-[#1F1F1F]">
         {/* Left Section - Session Info */}
         <div className="flex items-center gap-3 min-w-[100px]">
-          <span className="text-[#808080] text-xs font-medium">V{index + 1}</span>
+          <div className="h-[1.375rem] rounded-[0.375rem] min-w-[2rem] border-[1px] border-[#1F1F1F] flex justify-center items-center">
+            <span className="text-[#808080] text-xs font-medium">V{index + 1}</span>
+          </div>
           {isHovering && (
             <PrimaryButton onClick={closeAgentDrawer}
               classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem]"

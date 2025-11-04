@@ -28,6 +28,7 @@ const AgentDrawer: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [drawerWidth, setDrawerWidth] = useState<string>('100%');
   const [showPlayground, setShowPlayground] = useState(false);
+  const [activeBoxId, setActiveBoxId] = useState<string | null>(null);
 
   // Get active sessions
   const activeSessions = sessions.filter((session) =>
@@ -70,6 +71,13 @@ const AgentDrawer: React.FC = () => {
       createSession();
     }
   }, [isAgentDrawerOpen, activeSessions.length, createSession]);
+
+  // Set first session as active by default
+  useEffect(() => {
+    if (activeSessions.length > 0 && !activeBoxId) {
+      setActiveBoxId(activeSessions[0].id);
+    }
+  }, [activeSessions, activeBoxId]);
 
   // Set drawer width on client side
   useEffect(() => {
@@ -220,6 +228,8 @@ const AgentDrawer: React.FC = () => {
                               session={session}
                               index={index}
                               totalSessions={numBoxes}
+                              isActive={activeBoxId === session.id}
+                              onActivate={() => setActiveBoxId(session.id)}
                             />
                           </div>
                         );

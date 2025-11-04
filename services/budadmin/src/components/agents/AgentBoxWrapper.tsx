@@ -17,6 +17,8 @@ interface AgentBoxWrapperProps {
   session: AgentSession;
   index: number;
   totalSessions: number;
+  isActive: boolean;
+  onActivate: () => void;
 }
 
 const AgentBoxWrapper: React.FC<AgentBoxWrapperProps> = (props) => {
