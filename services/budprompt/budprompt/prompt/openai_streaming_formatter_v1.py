@@ -34,7 +34,6 @@ import uuid
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Union
 
 from openai.types.responses import (
-    Response,
     ResponseContentPartAddedEvent,
     ResponseContentPartDoneEvent,
     ResponseFunctionCallArgumentsDoneEvent,
@@ -85,6 +84,7 @@ from pydantic_ai.messages import (
     ToolCallPartDelta,
 )
 
+from ..responses.schemas import OpenAIResponse
 from .schemas import MCPToolConfig, Message, ModelSettings
 
 
@@ -250,6 +250,18 @@ class OpenAIStreamingFormatter_V1:
         """
         # Serialize the Pydantic model to dict
         event_dict = event.model_dump(mode="json", exclude_none=True)
+
+        # NOTE: Post-process: Convert response.created_at from float to int
+        # This is necessary because Pydantic serializes nested Response objects using
+        # the parent class type (Response), not the runtime subclass type (OpenAIResponse),
+        # which means our custom field_serializer is bypassed. Direct post-processing
+        # is the most reliable solution for this OpenAI SDK compatibility issue.
+        if (
+            "response" in event_dict
+            and isinstance(event_dict["response"], dict)
+            and "created_at" in event_dict["response"]
+        ):
+            event_dict["response"]["created_at"] = int(event_dict["response"]["created_at"])
 
         # Extract event type from the dict
         event_type = event_dict.get("type", "unknown")
@@ -1091,7 +1103,7 @@ class OpenAIStreamingFormatter_V1:
         output_items: Optional[List[Any]] = None,
         usage: Optional[Dict[str, Any]] = None,
         error: Optional[Dict[str, str]] = None,
-    ) -> Response:
+    ) -> OpenAIResponse:
         """Build Response object for OpenAI streaming events.
 
         Args:
@@ -1128,7 +1140,7 @@ class OpenAIStreamingFormatter_V1:
         # Format text config based on output schema
         text_config = self._format_text_config()
 
-        return Response(
+        return OpenAIResponse(
             id=self.response_id,
             object="response",
             created_at=self.created_at,

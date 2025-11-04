@@ -22,11 +22,10 @@ from typing import Any, Dict, Union
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from openai.types.responses import Response as OpenAIResponse
 
 from budprompt.commons.exceptions import OpenAIResponseException
 
-from .schemas import OpenAIError, OpenAIResponsesError, ResponseCreateRequest
+from .schemas import OpenAIError, OpenAIResponse, OpenAIResponsesError, ResponseCreateRequest
 from .services import ResponsesService
 
 

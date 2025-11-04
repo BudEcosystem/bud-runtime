@@ -22,7 +22,6 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from openai.types.responses import (
-    Response,
     ResponseTextConfig,
     ResponseUsage,
 )
@@ -69,6 +68,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.run import AgentRunResult
 
+from ..responses.schemas import OpenAIResponse
 from .schemas import MCPToolConfig, Message, ModelSettings
 
 
@@ -95,7 +95,7 @@ class OpenAIResponseFormatter_V1:
         deployment_name: Optional[str] = None,
         tools: Optional[List[MCPToolConfig]] = None,
         output_schema: Optional[Dict[str, Any]] = None,
-    ) -> Response:
+    ) -> OpenAIResponse:
         """Format pydantic-ai result to OpenAI Response structure.
 
         Args:
@@ -138,8 +138,8 @@ class OpenAIResponseFormatter_V1:
             # Format text configuration based on output schema
             text_config = self._format_text_config(output_schema)
 
-            # Build response using official Response type
-            return Response(
+            # Build response using custom OpenAIResponse type with int serialization
+            return OpenAIResponse(
                 id=response_id,
                 object="response",
                 created_at=int(time.time()),
