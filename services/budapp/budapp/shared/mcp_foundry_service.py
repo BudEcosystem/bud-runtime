@@ -813,9 +813,10 @@ class MCPFoundryService(metaclass=SingletonMeta):
             return response
 
         except MCPFoundryException as e:
-            if e.status_code == 404:
-                # Virtual server already deleted - this is okay
-                logger.warning(f"Virtual server {server_id} not found (already deleted)")
+            # Handle both 404 and 400 with "Server not found" message
+            if e.status_code == 404 or (e.status_code == 400 and "Server not found" in e.message):
+                # Server already deleted or doesn't exist - this is okay
+                logger.warning(f"Server {server_id} not found (already deleted): {e.message}")
                 return {}
             raise
 

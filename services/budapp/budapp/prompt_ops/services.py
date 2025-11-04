@@ -270,6 +270,29 @@ class PromptService(SessionMixin):
         if total_gateways > 0:
             logger.debug(f"Deleted {total_gateways} total MCP Foundry gateways for prompt {prompt_id}")
 
+        # Delete virtual servers from all versions before soft-deleting
+        total_virtual_servers = 0
+        for version in all_versions:
+            if version.version_metadata and isinstance(version.version_metadata, dict):
+                virtual_server_id = version.version_metadata.get("virtual_server_id")
+
+                if virtual_server_id:
+                    total_virtual_servers += 1
+                    logger.debug(
+                        f"Deleting virtual server {virtual_server_id} from version {version.version}",
+                    )
+
+                    try:
+                        # delete_virtual_server handles 404 gracefully (returns empty dict)
+                        await mcp_foundry_service.delete_virtual_server(virtual_server_id)
+                        logger.debug(f"Successfully deleted virtual server {virtual_server_id}")
+                    except MCPFoundryException as e:
+                        # Log error but continue - don't block prompt deletion
+                        logger.error(f"Failed to delete virtual server {virtual_server_id}: {e}")
+
+        if total_virtual_servers > 0:
+            logger.debug(f"Deleted {total_virtual_servers} total virtual servers for prompt {prompt_id}")
+
         # Update prompt status to DELETED
         await PromptDataManager(self.session).update_by_fields(db_prompt, {"status": PromptStatusEnum.DELETED})
 
@@ -1349,6 +1372,49 @@ class PromptService(SessionMixin):
         # Save using helper method
         await self._save_prompt_config_to_redis(payload)
 
+        # Step 7.5: Update PromptVersion metadata with virtual_server_id (if prompt and version exist in DB)
+        try:
+            # Check if prompt exists by name (prompt_id is the prompt name)
+            db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+                PromptModel,
+                fields={"name": prompt_id, "status": PromptStatusEnum.ACTIVE},
+                missing_ok=True,
+            )
+
+            if db_prompt:
+                # Check if prompt_version exists
+                db_prompt_version = await PromptVersionDataManager(self.session).retrieve_by_fields(
+                    PromptVersionModel,
+                    fields={"prompt_id": db_prompt.id, "version": int(target_version)},
+                    missing_ok=True,
+                )
+
+                if db_prompt_version:
+                    # Get existing metadata (default is empty dict from migration)
+                    existing_metadata = (
+                        db_prompt_version.version_metadata
+                        if isinstance(db_prompt_version.version_metadata, dict)
+                        else {}
+                    )
+
+                    # Store virtual_server_id (single value, not array - only one VS per version)
+                    existing_metadata["virtual_server_id"] = virtual_server_id
+
+                    # Update the prompt_version record using async pattern
+                    self.session.refresh(db_prompt_version)
+                    db_prompt_version = await PromptVersionDataManager(self.session).update_by_fields(
+                        db_prompt_version, {"version_metadata": existing_metadata}
+                    )
+
+                    logger.debug(
+                        f"Updated prompt_version metadata with virtual_server_id {virtual_server_id}",
+                        prompt_id=db_prompt.id,
+                        version=int(target_version),
+                    )
+        except Exception as e:
+            # Silent failure - don't block tool addition if DB update fails
+            logger.warning(f"Failed to update prompt_version metadata with virtual_server_id: {e}", exc_info=True)
+
         # Step 8: Return response
         return {
             "virtual_server_id": virtual_server_id,
@@ -1444,13 +1510,19 @@ class PromptService(SessionMixin):
         allowed_tool_names = mcp_tool.get("allowed_tool_names", [])
         updated_allowed_tool_names = [tool for tool in allowed_tool_names if tool not in tool_names_to_remove]
 
+        # Track virtual server deletion for metadata cleanup later
+        virtual_server_deleted = False
+        deleted_virtual_server_id = None
+
         # Step 8: Determine if we should remove entire MCP config or update it
         if not gateway_config:  # No more connectors - complete cleanup
             # Delete virtual server from MCP Foundry
             virtual_server_id = mcp_tool.get("server_url")
+            deleted_virtual_server_id = virtual_server_id  # Track for metadata cleanup
             if virtual_server_id:
                 try:
                     await mcp_foundry_service.delete_virtual_server(virtual_server_id)
+                    virtual_server_deleted = True  # Track successful deletion for metadata cleanup
                     logger.debug(f"Successfully deleted virtual server {virtual_server_id}")
                 except MCPFoundryException as e:
                     logger.error(f"Failed to delete virtual server {virtual_server_id}: {e}")
@@ -1520,6 +1592,24 @@ class PromptService(SessionMixin):
 
                             logger.debug(
                                 f"Removed gateway_id {gateway_id} from prompt_version metadata",
+                                prompt_id=db_prompt.id,
+                                version=target_version,
+                            )
+
+                    # Remove virtual_server_id if virtual server was deleted (no connectors remaining)
+                    if virtual_server_deleted and deleted_virtual_server_id:
+                        if "virtual_server_id" in existing_metadata:
+                            # Clear virtual_server_id since virtual server was deleted
+                            del existing_metadata["virtual_server_id"]
+
+                            # Update again with cleared virtual_server_id
+                            self.session.refresh(db_prompt_version)
+                            db_prompt_version = await PromptVersionDataManager(self.session).update_by_fields(
+                                db_prompt_version, {"version_metadata": existing_metadata}
+                            )
+
+                            logger.debug(
+                                f"Removed virtual_server_id {deleted_virtual_server_id} from prompt_version metadata (no connectors remaining)",
                                 prompt_id=db_prompt.id,
                                 version=target_version,
                             )
@@ -2797,6 +2887,23 @@ class PromptVersionService(SessionMixin):
                     # Any other errors will be raised and propagated
                     await mcp_foundry_service.delete_gateway(gateway_id)
                     logger.debug(f"Successfully deleted MCP Foundry gateway {gateway_id}")
+
+        # Delete virtual server if present in version metadata
+        if db_version.version_metadata and isinstance(db_version.version_metadata, dict):
+            virtual_server_id = db_version.version_metadata.get("virtual_server_id")
+
+            if virtual_server_id:
+                logger.debug(
+                    f"Deleting virtual server {virtual_server_id} for version {version_id}",
+                )
+
+                try:
+                    # delete_virtual_server handles 404 gracefully (returns empty dict)
+                    await mcp_foundry_service.delete_virtual_server(virtual_server_id)
+                    logger.debug(f"Successfully deleted virtual server {virtual_server_id}")
+                except MCPFoundryException as e:
+                    # Log error but continue - don't block version deletion
+                    logger.error(f"Failed to delete virtual server {virtual_server_id}: {e}")
 
         # Soft delete the version by updating its status
         await PromptVersionDataManager(self.session).update_by_fields(
