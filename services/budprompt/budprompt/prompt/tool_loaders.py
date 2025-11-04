@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic_ai.mcp import MCPServerStreamableHTTP
 
-from budprompt.commons.config import app_settings, secrets_settings
+from budprompt.commons.config import app_settings
 
 from .schemas import MCPToolConfig
 
@@ -52,7 +52,7 @@ class MCPToolLoader(ToolLoader):
     def __init__(self):
         """Initialize MCP tool loader with config from settings."""
         self.base_url = app_settings.mcp_foundry_base_url
-        self.api_key = secrets_settings.mcp_foundry_api_key
+        self.api_key = app_settings.mcp_foundry_api_key
 
     async def load_tools(self, tool_config: MCPToolConfig) -> Optional[MCPServerStreamableHTTP]:
         """Load MCP tools from configuration.

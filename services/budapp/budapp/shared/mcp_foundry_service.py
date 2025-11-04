@@ -41,7 +41,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
     def __init__(self):
         """Initialize the MCP Foundry service."""
         self.base_url = str(app_settings.mcp_foundry_base_url).rstrip("/")
-        self.api_key = secrets_settings.mcp_foundry_api_key
+        self.api_key = app_settings.mcp_foundry_api_key
         self.timeout = aiohttp.ClientTimeout(total=30)
         self.max_retries = 3
         self.retry_delay = 1  # seconds

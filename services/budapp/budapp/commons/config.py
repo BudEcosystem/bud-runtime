@@ -211,6 +211,7 @@ class AppConfig(BaseAppConfig):
 
     # MCP Foundry
     mcp_foundry_base_url: AnyHttpUrl = Field(alias="MCP_FOUNDRY_BASE_URL")
+    mcp_foundry_api_key: str = Field(alias="MCP_FOUNDRY_API_KEY")
 
     @computed_field
     def static_dir(self) -> str:
@@ -273,9 +274,6 @@ class SecretsConfig(BaseSecretsConfig):
     )
     hf_token: Optional[str] = Field(
         None, alias="HF_TOKEN", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
-    )
-    mcp_foundry_api_key: Optional[str] = Field(
-        None, alias="MCP_FOUNDRY_API_KEY", json_schema_extra=enable_periodic_sync_from_store(is_global=True)
     )
 
     base_dir: DirectoryPath = Field(default_factory=lambda: Path(__file__).parent.parent.parent.resolve())
