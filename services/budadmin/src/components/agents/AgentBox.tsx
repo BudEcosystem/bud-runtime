@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from "react";
-import { Dropdown, Tooltip } from "antd";
+import { Dropdown, Tooltip, Switch } from "antd";
 import {
   CloseOutlined,
   CopyOutlined,
@@ -24,12 +24,16 @@ interface AgentBoxProps {
   session: AgentSession;
   index: number;
   totalSessions: number;
+  isActive: boolean;
+  onActivate: () => void;
 }
 
 function AgentBoxInner({
   session,
   index,
-  totalSessions
+  totalSessions,
+  isActive,
+  onActivate
 }: AgentBoxProps) {
   // All hooks must be called before any conditional returns
   const {
@@ -69,6 +73,7 @@ function AgentBoxInner({
   const [isHovering, setIsHovering] = useState(false);
   const [structuredInputEnabled, setStructuredInputEnabled] = useState(false);
   const [structuredOutputEnabled, setStructuredOutputEnabled] = useState(false);
+  const [streamEnabled, setStreamEnabled] = useState(session?.settings?.stream ?? false);
 
   // Custom hook to create workflow handlers with consistent behavior
   const useWorkflowHandler = (name: string, workflowId?: string) => {
@@ -115,7 +120,8 @@ function AgentBoxInner({
         ? session.promptMessages
         : ""
     );
-  }, [session?.systemPrompt, session?.promptMessages]);
+    setStreamEnabled(session?.settings?.stream ?? false);
+  }, [session?.systemPrompt, session?.promptMessages, session?.settings?.stream]);
 
   // Handle case where session is null early
   if (!session) {
@@ -150,6 +156,18 @@ function AgentBoxInner({
   const handlePromptMessagesChange = (value: string) => {
     setLocalPromptMessages(value);
     if (session) updateSession(session.id, { promptMessages: value });
+  };
+
+  const handleStreamToggle = (checked: boolean) => {
+    setStreamEnabled(checked);
+    if (session) {
+      updateSession(session.id, {
+        settings: {
+          ...session.settings,
+          stream: checked
+        }
+      });
+    }
   };
 
   // Handler for when a flowgram card is clicked
@@ -187,6 +205,9 @@ function AgentBoxInner({
     guided_decoding_backend: "string",
     guided_whitespace_pattern: "string"
   });
+
+  // Get current stream setting
+  const getStreamSetting = () => streamEnabled;
 
   const handleSavePromptSchema = async () => {
     if (!session) {
@@ -393,7 +414,7 @@ function AgentBoxInner({
         set_default: false,
         deployment_name: session.selectedDeployment.model.name,
         model_settings: getDefaultModelSettings(session),
-        stream: true,
+        stream: getStreamSetting(),
         messages: [
           {
             role: "system",
@@ -405,6 +426,10 @@ function AgentBoxInner({
         allow_multiple_calls: true,
         system_prompt_role: "system"
       };
+
+      console.log("=== System Prompt Save Payload ===");
+      console.log("Stream enabled:", getStreamSetting());
+      console.log("Full payload:", payload);
 
       // Start workflow status tracking
       startSystemPromptWorkflow();
@@ -497,7 +522,7 @@ function AgentBoxInner({
         set_default: false,
         deployment_name: session.selectedDeployment.model.name,
         model_settings: getDefaultModelSettings(session),
-        stream: true,
+        stream: getStreamSetting(),
         messages: messages.map((msg: any) => ({
           role: msg.role,
           content: msg.content
@@ -507,6 +532,10 @@ function AgentBoxInner({
         allow_multiple_calls: true,
         system_prompt_role: "system"
       };
+
+      console.log("=== Prompt Messages Save Payload ===");
+      console.log("Stream enabled:", getStreamSetting());
+      console.log("Full payload:", payload);
 
       // Start workflow status tracking
       startPromptMessagesWorkflow();
@@ -555,6 +584,25 @@ function AgentBoxInner({
 
   const menuItems = [
     {
+      key: 'stream',
+      label: (
+        <div
+          className="flex items-center justify-between gap-3 py-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-[#B3B3B3]">Stream</span>
+          <Switch
+            size="small"
+            checked={streamEnabled}
+            onChange={handleStreamToggle}
+          />
+        </div>
+      ),
+      onClick: (e: any) => {
+        e.domEvent?.stopPropagation();
+      }
+    },
+    {
       key: 'delete',
       icon: '',
       // icon: <DeleteOutlined />,
@@ -564,24 +612,32 @@ function AgentBoxInner({
     }
   ];
 
-  // All boxes are expanded by default
-  const boxWidth = "600px";
-
   return (
     <div
-      className="agent-box flex flex-col bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg min-w-[400px] h-full overflow-hidden"
-      style={{ width: boxWidth, transition: "width 0.3s ease" }}
+      className="agent-box flex flex-col bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg h-full overflow-hidden w-full relative"
+      style={{ transition: "width 0.3s ease" }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
+      {/* Overlay for inactive boxes - prevents scroll capture by flowgram */}
+      {!isActive && (
+        <div
+          className="absolute inset-0 z-50 cursor-pointer bg-transparent"
+          onClick={onActivate}
+          title="Click to activate this agent box"
+        />
+      )}
+
       {/* Navigation Bar */}
       <div className="topBg text-white p-4 flex justify-between items-center h-[3.625rem] relative sticky top-0 z-10 bg-[#101010] border-b border-[#1F1F1F]">
         {/* Left Section - Session Info */}
         <div className="flex items-center gap-3 min-w-[100px]">
-          <span className="text-[#808080] text-xs font-medium">V{index + 1}</span>
+          <div className="h-[1.375rem] rounded-[0.375rem] min-w-[2rem] border-[1px] border-[#1F1F1F] flex justify-center items-center">
+            <span className="text-[#808080] text-xs font-medium">V{index + 1}</span>
+          </div>
           {isHovering && (
             <PrimaryButton onClick={closeAgentDrawer}
-              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem]"
+              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] bg-[#479d5f1a] hover:!bg-[#479d5f]"
               textClass="!text-[0.625rem] !font-[400]"
             >
               Save

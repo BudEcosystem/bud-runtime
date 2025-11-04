@@ -426,6 +426,13 @@ clickhouse:
   auth:
     username: bud
     password: bud
+  resources:
+    requests:
+      memory: 2Gi
+      cpu: 500m
+    limits:
+      memory: 4Gi
+      cpu: 2000m
   keeper:
     replicaCount: 1
     image:
