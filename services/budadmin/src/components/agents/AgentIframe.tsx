@@ -41,8 +41,9 @@ const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], ty
         typeForm: typeFormMessage.value
       };
 
-      // Send message to iframe
-      iframeRef.current.contentWindow.postMessage(message, '*');
+      // Send message to iframe with specific origin for security
+      const targetOrigin = new URL(playGroundUrl).origin;
+      iframeRef.current.contentWindow.postMessage(message, targetOrigin);
       console.log('Sent typeForm message to iframe:', message);
     }
   }, [typeFormMessage]);
