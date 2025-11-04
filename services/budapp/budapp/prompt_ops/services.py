@@ -2236,6 +2236,40 @@ class PromptWorkflowService(SessionMixin):
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     )
 
+            # Extract metadata from budprompt config for version_metadata
+            metadata = {}
+            if merged_data.get("name"):
+                try:
+                    prompt_service = PromptService(self.session)
+                    config_response = await prompt_service._perform_get_prompt_config_request(
+                        prompt_id=merged_data.get("name"),
+                        version=1,
+                        raw_data=True,
+                    )
+
+                    tools = config_response.get("data", {}).get("tools", [])
+                    for tool in tools:
+                        if tool.get("type") == "mcp":
+                            # Extract gateway_ids from gateway_config
+                            gateway_config = tool.get("gateway_config", {})
+                            if gateway_config:
+                                metadata["gateway_ids"] = list(gateway_config.values())
+
+                            # Extract virtual_server_id from server_url
+                            virtual_server_id = tool.get("server_url")
+                            if virtual_server_id:
+                                metadata["virtual_server_id"] = virtual_server_id
+                            break
+
+                    if metadata:
+                        logger.debug(
+                            f"Extracted metadata from budprompt config: {len(metadata.get('gateway_ids', []))} gateway_ids, "
+                            f"virtual_server_id={metadata.get('virtual_server_id')}"
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to extract metadata from budprompt config: {e}")
+                    metadata = {}
+
             # Create prompt
             db_prompt = await PromptDataManager(self.session).insert_one(
                 PromptModel(
@@ -2264,6 +2298,7 @@ class PromptWorkflowService(SessionMixin):
                     version=1,  # First version
                     status=PromptVersionStatusEnum.ACTIVE,
                     created_by=current_user_id,
+                    version_metadata=metadata,  # Populate with gateway_ids and virtual_server_id from budprompt config
                 )
             )
 
@@ -2712,6 +2747,40 @@ class PromptVersionService(SessionMixin):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+        # Extract metadata from budprompt config for version_metadata
+        metadata = {}
+        try:
+            prompt_service = PromptService(self.session)
+            config_response = await prompt_service._perform_get_prompt_config_request(
+                prompt_id=db_prompt.name,
+                version=next_version,
+                raw_data=True,
+            )
+
+            tools = config_response.get("data", {}).get("tools", [])
+            for tool in tools:
+                if tool.get("type") == "mcp":
+                    # Extract gateway_ids from gateway_config
+                    gateway_config = tool.get("gateway_config", {})
+                    if gateway_config:
+                        metadata["gateway_ids"] = list(gateway_config.values())
+
+                    # Extract virtual_server_id from server_url
+                    virtual_server_id = tool.get("server_url")
+                    if virtual_server_id:
+                        metadata["virtual_server_id"] = virtual_server_id
+                    break
+
+            if metadata:
+                logger.debug(
+                    f"Extracted metadata from budprompt config for version {next_version}: "
+                    f"{len(metadata.get('gateway_ids', []))} gateway_ids, "
+                    f"virtual_server_id={metadata.get('virtual_server_id')}"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to extract metadata from budprompt config: {e}")
+            metadata = {}
+
         # Create the new prompt version
         db_version = PromptVersionDataManager(self.session).add_one(
             PromptVersionModel(
@@ -2722,6 +2791,7 @@ class PromptVersionService(SessionMixin):
                 version=next_version,
                 status=PromptVersionStatusEnum.ACTIVE,
                 created_by=current_user_id,
+                version_metadata=metadata,  # Populate with gateway_ids and virtual_server_id from budprompt config
             )
         )
 
