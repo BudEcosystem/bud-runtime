@@ -344,7 +344,7 @@ export default function PromptsAgents() {
       <div className="boardPageView" id="prompts-agents-container">
         <div className="boardPageTop">
           <PageHeader
-            headding="Prompts & Agents"
+            headding="Agents"
             buttonLabel="Agent"
             buttonPermission={hasPermission(PermissionEnum.ModelManage)}
             buttonAction={() => {
