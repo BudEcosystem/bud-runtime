@@ -29,6 +29,7 @@ const AgentDrawer: React.FC = () => {
   const [drawerWidth, setDrawerWidth] = useState<string>('100%');
   const [showPlayground, setShowPlayground] = useState(false);
   const [activeBoxId, setActiveBoxId] = useState<string | null>(null);
+  const [typeFormTrigger, setTypeFormTrigger] = useState<boolean>(false);
 
   // Get active sessions
   const activeSessions = sessions.filter((session) =>
@@ -176,7 +177,10 @@ const AgentDrawer: React.FC = () => {
 
               {/* Chat/Message Icon */}
               <Tooltip title="Chat History" placement="right">
-                <button className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors">
+                <button
+                  onClick={() => setTypeFormTrigger(prev => !prev)}
+                  className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors"
+                >
                   <MessageOutlined className="text-[#808080] hover:text-[#965CDE] text-lg" />
                 </button>
               </Tooltip>
@@ -192,6 +196,7 @@ const AgentDrawer: React.FC = () => {
                   <AgentIframe
                     sessionId={activeSessions[0]?.id}
                     promptIds={activeSessions.map(session => session.promptId).filter(Boolean) as string[]}
+                    typeFormTrigger={typeFormTrigger}
                   />
                 </div>
               ) : (
