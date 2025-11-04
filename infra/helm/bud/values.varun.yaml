@@ -19,6 +19,8 @@ microservices:
         image: budstudio/budcluster:nightly
         env:
             VOLUME_TYPE: nfs
+    budgateway:
+        image: budstudio/budgateway:nightly
 
 storage:
     budmodelRegistry:
