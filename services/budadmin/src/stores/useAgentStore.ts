@@ -36,6 +36,7 @@ export interface AgentSession {
     temperature?: number;
     maxTokens?: number;
     topP?: number;
+    stream?: boolean;
   };
 }
 

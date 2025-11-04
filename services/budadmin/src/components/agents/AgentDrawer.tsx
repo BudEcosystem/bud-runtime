@@ -202,7 +202,7 @@ const AgentDrawer: React.FC = () => {
                       {activeSessions.map((session, index) => (
                         <div
                           key={session.id}
-                          className="flex-shrink-0"
+                          className={activeSessions.length === 1 ? "flex-1" : "flex-shrink-0"}
                           style={{ scrollSnapAlign: "start" }}
                         >
                           <AgentBoxWrapper

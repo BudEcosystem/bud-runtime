@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from "react";
-import { Dropdown, Tooltip } from "antd";
+import { Dropdown, Tooltip, Switch } from "antd";
 import {
   CloseOutlined,
   CopyOutlined,
@@ -69,6 +69,7 @@ function AgentBoxInner({
   const [isHovering, setIsHovering] = useState(false);
   const [structuredInputEnabled, setStructuredInputEnabled] = useState(false);
   const [structuredOutputEnabled, setStructuredOutputEnabled] = useState(false);
+  const [streamEnabled, setStreamEnabled] = useState(session?.settings?.stream ?? false);
 
   // Custom hook to create workflow handlers with consistent behavior
   const useWorkflowHandler = (name: string, workflowId?: string) => {
@@ -115,7 +116,8 @@ function AgentBoxInner({
         ? session.promptMessages
         : ""
     );
-  }, [session?.systemPrompt, session?.promptMessages]);
+    setStreamEnabled(session?.settings?.stream ?? false);
+  }, [session?.systemPrompt, session?.promptMessages, session?.settings?.stream]);
 
   // Handle case where session is null early
   if (!session) {
@@ -150,6 +152,18 @@ function AgentBoxInner({
   const handlePromptMessagesChange = (value: string) => {
     setLocalPromptMessages(value);
     if (session) updateSession(session.id, { promptMessages: value });
+  };
+
+  const handleStreamToggle = (checked: boolean) => {
+    setStreamEnabled(checked);
+    if (session) {
+      updateSession(session.id, {
+        settings: {
+          ...session.settings,
+          stream: checked
+        }
+      });
+    }
   };
 
   // Handler for when a flowgram card is clicked
@@ -187,6 +201,9 @@ function AgentBoxInner({
     guided_decoding_backend: "string",
     guided_whitespace_pattern: "string"
   });
+
+  // Get current stream setting
+  const getStreamSetting = () => streamEnabled;
 
   const handleSavePromptSchema = async () => {
     if (!session) {
@@ -393,7 +410,7 @@ function AgentBoxInner({
         set_default: false,
         deployment_name: session.selectedDeployment.model.name,
         model_settings: getDefaultModelSettings(session),
-        stream: true,
+        stream: getStreamSetting(),
         messages: [
           {
             role: "system",
@@ -405,6 +422,10 @@ function AgentBoxInner({
         allow_multiple_calls: true,
         system_prompt_role: "system"
       };
+
+      console.log("=== System Prompt Save Payload ===");
+      console.log("Stream enabled:", getStreamSetting());
+      console.log("Full payload:", payload);
 
       // Start workflow status tracking
       startSystemPromptWorkflow();
@@ -497,7 +518,7 @@ function AgentBoxInner({
         set_default: false,
         deployment_name: session.selectedDeployment.model.name,
         model_settings: getDefaultModelSettings(session),
-        stream: true,
+        stream: getStreamSetting(),
         messages: messages.map((msg: any) => ({
           role: msg.role,
           content: msg.content
@@ -507,6 +528,10 @@ function AgentBoxInner({
         allow_multiple_calls: true,
         system_prompt_role: "system"
       };
+
+      console.log("=== Prompt Messages Save Payload ===");
+      console.log("Stream enabled:", getStreamSetting());
+      console.log("Full payload:", payload);
 
       // Start workflow status tracking
       startPromptMessagesWorkflow();
@@ -555,6 +580,25 @@ function AgentBoxInner({
 
   const menuItems = [
     {
+      key: 'stream',
+      label: (
+        <div
+          className="flex items-center justify-between gap-3 py-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-[#B3B3B3]">Stream</span>
+          <Switch
+            size="small"
+            checked={streamEnabled}
+            onChange={handleStreamToggle}
+          />
+        </div>
+      ),
+      onClick: (e: any) => {
+        e.domEvent?.stopPropagation();
+      }
+    },
+    {
       key: 'delete',
       icon: '',
       // icon: <DeleteOutlined />,
@@ -564,8 +608,8 @@ function AgentBoxInner({
     }
   ];
 
-  // All boxes are expanded by default
-  const boxWidth = "600px";
+  // Dynamic width: full width for single session, 600px for multiple sessions
+  const boxWidth = totalSessions === 1 ? "100%" : "600px";
 
   return (
     <div
