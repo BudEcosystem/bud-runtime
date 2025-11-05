@@ -2631,7 +2631,6 @@ impl ModelProvider {
         }
     }
 
-<<<<<<< HEAD
     /// Upload batch file method
     #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_upload_batch_file"))]
     pub async fn upload_batch_file(
@@ -2643,52 +2642,27 @@ impl ModelProvider {
         dynamic_api_keys: &InferenceCredentials,
     ) -> Result<crate::openai_batch::OpenAIFileObject, Error> {
         use crate::inference::providers::batch::BatchProvider;
-=======
-    /// Realtime session creation method
-    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_create_realtime_session"))]
-    pub async fn create_realtime_session(
-        &self,
-        request: &crate::realtime::RealtimeSessionRequest,
-        client: &Client,
-        dynamic_api_keys: &InferenceCredentials,
-    ) -> Result<crate::realtime::RealtimeSessionResponse, Error> {
-        use crate::realtime::RealtimeSessionProvider;
->>>>>>> 54e6fa86b9865cdd5cc65c70e0f4dd3c6423b6fc
 
         match &self.config {
             ProviderConfig::OpenAI(provider) => {
                 provider
-<<<<<<< HEAD
                     .upload_file(content, filename, purpose, client, dynamic_api_keys)
-=======
-                    .create_session(request, client, dynamic_api_keys)
->>>>>>> 54e6fa86b9865cdd5cc65c70e0f4dd3c6423b6fc
                     .await
             }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
-<<<<<<< HEAD
                     .upload_file(content, filename, purpose, client, dynamic_api_keys)
                     .await
             }
             // Other providers don't support batch operations yet
             _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
                 capability: EndpointCapability::Batch.as_str().to_string(),
-=======
-                    .create_session(request, client, dynamic_api_keys)
-                    .await
-            }
-            // Other providers don't support realtime sessions yet
-            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
-                capability: EndpointCapability::RealtimeSession.as_str().to_string(),
->>>>>>> 54e6fa86b9865cdd5cc65c70e0f4dd3c6423b6fc
                 provider: self.name.to_string(),
             })),
         }
     }
 
-<<<<<<< HEAD
     /// Create batch method
     #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_create_batch"))]
     pub async fn create_batch(
@@ -2701,32 +2675,16 @@ impl ModelProvider {
         dynamic_api_keys: &InferenceCredentials,
     ) -> Result<crate::openai_batch::OpenAIBatchObject, Error> {
         use crate::inference::providers::batch::BatchProvider;
-=======
-    /// Realtime transcription session creation method
-    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_create_realtime_transcription_session"))]
-    pub async fn create_realtime_transcription_session(
-        &self,
-        request: &crate::realtime::RealtimeTranscriptionRequest,
-        client: &Client,
-        dynamic_api_keys: &InferenceCredentials,
-    ) -> Result<crate::realtime::RealtimeTranscriptionResponse, Error> {
-        use crate::realtime::RealtimeTranscriptionProvider;
->>>>>>> 54e6fa86b9865cdd5cc65c70e0f4dd3c6423b6fc
 
         match &self.config {
             ProviderConfig::OpenAI(provider) => {
                 provider
-<<<<<<< HEAD
                     .create_batch(input_file_id, endpoint, completion_window, metadata, client, dynamic_api_keys)
-=======
-                    .create_transcription_session(request, client, dynamic_api_keys)
->>>>>>> 54e6fa86b9865cdd5cc65c70e0f4dd3c6423b6fc
                     .await
             }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
-<<<<<<< HEAD
                     .create_batch(input_file_id, endpoint, completion_window, metadata, client, dynamic_api_keys)
                     .await
             }
@@ -2913,16 +2871,6 @@ impl ModelProvider {
             // Other providers don't support batch operations yet
             _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
                 capability: EndpointCapability::Batch.as_str().to_string(),
-=======
-                    .create_transcription_session(request, client, dynamic_api_keys)
-                    .await
-            }
-            // Other providers don't support realtime transcription yet
-            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
-                capability: EndpointCapability::RealtimeTranscription
-                    .as_str()
-                    .to_string(),
->>>>>>> 54e6fa86b9865cdd5cc65c70e0f4dd3c6423b6fc
                 provider: self.name.to_string(),
             })),
         }

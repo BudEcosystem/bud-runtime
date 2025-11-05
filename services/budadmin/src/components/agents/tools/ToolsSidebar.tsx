@@ -14,11 +14,11 @@ export const ToolsSidebar: React.FC<ToolsSidebarProps> = ({
   onClose,
   promptId,
 }) => {
+  if (!isOpen) return null;
+
   return (
     <div
-      className={`z-[100] tools-box absolute p-3 right-0 top-0 h-full transition-all duration-300 ease-in-out ${
-        isOpen ? 'translate-x-0' : 'translate-x-full'
-      }`}
+      className="z-[100] tools-box absolute p-3 right-0 top-0 h-full transition-all duration-300 ease-in-out translate-x-0"
       onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside tools
     >
       <div

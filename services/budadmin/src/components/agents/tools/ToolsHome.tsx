@@ -28,9 +28,11 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId }) => {
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [selectedConnector, setSelectedConnector] = useState<Connector | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list');
+  const [isSearching, setIsSearching] = useState(false);
 
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isInitialMount = useRef(true);
 
   // Initial load - Fetch both connected and unregistered tools
   useEffect(() => {
@@ -44,16 +46,31 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId }) => {
 
   // Handle search with debounce
   useEffect(() => {
+    // Skip on initial mount to avoid duplicate API calls
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    searchTimeoutRef.current = setTimeout(() => {
+    // Show loading indicator when user starts typing
+    setIsSearching(true);
+
+    searchTimeoutRef.current = setTimeout(async () => {
       setSearchQuery(localSearchQuery);
       if (promptId) {
         // Refetch both lists with search query
-        fetchConnectedTools({ page: 1, prompt_id: promptId });
-        fetchUnregisteredTools({ page: 1, prompt_id: promptId });
+        await Promise.all([
+          fetchConnectedTools({ page: 1, prompt_id: promptId }),
+          fetchUnregisteredTools({ page: 1, prompt_id: promptId })
+        ]);
+        // Hide loading indicator after search completes
+        setIsSearching(false);
+      } else {
+        setIsSearching(false);
       }
     }, 500);
 
@@ -98,6 +115,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId }) => {
     // Clear search when navigating to details
     setLocalSearchQuery('');
     setSearchQuery('');
+    setIsSearching(false);
     setSelectedConnector({ ...connector, isFromConnectedSection: isConnected } as Connector);
     setViewMode('details');
   };
@@ -161,9 +179,16 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId }) => {
       {/* Scrollable Content */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto relative"
         onScroll={handleScroll}
       >
+        {/* Search Loading Overlay */}
+        {isSearching && (
+          <div className="absolute inset-0 bg-[#0A0A0A] bg-opacity-70 flex justify-center items-center z-10">
+            <Spin />
+          </div>
+        )}
+
         {isLoading && connectors.length === 0 ? (
           <div className="flex justify-center items-center h-full">
             <Spin />

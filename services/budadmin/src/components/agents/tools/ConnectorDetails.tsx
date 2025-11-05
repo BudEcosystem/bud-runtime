@@ -9,6 +9,7 @@ import CustomSelect from 'src/flows/components/CustomSelect';
 import { AppRequest } from 'src/pages/api/requests';
 import { tempApiBaseUrl } from '@/components/environment';
 import { successToast, errorToast } from '@/components/toast';
+import { toast } from 'react-toastify';
 import { ToolDetails } from './ToolDetails';
 
 interface ConnectorDetailsProps {
@@ -182,7 +183,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       );
 
       if (response.status === 200 || response.status === 201) {
-        successToast('Connector registered successfully');
         setStep(2);
 
         // Fetch tools after successful registration
@@ -264,6 +264,18 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       );
 
       if (response.status === 200 || response.status === 201) {
+        // Show toast at bottom-right for the sidebar context
+        toast.success('Tools added successfully', {
+          position: 'bottom-right',
+          icon: () => (
+            <img alt="" height="20" width="20" src="/icons/toast-icon.svg" />
+          ),
+          style: {
+            background: '#479d5f1a',
+            color: '#479d5f',
+            border: '1px solid #479d5f',
+          },
+        });
         // Refresh tools list to show updated is_added status
         await fetchToolsAfterRegistration();
       }

@@ -681,8 +681,8 @@ function AgentBoxInner({
           </div>
           {isHovering && (
             <PrimaryButton onClick={closeAgentDrawer}
-              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] bg-[#479d5f1a] hover:!bg-[#479d5f]"
-              textClass="!text-[0.625rem] !font-[400]"
+              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] hover:!bg-[#479d5f] group"
+              textClass="!text-[0.625rem] !font-[400] text-[#479d5f] group-hover:text-[#EEEEEE]"
             >
               Save
             </PrimaryButton>
