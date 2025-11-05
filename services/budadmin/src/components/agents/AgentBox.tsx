@@ -121,19 +121,19 @@ function AgentBoxInner({
   const isRightSidebarOpen = isSettingsOpen || isToolsOpen;
 
   // Custom toggle functions that close the other sidebar
-  const toggleSettings = () => {
+  const toggleSettings = React.useCallback(() => {
     if (isToolsOpen) {
       closeTools();
     }
     toggleSettingsOriginal();
-  };
+  }, [isToolsOpen, closeTools, toggleSettingsOriginal]);
 
-  const toggleTools = () => {
+  const toggleTools = React.useCallback(() => {
     if (isSettingsOpen) {
       closeSettings();
     }
     toggleToolsOriginal();
-  };
+  }, [isSettingsOpen, closeSettings, toggleToolsOriginal]);
 
   // Update local state when session changes
   React.useEffect(() => {
