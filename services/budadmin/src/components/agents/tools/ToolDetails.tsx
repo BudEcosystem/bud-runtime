@@ -105,7 +105,7 @@ export const ToolDetails: React.FC<ToolDetailsProps> = ({
       </div>
 
       {/* Tool Icon and Name */}
-      <div className="px-[1.125rem] flex items-center gap-3 mb-6 pt-[]">
+      <div className="px-[1.125rem] flex items-center gap-3 mb-6">
         <div className="w-[1.5rem] h-[1.5rem] rounded-lg bg-[#1F1F1F] flex items-center justify-center text-lg">
           {getToolIcon()}
         </div>

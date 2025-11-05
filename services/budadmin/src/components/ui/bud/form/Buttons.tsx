@@ -44,7 +44,7 @@ export function PrimaryButton({
                 cursor: "not-allowed",
                 borderRadius: "0.3rem",
                 height: "1.75rem",
-                borderColor: "#965CDE !important",
+                // borderColor: "#965CDE !important",
                 background: "#1E0C34 !important",
               }}
             >
@@ -81,7 +81,7 @@ export function PrimaryButton({
             paddingRight: ".7rem",
             borderRadius: "0.3rem",
             height: "1.75rem",
-            borderColor: "#965CDE !important",
+            // borderColor: "#965CDE !important",
             background: "#1E0C34 !important",
           }}
         >
@@ -144,12 +144,23 @@ export function SecondaryButton({ classNames = "", ...props }: any) {
   return (
     <Button
       {...props}
-      className={`text-[0.75rem] h-[1.75rem] border-[.5px] border-[#757575] min-w-[4rem] font-normal bg-[#1F1F1F]
+      className={`text-[0.75rem]
     hover:bg-[#1F1F1F] hover:border-[#B3B3B3] ${classNames}
     ${props.text == "Skip" && "hover:bg-[#38260B] hover:border-[#896814]"}
     ${props.text == "Close" && "hover:bg-[#290E0E] hover:border-[#6F0E0E]"}
     ${props.disabled ? "bg-[#1F1F1F]  text-[#757575]! cursor-not-allowed" : "bg-[#1F1F1F] "}
     `}
+    style={{
+      height: '1.75rem',
+      border: '0.5px solid',
+      borderColor: '#757575',
+      borderRadius: '0.3rem',
+      minWidth: '4rem',
+      paddingLeft: '0.7rem',
+      paddingRight: '0.7rem',
+      background: '#1F1F1F',
+      transform: 'none'
+    }}
     >
       <Text_12_400_EEEEEE
         className={`${props.disabled ? "!text-[#757575] font-600" : "text-[#EEEEEE]"}`}
