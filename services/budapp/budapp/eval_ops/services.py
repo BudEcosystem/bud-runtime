@@ -1702,6 +1702,15 @@ class ExperimentService:
                     # Filter by trait UUIDs through the many-to-many relationship
                     q = q.join(DatasetModel.traits).filter(TraitModel.id.in_(filters.trait_ids))
 
+                # Always apply has_gen_eval_type filter (defaults to True in route)
+                if hasattr(filters, "has_gen_eval_type") and filters.has_gen_eval_type is not None:
+                    # Filter by datasets that have 'gen' key in eval_types JSONB field
+                    if filters.has_gen_eval_type:
+                        q = q.filter(DatasetModel.eval_types.has_key("gen"))
+                    else:
+                        # Filter for datasets WITHOUT 'gen' key
+                        q = q.filter(~DatasetModel.eval_types.has_key("gen"))
+
             # Get total count before applying pagination
             total_count = q.count()
 
@@ -1748,6 +1757,7 @@ class ExperimentService:
                     modalities=dataset.modalities,
                     sample_questions_answers=dataset.sample_questions_answers,
                     advantages_disadvantages=dataset.advantages_disadvantages,
+                    eval_types=dataset.eval_types,
                     traits=traits,
                 )
                 dataset_schemas.append(dataset_schema)
