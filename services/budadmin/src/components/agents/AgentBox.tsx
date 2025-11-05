@@ -660,8 +660,8 @@ function AgentBoxInner({
           </div>
           {isHovering && (
             <PrimaryButton onClick={closeAgentDrawer}
-              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] bg-[#479d5f1a] hover:!bg-[#479d5f]"
-              textClass="!text-[0.625rem] !font-[400]"
+              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] hover:!bg-[#479d5f] group"
+              textClass="!text-[0.625rem] !font-[400] text-[#479d5f] group-hover:text-[#EEEEEE]"
             >
               Save
             </PrimaryButton>
@@ -679,17 +679,17 @@ function AgentBoxInner({
         <div className="flex items-center gap-1">
           {/* Settings Button - Works as toggle */}
           <button
-            className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer transition-none ${isRightSidebarOpen ? 'bg-[#965CDE] bg-opacity-20' : ''
+            className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer transition-none ${isSettingsOpen ? 'bg-[#965CDE] bg-opacity-20' : ''
               }`}
             onClick={toggleSettings}
             style={{ transform: 'none' }}
           >
             <div
-              className={`w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group transition-none ${isRightSidebarOpen ? 'text-[#965CDE]' : 'text-[#B3B3B3] hover:text-[#FFFFFF]'
+              className={`w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group transition-none ${isSettingsOpen ? 'text-[#965CDE]' : 'text-[#B3B3B3] hover:text-[#FFFFFF]'
               }`}
               style={{ transform: 'none' }}
             >
-              <Tooltip title={isRightSidebarOpen ? "Close Settings" : "Settings"}>
+              <Tooltip title={isSettingsOpen ? "Close Settings" : "Settings"}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="18"
