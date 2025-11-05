@@ -271,7 +271,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             <img alt="" height="20" width="20" src="/icons/toast-icon.svg" />
           ),
           style: {
-            background: '#479d5f1a',
+            background: '#479d5f1a !important',
             color: '#479d5f',
             border: '1px solid #479d5f',
           },
@@ -495,7 +495,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                 </div>
 
                 {/* Tools List */}
-                <div className="space-y-2 mb-1 mx-[.5rem] border-[.5px] border-[#1F1F1F] rounded-[.5rem] py-[.5rem]">
+                <div className="space-y-2 mb-1 mx-[.5rem] border-[.5px] border-[#1F1F1F] rounded-[.5rem] ">
                   {availableTools.length === 0 ? (
                     <div className="px-4 py-8 text-center text-[#808080]">
                       No tools available
@@ -511,18 +511,22 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                       return (
                         <div
                           key={toolId}
-                          className="flex items-center justify-between px-[0.625rem] py-[0.46875rem] rounded-lg hover:bg-[#1A1A1A] border-[.5px] border-[transparent] hover:border hover:border-[#2A2A2A]"
+                          onClick={() => handleToolClick(tool)}
+                          className="flex items-center justify-between px-[0.625rem] py-[0.46875rem] rounded-lg hover:bg-[#1A1A1A] border-[.5px] border-[transparent] hover:border-[#2A2A2A] cursor-pointer"
                         >
                           <div className='flex items-center justify-start gap-[.5rem]'>
                             <Checkbox
                               checked={selectedTools.includes(toolId)}
-                              onChange={(e) => handleToolToggle(tool, e.target.checked)}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleToolToggle(tool, e.target.checked);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
                               className="AntCheckbox text-[#757575] w-[0.75rem] h-[0.75rem] text-[0.875rem]"
                             />
                             <Text_12_400_EEEEEE className="text-white">{toolName}</Text_12_400_EEEEEE>
                           </div>
                           <button
-                            onClick={() => handleToolClick(tool)}
                             className="cursor-pointer hover:opacity-70 transition-opacity"
                             style={{ transform: 'none' }}
                           >
