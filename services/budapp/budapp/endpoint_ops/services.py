@@ -55,6 +55,8 @@ from ..commons.constants import (
 )
 from ..commons.exceptions import ClientException, RedisException
 from ..core.schemas import NotificationPayload, NotificationResult
+from ..credential_ops.crud import ProprietaryCredentialDataManager
+from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
 from ..credential_ops.services import CredentialService
 from ..model_ops.crud import ModelDataManager, ProviderDataManager
 from ..model_ops.models import Model as ModelsModel
@@ -1714,6 +1716,17 @@ class EndpointService(SessionMixin):
             # Assign project_id
             project_id = db_endpoint.project_id
 
+            # Check maximum adapter limit per endpoint
+            existing_adapters = await AdapterDataManager(self.session).get_all_by_fields(
+                AdapterModel,
+                {"endpoint_id": endpoint_id},
+                exclude_fields={"status": AdapterStatusEnum.DELETED},
+            )
+            if len(existing_adapters) >= 5:
+                raise ClientException(
+                    "Maximum of 5 adapters per deployment reached. Please delete an existing adapter before adding a new one."
+                )
+
         # validate base model id
         if adapter_model_id:
             db_model = await ModelDataManager(self.session).retrieve_by_fields(
@@ -1887,8 +1900,13 @@ class EndpointService(SessionMixin):
     async def _get_adapters_by_endpoint(
         self, endpoint_id: UUID, endpoint_name: str, adapter_name: str, adapter_model_uri: str, adapter_id: UUID = None
     ) -> Tuple[List[AdapterModel], str]:
+        # Build exclude fields to filter out DELETED adapters and the current adapter (if specified)
+        exclude_fields = {"status": AdapterStatusEnum.DELETED}
+        if adapter_id:
+            exclude_fields["id"] = adapter_id
+
         db_adapters = await AdapterDataManager(self.session).get_all_by_fields(
-            AdapterModel, {"endpoint_id": endpoint_id}, exclude_fields={"id": adapter_id}
+            AdapterModel, {"endpoint_id": endpoint_id}, exclude_fields=exclude_fields
         )
 
         adapters = []
@@ -1908,6 +1926,12 @@ class EndpointService(SessionMixin):
         self, current_step_number: int, data: Dict, db_workflow: WorkflowModel, current_user_id: UUID
     ) -> Dict:
         """Trigger adapter deployment."""
+        # Retrieve endpoint to get deployment configuration
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel, {"id": data["endpoint_id"]}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+        )
+        deployment_config = db_endpoint.deployment_config
+
         # Create request payload
         payload = {
             "endpoint_name": data["endpoint_name"],
@@ -1918,6 +1942,8 @@ class EndpointService(SessionMixin):
             "namespace": data["namespace"],
             "cluster_id": str(data["cluster_id"]),
             "action": "add",
+            "input_tokens": deployment_config["avg_context_length"],
+            "output_tokens": deployment_config["avg_sequence_length"],
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
@@ -2047,6 +2073,42 @@ class EndpointService(SessionMixin):
         # Insert the adapter into the database
         db_adapter = await AdapterDataManager(self.session).insert_one(adapter_create)
 
+        # Create model_table Redis entry for the adapter using parent endpoint's config
+        try:
+            # Fetch parent endpoint to get URL, namespace, and other routing config
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel, {"id": db_adapter.endpoint_id}
+            )
+
+            # Credentials is set to Noe, as adapter is only for HF models
+            encrypted_credential_data = None
+
+            # Use model.source for provider type (same pattern as endpoint publication)
+            model_provider_type = db_endpoint.model.source.lower() if db_endpoint.model.source else "vllm"
+
+            # Add adapter to proxy cache with its own model_table:{adapter_id} entry
+            await self.add_model_to_proxy_cache(
+                endpoint_id=db_adapter.id,  # Use adapter's ID as the endpoint_id in cache
+                model_name=db_adapter.deployment_name,  # Use parent endpoint's namespace
+                model_type=model_provider_type,  # Use parent's provider type
+                api_base=db_endpoint.url,  # Use parent's URL for routing
+                supported_endpoints=db_endpoint.supported_endpoints,  # Use parent's supported endpoints
+                encrypted_credential_data=encrypted_credential_data,  # Pass credentials if available
+                include_pricing=False,  # Adapters don't have separate pricing
+            )
+            logger.debug(f"Added adapter {db_adapter.id} to proxy cache with model_table entry")
+        except Exception as e:
+            logger.error(f"Failed to add adapter {db_adapter.id} to proxy cache: {e}")
+            # Don't fail the workflow if cache update fails
+
+        # Update proxy cache to add the new adapter to api_key mappings
+        try:
+            await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+            await self.update_published_model_cache()
+            logger.debug(f"Updated proxy cache for project {db_endpoint.project_id} after adapter creation")
+        except (RedisException, Exception) as e:
+            logger.error(f"Failed to update proxy cache after adapter creation: {e}")
+
         # Update workflow step data
         workflow_step_data = {
             "adapter_id": str(db_adapter.id),
@@ -2119,6 +2181,9 @@ class EndpointService(SessionMixin):
         adapters, _ = await self._get_adapters_by_endpoint(
             db_adapter.endpoint_id, db_endpoint.name, db_adapter.name, db_adapter.model.local_path, db_adapter.id
         )
+        # Get deployment configuration for token parameters
+        deployment_config = db_endpoint.deployment_config
+
         # Create request payload
         payload = {
             "endpoint_name": db_endpoint.name,
@@ -2130,6 +2195,8 @@ class EndpointService(SessionMixin):
             "cluster_id": str(db_endpoint.bud_cluster_id) if db_endpoint.bud_cluster_id else "",
             "adapter_id": str(adapter_id),
             "action": "delete",
+            "input_tokens": deployment_config["avg_context_length"],
+            "output_tokens": deployment_config["avg_sequence_length"],
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
@@ -2206,6 +2273,13 @@ class EndpointService(SessionMixin):
         # Mark adapter as deleted
         await AdapterDataManager(self.session).update_by_fields(db_adapter, {"status": AdapterStatusEnum.DELETED})
         logger.debug(f"Adapter {db_adapter.id} marked as deleted")
+
+        # Delete the adapter's model_table Redis entry using existing method
+        try:
+            await self.delete_model_from_proxy_cache(db_adapter.id)
+            logger.debug(f"Deleted model_table:{db_adapter.id} from Redis cache")
+        except Exception as e:
+            logger.error(f"Failed to delete model_table entry for adapter {db_adapter.id}: {e}")
 
         # Update proxy cache to remove the deleted adapter
         try:

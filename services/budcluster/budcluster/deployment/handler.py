@@ -257,44 +257,47 @@ class DeploymentHandler:
         full_node_list = copy.deepcopy(node_list)
 
         for _idx, node in enumerate(node_list):
-            node["args"] = self._prepare_args(node["args"])
-            node["args"].append(f"--served-model-name={namespace}")
+            node["args"]["served-model-name"] = namespace
 
-            node["args"].append("--gpu-memory-utilization=0.95")
+            node["args"]["gpu-memory-utilization"] = 0.95
 
             # Enable LoRA configuration if engine supports it
             supports_lora = node.get("supports_lora", False)
             if supports_lora:
-                max_loras = 1 if not adapters else max(1, len(adapters))
-                node["args"].append(f"--max-loras={max_loras}")
-                node["args"].append("--max-lora-rank=256")
-                node["args"].append("--enable-lora")
+                # max_loras = 1 if not adapters else max(1, len(adapters))
+                max_loras = 5
+                node["args"]["max-loras"] = max_loras
+                node["args"]["max-lora-rank"] = 256
+                node["args"]["enable-lora"] = True
                 logger.info(f"LoRA enabled: max-loras={max_loras}, max-lora-rank=256")
 
             # Calculate max_model_len dynamically
             if input_tokens and output_tokens:
                 max_model_len = int((input_tokens + output_tokens) * 1.1)  # Add 10% safety margin
-                node["args"].append(f"--max-model-len={max_model_len}")
+                node["args"]["max-model-len"] = max_model_len
             else:
-                node["args"].append("--max-model-len=8192")  # Default fallback
+                node["args"]["max-model-len"] = 8192  # Default fallback
 
             # Add parser configuration if enabled
             if enable_tool_calling and tool_calling_parser_type:
-                node["args"].append("--enable-auto-tool-choice")
-                node["args"].append(f"--tool-call-parser={tool_calling_parser_type}")
+                node["args"]["enable-auto-tool-choice"] = True
+                node["args"]["tool-call-parser"] = tool_calling_parser_type
                 logger.info(f"Enabled tool calling with parser: {tool_calling_parser_type}")
                 # Add chat template if provided
                 if chat_template:
-                    node["args"].append(f"--chat-template={chat_template}")
+                    node["args"]["chat-template"] = chat_template
                     logger.info(f"Using chat template: {chat_template}")
 
             if enable_reasoning and reasoning_parser_type:
                 # Add reasoning-specific args based on parser type
-                node["args"].append(f"--reasoning-parser={reasoning_parser_type}")
+                node["args"]["reasoning-parser"] = reasoning_parser_type
                 # Add other reasoning parser configurations as needed
 
             # Update the full_node_list with the modified args
-            # full_node_list[idx]["args"] = node["args"].copy()
+            full_node_list[_idx]["args"] = node["args"].copy()
+
+            if isinstance(node["args"], dict):
+                node["args"] = self._prepare_args(node["args"])
 
             # thread_bind, core_count = self._get_cpu_affinity(device["tp_size"])
             # node["envs"]["VLLM_CPU_OMP_THREADS_BIND"] = thread_bind
