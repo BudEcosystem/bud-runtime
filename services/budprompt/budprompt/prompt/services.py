@@ -42,12 +42,13 @@ from ..commons.exceptions import (
 from ..commons.helpers import run_async
 from ..commons.security import HashManager
 from ..shared.redis_service import RedisService
-from .executors import SimplePromptExecutor
+from .executors import SimplePromptExecutor_V1
 from .revised_code.field_validation import generate_validation_function
 from .schema_builder import ModelGeneratorFactory
 from .schemas import (
     PromptConfigCopyRequest,
     PromptConfigCopyResponse,
+    PromptConfigGetRawResponse,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -74,7 +75,7 @@ class PromptExecutorService:
 
     def __init__(self):
         """Initialize the PromptExecutorService."""
-        self.executor = SimplePromptExecutor()
+        self.executor = SimplePromptExecutor_V1()
 
     async def execute_prompt_deprecated(
         self, request: PromptExecuteRequest
@@ -207,6 +208,7 @@ class PromptExecutorService:
                 allow_multiple_calls=request.allow_multiple_calls,
                 system_prompt_role=request.system_prompt_role,
                 api_key=api_key,
+                tools=request.tools,
             )
 
             return result
@@ -998,7 +1000,9 @@ class PromptService:
                 message="Failed to store prompt configuration",
             ) from e
 
-    async def get_prompt_config(self, prompt_id: str, version: Optional[int] = None) -> PromptConfigGetResponse:
+    async def get_prompt_config(
+        self, prompt_id: str, version: Optional[int] = None, raw_data: bool = False
+    ) -> Union[PromptConfigGetResponse, PromptConfigGetRawResponse]:
         """Get prompt configuration from Redis.
 
         This method retrieves the prompt configuration stored in Redis
@@ -1007,9 +1011,10 @@ class PromptService:
         Args:
             prompt_id: The unique identifier of the prompt configuration
             version: Optional version number to retrieve specific version
+            raw_data: If True, return raw Redis JSON without Pydantic processing
 
         Returns:
-            PromptConfigGetResponse with the configuration data
+            PromptConfigGetResponse with validated data or PromptConfigGetRawResponse with raw data
 
         Raises:
             ClientException: If configuration not found or Redis operation fails
@@ -1031,6 +1036,13 @@ class PromptService:
                         message=f"Default version not found for prompt_id: {prompt_id}",
                     )
 
+                # Decode bytes to string if needed
+                if isinstance(redis_key, bytes):
+                    redis_key = redis_key.decode("utf-8")
+
+            # Extract version from redis_key (format: prompt:{prompt_id}:v{version})
+            retrieved_version = int(redis_key.split(":v")[-1])
+
             # Fetch data from Redis using the determined key
             config_json = await self.redis_service.get(redis_key)
 
@@ -1045,15 +1057,27 @@ class PromptService:
                     message=message,
                 )
 
-            # Parse and validate the data
-            config_data = PromptConfigurationData.model_validate_json(config_json)
-
-            return PromptConfigGetResponse(
-                code=200,
-                message="Prompt configuration retrieved successfully",
-                prompt_id=prompt_id,
-                data=config_data,
-            )
+            # Return raw data or validated data based on raw_data flag
+            if raw_data:
+                # Parse as raw dict without Pydantic validation
+                config_dict = json.loads(config_json)
+                return PromptConfigGetRawResponse(
+                    code=200,
+                    message="Raw prompt configuration retrieved successfully",
+                    prompt_id=prompt_id,
+                    version=retrieved_version,
+                    data=config_dict,
+                )
+            else:
+                # Parse and validate the data with Pydantic
+                config_data = PromptConfigurationData.model_validate_json(config_json)
+                return PromptConfigGetResponse(
+                    code=200,
+                    message="Prompt configuration retrieved successfully",
+                    prompt_id=prompt_id,
+                    version=retrieved_version,
+                    data=config_data,
+                )
 
         except ClientException:
             # Re-raise client exceptions as-is

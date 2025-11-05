@@ -18,7 +18,7 @@
 
 from typing import Optional
 
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from budprompt.commons.config import app_settings
@@ -57,14 +57,14 @@ class BudServeProvider:
             )
         return self._provider
 
-    def get_model(self, model_name: str, **kwargs) -> OpenAIModel:
+    def get_model(self, model_name: str, **kwargs) -> OpenAIChatModel:
         """Create an OpenAI model instance configured for BudServe.
 
         Args:
             model_name: Name of the model deployment
-            **kwargs: Additional arguments passed to OpenAIModel (including system_prompt_role)
+            **kwargs: Additional arguments passed to OpenAIChatModel (including system_prompt_role)
 
         Returns:
-            OpenAIModel configured with BudServe provider
+            OpenAIChatModel configured with BudServe provider
         """
-        return OpenAIModel(model_name=model_name, provider=self.provider, **kwargs)
+        return OpenAIChatModel(model_name=model_name, provider=self.provider, **kwargs)

@@ -892,6 +892,32 @@ class PromptTypeEnum(StrEnum):
     SIMPLE_PROMPT = auto()
 
 
+class ConnectorAuthTypeEnum(StrEnum):
+    """Enumeration of connector authentication types from MCP registry.
+
+    Attributes:
+        OAUTH: OAuth authentication.
+        OPEN: No authentication required (open access).
+        HEADERS: Custom header-based authentication.
+    """
+
+    OAUTH = "OAuth"
+    OPEN = "Open"
+    HEADERS = "Headers"
+
+
+# Mapping from MCP Foundry auth_type values to ConnectorAuthTypeEnum
+# MCP Foundry uses legacy auth type strings that need to be mapped to our enum
+MCP_AUTH_TYPE_MAPPING = {
+    "API": ConnectorAuthTypeEnum.HEADERS,
+    "API Key": ConnectorAuthTypeEnum.HEADERS,
+    "OAuth": ConnectorAuthTypeEnum.OAUTH,
+    "OAuth2.1": ConnectorAuthTypeEnum.OAUTH,
+    "OAuth2.1 & API Key": ConnectorAuthTypeEnum.OAUTH,
+    "Open": ConnectorAuthTypeEnum.OPEN,
+}
+
+
 class PromptStatusEnum(StrEnum):
     """Enumeration of prompt statuses.
 
@@ -2907,6 +2933,105 @@ EMOJIS = [
     "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
     "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
 ]
+
+# Connector Authentication Credentials Mapping
+CONNECTOR_AUTH_CREDENTIALS_MAP = {
+    ConnectorAuthTypeEnum.OAUTH: [
+        {
+            "type": "dropdown",
+            "field": "grant_type",
+            "label": "Grant Type",
+            "order": 1,
+            "required": True,
+            "description": "OAuth grant type",
+            "options": ["client_credentials", "authorization_code"],
+        },
+        {
+            "type": "text",
+            "field": "client_id",
+            "label": "Client ID",
+            "order": 2,
+            "required": True,
+            "description": "Your OAuth client ID",
+        },
+        {
+            "type": "password",
+            "field": "client_secret",
+            "label": "Client Secret",
+            "order": 3,
+            "required": True,
+            "description": "Your OAuth client secret",
+        },
+        {
+            "type": "url",
+            "field": "token_url",
+            "label": "Token URL",
+            "order": 4,
+            "required": True,
+            "description": "OAuth token endpoint URL",
+        },
+        {
+            "type": "url",
+            "field": "authorization_url",
+            "label": "Authorization URL",
+            "order": 5,
+            "required": True,
+            "description": "OAuth authorization endpoint URL",
+        },
+        {
+            "type": "url",
+            "field": "redirect_uri",
+            "label": "Redirect URI",
+            "order": 6,
+            "required": True,
+            "description": "OAuth callback/redirect URI",
+        },
+        {
+            "type": "text",
+            "field": "scopes",
+            "label": "Scopes",
+            "order": 7,
+            "required": False,
+            "description": "Space-separated list of OAuth scopes",
+        },
+        {
+            "type": "text",
+            "field": "passthrough_headers",
+            "label": "Passthrough Headers",
+            "order": 8,
+            "required": False,
+            "description": "Comma-separated list of headers to pass through from client requests (e.g., 'Authorization, X-Tenant-Id, X-Trace-Id')",
+        },
+    ],
+    ConnectorAuthTypeEnum.HEADERS: [
+        {
+            "type": "text",
+            "field": "passthrough_headers",
+            "label": "Passthrough Headers",
+            "order": 1,
+            "required": False,
+            "description": "Comma-separated list of headers to pass through from client requests (e.g., 'Authorization, X-Tenant-Id, X-Trace-Id')",
+        },
+        {
+            "type": "key-value-array",
+            "field": "auth_headers",
+            "label": "Authentication Headers",
+            "order": 2,
+            "required": True,
+            "description": "Authentication headers (click 'Add Header' to add multiple key-value pairs)",
+        },
+    ],
+    ConnectorAuthTypeEnum.OPEN: [
+        {
+            "type": "text",
+            "field": "passthrough_headers",
+            "label": "Passthrough Headers",
+            "order": 1,
+            "required": False,
+            "description": "Comma-separated list of headers to pass through from client requests (e.g., 'Authorization, X-Tenant-Id, X-Trace-Id')",
+        },
+    ],
+}
 
 # Define success messages for different workflow types
 WORKFLOW_DELETE_MESSAGES = {

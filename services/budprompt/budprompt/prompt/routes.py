@@ -29,6 +29,7 @@ from ..commons.exceptions import ClientException
 from .schemas import (
     PromptConfigCopyRequest,
     PromptConfigCopyResponse,
+    PromptConfigGetRawResponse,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -230,7 +231,8 @@ async def save_prompt_config(
 async def get_prompt_config(
     prompt_id: str,
     version: Optional[int] = Query(None, description="Version of the configuration to retrieve", ge=1),
-) -> Union[PromptConfigGetResponse, ErrorResponse]:
+    raw_data: bool = Query(False, description="Return raw Redis data without Pydantic processing"),
+) -> Union[PromptConfigGetResponse, PromptConfigGetRawResponse, ErrorResponse]:
     """Get prompt configuration by ID.
 
     Args:
@@ -250,7 +252,7 @@ async def get_prompt_config(
         prompt_service = PromptService()
 
         # Get the configuration
-        result = await prompt_service.get_prompt_config(prompt_id, version)
+        result = await prompt_service.get_prompt_config(prompt_id, version, raw_data)
 
         return result.to_http_response()
 

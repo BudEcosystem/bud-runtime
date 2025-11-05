@@ -410,7 +410,8 @@ def get_model_analysis(model_readme: str) -> Dict[str, Any]:
             response = fetch_response_from_perplexity(app_settings.model, prompt, MODEL_ANALYSIS_PROMPT)
             model_analysis = json.loads(repair_json(response))
             return model_analysis
-        except Exception:
+        except Exception as e:
+            logger.warning("LLM model analysis failed: %s. Continuing without LLM-generated fields.", str(e))
             return {}
     else:
         try:
@@ -418,7 +419,11 @@ def get_model_analysis(model_readme: str) -> Dict[str, Any]:
             response = inference_client.chat_completions(prompt, system_prompt=MODEL_ANALYSIS_PROMPT, temperature=0.1)
             model_analysis = json.loads(repair_json(response))
             return model_analysis
-        except InferenceClientException:
+        except (InferenceClientException, JSONDecodeError) as e:
+            logger.warning("LLM model analysis failed: %s. Continuing without LLM-generated fields.", str(e))
+            return {}
+        except Exception as e:
+            logger.warning("LLM model analysis failed: %s. Continuing without LLM-generated fields.", str(e))
             return {}
 
 

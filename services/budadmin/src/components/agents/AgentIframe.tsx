@@ -4,11 +4,11 @@ import React, { useEffect, useRef, useState } from "react";
 interface AgentIframeProps {
   sessionId?: string;
   promptIds?: string[];
+  typeFormMessage?: { timestamp: number; value: boolean } | null;
 }
 
-const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [] }) => {
+const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], typeFormMessage = null }) => {
   const [refreshToken, setRefreshToken] = useState("");
-  const playGroundUrl = "https://playground.dev.bud.studio";
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Build iframe URL for agent playground with promptIds
@@ -32,6 +32,21 @@ const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [] }) 
       }
     }
   }, []);
+
+  // Send typeForm message to iframe when message changes
+  useEffect(() => {
+    if (typeFormMessage && iframeRef.current && iframeRef.current.contentWindow) {
+      const message = {
+        type: 'SET_TYPE_FORM',
+        typeForm: typeFormMessage.value
+      };
+
+      // Send message to iframe with specific origin for security
+      const targetOrigin = new URL(playGroundUrl).origin;
+      iframeRef.current.contentWindow.postMessage(message, targetOrigin);
+      console.log('Sent typeForm message to iframe:', message);
+    }
+  }, [typeFormMessage]);
 
   if (!refreshToken) {
     return (

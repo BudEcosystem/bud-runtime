@@ -107,6 +107,9 @@ def list_experiments(
     current_user: Annotated[User, Depends(get_current_active_user)],
     project_id: Annotated[Optional[uuid.UUID], Query(description="Filter by project ID")] = None,
     id: Annotated[Optional[uuid.UUID], Query(description="Filter by experiment ID")] = None,
+    search: Annotated[
+        Optional[str], Query(min_length=1, max_length=100, description="Search experiments by name (case-insensitive)")
+    ] = None,
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
 ):
@@ -114,6 +117,7 @@ def list_experiments(
 
     - **session**: Database session dependency.
     - **current_user**: The authenticated user whose experiments are listed.
+    - **search**: Optional search query to filter by experiment name (case-insensitive substring match).
     - **project_id**: Optional filter by project ID.
     - **id**: Optional filter by experiment ID.
     - **page**: Page number (default: 1).
@@ -127,6 +131,7 @@ def list_experiments(
             user_id=current_user.id,
             project_id=project_id,
             experiment_id=id,
+            search_query=search,
             offset=offset,
             limit=limit,
         )
