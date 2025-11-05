@@ -39215,5 +39215,34 @@
                 }
             ]
         }
+    },
+    "update_policy": {
+        "check_interval_hours": 24,
+        "auto_update": false,
+        "notify_on_update": true,
+        "backup_before_update": true,
+        "rollback_on_failure": true
+    },
+    "authentication": {
+        "required_for": [
+            "bud_custom"
+        ],
+        "method": "oauth2",
+        "token_endpoint": "https://auth.bud.eco/token"
+    },
+    "migration": null,
+    "changelog": {
+        "2025.01.05": [
+            "Added eval_type support for datasets to specify evaluation configurations",
+            "GSM8K dataset now includes gen evaluation type configuration"
+        ],
+        "2025.01.04": [
+            "Added GSM8K dataset for mathematical reasoning",
+            "Added HumanEval dataset for code generation",
+            "Added MMLU dataset for broad knowledge evaluation",
+            "Added Bud Multilingual QA dataset",
+            "Added Bud Safety Evaluation dataset",
+            "Enhanced metadata with token estimates"
+        ]
     }
 }
