@@ -68,34 +68,13 @@ interface ConnectorsStore {
 
   // Filter state
   searchQuery: string;
-  promptId: string | undefined;
-  isRegistered: boolean | undefined;
-  orderBy: string;
 
-  // Actions
-  fetchConnectors: (params?: ConnectorsListParams) => Promise<void>;
+  // Actions - Only the ones actually used by Tools components
   fetchConnectedTools: (params?: ConnectorsListParams) => Promise<void>;
   fetchUnregisteredTools: (params?: ConnectorsListParams) => Promise<void>;
   fetchConnectorDetails: (connectorId: string) => Promise<void>;
-  loadMore: () => Promise<void>;
-  refreshConnectors: () => Promise<void>;
-
-  // Filter actions
   setSearchQuery: (query: string) => void;
-  setPromptId: (promptId: string | undefined) => void;
-  setIsRegistered: (isRegistered: boolean | undefined) => void;
-  setOrderBy: (orderBy: string) => void;
-  applyFilters: () => void;
-  resetFilters: () => void;
-  clearConnectors: () => void;
 }
-
-const defaultFilters = {
-  searchQuery: "",
-  promptId: undefined,
-  isRegistered: undefined,
-  orderBy: "-created_at",
-};
 
 export const useConnectors = create<ConnectorsStore>((set, get) => ({
   // Initial state
@@ -109,81 +88,7 @@ export const useConnectors = create<ConnectorsStore>((set, get) => ({
   isLoading: false,
   isLoadingMore: false,
   isLoadingDetails: false,
-  ...defaultFilters,
-
-  // Fetch connectors from API
-  fetchConnectors: async (params?: ConnectorsListParams) => {
-    const state = get();
-
-    // Don't set loading if we're loading more
-    if (params?.page && params.page > 1) {
-      set({ isLoadingMore: true });
-    } else {
-      set({ isLoading: true });
-    }
-
-    try {
-      const queryParams: ConnectorsListParams = {
-        page: params?.page || state.currentPage,
-        limit: params?.limit || state.pageSize,
-        search: params?.search !== undefined ? params.search : (state.searchQuery.length > 0),
-        order_by: params?.order_by || state.orderBy,
-      };
-
-      // Add conditional parameters
-      if (state.searchQuery) {
-        queryParams.name = state.searchQuery;
-      }
-
-      if (state.promptId) {
-        queryParams.prompt_id = state.promptId;
-      }
-
-      if (state.isRegistered !== undefined) {
-        queryParams.is_registered = state.isRegistered;
-      }
-
-      // Remove undefined values
-      Object.keys(queryParams).forEach(key => {
-        if (queryParams[key as keyof ConnectorsListParams] === undefined || queryParams[key as keyof ConnectorsListParams] === "") {
-          delete queryParams[key as keyof ConnectorsListParams];
-        }
-      });
-
-      const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/connectors`, {
-        params: queryParams,
-      });
-
-      if (response.data) {
-        const connectors = response.data.connectors || response.data.data || [];
-        const isLoadMore = params?.page && params.page > 1;
-
-        // Update or append connectors based on whether we're loading more
-        const newConnectors = isLoadMore
-          ? [...state.connectors, ...connectors]
-          : connectors;
-
-        // Filter connected tools
-        const connectedTools = newConnectors.filter((c: Connector) => c.connected);
-
-        set({
-          connectors: newConnectors,
-          connectedTools,
-          totalCount: response.data.total || connectors.length,
-          currentPage: response.data.page || params?.page || 1,
-          totalPages: response.data.total_pages || Math.ceil((response.data.total || connectors.length) / state.pageSize),
-          isLoading: false,
-          isLoadingMore: false,
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching connectors:", error);
-      set({
-        isLoading: false,
-        isLoadingMore: false
-      });
-    }
-  },
+  searchQuery: "",
 
   // Fetch connected tools (is_registered: true)
   fetchConnectedTools: async (params?: ConnectorsListParams) => {
@@ -201,12 +106,12 @@ export const useConnectors = create<ConnectorsStore>((set, get) => ({
         limit: params?.limit || state.pageSize,
         is_registered: true,
         search: params?.search !== undefined ? params.search : (state.searchQuery.length > 0),
-        order_by: params?.order_by || state.orderBy,
+        order_by: params?.order_by || "-created_at",
       };
 
       // Add prompt_id if available
-      if (params?.prompt_id || state.promptId) {
-        queryParams.prompt_id = params?.prompt_id || state.promptId;
+      if (params?.prompt_id) {
+        queryParams.prompt_id = params.prompt_id;
       }
 
       // Add search query
@@ -259,12 +164,12 @@ export const useConnectors = create<ConnectorsStore>((set, get) => ({
         limit: params?.limit || state.pageSize,
         is_registered: false,
         search: params?.search !== undefined ? params.search : (state.searchQuery.length > 0),
-        order_by: params?.order_by || state.orderBy,
+        order_by: params?.order_by || "-created_at",
       };
 
       // Add prompt_id if available
-      if (params?.prompt_id || state.promptId) {
-        queryParams.prompt_id = params?.prompt_id || state.promptId;
+      if (params?.prompt_id) {
+        queryParams.prompt_id = params.prompt_id;
       }
 
       // Add search query
@@ -331,54 +236,8 @@ export const useConnectors = create<ConnectorsStore>((set, get) => ({
     }
   },
 
-  // Load more connectors (pagination)
-  loadMore: async () => {
-    const state = get();
-    if (state.currentPage >= state.totalPages || state.isLoadingMore) return;
-
-    await state.fetchConnectors({ page: state.currentPage + 1 });
-  },
-
-  // Refresh connectors
-  refreshConnectors: async () => {
-    set({ currentPage: 1, connectors: [] });
-    await get().fetchConnectors({ page: 1 });
-  },
-
   // Filter actions
   setSearchQuery: (query) => {
     set({ searchQuery: query });
-  },
-
-  setPromptId: (promptId) => {
-    set({ promptId: promptId });
-  },
-
-  setIsRegistered: (isRegistered) => {
-    set({ isRegistered: isRegistered });
-  },
-
-  setOrderBy: (orderBy) => {
-    set({ orderBy: orderBy });
-  },
-
-  applyFilters: () => {
-    set({ currentPage: 1, connectors: [] });
-    get().fetchConnectors({ page: 1 });
-  },
-
-  resetFilters: () => {
-    set({ ...defaultFilters, currentPage: 1, connectors: [] });
-    get().fetchConnectors({ page: 1 });
-  },
-
-  clearConnectors: () => {
-    set({
-      connectors: [],
-      connectedTools: [],
-      totalCount: 0,
-      currentPage: 1,
-      totalPages: 0,
-    });
   },
 }));
