@@ -12,6 +12,12 @@ import { successToast, errorToast } from '@/components/toast';
 import { toast } from 'react-toastify';
 import { ToolDetails } from './ToolDetails';
 
+interface Tool {
+  id: string;
+  name: string;
+  is_added?: boolean;
+}
+
 interface ConnectorDetailsProps {
   connector: Connector;
   onBack: () => void;
@@ -30,7 +36,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [availableTools, setAvailableTools] = useState<any[]>([]);
+  const [availableTools, setAvailableTools] = useState<Tool[]>([]);
   const [isLoadingTools, setIsLoadingTools] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -59,13 +65,13 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
           });
 
           if (response.data && response.data.tools) {
-            const tools = response.data.tools;
+            const tools: Tool[] = response.data.tools;
             setAvailableTools(tools);
 
             // Auto-select tools that have is_added: true
             const addedToolIds = tools
-              .filter((tool: any) => tool.is_added === true)
-              .map((tool: any) => tool.id)
+              .filter((tool) => tool.is_added === true)
+              .map((tool) => tool.id)
               .filter(Boolean);
 
             if (addedToolIds.length > 0) {
@@ -101,9 +107,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     }
   };
 
-  const handleToolToggle = (tool: any, checked: boolean) => {
-    // Only use tool ID (not name)
-    const toolId = typeof tool === 'string' ? tool : tool.id;
+  const handleToolToggle = (tool: Tool, checked: boolean) => {
+    const toolId = tool.id;
     if (!toolId) return; // Skip if no ID
 
     if (checked) {
@@ -114,9 +119,9 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     }
   };
 
-  const handleToolClick = (tool: any) => {
-    const toolId = typeof tool === 'string' ? tool : tool.id;
-    const toolName = typeof tool === 'string' ? tool : tool.name;
+  const handleToolClick = (tool: Tool) => {
+    const toolId = tool.id;
+    const toolName = tool.name;
 
     if (!toolId) return;
 
@@ -212,13 +217,13 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       });
 
       if (response.data && response.data.tools) {
-        const tools = response.data.tools;
+        const tools: Tool[] = response.data.tools;
         setAvailableTools(tools);
 
         // Auto-select tools that have is_added: true
         const addedToolIds = tools
-          .filter((tool: any) => tool.is_added === true)
-          .map((tool: any) => tool.id)
+          .filter((tool) => tool.is_added === true)
+          .map((tool) => tool.id)
           .filter(Boolean);
 
         if (addedToolIds.length > 0) {
@@ -502,9 +507,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                     </div>
                   ) : (
                     availableTools.map((tool) => {
-                      // Only use tool.id for the ID (not name)
-                      const toolId = typeof tool === 'string' ? tool : tool.id;
-                      const toolName = typeof tool === 'string' ? tool : tool.name;
+                      const toolId = tool.id;
+                      const toolName = tool.name;
 
                       if (!toolId) return null; // Skip if no ID
 
