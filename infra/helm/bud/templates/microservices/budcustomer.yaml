@@ -78,7 +78,7 @@ spec:
           - name: NEXT_PUBLIC_ANTD_HASH_SEED
             value: 'budcustomer'
           - name: NEXT_PUBLIC_ASK_BUD_MODEL
-            value: 'qwen3-32b'
+            value: 'bud-gpt-oss-20b-ada28b58'
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcustomer.env }}
           - name: {{ $key }}
