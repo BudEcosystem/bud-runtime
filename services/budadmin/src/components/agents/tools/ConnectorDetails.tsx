@@ -365,7 +365,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     );
   }
 
-  const connectionUrl = selectedConnectorDetails?.url || `https://${connector.name.toLowerCase()}.com/vfggbkjhgfcvhbjnklmhj`;
+  const connectionUrl = selectedConnectorDetails?.url;
 
   return (
     <div className="flex flex-col h-full  text-white">
@@ -398,18 +398,20 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             <Text_14_400_EEEEEE className="">Connect to {connector.name}</Text_14_400_EEEEEE>
           </div>
           {/* Connection URL */}
-          <div className="mb-4">
-            <a
-              href={connectionUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="cursor-pointer hover:underline hover:decoration-[#EEEEEE]"
-            >
-              <Text_10_400_B3B3B3 className="">
-                {connectionUrl}
-              </Text_10_400_B3B3B3>
-            </a>
-          </div>
+          {connectionUrl && (
+            <div className="mb-4">
+              <a
+                href={connectionUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="cursor-pointer hover:underline hover:decoration-[#EEEEEE]"
+              >
+                <Text_10_400_B3B3B3 className="">
+                  {connectionUrl}
+                </Text_10_400_B3B3B3>
+              </a>
+            </div>
+          )}
         </div>
       </div>
 
