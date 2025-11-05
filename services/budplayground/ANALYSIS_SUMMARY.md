@@ -406,4 +406,3 @@ Agent context should be retrieved from store, passed to PromptForm, merged in fo
 The BudPlayground service has a well-architected chat system that cleanly separates form intake from messaging. The Zustand store provides flexible state management with localStorage persistence. The API endpoints handle both normal and prompt-based chat modes effectively.
 
 The architecture is ready for agent-based integration. Key integration points are clearly identified, and implementation can be done incrementally without breaking existing functionality. All agent fields are optional, maintaining backward compatibility with existing prompt workflows.
-

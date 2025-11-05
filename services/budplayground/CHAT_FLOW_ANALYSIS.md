@@ -37,7 +37,7 @@ interface PromptFormProps {
    // Handles two schema formats:
    // 1. Direct properties: { fieldName: { type, title, ... } }
    // 2. Nested $defs: { $defs: { InputSchema: { properties: {...} } } }
-   
+
    let schemaToUse = config.data.input_schema ?? null;
    if (schemaToUse && schemaToUse.$defs?.InputSchema) {
      schemaToUse = schemaToUse.$defs.InputSchema.properties;
@@ -200,7 +200,7 @@ getPromptIds: () => string[];
    const params = new URLSearchParams(window.location.search);
    const showForm = params.get('show_form');
    const promptIdsParam = params.get('promptIds');
-   
+
    if (showForm === 'true' || (promptIdsParam && promptIdsParam.trim().length > 0)) {
      setShowPromptForm(true);
    }
@@ -584,4 +584,3 @@ The system is ready for agent-based integration at multiple points:
 - Settings propagation through ChatWindow
 - Agent routing in API endpoints
 - Context preservation across message streams
-

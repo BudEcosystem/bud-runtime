@@ -97,7 +97,7 @@ const body = useMemo(() => {
 const handlePromptFormSubmit = (data: any) => {
   setPromptData(data);
   setPromptFormSubmitted(true);
-  
+
   // If agent context, save it
   if (data.agentId) {
     store.setAgentContext(chat.id, {
@@ -105,7 +105,7 @@ const handlePromptFormSubmit = (data: any) => {
       metadata: data.agentMetadata
     });
   }
-  
+
   append({ role: 'user', content: userMessage });
   setShowPromptForm(false);
 };
@@ -349,4 +349,3 @@ store/chat.ts
    - Lazy load agent configs
    - Cache agent settings
    - Minimize re-renders on agent context change
-

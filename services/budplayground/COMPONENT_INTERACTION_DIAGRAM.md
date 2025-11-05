@@ -175,7 +175,7 @@ USER INTERACTION:
    └─ setShowPromptForm(false)
 
 4. useChat merges data
-   
+
    ┌──────────────────────────────────────────┐
    │ useChat Body (for useChat hook)          │
    ├──────────────────────────────────────────┤
@@ -201,7 +201,7 @@ USER INTERACTION:
    └──────────────────────────────────────────┘
 
 5. POST /api/prompt-chat
-   
+
    ┌──────────────────────────────────────────┐
    │ Request Headers                          │
    ├──────────────────────────────────────────┤
@@ -210,7 +210,7 @@ USER INTERACTION:
    │ X-Agent-Metadata: {...}        [IF AGENT]│
    │ Content-Type: application/json           │
    └──────────────────────────────────────────┘
-   
+
    ┌──────────────────────────────────────────┐
    │ Request Body                             │
    ├──────────────────────────────────────────┤
@@ -649,4 +649,3 @@ API endpoint /api/prompt-chat
          ├─ If both fail: Throw error
          └─ If no text extracted: Empty but valid response
 ```
-

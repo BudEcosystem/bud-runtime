@@ -1,4 +1,4 @@
-[![ Bud Ecosystem](https://github.com/BudEcosystem/.github/blob/main/assets/bud-runtime-banner.png)]() 
+[![ Bud Ecosystem](https://github.com/BudEcosystem/.github/blob/main/assets/bud-runtime-banner.png)]()
 
 # Bud AI Foundry
 
