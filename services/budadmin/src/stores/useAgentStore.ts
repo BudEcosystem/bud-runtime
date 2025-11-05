@@ -13,6 +13,25 @@ export interface AgentVariable {
   validation?: string;
 }
 
+export interface AgentSettings {
+  id: string;
+  name: string;
+  temperature: number;
+  limit_response_length: boolean;
+  sequence_length: number;
+  context_overflow_policy: string;
+  stop_strings: string[];
+  top_k_sampling: number;
+  repeat_penalty: number;
+  top_p_sampling: number;
+  min_p_sampling: number;
+  enable_structured_json_schema: boolean;
+  structured_json_schema: string;
+  is_valid_json_schema: boolean;
+  created_at: string;
+  modified_at: string;
+}
+
 export interface AgentSession {
   id: string;
   name: string;
@@ -46,6 +65,10 @@ interface AgentStore {
   sessions: AgentSession[];
   activeSessionIds: string[];
 
+  // Settings
+  settingPresets: AgentSettings[];
+  currentSettingPreset: AgentSettings | null;
+
   // UI State
   isAgentDrawerOpen: boolean;
   selectedSessionId: string | null;
@@ -66,6 +89,11 @@ interface AgentStore {
   addOutputVariable: (sessionId: string) => void;
   updateVariable: (sessionId: string, variableId: string, updates: Partial<AgentVariable>) => void;
   deleteVariable: (sessionId: string, variableId: string) => void;
+
+  // Settings Management
+  addSettingPreset: (preset: AgentSettings) => void;
+  updateSettingPreset: (preset: AgentSettings) => void;
+  setCurrentSettingPreset: (preset: AgentSettings) => void;
 
   // UI Actions
   openAgentDrawer: (workflowId?: string, nextStep?: string) => void;
@@ -134,6 +162,8 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       // Initial State
       sessions: [],
       activeSessionIds: [],
+      settingPresets: [],
+      currentSettingPreset: null,
       isAgentDrawerOpen: false,
       selectedSessionId: null,
       isModelSelectorOpen: false,
@@ -306,6 +336,25 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
             };
           })
         });
+      },
+
+      // Settings Management
+      addSettingPreset: (preset) => {
+        set({
+          settingPresets: [...get().settingPresets, preset]
+        });
+      },
+
+      updateSettingPreset: (preset) => {
+        set({
+          settingPresets: get().settingPresets.map(p =>
+            p.id === preset.id ? preset : p
+          )
+        });
+      },
+
+      setCurrentSettingPreset: (preset) => {
+        set({ currentSettingPreset: preset });
       },
 
       // UI Actions

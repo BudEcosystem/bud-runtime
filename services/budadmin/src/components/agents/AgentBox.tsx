@@ -15,6 +15,8 @@ import { SettingsSidebar, SettingsType } from "./schema/SettingsSidebar";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { ToolsSidebar } from "./tools/ToolsSidebar";
 import { ToolsProvider, useTools } from "./contexts/ToolsContext";
+import { SettingsSidebar as ModelSettingsSidebar } from "./settings/SettingsSidebar";
+import { ModelSettingsProvider, useModelSettings } from "./contexts/ModelSettingsContext";
 import { PrimaryButton } from "../ui/bud/form/Buttons";
 import { buildPromptSchemaFromSession } from "@/utils/promptSchemaBuilder";
 import { successToast, errorToast } from "@/components/toast";
@@ -111,19 +113,25 @@ function AgentBoxInner({
   const { status: systemPromptWorkflowStatus, startWorkflow: startSystemPromptWorkflow } = systemPromptWorkflow;
   const { status: promptMessagesWorkflowStatus, startWorkflow: startPromptMessagesWorkflow } = promptMessagesWorkflow;
 
-  // Use the settings context
+  // Use the settings context (schema settings)
   const { isOpen: isSettingsOpen, activeSettings, openSettings, closeSettings, toggleSettings: toggleSettingsOriginal } = useSettings();
 
   // Use the tools context
   const { isOpen: isToolsOpen, toggleTools: toggleToolsOriginal, closeTools } = useTools();
 
-  // Determine which sidebar is open
-  const isRightSidebarOpen = isSettingsOpen || isToolsOpen;
+  // Use the model settings context
+  const { isOpen: isModelSettingsOpen, toggleModelSettings: toggleModelSettingsOriginal, closeModelSettings } = useModelSettings();
 
-  // Custom toggle functions that close the other sidebar
+  // Determine which sidebar is open
+  const isRightSidebarOpen = isSettingsOpen || isToolsOpen || isModelSettingsOpen;
+
+  // Custom toggle functions that close the other sidebars
   const toggleSettings = () => {
     if (isToolsOpen) {
       closeTools();
+    }
+    if (isModelSettingsOpen) {
+      closeModelSettings();
     }
     toggleSettingsOriginal();
   };
@@ -132,7 +140,20 @@ function AgentBoxInner({
     if (isSettingsOpen) {
       closeSettings();
     }
+    if (isModelSettingsOpen) {
+      closeModelSettings();
+    }
     toggleToolsOriginal();
+  };
+
+  const toggleModelSettings = () => {
+    if (isSettingsOpen) {
+      closeSettings();
+    }
+    if (isToolsOpen) {
+      closeTools();
+    }
+    toggleModelSettingsOriginal();
   };
 
   // Update local state when session changes
@@ -677,19 +698,19 @@ function AgentBoxInner({
 
         {/* Right Section - Action Buttons */}
         <div className="flex items-center gap-1">
-          {/* Settings Button - Works as toggle */}
+          {/* Model Settings Button - Works as toggle */}
           <button
-            className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer transition-none ${isRightSidebarOpen ? 'bg-[#965CDE] bg-opacity-20' : ''
+            className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer transition-none ${isModelSettingsOpen ? 'bg-[#965CDE] bg-opacity-20' : ''
               }`}
-            onClick={toggleSettings}
+            onClick={toggleModelSettings}
             style={{ transform: 'none' }}
           >
             <div
-              className={`w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group transition-none ${isRightSidebarOpen ? 'text-[#965CDE]' : 'text-[#B3B3B3] hover:text-[#FFFFFF]'
+              className={`w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group transition-none ${isModelSettingsOpen ? 'text-[#965CDE]' : 'text-[#B3B3B3] hover:text-[#FFFFFF]'
               }`}
               style={{ transform: 'none' }}
             >
-              <Tooltip title={isRightSidebarOpen ? "Close Settings" : "Settings"}>
+              <Tooltip title={isModelSettingsOpen ? "Close Settings" : "Model Settings"}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="18"
@@ -864,6 +885,12 @@ function AgentBoxInner({
             onClose={closeTools}
             promptId={session?.promptId}
           />
+
+          {/* Model Settings Sidebar */}
+          <ModelSettingsSidebar
+            isOpen={isModelSettingsOpen}
+            onClose={closeModelSettings}
+          />
         </div>
       </div>
     </div>
@@ -875,7 +902,9 @@ function AgentBox(props: AgentBoxProps) {
   return (
     <SettingsProvider>
       <ToolsProvider>
-        <AgentBoxInner {...props} />
+        <ModelSettingsProvider>
+          <AgentBoxInner {...props} />
+        </ModelSettingsProvider>
       </ToolsProvider>
     </SettingsProvider>
   );
