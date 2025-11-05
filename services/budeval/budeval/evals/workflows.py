@@ -340,7 +340,7 @@ class EvaluationWorkflow:
         monitor_input = {
             "job_ids": run_ids,
             "poll_interval": 30,  # keep it simple
-            "max_attempts": 240,  # ~2h cap
+            "max_attempts": 1000,  # ~2h cap
         }
 
         monitoring_result = yield ctx.call_child_workflow(
