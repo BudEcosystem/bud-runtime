@@ -837,10 +837,22 @@ class ExperimentService:
             eval_run_ids = {str(run.id) for run in eval_runs}
             eval_metrics = [metric for metric in exp_data.current_metrics if metric.get("run_id") in eval_run_ids]
 
+            # Filter out failed/cancelled/skipped runs and runs with score of 0 from average calculation
+            excluded_statuses = {
+                RunStatusEnum.FAILED.value,
+                RunStatusEnum.CANCELLED.value,
+                RunStatusEnum.SKIPPED.value,
+            }
+            valid_metrics = [
+                metric
+                for metric in eval_metrics
+                if metric.get("status") not in excluded_statuses and metric.get("score_value", 0) > 0
+            ]
+
             evaluation_avg_score = 0.0
-            if eval_metrics:
-                total_score = sum(metric["score_value"] for metric in eval_metrics)
-                evaluation_avg_score = round(total_score / len(eval_metrics), 2)
+            if valid_metrics:
+                total_score = sum(metric["score_value"] for metric in valid_metrics)
+                evaluation_avg_score = round(total_score / len(valid_metrics), 2)
 
             progress_overview.append(
                 ProgressOverview(
