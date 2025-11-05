@@ -44,6 +44,47 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
   const [selectedToolName, setSelectedToolName] = useState<string | null>(null);
 
+  // Reusable function to fetch tools
+  const fetchTools = React.useCallback(async () => {
+    if (!promptId) return;
+
+    setIsLoadingTools(true);
+    try {
+      const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/tools`, {
+        params: {
+          prompt_id: promptId,
+          connector_id: connector.id,
+          page: 1,
+          limit: 100,
+        }
+      });
+
+      if (response.data && response.data.tools) {
+        const tools: Tool[] = response.data.tools;
+        setAvailableTools(tools);
+
+        // Auto-select tools that have is_added: true
+        const addedToolIds = tools
+          .filter((tool) => tool.is_added === true)
+          .map((tool) => tool.id)
+          .filter(Boolean);
+
+        if (addedToolIds.length > 0) {
+          setSelectedTools(addedToolIds);
+          // Check if all tools are added
+          if (addedToolIds.length === tools.length) {
+            setSelectAll(true);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching tools:', error);
+      errorToast('Failed to fetch tools');
+    } finally {
+      setIsLoadingTools(false);
+    }
+  }, [promptId, connector.id]);
+
   // Fetch connector details on mount
   useEffect(() => {
     fetchConnectorDetails(connector.id);
@@ -51,48 +92,10 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
   // Fetch tools if coming from connected section
   useEffect(() => {
-    const fetchTools = async () => {
-      if (connector.isFromConnectedSection && promptId) {
-        setIsLoadingTools(true);
-        try {
-          const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/tools`, {
-            params: {
-              prompt_id: promptId,
-              connector_id: connector.id,
-              page: 1,
-              limit: 100, // Fetch all tools
-            }
-          });
-
-          if (response.data && response.data.tools) {
-            const tools: Tool[] = response.data.tools;
-            setAvailableTools(tools);
-
-            // Auto-select tools that have is_added: true
-            const addedToolIds = tools
-              .filter((tool) => tool.is_added === true)
-              .map((tool) => tool.id)
-              .filter(Boolean);
-
-            if (addedToolIds.length > 0) {
-              setSelectedTools(addedToolIds);
-              // Check if all tools are added
-              if (addedToolIds.length === tools.length) {
-                setSelectAll(true);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching tools:', error);
-          errorToast('Failed to fetch tools');
-        } finally {
-          setIsLoadingTools(false);
-        }
-      }
-    };
-
-    fetchTools();
-  }, [connector.isFromConnectedSection, connector.id, promptId]);
+    if (connector.isFromConnectedSection && promptId) {
+      fetchTools();
+    }
+  }, [connector.isFromConnectedSection, promptId, fetchTools]);
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
@@ -191,54 +194,13 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         setStep(2);
 
         // Fetch tools after successful registration
-        await fetchToolsAfterRegistration();
+        await fetchTools();
       }
     } catch (error: any) {
       console.error('Error registering connector:', error);
       errorToast(error?.response?.data?.message || 'Failed to register connector');
     } finally {
       setIsRegistering(false);
-    }
-  };
-
-  // Fetch tools after registration
-  const fetchToolsAfterRegistration = async () => {
-    if (!promptId) return;
-
-    setIsLoadingTools(true);
-    try {
-      const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/tools`, {
-        params: {
-          prompt_id: promptId,
-          connector_id: connector.id,
-          page: 1,
-          limit: 100,
-        }
-      });
-
-      if (response.data && response.data.tools) {
-        const tools: Tool[] = response.data.tools;
-        setAvailableTools(tools);
-
-        // Auto-select tools that have is_added: true
-        const addedToolIds = tools
-          .filter((tool) => tool.is_added === true)
-          .map((tool) => tool.id)
-          .filter(Boolean);
-
-        if (addedToolIds.length > 0) {
-          setSelectedTools(addedToolIds);
-          // Check if all tools are added
-          if (addedToolIds.length === tools.length) {
-            setSelectAll(true);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching tools:', error);
-      errorToast('Failed to fetch tools');
-    } finally {
-      setIsLoadingTools(false);
     }
   };
 
@@ -282,7 +244,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
           },
         });
         // Refresh tools list to show updated is_added status
-        await fetchToolsAfterRegistration();
+        await fetchTools();
       }
     } catch (error: any) {
       console.error('Error connecting tools:', error);
