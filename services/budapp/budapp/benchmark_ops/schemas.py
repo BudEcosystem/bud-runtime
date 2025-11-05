@@ -122,8 +122,33 @@ class BenchmarkResponse(BaseModel):
             values = values.__dict__  # Convert object to dictionary
 
         nodes = values.get("nodes", [])
-        values["node_type"] = ",".join({device["type"] for node in nodes for device in node.get("devices", [])})
-        values["vendor_type"] = ",".join({device["name"] for node in nodes for device in node.get("devices", [])})
+        # Handle both list and single object formats
+        nodes_list = nodes if isinstance(nodes, list) else [nodes] if nodes else []
+
+        # Extract device types and vendor names in a single iteration
+        node_types = set()
+        vendor_types = set()
+
+        for node in nodes_list:
+            if not isinstance(node, dict):
+                continue
+            for device in node.get("devices", []):
+                # Ensure device is a dictionary
+                if isinstance(device, dict):
+                    # Extract device type
+                    device_type = device.get("type")
+                    if device_type:
+                        node_types.add(device_type)
+
+                    # Extract vendor name
+                    device_config = device.get("device_config")
+                    if isinstance(device_config, dict):
+                        vendor = device_config.get("vendor")
+                        if vendor:
+                            vendor_types.add(vendor)
+
+        values["node_type"] = ", ".join(sorted(node_types)) or "Unknown"
+        values["vendor_type"] = ", ".join(sorted(vendor_types)) or "Unknown"
         return values
 
 
