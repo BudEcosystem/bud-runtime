@@ -594,6 +594,10 @@ class ExpDataset(BaseModel):
         None,
         description="Advantages and disadvantages with structure {'advantages': ['str1'], 'disadvantages': ['str2']}.",
     )
+    eval_types: Optional[dict] = Field(
+        None,
+        description="Evaluation type configurations like {'gen': 'gsm8k_gen', 'agent': 'gsm8k_agent'}.",
+    )
     traits: List[Trait] = Field([], description="Traits associated with this dataset.")
 
     class Config:
@@ -625,6 +629,10 @@ class DatasetFilter(BaseModel):
     language: Optional[List[str]] = Field(None, description="Filter by languages.")
     domains: Optional[List[str]] = Field(None, description="Filter by domains.")
     trait_ids: Optional[List[UUID4]] = Field(None, description="Filter by trait UUIDs.")
+    has_gen_eval_type: Optional[bool] = Field(
+        None,
+        description="Filter datasets that have 'gen' key in eval_types. True to include only datasets with 'gen' key.",
+    )
 
 
 class CreateDatasetRequest(BaseModel):
