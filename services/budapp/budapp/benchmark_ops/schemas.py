@@ -130,6 +130,8 @@ class BenchmarkResponse(BaseModel):
         vendor_types = set()
 
         for node in nodes_list:
+            if not isinstance(node, dict):
+                continue
             for device in node.get("devices", []):
                 # Ensure device is a dictionary
                 if isinstance(device, dict):
@@ -139,7 +141,7 @@ class BenchmarkResponse(BaseModel):
                         node_types.add(device_type)
 
                     # Extract vendor name
-                    device_config = device.get("device_config", {})
+                    device_config = device.get("device_config")
                     if isinstance(device_config, dict):
                         vendor = device_config.get("vendor")
                         if vendor:
