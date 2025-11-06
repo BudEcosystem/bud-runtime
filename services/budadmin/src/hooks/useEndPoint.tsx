@@ -308,8 +308,10 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
         }
       );
       successToast(response.data.message);
+      return response;
     } catch (error) {
       console.error("Error creating model:", error);
+      return null;
     }
   },
 

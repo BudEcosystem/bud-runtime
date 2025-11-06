@@ -409,6 +409,14 @@ valkey:
     save ""
   auth:
     password: bud
+  primary:
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 1000m
   # Optional node scheduling for Valkey (Redis)
   master:
     nodeSelector: {}
@@ -448,6 +456,11 @@ clickhouse:
   # Optional node scheduling for ClickHouse
   nodeSelector: {}
   affinity: {}
+  resources:
+    requests:
+      memory: 1Gi
+    limits:
+      memory: 4Gi
 clickhouseExtra:
   autoCreateDB:
     - budproxy

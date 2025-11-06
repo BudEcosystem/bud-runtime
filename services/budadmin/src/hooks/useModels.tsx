@@ -216,6 +216,7 @@ type GetModelParams = {
     base_model?: string;
     base_model_relation?: string;
     supported_endpoints?: string[];
+    exclude_adapters?: boolean;
 };
 
 // create zustand store

@@ -1352,7 +1352,20 @@ class ClickHouseClient:
             except Exception as e:
                 # Ensure cursor is properly closed on errors
                 logger.error(f"Query execution failed: {e}. Query: {query[:100]}...")
+                # Try to clean up cursor state before raising
+                try:
+                    await self._cleanup_cursor_state(cursor)
+                except Exception as cleanup_error:
+                    logger.warning(f"Cursor cleanup failed during error handling: {cleanup_error}")
                 raise
+            finally:
+                # Ensure all remaining results are consumed to avoid "records not fetched" errors
+                try:
+                    while await cursor.fetchone():
+                        pass  # Consume all remaining records
+                except Exception as e:
+                    # Ignore errors when consuming remaining results
+                    logger.warning(f"Failed to consume remaining cursor results: {e}")
 
     async def execute_iter(
         self,

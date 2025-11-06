@@ -2074,13 +2074,15 @@ class EndpointService(SessionMixin):
         db_adapter = await AdapterDataManager(self.session).insert_one(adapter_create)
 
         # Create model_table Redis entry for the adapter using parent endpoint's config
+        # Track if model_table was successfully created for rollback purposes
+        model_table_created = False
         try:
             # Fetch parent endpoint to get URL, namespace, and other routing config
             db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
                 EndpointModel, {"id": db_adapter.endpoint_id}
             )
 
-            # Credentials is set to Noe, as adapter is only for HF models
+            # Credentials is set to None, as adapter is only for HF models
             encrypted_credential_data = None
 
             # Use model.source for provider type (same pattern as endpoint publication)
@@ -2096,18 +2098,36 @@ class EndpointService(SessionMixin):
                 encrypted_credential_data=encrypted_credential_data,  # Pass credentials if available
                 include_pricing=False,  # Adapters don't have separate pricing
             )
+            model_table_created = True
             logger.debug(f"Added adapter {db_adapter.id} to proxy cache with model_table entry")
         except Exception as e:
             logger.error(f"Failed to add adapter {db_adapter.id} to proxy cache: {e}")
-            # Don't fail the workflow if cache update fails
+            # Mark adapter as FAILED since cache creation failed
+            await AdapterDataManager(self.session).update_by_fields(db_adapter, {"status": AdapterStatusEnum.FAILURE})
+            # Re-raise to fail the workflow - don't create orphaned api_key entry
+            raise
 
         # Update proxy cache to add the new adapter to api_key mappings
-        try:
-            await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
-            await self.update_published_model_cache()
-            logger.debug(f"Updated proxy cache for project {db_endpoint.project_id} after adapter creation")
-        except (RedisException, Exception) as e:
-            logger.error(f"Failed to update proxy cache after adapter creation: {e}")
+        # Only proceed if model_table was successfully created
+        if model_table_created:
+            try:
+                await CredentialService(self.session).update_proxy_cache(db_endpoint.project_id)
+                await self.update_published_model_cache()
+                logger.debug(f"Updated proxy cache for project {db_endpoint.project_id} after adapter creation")
+            except (RedisException, Exception) as e:
+                logger.error(f"Failed to update proxy cache after adapter creation: {e}")
+                # If api_key update fails but model_table succeeded, clean up model_table
+                try:
+                    await self.delete_model_from_proxy_cache(db_adapter.id)
+                    logger.debug(f"Cleaned up model_table:{db_adapter.id} after api_key update failure")
+                except Exception as cleanup_error:
+                    logger.error(f"Failed to cleanup model_table after api_key update failure: {cleanup_error}")
+                # Mark adapter as FAILED
+                await AdapterDataManager(self.session).update_by_fields(
+                    db_adapter, {"status": AdapterStatusEnum.FAILURE}
+                )
+                # Re-raise to fail the workflow
+                raise
 
         # Update workflow step data
         workflow_step_data = {
