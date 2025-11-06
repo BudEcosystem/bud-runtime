@@ -327,6 +327,21 @@ class PromptSchemaRequest(CloudEventBase):
     access_token: Optional[str] = Field(None, description="JWT access token to be hashed for API key bypass")
 
 
+class PromptCleanupItem(BaseModel):
+    """Item for cleanup request."""
+
+    prompt_id: str = Field(..., description="Prompt identifier")
+    version: Optional[int] = Field(default=1, description="Version number (defaults to 1)")
+
+
+class PromptCleanupRequest(CloudEventBase):
+    """Request for MCP cleanup endpoint."""
+
+    prompts: Optional[List[PromptCleanupItem]] = Field(
+        default_factory=list, description="Prompts to cleanup. None/empty = cleanup expired prompts"
+    )
+
+
 class PromptSchemaResponse(ResponseBase):
     """Response schema for prompt schema validation."""
 
@@ -334,6 +349,16 @@ class PromptSchemaResponse(ResponseBase):
     workflow_id: UUID
     prompt_id: str = Field(..., description="Unique identifier for the prompt configuration")
     version: int | str = Field(..., description="The version of the prompt configuration that was saved")
+    created: int = Field(default_factory=lambda: int(time.time()))
+
+
+class PromptCleanupResponse(ResponseBase):
+    """Response schema for prompt cleanup."""
+
+    object: lowercase_string = "prompt_cleanup"
+    workflow_id: UUID
+    cleaned: List[Dict[str, Any]] = Field(default_factory=list, description="Successfully cleaned prompts")
+    failed: List[Dict[str, Any]] = Field(default_factory=list, description="Failed cleanup prompts")
     created: int = Field(default_factory=lambda: int(time.time()))
 
 
@@ -381,9 +406,11 @@ class PromptConfigurationData(BaseModel):
 
 
 class MCPCleanupRegistryEntry(BaseModel):
-    """Single cleanup entry in the common registry for MCP resource cleanup."""
+    """Single cleanup entry in the common registry for MCP resource cleanup.
 
-    prompt_key: str = Field(..., description="Full Redis key of the prompt config")
+    Note: prompt_key is used as the dictionary key in the registry, not stored in the entry.
+    """
+
     prompt_id: str = Field(..., description="Prompt identifier")
     version: int = Field(..., description="Version number")
     created_at: str = Field(..., description="ISO 8601 timestamp when first created")

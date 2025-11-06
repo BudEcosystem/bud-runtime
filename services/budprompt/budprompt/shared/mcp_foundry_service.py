@@ -27,7 +27,7 @@ from ..commons.exceptions import MCPFoundryException
 from ..shared.singleton import SingletonMeta
 
 
-logger = logging.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class MCPFoundryService(metaclass=SingletonMeta):
@@ -48,11 +48,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         # Initialize session as None, will be created on demand
         self._session: Optional[aiohttp.ClientSession] = None
 
-        logger.debug(
-            "MCP Foundry service initialized",
-            base_url=self.base_url,
-            has_api_key=bool(self.api_key),
-        )
+        logger.debug(f"MCP Foundry service initialized: base_url={self.base_url}, has_api_key={bool(self.api_key)}")
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create the aiohttp session.
@@ -109,11 +105,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 session = await self._get_session()
 
                 logger.debug(
-                    "Making MCP Foundry request",
-                    method=method,
-                    url=url,
-                    attempt=attempt + 1,
-                    params=params,
+                    f"Making MCP Foundry request: method={method}, url={url}, attempt={attempt + 1}, params={params}"
                 )
 
                 async with session.request(
@@ -149,10 +141,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                     data = await response.json()
 
                     logger.debug(
-                        "MCP Foundry request successful",
-                        method=method,
-                        url=url,
-                        status=response.status,
+                        f"MCP Foundry request successful: method={method}, url={url}, status={response.status}"
                     )
 
                     return data
@@ -160,11 +149,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             except aiohttp.ClientConnectionError as e:
                 last_exception = e
                 error_msg = f"Connection error to MCP Foundry: {str(e)}"
-                logger.warning(
-                    error_msg,
-                    attempt=attempt + 1,
-                    max_retries=self.max_retries,
-                )
+                logger.warning(f"{error_msg}: attempt={attempt + 1}, max_retries={self.max_retries}")
 
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
