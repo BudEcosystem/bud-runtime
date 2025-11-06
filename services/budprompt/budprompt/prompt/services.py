@@ -641,6 +641,10 @@ class PromptConfigurationService:
             else:
                 config_data = PromptConfigurationData()
 
+            # Store deployment_name if provided in request
+            if "deployment_name" in request_dict and request_dict["deployment_name"]:
+                config_data.deployment_name = request.deployment_name
+
             # Update configuration based on type
             if request.type == "input":
                 # Store input schema
