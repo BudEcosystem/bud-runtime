@@ -47,6 +47,7 @@ export default function SelectWithAdd(props: SelectWithAddProps) {
             )}
             options={options.map((item) => ({ label: item.name, value: item.id }))}
             onChange={onChange}
+            className='agentSelect'
         />
     );
 }

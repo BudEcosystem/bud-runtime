@@ -8,6 +8,7 @@ import InlineSwitch from "./input/InlineSwitch";
 import SelectWithAdd from "./input/SelectWithAdd";
 import LabelJSONInput from "./input/LabelJSONInput";
 import { useAgentStore, AgentSettings } from "@/stores/useAgentStore";
+import { Text_16_400_EEEEEE } from '@/components/ui/text';
 
 interface SettingsListItemProps {
     title: string;
@@ -27,7 +28,7 @@ function SettingsListItem(props: SettingsListItemProps) {
             >
                 <div className="flex flex-row items-center gap-[.4rem] py-[.5rem]">
                     <Image
-                        src="/icons/circle-settings.svg"
+                        src="/agents/icons/circle-settings.svg"
                         className={`transform transition-transform ${open ? "rotate-180" : ""}`}
                         preview={false}
                         alt="settings"
@@ -40,7 +41,7 @@ function SettingsListItem(props: SettingsListItemProps) {
                 </div>
                 <div className="flex flex-row items-center gap-[1rem] p-[.5rem]">
                     <Image
-                        src="/icons/chevron-down.svg"
+                        src="/agents/icons/chevron-down.svg"
                         className={`transform transition-transform ${open ? "" : "rotate-180"}`}
                         preview={false}
                         alt="chevron"
@@ -143,7 +144,7 @@ export default function Settings() {
             {
                 title: "Presets",
                 description: "Presets",
-                icon: "/icons/circle-settings.svg",
+                icon: "/agents/icons/circle-settings.svg",
                 children: (
                     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem] px-[.5rem]">
                         <SelectWithAdd
@@ -158,7 +159,7 @@ export default function Settings() {
             {
                 title: "Basic",
                 description: "General settings",
-                icon: "/icons/circle-settings.svg",
+                icon: "/agents/icons/circle-settings.svg",
                 children: (
                     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
                         <SliderInput
@@ -195,7 +196,7 @@ export default function Settings() {
             {
                 title: "Sampling",
                 description: "Sampling settings",
-                icon: "/icons/circle-settings.svg",
+                icon: "/agents/icons/circle-settings.svg",
                 children: (
                     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
                         <InlineInput
@@ -215,7 +216,7 @@ export default function Settings() {
             {
                 title: "Advanced",
                 description: "Advanced settings",
-                icon: "/icons/circle-settings.svg",
+                icon: "/agents/icons/circle-settings.svg",
                 children: (
                     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
                         <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
@@ -240,7 +241,7 @@ export default function Settings() {
                                             }}
                                             closeIcon={
                                                 <Image
-                                                    src="/icons/close.svg"
+                                                    src="/agents/icons/close.svg"
                                                     alt="Close"
                                                     preview={false}
                                                     className="!w-[.625rem] !h-[.625rem]"
@@ -259,7 +260,7 @@ export default function Settings() {
             {
                 title: "Structured Output",
                 description: "JSON settings",
-                icon: "/icons/circle-settings.svg",
+                icon: "/agents/icons/circle-settings.svg",
                 children: (
                     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
                         <InlineSwitch
@@ -295,10 +296,34 @@ export default function Settings() {
     }, [settings, settingPresets.length, initComponents]);
 
     return (
-        <div className="relative flex flex-col w-full h-full overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]">
-            {components?.map((item, index) => (
-                <SettingsListItem key={index} {...item} />
-            ))}
+        <div className="relative flex flex-col w-full h-full overflow-y-auto pb-[5rem]">
+            <div className="flex items-center justify-between border-b-[1px] border-b-[#1F1F1F] px-[0.9375rem] py-[1.5rem]">
+                <Text_16_400_EEEEEE className="leading-[100%]">Model Settings</Text_16_400_EEEEEE>
+                <button
+                    className="text-[#B3B3B3] hover:text-[#FFFFFF] transition-colors"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 18 18"
+                        fill="none"
+                    >
+                        <path
+                            d="M13.5 4.5L4.5 13.5M4.5 4.5L13.5 13.5"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                    </svg>
+                </button>
+            </div>
+            <div className='px-[1rem] pt-[.75rem]'>
+                {components?.map((item, index) => (
+                    <SettingsListItem key={index} {...item} />
+                ))}
+            </div>
         </div>
     );
 }

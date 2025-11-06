@@ -11,12 +11,22 @@ export function SettingsSidebar({ isOpen, onClose }: SettingsSidebarProps) {
 
   return (
     <div
-      className="absolute right-0 top-0 h-full w-[15rem] bg-[#0A0A0A] border-l border-[#1F1F1F] z-20 overflow-hidden"
+      className="z-[100] tools-box absolute p-3 right-0 top-0 h-full transition-all duration-300 ease-in-out translate-x-0"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex flex-col h-full">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-[#1F1F1F]">
+      <div
+        className="flex flex-col h-full w-[16rem] prompt-settings overflow-y-auto rounded-[12px]"
+        style={{
+          backgroundImage: 'url(/agents/settingsBg.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        <Settings />
+      </div>
+      {/* <div className="flex flex-col h-full">
+]        <div className="flex items-center justify-between p-4 border-b border-[#1F1F1F]">
           <h3 className="text-[#EEEEEE] text-sm font-medium">Model Settings</h3>
           <button
             onClick={onClose}
@@ -39,12 +49,10 @@ export function SettingsSidebar({ isOpen, onClose }: SettingsSidebarProps) {
             </svg>
           </button>
         </div>
-
-        {/* Settings Content */}
         <div className="flex-1 overflow-y-auto">
           <Settings />
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }
