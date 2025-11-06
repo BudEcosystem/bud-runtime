@@ -436,7 +436,7 @@ function AgentBoxInner({
         version: 1,
         set_default: false,
         deployment_name: session.selectedDeployment.model.name,
-        model_settings: getDefaultModelSettings(session),
+        // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
         messages: [
           {
@@ -544,7 +544,7 @@ function AgentBoxInner({
         version: 1,
         set_default: false,
         deployment_name: session.selectedDeployment.model.name,
-        model_settings: getDefaultModelSettings(session),
+        // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
         messages: messages.map((msg: any) => ({
           role: msg.role,
