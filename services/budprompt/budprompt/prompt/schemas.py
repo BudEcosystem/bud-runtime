@@ -380,6 +380,19 @@ class PromptConfigurationData(BaseModel):
     )
 
 
+class MCPCleanupRegistryEntry(BaseModel):
+    """Single cleanup entry in the common registry for MCP resource cleanup."""
+
+    prompt_key: str = Field(..., description="Full Redis key of the prompt config")
+    prompt_id: str = Field(..., description="Prompt identifier")
+    version: int = Field(..., description="Version number")
+    created_at: str = Field(..., description="ISO 8601 timestamp when first created")
+    expires_at: str = Field(..., description="ISO 8601 timestamp when expires")
+    cleanup_failed: bool = Field(default=False, description="Flag if cleanup failed")
+    reason: Optional[str] = Field(None, description="Error reason if cleanup failed")
+    mcp_resources: Dict[str, Any] = Field(..., description="MCP resource IDs to cleanup")
+
+
 class PromptExecuteData(BaseModel):
     """Schema for prompt configuration."""
 

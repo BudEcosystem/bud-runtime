@@ -21,6 +21,7 @@ import json
 import logging
 import time
 import uuid
+from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, Optional, Union
 
 from budmicroframe.commons.constants import WorkflowStatus
@@ -33,6 +34,7 @@ from budmicroframe.shared.dapr_workflow import DaprWorkflow
 from pydantic import ValidationError
 
 from ..commons.config import app_settings
+from ..commons.constants import CLEANUP_REGISTRY_KEY
 from ..commons.exceptions import (
     ClientException,
     PromptExecutionException,
@@ -46,6 +48,7 @@ from .executors import SimplePromptExecutor_V1
 from .revised_code.field_validation import generate_validation_function
 from .schema_builder import ModelGeneratorFactory
 from .schemas import (
+    MCPCleanupRegistryEntry,
     PromptConfigCopyRequest,
     PromptConfigCopyResponse,
     PromptConfigGetRawResponse,
@@ -906,6 +909,96 @@ class PromptService:
         """Initialize the PromptService."""
         self.redis_service = RedisService()
 
+    def _extract_mcp_resources(self, tools: list[Dict[str, Any]]) -> Dict[str, Any]:
+        """Extract MCP resource IDs from tools configuration.
+
+        Args:
+            tools: List of tool configurations
+
+        Returns:
+            Dictionary with virtual_server_id and gateways
+        """
+        mcp_resources = {"virtual_server_id": None, "gateways": {}}
+
+        for tool in tools:
+            if tool.get("type") == "mcp":
+                # Extract virtual server ID
+                if tool.get("server_url"):
+                    mcp_resources["virtual_server_id"] = tool.get("server_url")
+
+                # Extract gateway IDs
+                gateway_config = tool.get("gateway_config", {})
+                for connector_id, gateway_id in gateway_config.items():
+                    if gateway_id:
+                        mcp_resources["gateways"][connector_id] = gateway_id
+
+        return mcp_resources
+
+    async def _add_to_cleanup_registry(
+        self, prompt_id: str, version: int, redis_key: str, ttl: int, mcp_resources: Dict[str, Any]
+    ) -> None:
+        """Add or update entry in the common cleanup registry.
+
+        Args:
+            prompt_id: Prompt identifier
+            version: Version number
+            redis_key: Full Redis key of prompt config
+            ttl: TTL in seconds
+            mcp_resources: Extracted MCP resource IDs
+        """
+        # Read current registry
+        registry_json = await self.redis_service.get(CLEANUP_REGISTRY_KEY)
+        registry_list = json.loads(registry_json) if registry_json else []
+
+        # Find existing entry
+        existing_entry = None
+        existing_index = None
+        for idx, entry in enumerate(registry_list):
+            if entry["prompt_key"] == redis_key:
+                existing_entry = entry
+                existing_index = idx
+                break
+
+        # Calculate timestamps
+        now = datetime.now(timezone.utc)
+        expires_at = datetime.fromtimestamp(now.timestamp() + ttl, tz=timezone.utc)
+
+        # Create or update entry
+        if existing_entry:
+            # UPDATE: preserve created_at
+            entry_data = MCPCleanupRegistryEntry(
+                prompt_key=redis_key,
+                prompt_id=prompt_id,
+                version=version,
+                created_at=existing_entry["created_at"],
+                expires_at=expires_at.isoformat(),
+                cleanup_failed=False,  # Reset on update
+                reason=None,
+                mcp_resources=mcp_resources,
+            )
+            registry_list[existing_index] = entry_data.model_dump()
+            logger.debug(f"Updated cleanup registry entry for {redis_key}")
+        else:
+            # CREATE: new entry
+            entry_data = MCPCleanupRegistryEntry(
+                prompt_key=redis_key,
+                prompt_id=prompt_id,
+                version=version,
+                created_at=now.isoformat(),
+                expires_at=expires_at.isoformat(),
+                cleanup_failed=False,
+                reason=None,
+                mcp_resources=mcp_resources,
+            )
+            registry_list.append(entry_data.model_dump())
+            logger.debug(f"Added cleanup registry entry for {redis_key}")
+
+        # Write back to Redis (no TTL - permanent registry)
+        updated_registry_json = json.dumps(registry_list, indent=2)
+        await self.redis_service.set(CLEANUP_REGISTRY_KEY, updated_registry_json)
+
+        logger.info(f"Cleanup registry updated. Total entries: {len(registry_list)}")
+
     async def save_prompt_config(self, request: PromptConfigRequest) -> PromptConfigResponse:
         """Save or update prompt configuration in Redis.
 
@@ -983,6 +1076,20 @@ class PromptService:
                     f"Stored {storage_type} prompt configuration for prompt_id: {request.prompt_id} v{version} "
                     f"without updating default"
                 )
+
+            # Add to cleanup registry for temporary prompts with MCP tools
+            if not request.permanent and config_data.tools:
+                mcp_resources = self._extract_mcp_resources(config_data.tools)
+
+                # Only add if MCP resources exist
+                if mcp_resources["virtual_server_id"] or mcp_resources["gateways"]:
+                    await self._add_to_cleanup_registry(
+                        prompt_id=request.prompt_id,
+                        version=version,
+                        redis_key=redis_key,
+                        ttl=ttl,
+                        mcp_resources=mcp_resources,
+                    )
 
             return PromptConfigResponse(
                 code=200,
