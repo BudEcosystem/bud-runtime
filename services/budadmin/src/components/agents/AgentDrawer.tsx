@@ -58,14 +58,14 @@ const AgentDrawer: React.FC = () => {
 
   // Handle Play button click
   const handlePlayClick = () => {
-    if (!showPlayground && !showChatHistory) {
-      // If playground view is completely closed, open it
-      setShowPlayground(true);
-      setShowChatHistory(false);
-    } else {
-      // If any playground view is open (including chat history), switch to type mode
-      setShowPlayground(true);
-      setShowChatHistory(false);
+    const wasAnyViewOpen = showPlayground || showChatHistory;
+
+    // Always ensure the playground is shown and chat history is hidden when play is clicked
+    setShowPlayground(true);
+    setShowChatHistory(false);
+
+    if (wasAnyViewOpen) {
+      // If a view was already open, switch to type mode
       setTypeFormMessage({ timestamp: Date.now(), value: true });
     }
   };
