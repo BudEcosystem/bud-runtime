@@ -664,21 +664,44 @@ class PromptConfigurationService:
                 if "validations" in request_dict["schema"]:
                     config_data.output_validation = validation_codes
 
-            # Convert to JSON and store in Redis with configured TTL
+            # Determine TTL: None for permanent storage, configured TTL otherwise
+            permanent = request_dict.get("permanent", False)
+            ttl = None if permanent else app_settings.prompt_config_redis_ttl
+            storage_type = "permanent" if permanent else f"with {ttl}s TTL"
+
+            # Convert to JSON and store in Redis with determined TTL
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
-            run_async(redis_service.set(redis_key, config_json, ex=app_settings.prompt_config_redis_ttl))
+            run_async(redis_service.set(redis_key, config_json, ex=ttl))
 
             # Only set default version pointer if set_default is True
             set_default = request_dict.get("set_default", False)
             if set_default:
                 default_version_key = f"prompt:{prompt_id}:default_version"
-                run_async(redis_service.set(default_version_key, redis_key, ex=app_settings.prompt_config_redis_ttl))
+                run_async(redis_service.set(default_version_key, redis_key, ex=ttl))
                 logger.debug(
-                    f"Stored prompt configuration for prompt_id: {prompt_id}, type: {request.type}, updated default to v{version}"
+                    f"Stored {storage_type} prompt configuration for prompt_id: {prompt_id}, type: {request.type}, updated default to v{version}"
                 )
             else:
                 logger.debug(
-                    f"Stored prompt configuration for prompt_id: {prompt_id}, type: {request.type}, v{version} without updating default"
+                    f"Stored {storage_type} prompt configuration for prompt_id: {prompt_id}, type: {request.type}, v{version} without updating default"
+                )
+
+            # Add to cleanup registry for all temporary prompts
+            if not permanent:
+                # Create service instance to access instance methods
+                prompt_service = PromptService()
+
+                # Extract MCP resources (will be empty if no tools)
+                mcp_resources = prompt_service._extract_mcp_resources(config_data.tools or [])
+
+                run_async(
+                    prompt_service._add_to_cleanup_registry(
+                        prompt_id=prompt_id,
+                        version=version,
+                        redis_key=redis_key,
+                        ttl=ttl,
+                        mcp_resources=mcp_resources,
+                    )
                 )
 
             notification_req.payload.content = NotificationContent(
