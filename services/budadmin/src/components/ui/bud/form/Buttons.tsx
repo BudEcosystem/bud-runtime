@@ -44,6 +44,7 @@ export function PrimaryButton({
                 cursor: "not-allowed",
                 borderRadius: "0.3rem",
                 height: "1.75rem",
+                borderColor: "#965CDE",
                 background: "#1E0C34 !important",
               }}
             >
@@ -71,7 +72,7 @@ export function PrimaryButton({
       ) : (
         <Button
           {...props}
-          className={`flex justify-center items-center !border-[.5px] !border-[#965CDE] font-normal hover:bg-[#965CDE] ${classNames}
+          className={`flex justify-center items-center !border-[.5px] font-normal hover:bg-[#965CDE] ${classNames}
       ${disabled ? "!bg-[#1E0C34] hover:!bg-[#1E0C34] border-[#965CDE] text-[#888888] cursor-not-allowed" : "!bg-[#1E0C34] hover:!bg-[#965CDE]"} `}
           disabled={disabled} // Ensures that the button is actually disabled
           style={{
@@ -80,6 +81,7 @@ export function PrimaryButton({
             paddingRight: ".7rem",
             borderRadius: "0.3rem",
             height: "1.75rem",
+            borderColor: "#965CDE",
             background: "#1E0C34",
           }}
         >

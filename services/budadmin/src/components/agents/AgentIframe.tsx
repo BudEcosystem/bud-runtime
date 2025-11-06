@@ -1,5 +1,5 @@
-import { playGroundUrl } from "@/components/environment";
 import React, { useEffect, useRef, useState } from "react";
+import { playGroundUrl } from "../environment";
 
 interface AgentIframeProps {
   sessionId?: string;
@@ -43,19 +43,18 @@ const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], ty
       };
 
       // Send message to iframe with specific origin for security
+      // Extract origin from the actual iframe URL being used
+      let targetOrigin = 'https://admin.dev.bud.studio/';
       try {
-        if (!playGroundUrl) {
-          console.error('playGroundUrl is not defined. Check NEXT_PUBLIC_PLAYGROUND_URL environment variable.');
-          return;
-        }
-        const targetOrigin = new URL(playGroundUrl).origin;
-        iframeRef.current.contentWindow.postMessage(message, targetOrigin);
-        console.log('Sent typeForm message to iframe:', message);
+        targetOrigin = new URL(iframeUrl).origin;
       } catch (error) {
-        console.error('Failed to send message to iframe:', error);
+        console.warn('Failed to parse iframe URL for origin, using wildcard:', error);
       }
+
+      iframeRef.current.contentWindow.postMessage(message, targetOrigin);
+      console.log('Sent typeForm message to iframe:', message);
     }
-  }, [typeFormMessage]);
+  }, [typeFormMessage, iframeUrl]);
 
   // Check if playGroundUrl is defined
   if (!playGroundUrl) {
