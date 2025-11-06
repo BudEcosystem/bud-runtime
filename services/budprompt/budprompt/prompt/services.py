@@ -950,7 +950,8 @@ class PromptService:
                     "prompt_id",
                     "version",
                     "set_default",
-                ]:  # Skip prompt_id, version, and set_default as they're not part of config_data
+                    "permanent",
+                ]:
                     setattr(config_data, field_name, value)
 
             # Convert to JSON and store in Redis with configured TTL
@@ -963,18 +964,24 @@ class PromptService:
                     message="Enabling tools requires multiple LLM calls.",
                 )
 
+            # Determine TTL: None for permanent storage, configured TTL otherwise
+            ttl = None if request.permanent else app_settings.prompt_config_redis_ttl
+            storage_type = "permanent" if request.permanent else f"with {ttl}s TTL"
+
             # Store in Redis
-            await self.redis_service.set(redis_key, config_json, ex=app_settings.prompt_config_redis_ttl)
+            await self.redis_service.set(redis_key, config_json, ex=ttl)
 
             if request.set_default:
                 default_version_key = f"prompt:{request.prompt_id}:default_version"
-                await self.redis_service.set(default_version_key, redis_key, ex=app_settings.prompt_config_redis_ttl)
+                await self.redis_service.set(default_version_key, redis_key, ex=ttl)
                 logger.debug(
-                    f"Stored prompt configuration for prompt_id: {request.prompt_id} and updated default to v{version}"
+                    f"Stored {storage_type} prompt configuration for prompt_id: {request.prompt_id} "
+                    f"and updated default to v{version}"
                 )
             else:
                 logger.debug(
-                    f"Stored prompt configuration for prompt_id: {request.prompt_id} v{version} without updating default"
+                    f"Stored {storage_type} prompt configuration for prompt_id: {request.prompt_id} v{version} "
+                    f"without updating default"
                 )
 
             return PromptConfigResponse(

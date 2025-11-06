@@ -436,6 +436,10 @@ class PromptConfigRequest(BaseModel):
     )
     version: Optional[int] = Field(None, ge=1, description="Version of the configuration to save (defaults to 1)")
     set_default: bool = Field(False, description="Whether to set this version as the default (defaults to False)")
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
     deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
     model_settings: Optional[ModelSettings] = Field(None, description="Model settings configuration")
     stream: Optional[bool] = Field(None, description="Enable streaming response")
