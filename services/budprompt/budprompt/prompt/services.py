@@ -1077,19 +1077,18 @@ class PromptService:
                     f"without updating default"
                 )
 
-            # Add to cleanup registry for temporary prompts with MCP tools
-            if not request.permanent and config_data.tools:
-                mcp_resources = self._extract_mcp_resources(config_data.tools)
+            # Add to cleanup registry for all temporary prompts
+            if not request.permanent:
+                # Extract MCP resources (will be empty if no tools)
+                mcp_resources = self._extract_mcp_resources(config_data.tools or [])
 
-                # Only add if MCP resources exist
-                if mcp_resources["virtual_server_id"] or mcp_resources["gateways"]:
-                    await self._add_to_cleanup_registry(
-                        prompt_id=request.prompt_id,
-                        version=version,
-                        redis_key=redis_key,
-                        ttl=ttl,
-                        mcp_resources=mcp_resources,
-                    )
+                await self._add_to_cleanup_registry(
+                    prompt_id=request.prompt_id,
+                    version=version,
+                    redis_key=redis_key,
+                    ttl=ttl,
+                    mcp_resources=mcp_resources,
+                )
 
             return PromptConfigResponse(
                 code=200,
