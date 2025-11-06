@@ -250,6 +250,13 @@ class PromptSchemaConfig(BaseModel):
     )
 
 
+class PromptCleanupItem(BaseModel):
+    """Item for cleanup request."""
+
+    prompt_id: str = Field(..., description="Prompt identifier")
+    version: Optional[int] = Field(default=1, description="Version number (defaults to 1)")
+
+
 class CreatePromptWorkflowRequest(BaseModel):
     """Create prompt workflow request schema."""
 
@@ -271,6 +278,9 @@ class CreatePromptWorkflowRequest(BaseModel):
     rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
     rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
     bud_prompt_id: str | None = None
+    discarded_prompt_ids: Optional[List[PromptCleanupItem]] = Field(
+        None, description="List of temporary prompt IDs discarded by user that need cleanup"
+    )
 
     @model_validator(mode="after")
     def validate_fields(self):
@@ -309,6 +319,9 @@ class CreatePromptWorkflowSteps(BaseModel):
     rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
     rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
     bud_prompt_id: str | None = None
+    discarded_prompt_ids: Optional[List[PromptCleanupItem]] = Field(
+        None, description="List of temporary prompt IDs to cleanup"
+    )
 
 
 class EditPromptRequest(BaseModel):

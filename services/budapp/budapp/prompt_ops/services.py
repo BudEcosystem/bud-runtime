@@ -1977,6 +1977,55 @@ class PromptService(SessionMixin):
                 message="Failed to copy prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
+    async def _perform_cleanup_request(self, prompt_ids: List) -> Dict[str, Any]:
+        """Perform cleanup request to budprompt service via Dapr.
+
+        Args:
+            prompt_ids: List of prompt cleanup items with prompt_id and version
+
+        Returns:
+            Response data from budprompt service
+
+        Raises:
+            ClientException: If request fails
+        """
+        cleanup_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-cleanup"
+
+        # Prepare payload with prompts list
+        payload = {"prompts": prompt_ids}
+
+        logger.debug(f"Performing cleanup request to budprompt: {payload}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(cleanup_endpoint, json=payload) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        logger.error(f"Failed to cleanup prompts: {response.status} {response_data}")
+                        raise ClientException(
+                            message=response_data.get("message", "Failed to cleanup prompts"),
+                            status_code=response.status,
+                        )
+
+                    logger.debug(f"Successfully cleaned up {len(prompt_ids)} prompts")
+                    return response_data
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Network error during cleanup request: {e}")
+            raise ClientException(
+                message="Network error while cleaning up prompts",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            ) from e
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception(f"Failed to cleanup prompts: {e}")
+            raise ClientException(
+                message="Failed to cleanup prompts",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
     async def delete_prompt_from_proxy_cache(self, prompt_id: UUID) -> None:
         """Delete prompt from proxy cache.
 
@@ -2140,6 +2189,7 @@ class PromptWorkflowService(SessionMixin):
             rate_limit=rate_limit,
             rate_limit_value=rate_limit_value,
             bud_prompt_id=bud_prompt_id,
+            discarded_prompt_ids=request.discarded_prompt_ids,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Create or update workflow step
@@ -2175,6 +2225,7 @@ class PromptWorkflowService(SessionMixin):
                 "rate_limit",
                 "rate_limit_value",
                 "bud_prompt_id",
+                "discarded_prompt_ids",
             ]
 
             # from workflow steps extract necessary information
@@ -2321,6 +2372,21 @@ class PromptWorkflowService(SessionMixin):
             except Exception as e:
                 logger.error(f"Failed to update credential proxy cache: {e}")
                 # Continue - cache update is non-critical
+
+            # Cleanup discarded prompt resources
+            discarded_prompt_ids = merged_data.get("discarded_prompt_ids", [])
+            if discarded_prompt_ids and len(discarded_prompt_ids) > 0:
+                try:
+                    logger.debug(f"Triggering cleanup for {len(discarded_prompt_ids)} discarded prompts")
+                    prompt_service = PromptService(self.session)
+                    await prompt_service._perform_cleanup_request(discarded_prompt_ids)
+                    logger.debug("Cleanup completed successfully")
+                except Exception as e:
+                    # Log error but don't fail prompt creation
+                    logger.error(
+                        f"Failed to cleanup discarded prompts, but prompt creation succeeded: {e}",
+                        exc_info=True,
+                    )
 
             # Store final result in workflow step
             # NOTE: increment step to display success message
