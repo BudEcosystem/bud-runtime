@@ -69,31 +69,23 @@ interface ConnectorsStore {
   // Filter state
   searchQuery: string;
 
-  // Actions - Only the ones actually used by Tools components
+  // Public Actions - Used by Tools components
   fetchConnectedTools: (params?: ConnectorsListParams) => Promise<void>;
   fetchUnregisteredTools: (params?: ConnectorsListParams) => Promise<void>;
   fetchConnectorDetails: (connectorId: string) => Promise<void>;
   setSearchQuery: (query: string) => void;
 }
 
-export const useConnectors = create<ConnectorsStore>((set, get) => ({
-  // Initial state
-  connectors: [],
-  connectedTools: [],
-  selectedConnectorDetails: null,
-  totalCount: 0,
-  currentPage: 1,
-  pageSize: 10,
-  totalPages: 0,
-  isLoading: false,
-  isLoadingMore: false,
-  isLoadingDetails: false,
-  searchQuery: "",
-
-  // Fetch connected tools (is_registered: true)
-  fetchConnectedTools: async (params?: ConnectorsListParams) => {
+export const useConnectors = create<ConnectorsStore>((set, get) => {
+  // Internal generic fetch function to reduce duplication
+  const fetchConnectors = async (
+    params: ConnectorsListParams | undefined,
+    isRegistered: boolean,
+    updateTarget: 'connectedTools' | 'connectors'
+  ) => {
     const state = get();
 
+    // Set loading state based on pagination
     if (params?.page && params.page > 1) {
       set({ isLoadingMore: true });
     } else {
@@ -101,10 +93,11 @@ export const useConnectors = create<ConnectorsStore>((set, get) => ({
     }
 
     try {
+      // Build query parameters
       const queryParams: ConnectorsListParams = {
-        page: params?.page || 1,
+        page: params?.page || (updateTarget === 'connectors' ? state.currentPage : 1),
         limit: params?.limit || state.pageSize,
-        is_registered: true,
+        is_registered: isRegistered,
         search: params?.search !== undefined ? params.search : (state.searchQuery.length > 0),
         order_by: params?.order_by || "-created_at",
       };
@@ -119,71 +112,15 @@ export const useConnectors = create<ConnectorsStore>((set, get) => ({
         queryParams.name = state.searchQuery;
       }
 
-      // Remove undefined values
+      // Remove undefined/empty values
       Object.keys(queryParams).forEach(key => {
-        if (queryParams[key as keyof ConnectorsListParams] === undefined || queryParams[key as keyof ConnectorsListParams] === "") {
+        const value = queryParams[key as keyof ConnectorsListParams];
+        if (value === undefined || value === "") {
           delete queryParams[key as keyof ConnectorsListParams];
         }
       });
 
-      const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/connectors`, {
-        params: queryParams,
-      });
-
-      if (response.data) {
-        const tools = response.data.connectors || response.data.data || [];
-
-        set({
-          connectedTools: tools,
-          isLoading: false,
-          isLoadingMore: false,
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching connected tools:", error);
-      set({
-        isLoading: false,
-        isLoadingMore: false
-      });
-    }
-  },
-
-  // Fetch unregistered tools (is_registered: false)
-  fetchUnregisteredTools: async (params?: ConnectorsListParams) => {
-    const state = get();
-
-    if (params?.page && params.page > 1) {
-      set({ isLoadingMore: true });
-    } else {
-      set({ isLoading: true });
-    }
-
-    try {
-      const queryParams: ConnectorsListParams = {
-        page: params?.page || state.currentPage,
-        limit: params?.limit || state.pageSize,
-        is_registered: false,
-        search: params?.search !== undefined ? params.search : (state.searchQuery.length > 0),
-        order_by: params?.order_by || "-created_at",
-      };
-
-      // Add prompt_id if available
-      if (params?.prompt_id) {
-        queryParams.prompt_id = params.prompt_id;
-      }
-
-      // Add search query
-      if (state.searchQuery) {
-        queryParams.name = state.searchQuery;
-      }
-
-      // Remove undefined values
-      Object.keys(queryParams).forEach(key => {
-        if (queryParams[key as keyof ConnectorsListParams] === undefined || queryParams[key as keyof ConnectorsListParams] === "") {
-          delete queryParams[key as keyof ConnectorsListParams];
-        }
-      });
-
+      // Make API request
       const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/connectors`, {
         params: queryParams,
       });
@@ -192,52 +129,84 @@ export const useConnectors = create<ConnectorsStore>((set, get) => ({
         const tools = response.data.connectors || response.data.data || [];
         const isLoadMore = params?.page && params.page > 1;
 
-        // Update or append connectors based on whether we're loading more
-        const newConnectors = isLoadMore
-          ? [...state.connectors, ...tools]
-          : tools;
+        // Update state based on target and pagination
+        if (updateTarget === 'connectedTools') {
+          set({
+            connectedTools: tools,
+            isLoading: false,
+            isLoadingMore: false,
+          });
+        } else {
+          // For connectors, support pagination
+          const newConnectors = isLoadMore ? [...state.connectors, ...tools] : tools;
 
-        set({
-          connectors: newConnectors,
-          totalCount: response.data.total || tools.length,
-          currentPage: response.data.page || params?.page || 1,
-          totalPages: response.data.total_pages || Math.ceil((response.data.total || tools.length) / state.pageSize),
-          isLoading: false,
-          isLoadingMore: false,
-        });
+          set({
+            connectors: newConnectors,
+            totalCount: response.data.total || tools.length,
+            currentPage: response.data.page || params?.page || 1,
+            totalPages: response.data.total_pages || Math.ceil((response.data.total || tools.length) / state.pageSize),
+            isLoading: false,
+            isLoadingMore: false,
+          });
+        }
       }
     } catch (error) {
-      console.error("Error fetching unregistered tools:", error);
+      console.error(`Error fetching ${isRegistered ? 'connected' : 'unregistered'} tools:`, error);
       set({
         isLoading: false,
         isLoadingMore: false
       });
     }
-  },
+  };
 
-  // Fetch connector details
-  fetchConnectorDetails: async (connectorId: string) => {
-    set({ isLoadingDetails: true });
+  return {
+    // Initial state
+    connectors: [],
+    connectedTools: [],
+    selectedConnectorDetails: null,
+    totalCount: 0,
+    currentPage: 1,
+    pageSize: 10,
+    totalPages: 0,
+    isLoading: false,
+    isLoadingMore: false,
+    isLoadingDetails: false,
+    searchQuery: "",
 
-    try {
-      const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/connectors/${connectorId}`);
+    // Public wrapper: Fetch connected tools (is_registered: true)
+    fetchConnectedTools: async (params?: ConnectorsListParams) => {
+      await fetchConnectors(params, true, 'connectedTools');
+    },
 
-      if (response.data && response.data.connector) {
+    // Public wrapper: Fetch unregistered tools (is_registered: false)
+    fetchUnregisteredTools: async (params?: ConnectorsListParams) => {
+      await fetchConnectors(params, false, 'connectors');
+    },
+
+    // Fetch connector details
+    fetchConnectorDetails: async (connectorId: string) => {
+      set({ isLoadingDetails: true });
+
+      try {
+        const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/connectors/${connectorId}`);
+
+        if (response.data && response.data.connector) {
+          set({
+            selectedConnectorDetails: response.data.connector,
+            isLoadingDetails: false,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching connector details:", error);
         set({
-          selectedConnectorDetails: response.data.connector,
           isLoadingDetails: false,
         });
       }
-    } catch (error) {
-      console.error("Error fetching connector details:", error);
-      set({
-        isLoadingDetails: false,
-      });
-    }
-  },
+    },
 
-  // Filter actions
-  setSearchQuery: (query) => {
-    set({ searchQuery: query });
-  },
-}));
+    // Filter actions
+    setSearchQuery: (query) => {
+      set({ searchQuery: query });
+    },
+  };
+});
