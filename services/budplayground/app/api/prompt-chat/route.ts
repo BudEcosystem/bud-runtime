@@ -94,17 +94,9 @@ export async function POST(req: Request) {
   const model = body.model || 'qwen-4b-tools';
   const baseURL = resolveGatewayBase(body.metadata?.base_url ?? null);
 
-  console.log('[Prompt Chat] Using model:', model);
-  console.log('[Prompt Chat] Is follow-up message:', isFollowUpMessage);
-  console.log('[Prompt Chat] Messages count:', body.messages?.length || 0);
-  console.log('[Prompt Chat] Prompt input:', promptInput);
-  console.log('[Prompt Chat] Base URL:', baseURL);
-
   try {
     // Check if this is a structured prompt (has variables)
     const hasStructuredInput = body.prompt?.variables && Object.keys(body.prompt.variables).length > 0;
-
-    console.log('[Prompt Chat] Has structured input:', hasStructuredInput);
 
     // Build request body for gateway
     const requestBody: any = {
@@ -114,8 +106,6 @@ export async function POST(req: Request) {
 
     if (isFollowUpMessage) {
       // For follow-up messages, include the conversation history
-      console.log('[Prompt Chat] Building request for follow-up message');
-
       requestBody.messages = body.messages;
 
       // Still include prompt context (id and version) but NOT variables
@@ -127,8 +117,6 @@ export async function POST(req: Request) {
       }
     } else {
       // For initial prompt submission, use the original approach
-      console.log('[Prompt Chat] Building request for initial prompt submission');
-
       // Only include input field for unstructured prompts
       if (!hasStructuredInput && promptInput) {
         requestBody.input = promptInput;
@@ -153,8 +141,6 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log('[Prompt Chat] Request body:', JSON.stringify(requestBody, null, 2));
-
     // Make direct fetch call to gateway
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -163,16 +149,11 @@ export async function POST(req: Request) {
       ...(body.metadata?.project_id && { 'project-id': body.metadata.project_id }),
     };
 
-    console.log('[Prompt Chat] Sending request to:', `${baseURL}/responses`);
-
     const response = await fetch(`${baseURL}/responses`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
     });
-
-    console.log('[Prompt Chat] Response status:', response.status);
-    console.log('[Prompt Chat] Response content-type:', response.headers.get('content-type'));
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -191,7 +172,6 @@ export async function POST(req: Request) {
 
     // Get the response as text first
     const responseText = await response.text();
-    console.log('[Prompt Chat] Response text preview:', responseText.substring(0, 200));
 
     let text = '';
     let usage: any = null;
@@ -199,8 +179,6 @@ export async function POST(req: Request) {
 
     // Check if it's SSE format (starts with "event:")
     if (responseText.startsWith('event:')) {
-      console.log('[Prompt Chat] Parsing SSE format response');
-
       // Parse SSE stream
       const lines = responseText.split('\n');
       let currentEvent = '';
@@ -241,12 +219,8 @@ export async function POST(req: Request) {
           }
         }
       }
-
-      console.log('[Prompt Chat] Extracted text from SSE:', text.substring(0, 100));
     } else {
       // Try to parse as JSON (fallback)
-      console.log('[Prompt Chat] Parsing JSON format response');
-
       try {
         const result = JSON.parse(responseText);
 
@@ -270,8 +244,6 @@ export async function POST(req: Request) {
         throw new Error('Failed to parse gateway response');
       }
     }
-
-    console.log('[Prompt Chat] Final extracted text length:', text.length);
 
     // Create a streaming response for useChat
     const encoder = new TextEncoder();
