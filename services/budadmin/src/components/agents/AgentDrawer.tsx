@@ -63,7 +63,8 @@ const AgentDrawer: React.FC = () => {
       setShowPlayground(true);
       setShowChatHistory(false);
     } else {
-      // If playground is already open, send typeForm=true message
+      // If playground is already open, switch to type mode and ensure chat history is off
+      setShowChatHistory(false);
       setTypeFormMessage({ timestamp: Date.now(), value: true });
     }
   };
@@ -81,7 +82,7 @@ const AgentDrawer: React.FC = () => {
     // Only allow click if playground is enabled
     if (showPlayground || showChatHistory) {
       setShowChatHistory(true);
-      // setShowPlayground(false);
+      setShowPlayground(false);
       setTypeFormMessage({ timestamp: Date.now(), value: false });
     }
   };
