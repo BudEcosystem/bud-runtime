@@ -191,7 +191,7 @@ const AgentDrawer: React.FC = () => {
                   onClick={handlePlayClick}
                   className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors mb-3"
                 >
-                  <PlayCircleOutlined className={`text-lg ${(showPlayground && !showChatHistory) ? 'text-[#EEEEEE]' : 'text-[#808080] hover:text-[#EEEEEE]'}`} />
+                  <PlayCircleOutlined className={`text-lg ${showPlayground ? 'text-[#EEEEEE]' : 'text-[#808080] hover:text-[#EEEEEE]'}`} />
                 </button>
               </Tooltip>
 
