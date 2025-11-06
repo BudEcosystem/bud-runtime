@@ -42,7 +42,7 @@ const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], ty
 
       // Send message to iframe with specific origin for security
       // Extract origin from the actual iframe URL being used
-      let targetOrigin = '*';
+      let targetOrigin = 'https://admin.dev.bud.studio/';
       try {
         targetOrigin = new URL(iframeUrl).origin;
       } catch (error) {
