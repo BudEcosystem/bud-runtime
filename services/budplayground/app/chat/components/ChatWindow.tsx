@@ -29,7 +29,6 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
   const [showPromptForm, setShowPromptForm] = useState<boolean>(false);
-  const [isPrompPresent, setIsPromptPresent] = useState<boolean>(false);
   const [promptFormSubmitted, setPromptFormSubmitted] = useState<boolean>(false);
 
   // State to control PromptForm visibility based on postMessage from parent window
@@ -108,9 +107,6 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     // Show form if either show_form=true OR promptIds exist in URL
     if (showForm === 'true' || (promptIdsParam && promptIdsParam.trim().length > 0)) {
       setShowPromptForm(true);
-    }
-    if ((promptIdsParam && promptIdsParam.trim().length > 0)) {
-      setIsPromptPresent(true);
     }
   }, []);
 
@@ -396,37 +392,35 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             )}
           </div>
         </Content>
-        {!isPrompPresent && (
-          <Footer className="sticky bottom-0 !px-[2.6875rem]">
-            <NormalEditor
-              isLoading={status === "submitted" || status === "streaming"}
-              error={error}
-              disabled={
-                promptIds.length > 0
-                  ? !promptFormSubmitted
-                  : !chat?.selectedDeployment?.name
-              }
-              isPromptMode={promptIds.length > 0}
-              stop={stop}
-              handleInputChange={handleChange}
-              handleSubmit={(e) => {
-                // setSubmitInput(e);
-                handleSubmit(e);
+        <Footer className="sticky bottom-0 !px-[2.6875rem]">
+          <NormalEditor
+            isLoading={status === "submitted" || status === "streaming"}
+            error={error}
+            disabled={
+              promptIds.length > 0
+                ? !promptFormSubmitted
+                : !chat?.selectedDeployment?.name
+            }
+            isPromptMode={promptIds.length > 0}
+            stop={stop}
+            handleInputChange={handleChange}
+            handleSubmit={(e) => {
+              // setSubmitInput(e);
+              handleSubmit(e);
 
-                // Use smooth scrolling with scrollTo
-                setTimeout(() => {
-                  if (contentRef.current) {
-                    contentRef.current.scrollTo({
-                      top: contentRef.current.scrollHeight,
-                      behavior: 'smooth'
-                    });
-                  }
-                }, 100);
-              }}
-              input={input}
-            />
-          </Footer>
-        )}
+              // Use smooth scrolling with scrollTo
+              setTimeout(() => {
+                if (contentRef.current) {
+                  contentRef.current.scrollTo({
+                    top: contentRef.current.scrollHeight,
+                    behavior: 'smooth'
+                  });
+                }
+              }, 100);
+            }}
+            input={input}
+          />
+        </Footer>
 
         {/* Prompt Form - Absolutely positioned at bottom */}
         {enablePromptForm && showPromptForm && getPromptIds().length > 0 && (
