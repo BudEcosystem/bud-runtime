@@ -29,6 +29,7 @@ from budapp.commons.constants import (
     BudServeWorkflowStepEventName,
     VisibilityEnum,
     WorkflowStatusEnum,
+    WorkflowTypeEnum,
 )
 from budapp.commons.db_utils import SessionMixin
 from budapp.commons.exceptions import ClientException
@@ -666,6 +667,15 @@ class WorkflowService(SessionMixin):
             logger.error("Unable to delete failed or completed workflow")
             raise ClientException("Workflow is not in progress state")
 
+        # Cleanup for PROMPT_CREATION workflows
+        if db_workflow.workflow_type == WorkflowTypeEnum.PROMPT_CREATION:
+            try:
+                cleanup_service = WorkflowCleanupService(self.session)
+                await cleanup_service.cleanup_prompt_creation_workflow(workflow_id)
+            except Exception as e:
+                # Log warning but continue with deletion
+                logger.warning(f"Cleanup failed for workflow {workflow_id} but continuing with deletion: {e}")
+
         # Define success messages for different workflow types
         success_response = WORKFLOW_DELETE_MESSAGES.get(db_workflow.workflow_type, "Workflow deleted successfully")
 
@@ -690,6 +700,65 @@ class WorkflowService(SessionMixin):
         filters_dict["visibility"] = VisibilityEnum.PUBLIC
 
         return await WorkflowDataManager(self.session).get_all_workflows(offset, limit, filters_dict, order_by, search)
+
+
+class WorkflowCleanupService(SessionMixin):
+    """Service for handling post-deletion cleanup of workflows."""
+
+    async def cleanup_prompt_creation_workflow(self, workflow_id: UUID) -> None:
+        """Cleanup discarded prompts from a PROMPT_CREATION workflow.
+
+        Args:
+            workflow_id: The workflow UUID to cleanup
+
+        This method:
+        1. Fetches all workflow steps for the given workflow_id
+        2. Extracts discarded_prompt_ids from step data
+        3. Calls budprompt service to cleanup MCP resources
+        4. Logs errors but does not raise exceptions (best-effort cleanup)
+        """
+        try:
+            # Get all workflow steps
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": workflow_id}
+            )
+
+            # Define keys to extract from workflow steps
+            keys_of_interest = ["discarded_prompt_ids"]
+
+            # Extract necessary information from workflow steps
+            required_data = {}
+            for db_workflow_step in db_workflow_steps:
+                for key in keys_of_interest:
+                    if key in db_workflow_step.data:
+                        required_data[key] = db_workflow_step.data[key]
+
+            # Get discarded_prompt_ids
+            discarded_prompt_ids = required_data.get("discarded_prompt_ids", [])
+
+            # Only proceed if there are prompts to cleanup
+            if not discarded_prompt_ids or len(discarded_prompt_ids) == 0:
+                logger.debug(f"No discarded prompts to cleanup for workflow {workflow_id}")
+                return
+
+            # Call cleanup via PromptService
+            logger.debug(
+                f"Triggering cleanup for {len(discarded_prompt_ids)} discarded prompts from workflow {workflow_id}"
+            )
+
+            from budapp.prompt_ops.services import PromptService
+
+            prompt_service = PromptService(self.session)
+            await prompt_service._perform_cleanup_request(discarded_prompt_ids)
+
+            logger.debug(f"Successfully cleaned up {len(discarded_prompt_ids)} prompts from workflow {workflow_id}")
+
+        except Exception as e:
+            # Log error but don't raise - cleanup is best-effort
+            logger.warning(
+                f"Failed to cleanup discarded prompts from workflow {workflow_id}: {e}",
+                exc_info=True,
+            )
 
 
 class WorkflowStepService(SessionMixin):
