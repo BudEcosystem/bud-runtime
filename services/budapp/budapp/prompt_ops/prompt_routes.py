@@ -51,6 +51,7 @@ from .schemas import (
     GatewayResponse,
     GetPromptVersionResponse,
     PaginatedTagsResponse,
+    PromptCleanupRequest,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -1293,3 +1294,69 @@ async def get_tool(
             message="Failed to get tool",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+@router.post(
+    "/prompt-cleanup",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully cleaned up prompts",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Trigger cleanup of temporary prompt resources (MCP gateways, virtual servers, etc.)",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def cleanup_prompts(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: PromptCleanupRequest,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Cleanup temporary prompt resources.
+
+    This endpoint triggers cleanup of MCP resources (gateways, virtual servers)
+    for temporary prompts.
+
+    Execution modes:
+    - debug=false: Runs cleanup asynchronously via Dapr workflow in budprompt
+    - debug=true: Runs cleanup synchronously for immediate feedback
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        request: Cleanup request with list of prompts and debug flag
+
+    Returns:
+        SuccessResponse with status code and message, or ErrorResponse on failure
+    """
+    try:
+        logger.debug(
+            f"Cleanup request received for {len(request.prompts)} prompts (debug={request.debug}, user={current_user.id})"
+        )
+
+        prompt_service = PromptService(session)
+
+        # Call cleanup with debug flag
+        await prompt_service._perform_cleanup_request(prompt_ids=request.prompts, debug=request.debug)
+
+        return SuccessResponse(
+            message=f"Successfully triggered cleanup for {len(request.prompts)} prompts",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to cleanup prompts: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to cleanup prompts: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cleanup prompts"
+        ).to_http_response()

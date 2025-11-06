@@ -257,6 +257,18 @@ class PromptCleanupItem(BaseModel):
     version: Optional[int] = Field(default=1, description="Version number (defaults to 1)")
 
 
+class PromptCleanupRequest(BaseModel):
+    """Request for triggering prompt cleanup."""
+
+    prompts: List[PromptCleanupItem] = Field(
+        ..., description="List of prompts to cleanup with prompt_id and optional version"
+    )
+    debug: bool = Field(
+        default=True,
+        description="Run cleanup synchronously (true) or via workflow (false). Defaults to true",
+    )
+
+
 class CreatePromptWorkflowRequest(BaseModel):
     """Create prompt workflow request schema."""
 

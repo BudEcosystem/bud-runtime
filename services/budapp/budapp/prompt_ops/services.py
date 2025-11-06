@@ -1977,11 +1977,12 @@ class PromptService(SessionMixin):
                 message="Failed to copy prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
-    async def _perform_cleanup_request(self, prompt_ids: List) -> Dict[str, Any]:
+    async def _perform_cleanup_request(self, prompt_ids: List, debug: bool = False) -> Dict[str, Any]:
         """Perform cleanup request to budprompt service via Dapr.
 
         Args:
             prompt_ids: List of prompt cleanup items with prompt_id and version
+            debug: If True, runs cleanup synchronously. If False, runs via Dapr workflow (default)
 
         Returns:
             Response data from budprompt service
@@ -1992,7 +1993,7 @@ class PromptService(SessionMixin):
         cleanup_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-cleanup"
 
         # Prepare payload with prompts list
-        payload = {"prompts": prompt_ids}
+        payload = {"prompts": prompt_ids, "debug": debug}
 
         logger.debug(f"Performing cleanup request to budprompt: {payload}")
 
