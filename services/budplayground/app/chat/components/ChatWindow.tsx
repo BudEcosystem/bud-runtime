@@ -202,6 +202,19 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     addMessage(chat.id, promptMessage);
     addMessage(chat.id, responseMessage);
 
+    // After the first prompt message completes, update promptData to only include prompt ID context
+    // This ensures subsequent messages don't re-send the variables
+    if (promptData && promptData.prompt?.variables) {
+      setPromptData({
+        prompt: {
+          id: promptData.prompt?.id,
+          version: promptData.prompt?.version,
+        },
+        promptId: promptData.promptId,
+        model: promptData.model,
+      });
+    }
+
     // Use smooth scrolling with scrollTo
     setTimeout(() => {
       if (contentRef.current) {
@@ -250,18 +263,8 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       content: userMessage,
     });
 
-    // After the first message is sent, update promptData to only include prompt ID context
-    // This ensures subsequent messages don't re-send the variables
-    setTimeout(() => {
-      setPromptData({
-        prompt: {
-          id: data.prompt?.id,
-          version: data.prompt?.version,
-        },
-        promptId: data.promptId,
-        model: data.model,
-      });
-    }, 1000);
+    // Note: promptData will be updated in handleFinish after the first message completes
+    // to only include prompt ID context for subsequent messages
 
     // Close the form
     setShowPromptForm(false);
