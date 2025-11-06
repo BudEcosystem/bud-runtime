@@ -11,9 +11,11 @@ const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], ty
   const [refreshToken, setRefreshToken] = useState("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Build iframe URL for agent playground with promptIds
+  // Build iframe URL for agent playground with promptIds (safe fallback if playGroundUrl is undefined)
   const promptIdsParam = promptIds.filter(id => id).join(',');
-  const iframeUrl = `${playGroundUrl}/chat?embedded=true&refresh_token=${refreshToken}&is_single_chat=false${promptIdsParam ? `&promptIds=${promptIdsParam}` : ''}`;
+  const iframeUrl = playGroundUrl
+    ? `${playGroundUrl}/chat?embedded=true&refresh_token=${refreshToken}&is_single_chat=false${promptIdsParam ? `&promptIds=${promptIdsParam}` : ''}`
+    : '';
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -41,11 +43,30 @@ const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], ty
       };
 
       // Send message to iframe with specific origin for security
-      const targetOrigin = new URL(playGroundUrl).origin;
-      iframeRef.current.contentWindow.postMessage(message, targetOrigin);
-      console.log('Sent typeForm message to iframe:', message);
+      try {
+        if (!playGroundUrl) {
+          console.error('playGroundUrl is not defined. Check NEXT_PUBLIC_PLAYGROUND_URL environment variable.');
+          return;
+        }
+        const targetOrigin = new URL(playGroundUrl).origin;
+        iframeRef.current.contentWindow.postMessage(message, targetOrigin);
+        console.log('Sent typeForm message to iframe:', message);
+      } catch (error) {
+        console.error('Failed to send message to iframe:', error);
+      }
     }
   }, [typeFormMessage]);
+
+  // Check if playGroundUrl is defined
+  if (!playGroundUrl) {
+    return (
+      <div style={{ width: "100%", height: "100%", border: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <h1 className="text-[#FF0000] text-2xl font-bold">
+          Playground URL is not configured. Please set NEXT_PUBLIC_PLAYGROUND_URL environment variable.
+        </h1>
+      </div>
+    );
+  }
 
   if (!refreshToken) {
     return (

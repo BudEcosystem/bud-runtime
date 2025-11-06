@@ -396,33 +396,35 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
           </div>
         </Content>
         <Footer className="sticky bottom-0 !px-[2.6875rem]">
-          <NormalEditor
-            isLoading={status === "submitted" || status === "streaming"}
-            error={error}
-            disabled={
-              promptIds.length > 0
-                ? !promptFormSubmitted
-                : !chat?.selectedDeployment?.name
-            }
-            isPromptMode={promptIds.length > 0}
-            stop={stop}
-            handleInputChange={handleChange}
-            handleSubmit={(e) => {
-              // setSubmitInput(e);
-              handleSubmit(e);
+          {promptIds.length === 0 && (
+            <NormalEditor
+              isLoading={status === "submitted" || status === "streaming"}
+              error={error}
+              disabled={
+                promptIds.length > 0
+                  ? !promptFormSubmitted
+                  : !chat?.selectedDeployment?.name
+              }
+              isPromptMode={promptIds.length > 0}
+              stop={stop}
+              handleInputChange={handleChange}
+              handleSubmit={(e) => {
+                // setSubmitInput(e);
+                handleSubmit(e);
 
-              // Use smooth scrolling with scrollTo
-              setTimeout(() => {
-                if (contentRef.current) {
-                  contentRef.current.scrollTo({
-                    top: contentRef.current.scrollHeight,
-                    behavior: 'smooth'
-                  });
-                }
-              }, 100);
-            }}
-            input={input}
-          />
+                // Use smooth scrolling with scrollTo
+                setTimeout(() => {
+                  if (contentRef.current) {
+                    contentRef.current.scrollTo({
+                      top: contentRef.current.scrollHeight,
+                      behavior: 'smooth'
+                    });
+                  }
+                }, 100);
+              }}
+              input={input}
+            />
+          )}
         </Footer>
 
         {/* Prompt Form - Absolutely positioned at bottom */}
