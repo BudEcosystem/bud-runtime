@@ -224,7 +224,7 @@ Executive summary with key findings, data structures, and answers to common ques
 ### File Locations
 All files are located in the budplayground service root:
 ```
-/Users/athul/Documents/BUD-RUNTIME/playground/bud-runtime/services/budplayground/
+<project-root>/services/budplayground/
 ```
 
 ### Component File Paths

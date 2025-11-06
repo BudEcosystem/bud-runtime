@@ -342,7 +342,7 @@ Response in ChatWindow
 
 All analysis files are located in:
 ```
-/Users/athul/Documents/BUD-RUNTIME/playground/bud-runtime/services/budplayground/
+<project-root>/services/budplayground/
 ```
 
 - `CHAT_FLOW_ANALYSIS.md` - Comprehensive technical analysis
