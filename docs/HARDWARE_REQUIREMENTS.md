@@ -16,56 +16,51 @@ The platform consists of:
 
 ## Infrastructure Requirements Summary
 
-### Minimum Requirements (Development/Testing)
+### AI in Box - OEM
 
 | Resource | Requirement |
 |----------|-------------|
 | **CPU Cores** | 32 cores |
 | **Memory (RAM)** | 64 GiB |
 | **Storage (SSD)** | 200 GiB |
-| **Network Bandwidth** | 1 Gbps |
 | **Operating System** | Linux (Ubuntu 22.04+, RHEL 8+, or OpenShift 4.12+) |
 | **Kubernetes** | Version 1.29+ |
 
-**Typical Configuration**: 3 nodes × (8 vCPU, 16GB RAM, 100GB SSD)
+**Max concurrency**: Upto 100 concurrent users
 
 ---
 
-### Recommended Requirements (Staging/Small Production)
+### Enterprise deployment
 
 | Resource | Requirement |
 |----------|-------------|
-| **CPU Cores** | 60-80 cores |
-| **Memory (RAM)** | 80-120 GiB |
-| **Storage (SSD)** | 500-1,000 GiB |
-| **Network Bandwidth** | 5-10 Gbps |
-| **Operating System** | Linux (Ubuntu 20.04+, RHEL 8+, or OpenShift 4.12+) |
-| **Kubernetes** | Version 1.25+ |
+| **CPU Cores** | 96 cores |
+| **Memory (RAM)** | 384 GiB |
+| **Storage (SSD)** | 5 TiB |
+| **Network Bandwidth** | 10 Gbps |
+| **Operating System** | Linux (Ubuntu 22.04+, RHEL 8+, or OpenShift 4.12+) |
+| **Kubernetes** | Version 1.29+ |
 
-**Typical Configuration**: 5-7 nodes × (16 vCPU, 32GB RAM, 200GB SSD)
-
-**Use Case**: Staging environments, small production (<100 AI models, moderate traffic)
+**Max concurreny**: Upto 1000 concurrent users
 
 ---
 
-### Production Requirements (Large Scale)
+### CSP Deployment
 
 | Resource | Requirement |
 |----------|-------------|
 | **CPU Cores** | 120-200 cores |
-| **Memory (RAM)** | 250-500 GiB |
-| **Storage (SSD)** | 2-5 TiB |
+| **Memory (RAM)** | 0.5 - 1 TiB |
+| **Storage (SSD)** | 10 - 20 TiB |
 | **Network Bandwidth** | 10-40 Gbps |
 | **Operating System** | Linux (Ubuntu 22.04+, RHEL 8+, or OpenShift 4.12+) |
 | **Kubernetes** | Version 1.29+ |
 
-**Typical Configuration**: 15-25 nodes with specialized node pools (see below)
-
-**Use Case**: Production environments (>100 AI models, high traffic, mission-critical)
+**Concurrency**: 10000+
 
 ---
 
-## Detailed Production Architecture
+## Detailed Architecture
 
 ### Node Pool Breakdown
 
@@ -79,10 +74,7 @@ Production deployments use specialized node pools for optimal resource allocatio
 | **Gateway** | API gateway, ingress | 8 vCPU, 16GB RAM, 100GB SSD | 2-3 | 16-24 vCPU, 32-48GB RAM |
 
 
-**Total Production Resources**: 168-304 vCPU, 480-848GB RAM, 3-6TB storage
 ---
-
-## Storage Requirements
 
 ### Persistent Storage Breakdown
 
@@ -97,8 +89,7 @@ Production deployments use specialized node pools for optimal resource allocatio
 
 **Total Storage**:
 - **Minimum**: 256 GiB
-- **Recommended Small**: 1.5-2 TiB
-- **Recommended Large**: 3-6 TiB
+- **Recommended**: 2 TiB
 
 ### Storage Type Requirements
 
@@ -112,9 +103,33 @@ Production deployments use specialized node pools for optimal resource allocatio
 
 | Traffic Type | Minimum | Recommended | Notes |
 |--------------|---------|-------------|-------|
-| **Inter-Node** | 1 Gbps | 5 Gbps | Between cluster nodes |
-| **Internet Ingress** | 5 Gbps | 10 Gbps | API traffic, model uploads |
-| **Internet Egress** | 5 Gbps | 10 Gbps | Model downloads, webhooks |
+| **Inter-Node** | 5 Gbps | 10 Gbps | Between cluster nodes |
+| **Internet Ingress** | 1 Gbps | 5 Gbps | API traffic, model uploads |
+| **Internet Egress** | 1 Gbps | 5 Gbps | Model downloads, webhooks |
+
+---
+
+## High Availability Scenarios
+
+### Standard HA Configuration
+
+| Component | Configuration | Failover Time | Notes |
+|-----------|--------------|---------------|-------|
+| **Kubernetes Masters** | 3 nodes (multi-zone) | <30 seconds | Quorum-based, automatic |
+| **PostgreSQL** | 1 master + 2 replicas | <1 minute | Streaming replication, Patroni |
+| **ClickHouse** | 3-node cluster | <2 minutes | Distributed queries continue |
+| **Redis** | 3-node Sentinel | <10 seconds | Auto-failover via Sentinel |
+| **Microservices** | 3+ replicas | Immediate | Load balancer redirects |
+| **Gateway** | 3+ replicas | Immediate | Connection pool failover |
+
+
+### Key HA Features
+
+- **Auto-Scaling**: HPA enabled for all stateless services (CPU/memory threshold: 75%)
+- **Health Checks**: Liveness/readiness probes on all pods (5-second intervals)
+- **Anti-Affinity**: Pods distributed across zones to prevent single point of failure
+- **PodDisruptionBudget**: Minimum 50% pods available during updates
+- **Backup Schedule**: Daily database backups, 30-day retention, WAL archiving
 
 ---
 
