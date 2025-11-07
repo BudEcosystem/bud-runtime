@@ -1050,9 +1050,7 @@ async def disconnect_connector(
     session: Annotated[Session, Depends(get_session)],
     budprompt_id: str,
     connector_id: str,
-    version: Optional[int] = Query(
-        None, ge=1, description="Version of prompt config. If not specified, uses default version"
-    ),
+    version: Optional[int] = Query(default=1, ge=1, description="Version of prompt config (defaults to 1)"),
     permanent: bool = Query(
         False, description="Store configuration permanently without expiration (default: False, uses configured TTL)"
     ),
@@ -1352,7 +1350,8 @@ async def cleanup_prompts(
         prompt_service = PromptService(session)
 
         # Call cleanup with debug flag
-        await prompt_service._perform_cleanup_request(prompt_ids=request.prompts, debug=request.debug)
+        prompt_ids = [prompt.model_dump() for prompt in request.prompts]
+        await prompt_service._perform_cleanup_request(prompt_ids=prompt_ids, debug=request.debug)
 
         return SuccessResponse(
             message=f"Successfully triggered cleanup for {len(request.prompts)} prompts",
