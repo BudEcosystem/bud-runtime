@@ -29,6 +29,15 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
   const [showPromptForm, setShowPromptForm] = useState<boolean>(false);
+  const [promptFormSubmitted, setPromptFormSubmitted] = useState<boolean>(false);
+
+  // State to control PromptForm visibility based on postMessage from parent window
+  // Initially true if promptIds are present in URL
+  const [enablePromptForm, setEnablePromptForm] = useState<boolean>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const promptIdsParam = params.get('promptIds');
+    return !!(promptIdsParam && promptIdsParam.trim().length > 0);
+  });
 
   const promptRef = useRef("");
   const lastMessageRef = useRef<string>("");
@@ -101,6 +110,39 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     }
   }, []);
 
+  // Listen for postMessage events from parent window to control PromptForm visibility
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Optional: Verify the origin for security
+      // if (event.origin !== 'http://localhost:3000') return;
+
+      // Check if this is the message we're expecting
+      if (event.data && event.data.type === 'SET_TYPE_FORM') {
+        const typeFormValue = event.data.typeForm;
+
+        console.log('Received typeForm signal:', typeFormValue);
+
+        // Update state to show/hide PromptForm based on parent message
+        setEnablePromptForm(typeFormValue);
+
+        // Also update showPromptForm to reopen the form if typeForm is true
+        if (typeFormValue && getPromptIds().length > 0) {
+          setShowPromptForm(true);
+        } else {
+          setShowPromptForm(false);
+        }
+      }
+    };
+
+    // Listen for messages from parent
+    window.addEventListener('message', handleMessage);
+
+    // Cleanup listener on unmount
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
+
 
 
   const createNewChat = () => {
@@ -160,6 +202,19 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     addMessage(chat.id, promptMessage);
     addMessage(chat.id, responseMessage);
 
+    // After the first prompt message completes, update promptData to only include prompt ID context
+    // This ensures subsequent messages don't re-send the variables
+    if (promptData && promptData.prompt?.variables) {
+      setPromptData({
+        prompt: {
+          id: promptData.prompt?.id,
+          version: promptData.prompt?.version,
+        },
+        promptId: promptData.promptId,
+        model: promptData.model,
+      });
+    }
+
     // Use smooth scrolling with scrollTo
     setTimeout(() => {
       if (contentRef.current) {
@@ -187,16 +242,19 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const handlePromptFormSubmit = (data: any) => {
     console.log('Prompt form submitted with data:', data);
 
-    // Set the prompt data for the chat body
+    // Set the prompt data for the chat body (includes full data with variables for first message)
     setPromptData(data);
+
+    // Mark that the prompt form has been submitted (enables textarea for subsequent messages)
+    setPromptFormSubmitted(true);
 
     // Create a user message with the prompt input
     const userMessage =
       data.input ||
       (data.prompt?.variables
         ? Object.entries(data.prompt.variables)
-            .map(([k, v]) => `${k}: ${v}`)
-            .join('\n')
+          .map(([k, v]) => `${k}: ${v}`)
+          .join('\n')
         : '');
 
     // Append the message to trigger the chat with prompt context
@@ -204,6 +262,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       role: 'user',
       content: userMessage,
     });
+
+    // Note: promptData will be updated in handleFinish after the first message completes
+    // to only include prompt ID context for subsequent messages
 
     // Close the form
     setShowPromptForm(false);
@@ -314,7 +375,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
               <MessageLoading />
             )}
             {error && (
-              <div className="mt-4">
+              <div className="mt-4 pb-4">
                 <div
                   className="text-[#FF0000] text-[.75rem] font-[400]
 
@@ -335,33 +396,42 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
           </div>
         </Content>
         <Footer className="sticky bottom-0 !px-[2.6875rem]">
-          <NormalEditor
-            isLoading={status === "submitted" || status === "streaming"}
-            error={error}
-            disabled={!chat?.selectedDeployment?.name}
-            stop={stop}
-            handleInputChange={handleChange}
-            handleSubmit={(e) => {
-              // setSubmitInput(e);
-              handleSubmit(e);
+          {promptIds.length === 0 && (
+            <NormalEditor
+              isLoading={status === "submitted" || status === "streaming"}
+              error={error}
+              disabled={
+                promptIds.length > 0
+                  ? !promptFormSubmitted
+                  : !chat?.selectedDeployment?.name
+              }
+              isPromptMode={promptIds.length > 0}
+              stop={stop}
+              handleInputChange={handleChange}
+              handleSubmit={(e) => {
+                // setSubmitInput(e);
+                handleSubmit(e);
 
-              // Use smooth scrolling with scrollTo
-              setTimeout(() => {
-                if (contentRef.current) {
-                  contentRef.current.scrollTo({
-                    top: contentRef.current.scrollHeight,
-                    behavior: 'smooth'
-                  });
-                }
-              }, 100);
-            }}
-            input={input}
-          />
+                // Use smooth scrolling with scrollTo
+                setTimeout(() => {
+                  if (contentRef.current) {
+                    contentRef.current.scrollTo({
+                      top: contentRef.current.scrollHeight,
+                      behavior: 'smooth'
+                    });
+                  }
+                }, 100);
+              }}
+              input={input}
+            />
+          )}
         </Footer>
+
         {/* Prompt Form - Absolutely positioned at bottom */}
-        {showPromptForm && getPromptIds().length > 0 && (
+        {enablePromptForm && showPromptForm && getPromptIds().length > 0 && (
           <PromptForm
             promptIds={getPromptIds()}
+            chatId={chat.id}
             onSubmit={handlePromptFormSubmit}
             onClose={() => setShowPromptForm(false)}
           />

@@ -437,6 +437,8 @@ class SimulationService:
         reasoning_parser_type: Optional[str] = None,
         architecture_family: Optional[str] = None,
         chat_template: Optional[str] = None,
+        supports_lora: bool = False,
+        supports_pipeline_parallelism: bool = False,
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K deployment configurations based on the provided parameters.
@@ -474,6 +476,7 @@ class SimulationService:
                     benchmark_predictor_models_dir=app_settings.benchmark_predictor_models_dir,
                     dtype=quantization_type,
                     use_heuristic=True,  # DirectSearchOptimizer uses heuristic calculations
+                    supports_pipeline_parallelism=supports_pipeline_parallelism,
                 )
                 top_k_configs = optimizer.search()
                 # Convert SearchResult dataclasses to dicts for JSON serialization in workflow mode
@@ -496,6 +499,7 @@ class SimulationService:
                     population_size=app_settings.population_size,
                     dtype=quantization_type,
                     use_heuristic=False,  # Evolution uses ML regressor
+                    supports_pipeline_parallelism=supports_pipeline_parallelism,
                 )
                 top_k_configs = evolution.evolve()
                 # Convert EvaluationResult dataclasses to dicts for JSON serialization in workflow mode
@@ -518,6 +522,8 @@ class SimulationService:
                         "reasoning_parser_type": reasoning_parser_type,
                         "architecture_family": architecture_family,
                         "chat_template": chat_template,
+                        "supports_lora": supports_lora,
+                        "supports_pipeline_parallelism": supports_pipeline_parallelism,
                         "device_config": device_config,
                         "error": "No valid configurations found - device may not have enough memory for this model",
                     }
@@ -557,6 +563,8 @@ class SimulationService:
                                 "reasoning_parser_type": reasoning_parser_type,
                                 "architecture_family": architecture_family,
                                 "chat_template": chat_template,
+                                "supports_lora": supports_lora,
+                                "supports_pipeline_parallelism": supports_pipeline_parallelism,
                                 "device_config": device_result,
                             }
                         )
@@ -574,6 +582,8 @@ class SimulationService:
                             "reasoning_parser_type": reasoning_parser_type,
                             "architecture_family": architecture_family,
                             "chat_template": chat_template,
+                            "supports_lora": supports_lora,
+                            "supports_pipeline_parallelism": supports_pipeline_parallelism,
                             "device_config": device_config,
                         }
                     ]
@@ -598,6 +608,8 @@ class SimulationService:
                         "reasoning_parser_type": reasoning_parser_type,
                         "architecture_family": architecture_family,
                         "chat_template": chat_template,
+                        "supports_lora": supports_lora,
+                        "supports_pipeline_parallelism": supports_pipeline_parallelism,
                         "device_config": device_config,
                     }
                 )
@@ -1191,6 +1203,10 @@ class SimulationService:
                                     engine_name=engine_device_combo["engine_name"],
                                     engine_image=engine_device_combo["image"],
                                     simulation_method=simulation_method,
+                                    supports_lora=engine_device_combo.get("supports_lora", False),
+                                    supports_pipeline_parallelism=engine_device_combo.get(
+                                        "supports_pipeline_parallelism", False
+                                    ),
                                 )
                             )
 
@@ -1409,6 +1425,8 @@ class SimulationService:
                         "reasoning_parser_type": result.get("reasoning_parser_type"),
                         "architecture_family": result.get("architecture_family"),
                         "chat_template": result.get("chat_template"),
+                        "supports_lora": result.get("supports_lora"),
+                        "supports_pipeline_parallelism": result.get("supports_pipeline_parallelism"),
                         "top_k_configs": config_dict,
                     }
                     records.append(record)
@@ -1596,6 +1614,8 @@ class SimulationService:
                 reasoning_parser_type=getattr(result, "reasoning_parser_type", None),
                 architecture_family=getattr(result, "architecture_family", None),
                 chat_template=getattr(result, "chat_template", None),
+                supports_lora=getattr(result, "supports_lora", None),
+                supports_pipeline_parallelism=getattr(result, "supports_pipeline_parallelism", None),
             )
             deployment_config = self.optimal_search_node_group_config([result], concurrency)
             if deployment_config is not None:
@@ -1752,6 +1772,8 @@ class SimulationService:
             reasoning_parser_type=getattr(template_result, "reasoning_parser_type", None),
             architecture_family=getattr(template_result, "architecture_family", None),
             chat_template=getattr(template_result, "chat_template", None),
+            supports_lora=getattr(template_result, "supports_lora", None),
+            supports_pipeline_parallelism=getattr(template_result, "supports_pipeline_parallelism", None),
         )
 
     @staticmethod

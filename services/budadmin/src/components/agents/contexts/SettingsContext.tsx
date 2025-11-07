@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { SettingsType } from '../settings/SettingsSidebar';
+import { SettingsType } from '../schema/SettingsSidebar';
 
 interface SettingsContextType {
   isOpen: boolean;

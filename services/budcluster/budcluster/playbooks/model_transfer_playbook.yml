@@ -43,6 +43,26 @@
       delay: 5
       when: ns_result is not failed
 
+    - name: Delete existing model-transfer Helm release if present
+      kubernetes.core.helm:
+        name: "{{ helm_release_name }}"
+        release_namespace: "{{ namespace }}"
+        state: absent
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      ignore_errors: true
+
+    - name: Delete existing model-transfer pod if present
+      kubernetes.core.k8s:
+        state: absent
+        kind: Pod
+        label_selectors:
+          - "app=model-transfer"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      ignore_errors: true
+
     - name: Install Helm chart for model transfer
       kubernetes.core.helm:
         name: "{{ helm_release_name }}"

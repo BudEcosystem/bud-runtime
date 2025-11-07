@@ -837,6 +837,16 @@ class ExperimentService:
             eval_run_ids = {str(run.id) for run in eval_runs}
             eval_metrics = [metric for metric in exp_data.current_metrics if metric.get("run_id") in eval_run_ids]
 
+            # Extract unique dataset names from runs in this evaluation
+            dataset_names = []
+            seen_datasets = set()
+            for metric in eval_metrics:
+                dataset = metric.get("dataset", "")
+                if dataset and dataset != "Unknown Dataset" and dataset not in seen_datasets:
+                    dataset_names.append(dataset)
+                    seen_datasets.add(dataset)
+            current_evaluation_datasets = ", ".join(dataset_names) if dataset_names else ""
+
             # Filter out failed/cancelled/skipped runs and runs with score of 0 from average calculation
             excluded_statuses = {
                 RunStatusEnum.FAILED.value,
@@ -861,7 +871,7 @@ class ExperimentService:
                     objective=evaluation.description,
                     current=None,
                     progress=ProgressInfo(percent=0, completed=0, total=0),
-                    current_evaluation="",
+                    current_evaluation=current_evaluation_datasets,
                     current_model=current_model_name,
                     processing_rate_per_min=0,
                     average_score_pct=evaluation_avg_score,
