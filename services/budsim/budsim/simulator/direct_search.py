@@ -67,6 +67,7 @@ class DirectSearchOptimizer:
         use_heuristic: bool = False,
         concurrency_step: int = 5,  # Step size for concurrency reduction
         max_evaluations: int = 200,  # Safety limit
+        supports_pipeline_parallelism: bool = False,
     ):
         """Initialize DirectSearchOptimizer."""
         self.model = model
@@ -84,6 +85,7 @@ class DirectSearchOptimizer:
         self.use_heuristic = use_heuristic
         self.concurrency_step = concurrency_step
         self.max_evaluations = max_evaluations
+        self.supports_pipeline_parallelism = supports_pipeline_parallelism
 
         self.engine_config = get_engine_properties(self.engine_name, {"model": self.model})
 
@@ -132,6 +134,11 @@ class DirectSearchOptimizer:
             logger.warning(
                 f"Using fallback search space (individual device): max_tp={self.max_tp}, max_pp={self.max_pp}"
             )
+
+        # Override max_pp to 1 if engine doesn't support pipeline parallelism
+        if not self.supports_pipeline_parallelism:
+            logger.info("Engine does not support pipeline parallelism - constraining PP to 1")
+            self.max_pp = 1
 
         # Find minimum TP required to run the model (even with concurrency=1)
         self.min_tp = self._find_minimum_tp_required()

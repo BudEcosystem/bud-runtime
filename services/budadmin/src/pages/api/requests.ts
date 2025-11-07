@@ -240,10 +240,10 @@ const handleErrorResponse = (err) => {
     }
     return false;
   } else {
-    console.log(err);
     if (err && localStorage.getItem("access_token")) {
-      console.log(err.response?.data?.message);
-      errorToast(err.response?.data?.message || err.response?.data?.detail );
+      // Check both 'detail' (FastAPI HTTPException) and 'message' (custom ErrorResponse)
+      const errorMessage = err.response?.data?.detail || err.response?.data?.message;
+      errorToast(errorMessage);
     }
     return false;
   }

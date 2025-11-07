@@ -51,6 +51,8 @@ class SimulationResultsSchema(PSQLBase):
     reasoning_parser_type = Column(String(100), nullable=True)
     architecture_family = Column(String(100), nullable=True)
     chat_template = Column(String(500), nullable=True)
+    supports_lora = Column(Boolean, nullable=True, default=False)
+    supports_pipeline_parallelism = Column(Boolean, nullable=True, default=False)
     top_k_configs = Column(JSONB)
     is_blacklisted = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -820,13 +820,23 @@ class AdapterDataManager(DataManagerUtils):
         return result, count
 
     async def get_all_adapters_in_project(self, project_id: UUID) -> Tuple[List[AdapterModel], int]:
-        """Get all adapters in a project."""
-        stmt = select(AdapterModel).join(EndpointModel).filter(EndpointModel.project_id == project_id)
+        """Get all adapters in a project, excluding deleted adapters."""
+        stmt = (
+            select(AdapterModel)
+            .join(EndpointModel)
+            .filter(
+                EndpointModel.project_id == project_id,
+                AdapterModel.status != AdapterStatusEnum.DELETED,
+            )
+        )
         count_stmt = (
             select(func.count())
             .select_from(AdapterModel)
             .join(EndpointModel)
-            .filter(EndpointModel.project_id == project_id)
+            .filter(
+                EndpointModel.project_id == project_id,
+                AdapterModel.status != AdapterStatusEnum.DELETED,
+            )
         )
         count = self.execute_scalar(count_stmt)
         result = self.scalars_all(stmt)

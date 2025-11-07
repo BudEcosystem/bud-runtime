@@ -30,6 +30,14 @@ export type EndpointClusterData = {
     avg_context_length: number;
     avg_sequence_length: number;
     concurrent_requests: number;
+    engine_configs?: {
+      tool_calling_parser_type?: string;
+      reasoning_parser_type?: string;
+      chat_template?: string;
+      enable_tool_calling?: boolean;
+      enable_reasoning?: boolean;
+      supports_lora?: boolean;
+    };
   };
 };
 
@@ -41,6 +49,14 @@ export type Endpoint = {
     avg_context_length: number;
     avg_sequence_length: number;
     concurrent_requests: number;
+    engine_configs?: {
+      tool_calling_parser_type?: string;
+      reasoning_parser_type?: string;
+      chat_template?: string;
+      enable_tool_calling?: boolean;
+      enable_reasoning?: boolean;
+      supports_lora?: boolean;
+    };
   };
   created_at: string;
   modified_at: string;
@@ -292,8 +308,10 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
         }
       );
       successToast(response.data.message);
+      return response;
     } catch (error) {
       console.error("Error creating model:", error);
+      return null;
     }
   },
 

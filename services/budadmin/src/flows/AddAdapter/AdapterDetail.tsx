@@ -37,7 +37,7 @@ export const AdapterDetail = () => {
   }, [currentWorkflow]);
 
   const handleNext = async () => {
-    form.submit();
+    // form.submit();
     const result = await updateAdapterDetailWorkflow(
       adapterWorkflow?.adapterName,
       projectId,

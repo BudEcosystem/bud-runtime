@@ -1,6 +1,7 @@
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
+import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import DeployModelSpecificationInfo from "@/components/ui/bud/deploymentDrawer/DeployModelSpecificationInfo";
 import router, { useRouter } from "next/router";
 import BudStepAlert from "../components/BudStepAlert";
@@ -8,7 +9,7 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useProjects } from "src/hooks/useProjects";
 import { useDeployModel } from "src/stores/useDeployModel";
 import { useEndPoints } from "src/hooks/useEndPoint";
-import { useEffect } from "react";
+import { useContext, useEffect } from "react";
 
 export const AdapterResult = () => {
   const router = useRouter();
@@ -17,6 +18,7 @@ export const AdapterResult = () => {
   const { adapterWorkflow, currentWorkflow, setAdapterWorkflow } =
     useDeployModel();
   const { getAdapters } = useEndPoints();
+  const { form } = useContext(BudFormContext);
   const projectId = router.query.projectId as string;
   useEffect(() => {
     if (!currentWorkflow) {
@@ -46,6 +48,7 @@ export const AdapterResult = () => {
         router.push(
           `/projects/${selectedProject?.id}/deployments/${adapterWorkflow?.endpointId}`,
         );
+        form.resetFields();
         closeDrawer();
       }}
     >
