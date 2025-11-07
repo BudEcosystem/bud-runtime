@@ -955,6 +955,10 @@ class PromptService:
         mcp_resources = {"virtual_server_id": None, "gateways": {}}
 
         for tool in tools:
+            # Convert Pydantic model to dict if needed
+            if hasattr(tool, "model_dump"):
+                tool = tool.model_dump()
+
             if tool.get("type") == "mcp":
                 # Extract virtual server ID
                 if tool.get("server_url"):
@@ -971,31 +975,31 @@ class PromptService:
     async def _add_to_cleanup_registry(
         self, prompt_id: str, version: int, redis_key: str, ttl: int, mcp_resources: Dict[str, Any]
     ) -> None:
-        """Add or update entry in the common cleanup registry.
+        """Add or update entry in cleanup registry using Redis Hash (atomic).
 
-        Registry structure: {prompt_key: {entry_data}}
+        Uses Redis Hash for atomic per-prompt operations, eliminating race conditions.
 
         Args:
             prompt_id: Prompt identifier
             version: Version number
-            redis_key: Full Redis key of prompt config (used as dictionary key)
+            redis_key: Full Redis key (used as hash field)
             ttl: TTL in seconds
             mcp_resources: Extracted MCP resource IDs
         """
-        # Read current registry
-        registry_json = await self.redis_service.get(CLEANUP_REGISTRY_KEY)
-        registry_dict = json.loads(registry_json) if registry_json else {}
-
-        # Lookup existing entry (O(1) with dictionary)
-        existing_entry = registry_dict.get(redis_key)
+        # Read single field atomically (O(1))
+        existing_entry_json = await self.redis_service.hget(CLEANUP_REGISTRY_KEY, redis_key)
 
         # Calculate timestamps
         now = datetime.now(timezone.utc)
         expires_at = datetime.fromtimestamp(now.timestamp() + ttl, tz=timezone.utc)
 
         # Create or update entry
-        if existing_entry:
-            # UPDATE: preserve created_at
+        if existing_entry_json:
+            # Decode bytes if needed
+            if isinstance(existing_entry_json, bytes):
+                existing_entry_json = existing_entry_json.decode("utf-8")
+            existing_entry = json.loads(existing_entry_json)
+
             entry_data = MCPCleanupRegistryEntry(
                 prompt_id=prompt_id,
                 version=version,
@@ -1007,7 +1011,6 @@ class PromptService:
             )
             logger.debug(f"Updated cleanup registry entry for {redis_key}")
         else:
-            # CREATE: new entry
             entry_data = MCPCleanupRegistryEntry(
                 prompt_id=prompt_id,
                 version=version,
@@ -1019,38 +1022,23 @@ class PromptService:
             )
             logger.debug(f"Added cleanup registry entry for {redis_key}")
 
-        # Store entry with prompt_key as dictionary key
-        registry_dict[redis_key] = entry_data.model_dump()
+        # Write single field atomically
+        entry_json = json.dumps(entry_data.model_dump())
+        await self.redis_service.hset(CLEANUP_REGISTRY_KEY, redis_key, entry_json)
 
-        # Write back to Redis (no TTL - permanent registry)
-        updated_registry_json = json.dumps(registry_dict, indent=2)
-        await self.redis_service.set(CLEANUP_REGISTRY_KEY, updated_registry_json)
-
-        logger.debug(f"Cleanup registry updated. Total entries: {len(registry_dict)}")
+        logger.debug(f"Cleanup registry entry for {redis_key} stored atomically")
 
     async def _remove_from_cleanup_registry(self, redis_key: str) -> None:
-        """Remove entry from cleanup registry when prompt becomes permanent.
+        """Remove entry from cleanup registry using Redis Hash (atomic).
 
         Args:
-            redis_key: Full Redis key of prompt config to remove
+            redis_key: Full Redis key to remove
         """
-        # Load registry
-        registry_json = await self.redis_service.get(CLEANUP_REGISTRY_KEY)
-        if not registry_json:
-            logger.debug(f"Cleanup registry is empty, nothing to remove for {redis_key}")
-            return
+        # Atomic delete operation
+        deleted_count = await self.redis_service.hdel(CLEANUP_REGISTRY_KEY, redis_key)
 
-        registry_dict = json.loads(registry_json)
-
-        # Check if entry exists and remove
-        if redis_key in registry_dict:
-            del registry_dict[redis_key]
+        if deleted_count > 0:
             logger.debug(f"Removed {redis_key} from cleanup registry (now permanent)")
-
-            # Save updated registry
-            updated_registry_json = json.dumps(registry_dict, indent=2)
-            await self.redis_service.set(CLEANUP_REGISTRY_KEY, updated_registry_json)
-            logger.debug(f"Cleanup registry updated. Remaining entries: {len(registry_dict)}")
         else:
             logger.debug(f"Entry {redis_key} not found in cleanup registry, nothing to remove")
 
@@ -1527,17 +1515,25 @@ class PromptCleanupService:
             return cleanup_targets
 
         # Condition 2: Cleanup expired prompts
-        registry_json = run_async(redis_service.get(CLEANUP_REGISTRY_KEY))
-        if not registry_json:
+        # Read all hash fields atomically
+        registry_hash = run_async(redis_service.hgetall(CLEANUP_REGISTRY_KEY))
+        if not registry_hash:
             logger.debug("No cleanup registry found")
             return []
 
-        registry_dict = json.loads(registry_json)
+        # Iterate hash and decode
         now = datetime.now(timezone.utc)
-
         expired_targets = []
-        for prompt_key, entry in registry_dict.items():
+
+        for prompt_key_bytes, entry_json_bytes in registry_hash.items():
+            # Decode bytes to strings
+            prompt_key = prompt_key_bytes.decode("utf-8") if isinstance(prompt_key_bytes, bytes) else prompt_key_bytes
+            entry_json = entry_json_bytes.decode("utf-8") if isinstance(entry_json_bytes, bytes) else entry_json_bytes
+
+            # Parse entry
+            entry = json.loads(entry_json)
             expires_at = datetime.fromisoformat(entry["expires_at"])
+
             if expires_at < now:
                 expired_targets.append(
                     {
@@ -1587,10 +1583,7 @@ class PromptCleanupService:
             target_name=target_name,
         )
 
-        # Load registry
-        registry_json = run_async(redis_service.get(CLEANUP_REGISTRY_KEY))
-        registry_dict = json.loads(registry_json) if registry_json else {}
-
+        # Process each prompt with atomic operations (no upfront registry load)
         for target in cleanup_targets:
             prompt_key = target["prompt_key"]
             prompt_id = target["prompt_id"]
@@ -1598,19 +1591,23 @@ class PromptCleanupService:
             cleanup_errors = []
 
             try:
-                # Step 1: Find registry entry (O(1) lookup)
-                registry_entry = registry_dict.get(prompt_key)
+                # Atomic read of single entry
+                registry_entry_json = run_async(redis_service.hget(CLEANUP_REGISTRY_KEY, prompt_key))
 
-                # Step 1a: If not in registry, mark success and continue
-                if not registry_entry:
+                if not registry_entry_json:
                     logger.error(f"Cleanup registry entry not found for {prompt_key}")
                     results["success"].append({"prompt_id": prompt_id, "version": version})
                     continue
 
-                # Step 2: Extract MCP resources from registry
+                # Decode and parse
+                if isinstance(registry_entry_json, bytes):
+                    registry_entry_json = registry_entry_json.decode("utf-8")
+                registry_entry = json.loads(registry_entry_json)
+
+                # Extract MCP resources
                 mcp_resources = registry_entry.get("mcp_resources", {})
 
-                # Step 2a: Delete gateways
+                # Delete gateways
                 if mcp_resources.get("gateways"):
                     for _connector_id, gateway_id in mcp_resources["gateways"].items():
                         try:
@@ -1620,7 +1617,7 @@ class PromptCleanupService:
                             logger.error(f"Failed to delete gateway {gateway_id}: {e}")
                             cleanup_errors.append(f"gateway_{gateway_id}: {str(e)}")
 
-                # Step 2b: Delete virtual server
+                # Delete virtual server
                 if mcp_resources.get("virtual_server_id"):
                     try:
                         run_async(mcp_foundry_service.delete_virtual_server(mcp_resources["virtual_server_id"]))
@@ -1629,40 +1626,51 @@ class PromptCleanupService:
                         logger.error(f"Failed to delete virtual server: {e}")
                         cleanup_errors.append(f"virtual_server: {str(e)}")
 
-                # Step 3: Delete prompt config from Redis (if exists)
+                # Delete prompt config
                 prompt_exists = run_async(redis_service.get(prompt_key))
                 if prompt_exists:
                     run_async(redis_service.delete(prompt_key))
                     logger.debug(f"Deleted Redis key {prompt_key}")
 
-                # Step 4: Determine outcome based on errors
+                # Atomic update based on outcome
                 if cleanup_errors:
-                    # Partial failure: keep in registry for retry
-                    registry_dict[prompt_key]["cleanup_failed"] = True
-                    registry_dict[prompt_key]["reason"] = "; ".join(cleanup_errors)
+                    # Update entry with error info
+                    registry_entry["cleanup_failed"] = True
+                    registry_entry["reason"] = "; ".join(cleanup_errors)
+                    updated_entry_json = json.dumps(registry_entry)
+                    run_async(redis_service.hset(CLEANUP_REGISTRY_KEY, prompt_key, updated_entry_json))
+
                     logger.error(f"Cleanup failed for {prompt_key}: {'; '.join(cleanup_errors)}")
                     results["failed"].append(
                         {"prompt_id": prompt_id, "version": version, "reason": "; ".join(cleanup_errors)}
                     )
                 else:
-                    # Complete success: remove from registry
-                    del registry_dict[prompt_key]
+                    # Atomic delete on success
+                    run_async(redis_service.hdel(CLEANUP_REGISTRY_KEY, prompt_key))
+
                     logger.info(f"Cleaned up {prompt_key} successfully")
                     results["success"].append({"prompt_id": prompt_id, "version": version})
 
             except Exception as e:
-                # Mark as failed in registry
                 logger.error(f"Cleanup failed for {prompt_key}: {e}")
-                if registry_entry:
-                    registry_dict[prompt_key]["cleanup_failed"] = True
-                    registry_dict[prompt_key]["reason"] = str(e)
+
+                # Try to mark as failed in registry
+                try:
+                    current_entry_json = run_async(redis_service.hget(CLEANUP_REGISTRY_KEY, prompt_key))
+                    if current_entry_json:
+                        if isinstance(current_entry_json, bytes):
+                            current_entry_json = current_entry_json.decode("utf-8")
+                        current_entry = json.loads(current_entry_json)
+                        current_entry["cleanup_failed"] = True
+                        current_entry["reason"] = str(e)
+                        updated_entry_json = json.dumps(current_entry)
+                        run_async(redis_service.hset(CLEANUP_REGISTRY_KEY, prompt_key, updated_entry_json))
+                except Exception as update_error:
+                    logger.error(f"Failed to update registry for {prompt_key}: {update_error}")
+
                 results["failed"].append({"prompt_id": prompt_id, "version": version, "reason": str(e)})
 
-        # Update registry
-        updated_registry_json = json.dumps(registry_dict, indent=2)
-        run_async(redis_service.set(CLEANUP_REGISTRY_KEY, updated_registry_json))
-        logger.info(f"Registry updated. Remaining entries: {len(registry_dict)}")
-
+        logger.info(f"Cleanup complete. Success: {len(results['success'])}, Failed: {len(results['failed'])}")
         return results
 
     def __call__(self, request: PromptCleanupRequest, workflow_id: Optional[str] = None) -> PromptCleanupResponse:
