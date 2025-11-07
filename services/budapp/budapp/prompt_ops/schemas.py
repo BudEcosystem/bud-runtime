@@ -269,6 +269,23 @@ class PromptCleanupRequest(BaseModel):
     )
 
 
+class OAuthInitiateRequest(BaseModel):
+    """Request schema for OAuth flow initiation."""
+
+    prompt_id: str = Field(..., description="Prompt ID (UUID or draft ID)")
+    connector_id: str = Field(..., description="Connector ID to initiate OAuth for")
+    version: Optional[int] = Field(default=1, ge=1, description="Version of prompt config (defaults to 1)")
+
+
+class OAuthInitiateResponse(SuccessResponse):
+    """Response schema for OAuth initiation."""
+
+    authorization_url: str = Field(..., description="OAuth authorization URL to redirect user to")
+    state: str = Field(..., description="OAuth state parameter for security")
+    expires_in: int = Field(..., description="State expiration time in seconds")
+    gateway_id: str = Field(..., description="Gateway ID used for OAuth flow")
+
+
 class CreatePromptWorkflowRequest(BaseModel):
     """Create prompt workflow request schema."""
 

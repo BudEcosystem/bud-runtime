@@ -50,6 +50,8 @@ from .schemas import (
     EditPromptVersionRequest,
     GatewayResponse,
     GetPromptVersionResponse,
+    OAuthInitiateRequest,
+    OAuthInitiateResponse,
     PaginatedTagsResponse,
     PromptCleanupRequest,
     PromptConfigGetResponse,
@@ -1365,4 +1367,79 @@ async def cleanup_prompts(
         logger.exception(f"Failed to cleanup prompts: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cleanup prompts"
+        ).to_http_response()
+
+
+@router.post(
+    "/oauth/initiate",
+    responses={
+        status.HTTP_200_OK: {
+            "model": OAuthInitiateResponse,
+            "description": "Successfully initiated OAuth flow",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or connector not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Initiate OAuth flow for a connector",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def initiate_oauth(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: OAuthInitiateRequest,
+) -> Union[OAuthInitiateResponse, ErrorResponse]:
+    """Initiate OAuth flow for a connector.
+
+    This endpoint:
+    1. Fetches prompt configuration from Redis
+    2. Extracts gateway_id for the specified connector
+    3. Calls MCP Foundry OAuth initiate endpoint
+    4. Returns authorization URL for user redirection
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        request: OAuth initiation request with prompt_id, connector_id, and version
+
+    Returns:
+        OAuthInitiateResponse with authorization_url and state, or ErrorResponse on failure
+    """
+    try:
+        logger.debug(
+            f"OAuth initiation requested for prompt {request.prompt_id}, "
+            f"connector {request.connector_id}, version {request.version}"
+        )
+
+        prompt_service = PromptService(session)
+
+        # Initiate OAuth flow
+        oauth_data = await prompt_service.initiate_oauth_for_connector(
+            prompt_id=request.prompt_id,
+            connector_id=request.connector_id,
+            version=request.version,
+        )
+
+        return OAuthInitiateResponse(
+            authorization_url=oauth_data["authorization_url"],
+            state=oauth_data["state"],
+            expires_in=oauth_data["expires_in"],
+            gateway_id=oauth_data["gateway_id"],
+            message="OAuth flow initiated successfully",
+            code=status.HTTP_200_OK,
+            object="oauth.initiate",
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to initiate OAuth: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to initiate OAuth: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to initiate OAuth flow"
         ).to_http_response()

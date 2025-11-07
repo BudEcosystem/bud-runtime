@@ -820,6 +820,44 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 return {}
             raise
 
+    async def initiate_oauth(self, gateway_id: str) -> Dict[str, Any]:
+        """Initiate OAuth flow for a gateway.
+
+        Args:
+            gateway_id: The gateway ID to initiate OAuth for
+
+        Returns:
+            Dict containing:
+                - authorization_url: URL to redirect user to
+                - state: OAuth state parameter
+                - expires_in: State expiration time
+                - gateway_id: The gateway ID
+
+        Raises:
+            MCPFoundryException: If OAuth initiation fails
+        """
+        try:
+            logger.debug(f"Initiating OAuth flow for gateway {gateway_id}")
+
+            # Make the API call
+            response = await self._make_request(
+                method="POST",
+                endpoint="/oauth/api/initiate",
+                params={"gateway_id": gateway_id},
+            )
+
+            logger.debug(f"Successfully initiated OAuth for gateway {gateway_id}")
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error initiating OAuth for gateway {gateway_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def close(self):
         """Close the HTTP session."""
         if self._session and not self._session.closed:
