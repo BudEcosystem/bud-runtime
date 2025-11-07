@@ -236,7 +236,7 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
         borderTop: '0.5px solid #1F1F1F',
         background: 'rgba(255, 255, 255, 0.03)',
         backdropFilter: 'blur(5px)'
-      }} className='flex justify-center items-center'>
+      }} className='flex justify-end items-center px-[1rem]'>
         <PrimaryButton
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation();

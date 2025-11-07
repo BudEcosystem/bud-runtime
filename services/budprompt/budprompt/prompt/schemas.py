@@ -65,7 +65,7 @@ class ModelSettings(BaseModel):
     # Standard OpenAI-compatible parameters
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
     max_tokens: int = Field(default=2000, gt=0, description="Maximum tokens to generate")
-    top_p: float = Field(default=0.9, ge=0.0, le=1.0, description="Nucleus sampling parameter")
+    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling parameter")
     frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Penalize repeated tokens")
     presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Penalize tokens based on presence")
     stop_sequences: List[str] = Field(default_factory=list, description="Stop generation sequences")
@@ -111,6 +111,27 @@ class Message(BaseModel):
 
     role: Literal["system", "developer", "user", "assistant"] = Field(default="user")
     content: str = Field(..., min_length=1)
+
+
+class MCPToolConfig(BaseModel):
+    """MCP Tool configuration stored in prompt config."""
+
+    type: Literal["mcp"] = "mcp"
+    server_label: Optional[str] = Field(None, description="Virtual server name")
+    server_description: Optional[str] = Field(None, description="Server description")
+    server_url: Optional[str] = Field(None, description="Server URL")
+    require_approval: Literal["always", "never", "auto"] = Field(
+        default="never", description="Tool approval requirement"
+    )
+    allowed_tools: List[str] = Field(default_factory=list, description="List of tool IDs allowed")
+    allowed_tool_names: List[str] = Field(default_factory=list, description="List of tool IDs allowed")
+    connector_id: Optional[str] = Field(None, description="Virtual server ID from MCP Foundry")
+    gateway_config: Dict[str, str] = Field(
+        default_factory=dict, description="Gateway configuration with connector_id as key and gateway_id as value"
+    )
+    server_config: Dict[str, List[str]] = Field(
+        default_factory=dict, description="Server configuration with connector_id as key and list of tool IDs as value"
+    )
 
 
 class PromptExecuteRequest(BaseModel):
@@ -353,6 +374,10 @@ class PromptConfigurationData(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
+    tools: List[MCPToolConfig] = Field(
+        default_factory=list,
+        description="List of tool configurations (MCP tools) for this prompt",
+    )
 
 
 class PromptExecuteData(BaseModel):
@@ -392,6 +417,10 @@ class PromptExecuteData(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
+    tools: List[MCPToolConfig] = Field(
+        default_factory=list,
+        description="List of tool configurations (MCP tools) for this prompt",
+    )
 
 
 class PromptConfigRequest(BaseModel):
@@ -427,6 +456,10 @@ class PromptConfigRequest(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
+    tools: List[MCPToolConfig] = Field(
+        default_factory=list,
+        description="List of tool configurations (MCP tools) to add/update",
+    )
 
 
 class PromptConfigResponse(SuccessResponse):
@@ -443,7 +476,19 @@ class PromptConfigGetResponse(SuccessResponse):
     """
 
     prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")
+    version: int = Field(..., description="The version number of the configuration retrieved")
     data: PromptConfigurationData = Field(..., description="The prompt configuration data")
+
+
+class PromptConfigGetRawResponse(SuccessResponse):
+    """Response model for getting raw prompt configuration from Redis.
+
+    Returns the raw JSON data without Pydantic processing or default values.
+    """
+
+    prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")
+    version: int = Field(..., description="The version number of the configuration retrieved")
+    data: Dict[str, Any] = Field(..., description="The raw prompt configuration data from Redis")
 
 
 class PromptConfigCopyRequest(BaseModel):

@@ -55,6 +55,8 @@ spec:
             value: {{ .Values.externalServices.postgresql.databases.budprompt.password }}
           - name: PSQL_DB_NAME
             value: {{ .Values.externalServices.postgresql.databases.budprompt.name }}
+          - name: MCP_FOUNDRY_API_KEY
+            value: {{ .Values.microservices.keys.mcpFoundryApi }}
         {{- $root := . }}
         {{- range $key, $value := .Values.microservices.budprompt.env }}
           - name: {{ $key }}

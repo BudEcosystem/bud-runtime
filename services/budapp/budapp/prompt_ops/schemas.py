@@ -24,6 +24,7 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model
 
 from ..cluster_ops.schemas import ClusterResponse
 from ..commons.constants import (
+    ConnectorAuthTypeEnum,
     ModalityEnum,
     PromptStatusEnum,
     PromptTypeEnum,
@@ -143,7 +144,7 @@ class ModelSettings(BaseModel):
     # Standard OpenAI-compatible parameters
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
     max_tokens: int = Field(default=2000, gt=0, description="Maximum tokens to generate")
-    top_p: float = Field(default=0.9, ge=0.0, le=1.0, description="Nucleus sampling parameter")
+    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling parameter")
     frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Penalize repeated tokens")
     presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Penalize tokens based on presence")
     stop_sequences: List[str] = Field(default_factory=list, description="Stop generation sequences")
@@ -517,6 +518,26 @@ class PromptConfigResponse(SuccessResponse):
     bud_prompt_version: int = Field(..., ge=1, description="The version of the prompt configuration from budprompt")
 
 
+class MCPToolConfig(BaseModel):
+    """MCP Tool configuration stored in prompt config."""
+
+    type: Literal["mcp"] = "mcp"
+    server_label: Optional[str] = Field(None, description="Virtual server name")
+    server_description: Optional[str] = Field(None, description="Server description")
+    server_url: Optional[str] = Field(None, description="Server URL")
+    require_approval: Literal["always", "never", "auto"] = Field(
+        default="never", description="Tool approval requirement"
+    )
+    allowed_tools: List[str] = Field(default_factory=list, description="List of tool IDs allowed")
+    connector_id: Optional[str] = Field(None, description="Virtual server ID from MCP Foundry")
+    gateway_config: Dict[str, str] = Field(
+        default_factory=dict, description="Gateway configuration with connector_id as key and gateway_id as value"
+    )
+    server_config: Dict[str, List[str]] = Field(
+        default_factory=dict, description="Server configuration with connector_id as key and list of tool IDs as value"
+    )
+
+
 class PromptConfigurationData(BaseModel):
     """Schema for prompt configuration data retrieved from budprompt."""
 
@@ -554,6 +575,7 @@ class PromptConfigurationData(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
+    tools: List[MCPToolConfig] = Field(default_factory=list, description="MCP tool configurations")
 
 
 class GetPromptVersionResponse(SuccessResponse):
@@ -570,6 +592,7 @@ class PromptConfigGetResponse(SuccessResponse):
     """
 
     prompt_id: str = Field(..., description="The unique identifier for the prompt configuration")
+    version: int = Field(..., description="The version number of the configuration retrieved")
     data: PromptConfigurationData = Field(..., description="The prompt configuration data")
 
 
@@ -593,3 +616,214 @@ class BudPromptConfig(BaseModel):
     api_base: str
     model_name: str  # This will be the prompt name
     api_key_location: str = "dynamic::authorization"
+
+
+class ConnectorListItem(BaseModel):
+    """Schema for individual connector item in list."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    icon: Optional[str] = None
+    category: Optional[str] = None
+    url: str
+    provider: str
+    description: Optional[str] = None
+    documentation_url: Optional[str] = None
+
+
+class ConnectorListResponse(PaginatedSuccessResponse):
+    """Connector list response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    connectors: list[ConnectorListItem] = []
+
+
+class ConnectorFilter(BaseModel):
+    """Filter schema for connector list API."""
+
+    name: str | None = None
+    prompt_id: Optional[str] = Field(None, description="Prompt ID to filter registered/non-registered connectors")
+    is_registered: Optional[bool] = Field(None, description="Filter by registration status (requires prompt_id)")
+
+
+class Connector(BaseModel):
+    """Internal schema for full connector data."""
+
+    id: str
+    name: str
+    icon: Optional[str] = None
+    category: Optional[str] = None
+    url: str
+    provider: str
+    description: Optional[str] = None
+    documentation_url: Optional[str] = None
+    auth_type: ConnectorAuthTypeEnum
+    credential_schema: List[Dict[str, Any]]
+
+
+class ConnectorResponse(SuccessResponse):
+    """Response schema for single connector retrieval."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    connector: Connector
+
+
+class Tool(BaseModel):
+    """Schema for tool data."""
+
+    id: UUID4
+    name: str
+    description: str
+    type: str
+    schema: Dict[str, Any]
+
+
+class ToolListItem(BaseModel):
+    """Schema for tool item in list response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    type: str
+    is_added: bool = Field(..., description="Whether tool is added to prompt config")
+
+
+class ToolFilter(BaseModel):
+    """Filter schema for tool list API."""
+
+    prompt_id: str = Field(..., description="Prompt ID to filter tools (UUID or draft ID)")
+    connector_id: str = Field(..., description="Connector ID to filter tools")
+    version: Optional[int] = Field(None, ge=1, description="Version of prompt config")
+
+
+class ToolListResponse(PaginatedSuccessResponse):
+    """Tool list response schema."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    tools: list[ToolListItem] = []
+
+
+class ToolResponse(SuccessResponse):
+    """Response schema for single tool retrieval."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    tool: Tool
+
+
+class PassthroughHeadersMixin(BaseModel):
+    """Mixin for passthrough_headers field (common across all auth types)."""
+
+    passthrough_headers: Optional[List[str]] = Field(
+        None, description="List of headers to pass through (e.g., ['Authorization', 'X-Tenant-Id'])"
+    )
+
+
+class OAuthCredentials(PassthroughHeadersMixin):
+    """OAuth authentication credentials."""
+
+    grant_type: Literal["client_credentials", "authorization_code"] = Field(..., description="OAuth grant type")
+    client_id: str = Field(..., min_length=1, description="OAuth client ID")
+    client_secret: str = Field(..., min_length=1, description="OAuth client secret")
+    token_url: str = Field(..., description="OAuth token endpoint URL")
+    authorization_url: str = Field(..., description="OAuth authorization endpoint URL")
+    redirect_uri: str = Field(..., description="OAuth callback/redirect URI")
+    scopes: Optional[List[str]] = Field(None, description="List of OAuth scopes (e.g., ['repo', 'read:user'])")
+
+
+class HeadersCredentials(PassthroughHeadersMixin):
+    """Headers-based authentication credentials."""
+
+    auth_headers: List[Dict[str, str]] = Field(
+        ...,
+        min_length=1,
+        description="Authentication headers as list of dicts with 'key' and 'value' (e.g., [{'key': 'Authorization', 'value': 'Bearer token'}])",
+    )
+
+    @field_validator("auth_headers")
+    @classmethod
+    def validate_auth_headers(cls, v: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """Validate each header has 'key' and 'value' fields."""
+        for i, header in enumerate(v):
+            if "key" not in header or "value" not in header:
+                raise ValueError(f"Header at index {i} must have 'key' and 'value' fields")
+            if not header["key"] or not header["value"]:
+                raise ValueError(f"Header at index {i} must have non-empty 'key' and 'value'")
+        return v
+
+
+class OpenCredentials(PassthroughHeadersMixin):
+    """Open authentication (no auth required)."""
+
+    pass  # Only inherits passthrough_headers
+
+
+class RegisterConnectorRequest(BaseModel):
+    """Request schema for registering a connector to a prompt with auth type-specific credentials."""
+
+    credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials] = Field(
+        ..., description="Credentials matching connector's auth_type"
+    )
+    version: Optional[int] = Field(
+        None, ge=1, description="Optional version number. If not specified, updates default version."
+    )
+
+
+class AddToolRequest(BaseModel):
+    """Request schema for adding tools to a prompt."""
+
+    prompt_id: str = Field(..., description="Prompt ID (must exist in Redis)")
+    connector_id: str = Field(..., description="Connector ID")
+    tool_ids: List[UUID] = Field(
+        ..., description="Tool IDs to add/update (empty list removes all tools for this connector)"
+    )
+    version: Optional[int] = Field(None, ge=1, description="Prompt config version")
+
+
+class AddToolResponse(SuccessResponse):
+    """Response schema for adding tools."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    virtual_server_id: str = Field(..., description="Virtual server ID from MCP Foundry")
+    virtual_server_name: str = Field(..., description="Virtual server name (format: {prompt_id}__v{version})")
+    added_tools: List[str] = Field(..., description="List of added tool IDs")
+
+
+class GatewayResponse(BaseModel):
+    """Response from MCP Foundry gateway creation."""
+
+    gateway_id: str = Field(..., description="Gateway ID from MCP Foundry")
+    name: str = Field(..., description="Gateway name (format: {prompt_id}__v{version}__{connector_id})")
+    url: str
+    transport: str
+    visibility: str
+    created_at: Optional[datetime] = None
+
+
+class RegisterConnectorResponse(SuccessResponse):
+    """Response schema for connector registration.
+
+    Gateway name format: {prompt_id}__v{version}__{connector_id}
+    Each prompt version gets its own gateway for proper version isolation.
+    """
+
+    gateway: GatewayResponse
+    connector_id: str
+    budprompt_id: str
+
+
+class DisconnectConnectorResponse(SuccessResponse):
+    """Response schema for disconnecting connector."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    prompt_id: str = Field(..., description="Prompt ID")
+    connector_id: str = Field(..., description="Disconnected connector ID")
+    deleted_gateway_id: str = Field(..., description="Deleted gateway ID")

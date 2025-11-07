@@ -161,10 +161,10 @@ microservices:
     enabled: true
     image: budstudio/askbud:0.4.2
     daprid: askbud
-    model: qwen3-32b
+    model: bud-gpt-oss-20b-ada28b58
     env:
       INFERENCE_API_KEY: "test"
-      INFERENCE_URL: http://20.66.97.208/v1/
+      INFERENCE_URL: http://52.241.253.58/v1/
     nodeSelector: {}
     affinity: {}
   budapp:
@@ -301,7 +301,7 @@ microservices:
     env:
       PROMETHEUS_URL: https://metric.bud.studio
       # deadlink
-      BUD_LLM_BASE_URL: http://20.66.97.208/v1/
+      BUD_LLM_BASE_URL: http://52.241.253.58/v1/
       #deadlink
       EVAL_MANIFEST_URL: https://eval-datasets.bud.eco/v2/manifest.json
       #deadlink
@@ -326,7 +326,7 @@ microservices:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       BUD_CONNECT_URL: https://budconnect.bud.studio
-      BUD_LLM_MODEL: qwen3-32b
+      BUD_LLM_MODEL: bud-gpt-oss-20b-ada28b58
       CI: "true"
       CLICKHOUSE_USER: "{{ .Values.clickhouse.auth.username }}"
       CLICKHOUSE_PASSWORD: "{{ .Values.clickhouse.auth.password }}"
@@ -343,6 +343,7 @@ microservices:
       IS_TOPIC_NOTIFICATION_ENABLED: "true"
       LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
       LOG_LEVEL: INFO
+      MCP_FOUNDRY_BASE_URL: https://mcp-foundry.bud.studio/
       MINIO_ACCESS_KEY: "{{ .Values.minio.auth.rootUser }}"
       MINIO_BUCKET: models-registry
       MINIO_ENDPOINT: '{{ include "bud.ingress.hosts.s3" $ }}'
@@ -449,6 +450,13 @@ clickhouse:
   auth:
     username: bud
     password: bud
+  resources:
+    requests:
+      memory: 2Gi
+      cpu: 500m
+    limits:
+      memory: 4Gi
+      cpu: 2000m
   keeper:
     replicaCount: 1
     image:

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { infoToast } from "@/components/toast";
 
 export interface AgentVariable {
   id: string;
@@ -36,6 +37,7 @@ export interface AgentSession {
     temperature?: number;
     maxTokens?: number;
     topP?: number;
+    stream?: boolean;
   };
 }
 
@@ -142,13 +144,21 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
       // Session Management
       createSession: () => {
+        const activeSessionIds = get().activeSessionIds;
+
+        // Limit to maximum 3 active sessions
+        if (activeSessionIds.length >= 3) {
+          infoToast("Maximum of 3 agent boxes allowed");
+          return activeSessionIds[activeSessionIds.length - 1];
+        }
+
         const newSession = createDefaultSession();
         const currentSessions = get().sessions;
         newSession.position = currentSessions.length;
 
         set({
           sessions: [...currentSessions, newSession],
-          activeSessionIds: [...get().activeSessionIds, newSession.id],
+          activeSessionIds: [...activeSessionIds, newSession.id],
           selectedSessionId: newSession.id
         });
 
