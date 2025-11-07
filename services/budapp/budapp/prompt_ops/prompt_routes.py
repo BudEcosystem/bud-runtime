@@ -51,6 +51,7 @@ from .schemas import (
     GatewayResponse,
     GetPromptVersionResponse,
     PaginatedTagsResponse,
+    PromptCleanupRequest,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -1004,6 +1005,7 @@ async def register_connector(
             connector_id=connector_id,
             credentials=request.credentials,
             version=request.version,
+            permanent=request.permanent,
         )
 
         return RegisterConnectorResponse(
@@ -1048,8 +1050,9 @@ async def disconnect_connector(
     session: Annotated[Session, Depends(get_session)],
     budprompt_id: str,
     connector_id: str,
-    version: Optional[int] = Query(
-        None, ge=1, description="Version of prompt config. If not specified, uses default version"
+    version: Optional[int] = Query(default=1, ge=1, description="Version of prompt config (defaults to 1)"),
+    permanent: bool = Query(
+        False, description="Store configuration permanently without expiration (default: False, uses configured TTL)"
     ),
 ) -> Union[DisconnectConnectorResponse, ErrorResponse]:
     """Disconnect a connector from a prompt.
@@ -1068,6 +1071,7 @@ async def disconnect_connector(
         budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
         connector_id: The connector ID to disconnect
         version: Optional version number. If not specified, uses default version
+        permanent: Store configuration permanently without expiration
 
     Returns:
         DisconnectConnectorResponse with deletion details or ErrorResponse on failure
@@ -1077,6 +1081,7 @@ async def disconnect_connector(
             budprompt_id=budprompt_id,
             connector_id=connector_id,
             version=version,
+            permanent=permanent,
         )
 
         return DisconnectConnectorResponse(
@@ -1155,6 +1160,7 @@ async def add_tool(
             connector_id=request.connector_id,
             tool_ids=request.tool_ids,
             version=request.version,
+            permanent=request.permanent,
         )
 
         return AddToolResponse(
@@ -1293,3 +1299,70 @@ async def get_tool(
             message="Failed to get tool",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+@router.post(
+    "/prompt-cleanup",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully cleaned up prompts",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Trigger cleanup of temporary prompt resources (MCP gateways, virtual servers, etc.)",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def cleanup_prompts(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: PromptCleanupRequest,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Cleanup temporary prompt resources.
+
+    This endpoint triggers cleanup of MCP resources (gateways, virtual servers)
+    for temporary prompts.
+
+    Execution modes:
+    - debug=false: Runs cleanup asynchronously via Dapr workflow in budprompt
+    - debug=true: Runs cleanup synchronously for immediate feedback
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        request: Cleanup request with list of prompts and debug flag
+
+    Returns:
+        SuccessResponse with status code and message, or ErrorResponse on failure
+    """
+    try:
+        logger.debug(
+            f"Cleanup request received for {len(request.prompts)} prompts (debug={request.debug}, user={current_user.id})"
+        )
+
+        prompt_service = PromptService(session)
+
+        # Call cleanup with debug flag
+        prompt_ids = [prompt.model_dump() for prompt in request.prompts]
+        await prompt_service._perform_cleanup_request(prompt_ids=prompt_ids, debug=request.debug)
+
+        return SuccessResponse(
+            message=f"Successfully triggered cleanup for {len(request.prompts)} prompts",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to cleanup prompts: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to cleanup prompts: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cleanup prompts"
+        ).to_http_response()

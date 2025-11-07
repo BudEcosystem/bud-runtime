@@ -27,6 +27,7 @@ from fastapi.responses import StreamingResponse
 
 from ..commons.exceptions import ClientException
 from .schemas import (
+    PromptCleanupRequest,
     PromptConfigCopyRequest,
     PromptConfigCopyResponse,
     PromptConfigGetRawResponse,
@@ -38,8 +39,8 @@ from .schemas import (
     PromptSchemaRequest,
     PromptSetDefaultVersionRequest,
 )
-from .services import PromptConfigurationService, PromptExecutorService, PromptService
-from .workflows import PromptSchemaWorkflow
+from .services import PromptCleanupService, PromptConfigurationService, PromptExecutorService, PromptService
+from .workflows import PromptCleanupWorkflow, PromptSchemaWorkflow
 
 
 logger = logging.getLogger(__name__)
@@ -153,6 +154,36 @@ async def perform_prompt_schema(request: PromptSchemaRequest) -> Response:
             response = ErrorResponse(message="Error running prompt schema validation", code=500)
     else:
         response = await PromptSchemaWorkflow().__call__(request)
+
+    return response.to_http_response()
+
+
+@prompt_router.post("/prompt-cleanup")
+@pubsub_api_endpoint(request_model=PromptCleanupRequest)
+async def perform_prompt_cleanup(request: PromptCleanupRequest) -> Response:
+    """Run a prompt cleanup workflow.
+
+    This endpoint processes MCP resource cleanup for temporary prompts.
+    It can cleanup specific prompts or scan for expired prompts.
+
+    Args:
+        request (PromptCleanupRequest): The cleanup request containing
+        optional list of prompts to cleanup. Empty list means cleanup expired prompts.
+
+    Returns:
+        HTTP response containing the cleanup results.
+    """
+    response: Union[SuccessResponse, ErrorResponse]
+
+    if request.debug:
+        try:
+            logger.debug("Running prompt cleanup in debug mode", request.model_dump())
+            response = PromptCleanupService().__call__(request, workflow_id=str(uuid.uuid4()))
+        except Exception as e:
+            logger.exception("Error running prompt cleanup: %s", str(e))
+            response = ErrorResponse(message="Error running prompt cleanup", code=500)
+    else:
+        response = await PromptCleanupWorkflow().__call__(request)
 
     return response.to_http_response()
 

@@ -250,6 +250,25 @@ class PromptSchemaConfig(BaseModel):
     )
 
 
+class PromptCleanupItem(BaseModel):
+    """Item for cleanup request."""
+
+    prompt_id: str = Field(..., description="Prompt identifier")
+    version: Optional[int] = Field(default=1, description="Version number (defaults to 1)")
+
+
+class PromptCleanupRequest(BaseModel):
+    """Request for triggering prompt cleanup."""
+
+    prompts: List[PromptCleanupItem] = Field(
+        ..., description="List of prompts to cleanup with prompt_id and optional version"
+    )
+    debug: bool = Field(
+        default=True,
+        description="Run cleanup synchronously (true) or via workflow (false). Defaults to true",
+    )
+
+
 class CreatePromptWorkflowRequest(BaseModel):
     """Create prompt workflow request schema."""
 
@@ -271,6 +290,9 @@ class CreatePromptWorkflowRequest(BaseModel):
     rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
     rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
     bud_prompt_id: str | None = None
+    discarded_prompt_ids: Optional[List[PromptCleanupItem]] = Field(
+        None, description="List of temporary prompt IDs discarded by user that need cleanup"
+    )
 
     @model_validator(mode="after")
     def validate_fields(self):
@@ -309,6 +331,9 @@ class CreatePromptWorkflowSteps(BaseModel):
     rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
     rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
     bud_prompt_id: str | None = None
+    discarded_prompt_ids: Optional[List[PromptCleanupItem]] = Field(
+        None, description="List of temporary prompt IDs to cleanup"
+    )
 
 
 class EditPromptRequest(BaseModel):
@@ -455,6 +480,10 @@ class PromptSchemaRequest(BaseModel):
     schema: SchemaBase | None = None
     type: Literal["input", "output"] | None = None
     deployment_name: str | None = None
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
 
     @model_validator(mode="after")
     def validate_fields(self):
@@ -474,6 +503,7 @@ class PromptSchemaWorkflowSteps(BaseModel):
     schema: SchemaBase | None = None
     type: Literal["input", "output"] | None = None
     deployment_name: str | None = None
+    permanent: bool | None = None
 
 
 class PromptConfigRequest(BaseModel):
@@ -508,6 +538,10 @@ class PromptConfigRequest(BaseModel):
     system_prompt_role: Optional[Literal["system", "developer", "user"]] = Field(
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
+    )
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
     )
 
 
@@ -698,7 +732,7 @@ class ToolFilter(BaseModel):
 
     prompt_id: str = Field(..., description="Prompt ID to filter tools (UUID or draft ID)")
     connector_id: str = Field(..., description="Connector ID to filter tools")
-    version: Optional[int] = Field(None, ge=1, description="Version of prompt config")
+    version: Optional[int] = Field(default=1, ge=1, description="Version of prompt config (defaults to 1)")
 
 
 class ToolListResponse(PaginatedSuccessResponse):
@@ -773,6 +807,10 @@ class RegisterConnectorRequest(BaseModel):
     version: Optional[int] = Field(
         None, ge=1, description="Optional version number. If not specified, updates default version."
     )
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
 
 
 class AddToolRequest(BaseModel):
@@ -784,6 +822,10 @@ class AddToolRequest(BaseModel):
         ..., description="Tool IDs to add/update (empty list removes all tools for this connector)"
     )
     version: Optional[int] = Field(None, ge=1, description="Prompt config version")
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
 
 
 class AddToolResponse(SuccessResponse):
