@@ -1,3 +1,6 @@
+// Allow streaming responses up to 30 seconds
+export const maxDuration = 300;
+
 interface PromptBody {
   input?: string | null;
   prompt?: {
@@ -13,6 +16,10 @@ interface PromptBody {
   settings?: {
     temperature?: number;
   } | null;
+  messages?: Array<{
+    role: string;
+    content: string;
+  }>;
 }
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
@@ -31,23 +38,17 @@ const resolveGatewayBase = (preferred?: string | null) => {
     (item) => typeof item.value === 'string' && item.value.trim().length > 0,
   );
 
-  console.log('[Responses API] Selected base URL source:', selected?.name);
-  console.log('[Responses API] Selected base URL value:', selected?.value);
-
   let baseUrl = trimTrailingSlash(selected?.value || 'https://gateway.dev.bud.studio');
 
-  // IMPORTANT: Responses API is only available on gateway, not on app
-  // Replace app.dev.bud.studio with gateway.dev.bud.studio
   if (baseUrl.includes('app.dev.bud.studio')) {
-    console.log('[Responses API] Detected app.dev.bud.studio, redirecting to gateway.dev.bud.studio');
     baseUrl = baseUrl.replace('app.dev.bud.studio', 'gateway.dev.bud.studio');
   }
 
-  // Remove /openai/v1 or /v1 suffix if present, since we'll add /v1/responses
   baseUrl = baseUrl.replace(/\/openai\/v1$/, '');
-  baseUrl = baseUrl.replace(/\/v1$/, '');
 
-  console.log('[Responses API] Final base URL after cleanup:', baseUrl);
+  if (!baseUrl.endsWith('/v1')) {
+    baseUrl = `${baseUrl}/v1`;
+  }
 
   return baseUrl;
 };
@@ -76,99 +77,223 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  // Check if this is a follow-up message in a conversation
+  const isFollowUpMessage = body.messages && body.messages.length > 1;
+
   const promptInput = buildPromptInput(body);
 
-  if (!promptInput) {
+  // For initial prompt submission, we need prompt input
+  // For follow-up messages, we rely on the messages array
+  if (!promptInput && !isFollowUpMessage) {
     return Response.json(
-      { error: 'Missing prompt input' },
+      { error: 'Missing prompt input or messages' },
       { status: 400 },
     );
   }
 
+  const model = body.model || 'qwen-4b-tools';
   const baseURL = resolveGatewayBase(body.metadata?.base_url ?? null);
-  const responsesEndpoint = `${baseURL}/v1/responses`;
-
-  // Build request body matching gateway's expected format
-  const requestBody: {
-    prompt: {
-      id: string;
-      version?: string;
-    };
-    input: string;
-    model?: string;
-    temperature?: number;
-  } = {
-    prompt: {
-      id: body.prompt?.id || '',
-    },
-    input: promptInput,
-  };
-
-  // Add optional fields
-  if (body.prompt?.version) {
-    requestBody.prompt.version = body.prompt.version;
-  }
-  if (body.model) {
-    requestBody.model = body.model;
-  }
-  if (body.settings?.temperature !== undefined) {
-    requestBody.temperature = body.settings.temperature;
-  }
-
-  // Build headers
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  if (authorization) {
-    headers['Authorization'] = authorization;
-  }
-  if (apiKey) {
-    headers['api-key'] = apiKey;
-  }
-  if (body.metadata?.project_id) {
-    headers['project-id'] = body.metadata.project_id;
-  }
-
-  // Log the request
-  console.log('[Responses API] Endpoint:', responsesEndpoint);
-  console.log('[Responses API] Request body:', JSON.stringify(requestBody, null, 2));
-  console.log('[Responses API] Request headers:', headers);
 
   try {
-    const response = await fetch(responsesEndpoint, {
+    // Check if this is a structured prompt (has variables)
+    const hasStructuredInput = body.prompt?.variables && Object.keys(body.prompt.variables).length > 0;
+
+    // Build request body for gateway
+    const requestBody: any = {
+      temperature: body.settings?.temperature ?? 1,
+      // stream: false, // Gateway doesn't actually stream despite accepting this param
+    };
+
+    if (isFollowUpMessage) {
+      // For follow-up messages, include the conversation history
+      requestBody.messages = body.messages;
+
+      // Still include prompt context (id and version) but NOT variables
+      if (body.prompt?.id) {
+        requestBody.prompt = {
+          id: body.prompt.id,
+          version: body.prompt.version || '1',
+        };
+      }
+    } else {
+      // For initial prompt submission, use the original approach
+      // Only include input field for unstructured prompts
+      if (!hasStructuredInput && promptInput) {
+        requestBody.input = promptInput;
+      }
+
+      // Add prompt object with variables if provided
+      if (body.prompt?.id) {
+        // Transform variable keys: replace spaces with underscores
+        const transformedVariables: Record<string, string> = {};
+        if (body.prompt.variables) {
+          Object.entries(body.prompt.variables).forEach(([key, value]) => {
+            const transformedKey = key.replace(/\s+/g, '_');
+            transformedVariables[transformedKey] = String(value);
+          });
+        }
+
+        requestBody.prompt = {
+          id: body.prompt.id,
+          version: body.prompt.version || '1',
+          variables: transformedVariables,
+        };
+      }
+    }
+
+    // Make direct fetch call to gateway
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(authorization && { 'Authorization': authorization }),
+      ...(apiKey && { 'api-key': apiKey }),
+      ...(body.metadata?.project_id && { 'project-id': body.metadata.project_id }),
+    };
+
+    const response = await fetch(`${baseURL}/responses`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
     });
 
-    console.log('[Responses API] Response status:', response.status);
-    console.log('[Responses API] Response statusText:', response.statusText);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[Responses API] Error response:', errorText);
+      console.error('[Prompt Chat] Error response:', errorText);
 
-      let errorData;
+      let errorMessage = 'Failed to generate response';
       try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { error: errorText || 'Failed to generate response' };
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error || errorMessage;
+      } catch (e) {
+        errorMessage = errorText;
       }
 
-      return Response.json(errorData, { status: response.status });
+      throw new Error(errorMessage);
     }
 
-    const data = await response.json();
-    console.log('[Responses API] Success response:', JSON.stringify(data, null, 2));
+    // Get the response as text first
+    const responseText = await response.text();
 
-    return Response.json(data);
+    let text = '';
+    let usage: any = null;
+    let finishReason = 'completed';
+
+    // Check if it's SSE format (starts with "event:")
+    if (responseText.startsWith('event:')) {
+      // Parse SSE stream
+      const lines = responseText.split('\n');
+      let currentEvent = '';
+
+      for (const line of lines) {
+        if (line.startsWith('event:')) {
+          currentEvent = line.substring(6).trim();
+        } else if (line.startsWith('data:')) {
+          const data = line.substring(5).trim();
+
+          try {
+            const parsed = JSON.parse(data);
+
+            // Extract text from content deltas
+            if (currentEvent === 'content_delta' || currentEvent === 'output') {
+              if (parsed.delta) {
+                text += parsed.delta;
+              } else if (parsed.content && Array.isArray(parsed.content)) {
+                for (const content of parsed.content) {
+                  if (content.text) {
+                    text += content.text;
+                  }
+                }
+              }
+            }
+
+            // Extract usage and finish reason from response_end
+            if (currentEvent === 'response_end' || currentEvent === 'done') {
+              if (parsed.usage) {
+                usage = parsed.usage;
+              }
+              if (parsed.status) {
+                finishReason = parsed.status;
+              }
+            }
+          } catch (e) {
+            console.warn('[Prompt Chat] Failed to parse SSE data:', data);
+          }
+        }
+      }
+    } else {
+      // Try to parse as JSON (fallback)
+      try {
+        const result = JSON.parse(responseText);
+
+        // Extract text from gateway's response format
+        if (result.output && Array.isArray(result.output)) {
+          for (const item of result.output) {
+            if (item.content && Array.isArray(item.content)) {
+              for (const content of item.content) {
+                if (content.text) {
+                  text += content.text;
+                }
+              }
+            }
+          }
+        }
+
+        usage = result.usage;
+        finishReason = result.status || 'completed';
+      } catch (e) {
+        console.error('[Prompt Chat] Failed to parse response as JSON:', e);
+        throw new Error('Failed to parse gateway response');
+      }
+    }
+
+    // Create a streaming response for useChat
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        // Send the text as a stream chunk
+        controller.enqueue(encoder.encode(`0:${JSON.stringify(text)}\n`));
+
+        // Send usage metadata if available
+        if (usage) {
+          controller.enqueue(encoder.encode(`d:${JSON.stringify({
+            finishReason: finishReason,
+            usage: usage
+          })}\n`));
+        }
+
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Vercel-AI-Data-Stream': 'v1',
+      },
+    });
+
   } catch (error: any) {
-    console.error('[Responses API] Request error:', error);
+    console.error('[Prompt Chat] Error:', error);
+    console.error('[Prompt Chat] Error message:', error?.message);
+
+    // Handle errors
+    let actualError = error?.message ?? 'Failed to generate response';
+
+    if (error?.responseBody) {
+      try {
+        const parsedError = JSON.parse(error.responseBody);
+        if (parsedError?.error) {
+          actualError = typeof parsedError.error === 'string'
+            ? parsedError.error
+            : parsedError.error.message || actualError;
+        }
+      } catch (e) {
+        actualError = error.responseBody;
+      }
+    }
 
     return Response.json(
       {
-        error: error?.message ?? 'Failed to generate response',
+        error: actualError,
       },
       { status: 500 },
     );

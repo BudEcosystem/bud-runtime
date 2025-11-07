@@ -837,10 +837,32 @@ class ExperimentService:
             eval_run_ids = {str(run.id) for run in eval_runs}
             eval_metrics = [metric for metric in exp_data.current_metrics if metric.get("run_id") in eval_run_ids]
 
+            # Extract unique dataset names from runs in this evaluation
+            dataset_names = []
+            seen_datasets = set()
+            for metric in eval_metrics:
+                dataset = metric.get("dataset", "")
+                if dataset and dataset != "Unknown Dataset" and dataset not in seen_datasets:
+                    dataset_names.append(dataset)
+                    seen_datasets.add(dataset)
+            current_evaluation_datasets = ", ".join(dataset_names) if dataset_names else ""
+
+            # Filter out failed/cancelled/skipped runs and runs with score of 0 from average calculation
+            excluded_statuses = {
+                RunStatusEnum.FAILED.value,
+                RunStatusEnum.CANCELLED.value,
+                RunStatusEnum.SKIPPED.value,
+            }
+            valid_metrics = [
+                metric
+                for metric in eval_metrics
+                if metric.get("status") not in excluded_statuses and metric.get("score_value", 0) > 0
+            ]
+
             evaluation_avg_score = 0.0
-            if eval_metrics:
-                total_score = sum(metric["score_value"] for metric in eval_metrics)
-                evaluation_avg_score = round(total_score / len(eval_metrics), 2)
+            if valid_metrics:
+                total_score = sum(metric["score_value"] for metric in valid_metrics)
+                evaluation_avg_score = round(total_score / len(valid_metrics), 2)
 
             progress_overview.append(
                 ProgressOverview(
@@ -849,7 +871,7 @@ class ExperimentService:
                     objective=evaluation.description,
                     current=None,
                     progress=ProgressInfo(percent=0, completed=0, total=0),
-                    current_evaluation="",
+                    current_evaluation=current_evaluation_datasets,
                     current_model=current_model_name,
                     processing_rate_per_min=0,
                     average_score_pct=evaluation_avg_score,
@@ -1702,6 +1724,15 @@ class ExperimentService:
                     # Filter by trait UUIDs through the many-to-many relationship
                     q = q.join(DatasetModel.traits).filter(TraitModel.id.in_(filters.trait_ids))
 
+                # Always apply has_gen_eval_type filter (defaults to True in route)
+                if hasattr(filters, "has_gen_eval_type") and filters.has_gen_eval_type is not None:
+                    # Filter by datasets that have 'gen' key in eval_types JSONB field
+                    if filters.has_gen_eval_type:
+                        q = q.filter(DatasetModel.eval_types.has_key("gen"))
+                    else:
+                        # Filter for datasets WITHOUT 'gen' key
+                        q = q.filter(~DatasetModel.eval_types.has_key("gen"))
+
             # Get total count before applying pagination
             total_count = q.count()
 
@@ -1748,6 +1779,7 @@ class ExperimentService:
                     modalities=dataset.modalities,
                     sample_questions_answers=dataset.sample_questions_answers,
                     advantages_disadvantages=dataset.advantages_disadvantages,
+                    eval_types=dataset.eval_types,
                     traits=traits,
                 )
                 dataset_schemas.append(dataset_schema)

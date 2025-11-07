@@ -58,12 +58,14 @@ const AgentDrawer: React.FC = () => {
 
   // Handle Play button click
   const handlePlayClick = () => {
-    if (!showPlayground) {
-      // If playground is closed, open it
-      setShowPlayground(true);
-      setShowChatHistory(false);
-    } else {
-      // If playground is already open, send typeForm=true message
+    const wasAnyViewOpen = showPlayground || showChatHistory;
+
+    // Always ensure the playground is shown and chat history is hidden when play is clicked
+    setShowPlayground(true);
+    setShowChatHistory(false);
+
+    if (wasAnyViewOpen) {
+      // If a view was already open, switch to type mode
       setTypeFormMessage({ timestamp: Date.now(), value: true });
     }
   };
@@ -81,7 +83,7 @@ const AgentDrawer: React.FC = () => {
     // Only allow click if playground is enabled
     if (showPlayground || showChatHistory) {
       setShowChatHistory(true);
-      // setShowPlayground(false);
+      setShowPlayground(false);
       setTypeFormMessage({ timestamp: Date.now(), value: false });
     }
   };
@@ -191,7 +193,7 @@ const AgentDrawer: React.FC = () => {
                   onClick={handlePlayClick}
                   className="control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors mb-3"
                 >
-                  <PlayCircleOutlined className={`text-lg ${(showPlayground && !showChatHistory) ? 'text-[#EEEEEE]' : 'text-[#808080] hover:text-[#EEEEEE]'}`} />
+                  <PlayCircleOutlined className={`text-lg ${showPlayground ? 'text-[#EEEEEE]' : 'text-[#808080] hover:text-[#EEEEEE]'}`} />
                 </button>
               </Tooltip>
 

@@ -44,7 +44,7 @@ export function PrimaryButton({
                 cursor: "not-allowed",
                 borderRadius: "0.3rem",
                 height: "1.75rem",
-                borderColor: "#965CDE !important",
+                borderColor: "#965CDE",
                 background: "#1E0C34 !important",
               }}
             >
@@ -81,8 +81,8 @@ export function PrimaryButton({
             paddingRight: ".7rem",
             borderRadius: "0.3rem",
             height: "1.75rem",
-            borderColor: "#965CDE !important",
-            background: "#1E0C34 !important",
+            borderColor: "#965CDE",
+            background: "#1E0C34",
           }}
         >
           {!permission ? (

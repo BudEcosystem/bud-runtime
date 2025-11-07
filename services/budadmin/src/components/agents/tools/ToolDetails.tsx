@@ -6,6 +6,7 @@ import { Text_12_400_EEEEEE, Text_14_400_EEEEEE, Text_10_400_757575, Text_10_400
 import { AppRequest } from 'src/pages/api/requests';
 import { tempApiBaseUrl } from '@/components/environment';
 import { errorToast } from '@/components/toast';
+import ProjectTags from 'src/flows/components/ProjectTags';
 
 interface ToolDetailsProps {
   toolId: string;
@@ -104,7 +105,7 @@ export const ToolDetails: React.FC<ToolDetailsProps> = ({
       </div>
 
       {/* Tool Icon and Name */}
-      <div className="px-[1.125rem] flex items-center gap-3 mb-6 pt-[]">
+      <div className="px-[1.125rem] flex items-center gap-3 mb-6">
         <div className="w-[1.5rem] h-[1.5rem] rounded-lg bg-[#1F1F1F] flex items-center justify-center text-lg">
           {getToolIcon()}
         </div>
@@ -134,13 +135,25 @@ export const ToolDetails: React.FC<ToolDetailsProps> = ({
                     className="bg-[#ffffff08] border border-[#1F1F1F] rounded-lg p-[.54rem]"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                      <div className="w-[30%]">
                         <Text_12_400_EEEEEE>{paramName}</Text_12_400_EEEEEE>
+                      </div>
+                      <div className="w-[30%]">
                         <Text_10_400_757575>{paramDetails.type}</Text_10_400_757575>
                       </div>
-                      {isRequired && (
-                        <span className="text-[0.625rem] text-[#E82E2E]">Required</span>
-                      )}
+                      <div className="w-[30%]">
+                        {isRequired ? (
+                          <ProjectTags
+                            name='Required'
+                            color='#EC7575'
+                          />
+                        ) : (
+                          <ProjectTags
+                            name='Not required'
+                            color='#d1b854'
+                          />
+                        )}
+                      </div>
                     </div>
                     {/* {paramDetails.description && (
                       <Text_10_400_B3B3B3 className="mt-2">{paramDetails.description}</Text_10_400_B3B3B3>

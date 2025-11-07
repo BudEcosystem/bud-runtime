@@ -123,10 +123,10 @@ function AgentBoxInner({
   const { isOpen: isModelSettingsOpen, toggleModelSettings: toggleModelSettingsOriginal, closeModelSettings } = useModelSettings();
 
   // Determine which sidebar is open
-  const isRightSidebarOpen = isSettingsOpen || isToolsOpen || isModelSettingsOpen;
+  const isRightSidebarOpen = isSettingsOpen || isToolsOpen;
 
-  // Custom toggle functions that close the other sidebars
-  const toggleSettings = () => {
+  // Custom toggle functions that close the other sidebar
+  const toggleSettings = React.useCallback(() => {
     if (isToolsOpen) {
       closeTools();
     }
@@ -134,9 +134,9 @@ function AgentBoxInner({
       closeModelSettings();
     }
     toggleSettingsOriginal();
-  };
+  }, [isToolsOpen, closeTools, toggleSettingsOriginal]);
 
-  const toggleTools = () => {
+  const toggleTools = React.useCallback(() => {
     if (isSettingsOpen) {
       closeSettings();
     }
@@ -144,7 +144,7 @@ function AgentBoxInner({
       closeModelSettings();
     }
     toggleToolsOriginal();
-  };
+  }, [isSettingsOpen, closeSettings, toggleToolsOriginal]);
 
   const toggleModelSettings = () => {
     if (isSettingsOpen) {
@@ -457,7 +457,7 @@ function AgentBoxInner({
         version: 1,
         set_default: false,
         deployment_name: session.selectedDeployment.model.name,
-        model_settings: getDefaultModelSettings(session),
+        // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
         messages: [
           {
@@ -565,7 +565,7 @@ function AgentBoxInner({
         version: 1,
         set_default: false,
         deployment_name: session.selectedDeployment.model.name,
-        model_settings: getDefaultModelSettings(session),
+        // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
         messages: messages.map((msg: any) => ({
           role: msg.role,
@@ -681,7 +681,7 @@ function AgentBoxInner({
           </div>
           {isHovering && (
             <PrimaryButton onClick={closeAgentDrawer}
-              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] hover:!bg-[#479d5f] group"
+              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] hover:!bg-[#479d5f] hover:!border-[#965CDE] group"
               textClass="!text-[0.625rem] !font-[400] text-[#479d5f] group-hover:text-[#EEEEEE]"
             >
               Save
@@ -707,7 +707,7 @@ function AgentBoxInner({
           >
             <div
               className={`w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group transition-none ${isModelSettingsOpen ? 'text-[#965CDE]' : 'text-[#B3B3B3] hover:text-[#FFFFFF]'
-              }`}
+                }`}
               style={{ transform: 'none' }}
             >
               <Tooltip title={isModelSettingsOpen ? "Close Settings" : "Model Settings"}>

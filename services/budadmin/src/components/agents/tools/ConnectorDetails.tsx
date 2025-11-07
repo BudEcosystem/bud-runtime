@@ -12,6 +12,12 @@ import { successToast, errorToast } from '@/components/toast';
 import { toast } from 'react-toastify';
 import { ToolDetails } from './ToolDetails';
 
+interface Tool {
+  id: string;
+  name: string;
+  is_added?: boolean;
+}
+
 interface ConnectorDetailsProps {
   connector: Connector;
   onBack: () => void;
@@ -30,13 +36,54 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [availableTools, setAvailableTools] = useState<any[]>([]);
+  const [availableTools, setAvailableTools] = useState<Tool[]>([]);
   const [isLoadingTools, setIsLoadingTools] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [viewMode, setViewMode] = useState<'connector' | 'tool'>('connector');
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
   const [selectedToolName, setSelectedToolName] = useState<string | null>(null);
+
+  // Reusable function to fetch tools
+  const fetchTools = React.useCallback(async () => {
+    if (!promptId) return;
+
+    setIsLoadingTools(true);
+    try {
+      const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/tools`, {
+        params: {
+          prompt_id: promptId,
+          connector_id: connector.id,
+          page: 1,
+          limit: 100,
+        }
+      });
+
+      if (response.data && response.data.tools) {
+        const tools: Tool[] = response.data.tools;
+        setAvailableTools(tools);
+
+        // Auto-select tools that have is_added: true
+        const addedToolIds = tools
+          .filter((tool) => tool.is_added === true)
+          .map((tool) => tool.id)
+          .filter(Boolean);
+
+        if (addedToolIds.length > 0) {
+          setSelectedTools(addedToolIds);
+          // Check if all tools are added
+          if (addedToolIds.length === tools.length) {
+            setSelectAll(true);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching tools:', error);
+      errorToast('Failed to fetch tools');
+    } finally {
+      setIsLoadingTools(false);
+    }
+  }, [promptId, connector.id]);
 
   // Fetch connector details on mount
   useEffect(() => {
@@ -45,48 +92,10 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
   // Fetch tools if coming from connected section
   useEffect(() => {
-    const fetchTools = async () => {
-      if (connector.isFromConnectedSection && promptId) {
-        setIsLoadingTools(true);
-        try {
-          const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/tools`, {
-            params: {
-              prompt_id: promptId,
-              connector_id: connector.id,
-              page: 1,
-              limit: 100, // Fetch all tools
-            }
-          });
-
-          if (response.data && response.data.tools) {
-            const tools = response.data.tools;
-            setAvailableTools(tools);
-
-            // Auto-select tools that have is_added: true
-            const addedToolIds = tools
-              .filter((tool: any) => tool.is_added === true)
-              .map((tool: any) => tool.id)
-              .filter(Boolean);
-
-            if (addedToolIds.length > 0) {
-              setSelectedTools(addedToolIds);
-              // Check if all tools are added
-              if (addedToolIds.length === tools.length) {
-                setSelectAll(true);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching tools:', error);
-          errorToast('Failed to fetch tools');
-        } finally {
-          setIsLoadingTools(false);
-        }
-      }
-    };
-
-    fetchTools();
-  }, [connector.isFromConnectedSection, connector.id, promptId]);
+    if (connector.isFromConnectedSection && promptId) {
+      fetchTools();
+    }
+  }, [connector.isFromConnectedSection, promptId, fetchTools]);
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
@@ -101,9 +110,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     }
   };
 
-  const handleToolToggle = (tool: any, checked: boolean) => {
-    // Only use tool ID (not name)
-    const toolId = typeof tool === 'string' ? tool : tool.id;
+  const handleToolToggle = (tool: Tool, checked: boolean) => {
+    const toolId = tool.id;
     if (!toolId) return; // Skip if no ID
 
     if (checked) {
@@ -114,9 +122,9 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     }
   };
 
-  const handleToolClick = (tool: any) => {
-    const toolId = typeof tool === 'string' ? tool : tool.id;
-    const toolName = typeof tool === 'string' ? tool : tool.name;
+  const handleToolClick = (tool: Tool) => {
+    const toolId = tool.id;
+    const toolName = tool.name;
 
     if (!toolId) return;
 
@@ -186,54 +194,13 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         setStep(2);
 
         // Fetch tools after successful registration
-        await fetchToolsAfterRegistration();
+        await fetchTools();
       }
     } catch (error: any) {
       console.error('Error registering connector:', error);
       errorToast(error?.response?.data?.message || 'Failed to register connector');
     } finally {
       setIsRegistering(false);
-    }
-  };
-
-  // Fetch tools after registration
-  const fetchToolsAfterRegistration = async () => {
-    if (!promptId) return;
-
-    setIsLoadingTools(true);
-    try {
-      const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/tools`, {
-        params: {
-          prompt_id: promptId,
-          connector_id: connector.id,
-          page: 1,
-          limit: 100,
-        }
-      });
-
-      if (response.data && response.data.tools) {
-        const tools = response.data.tools;
-        setAvailableTools(tools);
-
-        // Auto-select tools that have is_added: true
-        const addedToolIds = tools
-          .filter((tool: any) => tool.is_added === true)
-          .map((tool: any) => tool.id)
-          .filter(Boolean);
-
-        if (addedToolIds.length > 0) {
-          setSelectedTools(addedToolIds);
-          // Check if all tools are added
-          if (addedToolIds.length === tools.length) {
-            setSelectAll(true);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching tools:', error);
-      errorToast('Failed to fetch tools');
-    } finally {
-      setIsLoadingTools(false);
     }
   };
 
@@ -271,13 +238,13 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             <img alt="" height="20" width="20" src="/icons/toast-icon.svg" />
           ),
           style: {
-            background: '#479d5f1a',
+            background: '#479d5f1a !important',
             color: '#479d5f',
             border: '1px solid #479d5f',
           },
         });
         // Refresh tools list to show updated is_added status
-        await fetchToolsAfterRegistration();
+        await fetchTools();
       }
     } catch (error: any) {
       console.error('Error connecting tools:', error);
@@ -398,7 +365,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     );
   }
 
-  const connectionUrl = selectedConnectorDetails?.url || `https://${connector.name.toLowerCase()}.com/vfggbkjhgfcvhbjnklmhj`;
+  const connectionUrl = selectedConnectorDetails?.url;
 
   return (
     <div className="flex flex-col h-full  text-white">
@@ -431,18 +398,20 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             <Text_14_400_EEEEEE className="">Connect to {connector.name}</Text_14_400_EEEEEE>
           </div>
           {/* Connection URL */}
-          <div className="mb-4">
-            <a
-              href={connectionUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="cursor-pointer hover:underline hover:decoration-[#EEEEEE]"
-            >
-              <Text_10_400_B3B3B3 className="">
-                {connectionUrl}
-              </Text_10_400_B3B3B3>
-            </a>
-          </div>
+          {connectionUrl && (
+            <div className="mb-4">
+              <a
+                href={connectionUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="cursor-pointer hover:underline hover:decoration-[#EEEEEE]"
+              >
+                <Text_10_400_B3B3B3 className="">
+                  {connectionUrl}
+                </Text_10_400_B3B3B3>
+              </a>
+            </div>
+          )}
         </div>
       </div>
 
@@ -495,34 +464,37 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                 </div>
 
                 {/* Tools List */}
-                <div className="space-y-2 mb-1 mx-[.5rem] border-[.5px] border-[#1F1F1F] rounded-[.5rem] py-[.5rem]">
+                <div className="space-y-2 mb-1 mx-[.5rem] border-[.5px] border-[#1F1F1F] rounded-[.5rem] ">
                   {availableTools.length === 0 ? (
                     <div className="px-4 py-8 text-center text-[#808080]">
                       No tools available
                     </div>
                   ) : (
                     availableTools.map((tool) => {
-                      // Only use tool.id for the ID (not name)
-                      const toolId = typeof tool === 'string' ? tool : tool.id;
-                      const toolName = typeof tool === 'string' ? tool : tool.name;
+                      const toolId = tool.id;
+                      const toolName = tool.name;
 
                       if (!toolId) return null; // Skip if no ID
 
                       return (
                         <div
                           key={toolId}
-                          className="flex items-center justify-between px-[0.625rem] py-[0.46875rem] rounded-lg hover:bg-[#1A1A1A] border-[.5px] border-[transparent] hover:border hover:border-[#2A2A2A]"
+                          onClick={() => handleToolClick(tool)}
+                          className="flex items-center justify-between px-[0.625rem] py-[0.46875rem] rounded-lg hover:bg-[#1A1A1A] border-[.5px] border-[transparent] hover:border-[#2A2A2A] cursor-pointer"
                         >
                           <div className='flex items-center justify-start gap-[.5rem]'>
                             <Checkbox
                               checked={selectedTools.includes(toolId)}
-                              onChange={(e) => handleToolToggle(tool, e.target.checked)}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleToolToggle(tool, e.target.checked);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
                               className="AntCheckbox text-[#757575] w-[0.75rem] h-[0.75rem] text-[0.875rem]"
                             />
                             <Text_12_400_EEEEEE className="text-white">{toolName}</Text_12_400_EEEEEE>
                           </div>
                           <button
-                            onClick={() => handleToolClick(tool)}
                             className="cursor-pointer hover:opacity-70 transition-opacity"
                             style={{ transform: 'none' }}
                           >
