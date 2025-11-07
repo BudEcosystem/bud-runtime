@@ -269,6 +269,58 @@ class PromptCleanupRequest(BaseModel):
     )
 
 
+class OAuthInitiateRequest(BaseModel):
+    """Request schema for OAuth flow initiation."""
+
+    prompt_id: str = Field(..., description="Prompt ID (UUID or draft ID)")
+    connector_id: str = Field(..., description="Connector ID to initiate OAuth for")
+    version: Optional[int] = Field(default=1, ge=1, description="Version of prompt config (defaults to 1)")
+
+
+class OAuthInitiateResponse(SuccessResponse):
+    """Response schema for OAuth initiation."""
+
+    authorization_url: str = Field(..., description="OAuth authorization URL to redirect user to")
+    state: str = Field(..., description="OAuth state parameter for security")
+    expires_in: int = Field(..., description="State expiration time in seconds")
+    gateway_id: str = Field(..., description="Gateway ID used for OAuth flow")
+
+
+class OAuthStatusResponse(SuccessResponse):
+    """Response schema for OAuth status check."""
+
+    oauth_enabled: bool = Field(..., description="Whether OAuth is enabled for this gateway")
+    grant_type: str = Field(..., description="OAuth grant type (e.g., 'authorization_code')")
+    client_id: str = Field(..., description="OAuth client ID")
+    scopes: List[str] = Field(..., description="List of OAuth scopes")
+    authorization_url: str = Field(..., description="OAuth authorization endpoint URL")
+    redirect_uri: str = Field(..., description="OAuth callback/redirect URI")
+    status_message: str = Field(..., description="Status message from MCP Foundry")
+
+
+class OAuthFetchToolsRequest(BaseModel):
+    """Request schema for fetching tools after OAuth."""
+
+    prompt_id: str = Field(..., description="Prompt ID (UUID or draft ID)")
+    connector_id: str = Field(..., description="Connector ID to fetch tools for")
+    version: Optional[int] = Field(default=1, ge=1, description="Version of prompt config (defaults to 1)")
+
+
+class OAuthCallbackRequest(BaseModel):
+    """Request schema for OAuth callback."""
+
+    code: str = Field(..., description="Authorization code from OAuth provider")
+    state: str = Field(..., description="State parameter from OAuth flow")
+
+
+class OAuthCallbackResponse(SuccessResponse):
+    """Response schema for OAuth callback."""
+
+    gateway_id: str = Field(..., description="Gateway ID")
+    user_id: str = Field(..., description="User ID/email")
+    expires_at: str = Field(..., description="Token expiration timestamp")
+
+
 class CreatePromptWorkflowRequest(BaseModel):
     """Create prompt workflow request schema."""
 

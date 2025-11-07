@@ -50,6 +50,12 @@ from .schemas import (
     EditPromptVersionRequest,
     GatewayResponse,
     GetPromptVersionResponse,
+    OAuthCallbackRequest,
+    OAuthCallbackResponse,
+    OAuthFetchToolsRequest,
+    OAuthInitiateRequest,
+    OAuthInitiateResponse,
+    OAuthStatusResponse,
     PaginatedTagsResponse,
     PromptCleanupRequest,
     PromptConfigGetResponse,
@@ -1365,4 +1371,265 @@ async def cleanup_prompts(
         logger.exception(f"Failed to cleanup prompts: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to cleanup prompts"
+        ).to_http_response()
+
+
+@router.post(
+    "/oauth/initiate",
+    responses={
+        status.HTTP_200_OK: {
+            "model": OAuthInitiateResponse,
+            "description": "Successfully initiated OAuth flow",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or connector not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Initiate OAuth flow for a connector",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def initiate_oauth(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: OAuthInitiateRequest,
+) -> Union[OAuthInitiateResponse, ErrorResponse]:
+    """Initiate OAuth flow for a connector.
+
+    This endpoint:
+    1. Fetches prompt configuration from Redis
+    2. Extracts gateway_id for the specified connector
+    3. Calls MCP Foundry OAuth initiate endpoint
+    4. Returns authorization URL for user redirection
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        request: OAuth initiation request with prompt_id, connector_id, and version
+
+    Returns:
+        OAuthInitiateResponse with authorization_url and state, or ErrorResponse on failure
+    """
+    try:
+        logger.debug(
+            f"OAuth initiation requested for prompt {request.prompt_id}, "
+            f"connector {request.connector_id}, version {request.version}"
+        )
+
+        prompt_service = PromptService(session)
+
+        # Initiate OAuth flow
+        oauth_data = await prompt_service.initiate_oauth_for_connector(
+            prompt_id=request.prompt_id,
+            connector_id=request.connector_id,
+            version=request.version,
+        )
+
+        return OAuthInitiateResponse(
+            authorization_url=oauth_data["authorization_url"],
+            state=oauth_data["state"],
+            expires_in=oauth_data["expires_in"],
+            gateway_id=oauth_data["gateway_id"],
+            message="OAuth flow initiated successfully",
+            code=status.HTTP_200_OK,
+            object="oauth.initiate",
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to initiate OAuth: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to initiate OAuth: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to initiate OAuth flow"
+        ).to_http_response()
+
+
+@router.get(
+    "/oauth/status",
+    responses={
+        status.HTTP_200_OK: {
+            "model": OAuthStatusResponse,
+            "description": "Successfully retrieved OAuth status",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or connector not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Get OAuth status for a connector",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def get_oauth_status(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: str = Query(..., description="Prompt id"),
+    connector_id: str = Query(..., description="Connector id to check OAuth status for"),
+    version: Optional[int] = Query(default=1, ge=1, description="Version of prompt config (defaults to 1)"),
+) -> Union[OAuthStatusResponse, ErrorResponse]:
+    """Get OAuth status for a connector.
+
+    This endpoint:
+    1. Fetches prompt configuration from Redis
+    2. Extracts gateway_id for the specified connector
+    3. Calls MCP Foundry OAuth status endpoint
+    4. Returns OAuth configuration details
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        prompt_id: Prompt ID (UUID or draft ID)
+        connector_id: Connector ID to check status for
+        version: Version of prompt config (defaults to 1)
+
+    Returns:
+        OAuthStatusResponse with OAuth configuration details, or ErrorResponse on failure
+    """
+    try:
+        logger.debug(f"OAuth status requested for prompt {prompt_id}, connector {connector_id}, version {version}")
+
+        prompt_service = PromptService(session)
+
+        # Get OAuth status
+        oauth_status = await prompt_service.get_oauth_status_for_connector(
+            prompt_id=prompt_id,
+            connector_id=connector_id,
+            version=version,
+        )
+
+        return OAuthStatusResponse(
+            oauth_enabled=oauth_status["oauth_enabled"],
+            grant_type=oauth_status["grant_type"],
+            client_id=oauth_status["client_id"],
+            scopes=oauth_status.get("scopes", []),
+            authorization_url=oauth_status["authorization_url"],
+            redirect_uri=oauth_status["redirect_uri"],
+            status_message=oauth_status.get("message", "OAuth status retrieved successfully"),
+            message="OAuth status retrieved successfully",
+            code=status.HTTP_200_OK,
+            object="oauth.status",
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to get OAuth status: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get OAuth status: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get OAuth status"
+        ).to_http_response()
+
+
+@router.post(
+    "/oauth/fetch-tools",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched tools after OAuth",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or connector not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Fetch tools after OAuth completion for a connector",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def fetch_tools_after_oauth(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: OAuthFetchToolsRequest,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Fetch tools after OAuth completion for a connector."""
+    try:
+        logger.debug(
+            f"Fetch tools requested for prompt {request.prompt_id}, "
+            f"connector {request.connector_id}, version {request.version}"
+        )
+
+        prompt_service = PromptService(session)
+
+        # Fetch tools after OAuth
+        fetch_data = await prompt_service.fetch_tools_after_oauth_for_connector(
+            prompt_id=request.prompt_id,
+            connector_id=request.connector_id,
+            version=request.version,
+        )
+
+        return SuccessResponse(
+            message=fetch_data["message"],
+            code=status.HTTP_200_OK,
+            object="oauth.fetch_tools",
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Client error fetching tools: {e.message}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to fetch tools after OAuth: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch tools after OAuth"
+        ).to_http_response()
+
+
+@router.post(
+    "/oauth/callback",
+    responses={
+        status.HTTP_200_OK: {
+            "model": OAuthCallbackResponse,
+            "description": "Successfully handled OAuth callback",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Handle OAuth callback from provider",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def oauth_callback(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: OAuthCallbackRequest,
+) -> Union[OAuthCallbackResponse, ErrorResponse]:
+    """Handle OAuth callback from provider."""
+    try:
+        logger.debug("OAuth callback received")
+
+        prompt_service = PromptService(session)
+
+        # Handle OAuth callback
+        callback_data = await prompt_service.handle_oauth_callback(
+            code=request.code,
+            state=request.state,
+        )
+
+        return OAuthCallbackResponse(
+            gateway_id=callback_data["gateway_id"],
+            user_id=callback_data["user_id"],
+            expires_at=callback_data["expires_at"],
+            message=callback_data["message"],
+            code=status.HTTP_200_OK,
+            object="oauth.callback",
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Client error handling OAuth callback: {e.message}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to handle OAuth callback: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to handle OAuth callback"
         ).to_http_response()

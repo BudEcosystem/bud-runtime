@@ -820,6 +820,159 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 return {}
             raise
 
+    async def initiate_oauth(self, gateway_id: str) -> Dict[str, Any]:
+        """Initiate OAuth flow for a gateway.
+
+        Args:
+            gateway_id: The gateway ID to initiate OAuth for
+
+        Returns:
+            Dict containing:
+                - authorization_url: URL to redirect user to
+                - state: OAuth state parameter
+                - expires_in: State expiration time
+                - gateway_id: The gateway ID
+
+        Raises:
+            MCPFoundryException: If OAuth initiation fails
+        """
+        try:
+            logger.debug(f"Initiating OAuth flow for gateway {gateway_id}")
+
+            # Make the API call
+            response = await self._make_request(
+                method="POST",
+                endpoint="/oauth/api/initiate",
+                params={"gateway_id": gateway_id},
+            )
+
+            logger.debug(f"Successfully initiated OAuth for gateway {gateway_id}")
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error initiating OAuth for gateway {gateway_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
+    async def get_oauth_status(self, gateway_id: str) -> Dict[str, Any]:
+        """Get OAuth status for a gateway.
+
+        Args:
+            gateway_id: The gateway ID to check OAuth status for
+
+        Returns:
+            Dict containing:
+                - oauth_enabled: Whether OAuth is enabled
+                - grant_type: OAuth grant type
+                - client_id: OAuth client ID
+                - scopes: List of OAuth scopes
+                - authorization_url: OAuth authorization URL
+                - redirect_uri: OAuth redirect URI
+                - message: Status message
+
+        Raises:
+            MCPFoundryException: If OAuth status check fails
+        """
+        try:
+            logger.debug(f"Checking OAuth status for gateway {gateway_id}")
+
+            # Make the API call - GET request
+            response = await self._make_request(
+                method="GET",
+                endpoint=f"/oauth/status/{gateway_id}",
+            )
+
+            logger.debug(f"Successfully retrieved OAuth status for gateway {gateway_id}")
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error checking OAuth status for gateway {gateway_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
+    async def fetch_tools_after_oauth(self, gateway_id: str) -> Dict[str, Any]:
+        """Fetch tools after OAuth completion for a gateway.
+
+        Args:
+            gateway_id: The gateway ID to fetch tools for
+
+        Returns:
+            Dict containing:
+                - success: Whether tool fetching was successful
+                - message: Status message from MCP Foundry
+
+        Raises:
+            MCPFoundryException: If tool fetching fails
+        """
+        try:
+            logger.debug(f"Fetching tools after OAuth for gateway {gateway_id}")
+
+            # Make the API call - POST request
+            response = await self._make_request(
+                method="POST",
+                endpoint=f"/oauth/fetch-tools/{gateway_id}",
+            )
+
+            logger.debug(f"Successfully fetched tools for gateway {gateway_id}")
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error fetching tools for gateway {gateway_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
+    async def handle_oauth_callback(self, code: str, state: str) -> Dict[str, Any]:
+        """Handle OAuth callback by forwarding to MCP Foundry.
+
+        Args:
+            code: Authorization code from OAuth provider
+            state: State parameter from OAuth flow
+
+        Returns:
+            Dict containing:
+                - success: Whether callback was successful
+                - gateway_id: Gateway ID
+                - user_id: User ID/email
+                - expires_at: Token expiration timestamp
+                - message: Status message
+
+        Raises:
+            MCPFoundryException: If OAuth callback fails
+        """
+        try:
+            logger.debug("Handling OAuth callback")
+
+            # Make the API call - POST request with query params
+            response = await self._make_request(
+                method="POST",
+                endpoint="/oauth/api/callback",
+                params={"code": code, "state": state},
+            )
+
+            logger.debug("OAuth callback handled successfully")
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error handling OAuth callback: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def close(self):
         """Close the HTTP session."""
         if self._session and not self._session.closed:
