@@ -113,14 +113,14 @@ Production deployments use specialized node pools for optimal resource allocatio
 
 ### Standard HA Configuration
 
-| Component | Configuration | Failover Time | Notes |
-|-----------|--------------|---------------|-------|
-| **Kubernetes Masters** | 3 nodes (multi-zone) | <30 seconds | Quorum-based, automatic |
-| **PostgreSQL** | 1 master + 2 replicas | <1 minute | Streaming replication, Patroni |
-| **ClickHouse** | 3-node cluster | <2 minutes | Distributed queries continue |
-| **Redis** | 3-node Sentinel | <10 seconds | Auto-failover via Sentinel |
-| **Microservices** | 3+ replicas | Immediate | Load balancer redirects |
-| **Gateway** | 3+ replicas | Immediate | Connection pool failover |
+| Component | Configuration | Failover Time |
+|-----------|--------------|---------------|
+| **Kubernetes Masters** | 3 nodes (multi-zone) | <30 seconds |
+| **PostgreSQL** | 1 master + 2 replicas | <1 minute |
+| **ClickHouse** | 3-node cluster | <2 minutes |
+| **Redis** | 3-node Sentinel | <10 seconds |
+| **Microservices** | 3+ replicas | Immediate |
+| **Gateway** | 3+ replicas | Immediate |
 
 
 ### Key HA Features
@@ -131,11 +131,9 @@ Production deployments use specialized node pools for optimal resource allocatio
 - **PodDisruptionBudget**: Minimum 50% pods available during updates
 - **Backup Schedule**: Daily database backups, 30-day retention, WAL archiving
 
----
 
-## Prerequisites
 
-### Required Software
+## Required Software
 
 - **Kubernetes**: Version 1.29+
 - **Helm**: Version 3.10 or higher
