@@ -286,6 +286,18 @@ class OAuthInitiateResponse(SuccessResponse):
     gateway_id: str = Field(..., description="Gateway ID used for OAuth flow")
 
 
+class OAuthStatusResponse(SuccessResponse):
+    """Response schema for OAuth status check."""
+
+    oauth_enabled: bool = Field(..., description="Whether OAuth is enabled for this gateway")
+    grant_type: str = Field(..., description="OAuth grant type (e.g., 'authorization_code')")
+    client_id: str = Field(..., description="OAuth client ID")
+    scopes: List[str] = Field(..., description="List of OAuth scopes")
+    authorization_url: str = Field(..., description="OAuth authorization endpoint URL")
+    redirect_uri: str = Field(..., description="OAuth callback/redirect URI")
+    status_message: str = Field(..., description="Status message from MCP Foundry")
+
+
 class CreatePromptWorkflowRequest(BaseModel):
     """Create prompt workflow request schema."""
 

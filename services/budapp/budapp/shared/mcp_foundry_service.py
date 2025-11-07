@@ -858,6 +858,46 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def get_oauth_status(self, gateway_id: str) -> Dict[str, Any]:
+        """Get OAuth status for a gateway.
+
+        Args:
+            gateway_id: The gateway ID to check OAuth status for
+
+        Returns:
+            Dict containing:
+                - oauth_enabled: Whether OAuth is enabled
+                - grant_type: OAuth grant type
+                - client_id: OAuth client ID
+                - scopes: List of OAuth scopes
+                - authorization_url: OAuth authorization URL
+                - redirect_uri: OAuth redirect URI
+                - message: Status message
+
+        Raises:
+            MCPFoundryException: If OAuth status check fails
+        """
+        try:
+            logger.debug(f"Checking OAuth status for gateway {gateway_id}")
+
+            # Make the API call - GET request
+            response = await self._make_request(
+                method="GET",
+                endpoint=f"/oauth/status/{gateway_id}",
+            )
+
+            logger.debug(f"Successfully retrieved OAuth status for gateway {gateway_id}")
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error checking OAuth status for gateway {gateway_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def close(self):
         """Close the HTTP session."""
         if self._session and not self._session.closed:

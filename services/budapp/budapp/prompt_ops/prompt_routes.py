@@ -52,6 +52,7 @@ from .schemas import (
     GetPromptVersionResponse,
     OAuthInitiateRequest,
     OAuthInitiateResponse,
+    OAuthStatusResponse,
     PaginatedTagsResponse,
     PromptCleanupRequest,
     PromptConfigGetResponse,
@@ -1442,4 +1443,83 @@ async def initiate_oauth(
         logger.exception(f"Failed to initiate OAuth: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to initiate OAuth flow"
+        ).to_http_response()
+
+
+@router.get(
+    "/oauth/status",
+    responses={
+        status.HTTP_200_OK: {
+            "model": OAuthStatusResponse,
+            "description": "Successfully retrieved OAuth status",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or connector not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Get OAuth status for a connector",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_oauth_status(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: str = Query(..., description="Prompt id"),
+    connector_id: str = Query(..., description="Connector id to check OAuth status for"),
+    version: Optional[int] = Query(default=1, ge=1, description="Version of prompt config (defaults to 1)"),
+) -> Union[OAuthStatusResponse, ErrorResponse]:
+    """Get OAuth status for a connector.
+
+    This endpoint:
+    1. Fetches prompt configuration from Redis
+    2. Extracts gateway_id for the specified connector
+    3. Calls MCP Foundry OAuth status endpoint
+    4. Returns OAuth configuration details
+
+    Args:
+        current_user: The authenticated user
+        session: Database session
+        prompt_id: Prompt ID (UUID or draft ID)
+        connector_id: Connector ID to check status for
+        version: Version of prompt config (defaults to 1)
+
+    Returns:
+        OAuthStatusResponse with OAuth configuration details, or ErrorResponse on failure
+    """
+    try:
+        logger.debug(f"OAuth status requested for prompt {prompt_id}, connector {connector_id}, version {version}")
+
+        prompt_service = PromptService(session)
+
+        # Get OAuth status
+        oauth_status = await prompt_service.get_oauth_status_for_connector(
+            prompt_id=prompt_id,
+            connector_id=connector_id,
+            version=version,
+        )
+
+        return OAuthStatusResponse(
+            oauth_enabled=oauth_status["oauth_enabled"],
+            grant_type=oauth_status["grant_type"],
+            client_id=oauth_status["client_id"],
+            scopes=oauth_status.get("scopes", []),
+            authorization_url=oauth_status["authorization_url"],
+            redirect_uri=oauth_status["redirect_uri"],
+            status_message=oauth_status.get("message", "OAuth status retrieved successfully"),
+            message="OAuth status retrieved successfully",
+            code=status.HTTP_200_OK,
+            object="oauth.status",
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Failed to get OAuth status: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get OAuth status: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get OAuth status"
         ).to_http_response()
