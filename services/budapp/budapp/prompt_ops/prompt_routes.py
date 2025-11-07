@@ -1005,6 +1005,7 @@ async def register_connector(
             connector_id=connector_id,
             credentials=request.credentials,
             version=request.version,
+            permanent=request.permanent,
         )
 
         return RegisterConnectorResponse(
@@ -1052,6 +1053,9 @@ async def disconnect_connector(
     version: Optional[int] = Query(
         None, ge=1, description="Version of prompt config. If not specified, uses default version"
     ),
+    permanent: bool = Query(
+        False, description="Store configuration permanently without expiration (default: False, uses configured TTL)"
+    ),
 ) -> Union[DisconnectConnectorResponse, ErrorResponse]:
     """Disconnect a connector from a prompt.
 
@@ -1069,6 +1073,7 @@ async def disconnect_connector(
         budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
         connector_id: The connector ID to disconnect
         version: Optional version number. If not specified, uses default version
+        permanent: Store configuration permanently without expiration
 
     Returns:
         DisconnectConnectorResponse with deletion details or ErrorResponse on failure
@@ -1078,6 +1083,7 @@ async def disconnect_connector(
             budprompt_id=budprompt_id,
             connector_id=connector_id,
             version=version,
+            permanent=permanent,
         )
 
         return DisconnectConnectorResponse(
@@ -1156,6 +1162,7 @@ async def add_tool(
             connector_id=request.connector_id,
             tool_ids=request.tool_ids,
             version=request.version,
+            permanent=request.permanent,
         )
 
         return AddToolResponse(

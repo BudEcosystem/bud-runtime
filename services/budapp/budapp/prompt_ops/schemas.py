@@ -480,6 +480,10 @@ class PromptSchemaRequest(BaseModel):
     schema: SchemaBase | None = None
     type: Literal["input", "output"] | None = None
     deployment_name: str | None = None
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
 
     @model_validator(mode="after")
     def validate_fields(self):
@@ -499,6 +503,7 @@ class PromptSchemaWorkflowSteps(BaseModel):
     schema: SchemaBase | None = None
     type: Literal["input", "output"] | None = None
     deployment_name: str | None = None
+    permanent: bool | None = None
 
 
 class PromptConfigRequest(BaseModel):
@@ -533,6 +538,10 @@ class PromptConfigRequest(BaseModel):
     system_prompt_role: Optional[Literal["system", "developer", "user"]] = Field(
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
+    )
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
     )
 
 
@@ -798,6 +807,10 @@ class RegisterConnectorRequest(BaseModel):
     version: Optional[int] = Field(
         None, ge=1, description="Optional version number. If not specified, updates default version."
     )
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
 
 
 class AddToolRequest(BaseModel):
@@ -809,6 +822,10 @@ class AddToolRequest(BaseModel):
         ..., description="Tool IDs to add/update (empty list removes all tools for this connector)"
     )
     version: Optional[int] = Field(None, ge=1, description="Prompt config version")
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
 
 
 class AddToolResponse(SuccessResponse):

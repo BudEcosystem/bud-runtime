@@ -1056,6 +1056,7 @@ class PromptService(SessionMixin):
         connector_id: str,
         credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials],
         version: Optional[int] = None,
+        permanent: bool = False,
     ) -> GatewayResponse:
         """Register a connector for a prompt by creating gateway in MCP Foundry.
 
@@ -1064,6 +1065,7 @@ class PromptService(SessionMixin):
             connector_id: The connector ID to register
             credentials: Connector credentials based on auth_type
             version: Optional version to update. If None, updates default version
+            permanent: Store configuration permanently without expiration
 
         Returns:
             gateway
@@ -1169,7 +1171,7 @@ class PromptService(SessionMixin):
             )
 
             # Store MCP tool configuration in Redis via budprompt service
-            await self._store_mcp_tool_config(budprompt_id, connector_id, gateway.gateway_id, version)
+            await self._store_mcp_tool_config(budprompt_id, connector_id, gateway.gateway_id, version, permanent)
 
             # Update PromptVersion metadata with gateway_id (if prompt and version exist in DB)
             try:
@@ -1234,7 +1236,12 @@ class PromptService(SessionMixin):
             )
 
     async def add_tool_for_prompt(
-        self, prompt_id: str, connector_id: str, tool_ids: List[str], version: Optional[int] = None
+        self,
+        prompt_id: str,
+        connector_id: str,
+        tool_ids: List[str],
+        version: Optional[int] = None,
+        permanent: bool = False,
     ) -> Dict[str, Any]:
         """Add tools for a prompt by creating/updating virtual server in MCP Foundry.
 
@@ -1243,6 +1250,7 @@ class PromptService(SessionMixin):
             connector_id: The connector ID
             tool_ids: List of tool IDs to add (replaces existing tools)
             version: Optional version to update. If None, uses default version
+            permanent: Store configuration permanently without expiration
 
         Returns:
             Dict with virtual_server_id, virtual_server_name, added_tools, and action
@@ -1367,6 +1375,7 @@ class PromptService(SessionMixin):
             "version": target_version,
             "set_default": False,  # Don't change default for existing configs
             "tools": tools,  # Override tools field
+            "permanent": permanent,  # Control TTL
         }
 
         # Save using helper method
@@ -1423,13 +1432,14 @@ class PromptService(SessionMixin):
         }
 
     async def disconnect_connector_from_prompt(
-        self, budprompt_id: str, connector_id: str, version: Optional[int] = None
+        self, budprompt_id: str, connector_id: str, version: Optional[int] = None, permanent: bool = False
     ) -> Dict[str, Any]:
         """Disconnect a connector from a prompt by deleting gateway and cleaning config.
 
         Args:
             budprompt_id: The bud prompt ID (UUID or draft ID)
             connector_id: The connector ID to disconnect
+            permanent: Store configuration permanently without expiration
             version: Optional version to update. If None, updates default version
 
         Returns:
@@ -1547,6 +1557,7 @@ class PromptService(SessionMixin):
             "version": target_version,
             "set_default": False,
             "tools": tools,
+            "permanent": permanent,  # Control TTL
         }
         await self._save_prompt_config_to_redis(payload)
 
@@ -1665,7 +1676,12 @@ class PromptService(SessionMixin):
             )
 
     async def _store_mcp_tool_config(
-        self, budprompt_id: str, connector_id: str, gateway_id: str, version: Optional[int] = None
+        self,
+        budprompt_id: str,
+        connector_id: str,
+        gateway_id: str,
+        version: Optional[int] = None,
+        permanent: bool = False,
     ) -> None:
         """Store MCP tool configuration in Redis via budprompt service.
 
@@ -1674,6 +1690,7 @@ class PromptService(SessionMixin):
             connector_id: The connector ID
             gateway_id: The gateway ID from MCP Foundry
             version: Optional version to update. If None, updates default version
+            permanent: Store configuration permanently without expiration
 
         Raises:
             ClientException: If storing configuration fails
@@ -1768,6 +1785,7 @@ class PromptService(SessionMixin):
                 "version": target_version,
                 "set_default": False,  # Don't change default for existing configs
                 "tools": updated_tools,  # Override tools field
+                "permanent": permanent,  # Control TTL
             }
         else:
             # New config: set allow_multiple_calls=true for MCP support
@@ -1777,6 +1795,7 @@ class PromptService(SessionMixin):
                 "set_default": True,  # Set as default for new configs
                 "allow_multiple_calls": True,  # Enable for MCP tools
                 "tools": updated_tools,
+                "permanent": permanent,  # Control TTL
             }
 
         await self._save_prompt_config_to_redis(payload)
@@ -2456,6 +2475,7 @@ class PromptWorkflowService(SessionMixin):
             schema=schema,
             type=type,
             deployment_name=deployment_name,
+            permanent=request.permanent,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Create or update workflow step
@@ -2483,6 +2503,7 @@ class PromptWorkflowService(SessionMixin):
                 "schema",
                 "type",
                 "deployment_name",
+                "permanent",
             ]
 
             # from workflow steps extract necessary information
@@ -2609,6 +2630,7 @@ class PromptWorkflowService(SessionMixin):
             "schema": data.get("schema"),
             "type": data.get("type"),
             "deployment_name": data.get("deployment_name"),
+            "permanent": data.get("permanent", False),
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),
