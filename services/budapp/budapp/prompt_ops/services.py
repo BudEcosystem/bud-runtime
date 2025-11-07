@@ -2113,13 +2113,13 @@ class PromptService(SessionMixin):
             raise ClientException(
                 message="Failed to initiate OAuth flow",
                 status_code=e.status_code or status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            ) from e
         except Exception as e:
             logger.error(f"Unexpected error initiating OAuth: {e}")
             raise ClientException(
                 message="Failed to initiate OAuth flow",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            ) from e
 
     async def delete_prompt_from_proxy_cache(self, prompt_id: UUID) -> None:
         """Delete prompt from proxy cache.
