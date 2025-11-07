@@ -2283,7 +2283,7 @@ class PromptService(SessionMixin):
         except MCPFoundryException as e:
             logger.error(f"MCP Foundry OAuth callback failed: {e}")
             raise ClientException(
-                message=str(e),
+                message="Failed to handle OAuth callback",
                 status_code=e.status_code or status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
         except Exception as e:
