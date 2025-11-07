@@ -1467,7 +1467,7 @@ async def initiate_oauth(
     },
     description="Get OAuth status for a connector",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def get_oauth_status(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -1598,7 +1598,7 @@ async def fetch_tools_after_oauth(
     },
     description="Handle OAuth callback from provider",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def oauth_callback(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
