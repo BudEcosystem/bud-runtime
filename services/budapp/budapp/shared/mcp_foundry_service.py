@@ -898,6 +898,41 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def fetch_tools_after_oauth(self, gateway_id: str) -> Dict[str, Any]:
+        """Fetch tools after OAuth completion for a gateway.
+
+        Args:
+            gateway_id: The gateway ID to fetch tools for
+
+        Returns:
+            Dict containing:
+                - success: Whether tool fetching was successful
+                - message: Status message from MCP Foundry
+
+        Raises:
+            MCPFoundryException: If tool fetching fails
+        """
+        try:
+            logger.debug(f"Fetching tools after OAuth for gateway {gateway_id}")
+
+            # Make the API call - POST request
+            response = await self._make_request(
+                method="POST",
+                endpoint=f"/oauth/fetch-tools/{gateway_id}",
+            )
+
+            logger.debug(f"Successfully fetched tools for gateway {gateway_id}")
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error fetching tools for gateway {gateway_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def close(self):
         """Close the HTTP session."""
         if self._session and not self._session.closed:

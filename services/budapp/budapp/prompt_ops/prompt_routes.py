@@ -50,6 +50,7 @@ from .schemas import (
     EditPromptVersionRequest,
     GatewayResponse,
     GetPromptVersionResponse,
+    OAuthFetchToolsRequest,
     OAuthInitiateRequest,
     OAuthInitiateResponse,
     OAuthStatusResponse,
@@ -1522,4 +1523,60 @@ async def get_oauth_status(
         logger.exception(f"Failed to get OAuth status: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get OAuth status"
+        ).to_http_response()
+
+
+@router.post(
+    "/oauth/fetch-tools",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully fetched tools after OAuth",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or connector not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Fetch tools after OAuth completion for a connector",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def fetch_tools_after_oauth(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: OAuthFetchToolsRequest,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Fetch tools after OAuth completion for a connector."""
+    try:
+        logger.debug(
+            f"Fetch tools requested for prompt {request.prompt_id}, "
+            f"connector {request.connector_id}, version {request.version}"
+        )
+
+        prompt_service = PromptService(session)
+
+        # Fetch tools after OAuth
+        fetch_data = await prompt_service.fetch_tools_after_oauth_for_connector(
+            prompt_id=request.prompt_id,
+            connector_id=request.connector_id,
+            version=request.version,
+        )
+
+        return SuccessResponse(
+            message=fetch_data["message"],
+            code=status.HTTP_200_OK,
+            object="oauth.fetch_tools",
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Client error fetching tools: {e.message}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to fetch tools after OAuth: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch tools after OAuth"
         ).to_http_response()

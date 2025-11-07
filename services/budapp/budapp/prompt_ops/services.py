@@ -2192,6 +2192,72 @@ class PromptService(SessionMixin):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 
+    async def fetch_tools_after_oauth_for_connector(
+        self,
+        prompt_id: str,
+        connector_id: str,
+        version: Optional[int] = 1,
+    ) -> Dict[str, Any]:
+        """Fetch tools after OAuth for a connector.
+
+        Args:
+            prompt_id: The prompt ID (UUID or draft ID)
+            connector_id: The connector ID
+            version: Version of prompt config (defaults to 1)
+
+        Returns:
+            Dict containing tool fetching response from MCP Foundry
+
+        Raises:
+            ClientException: If prompt config not found or tool fetching fails
+        """
+        logger.debug(f"Fetching tools for connector {connector_id} in prompt {prompt_id} version {version}")
+
+        try:
+            # 1. Fetch prompt config from Redis
+            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version, raw_data=True)
+            config_data = config_response.get("data", {})
+            tools = config_data.get("tools", [])
+
+            # 2. Find MCP tool and extract gateway_config
+            mcp_tool = next((tool for tool in tools if tool.get("type") == "mcp"), None)
+
+            if not mcp_tool:
+                raise ClientException(
+                    message=f"No MCP connectors registered for prompt {prompt_id}",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
+            # 3. Extract gateway_config from MCP tool
+            gateway_config = mcp_tool.get("gateway_config", {})
+
+            # 4. Find gateway_id for the connector
+            gateway_id = gateway_config.get(connector_id)
+
+            if not gateway_id:
+                raise ClientException(
+                    message=f"Connector {connector_id} not registered for prompt {prompt_id} version {version}",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
+            logger.debug(f"Found gateway_id {gateway_id} for connector {connector_id}")
+
+            # 5. Call MCP Foundry to fetch tools
+            fetch_response = await mcp_foundry_service.fetch_tools_after_oauth(gateway_id)
+
+            logger.debug(f"Tools fetched successfully for gateway {gateway_id}")
+            return fetch_response
+
+        except ClientException:
+            # Re-raise client exceptions as-is
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching tools for connector {connector_id}: {e}", exc_info=True)
+            raise ClientException(
+                message="Failed to fetch tools after OAuth",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
     async def delete_prompt_from_proxy_cache(self, prompt_id: UUID) -> None:
         """Delete prompt from proxy cache.
 

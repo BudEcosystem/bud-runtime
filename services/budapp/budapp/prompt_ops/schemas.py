@@ -298,6 +298,14 @@ class OAuthStatusResponse(SuccessResponse):
     status_message: str = Field(..., description="Status message from MCP Foundry")
 
 
+class OAuthFetchToolsRequest(BaseModel):
+    """Request schema for fetching tools after OAuth."""
+
+    prompt_id: str = Field(..., description="Prompt ID (UUID or draft ID)")
+    connector_id: str = Field(..., description="Connector ID to fetch tools for")
+    version: Optional[int] = Field(default=1, ge=1, description="Version of prompt config (defaults to 1)")
+
+
 class CreatePromptWorkflowRequest(BaseModel):
     """Create prompt workflow request schema."""
 
