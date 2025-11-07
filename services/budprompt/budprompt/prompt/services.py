@@ -703,6 +703,10 @@ class PromptConfigurationService:
                         mcp_resources=mcp_resources,
                     )
                 )
+            else:
+                # Remove from cleanup registry if exists (permanent prompts don't need cleanup)
+                prompt_service = PromptService()
+                run_async(prompt_service._remove_from_cleanup_registry(redis_key))
 
             notification_req.payload.content = NotificationContent(
                 title="Successfully stored prompt configuration",
@@ -1024,6 +1028,32 @@ class PromptService:
 
         logger.debug(f"Cleanup registry updated. Total entries: {len(registry_dict)}")
 
+    async def _remove_from_cleanup_registry(self, redis_key: str) -> None:
+        """Remove entry from cleanup registry when prompt becomes permanent.
+
+        Args:
+            redis_key: Full Redis key of prompt config to remove
+        """
+        # Load registry
+        registry_json = await self.redis_service.get(CLEANUP_REGISTRY_KEY)
+        if not registry_json:
+            logger.debug(f"Cleanup registry is empty, nothing to remove for {redis_key}")
+            return
+
+        registry_dict = json.loads(registry_json)
+
+        # Check if entry exists and remove
+        if redis_key in registry_dict:
+            del registry_dict[redis_key]
+            logger.debug(f"Removed {redis_key} from cleanup registry (now permanent)")
+
+            # Save updated registry
+            updated_registry_json = json.dumps(registry_dict, indent=2)
+            await self.redis_service.set(CLEANUP_REGISTRY_KEY, updated_registry_json)
+            logger.debug(f"Cleanup registry updated. Remaining entries: {len(registry_dict)}")
+        else:
+            logger.debug(f"Entry {redis_key} not found in cleanup registry, nothing to remove")
+
     async def save_prompt_config(self, request: PromptConfigRequest) -> PromptConfigResponse:
         """Save or update prompt configuration in Redis.
 
@@ -1114,6 +1144,9 @@ class PromptService:
                     ttl=ttl,
                     mcp_resources=mcp_resources,
                 )
+            else:
+                # Remove from cleanup registry if exists (permanent prompts don't need cleanup)
+                await self._remove_from_cleanup_registry(redis_key)
 
             return PromptConfigResponse(
                 code=200,
