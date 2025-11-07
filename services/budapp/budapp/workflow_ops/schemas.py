@@ -120,6 +120,9 @@ class RetrieveWorkflowStepData(BaseModel):
     # User preferences for parsers
     enable_tool_calling: bool | None = None
     enable_reasoning: bool | None = None
+    # Engine capability flags from simulator
+    supports_lora: bool | None = None
+    supports_pipeline_parallelism: bool | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

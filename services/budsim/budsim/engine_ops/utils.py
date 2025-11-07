@@ -61,6 +61,8 @@ def fetch_compatible_engines(
                     "reasoning_parser_type": engine.get("reasoning_parser_type"),
                     "architecture_family": engine.get("architecture_family"),
                     "chat_template": engine.get("chat_template"),
+                    "supports_lora": engine.get("supports_lora", False),
+                    "supports_pipeline_parallelism": engine.get("supports_pipeline_parallelism", False),
                 }
             )
         if compatible_engines:

@@ -37,6 +37,7 @@ export default function DeployModel() {
       page,
       limit,
       table_source: "model",
+      exclude_adapters: true,
     }).then((data) => {
       setModels(data);
     });

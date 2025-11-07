@@ -29,17 +29,23 @@ export default function DeployModelConfiguration() {
     const reasoningParserType = (workflowSteps as any)?.reasoning_parser_type || simulatorMetadata.reasoning_parser_type || clusterMetadata.reasoning_parser_type;
     const chatTemplate = (workflowSteps as any)?.chat_template || simulatorMetadata.chat_template || clusterMetadata.chat_template;
 
+    // Extract capability flags with same priority
+    const supportsLora = (workflowSteps as any)?.supports_lora ?? simulatorMetadata.supports_lora ?? clusterMetadata.supports_lora ?? false;
+    const supportsPP = (workflowSteps as any)?.supports_pipeline_parallelism ?? simulatorMetadata.supports_pipeline_parallelism ?? clusterMetadata.supports_pipeline_parallelism ?? false;
+
     const hasToolParser = !!toolParserType;
     const hasReasoningParser = !!reasoningParserType;
 
     setHasAvailableParsers(hasToolParser || hasReasoningParser);
 
-    // Update configuration with available parsers from either source
+    // Update configuration with available parsers and capability flags from either source
     // Merge only derived fields; preserve user toggles in state
     setDeploymentConfiguration({
       available_tool_parser: toolParserType || null,
       available_reasoning_parser: reasoningParserType || null,
       chat_template: chatTemplate || null,
+      supports_lora: supportsLora,
+      supports_pipeline_parallelism: supportsPP,
     });
 
     // If no parsers available, skip this step based on navigation direction

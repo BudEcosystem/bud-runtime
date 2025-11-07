@@ -2129,6 +2129,9 @@ class ClusterService(SessionMixin):
                     tool_calling_parser_type=recommended_cluster_data.get("tool_calling_parser_type"),
                     reasoning_parser_type=recommended_cluster_data.get("reasoning_parser_type"),
                     chat_template=recommended_cluster_data.get("chat_template"),
+                    # Add engine capability flags from simulator
+                    supports_lora=recommended_cluster_data.get("supports_lora"),
+                    supports_pipeline_parallelism=recommended_cluster_data.get("supports_pipeline_parallelism"),
                 )
             )
 

@@ -66,7 +66,11 @@ export default function AddCredentialForm() {
         selectedProvider.type,
         payload,
       );
-      openDrawerWithStep("credentials-success");
+
+      // Only show success if credential was created successfully
+      if (result) {
+        openDrawerWithStep("credentials-success");
+      }
     } catch (error) {
       console.error("Error creating credentials:", error);
     } finally {

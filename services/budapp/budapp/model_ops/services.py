@@ -3087,6 +3087,8 @@ class ModelService(SessionMixin):
         tool_calling_parser_type: Optional[str] = None,
         reasoning_parser_type: Optional[str] = None,
         chat_template: Optional[str] = None,
+        supports_lora: Optional[bool] = None,
+        supports_pipeline_parallelism: Optional[bool] = None,
     ) -> EndpointModel:
         """Create workflow steps and execute deployment workflow.
 
@@ -3181,6 +3183,8 @@ class ModelService(SessionMixin):
             tool_calling_parser_type=tool_calling_parser_type,
             reasoning_parser_type=reasoning_parser_type,
             chat_template=chat_template,
+            supports_lora=supports_lora,
+            supports_pipeline_parallelism=supports_pipeline_parallelism,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Get workflow steps
