@@ -15,7 +15,7 @@ interface SliderInputProps {
 function SliderInput(props: SliderInputProps) {
   return (
     <>
-      <div className="flex flex-col items-start px-[.5rem] py-[.375rem]">
+      <div className="flex flex-col items-start px-[.5rem]">
         <div className="flex flex-row justify-start gap-[.5rem]">
           <span className="text-[#EEEEEE] text-[.75rem] font-[400]">
             {props.title}
@@ -33,10 +33,10 @@ function SliderInput(props: SliderInputProps) {
           )}
         </div>
       </div>
-      <div className="flex items-center justify-center mt-[.5rem] px-[.5rem]">
+      <div className="flex items-center justify-center px-[.5rem]">
         <div className="text-[#757575] text-[.75rem] mr-1">{props.min}</div>
         <Slider
-          className="budSlider mt-10 w-full"
+          className="budSlider mt-[2rem] w-full"
           defaultValue={props.defaultValue}
           min={props.min}
           max={props.max}

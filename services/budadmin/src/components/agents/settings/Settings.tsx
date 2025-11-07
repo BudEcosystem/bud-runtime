@@ -1,12 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
-import { Button, Image, Select, Tag } from "antd";
+import { Image, Select, Tag } from "antd";
 import React, { useEffect, useState, useCallback } from "react";
 import { getChromeColor } from "@/utils/color";
 import SliderInput from "./input/SliderInput";
 import InlineInput from "./input/InlineInput";
 import InlineSwitch from "./input/InlineSwitch";
 import SelectWithAdd from "./input/SelectWithAdd";
-import LabelJSONInput from "./input/LabelJSONInput";
 import { useAgentStore, AgentSettings } from "@/stores/useAgentStore";
 import { Text_16_400_EEEEEE } from '@/components/ui/text';
 
@@ -55,7 +54,11 @@ function SettingsListItem(props: SettingsListItemProps) {
     );
 }
 
-export default function Settings() {
+interface SettingsProps {
+    onClose: () => void;
+}
+
+export default function Settings({ onClose }: SettingsProps) {
     const { settingPresets, addSettingPreset, updateSettingPreset, currentSettingPreset, setCurrentSettingPreset } = useAgentStore();
     const [settings, setSettings] = useState<AgentSettings | null>(null);
     const [components, setComponents] = useState<SettingsListItemProps[]>([]);
@@ -72,18 +75,25 @@ export default function Settings() {
             const defaultSettings: AgentSettings = {
                 id: uuidv4(),
                 name: "Default",
-                temperature: 1,
-                limit_response_length: false,
-                sequence_length: 0,
-                context_overflow_policy: "",
-                stop_strings: [],
-                top_k_sampling: 0,
-                repeat_penalty: 0,
-                top_p_sampling: 1,
-                min_p_sampling: 0,
-                enable_structured_json_schema: false,
-                is_valid_json_schema: false,
-                structured_json_schema: "",
+                temperature: 0.7,
+                max_tokens: 2000,
+                top_p: 1.0,
+                frequency_penalty: 0,
+                presence_penalty: 0,
+                stop_sequences: [],
+                seed: 0,
+                timeout: 0,
+                parallel_tool_calls: true,
+                logprobs: false,
+                logit_bias: {},
+                extra_headers: {},
+                max_completion_tokens: 0,
+                stream_options: {},
+                response_format: {},
+                tool_choice: "auto",
+                chat_template: "",
+                chat_template_kwargs: {},
+                mm_processor_kwargs: {},
                 created_at: new Date().toISOString(),
                 modified_at: new Date().toISOString(),
             };
@@ -100,18 +110,25 @@ export default function Settings() {
         const newPreset: AgentSettings = {
             id: uuidv4(),
             name: name,
-            temperature: settings?.temperature || 0.5,
-            limit_response_length: settings?.limit_response_length || false,
-            sequence_length: settings?.sequence_length || 0,
-            context_overflow_policy: settings?.context_overflow_policy || "",
-            stop_strings: settings?.stop_strings || [],
-            top_k_sampling: settings?.top_k_sampling || 0,
-            repeat_penalty: settings?.repeat_penalty || 0,
-            top_p_sampling: settings?.top_p_sampling || 0,
-            min_p_sampling: settings?.min_p_sampling || 0,
-            structured_json_schema: settings?.structured_json_schema || "",
-            enable_structured_json_schema: settings?.enable_structured_json_schema || false,
-            is_valid_json_schema: settings?.is_valid_json_schema || false,
+            temperature: settings?.temperature || 0.7,
+            max_tokens: settings?.max_tokens || 2000,
+            top_p: settings?.top_p || 1.0,
+            frequency_penalty: settings?.frequency_penalty || 0,
+            presence_penalty: settings?.presence_penalty || 0,
+            stop_sequences: settings?.stop_sequences || [],
+            seed: settings?.seed || 0,
+            timeout: settings?.timeout || 0,
+            parallel_tool_calls: settings?.parallel_tool_calls ?? true,
+            logprobs: settings?.logprobs ?? false,
+            logit_bias: settings?.logit_bias || {},
+            extra_headers: settings?.extra_headers || {},
+            max_completion_tokens: settings?.max_completion_tokens || 0,
+            stream_options: settings?.stream_options || {},
+            response_format: settings?.response_format || {},
+            tool_choice: settings?.tool_choice || "auto",
+            chat_template: settings?.chat_template || "",
+            chat_template_kwargs: settings?.chat_template_kwargs || {},
+            mm_processor_kwargs: settings?.mm_processor_kwargs || {},
             created_at: new Date().toISOString(),
             modified_at: new Date().toISOString(),
         };
@@ -164,51 +181,57 @@ export default function Settings() {
                     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
                         <SliderInput
                             title="Temperature"
-                            min={0.1}
-                            max={1}
+                            min={0}
+                            max={2}
                             step={0.1}
-                            defaultValue={settings?.temperature || 0}
-                            value={settings?.temperature || 0}
+                            defaultValue={settings?.temperature || 0.7}
+                            value={settings?.temperature || 0.7}
                             onChange={(value) => handleChange({ temperature: value })}
                         />
-                        <InlineSwitch
-                            title="Limit Response Length"
-                            value={settings?.limit_response_length || false}
-                            defaultValue={settings?.limit_response_length || false}
+                        <InlineInput
+                            title="Max Tokens"
+                            value={`${settings?.max_tokens || 0}`}
+                            defaultValue={`${settings?.max_tokens || 0}`}
+                            type="number"
                             onChange={(value) =>
-                                handleChange({ limit_response_length: value })
+                                handleChange({ max_tokens: Math.max(0, parseInt(value, 10) || 0) })
                             }
                         />
-                        {settings?.limit_response_length && (
-                            <InlineInput
-                                title="Sequence Length"
-                                value={`${settings?.sequence_length || 0}`}
-                                defaultValue={`${settings?.sequence_length || 0}`}
-                                type="number"
-                                onChange={(value) =>
-                                    handleChange({ sequence_length: Math.max(0, parseInt(value, 10) || 0) })
-                                }
-                            />
-                        )}
+                        <SliderInput
+                            title="Top P"
+                            min={0}
+                            max={1}
+                            step={0.1}
+                            defaultValue={settings?.top_p || 1.0}
+                            value={settings?.top_p || 1.0}
+                            onChange={(value) => handleChange({ top_p: value })}
+                        />
                     </div>
                 ),
             },
             {
-                title: "Sampling",
-                description: "Sampling settings",
+                title: "Penalties",
+                description: "Penalty settings",
                 icon: "/agents/icons/circle-settings.svg",
                 children: (
                     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-                        <InlineInput
-                            title="Repeat Penalty"
-                            value={`${settings?.repeat_penalty || 0}`}
-                            defaultValue={`${settings?.repeat_penalty || 0}`}
-                            min={0}
-                            max={1}
-                            type="number"
-                            onChange={(value) =>
-                                handleChange({ repeat_penalty: Math.min(1, Math.max(0, parseFloat(value) || 0)) })
-                            }
+                        <SliderInput
+                            title="Frequency Penalty"
+                            min={-2}
+                            max={2}
+                            step={0.1}
+                            defaultValue={settings?.frequency_penalty || 0}
+                            value={settings?.frequency_penalty || 0}
+                            onChange={(value) => handleChange({ frequency_penalty: value })}
+                        />
+                        <SliderInput
+                            title="Presence Penalty"
+                            min={-2}
+                            max={2}
+                            step={0.1}
+                            defaultValue={settings?.presence_penalty || 0}
+                            value={settings?.presence_penalty || 0}
+                            onChange={(value) => handleChange({ presence_penalty: value })}
                         />
                     </div>
                 ),
@@ -221,15 +244,15 @@ export default function Settings() {
                     <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
                         <div className="flex flex-row items-center gap-[.625rem] p-[.5rem] w-full">
                             <span className="text-[#EEEEEE] text-[.75rem] font-[400] text-nowrap w-full">
-                                Stop Strings
+                                Stop Sequences
                             </span>
-                            <div className="flex flex-row items-center gap-[.5rem] w-full min-w-[7.69rem] max-w-[7.69rem] max-h-[2rem]">
+                            <div className="flex flex-row items-center gap-[.5rem] w-full min-w-[5.69rem] max-w-[7.69rem]">
                                 <Select
                                     mode="tags"
-                                    defaultValue={settings?.stop_strings || []}
-                                    value={settings?.stop_strings || []}
-                                    onChange={(value) => handleChange({ stop_strings: value })}
-                                    className="customSelect w-full h-full !h-[2rem]"
+                                    defaultValue={settings?.stop_sequences || []}
+                                    value={settings?.stop_sequences || []}
+                                    onChange={(value) => handleChange({ stop_sequences: value })}
+                                    className="agentSelect w-full "
                                     tagRender={(props) => (
                                         <Tag
                                             closable
@@ -244,7 +267,7 @@ export default function Settings() {
                                                     src="/agents/icons/close.svg"
                                                     alt="Close"
                                                     preview={false}
-                                                    className="!w-[.625rem] !h-[.625rem]"
+                                                    className="w-[.5rem] h-[.5rem]"
                                                 />
                                             }
                                         >
@@ -254,34 +277,49 @@ export default function Settings() {
                                 />
                             </div>
                         </div>
-                    </div>
-                ),
-            },
-            {
-                title: "Structured Output",
-                description: "JSON settings",
-                icon: "/agents/icons/circle-settings.svg",
-                children: (
-                    <div className="flex flex-col w-full gap-[.5rem] py-[.375rem]">
-                        <InlineSwitch
-                            title="Enable Structured Output"
-                            value={settings?.enable_structured_json_schema || false}
-                            defaultValue={settings?.enable_structured_json_schema || false}
+                        <InlineInput
+                            title="Seed"
+                            value={`${settings?.seed || 0}`}
+                            defaultValue={`${settings?.seed || 0}`}
+                            type="number"
                             onChange={(value) =>
-                                handleChange({ enable_structured_json_schema: value })
+                                handleChange({ seed: parseInt(value, 10) || 0 })
                             }
                         />
-                        {settings?.enable_structured_json_schema && (
-                            <LabelJSONInput
-                                title="JSON Schema"
-                                description="Structured Output"
-                                placeholder="Enter JSON Schema"
-                                value={settings?.structured_json_schema || ""}
-                                onChange={(value, valid) => {
-                                    handleChange({ structured_json_schema: value, is_valid_json_schema: valid });
-                                }}
-                            />
-                        )}
+                        <InlineInput
+                            title="Timeout"
+                            value={`${settings?.timeout || 0}`}
+                            defaultValue={`${settings?.timeout || 0}`}
+                            type="number"
+                            onChange={(value) =>
+                                handleChange({ timeout: Math.max(0, parseInt(value, 10) || 0) })
+                            }
+                        />
+                        <InlineInput
+                            title="Max Completion Tokens"
+                            value={`${settings?.max_completion_tokens || 0}`}
+                            defaultValue={`${settings?.max_completion_tokens || 0}`}
+                            type="number"
+                            onChange={(value) =>
+                                handleChange({ max_completion_tokens: Math.max(0, parseInt(value, 10) || 0) })
+                            }
+                        />
+                        <InlineSwitch
+                            title="Parallel Tool Calls"
+                            value={settings?.parallel_tool_calls ?? true}
+                            defaultValue={settings?.parallel_tool_calls ?? true}
+                            onChange={(value) =>
+                                handleChange({ parallel_tool_calls: value })
+                            }
+                        />
+                        <InlineSwitch
+                            title="Logprobs"
+                            value={settings?.logprobs ?? false}
+                            defaultValue={settings?.logprobs ?? false}
+                            onChange={(value) =>
+                                handleChange({ logprobs: value })
+                            }
+                        />
                     </div>
                 ),
             },
@@ -296,10 +334,11 @@ export default function Settings() {
     }, [settings, settingPresets.length, initComponents]);
 
     return (
-        <div className="relative flex flex-col w-full h-full overflow-y-auto pb-[5rem]">
+        <div className="relative flex flex-col w-full h-full overflow-y-auto pb-[1rem]">
             <div className="flex items-center justify-between border-b-[1px] border-b-[#1F1F1F] px-[0.9375rem] py-[1.5rem]">
                 <Text_16_400_EEEEEE className="leading-[100%]">Model Settings</Text_16_400_EEEEEE>
                 <button
+                    onClick={onClose}
                     className="text-[#B3B3B3] hover:text-[#FFFFFF] transition-colors"
                 >
                     <svg

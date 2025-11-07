@@ -824,11 +824,15 @@ function AgentBoxInner({
       {/* Content */}
       <div className="flex-1 overflow-hidden relative">
         <div
-          className={`flex w-full h-full transition-all duration-300 ease-in-out ${isRightSidebarOpen ? 'pr-[15rem]' : 'pr-0'}`}
+          className={`flex w-full h-full transition-all duration-300 ease-in-out ${isRightSidebarOpen || isModelSettingsOpen ? 'pr-[15rem]' : 'pr-0'}`}
           onClick={() => {
-            // Close settings when clicking outside the settings box but inside the agent box
+            // Close sidebars when clicking outside but inside the agent box
             if (isRightSidebarOpen) {
               closeSettings();
+              closeTools();
+            }
+            if (isModelSettingsOpen) {
+              closeModelSettings();
             }
           }}
         >
@@ -890,6 +894,7 @@ function AgentBoxInner({
           <ModelSettingsSidebar
             isOpen={isModelSettingsOpen}
             onClose={closeModelSettings}
+            session={session}
           />
         </div>
       </div>
