@@ -50,6 +50,8 @@ from .schemas import (
     EditPromptVersionRequest,
     GatewayResponse,
     GetPromptVersionResponse,
+    OAuthCallbackRequest,
+    OAuthCallbackResponse,
     OAuthFetchToolsRequest,
     OAuthInitiateRequest,
     OAuthInitiateResponse,
@@ -1579,4 +1581,55 @@ async def fetch_tools_after_oauth(
         logger.exception(f"Failed to fetch tools after OAuth: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to fetch tools after OAuth"
+        ).to_http_response()
+
+
+@router.post(
+    "/oauth/callback",
+    responses={
+        status.HTTP_200_OK: {
+            "model": OAuthCallbackResponse,
+            "description": "Successfully handled OAuth callback",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Handle OAuth callback from provider",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def oauth_callback(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: OAuthCallbackRequest,
+) -> Union[OAuthCallbackResponse, ErrorResponse]:
+    """Handle OAuth callback from provider."""
+    try:
+        logger.debug("OAuth callback received")
+
+        prompt_service = PromptService(session)
+
+        # Handle OAuth callback
+        callback_data = await prompt_service.handle_oauth_callback(
+            code=request.code,
+            state=request.state,
+        )
+
+        return OAuthCallbackResponse(
+            gateway_id=callback_data["gateway_id"],
+            user_id=callback_data["user_id"],
+            expires_at=callback_data["expires_at"],
+            message=callback_data["message"],
+            code=status.HTTP_200_OK,
+            object="oauth.callback",
+        ).to_http_response()
+
+    except ClientException as e:
+        logger.error(f"Client error handling OAuth callback: {e.message}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to handle OAuth callback: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to handle OAuth callback"
         ).to_http_response()

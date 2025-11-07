@@ -2258,6 +2258,41 @@ class PromptService(SessionMixin):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 
+    async def handle_oauth_callback(self, code: str, state: str) -> Dict[str, Any]:
+        """Handle OAuth callback.
+
+        Args:
+            code: Authorization code from OAuth provider
+            state: State parameter from OAuth flow
+
+        Returns:
+            Dict containing callback response from MCP Foundry
+
+        Raises:
+            ClientException: If OAuth callback fails
+        """
+        logger.debug("Handling OAuth callback")
+
+        try:
+            # Forward to MCP Foundry
+            callback_response = await mcp_foundry_service.handle_oauth_callback(code, state)
+
+            logger.debug("OAuth callback handled successfully")
+            return callback_response
+
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry OAuth callback failed: {e}")
+            raise ClientException(
+                message=str(e),
+                status_code=e.status_code or status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+        except Exception as e:
+            logger.error(f"Unexpected error handling OAuth callback: {e}", exc_info=True)
+            raise ClientException(
+                message="Failed to handle OAuth callback",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
     async def delete_prompt_from_proxy_cache(self, prompt_id: UUID) -> None:
         """Delete prompt from proxy cache.
 

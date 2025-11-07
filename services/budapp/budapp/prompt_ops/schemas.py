@@ -306,6 +306,21 @@ class OAuthFetchToolsRequest(BaseModel):
     version: Optional[int] = Field(default=1, ge=1, description="Version of prompt config (defaults to 1)")
 
 
+class OAuthCallbackRequest(BaseModel):
+    """Request schema for OAuth callback."""
+
+    code: str = Field(..., description="Authorization code from OAuth provider")
+    state: str = Field(..., description="State parameter from OAuth flow")
+
+
+class OAuthCallbackResponse(SuccessResponse):
+    """Response schema for OAuth callback."""
+
+    gateway_id: str = Field(..., description="Gateway ID")
+    user_id: str = Field(..., description="User ID/email")
+    expires_at: str = Field(..., description="Token expiration timestamp")
+
+
 class CreatePromptWorkflowRequest(BaseModel):
     """Create prompt workflow request schema."""
 

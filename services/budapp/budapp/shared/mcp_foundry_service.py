@@ -933,6 +933,46 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def handle_oauth_callback(self, code: str, state: str) -> Dict[str, Any]:
+        """Handle OAuth callback by forwarding to MCP Foundry.
+
+        Args:
+            code: Authorization code from OAuth provider
+            state: State parameter from OAuth flow
+
+        Returns:
+            Dict containing:
+                - success: Whether callback was successful
+                - gateway_id: Gateway ID
+                - user_id: User ID/email
+                - expires_at: Token expiration timestamp
+                - message: Status message
+
+        Raises:
+            MCPFoundryException: If OAuth callback fails
+        """
+        try:
+            logger.debug("Handling OAuth callback")
+
+            # Make the API call - POST request with query params
+            response = await self._make_request(
+                method="POST",
+                endpoint="/oauth/api/callback",
+                params={"code": code, "state": state},
+            )
+
+            logger.debug("OAuth callback handled successfully")
+            return response
+
+        except MCPFoundryException:
+            # Re-raise MCP Foundry exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error handling OAuth callback: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def close(self):
         """Close the HTTP session."""
         if self._session and not self._session.closed:
