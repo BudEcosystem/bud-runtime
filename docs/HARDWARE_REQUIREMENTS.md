@@ -16,7 +16,7 @@ The platform consists of:
 
 ## Infrastructure Requirements Summary
 
-### AI in Box - OEM
+### AI-In-A-Box - OEM
 
 | Resource | Requirement |
 |----------|-------------|
