@@ -6,11 +6,10 @@ import { useConnectors, Connector, CredentialSchemaField } from '@/stores/useCon
 import { Text_10_400_B3B3B3, Text_12_400_EEEEEE, Text_14_400_EEEEEE } from '@/components/ui/text';
 import { PrimaryButton, SecondaryButton } from '@/components/ui/bud/form/Buttons';
 import CustomSelect from 'src/flows/components/CustomSelect';
-import { AppRequest } from 'src/pages/api/requests';
-import { tempApiBaseUrl } from '@/components/environment';
 import { successToast, errorToast } from '@/components/toast';
 import { toast } from 'react-toastify';
 import { ToolDetails } from './ToolDetails';
+import { ConnectorService } from 'src/services/connectorService';
 
 interface Tool {
   id: string;
@@ -43,6 +42,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   const [viewMode, setViewMode] = useState<'connector' | 'tool'>('connector');
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
   const [selectedToolName, setSelectedToolName] = useState<string | null>(null);
+  const [headerHeight, setHeaderHeight] = useState<number>(0);
+  const headerRef = React.useRef<HTMLDivElement>(null);
 
   // Reusable function to fetch tools
   const fetchTools = React.useCallback(async () => {
@@ -50,13 +51,11 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
     setIsLoadingTools(true);
     try {
-      const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/tools`, {
-        params: {
-          prompt_id: promptId,
-          connector_id: connector.id,
-          page: 1,
-          limit: 100,
-        }
+      const response = await ConnectorService.fetchTools({
+        prompt_id: promptId,
+        connector_id: connector.id,
+        page: 1,
+        limit: 100,
       });
 
       if (response.data && response.data.tools) {
@@ -96,6 +95,40 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       fetchTools();
     }
   }, [connector.isFromConnectedSection, promptId, fetchTools]);
+
+  // Measure header height
+  useEffect(() => {
+    if (headerRef.current) {
+      const height = headerRef.current.offsetHeight;
+      setHeaderHeight(height);
+    }
+  }, [selectedConnectorDetails?.url]); // Re-measure when connection URL changes (can affect height)
+
+  // Check OAuth status when component loads and OAuth is detected
+  useEffect(() => {
+    const checkOAuthStatus = async () => {
+      if (!promptId || !selectedConnectorDetails) return;
+
+      const authType = selectedConnectorDetails?.auth_type;
+
+      if (authType?.toLowerCase() === 'oauth') {
+        console.log('OAuth connector detected on load, checking OAuth status...');
+
+        try {
+          const statusResponse = await ConnectorService.checkOAuthStatus(promptId, connector.id);
+          console.log('OAuth status response:', statusResponse.data);
+
+          // TODO: Handle OAuth status response
+          // Possible statuses: pending, authorized, failed, etc.
+        } catch (error: any) {
+          console.error('Error checking OAuth status:', error);
+          // Don't show error toast on load, just log it
+        }
+      }
+    };
+
+    checkOAuthStatus();
+  }, [promptId, connector.id, selectedConnectorDetails]);
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
@@ -185,16 +218,64 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         version: 1
       };
 
-      const response = await AppRequest.Post(
-        `${tempApiBaseUrl}/prompts/${promptId}/connectors/${connector.id}/register`,
-        payload
-      );
+      console.log('Registering connector with payload:', payload);
+
+      // Step 1: Register the connector first
+      const response = await ConnectorService.registerConnector(promptId, connector.id, payload);
+
+      console.log('Registration response status:', response.status);
+      console.log('Registration response:', response.data);
 
       if (response.status === 200 || response.status === 201) {
-        setStep(2);
+        console.log('Registration successful');
 
-        // Fetch tools after successful registration
-        await fetchTools();
+        // Step 2: Check if OAuth authentication is required
+        const authType = selectedConnectorDetails?.auth_type;
+        console.log('Auth Type from connector details:', authType);
+        console.log('Is OAuth?:', authType?.toLowerCase() === 'oauth');
+
+        if (authType?.toLowerCase() === 'oauth') {
+          console.log('OAuth connector detected, initiating OAuth flow...');
+
+          try {
+            const oauthPayload = {
+              prompt_id: promptId,
+              connector_id: connector.id,
+              version: 1
+            };
+
+            console.log('Calling OAuth initiate API with payload:', oauthPayload);
+
+            const oauthResponse = await ConnectorService.initiateOAuth(oauthPayload);
+
+            console.log('OAuth initiate response:', oauthResponse.data);
+
+            // Redirect to the authorization URL from the response
+            const authorizationUrl = oauthResponse.data?.authorization_url;
+
+            if (authorizationUrl) {
+              console.log('Redirecting to authorization URL:', authorizationUrl);
+              window.location.href = authorizationUrl;
+            } else {
+              console.error('No authorization_url in OAuth response');
+              errorToast('OAuth authorization URL not found');
+            }
+
+            return;
+          } catch (oauthError: any) {
+            console.error('Error initiating OAuth:', oauthError);
+            errorToast(oauthError?.response?.data?.message || 'Failed to initiate OAuth');
+            return;
+          }
+        } else {
+          console.log('Non-OAuth connector, proceeding to step 2');
+
+          // For non-OAuth connectors, proceed normally to step 2
+          setStep(2);
+
+          // Fetch tools after successful registration
+          await fetchTools();
+        }
       }
     } catch (error: any) {
       console.error('Error registering connector:', error);
@@ -225,10 +306,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         version: 1
       };
 
-      const response = await AppRequest.Post(
-        `${tempApiBaseUrl}/prompts/prompt-config/add-tool`,
-        payload
-      );
+      const response = await ConnectorService.connectTools(payload);
 
       if (response.status === 200 || response.status === 201) {
         // Show toast at bottom-right for the sidebar context
@@ -263,9 +341,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     setIsDisconnecting(true);
 
     try {
-      const response = await AppRequest.Delete(
-        `${tempApiBaseUrl}/prompts/${promptId}/connectors/${connector.id}/disconnect`
-      );
+      const response = await ConnectorService.disconnectConnector(promptId, connector.id);
 
       if (response.status === 200 || response.status === 204) {
         successToast('Connector disconnected successfully');
@@ -370,7 +446,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   return (
     <div className="flex flex-col h-full  text-white">
       {/* Header */}
-      <div className="px-[1.125rem] py-[1.2rem] relative">
+      <div ref={headerRef} className="px-[1.125rem] py-[1.2rem] relative">
         <button
           onClick={onBack}
           className="w-[1.125rem] h-[1.125rem] p-[.1rem] rounded-full flex items-center justify-center bg-[#18191B] hover:bg-[#1A1A1A] transition-colors absolute"
@@ -416,175 +492,190 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto py-2 pb-[0]">
+      <div
+        className="flex-1 overflow-y-auto py-2 pb-[0]"
+        style={{ minHeight: headerHeight > 0 ? `calc(100% - ${headerHeight}px)` : 'auto' }}
+      >
         {/* first step */}
         {step === 1 && (
-          <div className='flex flex-col'>
+          <div className='flex flex-col h-full justify-between'>
             {/* Dynamic Input Fields based on credential_schema */}
             <div className="space-y-3 mb-6 px-[1.125rem]">
               {selectedConnectorDetails?.credential_schema
                 ?.sort((a, b) => a.order - b.order)
                 .map(field => renderFormField(field))}
             </div>
-            <div className='flex justify-end items-center px-[1rem]'>
-              <PrimaryButton
-                onClick={handleContinue}
-                loading={isRegistering}
-                disabled={isRegistering || !isStepOneValid()}
-                style={{
-                  cursor: (isRegistering || !isStepOneValid()) ? 'not-allowed' : 'pointer',
-                  transform: 'none'
-                }}
-                classNames="h-[1.375rem] rounded-[0.375rem] "
-                textClass="!text-[0.625rem] !font-[400]"
-              >
-                {isRegistering ? 'Registering...' : 'Continue'}
-              </PrimaryButton>
+            <div style={{
+              marginTop: '18px',
+              paddingTop: '18px',
+              paddingBottom: '18px',
+              borderRadius: '0 0 11px 11px',
+              borderTop: '0.5px solid #1F1F1F',
+              background: 'rgba(255, 255, 255, 0.03)',
+              backdropFilter: 'blur(5px)'
+            }} className='px-[1rem]'>
+              <div className='flex justify-end items-center px-[1rem]'>
+                <PrimaryButton
+                  onClick={handleContinue}
+                  loading={isRegistering}
+                  disabled={isRegistering || !isStepOneValid()}
+                  style={{
+                    cursor: (isRegistering || !isStepOneValid()) ? 'not-allowed' : 'pointer',
+                    transform: 'none'
+                  }}
+                  classNames="h-[1.375rem] rounded-[0.375rem] "
+                  textClass="!text-[0.625rem] !font-[400]"
+                >
+                  {isRegistering ? 'Registering...' : 'Continue'}
+                </PrimaryButton>
+              </div>
             </div>
           </div>
         )}
 
         {/* second step */}
         {step === 2 && (
-          <>
+          <div className='flex flex-col h-full justify-between'>
             {isLoadingTools ? (
               <div className="flex justify-center items-center py-8">
                 <Spin />
               </div>
             ) : (
               <>
-                {/* Select All Tools */}
-                <div className="flex items-center gap-2 mb-4 px-[1.125rem]">
-                  <Checkbox
-                    checked={selectAll}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="AntCheckbox text-[#757575] w-[0.75rem] h-[0.75rem] text-[0.875rem]"
-                  />
-                  <Text_12_400_EEEEEE className="text-nowrap">Select all tools</Text_12_400_EEEEEE>
-                </div>
+                <div>
+                  {/* Select All Tools */}
+                  <div className="flex items-center gap-2 mb-4 px-[1.125rem]">
+                    <Checkbox
+                      checked={selectAll}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="AntCheckbox text-[#757575] w-[0.75rem] h-[0.75rem] text-[0.875rem]"
+                    />
+                    <Text_12_400_EEEEEE className="text-nowrap">Select all tools</Text_12_400_EEEEEE>
+                  </div>
 
-                {/* Tools List */}
-                <div className="space-y-2 mb-1 mx-[.5rem] border-[.5px] border-[#1F1F1F] rounded-[.5rem] ">
-                  {availableTools.length === 0 ? (
-                    <div className="px-4 py-8 text-center text-[#808080]">
-                      No tools available
-                    </div>
-                  ) : (
-                    availableTools.map((tool) => {
-                      const toolId = tool.id;
-                      const toolName = tool.name;
+                  {/* Tools List */}
+                  <div className="space-y-2 mb-1 mx-[.5rem] border-[.5px] border-[#1F1F1F] rounded-[.5rem] ">
+                    {availableTools.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-[#808080]">
+                        No tools available
+                      </div>
+                    ) : (
+                      availableTools.map((tool) => {
+                        const toolId = tool.id;
+                        const toolName = tool.name;
 
-                      if (!toolId) return null; // Skip if no ID
+                        if (!toolId) return null; // Skip if no ID
 
-                      return (
-                        <div
-                          key={toolId}
-                          onClick={() => handleToolClick(tool)}
-                          className="flex items-center justify-between px-[0.625rem] py-[0.46875rem] rounded-lg hover:bg-[#1A1A1A] border-[.5px] border-[transparent] hover:border-[#2A2A2A] cursor-pointer"
-                        >
-                          <div className='flex items-center justify-start gap-[.5rem]'>
-                            <Checkbox
-                              checked={selectedTools.includes(toolId)}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleToolToggle(tool, e.target.checked);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="AntCheckbox text-[#757575] w-[0.75rem] h-[0.75rem] text-[0.875rem]"
-                            />
-                            <Text_12_400_EEEEEE className="text-white">{toolName}</Text_12_400_EEEEEE>
-                          </div>
-                          <button
-                            className="cursor-pointer hover:opacity-70 transition-opacity"
-                            style={{ transform: 'none' }}
+                        return (
+                          <div
+                            key={toolId}
+                            onClick={() => handleToolClick(tool)}
+                            className="flex items-center justify-between px-[0.625rem] py-[0.46875rem] rounded-lg hover:bg-[#1A1A1A] border-[.5px] border-[transparent] hover:border-[#2A2A2A] cursor-pointer"
                           >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="text-[#808080]"
+                            <div className='flex items-center justify-start gap-[.5rem]'>
+                              <Checkbox
+                                checked={selectedTools.includes(toolId)}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleToolToggle(tool, e.target.checked);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="AntCheckbox text-[#757575] w-[0.75rem] h-[0.75rem] text-[0.875rem]"
+                              />
+                              <Text_12_400_EEEEEE className="text-white">{toolName}</Text_12_400_EEEEEE>
+                            </div>
+                            <button
+                              className="cursor-pointer hover:opacity-70 transition-opacity"
+                              style={{ transform: 'none' }}
                             >
-                              <polyline points="9 18 15 12 9 6" />
-                            </svg>
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="text-[#808080]"
+                              >
+                                <polyline points="9 18 15 12 9 6" />
+                              </svg>
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               </>
             )}
-          </>
+            {/* Buttons - Only show on step 2 */}
+            {step === 2 && (
+              <div style={{
+                marginTop: '18px',
+                paddingTop: '18px',
+                paddingBottom: '18px',
+                borderRadius: '0 0 11px 11px',
+                borderTop: '0.5px solid #1F1F1F',
+                background: 'rgba(255, 255, 255, 0.03)',
+                backdropFilter: 'blur(5px)'
+              }} className='px-[1rem]'>
+                {connector.isFromConnectedSection ? (
+                  // Show Save and Disconnect buttons for connected tools
+                  <div className='flex justify-between items-center'>
+                    <SecondaryButton
+                      onClick={handleConnect}
+                      loading={isConnecting}
+                      disabled={isConnecting || selectedTools.length === 0 || isDisconnecting}
+                      style={{
+                        cursor: (isConnecting || selectedTools.length === 0 || isDisconnecting) ? 'not-allowed' : 'pointer',
+                        transform: 'none'
+                      }}
+                      classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !transition-colors !tranform-none"
+                      textClass="!text-[0.625rem] !font-[400] !transition-colors !tranform-none"
+                    >
+                      {isConnecting ? 'Saving...' : 'Save'}
+                    </SecondaryButton>
+                    <PrimaryButton
+                      onClick={handleDisconnect}
+                      loading={isDisconnecting}
+                      disabled={isDisconnecting || isConnecting}
+                      style={{
+                        cursor: (isDisconnecting || isConnecting) ? 'not-allowed' : 'pointer',
+                        transform: 'none'
+                      }}
+                      classNames="h-[1.375rem] rounded-[0.375rem] !border-[#361519] bg-[#952f2f26] group"
+                      textClass="!text-[0.625rem] !font-[400] text-[#E82E2E] group-hover:text-[#EEEEEE]"
+                    >
+                      {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                    </PrimaryButton>
+                  </div>
+                ) : (
+                  // Show Connect button for unregistered tools
+                  <div className='flex justify-end items-center'>
+                    <PrimaryButton
+                      onClick={handleConnect}
+                      loading={isConnecting}
+                      disabled={isConnecting || selectedTools.length === 0}
+                      style={{
+                        cursor: (isConnecting || selectedTools.length === 0) ? 'not-allowed' : 'pointer',
+                        transform: 'none'
+                      }}
+                      classNames="h-[1.375rem] rounded-[0.375rem]"
+                      textClass="!text-[0.625rem] !font-[400]"
+                    >
+                      {isConnecting ? 'Connecting...' : 'Connect'}
+                    </PrimaryButton>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
-      </div>
 
-      {/* Buttons - Only show on step 2 */}
-      {step === 2 && (
-        <div style={{
-          marginTop: '18px',
-          paddingTop: '18px',
-          paddingBottom: '18px',
-          borderRadius: '0 0 11px 11px',
-          borderTop: '0.5px solid #1F1F1F',
-          background: 'rgba(255, 255, 255, 0.03)',
-          backdropFilter: 'blur(5px)'
-        }} className='px-[1rem]'>
-          {connector.isFromConnectedSection ? (
-            // Show Save and Disconnect buttons for connected tools
-            <div className='flex justify-between items-center'>
-              <SecondaryButton
-                onClick={handleConnect}
-                loading={isConnecting}
-                disabled={isConnecting || selectedTools.length === 0 || isDisconnecting}
-                style={{
-                  cursor: (isConnecting || selectedTools.length === 0 || isDisconnecting) ? 'not-allowed' : 'pointer',
-                  transform: 'none'
-                }}
-                classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !transition-colors !tranform-none"
-                textClass="!text-[0.625rem] !font-[400] !transition-colors !tranform-none"
-              >
-                {isConnecting ? 'Saving...' : 'Save'}
-              </SecondaryButton>
-              <PrimaryButton
-                onClick={handleDisconnect}
-                loading={isDisconnecting}
-                disabled={isDisconnecting || isConnecting}
-                style={{
-                  cursor: (isDisconnecting || isConnecting) ? 'not-allowed' : 'pointer',
-                  transform: 'none'
-                }}
-                classNames="h-[1.375rem] rounded-[0.375rem] !border-[#361519] bg-[#952f2f26] group"
-                textClass="!text-[0.625rem] !font-[400] text-[#E82E2E] group-hover:text-[#EEEEEE]"
-              >
-                {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-              </PrimaryButton>
-            </div>
-          ) : (
-            // Show Connect button for unregistered tools
-            <div className='flex justify-end items-center'>
-              <PrimaryButton
-                onClick={handleConnect}
-                loading={isConnecting}
-                disabled={isConnecting || selectedTools.length === 0}
-                style={{
-                  cursor: (isConnecting || selectedTools.length === 0) ? 'not-allowed' : 'pointer',
-                  transform: 'none'
-                }}
-                classNames="h-[1.375rem] rounded-[0.375rem]"
-                textClass="!text-[0.625rem] !font-[400]"
-              >
-                {isConnecting ? 'Connecting...' : 'Connect'}
-              </PrimaryButton>
-            </div>
-          )}
-        </div>
-      )}
+      </div>
     </div>
   );
 };
