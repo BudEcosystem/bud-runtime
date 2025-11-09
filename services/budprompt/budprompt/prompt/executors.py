@@ -1271,9 +1271,7 @@ class SimplePromptExecutor_V1:
             context = self._prepare_template_context(validated_input, input_schema is not None)
 
             # Render system_prompt if provided
-            rendered_system_prompt = None
-            if system_prompt:
-                rendered_system_prompt = render_template(system_prompt, context)
+            rendered_system_prompt = render_template(system_prompt, context) if system_prompt else None
 
             # Handle output type and validation
             output_type = await self._get_output_type(output_schema, output_validation)
