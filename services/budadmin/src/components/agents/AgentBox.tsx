@@ -51,6 +51,7 @@ function AgentBoxInner({
     deleteVariable,
     createSession,
     closeAgentDrawer,
+    addDeletedPromptId,
   } = useAgentStore();
 
   // Ensure session has a promptId (migration for old sessions)
@@ -212,6 +213,40 @@ function AgentBoxInner({
         }
       });
     }
+  };
+
+  // Handler for close button with cleanup API call
+  const handleCloseSession = async () => {
+    if (!session) return;
+
+    // Call cleanup API if promptId exists
+    if (session.promptId) {
+      try {
+        const payload = {
+          prompts: [
+            {
+              prompt_id: session.promptId
+            }
+          ]
+        };
+
+        await AppRequest.Post(
+          `${tempApiBaseUrl}/prompts/prompt-cleanup`,
+          payload
+        );
+
+        // Record the deleted prompt ID in Zustand store
+        addDeletedPromptId(session.id, session.promptId);
+
+        // Note: No success toast as per requirements
+      } catch (error: any) {
+        console.error("Error calling prompt cleanup:", error);
+        // Don't show error toast either, just log it
+      }
+    }
+
+    // Delete the session
+    deleteSession(session.id);
   };
 
   // Handler for when a flowgram card is clicked
@@ -652,7 +687,7 @@ function AgentBoxInner({
       // icon: <DeleteOutlined />,
       label: 'Close',
       danger: true,
-      onClick: () => session && deleteSession(session.id)
+      onClick: () => session && handleCloseSession()
     }
   ];
 
@@ -811,7 +846,7 @@ function AgentBoxInner({
           {totalSessions > 1 && (
             <Tooltip title="Close" placement="bottom">
               <button
-                onClick={() => session && deleteSession(session.id)}
+                onClick={() => session && handleCloseSession()}
                 className="w-7 h-7 rounded-md flex justify-center items-center cursor-pointer hover:bg-[#1A1A1A] transition-colors"
               >
                 <CloseOutlined className="text-[#B3B3B3] hover:text-[#FF4444] text-base" />

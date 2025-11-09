@@ -85,6 +85,9 @@ interface AgentStore {
     nextStep: string | null;
   };
 
+  // Deleted prompts tracking
+  deletedPromptIds: Array<{sessionId: string; promptId: string}>;
+
   // Session Management
   createSession: () => string;
   updateSession: (id: string, updates: Partial<AgentSession>) => void;
@@ -112,6 +115,9 @@ interface AgentStore {
   // Bulk Actions
   clearAllSessions: () => void;
   setActiveSessionIds: (ids: string[]) => void;
+
+  // Prompt cleanup tracking
+  addDeletedPromptId: (sessionId: string, promptId: string) => void;
 }
 
 const generateId = () => {
@@ -178,6 +184,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         isInWorkflow: false,
         nextStep: null,
       },
+      deletedPromptIds: [],
 
       // Session Management
       createSession: () => {
@@ -445,5 +452,12 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
       setActiveSessionIds: (ids) => {
         set({ activeSessionIds: ids });
+      },
+
+      // Prompt cleanup tracking
+      addDeletedPromptId: (sessionId, promptId) => {
+        set({
+          deletedPromptIds: [...get().deletedPromptIds, { sessionId, promptId }]
+        });
       }
     }));
