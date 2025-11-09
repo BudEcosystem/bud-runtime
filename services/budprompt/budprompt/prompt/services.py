@@ -215,6 +215,7 @@ class PromptExecutorService:
                 system_prompt_role=request.system_prompt_role,
                 api_key=api_key,
                 tools=request.tools,
+                system_prompt=request.system_prompt,
             )
 
             return result

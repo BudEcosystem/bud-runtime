@@ -1219,6 +1219,7 @@ class SimplePromptExecutor_V1:
         system_prompt_role: Optional[str] = None,
         api_key: Optional[str] = None,
         tools: Optional[List[MCPToolConfig]] = None,
+        system_prompt: Optional[str] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt with structured or unstructured input and output.
 
@@ -1238,6 +1239,7 @@ class SimplePromptExecutor_V1:
             system_prompt_role: Role for system prompts (system/developer/user)
             api_key: Optional API key for authorization
             tools: Optional list of tool configurations (MCP tools, etc.)
+            system_prompt: Optional system prompt with Jinja2 template support
 
         Returns:
             Output data (Dict for structured, str for unstructured) or AsyncGenerator for streaming
@@ -1268,6 +1270,11 @@ class SimplePromptExecutor_V1:
             # Prepare context for template rendering
             context = self._prepare_template_context(validated_input, input_schema is not None)
 
+            # Render system_prompt if provided
+            rendered_system_prompt = None
+            if system_prompt:
+                rendered_system_prompt = render_template(system_prompt, context)
+
             # Handle output type and validation
             output_type = await self._get_output_type(output_schema, output_validation)
 
@@ -1287,7 +1294,7 @@ class SimplePromptExecutor_V1:
             )
 
             # Build message history from all messages
-            message_history = self._build_message_history(messages, context)
+            message_history = self._build_message_history(messages, context, rendered_system_prompt)
 
             # Get user prompt from input_data
             user_prompt = self._prepare_user_prompt(input_data)
@@ -1576,17 +1583,24 @@ class SimplePromptExecutor_V1:
 
         return context
 
-    def _build_message_history(self, messages: List[Message], context: Dict[str, Any]) -> List[ModelMessage]:
+    def _build_message_history(
+        self, messages: List[Message], context: Dict[str, Any], system_prompt: Optional[str] = None
+    ) -> List[ModelMessage]:
         """Build message history from messages list.
 
         Args:
             messages: List of messages with roles and content
             context: Context for template rendering
+            system_prompt: Optional system prompt to prepend as first message
 
         Returns:
             List of Pydantic AI ModelMessage objects
         """
         message_history = []
+
+        # Prepend system_prompt as first message if provided
+        if system_prompt:
+            message_history.append(ModelRequest(parts=[SystemPromptPart(content=system_prompt)]))
 
         # Process all messages
         for msg in messages:
