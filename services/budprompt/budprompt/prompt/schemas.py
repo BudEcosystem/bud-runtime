@@ -372,6 +372,7 @@ class PromptConfigurationData(BaseModel):
     deployment_name: Optional[str] = Field(None, description="Model deployment name")
     model_settings: Optional[ModelSettings] = Field(None, description="Model settings")
     stream: Optional[bool] = Field(None, description="Enable streaming response")
+    system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
     input_schema: Optional[Dict[str, Any]] = Field(
         None, description="JSON schema for structured input (None for unstructured)"
     )
@@ -430,6 +431,7 @@ class PromptExecuteData(BaseModel):
     deployment_name: str = Field(..., min_length=1, description="Model deployment name")
     model_settings: ModelSettings = Field(default_factory=ModelSettings)
     stream: bool = Field(default=False, description="Enable streaming response")
+    system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
     input_schema: Optional[Dict[str, Any]] = Field(
         None, description="JSON schema for structured input (None for unstructured)"
     )
@@ -487,6 +489,7 @@ class PromptConfigRequest(BaseModel):
     deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
     model_settings: Optional[ModelSettings] = Field(None, description="Model settings configuration")
     stream: Optional[bool] = Field(None, description="Enable streaming response")
+    system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
     messages: Optional[List[Message]] = Field(
         None, description="Conversation messages (can include system/developer messages)"
     )

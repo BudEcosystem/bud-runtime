@@ -591,6 +591,7 @@ class PromptConfigRequest(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
+    system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
     permanent: bool = Field(
         default=False,
         description="Store configuration permanently without expiration (default: False, uses configured TTL)",
@@ -661,6 +662,7 @@ class PromptConfigurationData(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
+    system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
     tools: List[MCPToolConfig] = Field(default_factory=list, description="MCP tool configurations")
 
 
