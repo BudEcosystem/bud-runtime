@@ -24,6 +24,7 @@ from fastapi import status
 from keycloak.exceptions import KeycloakAuthenticationError, KeycloakPostError
 
 from budapp.audit_ops import log_audit
+from budapp.auth.user_onboarding_service import UserOnboardingService
 from budapp.commons import logging
 from budapp.commons.config import app_settings, secrets_settings
 from budapp.commons.constants import (
@@ -49,7 +50,6 @@ from ..core.schemas import SubscriberCreate
 from ..permissions.schemas import PermissionList
 from ..permissions.service import PermissionService
 from ..project_ops.models import Project as ProjectModel
-from ..project_ops.schemas import ProjectUserAdd
 from ..shared.jwt_blacklist_service import JWTBlacklistService
 from ..shared.notification_service import BudNotifyHandler
 from .schemas import LogoutRequest, RefreshTokenRequest, RefreshTokenResponse, ResourceCreate, UserLogin, UserLoginData
@@ -72,9 +72,9 @@ class AuthService(SessionMixin):
         if not db_user:
             logger.info(f"User {user.email} not in database. Attempting JIT provisioning from Keycloak...")
 
-            # Try to get tenant client for JIT provisioning
+            # Try to get tenant and client for JIT provisioning
             realm_name = app_settings.default_realm_name
-            tenant_client = await self._get_tenant_client_for_jit(user.email, realm_name)
+            tenant, tenant_client = await self._get_tenant_and_client_for_jit(realm_name)
 
             if not tenant_client:
                 log_audit(
@@ -112,10 +112,11 @@ class AuthService(SessionMixin):
                 if not keycloak_user:
                     raise ClientException("User found in Keycloak but unable to fetch details")
 
-                # Create user in database
+                # Create user in database (pass tenant to avoid redundant DB query)
                 db_user = await self._create_user_from_keycloak(
                     keycloak_user=keycloak_user,
                     tenant_client=tenant_client,
+                    tenant=tenant,
                     realm_name=realm_name,
                 )
 
@@ -389,42 +390,51 @@ class AuthService(SessionMixin):
         logger.info(f"Syncing roles from Keycloak for existing user {user.email}")
         try:
             realm_roles = keycloak_manager.get_user_realm_roles(str(db_user.auth_id), tenant.realm_name)
-            logger.info(f"User {user.email} current Keycloak roles: {realm_roles}")
 
-            # Determine current permissions from Keycloak roles
-            current_user_type, current_role, current_is_superuser = self._determine_user_permissions_from_roles(
-                realm_roles
-            )
+            # Check if role fetch was successful (None indicates error, empty list is valid)
+            if realm_roles is not None:
+                logger.info(f"User {user.email} current Keycloak roles: {realm_roles}")
 
-            # Update database if roles have changed
-            if (
-                db_user.user_type != current_user_type
-                or db_user.role != current_role
-                or db_user.is_superuser != current_is_superuser
-            ):
-                logger.info(
-                    f"Updating user {user.email} roles: "
-                    f"user_type {db_user.user_type} -> {current_user_type}, "
-                    f"role {db_user.role} -> {current_role}, "
-                    f"is_superuser {db_user.is_superuser} -> {current_is_superuser}"
+                # Determine current permissions from Keycloak roles
+                current_user_type, current_role, current_is_superuser = self._determine_user_permissions_from_roles(
+                    realm_roles
                 )
 
-                db_user.user_type = current_user_type
-                db_user.role = current_role
-                db_user.is_superuser = current_is_superuser
+                # Update database if roles have changed
+                if (
+                    db_user.user_type != current_user_type
+                    or db_user.role != current_role
+                    or db_user.is_superuser != current_is_superuser
+                ):
+                    logger.info(
+                        f"Updating user {user.email} roles: "
+                        f"user_type {db_user.user_type} -> {current_user_type}, "
+                        f"role {db_user.role} -> {current_role}, "
+                        f"is_superuser {db_user.is_superuser} -> {current_is_superuser}"
+                    )
 
-                # Update the user record
-                updated_user = UserDataManager(self.session).update_one(db_user)
-                if updated_user:
-                    db_user = updated_user
-                    logger.info(f"Successfully synced roles for user {user.email}")
+                    db_user.user_type = current_user_type
+                    db_user.role = current_role
+                    db_user.is_superuser = current_is_superuser
+
+                    # Update the user record
+                    updated_user = UserDataManager(self.session).update_one(db_user)
+                    if updated_user:
+                        db_user = updated_user
+                        logger.info(f"Successfully synced roles for user {user.email}")
+                else:
+                    logger.debug(f"User {user.email} roles are already up-to-date")
             else:
-                logger.debug(f"User {user.email} roles are already up-to-date")
+                # Role fetch failed - skip sync to prevent privilege de-escalation
+                logger.warning(
+                    f"Skipping role sync for {user.email} due to Keycloak error. Using existing database roles."
+                )
 
         except Exception as e:
             # Log error but don't fail login - use existing database roles
             logger.warning(
-                f"Failed to sync roles from Keycloak for {user.email}: {str(e)}. Continuing with database roles."
+                f"Failed to sync roles from Keycloak for {user.email}: {str(e)}. Continuing with database roles.",
+                exc_info=True,
             )
 
         # Validate user_type AFTER role sync: Prevent clients from logging in as admin
@@ -535,15 +545,14 @@ class AuthService(SessionMixin):
 
         return user_type, role, is_superuser
 
-    async def _get_tenant_client_for_jit(self, email: str, realm_name: str) -> Optional[TenantClient]:
-        """Get tenant client for JIT provisioning based on realm.
+    async def _get_tenant_and_client_for_jit(self, realm_name: str) -> tuple[Optional[Tenant], Optional[TenantClient]]:
+        """Get tenant and tenant client for JIT provisioning based on realm.
 
         Args:
-            email: User email
             realm_name: Realm name
 
         Returns:
-            TenantClient if found, None otherwise
+            A tuple of (Tenant, TenantClient) if found, otherwise (None, None)
         """
         # Get tenant by realm name
         tenant = await UserDataManager(self.session).retrieve_by_fields(
@@ -554,7 +563,7 @@ class AuthService(SessionMixin):
 
         if not tenant:
             logger.warning(f"No tenant found for realm {realm_name}")
-            return None
+            return None, None
 
         # Get default client for this tenant
         tenant_client = await UserDataManager(self.session).retrieve_by_fields(
@@ -563,12 +572,13 @@ class AuthService(SessionMixin):
             missing_ok=True,
         )
 
-        return tenant_client
+        return tenant, tenant_client
 
     async def _create_user_from_keycloak(
         self,
         keycloak_user: Dict,
         tenant_client: TenantClient,
+        tenant: Tenant,
         realm_name: str,
     ) -> UserModel:
         """Create database user from Keycloak user data.
@@ -579,6 +589,7 @@ class AuthService(SessionMixin):
         Args:
             keycloak_user: User data from Keycloak
             tenant_client: Tenant client for the realm
+            tenant: Tenant object for the realm (passed to avoid redundant DB query)
             realm_name: Realm name
 
         Returns:
@@ -596,7 +607,16 @@ class AuthService(SessionMixin):
         logger.info(f"Keycloak user {email} has roles: {realm_roles}")
 
         # Use helper method to determine permissions from roles
-        user_type, role, is_superuser = self._determine_user_permissions_from_roles(realm_roles)
+        # Handle case where role fetch returns None (error case)
+        if realm_roles is not None:
+            user_type, role, is_superuser = self._determine_user_permissions_from_roles(realm_roles)
+        else:
+            # Default to CLIENT/DEVELOPER on error (safe default for new users)
+            logger.warning(f"Failed to fetch roles for {email} during JIT provisioning, using default permissions")
+            user_type = UserTypeEnum.CLIENT.value
+            role = UserRoleEnum.DEVELOPER.value
+            is_superuser = False
+
         logger.info(
             f"JIT provisioning user {email} as user_type={user_type}, role={role}, is_superuser={is_superuser}"
         )
@@ -618,11 +638,7 @@ class AuthService(SessionMixin):
         created_user = await UserDataManager(self.session).insert_one(new_user)
         logger.info(f"Created user {email} via JIT provisioning with ID {created_user.id}")
 
-        # Create tenant-user mapping
-        tenant = await UserDataManager(self.session).retrieve_by_fields(
-            Tenant,
-            {"realm_name": realm_name},
-        )
+        # Create tenant-user mapping (using passed tenant to avoid redundant query)
 
         tenant_user_mapping = TenantUserMapping(
             tenant_id=tenant.id,
@@ -633,9 +649,6 @@ class AuthService(SessionMixin):
 
         # Create notification subscriber
         try:
-            from budapp.core.schemas import SubscriberCreate
-            from budapp.shared.notification_service import BudNotifyHandler
-
             subscriber_data = SubscriberCreate(
                 subscriber_id=str(created_user.id),
                 email=created_user.email,
@@ -652,8 +665,6 @@ class AuthService(SessionMixin):
             # Don't fail JIT if subscriber creation fails
 
         # Use UserOnboardingService for billing, project, and permissions
-        from budapp.auth.user_onboarding_service import UserOnboardingService
-
         onboarding_service = UserOnboardingService(self.session)
         await onboarding_service.setup_new_client_user(
             user=created_user,

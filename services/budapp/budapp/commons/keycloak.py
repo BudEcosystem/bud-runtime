@@ -313,7 +313,7 @@ class KeycloakManager:
             logger.error(f"Error fetching Keycloak user by email {email}: {str(e)}")
             return None
 
-    def get_user_realm_roles(self, user_id: str, realm_name: str) -> list[str]:
+    def get_user_realm_roles(self, user_id: str, realm_name: str) -> Optional[list[str]]:
         """Get realm roles assigned to a user in Keycloak.
 
         This is useful for JIT provisioning to determine user permissions.
@@ -323,7 +323,8 @@ class KeycloakManager:
             realm_name: Name of the realm
 
         Returns:
-            List of realm role names (e.g., ['admin', 'developer'])
+            List of realm role names (e.g., ['admin', 'developer']) if successful,
+            None if there was an error fetching roles (distinguishes from empty list)
         """
         try:
             realm_admin = self.get_realm_admin(realm_name)
@@ -332,8 +333,8 @@ class KeycloakManager:
             logger.info(f"User {user_id} has realm roles: {role_names}")
             return role_names
         except Exception as e:
-            logger.error(f"Error fetching realm roles for user {user_id}: {str(e)}")
-            return []
+            logger.error(f"Error fetching realm roles for user {user_id}: {str(e)}", exc_info=True)
+            return None  # Return None to indicate error, not empty list
 
     async def create_client(self, client_id: str, realm_name: str) -> Tuple[str, str]:
         """Create a new client in Keycloak.
