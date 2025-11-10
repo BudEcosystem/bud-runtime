@@ -98,6 +98,7 @@ class KeycloakManager:
             client_id=str(credentials.client_named_id),
             realm_name=realm_name,
             client_secret_key=credentials.client_secret,
+            verify=app_settings.keycloak_verify_ssl,
         )
 
     async def update_user_password(self, user_id: str, password: str, realm_name: str) -> None:
@@ -227,9 +228,112 @@ class KeycloakManager:
             )
 
             logger.debug(f"Permission response: {data_raw.json()}")
-            permission_id = data_raw.json()["id"]
+            _ = data_raw.json()["id"]  # Permission created successfully
 
-            logger.debug(f"Permission ID: {permission_id}")
+    def client_exists(self, client_id: str, realm_name: str) -> bool:
+        """Check if a client exists in Keycloak by its internal UUID.
+
+        Args:
+            client_id: The internal UUID of the client to check
+            realm_name: Name of the realm to check in
+
+        Returns:
+            bool: True if client exists, False otherwise
+        """
+        try:
+            realm_admin = self.get_realm_admin(realm_name)
+            realm_admin.get_client(client_id)
+            return True
+        except KeycloakGetError:
+            return False
+
+    def user_exists_in_realm(self, user_id: str, realm_name: str) -> bool:
+        """Check if a user exists in Keycloak by their UUID.
+
+        Args:
+            user_id: The UUID of the user to check
+            realm_name: Name of the realm to check in
+
+        Returns:
+            bool: True if user exists, False otherwise
+        """
+        try:
+            realm_admin = self.get_realm_admin(realm_name)
+            realm_admin.get_user(user_id)
+            return True
+        except KeycloakGetError:
+            return False
+
+    async def ensure_realm_roles_exist(self, realm_name: str) -> None:
+        """Ensure all required realm roles exist, creating them if missing.
+
+        This is useful when working with externally created realms that may not
+        have the standard roles that budapp expects.
+
+        Args:
+            realm_name: Name of the realm to check and update
+        """
+        realm_admin = self.get_realm_admin(realm_name)
+
+        required_roles = [
+            UserRoleEnum.ADMIN.value,
+            UserRoleEnum.DEVELOPER.value,
+            UserRoleEnum.TESTER.value,
+            UserRoleEnum.DEVOPS.value,
+            UserRoleEnum.SUPER_ADMIN.value,
+        ]
+
+        for role_name in required_roles:
+            realm_admin.create_realm_role(
+                {"name": role_name, "description": f"Role: {role_name}"},
+                skip_exists=True,  # Won't error if role already exists
+            )
+
+        logger.info(f"Ensured all required realm roles exist in {realm_name}")
+
+    def get_keycloak_user_by_email(self, email: str, realm_name: str) -> Optional[Dict]:
+        """Get Keycloak user details by email address.
+
+        This is useful for JIT provisioning to fetch user details from Keycloak.
+
+        Args:
+            email: User email to search for
+            realm_name: Name of the realm
+
+        Returns:
+            User dict if found, None otherwise
+        """
+        try:
+            realm_admin = self.get_realm_admin(realm_name)
+            users = realm_admin.get_users({"email": email})
+            if users and len(users) > 0:
+                return users[0]  # Return first match
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching Keycloak user by email {email}: {str(e)}")
+            return None
+
+    def get_user_realm_roles(self, user_id: str, realm_name: str) -> list[str]:
+        """Get realm roles assigned to a user in Keycloak.
+
+        This is useful for JIT provisioning to determine user permissions.
+
+        Args:
+            user_id: Keycloak user ID (UUID)
+            realm_name: Name of the realm
+
+        Returns:
+            List of realm role names (e.g., ['admin', 'developer'])
+        """
+        try:
+            realm_admin = self.get_realm_admin(realm_name)
+            roles = realm_admin.get_realm_roles_of_user(user_id)
+            role_names = [role.get("name") for role in roles if role.get("name")]
+            logger.info(f"User {user_id} has realm roles: {role_names}")
+            return role_names
+        except Exception as e:
+            logger.error(f"Error fetching realm roles for user {user_id}: {str(e)}")
+            return []
 
     async def create_client(self, client_id: str, realm_name: str) -> Tuple[str, str]:
         """Create a new client in Keycloak.
@@ -520,8 +624,6 @@ class KeycloakManager:
             user_id = realm_admin.create_user(payload=user_representation, exist_ok=True)
             logger.info(f"Realm admin {username} created successfully")
 
-            logger.debug(f"User ID of realm admin {username}: {user_id}")
-
             # Step 1: Get all realm roles
             roles = realm_admin.get_realm_roles()
             super_admin_role = next((r for r in roles if r["name"] == "super_admin"), None)
@@ -553,7 +655,7 @@ class KeycloakManager:
                 module_resource["_id"]
                 policy_name = f"urn:bud:policy:{user_id}"
                 existing_policies = realm_admin.get_client_authz_policies(client_id)
-                logger.debug(f"Existing policies: {existing_policies}")
+                logger.debug(f"Found {len(existing_policies)} existing policies")
                 user_policy = next((p for p in existing_policies if p["name"] == policy_name), None)
 
                 if not user_policy:
@@ -561,7 +663,7 @@ class KeycloakManager:
                         "name": policy_name,
                         "description": f"User policy for {user_id}",
                         "logic": "POSITIVE",
-                        "users": [user_id],
+                        "users": [str(user_id)],
                     }
 
                     logger.debug(f"Creating user policy: {json.dumps(user_policy, indent=4)}")
@@ -593,8 +695,6 @@ class KeycloakManager:
                     logger.debug(f"All permissions response: {data_raw.json()}")
                     permission_id = data_raw.json()[0]["id"]
 
-                    logger.debug(f"Permission ID: {permission_id}")
-
                     # Get The Permission
                     permission_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/permission/scope/{permission_id}"
                     permission_data_raw = realm_admin.connection.raw_get(
@@ -622,10 +722,6 @@ class KeycloakManager:
                         permission=False,
                     )
 
-                    logger.debug(f"Permission resources response: {permission_resources_data_raw.json()}")
-
-                    # [{"name":"module_cluster","_id":"b6be1355-d4d6-4271-aa71-1f6986b11419"}]
-
                     # get the scopes
                     permission_scopes_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/{permission_id}/scopes"
                     permission_scopes_data_raw = realm_admin.connection.raw_get(
@@ -634,10 +730,6 @@ class KeycloakManager:
                         permission=False,
                     )
 
-                    logger.debug(f"Permission scopes response: {permission_scopes_data_raw.json()}")
-
-                    # [{"id":"370c6c54-1471-4728-97d7-fd8d97b6b4c2","name":"manage"}]
-
                     # get associated policies and check if our policy is one of them
                     permission_policies_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/{permission_id}/associatedPolicies"
                     permission_policies_data_raw = realm_admin.connection.raw_get(
@@ -645,8 +737,6 @@ class KeycloakManager:
                         max=-1,
                         permission=False,
                     )
-
-                    logger.debug(f"Permission policies response: {permission_policies_data_raw.json()}")
 
                     # Check if the user policy is one of the associated policies
                     # user_policy_id = next((p["id"] for p in permission_policies_data_raw.json() if p["name"] == policy_name), None)
@@ -800,18 +890,44 @@ class KeycloakManager:
                     "name": policy_name,
                     "description": f"User policy for {user_id}",
                     "logic": "POSITIVE",
-                    "users": [user_id],
+                    "users": [str(user_id)],
                 }
 
                 policy_url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/user"
-                data_raw = realm_admin.connection.raw_post(
-                    policy_url,
-                    data=json.dumps(user_policy),
-                    max=-1,
-                    permission=False,
-                )
-                user_policy_id = data_raw.json()["id"]
-                logger.debug(f"Created user policy {policy_name}")
+
+                try:
+                    data_raw = realm_admin.connection.raw_post(
+                        policy_url,
+                        data=json.dumps(user_policy),
+                        max=-1,
+                        permission=False,
+                    )
+                    logger.debug(f"User policy creation response: {data_raw.json()}")
+
+                    response_json = data_raw.json()
+                    if "id" not in response_json:
+                        logger.error(f"User policy creation failed. Response: {response_json}")
+                        raise ValueError(f"Failed to create user policy {policy_name}. Response: {response_json}")
+
+                    user_policy_id = response_json["id"]
+                    logger.info(f"Created user policy {policy_name} with ID {user_policy_id}")
+                except KeycloakPostError as e:
+                    if e.response_code == 409:
+                        # Policy might already exist - try to refetch
+                        logger.warning(
+                            f"User policy {policy_name} might already exist (409 Conflict). Retrying fetch..."
+                        )
+                        existing_policies = realm_admin.get_client_authz_policies(client_id)
+                        user_policy = next((p for p in existing_policies if p["name"] == policy_name), None)
+                        if user_policy:
+                            user_policy_id = user_policy["id"]
+                            logger.info(f"Found existing user policy {policy_name} with ID {user_policy_id}")
+                        else:
+                            logger.error(f"User policy {policy_name} not found even after 409 Conflict")
+                            raise
+                    else:
+                        logger.error(f"Keycloak error creating user policy {policy_name}: {str(e)}")
+                        raise
             else:
                 user_policy_id = user_policy["id"]
 
@@ -834,7 +950,7 @@ class KeycloakManager:
                         logger.error(f"Failed to create resource {resource_name}")
                         continue
 
-                    logger.debug(f"Successfully created resource {resource_name}")
+                    logger.info(f"Successfully created resource {resource_name}")
 
                 # Get scopes for this module
                 kc_scopes = realm_admin.get_client_authz_scopes(client_id)
@@ -922,7 +1038,7 @@ class KeycloakManager:
                         logger.warning(f"Permission {permission_name} might not exist or error occurred: {str(e)}")
                         continue
 
-            logger.debug(f"Completed permission sync for user {user_id}")
+            logger.info(f"Completed permission sync for user {user_id}")
 
         except Exception as e:
             logger.error(f"Error syncing permissions for user {user_id}: {str(e)}")
@@ -980,6 +1096,9 @@ class KeycloakManager:
         Returns:
             dict: Contains access_token, refresh_token, etc.
 
+        Raises:
+            KeycloakAuthenticationError: If authentication fails
+
         Example:
             {
                 "access_token": "eyJhbGciOiJSUzI1NiIsInR...",
@@ -994,14 +1113,58 @@ class KeycloakManager:
         """
         try:
             openid_client = self.get_keycloak_openid_client(realm_name, credentials)
+
+            # Log authentication attempt details (without sensitive info)
+            logger.info(
+                f"Attempting Keycloak authentication: username={username}, realm={realm_name}, "
+                f"client_id={credentials.client_named_id}"
+            )
+
             token = openid_client.token(username, password, scope="openid profile email roles")
+            logger.info(f"Successfully authenticated user {username} in realm {realm_name}")
             return token
-        except KeycloakAuthenticationError:
-            logger.warning(f"Invalid credentials for user {username}")
-            return {}
+        except KeycloakAuthenticationError as e:
+            # Log detailed error information from Keycloak
+            error_message = str(e)
+
+            # Try to extract additional error details from exception
+            error_details = {
+                "error_message": error_message,
+                "exception_type": type(e).__name__,
+            }
+
+            # Check for response_code attribute
+            if hasattr(e, "response_code"):
+                error_details["response_code"] = e.response_code
+
+            # Check for response_body attribute
+            if hasattr(e, "response_body"):
+                error_details["response_body"] = e.response_body
+
+            # Check for error attribute
+            if hasattr(e, "error"):
+                error_details["error"] = e.error
+
+            # Log all exception attributes for debugging
+            from contextlib import suppress
+
+            with suppress(Exception):
+                error_details["all_attributes"] = {k: v for k, v in vars(e).items() if not k.startswith("_")}
+
+            logger.error(
+                f"Keycloak authentication failed for user {username} in realm {realm_name}. "
+                f"Error details: {error_details}. "
+                f"Common causes: 1) Temporary password not reset, 2) Account disabled, "
+                f"3) Email not verified, 4) Invalid credentials"
+            )
+            # Re-raise the exception to be handled by the caller
+            raise
         except Exception as e:
-            logger.error(f"Error verifying password for user {username}: {str(e)}")
-            return {}
+            logger.error(
+                f"Unexpected error during authentication for user {username} in realm {realm_name}: "
+                f"{type(e).__name__}: {str(e)}"
+            )
+            raise
 
     async def logout_user(self, refresh_token: str, realm_name: str, credentials: TenantClientSchema) -> bool:
         """Log out a user by invalidating the refresh token.
@@ -1072,7 +1235,13 @@ class KeycloakManager:
             }
 
             try:
-                response = requests.post(token_endpoint, headers=headers, data=payload, timeout=30)
+                response = requests.post(
+                    token_endpoint,
+                    headers=headers,
+                    data=payload,
+                    timeout=30,
+                    verify=app_settings.keycloak_verify_ssl,
+                )
                 response.raise_for_status()
             except requests.exceptions.Timeout:
                 logger.error("Timeout while requesting RPT from Keycloak")
@@ -1720,7 +1889,7 @@ class KeycloakManager:
             for scope in scopes:
                 scope_id = next(s["id"] for s in kc_scopes if s["name"] == scope)
 
-                logger.info(f"Scope ID: {scope_id}")
+                logger.debug(f"Scope ID: {scope_id}")
 
                 permission = {
                     "name": f"urn:bud:permission:{resource.resource_type}:{resource.resource_id}:{scope}",
@@ -1743,9 +1912,7 @@ class KeycloakManager:
                 )
 
                 logger.debug(f"Permission response: {data_raw.json()}")
-                permission_id = data_raw.json()["id"]
-
-                logger.debug(f"Permission ID: {permission_id}")
+                _ = data_raw.json()["id"]  # Permission created successfully
 
         except Exception as e:
             logger.error(f"Error creating resource with permissions: {str(e)}", exc_info=True)
@@ -1914,19 +2081,16 @@ class KeycloakManager:
             realm_admin = self.get_realm_admin(realm_name)
             policy_name = f"urn:bud:policy:{user_id}"
 
-            logger.info(f"Policy name: {policy_name}")
+            logger.debug(f"Retrieving permissions for policy: {policy_name}")
 
             # 1. Find the user's policy
             policies = realm_admin.get_client_authz_policies(client_id)
-            logger.info(f"Policies: {policies}")
             user_policy = next((p for p in policies if p["name"] == policy_name), None)
             if not user_policy:
                 logger.warning(f"No policy found for user {user_id}")
                 return {"permissions": []}
 
             user_policy_id = user_policy["id"]
-
-            logger.info(f"User policy ID: {user_policy_id}")
 
             # call the the keycloak using api
             url = f"{app_settings.keycloak_server_url}/admin/realms/{realm_name}/clients/{client_id}/authz/resource-server/policy/{user_policy_id}/dependentPolicies"
@@ -1936,26 +2100,20 @@ class KeycloakManager:
                 permission=False,
             )
 
-            logger.info(f"All User Perimission: {data_raw.json()}")
+            logger.debug(f"Retrieved {len(data_raw.json())} permissions for user {user_id}")
 
             # Get all the permissions
-            permissions = realm_admin.get_client_authz_permissions(client_id)
-            logger.info(f"All Permissions: {permissions}")
+            _ = realm_admin.get_client_authz_permissions(client_id)
 
             # Get all the resources
             resources = realm_admin.get_client_authz_resources(client_id)
-            logger.info(f"All Resources: {resources}")
 
-            annotated_resources = self.annotate_resources_with_permissions(
-                resources=resources, user_permissions=data_raw.json()
-            )
-
-            logger.info(f"Annotated Resources: {annotated_resources}")
+            _ = self.annotate_resources_with_permissions(resources=resources, user_permissions=data_raw.json())
 
             # formatted
             formatted = self.format_permissions_output(resources=resources, user_permissions=data_raw.json())
 
-            logger.info(f"Formatted Permissions: {formatted}")
+            logger.debug(f"Formatted {len(formatted.get('permissions', []))} permissions for user {user_id}")
 
             return formatted
 
