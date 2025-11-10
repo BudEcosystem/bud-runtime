@@ -992,7 +992,7 @@ class ExperimentService:
                 self.session.query(TraitModel)
                 .join(PivotModel, TraitModel.id == PivotModel.trait_id)
                 .join(DatasetModel, PivotModel.dataset_id == DatasetModel.id)
-                .filter(DatasetModel.eval_types.has_key("gen"))  # Filter datasets with 'gen' key in eval_types
+                .filter(DatasetModel.eval_types.op("?")("gen"))  # Filter datasets with 'gen' key in eval_types
                 .distinct()
             )
 
