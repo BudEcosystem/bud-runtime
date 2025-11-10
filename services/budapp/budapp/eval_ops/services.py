@@ -987,7 +987,8 @@ class ExperimentService:
             HTTPException(status_code=500): If database query fails.
         """
         try:
-            q = self.session.query(TraitModel)
+            # Only return traits that have at least one associated dataset
+            q = self.session.query(TraitModel).join(PivotModel, TraitModel.id == PivotModel.trait_id).distinct()
 
             # Apply filters
             if name:
@@ -1003,7 +1004,7 @@ class ExperimentService:
             # Get total count before applying pagination
             total_count = q.count()
 
-            # Apply pagination - no need to load datasets for listing
+            # Apply pagination
             traits = q.offset(offset).limit(limit).all()
 
             # Convert to lightweight schema objects without datasets
