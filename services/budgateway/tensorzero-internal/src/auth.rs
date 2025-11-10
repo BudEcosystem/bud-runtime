@@ -211,12 +211,10 @@ pub async fn require_api_key(
         }
 
         // Mark as authenticated - use from_static for known static string
-        request
-            .headers_mut()
-            .insert(
-                "x-tensorzero-endpoint-id",
-                axum::http::HeaderValue::from_static("models_list"),
-            );
+        request.headers_mut().insert(
+            "x-tensorzero-endpoint-id",
+            axum::http::HeaderValue::from_static("models_list"),
+        );
 
         return Ok(next.run(request).await);
     }
@@ -234,26 +232,30 @@ pub async fn require_api_key(
         };
 
         // Determine lookup key: either model OR prompt.id with prompt: prefix
-        let (lookup_key, is_prompt_based, _original_prompt_id) = if let Some(model) = val.get("model").and_then(|v| v.as_str()) {
-            // Traditional model-based request
-            (model.to_string(), false, None)
-        } else if let Some(prompt_id) = val.get("prompt")
-            .and_then(|p| p.get("id"))
-            .and_then(|id| id.as_str()) {
-            // Add prompt: prefix for authorization lookup
-            (format!("prompt:{}", prompt_id), true, Some(prompt_id.to_string()))
-        } else {
-            // Provide endpoint-specific error message
-            let error_message = if is_responses_endpoint {
-                "Model name or prompt.id required in request body"
+        let (lookup_key, is_prompt_based, _original_prompt_id) =
+            if let Some(model) = val.get("model").and_then(|v| v.as_str()) {
+                // Traditional model-based request
+                (model.to_string(), false, None)
+            } else if let Some(prompt_id) = val
+                .get("prompt")
+                .and_then(|p| p.get("id"))
+                .and_then(|id| id.as_str())
+            {
+                // Add prompt: prefix for authorization lookup
+                (
+                    format!("prompt:{}", prompt_id),
+                    true,
+                    Some(prompt_id.to_string()),
+                )
             } else {
-                "Missing model name in request body"
+                // Provide endpoint-specific error message
+                let error_message = if is_responses_endpoint {
+                    "Model name or prompt.id required in request body"
+                } else {
+                    "Missing model name in request body"
+                };
+                return Err(auth_error_response(StatusCode::BAD_REQUEST, error_message));
             };
-            return Err(auth_error_response(
-                StatusCode::BAD_REQUEST,
-                error_message,
-            ));
-        };
 
         // We already checked that api_config is Ok in the if statement above
         #[expect(clippy::unwrap_used)]
@@ -268,10 +270,7 @@ pub async fn require_api_key(
                 } else {
                     format!("Model not found: {}", lookup_key)
                 };
-                return Err(auth_error_response(
-                    StatusCode::NOT_FOUND,
-                    &error_message,
-                ))
+                return Err(auth_error_response(StatusCode::NOT_FOUND, &error_message));
             }
         };
 
