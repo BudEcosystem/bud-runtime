@@ -987,8 +987,14 @@ class ExperimentService:
             HTTPException(status_code=500): If database query fails.
         """
         try:
-            # Only return traits that have at least one associated dataset
-            q = self.session.query(TraitModel).join(PivotModel, TraitModel.id == PivotModel.trait_id).distinct()
+            # Only return traits that have at least one associated dataset with eval_type 'gen'
+            q = (
+                self.session.query(TraitModel)
+                .join(PivotModel, TraitModel.id == PivotModel.trait_id)
+                .join(DatasetModel, PivotModel.dataset_id == DatasetModel.id)
+                .filter(DatasetModel.eval_types.has_key("gen"))  # Filter datasets with 'gen' key in eval_types
+                .distinct()
+            )
 
             # Apply filters
             if name:
