@@ -1,5 +1,5 @@
 use axum::body::Body;
-use axum::extract::State;
+use axum::extract::{Extension, State};
 use axum::http::HeaderMap;
 use axum::response::sse::{Event, Sse};
 use axum::response::{IntoResponse, Response};
@@ -20,6 +20,7 @@ use tokio_stream::StreamExt;
 use tracing::instrument;
 use uuid::Uuid;
 
+use crate::analytics::RequestAnalytics;
 use crate::cache::{CacheOptions, CacheParamsOptions};
 use crate::clickhouse::ClickHouseConnectionInfo;
 use crate::config_parser::{Config, ObjectStoreInfo};
@@ -168,6 +169,7 @@ pub async fn inference_handler(
         ..
     }): AppState,
     headers: HeaderMap,
+    Extension(analytics): Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>,
     StructuredJson(mut params): StructuredJson<Params>,
 ) -> Result<Response<Body>, Error> {
     // Extract observability metadata from headers
@@ -217,6 +219,7 @@ pub async fn inference_handler(
         kafka_connection_info.clone(),
         model_credential_store,
         params,
+        Some(analytics),
     )
     .await;
 
@@ -391,6 +394,7 @@ pub async fn inference(
     kafka_connection_info: KafkaConnectionInfo,
     model_credential_store: Arc<std::sync::RwLock<HashMap<String, SecretString>>>,
     params: Params,
+    analytics: Option<Arc<tokio::sync::Mutex<RequestAnalytics>>>,
 ) -> Result<InferenceOutput, Error> {
     let span = tracing::Span::current();
     if let Some(function_name) = &params.function_name {
@@ -486,6 +490,8 @@ pub async fn inference(
     let obs_metadata_clone = params.observability_metadata.clone();
     let function_name_clone = params.function_name.clone();
     let model_name_clone = params.model_name.clone();
+    let gateway_request_clone = params.gateway_request.clone();
+    let analytics_clone = analytics.clone();
 
     // Should we store the results?
     let dryrun = params.dryrun.unwrap_or(false);
@@ -725,7 +731,7 @@ pub async fn inference(
 
     // Serialize the error response BEFORE sending to metrics
     // This ensures the gateway_response field contains what will be sent to the client
-    let error_response = error.to_response_json();
+    let (_status_code, error_response_json) = error.to_response_json();
 
     // Send failure event to Kafka and ClickHouse for observability
     if !dryrun {
@@ -735,12 +741,14 @@ pub async fn inference(
             inference_id,
             episode_id,
             &error,
-            Some(&error_response), // Pass the serialized error response
+            Some(&error_response_json), // Pass the serialized error response
             &resolved_input,
             obs_metadata_clone,
             function_name_clone,
             model_name_clone,
             start_time,
+            gateway_request_clone,
+            analytics_clone,
         )
         .await;
     }
@@ -1401,6 +1409,8 @@ async fn send_failure_event(
     function_name: Option<String>,
     model_name: Option<String>,
     start_time: Instant,
+    gateway_request: Option<String>,
+    analytics: Option<Arc<tokio::sync::Mutex<RequestAnalytics>>>,
 ) {
     let request_arrival_time = chrono::Utc::now()
         - chrono::Duration::milliseconds(start_time.elapsed().as_millis() as i64);
@@ -1408,8 +1418,44 @@ async fn send_failure_event(
 
     // Extract error details
     let error_details = error.get_details();
-    let status_code = error.status_code();
     let error_message = error.to_string();
+
+    // Extract the actual provider status code from nested errors
+    // When errors are wrapped (e.g., AllVariantsFailed wrapping InferenceClient),
+    // we want the provider's status code (400) not the wrapper's (502)
+    let status_code = match error_details {
+        ErrorDetails::AllVariantsFailed { errors } => {
+            // Get first error's status code if it's an InferenceClient error
+            errors
+                .values()
+                .next()
+                .and_then(|e| match e.get_details() {
+                    ErrorDetails::InferenceClient { status_code, .. } => *status_code,
+                    _ => None,
+                })
+                .unwrap_or_else(|| error.status_code())
+        }
+        ErrorDetails::ModelProvidersExhausted { provider_errors } => provider_errors
+            .values()
+            .next()
+            .and_then(|e| match e.get_details() {
+                ErrorDetails::InferenceClient { status_code, .. } => *status_code,
+                _ => None,
+            })
+            .unwrap_or_else(|| error.status_code()),
+        ErrorDetails::ModelChainExhausted { model_errors } => model_errors
+            .values()
+            .next()
+            .and_then(|e| match e.get_details() {
+                ErrorDetails::InferenceClient { status_code, .. } => *status_code,
+                _ => None,
+            })
+            .unwrap_or_else(|| error.status_code()),
+        ErrorDetails::InferenceClient { status_code, .. } => {
+            status_code.unwrap_or_else(|| error.status_code())
+        }
+        _ => error.status_code(),
+    };
 
     // Determine error type based on ErrorDetails variant
     let error_type = match error_details {
@@ -1488,6 +1534,9 @@ async fn send_failure_event(
 
     let serialized_input = serialize_or_log(&resolved_input.messages);
 
+    // Use the gateway_response passed in (already serialized from the error response)
+    let gateway_response = gateway_response.map(|v| serde_json::to_string(v).ok()).flatten();
+
     let model_inference = crate::inference::types::ModelInferenceDatabaseInsert {
         id: uuid::Uuid::now_v7(),
         inference_id,
@@ -1508,8 +1557,8 @@ async fn send_failure_event(
         ttft_ms: None,
         cached: false,
         finish_reason: None,
-        gateway_request: None,
-        gateway_response: gateway_response.map(|r| r.to_string()), // Store serialized error response
+        gateway_request,
+        gateway_response,
         endpoint_type: "chat".to_string(),
         guardrail_scan_summary: Some(serde_json::json!({}).to_string()),
     };
@@ -1525,6 +1574,34 @@ async fn send_failure_event(
         );
     }
 
+    // Write analytics record to ClickHouse with inference_id for failed requests
+    // This ensures gateway_metadata is available even for errors
+    if let Some(analytics_arc) = &analytics {
+        let mut analytics_guard = analytics_arc.lock().await;
+        let record = &mut analytics_guard.record;
+
+        // Set the inference_id so the analytics can be joined with the inference
+        record.inference_id = Some(inference_id);
+
+        // Update response information for failed request
+        record.status_code = status_code.as_u16();
+        let elapsed = start_time.elapsed();
+        record.total_duration_ms = elapsed.as_millis() as u32;
+        record.response_timestamp = chrono::Utc::now();
+
+        // Clone the record to write (release lock before async operation)
+        let analytics_record = record.clone();
+        drop(analytics_guard);
+
+        // Write analytics to ClickHouse
+        if let Err(e) = clickhouse_connection_info
+            .write(&[analytics_record], "GatewayAnalytics")
+            .await
+        {
+            tracing::error!("Failed to write analytics for failed inference: {}", e);
+        }
+    }
+
     // Then create ModelInferenceDetails record with error information
     // Note: The api_key_project_id might be truncated in the error - handle gracefully
     let parsed_api_key_project_id = api_key_project_id.and_then(|id| {
@@ -1538,7 +1615,7 @@ async fn send_failure_event(
 
     let inference_details = crate::clickhouse::ModelInferenceDetailsInsert {
         inference_id,
-        request_ip: None,
+        request_ip: None, // Gateway metadata now in GatewayAnalytics table
         project_id: uuid::Uuid::parse_str(&project_id).ok().unwrap_or_default(),
         endpoint_id: uuid::Uuid::parse_str(&endpoint_id).ok().unwrap_or_default(),
         model_id: uuid::Uuid::parse_str(&model_id).ok().unwrap_or_default(),
