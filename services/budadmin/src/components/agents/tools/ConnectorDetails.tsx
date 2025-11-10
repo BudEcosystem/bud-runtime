@@ -23,6 +23,68 @@ interface ConnectorDetailsProps {
   promptId?: string;
 }
 
+/**
+ * OAuth Flow:
+ * 1. User fills connector credentials and clicks "Continue"
+ * 2. Connector is registered via /prompts/{promptId}/connectors/{connectorId}/register
+ * 3. If OAuth connector, initiate OAuth via /prompts/oauth/initiate
+ * 4. Save current state to localStorage
+ * 5. Redirect user to OAuth provider's authorization URL
+ * 6. User authorizes on OAuth provider's site
+ * 7. OAuth provider redirects back to /prompts&agents?code=...&state=...
+ * 8. Page detects callback and opens AgentDrawer
+ * 9. ConnectorDetails component detects callback params
+ * 10. Complete OAuth via /prompts/oauth/callback with code and state
+ * 11. Move to step 2 and fetch tools
+ * 12. Clean up URL params and localStorage state
+ */
+
+// OAuth state management helpers
+const OAUTH_STATE_KEY = 'oauth_connector_state';
+
+interface OAuthState {
+  promptId: string;
+  connectorId: string;
+  connectorName: string;
+  step: 1 | 2;
+  timestamp: number;
+}
+
+const saveOAuthState = (state: OAuthState) => {
+  try {
+    localStorage.setItem(OAUTH_STATE_KEY, JSON.stringify(state));
+  } catch (error) {
+    console.error('Failed to save OAuth state:', error);
+  }
+};
+
+const getOAuthState = (): OAuthState | null => {
+  try {
+    const saved = localStorage.getItem(OAUTH_STATE_KEY);
+    if (!saved) return null;
+
+    const state = JSON.parse(saved);
+    // Check if state is not older than 10 minutes
+    if (Date.now() - state.timestamp > 10 * 60 * 1000) {
+      localStorage.removeItem(OAUTH_STATE_KEY);
+      return null;
+    }
+
+    return state;
+  } catch (error) {
+    console.error('Failed to get OAuth state:', error);
+    return null;
+  }
+};
+
+const clearOAuthState = () => {
+  try {
+    localStorage.removeItem(OAUTH_STATE_KEY);
+  } catch (error) {
+    console.error('Failed to clear OAuth state:', error);
+  }
+};
+
 export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   connector,
   onBack,
@@ -44,6 +106,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   const [selectedToolName, setSelectedToolName] = useState<string | null>(null);
   const [headerHeight, setHeaderHeight] = useState<number>(0);
   const headerRef = React.useRef<HTMLDivElement>(null);
+  const oauthCallbackProcessed = React.useRef(false);
 
   // Reusable function to fetch tools
   const fetchTools = React.useCallback(async () => {
@@ -88,6 +151,88 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   useEffect(() => {
     fetchConnectorDetails(connector.id);
   }, [connector.id]);
+
+  // Handle OAuth callback on mount
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      // Prevent multiple executions
+      if (oauthCallbackProcessed.current) {
+        console.log('OAuth callback already processed, skipping');
+        return;
+      }
+
+      // Check if we're coming back from OAuth
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+
+      if (!code || !state) return;
+
+      console.log('OAuth callback detected with code and state');
+
+      // Get saved state
+      const savedState = getOAuthState();
+
+      if (!savedState) {
+        console.log('No saved OAuth state found');
+        return;
+      }
+
+      console.log('Saved OAuth state:', savedState);
+
+      // Verify this callback is for the current connector
+      if (savedState.connectorId !== connector.id) {
+        console.log('OAuth callback is for different connector, ignoring');
+        return;
+      }
+
+      // Mark as processed
+      oauthCallbackProcessed.current = true;
+
+      // Complete the OAuth flow
+      try {
+        setIsRegistering(true);
+
+        console.log('Completing OAuth callback...');
+        const response = await ConnectorService.completeOAuthCallback(
+          savedState.promptId,
+          savedState.connectorId,
+          code,
+          state
+        );
+
+        console.log('OAuth callback response:', response.data);
+
+        // Clean up URL params
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+
+        // Clear saved state
+        clearOAuthState();
+
+        // Move to step 2 to show tools
+        setStep(2);
+
+        // Fetch tools
+        await fetchTools();
+
+        successToast('OAuth authorization successful');
+      } catch (error: any) {
+        console.error('Error completing OAuth callback:', error);
+        errorToast(error?.response?.data?.message || 'Failed to complete OAuth authorization');
+
+        // Clean up URL params even on error
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+
+        clearOAuthState();
+      } finally {
+        setIsRegistering(false);
+      }
+    };
+
+    handleOAuthCallback();
+  }, [connector.id, fetchTools]);
 
   // Fetch tools if coming from connected section
   useEffect(() => {
@@ -255,6 +400,17 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
             if (authorizationUrl) {
               console.log('Redirecting to authorization URL:', authorizationUrl);
+
+              // Save state before redirecting
+              saveOAuthState({
+                promptId: promptId,
+                connectorId: connector.id,
+                connectorName: connector.name,
+                step: 1,
+                timestamp: Date.now()
+              });
+
+              // Redirect to OAuth provider
               window.location.href = authorizationUrl;
             } else {
               console.error('No authorization_url in OAuth response');

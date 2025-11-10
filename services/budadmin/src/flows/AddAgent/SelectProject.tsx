@@ -11,8 +11,10 @@ import { useProjects } from "src/hooks/useProjects";
 import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 import { usePromptsAgents } from "@/stores/usePromptsAgents";
 import { useAddAgent } from "@/stores/useAddAgent";
+import { useRouter } from "next/router";
 
 export default function SelectProject() {
+  const router = useRouter();
   const { openDrawerWithStep } = useDrawer();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("");
@@ -28,7 +30,6 @@ export default function SelectProject() {
   const {
     createWorkflow,
     setSelectedProject: setStoreSelectedProject,
-    currentWorkflow,
     loading: workflowLoading
   } = useAddAgent();
 
@@ -60,6 +61,43 @@ export default function SelectProject() {
       if (!response) {
         errorToast("Failed to create agent workflow");
         return;
+      }
+
+      // Update URL with workflow ID
+      if (response.workflow_id) {
+        // Build URL manually to avoid encoding issues
+        // Use window.location.pathname to get the actual browser URL (not router.pathname which includes /home)
+        const currentPath = window.location.pathname;
+        const queryParts: string[] = [];
+
+        // Add all existing query params except 'agent'
+        Object.entries(router.query).forEach(([key, value]) => {
+          if (key !== 'agent' && value) {
+            // Don't encode commas in prompt parameter
+            if (key === 'prompt') {
+              queryParts.push(`${key}=${value}`);
+            } else {
+              queryParts.push(`${key}=${encodeURIComponent(String(value))}`);
+            }
+          }
+        });
+
+        // Add new agent param
+        queryParts.push(`agent=${response.workflow_id}`);
+
+        // Build the final URL
+        const newUrl = queryParts.length > 0
+          ? `${currentPath}?${queryParts.join('&')}`
+          : currentPath;
+
+        // Use window.history.replaceState to update URL
+        window.history.replaceState(
+          { ...window.history.state },
+          '',
+          newUrl
+        );
+
+        console.log('Updated URL with workflow ID:', response.workflow_id);
       }
 
       // Move to next step - Select Type screen (now step 2)

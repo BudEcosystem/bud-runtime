@@ -3,7 +3,7 @@ import Settings from "./Settings";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { useAgentStore, AgentSession } from "@/stores/useAgentStore";
 import { AppRequest } from "src/pages/api/requests";
-import { successToast, errorToast } from "@/components/toast";
+import { errorToast } from "@/components/toast";
 
 interface SettingsSidebarProps {
   isOpen: boolean;
@@ -60,7 +60,7 @@ export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarPro
       };
 
       await AppRequest.Post("/prompts/prompt-config", payload);
-      successToast("Model settings updated successfully");
+      // successToast("Model settings updated successfully"); // Removed: No toast needed
     } catch (error) {
       console.error("Failed to update model settings:", error);
       errorToast("Failed to update model settings");

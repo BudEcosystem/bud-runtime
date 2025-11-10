@@ -10,10 +10,12 @@ import { useDrawer } from "@/hooks/useDrawer";
 import AgentBoxWrapper from "./AgentBoxWrapper";
 import AgentSelector from "./AgentSelector";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/router";
 
 const AgentIframe = dynamic(() => import("./AgentIframe"), { ssr: false });
 
 const AgentDrawer: React.FC = () => {
+  const router = useRouter();
   const {
     isAgentDrawerOpen,
     closeAgentDrawer,
@@ -118,6 +120,54 @@ const AgentDrawer: React.FC = () => {
       window.removeEventListener('resize', updateDrawerWidth);
     };
   }, []);
+
+  // Update URL with prompt IDs when active sessions change
+  useEffect(() => {
+    if (!isAgentDrawerOpen) return;
+
+    // Get all prompt IDs from active sessions
+    const promptIds = activeSessions
+      .map(session => session.promptId)
+      .filter(Boolean); // Remove undefined/null values
+
+    // Get current prompt param from URL
+    const currentPromptParam = router.query.prompt;
+    const newPromptParam = promptIds.length > 0 ? promptIds.join(',') : undefined;
+
+    // Only update if the URL param is different from what we want to set
+    if (currentPromptParam !== newPromptParam) {
+      // Build URL manually to avoid encoding commas
+      // Use window.location.pathname to get the actual browser URL (not router.pathname which includes /home)
+      const currentPath = window.location.pathname;
+      const queryParts: string[] = [];
+
+      // Add all existing query params except 'prompt'
+      Object.entries(router.query).forEach(([key, value]) => {
+        if (key !== 'prompt' && value) {
+          queryParts.push(`${key}=${encodeURIComponent(String(value))}`);
+        }
+      });
+
+      // Add new prompt param if exists (without encoding commas)
+      if (newPromptParam) {
+        queryParts.push(`prompt=${newPromptParam}`);
+      }
+
+      // Build the final URL
+      const newUrl = queryParts.length > 0
+        ? `${currentPath}?${queryParts.join('&')}`
+        : currentPath;
+
+      // Use window.history.replaceState to update URL
+      window.history.replaceState(
+        { ...window.history.state },
+        '',
+        newUrl
+      );
+
+      console.log('Updated URL with prompt IDs:', promptIds);
+    }
+  }, [activeSessions, isAgentDrawerOpen, router]);
 
 
 

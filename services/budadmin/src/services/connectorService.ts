@@ -57,6 +57,21 @@ export class ConnectorService {
   }
 
   /**
+   * Complete OAuth callback with authorization code
+   */
+  static async completeOAuthCallback(promptId: string, connectorId: string, code: string, state: string) {
+    return await AppRequest.Post(
+      `${tempApiBaseUrl}/prompts/oauth/callback`,
+      {
+        prompt_id: promptId,
+        connector_id: connectorId,
+        code,
+        state
+      }
+    );
+  }
+
+  /**
    * Register a connector with credentials
    */
   static async registerConnector(
