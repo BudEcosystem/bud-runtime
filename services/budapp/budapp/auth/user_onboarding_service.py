@@ -32,6 +32,7 @@ from budapp.commons.constants import (
     ProjectTypeEnum,
     UserTypeEnum,
 )
+from budapp.commons.keycloak import KeycloakManager
 from budapp.permissions.schemas import PermissionList
 from budapp.permissions.service import PermissionService
 from budapp.project_ops.models import Project as ProjectModel
@@ -62,42 +63,49 @@ class UserOnboardingService:
         tenant: Tenant,
         tenant_client: Optional[TenantClient] = None,
     ) -> None:
-        """Set up billing and create default project for new CLIENT users.
+        """Set up billing, projects, and permissions for new users.
 
-        This method consolidates the common logic for setting up new CLIENT users,
-        including:
-        - Assigning the default free billing plan
-        - Creating a default project
-        - Setting up project permissions in Keycloak
+        This method handles onboarding for both CLIENT and ADMIN users:
+        - CLIENT users: billing + default project + permissions
+        - ADMIN users: only permissions (no billing, no project)
 
         Args:
             user: The newly created user
             tenant: The tenant the user belongs to
             tenant_client: The tenant client configuration (optional)
         """
-        # Only process CLIENT users
-        if user.user_type != UserTypeEnum.CLIENT:
-            logger.info(f"Skipping onboarding for non-CLIENT user {user.email} (type: {user.user_type})")
+        logger.info(f"Starting onboarding for {user.user_type} user {user.email}")
+
+        if user.user_type == UserTypeEnum.CLIENT:
+            # CLIENT user setup: billing + project + permissions
+            # Step 1: Assign default billing plan
+            await self._assign_default_billing_plan(user)
+
+            # Step 2: Create default project
+            project = await self._create_default_project(user)
+
+            # Step 3: Set up project permissions in Keycloak
+            if project and tenant_client and user.auth_id:
+                await self._setup_project_permissions(
+                    user=user,
+                    project=project,
+                    tenant=tenant,
+                    tenant_client=tenant_client,
+                )
+
+        elif user.user_type == UserTypeEnum.ADMIN:
+            # ADMIN user setup: only permissions (no billing, no project)
+            if tenant_client and user.auth_id:
+                await self._setup_admin_permissions(
+                    user=user,
+                    tenant=tenant,
+                    tenant_client=tenant_client,
+                )
+        else:
+            logger.warning(f"Unknown user type {user.user_type} for user {user.email}, skipping onboarding")
             return
 
-        logger.info(f"Starting onboarding for CLIENT user {user.email}")
-
-        # Step 1: Assign default billing plan
-        await self._assign_default_billing_plan(user)
-
-        # Step 2: Create default project
-        project = await self._create_default_project(user)
-
-        # Step 3: Set up project permissions in Keycloak
-        if project and tenant_client and user.auth_id:
-            await self._setup_project_permissions(
-                user=user,
-                project=project,
-                tenant=tenant,
-                tenant_client=tenant_client,
-            )
-
-        logger.info(f"Completed onboarding for CLIENT user {user.email}")
+        logger.info(f"Completed onboarding for {user.user_type} user {user.email}")
 
     async def _assign_default_billing_plan(self, user: User) -> Optional[UserBilling]:
         """Assign the default free billing plan to a new user.
@@ -199,7 +207,13 @@ class UserOnboardingService:
         tenant: Tenant,
         tenant_client: TenantClient,
     ) -> None:
-        """Set up project permissions in Keycloak for a user.
+        """Set up module and project permissions in Keycloak for a JIT provisioned user.
+
+        This method sets up permissions for users created via JIT (Just-In-Time) provisioning
+        from Keycloak. Since these users already exist in Keycloak but lack application permissions,
+        we need to:
+        1. Create/update module-level permissions (CLIENT_ACCESS, PROJECT_VIEW, PROJECT_MANAGE)
+        2. Create project-specific resource permissions in Keycloak
 
         Args:
             user: The user to grant permissions to
@@ -208,43 +222,111 @@ class UserOnboardingService:
             tenant_client: The tenant client configuration
         """
         try:
-            # Create permissions for the project in Keycloak
+            keycloak_manager = KeycloakManager()
+
+            # Step 1: Set up module-level permissions for CLIENT users
+            # These are the same default permissions assigned during registration
+            logger.info(f"Setting up module-level permissions for user {user.email}")
+
+            module_permissions = [
+                {"name": "client:access", "has_permission": True},  # CLIENT_ACCESS
+                {"name": "project:view", "has_permission": True},  # PROJECT_VIEW
+                {"name": "project:manage", "has_permission": True},  # PROJECT_MANAGE
+            ]
+
+            await keycloak_manager.update_user_global_permissions(
+                user_auth_id=str(user.auth_id),
+                permissions=module_permissions,
+                realm_name=tenant.realm_name,
+                client_id=tenant_client.client_id,
+            )
+
+            logger.info(f"Module-level permissions set for user {user.email}")
+
+            # Step 2: Create project-specific resource permissions
+            # This creates the project resource in Keycloak and links it to the user's policy
+            logger.info(f"Creating project resource permissions for user {user.email} on project {project.id}")
+
             payload = ResourceCreate(
                 resource_id=str(project.id),
                 resource_type="project",
                 scopes=["view", "manage"],
             )
 
-            await self.permission_service.create_resource(
-                payload,
-                str(user.auth_id),
-                tenant.realm_name,
-                tenant_client.client_id,
-            )
+            # Use the working method from PermissionService (same as registration flow)
+            await self.permission_service.create_resource_permission_by_user(user, payload)
 
-            # Grant permissions to the user
-            project_users = ProjectUserAdd(
-                project_id=project.id,
-                user_id=user.id,
-                permissions=[
-                    PermissionList(name=PermissionEnum.PROJECT_VIEW, has_permission=True),
-                    PermissionList(name=PermissionEnum.PROJECT_MANAGE, has_permission=True),
-                ],
+            logger.info(
+                f"Permissions successfully set up for user {user.email}: "
+                f"module permissions (CLIENT_ACCESS, PROJECT_VIEW, PROJECT_MANAGE) and "
+                f"project {project.id} permissions (view, manage)"
             )
-
-            await self.permission_service.grant_permissions(
-                project_users,
-                str(user.auth_id),
-                tenant.realm_name,
-                tenant_client.client_id,
-            )
-
-            logger.info(f"Project permissions granted for user: {user.email} on project: {project.id}")
 
         except Exception as e:
-            logger.error(f"Failed to set up project permissions for user {user.email}: {e}")
-            # Don't rollback here as the project is already created
-            # Permissions can be fixed manually if needed
+            logger.error(f"Failed to set up permissions for user {user.email}: {e}", exc_info=True)
+            # Re-raise to alert that permissions failed - this is critical for user functionality
+            raise RuntimeError(
+                f"Permission setup failed for user {user.email}. "
+                f"User cannot access the application without proper permissions. Error: {str(e)}"
+            )
+
+    async def _setup_admin_permissions(
+        self,
+        user: User,
+        tenant: Tenant,
+        tenant_client: TenantClient,
+    ) -> None:
+        """Set up module permissions in Keycloak for ADMIN users.
+
+        This method grants ADMIN users all module-level permissions they need to
+        manage the application, including models, projects, endpoints, clusters,
+        users, and benchmarks.
+
+        Args:
+            user: The ADMIN user to grant permissions to
+            tenant: The tenant
+            tenant_client: The tenant client configuration
+        """
+        try:
+            keycloak_manager = KeycloakManager()
+
+            logger.info(f"Setting up ADMIN permissions for user {user.email}")
+
+            # Grant all module permissions for ADMIN users
+            admin_permissions = [
+                {"name": "model:view", "has_permission": True},
+                {"name": "model:manage", "has_permission": True},
+                {"name": "project:view", "has_permission": True},
+                {"name": "project:manage", "has_permission": True},
+                {"name": "endpoint:view", "has_permission": True},
+                {"name": "endpoint:manage", "has_permission": True},
+                {"name": "cluster:view", "has_permission": True},
+                {"name": "cluster:manage", "has_permission": True},
+                {"name": "user:view", "has_permission": True},
+                {"name": "user:manage", "has_permission": True},
+                {"name": "benchmark:view", "has_permission": True},
+                {"name": "benchmark:manage", "has_permission": True},
+            ]
+
+            await keycloak_manager.update_user_global_permissions(
+                user_auth_id=str(user.auth_id),
+                permissions=admin_permissions,
+                realm_name=tenant.realm_name,
+                client_id=tenant_client.client_id,
+            )
+
+            logger.info(
+                f"ADMIN permissions successfully set up for user {user.email}: "
+                f"All module permissions (model, project, endpoint, cluster, user, benchmark)"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to set up ADMIN permissions for user {user.email}: {e}", exc_info=True)
+            # Re-raise to alert that permissions failed - this is critical for user functionality
+            raise RuntimeError(
+                f"ADMIN permission setup failed for user {user.email}. "
+                f"User cannot access the application without proper permissions. Error: {str(e)}"
+            )
 
     async def onboard_user_by_email(
         self,
