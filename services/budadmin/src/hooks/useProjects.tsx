@@ -218,7 +218,6 @@ export const useProjects = create<{
         `${tempApiBaseUrl}/projects/${projectId}`,
         data,
       );
-      successToast(response.data.message);
       return response;
     } catch (error) {
       console.error("Error creating model:", error);
