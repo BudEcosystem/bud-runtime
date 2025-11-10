@@ -179,17 +179,17 @@ class AuthService(SessionMixin):
                 )
                 raise ClientException("Incorrect email or password")
             except Exception as e:
-                logger.error(f"Keycloak user sync failed for {user.email}: {str(e)}")
+                logger.error(f"Keycloak user sync failed for {user.email}: {str(e)}", exc_info=True)
                 log_audit(
                     session=self.session,
                     action=AuditActionEnum.LOGIN_FAILED,
                     resource_type=AuditResourceTypeEnum.USER,
                     resource_name=user.email,
-                    details={"email": user.email, "reason": f"Keycloak sync failed: {str(e)}"},
+                    details={"email": user.email, "reason": f"JIT provisioning failed: {str(e)}"},
                     request=request,
                     success=False,
                 )
-                raise ClientException("This email is not registered")
+                raise ClientException("Could not complete account setup. Please contact support.")
 
         # Get tenant information
         logger.info(f"LOGIN ATTEMPT: Getting tenant for {user.email} (tenant_id: {user.tenant_id})")
