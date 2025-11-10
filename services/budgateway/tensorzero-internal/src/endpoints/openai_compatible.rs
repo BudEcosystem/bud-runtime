@@ -2831,10 +2831,7 @@ pub struct ListModelsResponse {
 /// A handler for the OpenAI-compatible list models endpoint
 #[debug_handler(state = AppStateData)]
 pub async fn list_models(
-    State(AppStateData {
-        config,
-        ..
-    }): AppState,
+    State(AppStateData { config, .. }): AppState,
     headers: HeaderMap,
 ) -> Result<Json<ListModelsResponse>, Error> {
     // Check if the request is authenticated by looking for the auth metadata header

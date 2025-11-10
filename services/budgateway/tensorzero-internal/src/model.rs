@@ -1976,10 +1976,9 @@ impl UninitializedProviderConfig {
                 model_name: _,
                 api_base,
                 api_key_location,
-            } => ProviderConfig::BudDoc(BudDocProvider::new(
-                api_base.to_string(),
-                api_key_location,
-            )?),
+            } => {
+                ProviderConfig::BudDoc(BudDocProvider::new(api_base.to_string(), api_key_location)?)
+            }
             UninitializedProviderConfig::BudPrompt {
                 model_name: _,
                 api_base,
@@ -2603,11 +2602,15 @@ impl ModelProvider {
 
         match &self.config {
             ProviderConfig::VLLM(provider) => {
-                provider.complete_stream(request, client, dynamic_api_keys).await
+                provider
+                    .complete_stream(request, client, dynamic_api_keys)
+                    .await
             }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
-                provider.complete_stream(request, client, dynamic_api_keys).await
+                provider
+                    .complete_stream(request, client, dynamic_api_keys)
+                    .await
             }
             // Other providers don't support completions streaming yet
             _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
