@@ -18,9 +18,8 @@ use super::openai::{
 use super::provider_trait::{InferenceProvider, TensorZeroEventError};
 use crate::cache::ModelProviderRequest;
 use crate::completions::{
-    CompletionChoice, CompletionChunk, CompletionLogProbs,
-    CompletionPrompt, CompletionProvider, CompletionProviderResponse, CompletionRequest,
-    CompletionStream, CompletionStop,
+    CompletionChoice, CompletionChunk, CompletionLogProbs, CompletionPrompt, CompletionProvider,
+    CompletionProviderResponse, CompletionRequest, CompletionStop, CompletionStream,
 };
 use crate::embeddings::{EmbeddingProvider, EmbeddingProviderResponse, EmbeddingRequest};
 use crate::endpoints::inference::InferenceCredentials;
@@ -923,25 +922,34 @@ impl CompletionProvider for VLLMProvider {
         if res.status().is_success() {
             let raw_response = res.text().await.map_err(|e| {
                 Error::new(ErrorDetails::InferenceServer {
-                    message: format!("Error parsing completion response: {}", DisplayOrDebugGateway::new(e)),
+                    message: format!(
+                        "Error parsing completion response: {}",
+                        DisplayOrDebugGateway::new(e)
+                    ),
                     raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
                     raw_response: None,
                     provider_type: PROVIDER_TYPE.to_string(),
                 })
             })?;
 
-            let response: VLLMCompletionResponse = serde_json::from_str(&raw_response).map_err(|e| {
-                Error::new(ErrorDetails::InferenceServer {
-                    message: format!("Error parsing completion response: {}", DisplayOrDebugGateway::new(e)),
-                    raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
-                    raw_response: Some(raw_response.clone()),
-                    provider_type: PROVIDER_TYPE.to_string(),
-                })
-            })?;
+            let response: VLLMCompletionResponse =
+                serde_json::from_str(&raw_response).map_err(|e| {
+                    Error::new(ErrorDetails::InferenceServer {
+                        message: format!(
+                            "Error parsing completion response: {}",
+                            DisplayOrDebugGateway::new(e)
+                        ),
+                        raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
+                        raw_response: Some(raw_response.clone()),
+                        provider_type: PROVIDER_TYPE.to_string(),
+                    })
+                })?;
 
             // Convert vLLM response to our format
-            let choices: Vec<CompletionChoice> = response.choices.into_iter().map(|choice| {
-                CompletionChoice {
+            let choices: Vec<CompletionChoice> = response
+                .choices
+                .into_iter()
+                .map(|choice| CompletionChoice {
                     text: choice.text,
                     index: choice.index,
                     logprobs: choice.logprobs.map(|lp| CompletionLogProbs {
@@ -951,8 +959,8 @@ impl CompletionProvider for VLLMProvider {
                         text_offset: lp.text_offset,
                     }),
                     finish_reason: choice.finish_reason,
-                }
-            }).collect();
+                })
+                .collect();
 
             let usage = Usage {
                 input_tokens: response.usage.prompt_tokens,
@@ -961,7 +969,10 @@ impl CompletionProvider for VLLMProvider {
 
             let raw_request = serde_json::to_string(&request_body).map_err(|e| {
                 Error::new(ErrorDetails::Serialization {
-                    message: format!("Error serializing request: {}", DisplayOrDebugGateway::new(e)),
+                    message: format!(
+                        "Error serializing request: {}",
+                        DisplayOrDebugGateway::new(e)
+                    ),
                 })
             })?;
 
@@ -979,7 +990,10 @@ impl CompletionProvider for VLLMProvider {
             let status = res.status();
             let raw_response = res.text().await.map_err(|e| {
                 Error::new(ErrorDetails::InferenceServer {
-                    message: format!("Error parsing error response: {}", DisplayOrDebugGateway::new(e)),
+                    message: format!(
+                        "Error parsing error response: {}",
+                        DisplayOrDebugGateway::new(e)
+                    ),
                     raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
                     raw_response: None,
                     provider_type: PROVIDER_TYPE.to_string(),
@@ -1053,7 +1067,10 @@ impl CompletionProvider for VLLMProvider {
 
         let raw_request = serde_json::to_string(&request_body).map_err(|e| {
             Error::new(ErrorDetails::Serialization {
-                message: format!("Error serializing request: {}", DisplayOrDebugGateway::new(e)),
+                message: format!(
+                    "Error serializing request: {}",
+                    DisplayOrDebugGateway::new(e)
+                ),
             })
         })?;
 
@@ -1072,7 +1089,10 @@ impl CompletionProvider for VLLMProvider {
             .eventsource()
             .map_err(|e| {
                 Error::new(ErrorDetails::InferenceClient {
-                    message: format!("Error sending completion stream request to vLLM: {}", DisplayOrDebugGateway::new(e)),
+                    message: format!(
+                        "Error sending completion stream request to vLLM: {}",
+                        DisplayOrDebugGateway::new(e)
+                    ),
                     status_code: None,
                     raw_request: Some(raw_request.clone()),
                     raw_response: None,

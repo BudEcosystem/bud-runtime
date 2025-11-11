@@ -32,13 +32,13 @@ use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
 use crate::inference::types::resolved_input::{FileWithPath, ResolvedInput};
 use crate::inference::types::storage::StoragePath;
 use crate::inference::types::{
-    collect_chunks, serialize_or_log, AudioInferenceDatabaseInsert, Base64File, ChatInferenceDatabaseInsert,
-    CollectChunksArgs, ContentBlockChatOutput, ContentBlockChunk, EmbeddingInferenceDatabaseInsert,
-    FetchContext, FinishReason, ImageInferenceDatabaseInsert, InferenceResult,
-    InferenceResultChunk, InferenceResultStream, Input, InternalJsonInferenceOutput,
-    JsonInferenceDatabaseInsert, JsonInferenceOutput, ModelInferenceResponseWithMetadata,
-    ModerationInferenceDatabaseInsert, RequestMessage, ResolvedInputMessageContent,
-    Usage,
+    collect_chunks, serialize_or_log, AudioInferenceDatabaseInsert, Base64File,
+    ChatInferenceDatabaseInsert, CollectChunksArgs, ContentBlockChatOutput, ContentBlockChunk,
+    EmbeddingInferenceDatabaseInsert, FetchContext, FinishReason, ImageInferenceDatabaseInsert,
+    InferenceResult, InferenceResultChunk, InferenceResultStream, Input,
+    InternalJsonInferenceOutput, JsonInferenceDatabaseInsert, JsonInferenceOutput,
+    ModelInferenceResponseWithMetadata, ModerationInferenceDatabaseInsert, RequestMessage,
+    ResolvedInputMessageContent, Usage,
 };
 use crate::jsonschema_util::DynamicJSONSchema;
 use crate::kafka::KafkaConnectionInfo;
@@ -723,6 +723,10 @@ pub async fn inference(
         errors: variant_errors,
     });
 
+    // Serialize the error response BEFORE sending to metrics
+    // This ensures the gateway_response field contains what will be sent to the client
+    let error_response = error.to_response_json();
+
     // Send failure event to Kafka and ClickHouse for observability
     if !dryrun {
         send_failure_event(
@@ -731,6 +735,7 @@ pub async fn inference(
             inference_id,
             episode_id,
             &error,
+            Some(&error_response), // Pass the serialized error response
             &resolved_input,
             obs_metadata_clone,
             function_name_clone,
@@ -1369,7 +1374,7 @@ pub async fn write_inference(
             api_key_id,
             user_id,
             api_key_project_id,
-            error_code: None,  // No error for successful inferences
+            error_code: None, // No error for successful inferences
             error_message: None,
             error_type: None,
             status_code: None,
@@ -1388,8 +1393,9 @@ async fn send_failure_event(
     kafka_connection_info: &KafkaConnectionInfo,
     clickhouse_connection_info: &ClickHouseConnectionInfo,
     inference_id: Uuid,
-    _episode_id: Uuid,  // Currently unused but kept for future use
+    _episode_id: Uuid, // Currently unused but kept for future use
     error: &Error,
+    gateway_response: Option<&serde_json::Value>, // Add gateway_response parameter
     resolved_input: &ResolvedInput,
     observability_metadata: Option<ObservabilityMetadata>,
     function_name: Option<String>,
@@ -1454,11 +1460,11 @@ async fn send_failure_event(
         project_id: project_id.clone(),
         endpoint_id: endpoint_id.clone(),
         model_id: model_id.clone(),
-        is_success: false,  // This is a failure event
+        is_success: false, // This is a failure event
         request_arrival_time,
         request_forward_time,
         request_ip: None,
-        cost: None,  // Failed requests may still incur costs, but we don't know yet
+        cost: None, // Failed requests may still incur costs, but we don't know yet
         response_analysis: None,
         api_key_id: api_key_id.clone(),
         user_id: user_id.clone(),
@@ -1470,7 +1476,10 @@ async fn send_failure_event(
     };
 
     // Send to Kafka observability topic
-    if let Err(e) = kafka_connection_info.add_observability_event(event.clone()).await {
+    if let Err(e) = kafka_connection_info
+        .add_observability_event(event.clone())
+        .await
+    {
         tracing::error!("Failed to send failure observability event to Kafka: {}", e);
     }
 
@@ -1482,9 +1491,13 @@ async fn send_failure_event(
     let model_inference = crate::inference::types::ModelInferenceDatabaseInsert {
         id: uuid::Uuid::now_v7(),
         inference_id,
-        raw_request: "".to_string(),  // Failed before request could be made
-        raw_response: error_message.clone(),  // Store error as response
-        system: resolved_input.system.as_ref().and_then(|v| v.as_str()).map(|s| s.to_string()),
+        raw_request: "".to_string(), // Failed before request could be made
+        raw_response: error_message.clone(), // Store error as response
+        system: resolved_input
+            .system
+            .as_ref()
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
         input_messages: serialized_input.clone(),
         output: format!("Error: {}", error_message),
         input_tokens: None,
@@ -1496,18 +1509,20 @@ async fn send_failure_event(
         cached: false,
         finish_reason: None,
         gateway_request: None,
-        gateway_response: None,
+        gateway_response: gateway_response.map(|r| r.to_string()), // Store serialized error response
         endpoint_type: "chat".to_string(),
         guardrail_scan_summary: Some(serde_json::json!({}).to_string()),
     };
-
 
     // Write the ModelInference record
     if let Err(e) = clickhouse_connection_info
         .write(&[model_inference], "ModelInference")
         .await
     {
-        tracing::error!("Failed to write failure to ClickHouse ModelInference: {}", e);
+        tracing::error!(
+            "Failed to write failure to ClickHouse ModelInference: {}",
+            e
+        );
     }
 
     // Then create ModelInferenceDetails record with error information
@@ -1515,7 +1530,7 @@ async fn send_failure_event(
     let parsed_api_key_project_id = api_key_project_id.and_then(|id| {
         // If the ID looks truncated (like "4c..."), try to handle it
         if id.len() < 36 {
-            None  // Skip invalid UUIDs
+            None // Skip invalid UUIDs
         } else {
             uuid::Uuid::parse_str(&id).ok()
         }
@@ -1545,7 +1560,10 @@ async fn send_failure_event(
         .write(&[inference_details], "ModelInferenceDetails")
         .await
     {
-        tracing::error!("Failed to write failure to ClickHouse ModelInferenceDetails: {}", e);
+        tracing::error!(
+            "Failed to write failure to ClickHouse ModelInferenceDetails: {}",
+            e
+        );
     }
 }
 

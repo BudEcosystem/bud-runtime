@@ -20,7 +20,7 @@ import { isValidProjectName } from "@/lib/utils";
 
 
 function EditProjectForm() {
-  const { selectedProject, projectValues, setProjectValues } = useProjects();
+  const { selectedProject } = useProjects();
   const { values = {} } = useContext(BudFormContext);
 
   const [options, setOptions] = useState([]);
@@ -65,10 +65,6 @@ function EditProjectForm() {
               ]}
               label="Tags"
               options={options}
-              onChange={(tags) => setProjectValues({
-                ...projectValues,
-                tags: tags
-              })}
             />
           </div>
 
@@ -80,10 +76,6 @@ function EditProjectForm() {
               placeholder="Write Description Here"
               rules={[{ required: true, message: "Please enter description" }]}
               value={values.description}
-              onChange={(description) => setProjectValues({
-                ...projectValues,
-                description: description
-              })}
             />
           </div>
         </div>
@@ -96,7 +88,7 @@ function EditProjectForm() {
 export default function EditProject() {
   const { values, submittable } = useContext(BudFormContext);
   const { openDrawer, closeDrawer } = useDrawer();
-  const { selectedProject, updateProject, getProject, projectValues } = useProjects();
+  const { selectedProject, updateProject, getGlobalProject } = useProjects();
 
 
   return (
@@ -105,13 +97,13 @@ export default function EditProject() {
       disableNext={!submittable}
       onNext={async (values) => {
         const result = await updateProject(selectedProject?.id, {
-          name: projectValues?.name === selectedProject?.name ? undefined : projectValues?.name,
+          name: values?.name === selectedProject?.name ? undefined : values?.name,
           description: values?.description,
           icon: values?.icon,
           tags: values?.tags,
         });
         if (result) {
-          await getProject(selectedProject?.id);
+          await getGlobalProject(selectedProject?.id);
           // successToast("Project Updated Successfully")
           closeDrawer();
         }
