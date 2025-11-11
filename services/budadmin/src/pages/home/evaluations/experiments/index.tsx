@@ -245,7 +245,7 @@ const ExperimentsTable = () => {
           return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
         }
         return (
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap p-2">
             {tagsArray.map((tag, index) => (
               <Tags
                 key={index}
@@ -316,7 +316,7 @@ const ExperimentsTable = () => {
     {
       title: "",
       key: "action",
-      width: 140,
+      // width: 140,
       align: 'left' as const,
       className: "px-0",
       render: (_, record) => (
