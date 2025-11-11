@@ -396,6 +396,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
         if (authType?.toLowerCase() === 'oauth') {
           console.log('OAuth connector detected, initiating OAuth flow...');
+          console.log('Current promptId:', promptId);
+          console.log('Current workflowId:', workflowId);
 
           try {
             const oauthPayload = {
