@@ -53,6 +53,27 @@ export const useOAuthCallback = (onOAuthCallback?: (state: OAuthState) => void) 
           hasProcessed.current = true;
           sessionStorage.setItem(OAUTH_PROCESSED_KEY, 'true');
 
+          // Update URL to include agent parameter if workflowId exists
+          if (savedState.workflowId) {
+            const currentUrl = new URL(window.location.href);
+            const params = new URLSearchParams(currentUrl.search);
+
+            // Add agent parameter
+            if (!params.has('agent')) {
+              params.set('agent', savedState.workflowId);
+            }
+
+            // Add prompt parameter if it doesn't exist
+            if (!params.has('prompt') && savedState.promptId) {
+              params.set('prompt', savedState.promptId);
+            }
+
+            // Update URL without reloading the page
+            const newUrl = `${currentUrl.pathname}?${params.toString()}`;
+            window.history.replaceState({}, '', newUrl);
+            console.log('Updated URL with agent parameter:', newUrl);
+          }
+
           // Set flag to open drawer
           localStorage.setItem(OAUTH_DRAWER_KEY, 'true');
 
