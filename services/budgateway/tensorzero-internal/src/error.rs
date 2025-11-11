@@ -1154,6 +1154,37 @@ impl Error {
             }
         }
 
+        // Helper function to extract clean error message from provider error JSON
+        fn extract_error_message(provider_error: &Value, fallback: &str) -> Value {
+            // Use Option combinators instead of nested if-let
+            let message_str = provider_error
+                .as_object()
+                .and_then(|obj| obj.get("message"))
+                .and_then(|v| v.as_str());
+
+            let message_str = match message_str {
+                Some(s) => s,
+                None => return json!({"message": fallback}),
+            };
+
+            // Clean the message by trimming whitespace and removing trailing punctuation
+            let cleaned = message_str.trim().trim_end_matches('.');
+
+            // Try to parse as JSON and extract nested error.message
+            let parsed_message = serde_json::from_str::<Value>(cleaned)
+                .ok()
+                .and_then(|parsed| {
+                    parsed
+                        .get("error")
+                        .and_then(|e| e.get("message"))
+                        .and_then(|m| m.as_str())
+                        .map(String::from)
+                })
+                .unwrap_or_else(|| cleaned.to_string());
+
+            json!({"message": parsed_message})
+        }
+
         // Helper function to build response with provider error
         fn build_provider_error_response(
             error: &Error,
@@ -1163,43 +1194,7 @@ impl Error {
             let status = provider_status.unwrap_or_else(|| error.status_code());
 
             // Extract clean error message from provider_error
-            // If provider_error.message contains nested JSON with error.message, extract it
-            let clean_error = if let Some(error_obj) = provider_error.as_object() {
-                if let Some(message_value) = error_obj.get("message") {
-                    if let Some(message_str) = message_value.as_str() {
-                        // Clean the message by trimming whitespace and removing trailing punctuation
-                        // This handles cases where providers return invalid JSON like '{"error":{...}}. '
-                        let cleaned_message = message_str.trim().trim_end_matches('.');
-
-                        // Try to parse as JSON and extract nested error.message
-                        if let Ok(parsed) = serde_json::from_str::<Value>(cleaned_message) {
-                            if let Some(nested_error) = parsed.get("error") {
-                                if let Some(nested_msg) =
-                                    nested_error.get("message").and_then(|m| m.as_str())
-                                {
-                                    // Found nested message - use it!
-                                    json!({"message": nested_msg})
-                                } else {
-                                    // No nested message, use cleaned string
-                                    json!({"message": cleaned_message})
-                                }
-                            } else {
-                                // No "error" key, use cleaned string
-                                json!({"message": cleaned_message})
-                            }
-                        } else {
-                            // Not valid JSON, use cleaned string
-                            json!({"message": cleaned_message})
-                        }
-                    } else {
-                        json!({"message": error.to_string()})
-                    }
-                } else {
-                    json!({"message": error.to_string()})
-                }
-            } else {
-                json!({"message": error.to_string()})
-            };
+            let clean_error = extract_error_message(&provider_error, &error.to_string());
 
             let body = json!({
                 "error": clean_error,
