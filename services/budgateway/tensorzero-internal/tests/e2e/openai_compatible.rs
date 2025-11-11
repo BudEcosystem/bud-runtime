@@ -1,14 +1,16 @@
 #![expect(clippy::print_stdout)]
 
 use std::collections::HashSet;
+use std::sync::Arc;
 
-use axum::{extract::State, http::HeaderMap};
+use axum::{extract::State, http::HeaderMap, Extension};
 use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::{common::get_gateway_endpoint, providers::common::make_embedded_gateway_no_config};
 use tensorzero_internal::{
+    analytics::RequestAnalytics,
     clickhouse::test_helpers::{
         get_clickhouse, select_chat_inference_clickhouse, select_json_inference_clickhouse,
         select_model_inference_clickhouse,
@@ -859,8 +861,10 @@ async fn test_openai_compatible_streaming_tool_call() {
 async fn test_openai_compatible_warn_unknown_fields() {
     let client = make_embedded_gateway_no_config().await;
     let state = client.get_app_state_data().unwrap().clone();
+    let analytics = Arc::new(tokio::sync::Mutex::new(RequestAnalytics::new()));
     tensorzero_internal::endpoints::openai_compatible::inference_handler(
         State(state),
+        Some(Extension(analytics)),
         HeaderMap::default(),
         StructuredJson(
             serde_json::from_value(serde_json::json!({
