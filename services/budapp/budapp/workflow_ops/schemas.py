@@ -112,6 +112,7 @@ class RetrieveWorkflowStepData(BaseModel):
     rate_limit_value: int | None = None
     bud_prompt_id: str | None = None
     bud_prompt_version: int | str | None = None
+    discarded_prompt_ids: list[dict] | None = None
     prompt_schema_events: dict | None = None
     # Parser metadata from cluster/simulator
     tool_calling_parser_type: str | None = None

@@ -89,10 +89,7 @@ async fn extract_model_from_request(request: &mut Request) -> Result<String, Rat
     // Strategy 2: Check for prompt ID from authentication (for prompt-based requests)
     if let Some(prompt_id_header) = request.headers().get("x-tensorzero-prompt-id") {
         if let Ok(prompt_id) = prompt_id_header.to_str() {
-            debug!(
-                "Using prompt ID for rate limiting: {}",
-                prompt_id
-            );
+            debug!("Using prompt ID for rate limiting: {}", prompt_id);
             return Ok(prompt_id.to_string());
         }
     }

@@ -315,6 +315,10 @@ class PromptSchemaRequest(CloudEventBase):
     prompt_id: Optional[str] = Field(None, description="Unique identifier for the prompt configuration")
     version: Optional[int] = Field(None, ge=1, description="Version of the configuration to save (defaults to 1)")
     set_default: bool = Field(False, description="Whether to set this version as the default (defaults to False)")
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
     schema: SchemaBase = Field(None, description="JSON schema for structured input/output (None for unstructured)")
     type: Literal["input", "output"] = Field(..., description="Type of schema - either 'input' or 'output'")
     deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
@@ -327,6 +331,21 @@ class PromptSchemaRequest(CloudEventBase):
     access_token: Optional[str] = Field(None, description="JWT access token to be hashed for API key bypass")
 
 
+class PromptCleanupItem(BaseModel):
+    """Item for cleanup request."""
+
+    prompt_id: str = Field(..., description="Prompt identifier")
+    version: Optional[int] = Field(default=1, description="Version number (defaults to 1)")
+
+
+class PromptCleanupRequest(CloudEventBase):
+    """Request for MCP cleanup endpoint."""
+
+    prompts: Optional[List[PromptCleanupItem]] = Field(
+        default_factory=list, description="Prompts to cleanup. None/empty = cleanup expired prompts"
+    )
+
+
 class PromptSchemaResponse(ResponseBase):
     """Response schema for prompt schema validation."""
 
@@ -337,12 +356,23 @@ class PromptSchemaResponse(ResponseBase):
     created: int = Field(default_factory=lambda: int(time.time()))
 
 
+class PromptCleanupResponse(ResponseBase):
+    """Response schema for prompt cleanup."""
+
+    object: lowercase_string = "prompt_cleanup"
+    workflow_id: UUID
+    cleaned: List[Dict[str, Any]] = Field(default_factory=list, description="Successfully cleaned prompts")
+    failed: List[Dict[str, Any]] = Field(default_factory=list, description="Failed cleanup prompts")
+    created: int = Field(default_factory=lambda: int(time.time()))
+
+
 class PromptConfigurationData(BaseModel):
     """Schema for prompt configuration."""
 
     deployment_name: Optional[str] = Field(None, description="Model deployment name")
     model_settings: Optional[ModelSettings] = Field(None, description="Model settings")
     stream: Optional[bool] = Field(None, description="Enable streaming response")
+    system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
     input_schema: Optional[Dict[str, Any]] = Field(
         None, description="JSON schema for structured input (None for unstructured)"
     )
@@ -380,12 +410,28 @@ class PromptConfigurationData(BaseModel):
     )
 
 
+class MCPCleanupRegistryEntry(BaseModel):
+    """Single cleanup entry in the common registry for MCP resource cleanup.
+
+    Note: prompt_key is used as the dictionary key in the registry, not stored in the entry.
+    """
+
+    prompt_id: str = Field(..., description="Prompt identifier")
+    version: int = Field(..., description="Version number")
+    created_at: str = Field(..., description="ISO 8601 timestamp when first created")
+    expires_at: str = Field(..., description="ISO 8601 timestamp when expires")
+    cleanup_failed: bool = Field(default=False, description="Flag if cleanup failed")
+    reason: Optional[str] = Field(None, description="Error reason if cleanup failed")
+    mcp_resources: Dict[str, Any] = Field(..., description="MCP resource IDs to cleanup")
+
+
 class PromptExecuteData(BaseModel):
     """Schema for prompt configuration."""
 
     deployment_name: str = Field(..., min_length=1, description="Model deployment name")
     model_settings: ModelSettings = Field(default_factory=ModelSettings)
     stream: bool = Field(default=False, description="Enable streaming response")
+    system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
     input_schema: Optional[Dict[str, Any]] = Field(
         None, description="JSON schema for structured input (None for unstructured)"
     )
@@ -436,9 +482,14 @@ class PromptConfigRequest(BaseModel):
     )
     version: Optional[int] = Field(None, ge=1, description="Version of the configuration to save (defaults to 1)")
     set_default: bool = Field(False, description="Whether to set this version as the default (defaults to False)")
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
     deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
     model_settings: Optional[ModelSettings] = Field(None, description="Model settings configuration")
     stream: Optional[bool] = Field(None, description="Enable streaming response")
+    system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
     messages: Optional[List[Message]] = Field(
         None, description="Conversation messages (can include system/developer messages)"
     )

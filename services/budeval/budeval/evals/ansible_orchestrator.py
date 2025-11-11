@@ -263,14 +263,36 @@ class AnsibleOrchestrator:
                                     "args": ["-c", bash_script],
                                     "env": [
                                         {"name": "ENGINE_ARGS", "value": ""},
-                                        {"name": "OPENCOMPASS_CONFIG_PATH", "value": "/workspace/configs"},
-                                        {"name": "HF_HOME", "value": "/workspace/cache"},
-                                        {"name": "TRANSFORMERS_CACHE", "value": "/workspace/cache"},
-                                        {"name": "TORCH_HOME", "value": "/workspace/cache"},
+                                        {
+                                            "name": "OPENCOMPASS_CONFIG_PATH",
+                                            "value": "/workspace/configs",
+                                        },
+                                        {
+                                            "name": "HF_HOME",
+                                            "value": "/workspace/cache",
+                                        },
+                                        {
+                                            "name": "TRANSFORMERS_CACHE",
+                                            "value": "/workspace/cache",
+                                        },
+                                        {
+                                            "name": "TORCH_HOME",
+                                            "value": "/workspace/cache",
+                                        },
+                                        {
+                                            "name": "COMPASS_DATA_CACHE",
+                                            "value": "/workspace/shared",
+                                        },
                                     ],
                                     "volumeMounts": [
-                                        {"name": "eval-datasets-shared", "mountPath": "/workspace/shared"},
-                                        {"name": "cache-volume", "mountPath": "/workspace/cache"},
+                                        {
+                                            "name": "eval-datasets-shared",
+                                            "mountPath": "/workspace/shared",
+                                        },
+                                        {
+                                            "name": "cache-volume",
+                                            "mountPath": "/workspace/cache",
+                                        },
                                     ],
                                     "workingDir": "/workspace",
                                 }
@@ -376,7 +398,11 @@ class AnsibleOrchestrator:
                 return extraction_results
             else:
                 logger.error("Extraction results file not found")
-                return {"success": False, "results": [], "error": "Results file not created"}
+                return {
+                    "success": False,
+                    "results": [],
+                    "error": "Results file not created",
+                }
 
         except Exception as e:
             logger.error(f"Failed to extract results: {e}", exc_info=True)

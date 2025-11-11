@@ -17,17 +17,21 @@
 
 """Implements auth services and business logic that power the microservices, including key functionality and integrations."""
 
+from typing import Dict, Optional
 from uuid import UUID
 
 from fastapi import status
+from keycloak.exceptions import KeycloakAuthenticationError, KeycloakPostError
 
 from budapp.audit_ops import log_audit
+from budapp.auth.user_onboarding_service import UserOnboardingService
 from budapp.commons import logging
 from budapp.commons.config import app_settings, secrets_settings
 from budapp.commons.constants import (
     AuditActionEnum,
     AuditResourceTypeEnum,
     UserColorEnum,
+    UserRoleEnum,
     UserStatusEnum,
     UserTypeEnum,
 )
@@ -46,7 +50,6 @@ from ..core.schemas import SubscriberCreate
 from ..permissions.schemas import PermissionList
 from ..permissions.service import PermissionService
 from ..project_ops.models import Project as ProjectModel
-from ..project_ops.schemas import ProjectUserAdd
 from ..shared.jwt_blacklist_service import JWTBlacklistService
 from ..shared.notification_service import BudNotifyHandler
 from .schemas import LogoutRequest, RefreshTokenRequest, RefreshTokenResponse, ResourceCreate, UserLogin, UserLoginData
@@ -58,51 +61,139 @@ logger = logging.get_logger(__name__)
 class AuthService(SessionMixin):
     async def login_user(self, user: UserLogin, request=None) -> UserLoginData:
         """Login a user with email and password."""
-        logger.debug(f"::USER:: User: {user}")
-
         # Get user
         db_user = await UserDataManager(self.session).retrieve_by_fields(
             UserModel, {"email": user.email}, missing_ok=True
         )
 
+        logger.info(f"LOGIN ATTEMPT: User {user.email} found in database: {db_user is not None}")
+
         # Check if user exists
         if not db_user:
-            logger.debug(f"User not found in database: {user.email}")
-            # Log failed login attempt - email not registered
-            log_audit(
-                session=self.session,
-                action=AuditActionEnum.LOGIN_FAILED,
-                resource_type=AuditResourceTypeEnum.USER,
-                resource_name=user.email,
-                details={"email": user.email, "reason": "Email not registered"},
-                request=request,
-                success=False,
-            )
-            raise ClientException("This email is not registered")
+            logger.info(f"User {user.email} not in database. Attempting JIT provisioning from Keycloak...")
 
-        # Validate user_type: Prevent clients from logging in as admin
-        if user.user_type == UserTypeEnum.ADMIN and db_user.user_type == UserTypeEnum.CLIENT:
-            logger.debug(f"Client user attempting to login as admin: {user.email}")
-            # Log failed login attempt - unauthorized user_type
-            log_audit(
-                session=self.session,
-                action=AuditActionEnum.LOGIN_FAILED,
-                resource_type=AuditResourceTypeEnum.USER,
-                resource_id=db_user.id,
-                resource_name=db_user.email,
-                user_id=db_user.id,
-                details={
-                    "email": user.email,
-                    "reason": "Client users cannot login with admin user_type",
-                    "requested_user_type": user.user_type.value,
-                    "actual_user_type": db_user.user_type,
-                },
-                request=request,
-                success=False,
-            )
-            raise ClientException("Incorrect email or password")
+            # Try to get tenant and client for JIT provisioning
+            realm_name = app_settings.default_realm_name
+            tenant, tenant_client = await self._get_tenant_and_client_for_jit(realm_name)
+
+            if not tenant_client:
+                log_audit(
+                    session=self.session,
+                    action=AuditActionEnum.LOGIN_FAILED,
+                    resource_type=AuditResourceTypeEnum.USER,
+                    resource_name=user.email,
+                    details={"email": user.email, "reason": "No tenant found for JIT provisioning"},
+                    request=request,
+                    success=False,
+                )
+                raise ClientException("This email is not registered")
+
+            try:
+                # Authenticate with Keycloak to verify credentials
+                keycloak_manager = KeycloakManager()
+                decrypted_secret = await tenant_client.get_decrypted_client_secret()
+                credentials = TenantClientSchema(
+                    id=tenant_client.id,
+                    client_id=tenant_client.client_id,
+                    client_named_id=tenant_client.client_named_id,
+                    client_secret=decrypted_secret,
+                )
+
+                # This will raise exception if auth fails
+                await keycloak_manager.authenticate_user(
+                    username=user.email,
+                    password=user.password,
+                    realm_name=realm_name,
+                    credentials=credentials,
+                )
+
+                # Fetch user details from Keycloak
+                keycloak_user = keycloak_manager.get_keycloak_user_by_email(user.email, realm_name)
+                if not keycloak_user:
+                    raise ClientException("User found in Keycloak but unable to fetch details")
+
+                # Create user in database (pass tenant to avoid redundant DB query)
+                db_user = await self._create_user_from_keycloak(
+                    keycloak_user=keycloak_user,
+                    tenant_client=tenant_client,
+                    tenant=tenant,
+                    realm_name=realm_name,
+                )
+
+                logger.info(f"JIT provisioning successful for user {user.email}")
+                log_audit(
+                    session=self.session,
+                    action=AuditActionEnum.LOGIN,
+                    resource_type=AuditResourceTypeEnum.USER,
+                    resource_id=db_user.id,
+                    resource_name=db_user.email,
+                    user_id=db_user.id,
+                    details={"email": user.email, "keycloak_sync": True},
+                    request=request,
+                    success=True,
+                )
+
+            except KeycloakPostError as e:
+                # Handle Keycloak account setup errors during JIT provisioning
+                error_msg = str(e)
+                logger.error(f"Keycloak account setup error for {user.email} during JIT provisioning: {error_msg}")
+
+                # Parse error to provide user-friendly message
+                user_message = "Incorrect email or password"
+                reason = f"Keycloak error: {error_msg}"
+
+                # Check for specific account setup issues
+                if "not fully set up" in error_msg.lower():
+                    user_message = "Account setup incomplete. Please verify your email and complete required actions."
+                    reason = "Account not fully set up in Keycloak"
+                elif "invalid_grant" in error_msg.lower():
+                    user_message = "Unable to login. Please contact administrator to complete account setup."
+                    reason = "Invalid grant - account setup issue"
+                elif "account disabled" in error_msg.lower() or "account is disabled" in error_msg.lower():
+                    user_message = "This account has been disabled. Please contact administrator."
+                    reason = "Account disabled in Keycloak"
+
+                log_audit(
+                    session=self.session,
+                    action=AuditActionEnum.LOGIN_FAILED,
+                    resource_type=AuditResourceTypeEnum.USER,
+                    resource_name=user.email,
+                    details={"email": user.email, "reason": reason, "keycloak_error": error_msg},
+                    request=request,
+                    success=False,
+                )
+                raise ClientException(user_message)
+            except KeycloakAuthenticationError as e:
+                error_msg = str(e)
+                logger.error(
+                    f"Keycloak authentication failed for {user.email} during JIT provisioning: {error_msg}. "
+                    f"Check Keycloak Admin Console: Users > {user.email} > Credentials tab for temporary password flag"
+                )
+                log_audit(
+                    session=self.session,
+                    action=AuditActionEnum.LOGIN_FAILED,
+                    resource_type=AuditResourceTypeEnum.USER,
+                    resource_name=user.email,
+                    details={"email": user.email, "reason": f"Authentication failed: {error_msg}"},
+                    request=request,
+                    success=False,
+                )
+                raise ClientException("Incorrect email or password")
+            except Exception as e:
+                logger.error(f"Keycloak user sync failed for {user.email}: {str(e)}", exc_info=True)
+                log_audit(
+                    session=self.session,
+                    action=AuditActionEnum.LOGIN_FAILED,
+                    resource_type=AuditResourceTypeEnum.USER,
+                    resource_name=user.email,
+                    details={"email": user.email, "reason": f"JIT provisioning failed: {str(e)}"},
+                    request=request,
+                    success=False,
+                )
+                raise ClientException("Could not complete account setup. Please contact support.")
 
         # Get tenant information
+        logger.info(f"LOGIN ATTEMPT: Getting tenant for {user.email} (tenant_id: {user.tenant_id})")
         tenant = None
         if user.tenant_id:
             tenant = await UserDataManager(self.session).retrieve_by_fields(
@@ -174,8 +265,6 @@ class AuthService(SessionMixin):
             #         Tenant, {"id": tenant_mapping.tenant_id}, missing_ok=True
             #  )
 
-        logger.debug(f"::USER:: Tenant: {tenant.realm_name if tenant else 'None'}")
-
         if not tenant:
             # Log failed login attempt - no tenant association
             log_audit(
@@ -214,7 +303,7 @@ class AuthService(SessionMixin):
             )
             raise ClientException("Tenant client configuration not found")
 
-        logger.debug(f"::USER:: Tenant client: {tenant_client.id} {tenant_client.client_id}")
+        logger.info(f"LOGIN ATTEMPT: About to authenticate {user.email} with Keycloak in realm {tenant.realm_name}")
 
         # Authenticate with Keycloak
         keycloak_manager = KeycloakManager()
@@ -227,16 +316,34 @@ class AuthService(SessionMixin):
             client_secret=decrypted_secret,
         )
 
-        token_data = await keycloak_manager.authenticate_user(
-            username=user.email,
-            password=user.password,
-            realm_name=tenant.realm_name,  # default realm name
-            credentials=credentials,
-        )
+        try:
+            token_data = await keycloak_manager.authenticate_user(
+                username=user.email,
+                password=user.password,
+                realm_name=tenant.realm_name,  # default realm name
+                credentials=credentials,
+            )
+        except KeycloakPostError as e:
+            # Handle Keycloak account setup errors (400 errors from token endpoint)
+            error_msg = str(e)
+            logger.error(f"Keycloak account setup error for user {user.email}: {error_msg}")
 
-        if not token_data:
-            logger.debug(f"Invalid credentials for user: {user.email}")
-            # Log failed login attempt - wrong password
+            # Parse error to provide user-friendly message
+            user_message = "Incorrect email or password"
+            reason = f"Keycloak error: {error_msg}"
+
+            # Check for specific account setup issues
+            if "not fully set up" in error_msg.lower():
+                user_message = "Account setup incomplete. Please verify your email and complete required actions."
+                reason = "Account not fully set up in Keycloak"
+            elif "invalid_grant" in error_msg.lower():
+                user_message = "Unable to login. Please contact administrator to complete account setup."
+                reason = "Invalid grant - account setup issue"
+            elif "account disabled" in error_msg.lower() or "account is disabled" in error_msg.lower():
+                user_message = "This account has been disabled. Please contact administrator."
+                reason = "Account disabled in Keycloak"
+
+            # Log failed login attempt
             log_audit(
                 session=self.session,
                 action=AuditActionEnum.LOGIN_FAILED,
@@ -244,14 +351,121 @@ class AuthService(SessionMixin):
                 resource_id=db_user.id,
                 resource_name=db_user.email,
                 user_id=db_user.id,
-                details={"email": user.email, "reason": "Incorrect password", "tenant": tenant.realm_name},
+                details={
+                    "email": user.email,
+                    "reason": reason,
+                    "keycloak_error": error_msg,
+                    "tenant": tenant.realm_name,
+                },
+                request=request,
+                success=False,
+            )
+            raise ClientException(user_message)
+        except KeycloakAuthenticationError as e:
+            error_msg = str(e)
+            logger.error(
+                f"Keycloak authentication failed for existing user {user.email}: {error_msg}. "
+                f"Check Keycloak Admin Console: Users > {user.email} > Credentials tab"
+            )
+            # Log failed login attempt - authentication failed
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_id=db_user.id,
+                resource_name=db_user.email,
+                user_id=db_user.id,
+                details={
+                    "email": user.email,
+                    "reason": f"Authentication failed: {error_msg}",
+                    "tenant": tenant.realm_name,
+                },
                 request=request,
                 success=False,
             )
             raise ClientException("Incorrect email or password")
 
+        # Sync user roles from Keycloak to ensure database is up-to-date
+        # This ensures that role changes in Keycloak are reflected on next login
+        logger.info(f"Syncing roles from Keycloak for existing user {user.email}")
+        try:
+            realm_roles = keycloak_manager.get_user_realm_roles(str(db_user.auth_id), tenant.realm_name)
+
+            # Check if role fetch was successful (None indicates error, empty list is valid)
+            if realm_roles is not None:
+                logger.info(f"User {user.email} current Keycloak roles: {realm_roles}")
+
+                # Determine current permissions from Keycloak roles
+                current_user_type, current_role, current_is_superuser = self._determine_user_permissions_from_roles(
+                    realm_roles
+                )
+
+                # Update database if roles have changed
+                if (
+                    db_user.user_type != current_user_type
+                    or db_user.role != current_role
+                    or db_user.is_superuser != current_is_superuser
+                ):
+                    logger.info(
+                        f"Updating user {user.email} roles: "
+                        f"user_type {db_user.user_type} -> {current_user_type}, "
+                        f"role {db_user.role} -> {current_role}, "
+                        f"is_superuser {db_user.is_superuser} -> {current_is_superuser}"
+                    )
+
+                    db_user.user_type = current_user_type
+                    db_user.role = current_role
+                    db_user.is_superuser = current_is_superuser
+
+                    # Update the user record
+                    updated_user = UserDataManager(self.session).update_one(db_user)
+                    if updated_user:
+                        db_user = updated_user
+                        logger.info(f"Successfully synced roles for user {user.email}")
+                else:
+                    logger.debug(f"User {user.email} roles are already up-to-date")
+            else:
+                # Role fetch failed - skip sync to prevent privilege de-escalation
+                logger.warning(
+                    f"Skipping role sync for {user.email} due to Keycloak error. Using existing database roles."
+                )
+
+        except Exception as e:
+            # Log error but don't fail login - use existing database roles
+            logger.warning(
+                f"Failed to sync roles from Keycloak for {user.email}: {str(e)}. Continuing with database roles.",
+                exc_info=True,
+            )
+
+        # Validate user_type AFTER role sync: Prevent clients from logging in as admin
+        # This validation now uses the freshly synced user_type from Keycloak
+        logger.info(
+            f"LOGIN ATTEMPT: Validating user_type for {user.email} "
+            f"(requested: {user.user_type}, actual: {db_user.user_type})"
+        )
+        if user.user_type == UserTypeEnum.ADMIN and db_user.user_type == UserTypeEnum.CLIENT:
+            logger.warning(f"Client user attempting to login as admin: {user.email}")
+            # Log failed login attempt - unauthorized user_type
+            log_audit(
+                session=self.session,
+                action=AuditActionEnum.LOGIN_FAILED,
+                resource_type=AuditResourceTypeEnum.USER,
+                resource_id=db_user.id,
+                resource_name=db_user.email,
+                user_id=db_user.id,
+                details={
+                    "email": user.email,
+                    "reason": "Client users cannot login with admin user_type",
+                    "requested_user_type": user.user_type.value,
+                    "actual_user_type": db_user.user_type,
+                },
+                request=request,
+                success=False,
+            )
+            raise ClientException("Access denied: This account does not have admin privileges")
+
         if db_user.status == UserStatusEnum.DELETED:
-            logger.debug(f"User account is not active: {user.email}")
+            logger.warning(f"Login attempt for inactive account: {user.email} (status: {db_user.status})")
             # Log failed login attempt - account deleted/inactive
             log_audit(
                 session=self.session,
@@ -270,8 +484,6 @@ class AuthService(SessionMixin):
                 success=False,
             )
             raise ClientException("User account is not active")
-
-        logger.debug(f"User Retrieved: {user.email}")
 
         # Log successful login
         log_audit(
@@ -294,6 +506,174 @@ class AuthService(SessionMixin):
             first_login=db_user.first_login,
             is_reset_password=db_user.is_reset_password,
         )
+
+    def _determine_user_permissions_from_roles(self, realm_roles: list[str]) -> tuple[str, str, bool]:
+        """Determine user_type, role, and is_superuser from Keycloak realm roles.
+
+        This logic is shared between JIT provisioning and role synchronization
+        to ensure consistency.
+
+        Args:
+            realm_roles: List of Keycloak realm role names (e.g., ['admin', 'developer'])
+
+        Returns:
+            Tuple of (user_type, role, is_superuser)
+        """
+        # Determine user_type based on realm roles
+        # If user has super_admin or admin role, they are ADMIN type
+        # Otherwise, they are CLIENT type
+        if "super_admin" in realm_roles or "admin" in realm_roles:
+            user_type = UserTypeEnum.ADMIN.value
+            is_superuser = "super_admin" in realm_roles
+        else:
+            user_type = UserTypeEnum.CLIENT.value
+            is_superuser = False
+
+        # Determine role based on realm roles (priority order)
+        if "super_admin" in realm_roles:
+            role = UserRoleEnum.SUPER_ADMIN.value
+        elif "admin" in realm_roles:
+            role = UserRoleEnum.ADMIN.value
+        elif "devops" in realm_roles:
+            role = UserRoleEnum.DEVOPS.value
+        elif "tester" in realm_roles:
+            role = UserRoleEnum.TESTER.value
+        elif "developer" in realm_roles:
+            role = UserRoleEnum.DEVELOPER.value
+        else:
+            role = UserRoleEnum.DEVELOPER.value  # Safe default
+
+        return user_type, role, is_superuser
+
+    async def _get_tenant_and_client_for_jit(self, realm_name: str) -> tuple[Optional[Tenant], Optional[TenantClient]]:
+        """Get tenant and tenant client for JIT provisioning based on realm.
+
+        Args:
+            realm_name: Realm name
+
+        Returns:
+            A tuple of (Tenant, TenantClient) if found, otherwise (None, None)
+        """
+        # Get tenant by realm name
+        tenant = await UserDataManager(self.session).retrieve_by_fields(
+            Tenant,
+            {"realm_name": realm_name},
+            missing_ok=True,
+        )
+
+        if not tenant:
+            logger.warning(f"No tenant found for realm {realm_name}")
+            return None, None
+
+        # Get default client for this tenant
+        tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+            TenantClient,
+            {"tenant_id": tenant.id, "client_named_id": app_settings.default_client_name},
+            missing_ok=True,
+        )
+
+        return tenant, tenant_client
+
+    async def _create_user_from_keycloak(
+        self,
+        keycloak_user: Dict,
+        tenant_client: TenantClient,
+        tenant: Tenant,
+        realm_name: str,
+    ) -> UserModel:
+        """Create database user from Keycloak user data.
+
+        Similar to _create_user_from_oauth() but for Keycloak-native users.
+        Derives user_type and role from Keycloak realm roles.
+
+        Args:
+            keycloak_user: User data from Keycloak
+            tenant_client: Tenant client for the realm
+            tenant: Tenant object for the realm (passed to avoid redundant DB query)
+            realm_name: Realm name
+
+        Returns:
+            Created UserModel instance
+        """
+        email = keycloak_user.get("email")
+        keycloak_user_id = keycloak_user.get("id")
+        first_name = keycloak_user.get("firstName", "")
+        last_name = keycloak_user.get("lastName", "")
+        name = f"{first_name} {last_name}".strip() or email.split("@")[0]
+
+        # Fetch user's Keycloak realm roles to determine permissions
+        keycloak_manager = KeycloakManager()
+        realm_roles = keycloak_manager.get_user_realm_roles(keycloak_user_id, realm_name)
+        logger.info(f"Keycloak user {email} has roles: {realm_roles}")
+
+        # Use helper method to determine permissions from roles
+        # Handle case where role fetch returns None (error case)
+        if realm_roles is not None:
+            user_type, role, is_superuser = self._determine_user_permissions_from_roles(realm_roles)
+        else:
+            # Default to CLIENT/DEVELOPER on error (safe default for new users)
+            logger.warning(f"Failed to fetch roles for {email} during JIT provisioning, using default permissions")
+            user_type = UserTypeEnum.CLIENT.value
+            role = UserRoleEnum.DEVELOPER.value
+            is_superuser = False
+
+        logger.info(
+            f"JIT provisioning user {email} as user_type={user_type}, role={role}, is_superuser={is_superuser}"
+        )
+
+        # Create user with derived permissions
+        new_user = UserModel(
+            name=name,
+            email=email,
+            auth_id=keycloak_user_id,
+            user_type=user_type,
+            role=role,
+            status=UserStatusEnum.ACTIVE.value,
+            color=UserColorEnum.get_random_color(),
+            first_login=True,
+            is_reset_password=False,  # Keycloak manages password
+            is_superuser=is_superuser,
+        )
+
+        created_user = await UserDataManager(self.session).insert_one(new_user)
+        logger.info(f"Created user {email} via JIT provisioning with ID {created_user.id}")
+
+        # Create tenant-user mapping (using passed tenant to avoid redundant query)
+
+        tenant_user_mapping = TenantUserMapping(
+            tenant_id=tenant.id,
+            user_id=created_user.id,
+        )
+        await UserDataManager(self.session).insert_one(tenant_user_mapping)
+        logger.info(f"Created tenant-user mapping for {email}")
+
+        # Create notification subscriber
+        try:
+            subscriber_data = SubscriberCreate(
+                subscriber_id=str(created_user.id),
+                email=created_user.email,
+                first_name=created_user.name,
+            )
+            await BudNotifyHandler().create_subscriber(subscriber_data)
+            logger.info(f"User {created_user.email} added to budnotify subscriber")
+
+            _ = await UserDataManager(self.session).update_subscriber_status(
+                user_ids=[created_user.id], is_subscriber=True
+            )
+        except Exception as e:
+            logger.error(f"Failed to create subscriber for {created_user.email}: {e}")
+            # Don't fail JIT if subscriber creation fails
+
+        # Use UserOnboardingService for billing, project, and permissions
+        onboarding_service = UserOnboardingService(self.session)
+        await onboarding_service.setup_new_client_user(
+            user=created_user,
+            tenant=tenant,
+            tenant_client=tenant_client,
+        )
+        logger.info(f"Completed onboarding setup for {created_user.email}")
+
+        return created_user
 
     async def refresh_token(self, token: RefreshTokenRequest) -> RefreshTokenResponse:
         """Refresh a user's access token using their refresh token."""
@@ -342,8 +722,6 @@ class AuthService(SessionMixin):
             tenant_client = await UserDataManager(self.session).retrieve_by_fields(
                 TenantClient, {"tenant_id": tenant.id}, missing_ok=True
             )
-
-            logger.debug(f"::USER:: Tenant client: {tenant_client.id} {tenant_client.client_id}")
 
             keycloak_manager = KeycloakManager()
             # Decrypt client secret for use

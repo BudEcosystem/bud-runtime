@@ -1,7 +1,7 @@
 """Added metadata to prompt version
 
 Revision ID: 8a9b463c9646
-Revises: e66057c39de4
+Revises: b4d764550ad9
 Create Date: 2025-11-03 07:59:04.792357
 
 """

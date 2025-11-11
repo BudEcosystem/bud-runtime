@@ -1056,6 +1056,7 @@ class PromptService(SessionMixin):
         connector_id: str,
         credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials],
         version: Optional[int] = None,
+        permanent: bool = False,
     ) -> GatewayResponse:
         """Register a connector for a prompt by creating gateway in MCP Foundry.
 
@@ -1064,6 +1065,7 @@ class PromptService(SessionMixin):
             connector_id: The connector ID to register
             credentials: Connector credentials based on auth_type
             version: Optional version to update. If None, updates default version
+            permanent: Store configuration permanently without expiration
 
         Returns:
             gateway
@@ -1169,7 +1171,7 @@ class PromptService(SessionMixin):
             )
 
             # Store MCP tool configuration in Redis via budprompt service
-            await self._store_mcp_tool_config(budprompt_id, connector_id, gateway.gateway_id, version)
+            await self._store_mcp_tool_config(budprompt_id, connector_id, gateway.gateway_id, version, permanent)
 
             # Update PromptVersion metadata with gateway_id (if prompt and version exist in DB)
             try:
@@ -1234,7 +1236,12 @@ class PromptService(SessionMixin):
             )
 
     async def add_tool_for_prompt(
-        self, prompt_id: str, connector_id: str, tool_ids: List[str], version: Optional[int] = None
+        self,
+        prompt_id: str,
+        connector_id: str,
+        tool_ids: List[str],
+        version: Optional[int] = None,
+        permanent: bool = False,
     ) -> Dict[str, Any]:
         """Add tools for a prompt by creating/updating virtual server in MCP Foundry.
 
@@ -1243,6 +1250,7 @@ class PromptService(SessionMixin):
             connector_id: The connector ID
             tool_ids: List of tool IDs to add (replaces existing tools)
             version: Optional version to update. If None, uses default version
+            permanent: Store configuration permanently without expiration
 
         Returns:
             Dict with virtual_server_id, virtual_server_name, added_tools, and action
@@ -1367,6 +1375,7 @@ class PromptService(SessionMixin):
             "version": target_version,
             "set_default": False,  # Don't change default for existing configs
             "tools": tools,  # Override tools field
+            "permanent": permanent,  # Control TTL
         }
 
         # Save using helper method
@@ -1423,13 +1432,14 @@ class PromptService(SessionMixin):
         }
 
     async def disconnect_connector_from_prompt(
-        self, budprompt_id: str, connector_id: str, version: Optional[int] = None
+        self, budprompt_id: str, connector_id: str, version: Optional[int] = None, permanent: bool = False
     ) -> Dict[str, Any]:
         """Disconnect a connector from a prompt by deleting gateway and cleaning config.
 
         Args:
             budprompt_id: The bud prompt ID (UUID or draft ID)
             connector_id: The connector ID to disconnect
+            permanent: Store configuration permanently without expiration
             version: Optional version to update. If None, updates default version
 
         Returns:
@@ -1547,6 +1557,7 @@ class PromptService(SessionMixin):
             "version": target_version,
             "set_default": False,
             "tools": tools,
+            "permanent": permanent,  # Control TTL
         }
         await self._save_prompt_config_to_redis(payload)
 
@@ -1665,7 +1676,12 @@ class PromptService(SessionMixin):
             )
 
     async def _store_mcp_tool_config(
-        self, budprompt_id: str, connector_id: str, gateway_id: str, version: Optional[int] = None
+        self,
+        budprompt_id: str,
+        connector_id: str,
+        gateway_id: str,
+        version: Optional[int] = None,
+        permanent: bool = False,
     ) -> None:
         """Store MCP tool configuration in Redis via budprompt service.
 
@@ -1674,6 +1690,7 @@ class PromptService(SessionMixin):
             connector_id: The connector ID
             gateway_id: The gateway ID from MCP Foundry
             version: Optional version to update. If None, updates default version
+            permanent: Store configuration permanently without expiration
 
         Raises:
             ClientException: If storing configuration fails
@@ -1768,6 +1785,7 @@ class PromptService(SessionMixin):
                 "version": target_version,
                 "set_default": False,  # Don't change default for existing configs
                 "tools": updated_tools,  # Override tools field
+                "permanent": permanent,  # Control TTL
             }
         else:
             # New config: set allow_multiple_calls=true for MCP support
@@ -1777,6 +1795,7 @@ class PromptService(SessionMixin):
                 "set_default": True,  # Set as default for new configs
                 "allow_multiple_calls": True,  # Enable for MCP tools
                 "tools": updated_tools,
+                "permanent": permanent,  # Control TTL
             }
 
         await self._save_prompt_config_to_redis(payload)
@@ -1977,6 +1996,303 @@ class PromptService(SessionMixin):
                 message="Failed to copy prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
+    async def _perform_cleanup_request(self, prompt_ids: List, debug: bool = False) -> Dict[str, Any]:
+        """Perform cleanup request to budprompt service via Dapr.
+
+        Args:
+            prompt_ids: List of prompt cleanup items with prompt_id and version
+            debug: If True, runs cleanup synchronously. If False, runs via Dapr workflow (default)
+
+        Returns:
+            Response data from budprompt service
+
+        Raises:
+            ClientException: If request fails
+        """
+        cleanup_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_prompt_app_id}/method/v1/prompt/prompt-cleanup"
+
+        # Prepare payload with prompts list
+        payload = {"prompts": prompt_ids, "debug": debug}
+
+        logger.debug(f"Performing cleanup request to budprompt: {payload}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(cleanup_endpoint, json=payload) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200:
+                        logger.error(f"Failed to cleanup prompts: {response.status} {response_data}")
+                        raise ClientException(
+                            message=response_data.get("message", "Failed to cleanup prompts"),
+                            status_code=response.status,
+                        )
+
+                    logger.debug(f"Successfully cleaned up {len(prompt_ids)} prompts")
+                    return response_data
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Network error during cleanup request: {e}")
+            raise ClientException(
+                message="Network error while cleaning up prompts",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            ) from e
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception(f"Failed to cleanup prompts: {e}")
+            raise ClientException(
+                message="Failed to cleanup prompts",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
+    async def initiate_oauth_for_connector(
+        self,
+        prompt_id: str,
+        connector_id: str,
+        version: Optional[int] = 1,
+    ) -> Dict[str, Any]:
+        """Initiate OAuth flow for a connector.
+
+        Args:
+            prompt_id: The prompt ID (UUID or draft ID)
+            connector_id: The connector ID
+            version: Version of prompt config (defaults to 1)
+
+        Returns:
+            Dict containing OAuth initiation response from MCP Foundry
+
+        Raises:
+            ClientException: If prompt config not found or OAuth initiation fails
+        """
+        logger.debug(f"Initiating OAuth for connector {connector_id} in prompt {prompt_id} version {version}")
+
+        try:
+            # 1. Fetch prompt config from Redis
+            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version, raw_data=True)
+            config_data = config_response.get("data", {})
+            tools = config_data.get("tools", [])
+
+            # 2. Find MCP tool and extract gateway_config
+            mcp_tool = None
+            for tool in tools:
+                if tool.get("type") == "mcp":
+                    mcp_tool = tool
+                    break
+
+            if not mcp_tool:
+                raise ClientException(
+                    message=f"No MCP connectors registered for prompt {prompt_id}",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
+            # 3. Extract gateway_config from MCP tool
+            gateway_config = mcp_tool.get("gateway_config", {})
+
+            # 4. Find gateway_id for the connector
+            gateway_id = gateway_config.get(connector_id)
+
+            if not gateway_id:
+                raise ClientException(
+                    message=f"Connector {connector_id} not registered for prompt {prompt_id} version {version}",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
+            logger.debug(f"Found gateway_id {gateway_id} for connector {connector_id}")
+
+            # 5. Call MCP Foundry to initiate OAuth
+            oauth_response = await mcp_foundry_service.initiate_oauth(gateway_id)
+
+            logger.debug(f"OAuth flow initiated successfully for gateway {gateway_id}")
+            return oauth_response
+
+        except ClientException:
+            raise
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry error initiating OAuth: {e}")
+            raise ClientException(
+                message="Failed to initiate OAuth flow",
+                status_code=e.status_code or status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+        except Exception as e:
+            logger.error(f"Unexpected error initiating OAuth: {e}")
+            raise ClientException(
+                message="Failed to initiate OAuth flow",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    async def get_oauth_status_for_connector(
+        self,
+        prompt_id: str,
+        connector_id: str,
+        version: Optional[int] = 1,
+    ) -> Dict[str, Any]:
+        """Get OAuth status for a connector.
+
+        Args:
+            prompt_id: The prompt ID (UUID or draft ID)
+            connector_id: The connector ID
+            version: Version of prompt config (defaults to 1)
+
+        Returns:
+            Dict containing OAuth status from MCP Foundry
+
+        Raises:
+            ClientException: If prompt config not found or OAuth status check fails
+        """
+        logger.debug(f"Getting OAuth status for connector {connector_id} in prompt {prompt_id} version {version}")
+
+        try:
+            # 1. Fetch prompt config from Redis
+            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version, raw_data=True)
+            config_data = config_response.get("data", {})
+            tools = config_data.get("tools", [])
+
+            # 2. Find MCP tool and extract gateway_config
+            mcp_tool = next((tool for tool in tools if tool.get("type") == "mcp"), None)
+
+            if not mcp_tool:
+                raise ClientException(
+                    message=f"No MCP connectors registered for prompt {prompt_id}",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
+            # 3. Extract gateway_config from MCP tool
+            gateway_config = mcp_tool.get("gateway_config", {})
+
+            # 4. Find gateway_id for the connector
+            gateway_id = gateway_config.get(connector_id)
+
+            if not gateway_id:
+                raise ClientException(
+                    message=f"Connector {connector_id} not registered for prompt {prompt_id} version {version}",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
+            logger.debug(f"Found gateway_id {gateway_id} for connector {connector_id}")
+
+            # 5. Call MCP Foundry to get OAuth status
+            oauth_status = await mcp_foundry_service.get_oauth_status(gateway_id)
+
+            logger.debug(f"OAuth status retrieved successfully for gateway {gateway_id}")
+            return oauth_status
+
+        except ClientException:
+            raise
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry error getting OAuth status: {e}")
+            raise ClientException(
+                message="Failed to get OAuth status",
+                status_code=e.status_code or status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error getting OAuth status: {e}")
+            raise ClientException(
+                message="Failed to get OAuth status",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
+    async def fetch_tools_after_oauth_for_connector(
+        self,
+        prompt_id: str,
+        connector_id: str,
+        version: Optional[int] = 1,
+    ) -> Dict[str, Any]:
+        """Fetch tools after OAuth for a connector.
+
+        Args:
+            prompt_id: The prompt ID (UUID or draft ID)
+            connector_id: The connector ID
+            version: Version of prompt config (defaults to 1)
+
+        Returns:
+            Dict containing tool fetching response from MCP Foundry
+
+        Raises:
+            ClientException: If prompt config not found or tool fetching fails
+        """
+        logger.debug(f"Fetching tools for connector {connector_id} in prompt {prompt_id} version {version}")
+
+        try:
+            # 1. Fetch prompt config from Redis
+            config_response = await self._perform_get_prompt_config_request(prompt_id, version=version, raw_data=True)
+            config_data = config_response.get("data", {})
+            tools = config_data.get("tools", [])
+
+            # 2. Find MCP tool and extract gateway_config
+            mcp_tool = next((tool for tool in tools if tool.get("type") == "mcp"), None)
+
+            if not mcp_tool:
+                raise ClientException(
+                    message=f"No MCP connectors registered for prompt {prompt_id}",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
+            # 3. Extract gateway_config from MCP tool
+            gateway_config = mcp_tool.get("gateway_config", {})
+
+            # 4. Find gateway_id for the connector
+            gateway_id = gateway_config.get(connector_id)
+
+            if not gateway_id:
+                raise ClientException(
+                    message=f"Connector {connector_id} not registered for prompt {prompt_id} version {version}",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
+            logger.debug(f"Found gateway_id {gateway_id} for connector {connector_id}")
+
+            # 5. Call MCP Foundry to fetch tools
+            fetch_response = await mcp_foundry_service.fetch_tools_after_oauth(gateway_id)
+
+            logger.debug(f"Tools fetched successfully for gateway {gateway_id}")
+            return fetch_response
+
+        except ClientException:
+            # Re-raise client exceptions as-is
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching tools for connector {connector_id}: {e}", exc_info=True)
+            raise ClientException(
+                message="Failed to fetch tools after OAuth",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
+    async def handle_oauth_callback(self, code: str, state: str) -> Dict[str, Any]:
+        """Handle OAuth callback.
+
+        Args:
+            code: Authorization code from OAuth provider
+            state: State parameter from OAuth flow
+
+        Returns:
+            Dict containing callback response from MCP Foundry
+
+        Raises:
+            ClientException: If OAuth callback fails
+        """
+        logger.debug("Handling OAuth callback")
+
+        try:
+            # Forward to MCP Foundry
+            callback_response = await mcp_foundry_service.handle_oauth_callback(code, state)
+
+            logger.debug("OAuth callback handled successfully")
+            return callback_response
+
+        except MCPFoundryException as e:
+            logger.error(f"MCP Foundry OAuth callback failed: {e}")
+            raise ClientException(
+                message="Failed to handle OAuth callback",
+                status_code=e.status_code or status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+        except Exception as e:
+            logger.error(f"Unexpected error handling OAuth callback: {e}", exc_info=True)
+            raise ClientException(
+                message="Failed to handle OAuth callback",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
     async def delete_prompt_from_proxy_cache(self, prompt_id: UUID) -> None:
         """Delete prompt from proxy cache.
 
@@ -2140,6 +2456,7 @@ class PromptWorkflowService(SessionMixin):
             rate_limit=rate_limit,
             rate_limit_value=rate_limit_value,
             bud_prompt_id=bud_prompt_id,
+            discarded_prompt_ids=request.discarded_prompt_ids,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Create or update workflow step
@@ -2175,6 +2492,7 @@ class PromptWorkflowService(SessionMixin):
                 "rate_limit",
                 "rate_limit_value",
                 "bud_prompt_id",
+                "discarded_prompt_ids",
             ]
 
             # from workflow steps extract necessary information
@@ -2322,6 +2640,21 @@ class PromptWorkflowService(SessionMixin):
                 logger.error(f"Failed to update credential proxy cache: {e}")
                 # Continue - cache update is non-critical
 
+            # Cleanup discarded prompt resources
+            discarded_prompt_ids = merged_data.get("discarded_prompt_ids", [])
+            if discarded_prompt_ids and len(discarded_prompt_ids) > 0:
+                try:
+                    logger.debug(f"Triggering cleanup for {len(discarded_prompt_ids)} discarded prompts")
+                    prompt_service = PromptService(self.session)
+                    await prompt_service._perform_cleanup_request(discarded_prompt_ids)
+                    logger.debug("Cleanup completed successfully")
+                except Exception as e:
+                    # Log error but don't fail prompt creation
+                    logger.error(
+                        f"Failed to cleanup discarded prompts, but prompt creation succeeded: {e}",
+                        exc_info=True,
+                    )
+
             # Store final result in workflow step
             # NOTE: increment step to display success message
             final_step_data = {"prompt_id": str(db_prompt.id), "version_id": str(db_version.id)}
@@ -2389,6 +2722,7 @@ class PromptWorkflowService(SessionMixin):
             schema=schema,
             type=type,
             deployment_name=deployment_name,
+            permanent=request.permanent,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Create or update workflow step
@@ -2416,6 +2750,7 @@ class PromptWorkflowService(SessionMixin):
                 "schema",
                 "type",
                 "deployment_name",
+                "permanent",
             ]
 
             # from workflow steps extract necessary information
@@ -2542,6 +2877,7 @@ class PromptWorkflowService(SessionMixin):
             "schema": data.get("schema"),
             "type": data.get("type"),
             "deployment_name": data.get("deployment_name"),
+            "permanent": data.get("permanent", False),
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),

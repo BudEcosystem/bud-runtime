@@ -250,6 +250,77 @@ class PromptSchemaConfig(BaseModel):
     )
 
 
+class PromptCleanupItem(BaseModel):
+    """Item for cleanup request."""
+
+    prompt_id: str = Field(..., description="Prompt identifier")
+    version: Optional[int] = Field(default=1, description="Version number (defaults to 1)")
+
+
+class PromptCleanupRequest(BaseModel):
+    """Request for triggering prompt cleanup."""
+
+    prompts: List[PromptCleanupItem] = Field(
+        ..., description="List of prompts to cleanup with prompt_id and optional version"
+    )
+    debug: bool = Field(
+        default=True,
+        description="Run cleanup synchronously (true) or via workflow (false). Defaults to true",
+    )
+
+
+class OAuthInitiateRequest(BaseModel):
+    """Request schema for OAuth flow initiation."""
+
+    prompt_id: str = Field(..., description="Prompt ID (UUID or draft ID)")
+    connector_id: str = Field(..., description="Connector ID to initiate OAuth for")
+    version: Optional[int] = Field(default=1, ge=1, description="Version of prompt config (defaults to 1)")
+
+
+class OAuthInitiateResponse(SuccessResponse):
+    """Response schema for OAuth initiation."""
+
+    authorization_url: str = Field(..., description="OAuth authorization URL to redirect user to")
+    state: str = Field(..., description="OAuth state parameter for security")
+    expires_in: int = Field(..., description="State expiration time in seconds")
+    gateway_id: str = Field(..., description="Gateway ID used for OAuth flow")
+
+
+class OAuthStatusResponse(SuccessResponse):
+    """Response schema for OAuth status check."""
+
+    oauth_enabled: bool = Field(..., description="Whether OAuth is enabled for this gateway")
+    grant_type: str = Field(..., description="OAuth grant type (e.g., 'authorization_code')")
+    client_id: str = Field(..., description="OAuth client ID")
+    scopes: List[str] = Field(..., description="List of OAuth scopes")
+    authorization_url: str = Field(..., description="OAuth authorization endpoint URL")
+    redirect_uri: str = Field(..., description="OAuth callback/redirect URI")
+    status_message: str = Field(..., description="Status message from MCP Foundry")
+
+
+class OAuthFetchToolsRequest(BaseModel):
+    """Request schema for fetching tools after OAuth."""
+
+    prompt_id: str = Field(..., description="Prompt ID (UUID or draft ID)")
+    connector_id: str = Field(..., description="Connector ID to fetch tools for")
+    version: Optional[int] = Field(default=1, ge=1, description="Version of prompt config (defaults to 1)")
+
+
+class OAuthCallbackRequest(BaseModel):
+    """Request schema for OAuth callback."""
+
+    code: str = Field(..., description="Authorization code from OAuth provider")
+    state: str = Field(..., description="State parameter from OAuth flow")
+
+
+class OAuthCallbackResponse(SuccessResponse):
+    """Response schema for OAuth callback."""
+
+    gateway_id: str = Field(..., description="Gateway ID")
+    user_id: str = Field(..., description="User ID/email")
+    expires_at: str = Field(..., description="Token expiration timestamp")
+
+
 class CreatePromptWorkflowRequest(BaseModel):
     """Create prompt workflow request schema."""
 
@@ -271,6 +342,9 @@ class CreatePromptWorkflowRequest(BaseModel):
     rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
     rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
     bud_prompt_id: str | None = None
+    discarded_prompt_ids: Optional[List[PromptCleanupItem]] = Field(
+        None, description="List of temporary prompt IDs discarded by user that need cleanup"
+    )
 
     @model_validator(mode="after")
     def validate_fields(self):
@@ -309,6 +383,9 @@ class CreatePromptWorkflowSteps(BaseModel):
     rate_limit: bool = Field(default=False, description="Enable or disable rate limiting")
     rate_limit_value: Optional[int] = Field(None, ge=1, description="Rate limit value (requests per minute)")
     bud_prompt_id: str | None = None
+    discarded_prompt_ids: Optional[List[PromptCleanupItem]] = Field(
+        None, description="List of temporary prompt IDs to cleanup"
+    )
 
 
 class EditPromptRequest(BaseModel):
@@ -455,6 +532,10 @@ class PromptSchemaRequest(BaseModel):
     schema: SchemaBase | None = None
     type: Literal["input", "output"] | None = None
     deployment_name: str | None = None
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
 
     @model_validator(mode="after")
     def validate_fields(self):
@@ -474,6 +555,7 @@ class PromptSchemaWorkflowSteps(BaseModel):
     schema: SchemaBase | None = None
     type: Literal["input", "output"] | None = None
     deployment_name: str | None = None
+    permanent: bool | None = None
 
 
 class PromptConfigRequest(BaseModel):
@@ -508,6 +590,11 @@ class PromptConfigRequest(BaseModel):
     system_prompt_role: Optional[Literal["system", "developer", "user"]] = Field(
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
+    )
+    system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
     )
 
 
@@ -575,6 +662,7 @@ class PromptConfigurationData(BaseModel):
         None,
         description="Role for system prompts in OpenAI models. 'developer' only works with compatible models (not o1-mini)",
     )
+    system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
     tools: List[MCPToolConfig] = Field(default_factory=list, description="MCP tool configurations")
 
 
@@ -698,7 +786,7 @@ class ToolFilter(BaseModel):
 
     prompt_id: str = Field(..., description="Prompt ID to filter tools (UUID or draft ID)")
     connector_id: str = Field(..., description="Connector ID to filter tools")
-    version: Optional[int] = Field(None, ge=1, description="Version of prompt config")
+    version: Optional[int] = Field(default=1, ge=1, description="Version of prompt config (defaults to 1)")
 
 
 class ToolListResponse(PaginatedSuccessResponse):
@@ -773,6 +861,10 @@ class RegisterConnectorRequest(BaseModel):
     version: Optional[int] = Field(
         None, ge=1, description="Optional version number. If not specified, updates default version."
     )
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
 
 
 class AddToolRequest(BaseModel):
@@ -784,6 +876,10 @@ class AddToolRequest(BaseModel):
         ..., description="Tool IDs to add/update (empty list removes all tools for this connector)"
     )
     version: Optional[int] = Field(None, ge=1, description="Prompt config version")
+    permanent: bool = Field(
+        default=False,
+        description="Store configuration permanently without expiration (default: False, uses configured TTL)",
+    )
 
 
 class AddToolResponse(SuccessResponse):

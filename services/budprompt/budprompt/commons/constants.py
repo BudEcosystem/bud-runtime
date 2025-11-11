@@ -15,3 +15,6 @@
 #  -----------------------------------------------------------------------------
 
 """The constants used in the budprompt module."""
+
+# MCP Cleanup Registry
+CLEANUP_REGISTRY_KEY = "prompt:cleanup_registry"

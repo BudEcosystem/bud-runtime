@@ -106,6 +106,9 @@ class AppConfig(BaseAppConfig):
     # default non master realm name
     default_realm_name: str = Field(alias="DEFAULT_REALM_NAME", default="bud")
 
+    # default client name for bud-stack in shared realm
+    default_client_name: str = Field(alias="DEFAULT_CLIENT_NAME", default="default-internal-client")
+
     # Token
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_minutes: int = Field(60 * 24 * 7, alias="REFRESH_TOKEN_EXPIRE_MINUTES")
