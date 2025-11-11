@@ -13,6 +13,7 @@ interface RegisterConnectorPayload {
 interface OAuthInitiatePayload {
   prompt_id: string;
   connector_id: string;
+  workflow_id?: string;
   version?: number;
 }
 

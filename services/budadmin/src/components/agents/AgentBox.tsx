@@ -929,6 +929,7 @@ function AgentBoxInner({
             isOpen={isToolsOpen}
             onClose={closeTools}
             promptId={session?.promptId}
+            workflowId={session?.workflowId}
           />
 
           {/* Model Settings Sidebar */}

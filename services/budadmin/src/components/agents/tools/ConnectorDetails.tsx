@@ -21,6 +21,7 @@ interface ConnectorDetailsProps {
   connector: Connector;
   onBack: () => void;
   promptId?: string;
+  workflowId?: string;
 }
 
 /**
@@ -46,6 +47,7 @@ interface OAuthState {
   promptId: string;
   connectorId: string;
   connectorName: string;
+  workflowId?: string;
   step: 1 | 2;
   timestamp: number;
 }
@@ -89,6 +91,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   connector,
   onBack,
   promptId,
+  workflowId,
 }) => {
   const { fetchConnectorDetails, selectedConnectorDetails, isLoadingDetails } = useConnectors();
 
@@ -398,6 +401,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             const oauthPayload = {
               prompt_id: promptId,
               connector_id: connector.id,
+              workflow_id: workflowId,
               version: 1
             };
 
@@ -418,6 +422,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                 promptId: promptId,
                 connectorId: connector.id,
                 connectorName: connector.name,
+                workflowId: workflowId,
                 step: 1,
                 timestamp: Date.now()
               });
