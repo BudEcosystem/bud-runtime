@@ -137,14 +137,23 @@ const AgentDrawer: React.FC = () => {
     // Only update if the URL param is different from what we want to set
     if (currentPromptParam !== newPromptParam) {
       // Build URL manually to avoid encoding commas
-      // Use window.location.pathname to get the actual browser URL (not router.pathname which includes /home)
+      // Use window.location to get the actual browser URL
       const currentPath = window.location.pathname;
       const queryParts: string[] = [];
 
+      // Parse existing query params from actual browser URL (not router.query)
+      // This ensures we capture params added via window.history.replaceState
+      const urlSearchParams = new URLSearchParams(window.location.search);
+
       // Add all existing query params except 'prompt'
-      Object.entries(router.query).forEach(([key, value]) => {
+      urlSearchParams.forEach((value, key) => {
         if (key !== 'prompt' && value) {
-          queryParts.push(`${key}=${encodeURIComponent(String(value))}`);
+          // Don't encode agent parameter
+          if (key === 'agent') {
+            queryParts.push(`${key}=${value}`);
+          } else {
+            queryParts.push(`${key}=${encodeURIComponent(value)}`);
+          }
         }
       });
 
@@ -166,6 +175,7 @@ const AgentDrawer: React.FC = () => {
       );
 
       console.log('Updated URL with prompt IDs:', promptIds);
+      console.log('Preserved agent param:', urlSearchParams.get('agent'));
     }
   }, [activeSessions, isAgentDrawerOpen, router]);
 
