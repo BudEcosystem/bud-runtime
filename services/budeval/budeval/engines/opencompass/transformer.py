@@ -54,6 +54,7 @@ models = [
         query_per_second={int(request.eval_model_info.extra_args.get("query_per_second", "10"))},
         max_out_len={int(request.eval_model_info.extra_args.get("max_out_len", str(request.eval_model_info.extra_args.get("max_out_len") or 2048)))},
         max_seq_len={int(request.eval_model_info.extra_args.get("max_seq_len", "4096"))},
+        mode='mid',
         batch_size=20
     )
 ]
