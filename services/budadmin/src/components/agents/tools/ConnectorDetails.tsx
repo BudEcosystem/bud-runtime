@@ -114,12 +114,24 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
     setIsLoadingTools(true);
     try {
-      const response = await ConnectorService.fetchTools({
-        prompt_id: promptId,
-        connector_id: connector.id,
-        page: 1,
-        limit: 100,
-      });
+      const authType = selectedConnectorDetails?.auth_type;
+      let response: any;
+
+      // Use different endpoint based on auth type
+      if (authType?.toLowerCase() === 'oauth') {
+        response = await ConnectorService.fetchOAuthTools({
+          prompt_id: promptId,
+          connector_id: connector.id,
+          version: 1,
+        });
+      } else {
+        response = await ConnectorService.fetchTools({
+          prompt_id: promptId,
+          connector_id: connector.id,
+          page: 1,
+          limit: 100,
+        });
+      }
 
       if (response.data && response.data.tools) {
         const tools: Tool[] = response.data.tools;
@@ -145,7 +157,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     } finally {
       setIsLoadingTools(false);
     }
-  }, [promptId, connector.id]);
+  }, [promptId, connector.id, selectedConnectorDetails?.auth_type]);
 
   // Fetch connector details on mount
   useEffect(() => {

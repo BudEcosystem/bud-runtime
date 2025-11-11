@@ -30,6 +30,12 @@ interface FetchToolsParams {
   limit?: number;
 }
 
+interface FetchOAuthToolsPayload {
+  prompt_id: string;
+  connector_id: string;
+  version?: number;
+}
+
 export class ConnectorService {
   /**
    * Initiate OAuth flow for a connector
@@ -106,6 +112,16 @@ export class ConnectorService {
         limit: params.limit || 100,
       }
     });
+  }
+
+  /**
+   * Fetch OAuth tools for a connector
+   */
+  static async fetchOAuthTools(payload: FetchOAuthToolsPayload) {
+    return await AppRequest.Post(
+      `${tempApiBaseUrl}/prompts/oauth/fetch-tools`,
+      payload
+    );
   }
 
   /**
