@@ -17,6 +17,19 @@ pub mod test_helpers;
 use crate::error::DisplayOrDebugGateway;
 use crate::error::{Error, ErrorDetails};
 
+/// Custom serializer for DateTime fields to format them for ClickHouse compatibility
+/// Formats as "YYYY-MM-DD HH:MM:SS" to match ClickHouse DateTime type (second precision)
+fn serialize_datetime<S>(
+    dt: &chrono::DateTime<chrono::Utc>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let formatted = dt.format("%Y-%m-%d %H:%M:%S").to_string();
+    serializer.serialize_str(&formatted)
+}
+
 #[derive(Debug, Clone)]
 pub enum ClickHouseConnectionInfo {
     Disabled,
@@ -620,7 +633,9 @@ pub struct ModelInferenceDetailsInsert {
     pub cost: Option<f64>,
     pub response_analysis: Option<serde_json::Value>,
     pub is_success: bool,
+    #[serde(serialize_with = "serialize_datetime")]
     pub request_arrival_time: chrono::DateTime<chrono::Utc>,
+    #[serde(serialize_with = "serialize_datetime")]
     pub request_forward_time: chrono::DateTime<chrono::Utc>,
     pub api_key_id: Option<uuid::Uuid>,
     pub user_id: Option<uuid::Uuid>,

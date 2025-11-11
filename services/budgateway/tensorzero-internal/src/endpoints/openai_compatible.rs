@@ -14,7 +14,7 @@ use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::debug_handler;
-use axum::extract::{Multipart, Path, Query, State};
+use axum::extract::{Extension, Multipart, Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, Sse};
 use axum::response::{IntoResponse, Response};
@@ -25,6 +25,7 @@ use serde_json::{json, Map, Value};
 use url::Url;
 use uuid::Uuid;
 
+use crate::analytics::RequestAnalytics;
 use crate::cache::CacheParamsOptions;
 use crate::endpoints::inference::{
     inference, write_inference, ChatCompletionInferenceParams, InferenceClients,
@@ -193,6 +194,7 @@ pub async fn inference_handler(
         guardrails,
         ..
     }): AppState,
+    Extension(analytics): Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>,
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleParams>,
 ) -> Result<Response<Body>, Error> {
@@ -617,6 +619,7 @@ pub async fn inference_handler(
         kafka_connection_info.clone(),
         model_credential_store.clone(),
         params,
+        Some(analytics),
     )
     .await?;
 
@@ -8084,6 +8087,7 @@ struct AnthropicMetadata {
 #[debug_handler(state = AppStateData)]
 pub async fn anthropic_messages_handler(
     State(app_state): AppState,
+    Extension(analytics): Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>,
     headers: HeaderMap,
     StructuredJson(anthropic_params): StructuredJson<AnthropicMessagesParams>,
 ) -> Result<Response<Body>, Error> {
@@ -8098,8 +8102,13 @@ pub async fn anthropic_messages_handler(
     let openai_params = convert_anthropic_to_openai(anthropic_params)?;
 
     // Call the existing inference handler with converted parameters
-    let response =
-        inference_handler(State(app_state), headers, StructuredJson(openai_params)).await?;
+    let response = inference_handler(
+        State(app_state),
+        Extension(analytics),
+        headers,
+        StructuredJson(openai_params),
+    )
+    .await?;
 
     // Convert the response from OpenAI format to Anthropic format
     convert_openai_response_to_anthropic(response).await

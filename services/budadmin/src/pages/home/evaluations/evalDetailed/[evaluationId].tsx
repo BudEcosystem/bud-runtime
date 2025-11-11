@@ -132,9 +132,9 @@ const EvalDetailed = () => {
     const fetchDatasets = async () => {
       if (id) {
         try {
-          const response = await AppRequest.Get(`/experiments/datasets?trait_ids=${id}`);
+          const response = await AppRequest.Get(`/experiments/datasets/${id}`);
           console.log("Datasets API Response:", response.data);
-          setDatasets(response.data);
+          setDatasets(response.data.dataset);
 
           // If we have datasets, fetch the first dataset's details as an example
           if (response.data && response.data.datasets && response.data.datasets.length > 0) {
@@ -237,7 +237,7 @@ const EvalDetailed = () => {
                     </div>
                   ),
                   key: "1",
-                  children: <LeaderboardDetails />,
+                  children: <LeaderboardDetails datasets={datasets}/>,
                   // children: <></>,
                 },
                 {
