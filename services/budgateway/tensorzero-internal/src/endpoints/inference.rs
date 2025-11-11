@@ -170,7 +170,7 @@ pub async fn inference_handler(
         ..
     }): AppState,
     headers: HeaderMap,
-    Extension(analytics): Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>,
+    analytics: Option<Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>>,
     StructuredJson(mut params): StructuredJson<Params>,
 ) -> Result<Response<Body>, Error> {
     // Extract observability metadata from headers
@@ -220,7 +220,7 @@ pub async fn inference_handler(
         kafka_connection_info.clone(),
         model_credential_store,
         params,
-        Some(analytics.clone()),
+        analytics.as_ref().map(|ext| ext.0.clone()),
     )
     .await;
 
@@ -335,12 +335,14 @@ pub async fn inference_handler(
             let mut error_response = error.into_response();
 
             // Extract inference_id from analytics if available
-            if let Ok(analytics_guard) = analytics.try_lock() {
-                if let Some(inference_id) = analytics_guard.record.inference_id {
-                    error_response.headers_mut().insert(
-                        "x-tensorzero-inference-id",
-                        inference_id.to_string().parse().unwrap(),
-                    );
+            if let Some(analytics_ext) = &analytics {
+                if let Ok(analytics_guard) = analytics_ext.0.try_lock() {
+                    if let Some(inference_id) = analytics_guard.record.inference_id {
+                        error_response.headers_mut().insert(
+                            "x-tensorzero-inference-id",
+                            inference_id.to_string().parse().unwrap(),
+                        );
+                    }
                 }
             }
 
