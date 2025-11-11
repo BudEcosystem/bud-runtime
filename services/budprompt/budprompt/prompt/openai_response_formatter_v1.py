@@ -115,34 +115,10 @@ class OpenAIResponseFormatter_V1:
             # Get messages from pydantic-ai result
             all_messages = pydantic_result.all_messages()
 
-            # Extract output items using official types and get MCP tool call IDs
-            output_items, mcp_tool_call_ids = await self._format_output_items(all_messages, tools)
-
-            # Check if we should add structured output text from result.output
-            if self._has_final_result_tool_return(pydantic_result, all_messages):
-                # Add structured output as output_text
-                structured_output = pydantic_result.output
-
-                output_items.append(
-                    ResponseOutputMessage(
-                        id=f"msg_{uuid.uuid4().hex}",
-                        type="message",
-                        status="completed",
-                        content=[
-                            ResponseOutputText(
-                                type="output_text",
-                                text=(
-                                    structured_output.model_dump_json()
-                                    if hasattr(structured_output, "model_dump_json")
-                                    else str(structured_output)
-                                ),
-                                annotations=[],
-                            )
-                        ],
-                        role="assistant",
-                    )
-                )
-                logger.debug("Added structured output text from result.output (final_result tool return detected)")
+            # Extract output items and add structured output if present
+            output_items, mcp_tool_call_ids = await self.build_complete_output_items(
+                all_messages, pydantic_result, tools
+            )
 
             # Extract input items (system prompts, user prompts, tool returns, retry prompts)
             # Pass MCP tool call IDs to identify MCP tool returns
@@ -293,6 +269,55 @@ class OpenAIResponseFormatter_V1:
                                     id=part.id if hasattr(part, "id") and part.id else None,
                                 )
                             )
+
+        return output_items, mcp_tool_call_ids
+
+    async def build_complete_output_items(
+        self,
+        all_messages: List[ModelMessage],
+        agent_result: AgentRunResult,
+        tools: Optional[List[MCPToolConfig]] = None,
+    ) -> tuple[List[Any], set]:
+        """Format output items from messages and add structured output if present.
+
+        This wrapper around _format_output_items also checks for and adds
+        structured output from final_result tool returns.
+
+        Args:
+            all_messages: All messages from agent execution
+            agent_result: The AgentRunResult from pydantic-ai
+            tools: Optional MCP tool configurations
+
+        Returns:
+            Tuple of (output_items list, mcp_tool_call_ids set)
+        """
+        # Get base output items
+        output_items, mcp_tool_call_ids = await self._format_output_items(all_messages, tools)
+
+        # Check if we should add structured output text from result.output
+        if self._has_final_result_tool_return(agent_result, all_messages):
+            structured_output = agent_result.output
+
+            output_items.append(
+                ResponseOutputMessage(
+                    id=f"msg_{uuid.uuid4().hex}",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            type="output_text",
+                            text=(
+                                structured_output.model_dump_json()
+                                if hasattr(structured_output, "model_dump_json")
+                                else str(structured_output)
+                            ),
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            )
+            logger.debug("Added structured output text from result.output (final_result tool return detected)")
 
         return output_items, mcp_tool_call_ids
 

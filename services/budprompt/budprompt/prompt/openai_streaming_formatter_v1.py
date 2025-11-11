@@ -1180,7 +1180,8 @@ class OpenAIStreamingFormatter_V1:
         """Build complete output items from AgentRunResult.
 
         This reuses the non-streaming formatter's logic to parse all messages
-        and build a complete output array including MCP tools, calls, and text.
+        and build a complete output array including MCP tools, calls, text, and
+        structured output from final_result tool returns.
 
         Args:
             final_result: The AgentRunResult from pydantic-ai
@@ -1191,10 +1192,10 @@ class OpenAIStreamingFormatter_V1:
         """
         from .openai_response_formatter_v1 import OpenAIResponseFormatter_V1
 
-        # Use the non-streaming formatter to extract output items from all messages
+        # Use the non-streaming formatter to build complete output items (includes structured output)
         formatter = OpenAIResponseFormatter_V1()
         all_messages = final_result.all_messages()
-        output_items, _ = await formatter._format_output_items(all_messages, tools)
+        output_items, _ = await formatter.build_complete_output_items(all_messages, final_result, tools)
 
         return output_items
 
