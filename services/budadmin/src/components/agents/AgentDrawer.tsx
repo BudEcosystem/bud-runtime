@@ -148,7 +148,7 @@ const AgentDrawer: React.FC = () => {
       // Add all existing query params except 'prompt'
       urlSearchParams.forEach((value, key) => {
         if (key !== 'prompt' && value) {
-          // Don't encode agent parameter (keep it as-is like prompt)
+          // Don't encode agent parameter
           if (key === 'agent') {
             queryParts.push(`${key}=${value}`);
           } else {

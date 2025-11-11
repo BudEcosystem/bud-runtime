@@ -58,13 +58,16 @@ export default function SelectProject() {
       // Create or update the workflow with the selected project
       const response = await createWorkflow(selectedProject);
 
-      if (!response) {
+      if (!response || !response.data) {
         errorToast("Failed to create agent workflow");
         return;
       }
 
+      // Extract workflow_id from response (could be in workflow_id or id field)
+      const workflowId = response.data.workflow_id || response.data.id;
+
       // Update URL with workflow ID
-      if (response.workflow_id) {
+      if (workflowId) {
         // Build URL manually to avoid encoding issues
         // Use window.location.pathname to get the actual browser URL (not router.pathname which includes /home)
         const currentPath = window.location.pathname;
@@ -83,7 +86,7 @@ export default function SelectProject() {
         });
 
         // Add new agent param
-        queryParts.push(`agent=${response.workflow_id}`);
+        queryParts.push(`agent=${workflowId}`);
 
         // Build the final URL
         const newUrl = queryParts.length > 0
@@ -97,7 +100,11 @@ export default function SelectProject() {
           newUrl
         );
 
-        console.log('Updated URL with workflow ID:', response.workflow_id);
+        console.log('Updated URL with workflow ID:', workflowId);
+      } else {
+        console.error('No workflow_id found in response:', response.data);
+        errorToast("Failed to get workflow ID");
+        return;
       }
 
       // Move to next step - Select Type screen (now step 2)
