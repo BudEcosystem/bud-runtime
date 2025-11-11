@@ -9,6 +9,7 @@ export interface OAuthState {
   promptId: string;
   connectorId: string;
   connectorName: string;
+  workflowId?: string;
   step: 1 | 2;
   timestamp: number;
 }
