@@ -864,7 +864,7 @@ async fn test_openai_compatible_warn_unknown_fields() {
     let analytics = Arc::new(tokio::sync::Mutex::new(RequestAnalytics::new()));
     tensorzero_internal::endpoints::openai_compatible::inference_handler(
         State(state),
-        Extension(analytics),
+        Some(Extension(analytics)),
         HeaderMap::default(),
         StructuredJson(
             serde_json::from_value(serde_json::json!({

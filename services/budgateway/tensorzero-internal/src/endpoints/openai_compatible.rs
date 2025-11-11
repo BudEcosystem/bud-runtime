@@ -194,7 +194,7 @@ pub async fn inference_handler(
         guardrails,
         ..
     }): AppState,
-    Extension(analytics): Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>,
+    analytics: Option<Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>>,
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleParams>,
 ) -> Result<Response<Body>, Error> {
@@ -619,7 +619,7 @@ pub async fn inference_handler(
         kafka_connection_info.clone(),
         model_credential_store.clone(),
         params,
-        Some(analytics),
+        analytics.as_ref().map(|ext| ext.0.clone()),
     )
     .await?;
 
@@ -8087,7 +8087,7 @@ struct AnthropicMetadata {
 #[debug_handler(state = AppStateData)]
 pub async fn anthropic_messages_handler(
     State(app_state): AppState,
-    Extension(analytics): Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>,
+    analytics: Option<Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>>,
     headers: HeaderMap,
     StructuredJson(anthropic_params): StructuredJson<AnthropicMessagesParams>,
 ) -> Result<Response<Body>, Error> {
@@ -8104,7 +8104,7 @@ pub async fn anthropic_messages_handler(
     // Call the existing inference handler with converted parameters
     let response = inference_handler(
         State(app_state),
-        Extension(analytics),
+        analytics,
         headers,
         StructuredJson(openai_params),
     )
