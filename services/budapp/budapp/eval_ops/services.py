@@ -4319,6 +4319,13 @@ class EvaluationWorkflowService:
                     dbrun.status = RunStatusEnum.FAILED.value
                     has_failures = True
 
+                # Raw Result
+                raw_result = RawResultModel(
+                    run_id=dbrun.id,
+                    preview_results=run.get("run", {}),
+                )
+                self.session.add(raw_result)
+
                 # Update The Metrics
                 accuracy_score_ar = run.get("scores", [])
                 if len(accuracy_score_ar) > 0:
