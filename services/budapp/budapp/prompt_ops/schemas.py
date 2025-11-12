@@ -569,7 +569,7 @@ class PromptConfigRequest(BaseModel):
         None,
         description="Unique identifier for the prompt configuration. If not provided, will be auto-generated.",
     )
-    version: Optional[int] = Field(default=1, ge=1, description="Version of the configuration to save (defaults to 1)")
+    version: int = Field(default=1, ge=1, description="Version of the configuration to save (defaults to 1)")
     set_default: bool = Field(False, description="Whether to set this version as the default (defaults to False)")
     deployment_name: Optional[str] = Field(None, min_length=1, description="Model deployment name")
     model_settings: Optional[ModelSettings] = Field(None, description="Model settings configuration")
@@ -858,7 +858,7 @@ class RegisterConnectorRequest(BaseModel):
     credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials] = Field(
         ..., description="Credentials matching connector's auth_type"
     )
-    version: Optional[int] = Field(default=1, ge=1, description="Version of prompt config (defaults to 1)")
+    version: int = Field(default=1, ge=1, description="Version of prompt config (defaults to 1)")
     permanent: bool = Field(
         default=False,
         description="Store configuration permanently without expiration (default: False, uses configured TTL)",
@@ -873,7 +873,7 @@ class AddToolRequest(BaseModel):
     tool_ids: List[UUID] = Field(
         ..., description="Tool IDs to add/update (empty list removes all tools for this connector)"
     )
-    version: Optional[int] = Field(default=1, ge=1, description="Prompt config version (defaults to 1)")
+    version: int = Field(default=1, ge=1, description="Prompt config version (defaults to 1)")
     permanent: bool = Field(
         default=False,
         description="Store configuration permanently without expiration (default: False, uses configured TTL)",
