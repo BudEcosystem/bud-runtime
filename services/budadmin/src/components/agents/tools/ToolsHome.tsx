@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Input, Spin, Empty } from 'antd';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useConnectors, Connector } from '@/stores/useConnectors';
 import { Text_14_400_757575, Text_14_400_EEEEEE } from '@/components/ui/text';
 import { ConnectorDetails } from './ConnectorDetails';
@@ -12,6 +13,9 @@ interface ToolsHomeProps {
 }
 
 export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const {
     connectors,
     connectedTools,
@@ -44,6 +48,22 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
       fetchUnregisteredTools({ page: 1, prompt_id: promptId });
     }
   }, [promptId]);
+
+  // Restore connector state from URL on initial load
+  useEffect(() => {
+    const connectorId = searchParams.get('connector');
+    if (connectorId && (connectors.length > 0 || connectedTools.length > 0)) {
+      // Find connector in either list
+      const foundConnector = connectedTools.find(c => c.id === connectorId) ||
+                            connectors.find(c => c.id === connectorId);
+
+      if (foundConnector) {
+        const isConnected = connectedTools.some(c => c.id === connectorId);
+        setSelectedConnector({ ...foundConnector, isFromConnectedSection: isConnected } as Connector);
+        setViewMode('details');
+      }
+    }
+  }, [searchParams, connectors, connectedTools]);
 
   // Handle search with debounce
   useEffect(() => {
@@ -119,11 +139,21 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     setIsSearching(false);
     setSelectedConnector({ ...connector, isFromConnectedSection: isConnected } as Connector);
     setViewMode('details');
+
+    // Add connector ID to URL parameters
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('connector', connector.id);
+    router.push(`?${params.toString()}`, { scroll: false });
   };
 
   const handleBackToList = () => {
     setSelectedConnector(null);
     setViewMode('list');
+
+    // Remove connector parameter from URL
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('connector');
+    router.push(`?${params.toString()}`, { scroll: false });
 
     // Refresh both lists when coming back
     if (promptId) {
