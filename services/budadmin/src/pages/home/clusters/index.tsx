@@ -2,7 +2,7 @@
 "use client";
 import { Box, Button, Flex } from "@radix-ui/themes";
 import { ReloadIcon, Pencil1Icon, TrashIcon } from "@radix-ui/react-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import React from "react";
 import DashBoardLayout from "../layout";
 // import { Marker } from "../../components/marker";
@@ -43,19 +43,44 @@ export default function Clusters() {
     deleteCluster,
     setClusterValues,
     getClusterById,
+    totalClusters,
+    totalPages,
   } = useCluster();
   const { contextHolder, openConfirm } = useConfirmAction();
 
-  useEffect(() => {
-    // if (hasPermission(PermissionEnum.ClusterView)) {
-    //   getClusters({ page: 1, limit: 1000 });
-    // }
-    if (isMounted) {
-      setTimeout(() => {
-        getClusters({ page: 1, limit: 1000 });
-      }, 1000);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+
+  // Add refs to prevent multiple API calls
+  const isLoadingMore = useRef(false);
+  const lastScrollTop = useRef(0);
+
+  const loadClusters = async (page: number, isInfiniteScroll: boolean = false) => {
+    if (!hasPermission(PermissionEnum.ClusterView)) return;
+
+    // Prevent multiple simultaneous calls for infinite scroll
+    if (isInfiniteScroll && isLoadingMore.current) {
+      return;
     }
-  }, [loadingUser, isMounted]);
+
+    if (isInfiniteScroll) {
+      isLoadingMore.current = true;
+    }
+
+    await getClusters({ page, limit: pageSize });
+
+    if (isInfiniteScroll) {
+      isLoadingMore.current = false;
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    if (isMounted && hasPermission(PermissionEnum.ClusterView)) {
+      loadClusters(1, false);
+    }
+  }, [isMounted]);
 
   useHandleRouteChange(() => {
     notification.destroy();
@@ -118,6 +143,38 @@ export default function Clusters() {
     router.push(`/clusters/${item.id}`);
   };
 
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollTop = target.scrollTop;
+    const scrollHeight = target.scrollHeight;
+    const clientHeight = target.clientHeight;
+
+    // Only trigger when scrolling down
+    if (scrollTop <= lastScrollTop.current) {
+      lastScrollTop.current = scrollTop;
+      return;
+    }
+
+    lastScrollTop.current = scrollTop;
+
+    // Calculate if we're near the bottom (within 100px)
+    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
+
+    // Check if we should load more
+    if (
+      isNearBottom &&
+      !isLoadingMore.current &&
+      totalClusters &&
+      totalPages &&
+      clusters.length < totalClusters &&
+      currentPage < totalPages
+    ) {
+      const nextPage = currentPage + 1;
+      setCurrentPage(nextPage);
+      loadClusters(nextPage, true);
+    }
+  };
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -141,7 +198,10 @@ export default function Clusters() {
           />
         </div>
         {hasPermission(PermissionEnum.ClusterView) ? (
-          <div className="boardMainContainer listingContainer scroll-smooth ">
+          <div
+            className="boardMainContainer listingContainer scroll-smooth"
+            onScroll={handleScroll}
+          >
             {clusters.length > 0 ? (
               <div className="grid gap-[1.1rem] grid-cols-3 mt-[2.95rem] 1680px:mt-[1.75rem] pb-[1.1rem]">
                 <>
