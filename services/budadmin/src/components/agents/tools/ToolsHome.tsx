@@ -71,24 +71,23 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
       return;
     }
 
+    // Don't fetch if already loading
+    if (isLoadingDetails) {
+      return;
+    }
+
     // Don't fetch if we already have the details for this connector
     if (selectedConnectorDetails && selectedConnectorDetails.id === connectorId) {
       hasRestoredFromUrl.current = true;
       return;
     }
 
-    // Fetch connector details from API
-    const restoreFromUrl = async () => {
-      try {
-        hasRestoredFromUrl.current = true;
-        await fetchConnectorDetails(connectorId);
-      } catch (error) {
-        console.error('Error fetching connector from URL:', error);
-        hasRestoredFromUrl.current = false;
-      }
-    };
-
-    restoreFromUrl();
+    // Fetch connector details from API (only once)
+    hasRestoredFromUrl.current = true;
+    fetchConnectorDetails(connectorId).catch((error) => {
+      console.error('Error fetching connector from URL:', error);
+      hasRestoredFromUrl.current = false;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 

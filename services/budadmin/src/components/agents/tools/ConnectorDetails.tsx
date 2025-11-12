@@ -162,9 +162,18 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     }
   }, [promptId, connector.id, selectedConnectorDetails?.auth_type]);
 
-  // Fetch connector details on mount
+  // Fetch connector details on mount (only if not already loaded)
   useEffect(() => {
+    // Don't fetch if we already have the details for this connector
+    if (selectedConnectorDetails && selectedConnectorDetails.id === connector.id) {
+      return;
+    }
+    // Don't fetch if already loading
+    if (isLoadingDetails) {
+      return;
+    }
     fetchConnectorDetails(connector.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connector.id]);
 
   // Handle OAuth callback on mount
