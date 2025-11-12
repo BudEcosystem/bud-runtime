@@ -1,3 +1,5 @@
+import { Logger, extractErrorMessage, categorizeError } from '@/app/lib/logger';
+
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 300;
 
@@ -68,12 +70,31 @@ const buildPromptInput = (body: PromptBody) => {
 };
 
 export async function POST(req: Request) {
-  const body: PromptBody = await req.json();
+  const logger = new Logger({ endpoint: 'Prompt Chat', method: 'POST' });
+
+  let body: PromptBody;
+  try {
+    body = await req.json();
+  } catch (error) {
+    logger.error('Failed to parse request body', error);
+    return Response.json(
+      { error: 'Invalid JSON in request body' },
+      { status: 400 },
+    );
+  }
 
   const authorization = req.headers.get('authorization');
   const apiKey = req.headers.get('api-key');
 
+  // Log request details (sanitized)
+  const headers: Record<string, string> = {
+    'authorization': authorization || 'missing',
+    'api-key': apiKey || 'missing',
+  };
+  logger.logRequest(body, headers);
+
   if (!authorization && !apiKey) {
+    logger.error('Missing authentication credentials');
     return new Response('Unauthorized', { status: 401 });
   }
 
@@ -85,6 +106,7 @@ export async function POST(req: Request) {
   // For initial prompt submission, we need prompt input
   // For follow-up messages, we rely on the messages array
   if (!promptInput && !isFollowUpMessage) {
+    logger.warn('Missing prompt input or messages', { promptInput, isFollowUpMessage });
     return Response.json(
       { error: 'Missing prompt input or messages' },
       { status: 400 },
@@ -93,6 +115,8 @@ export async function POST(req: Request) {
 
   const model = body.model || 'qwen-4b-tools';
   const baseURL = resolveGatewayBase(body.metadata?.base_url ?? null);
+
+  logger.info(`Using model: ${model}, Gateway URL: ${baseURL}`);
 
   try {
     // Check if this is a structured prompt (has variables)
@@ -142,36 +166,62 @@ export async function POST(req: Request) {
     }
 
     // Make direct fetch call to gateway
-    const headers: Record<string, string> = {
+    const gatewayHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(authorization && { 'Authorization': authorization }),
       ...(apiKey && { 'api-key': apiKey }),
       ...(body.metadata?.project_id && { 'project-id': body.metadata.project_id }),
     };
 
-    const response = await fetch(`${baseURL}/responses`, {
+    const gatewayUrl = `${baseURL}/responses`;
+    logger.logGatewayRequest(gatewayUrl, 'POST', gatewayHeaders, requestBody);
+
+    const response = await fetch(gatewayUrl, {
       method: 'POST',
-      headers,
+      headers: gatewayHeaders,
       body: JSON.stringify(requestBody),
     });
 
+    logger.info(`Gateway response status: ${response.status}`);
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[Prompt Chat] Error response:', errorText);
+      logger.logGatewayResponse(response.status, errorText);
 
+      // Parse error message properly
       let errorMessage = 'Failed to generate response';
+      let errorJson: any = null;
+
       try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error || errorMessage;
+        errorJson = JSON.parse(errorText);
+        // Use the new extractErrorMessage utility to properly extract the message
+        errorMessage = extractErrorMessage(errorJson);
       } catch (e) {
-        errorMessage = errorText;
+        // If parsing fails, use the raw text
+        errorMessage = errorText || errorMessage;
       }
 
-      throw new Error(errorMessage);
+      logger.error('Gateway returned error', {
+        status: response.status,
+        errorMessage,
+        rawResponse: errorText.substring(0, 500),
+      });
+
+      // Categorize the error for user-friendly message
+      const categorized = categorizeError(response.status, errorMessage);
+
+      // Throw with both technical and user-friendly messages
+      const error: any = new Error(categorized.userMessage);
+      error.technicalMessage = categorized.technicalMessage;
+      error.category = categorized.category;
+      error.statusCode = response.status;
+
+      throw error;
     }
 
     // Get the response as text first
     const responseText = await response.text();
+    logger.logGatewayResponse(response.status, responseText);
 
     let text = '';
     let usage: any = null;
@@ -272,30 +322,54 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('[Prompt Chat] Error:', error);
-    console.error('[Prompt Chat] Error message:', error?.message);
+    // Log detailed error information
+    logger.error('Failed to process prompt chat request', error, {
+      category: error?.category,
+      statusCode: error?.statusCode,
+      technicalMessage: error?.technicalMessage,
+    });
 
-    // Handle errors
-    let actualError = error?.message ?? 'Failed to generate response';
+    // Determine the user-facing error message
+    let userMessage = 'Failed to generate response';
+    let technicalMessage = error?.message || userMessage;
+    let statusCode = 500;
 
-    if (error?.responseBody) {
+    // If we have a categorized error from the gateway
+    if (error?.category && error?.statusCode) {
+      userMessage = error.message; // Already user-friendly from categorizeError
+      technicalMessage = error.technicalMessage || error.message;
+      statusCode = error.statusCode;
+    } else if (error?.responseBody) {
+      // Legacy error handling for other error formats
       try {
         const parsedError = JSON.parse(error.responseBody);
-        if (parsedError?.error) {
-          actualError = typeof parsedError.error === 'string'
-            ? parsedError.error
-            : parsedError.error.message || actualError;
-        }
+        technicalMessage = extractErrorMessage(parsedError);
+        const categorized = categorizeError(statusCode, technicalMessage);
+        userMessage = categorized.userMessage;
       } catch (e) {
-        actualError = error.responseBody;
+        technicalMessage = error.responseBody;
       }
+    } else if (error?.message) {
+      // Extract from standard Error object
+      technicalMessage = error.message;
+      const categorized = categorizeError(statusCode, technicalMessage);
+      userMessage = categorized.userMessage;
     }
 
+    // Log final error response
+    logger.error('Returning error response', {
+      statusCode,
+      userMessage,
+      technicalMessage,
+    });
+
+    // Return structured error response
     return Response.json(
       {
-        error: actualError,
+        error: userMessage,
+        details: process.env.NODE_ENV === 'development' ? technicalMessage : undefined,
       },
-      { status: 500 },
+      { status: statusCode },
     );
   }
 }

@@ -375,21 +375,40 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
               <MessageLoading />
             )}
             {error && (
-              <div className="mt-4 pb-4">
-                <div
-                  className="text-[#FF0000] text-[.75rem] font-[400]
-
-                "
-                >
-                  {error.message}
+              <div className="mt-4 pb-4 border border-[#FF000040] bg-[#FF000010] rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="10" cy="10" r="9" stroke="#FF0000" strokeWidth="1.5"/>
+                      <path d="M10 6V11" stroke="#FF0000" strokeWidth="1.5" strokeLinecap="round"/>
+                      <circle cx="10" cy="14" r="0.75" fill="#FF0000"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-[#FF4444] text-[.875rem] font-[500] mb-2">
+                      Error Processing Request
+                    </div>
+                    <div className="text-[#FFAAAA] text-[.75rem] font-[400] leading-relaxed">
+                      {error.message || 'An unexpected error occurred'}
+                    </div>
+                    {process.env.NODE_ENV === 'development' && (error as any).details && (
+                      <details className="mt-3">
+                        <summary className="text-[#FF8888] text-[.7rem] cursor-pointer hover:text-[#FFAAAA]">
+                          Technical Details
+                        </summary>
+                        <div className="mt-2 text-[#FF8888] text-[.65rem] font-mono bg-[#00000040] p-2 rounded overflow-auto max-h-32">
+                          {(error as any).details}
+                        </div>
+                      </details>
+                    )}
+                  </div>
                 </div>
                 <button
                   type="button"
-                  className="px-[.5rem] p-[.25rem] mt-4 text-[#fff] border border-[#757575] rounded-sm bg-[#965cde] text-[.75rem] font-[400] hover:bg-[#965cde] hover:text-[
-                  #fff] focus:outline-none cursor-pointer"
+                  className="px-[.75rem] py-[.5rem] mt-4 text-[#fff] border border-[#965cde] rounded-md bg-[#965cde] text-[.75rem] font-[500] hover:bg-[#8a4dcc] hover:border-[#8a4dcc] transition-colors focus:outline-none focus:ring-2 focus:ring-[#965cde] focus:ring-offset-2 focus:ring-offset-[#101010] cursor-pointer"
                   onClick={() => reload()}
                 >
-                  Retry
+                  Try Again
                 </button>
               </div>
             )}
