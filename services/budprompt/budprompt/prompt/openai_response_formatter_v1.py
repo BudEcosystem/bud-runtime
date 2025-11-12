@@ -68,6 +68,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.run import AgentRunResult
 
+from ..commons.constants import STRUCTURED_OUTPUT_TOOL_NAME, STRUCTURED_PUTOUT_TOOL_DESCRIPTION
 from ..responses.schemas import OpenAIResponse
 from .schemas import MCPToolConfig, Message, ModelSettings
 
@@ -115,8 +116,10 @@ class OpenAIResponseFormatter_V1:
             # Get messages from pydantic-ai result
             all_messages = pydantic_result.all_messages()
 
-            # Extract output items using official types and get MCP tool call IDs
-            output_items, mcp_tool_call_ids = await self._format_output_items(all_messages, tools)
+            # Extract output items and add structured output if present
+            output_items, mcp_tool_call_ids = await self.build_complete_output_items(
+                all_messages, pydantic_result, tools
+            )
 
             # Extract input items (system prompts, user prompts, tool returns, retry prompts)
             # Pass MCP tool call IDs to identify MCP tool returns
@@ -269,6 +272,103 @@ class OpenAIResponseFormatter_V1:
                             )
 
         return output_items, mcp_tool_call_ids
+
+    async def build_complete_output_items(
+        self,
+        all_messages: List[ModelMessage],
+        agent_result: AgentRunResult,
+        tools: Optional[List[MCPToolConfig]] = None,
+    ) -> tuple[List[Any], set]:
+        """Format output items from messages and add structured output if present.
+
+        This wrapper around _format_output_items also checks for and adds
+        structured output from final_result tool returns.
+
+        Args:
+            all_messages: All messages from agent execution
+            agent_result: The AgentRunResult from pydantic-ai
+            tools: Optional MCP tool configurations
+
+        Returns:
+            Tuple of (output_items list, mcp_tool_call_ids set)
+        """
+        # Get base output items
+        output_items, mcp_tool_call_ids = await self._format_output_items(all_messages, tools)
+
+        # Check if we should add structured output text from result.output
+        if self._has_final_result_tool_return(agent_result, all_messages):
+            structured_output = agent_result.output
+
+            output_items.append(
+                ResponseOutputMessage(
+                    id=f"msg_{uuid.uuid4().hex}",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            type="output_text",
+                            text=(
+                                structured_output.model_dump_json()
+                                if hasattr(structured_output, "model_dump_json")
+                                else str(structured_output)
+                            ),
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            )
+            logger.debug("Added structured output text from result.output (final_result tool return detected)")
+
+        return output_items, mcp_tool_call_ids
+
+    def _has_final_result_tool_return(
+        self,
+        result: AgentRunResult,
+        all_messages: List[ModelMessage],
+    ) -> bool:
+        """Check if result has a final_result tool return indicating structured output.
+
+        Verifies:
+        1. result.output has a value (not None or empty)
+        2. result._output_tool_name is "final_result"
+        3. Any message contains a ToolReturnPart for "final_result"
+        4. Tool return content is "Final result processed."
+
+        Args:
+            result: The AgentRunResult from execution
+            all_messages: All messages from result.all_messages()
+
+        Returns:
+            True if final_result tool return is present with expected content
+        """
+        # Check if result.output has a value
+        if not result.output:
+            return False
+
+        # Check if Tool Output mode with final_result
+        if not result._output_tool_name or result._output_tool_name != STRUCTURED_OUTPUT_TOOL_NAME:
+            return False
+
+        # Check if messages exist
+        if not all_messages:
+            return False
+
+        # Search through all messages for the final_result ToolReturnPart
+        for message in all_messages:
+            if not hasattr(message, "parts") or not message.parts:
+                continue
+
+            for part in message.parts:
+                # Check if this is the final_result ToolReturnPart with expected content
+                if (
+                    isinstance(part, ToolReturnPart)
+                    and part.tool_name == STRUCTURED_OUTPUT_TOOL_NAME
+                    and part.content == STRUCTURED_PUTOUT_TOOL_DESCRIPTION
+                ):
+                    return True
+
+        return False
 
     async def _format_input_items(
         self,

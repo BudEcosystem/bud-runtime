@@ -84,6 +84,7 @@ from pydantic_ai.messages import (
     ToolCallPartDelta,
 )
 
+from ..commons.constants import STRUCTURED_OUTPUT_TOOL_NAME
 from ..responses.schemas import OpenAIResponse
 from .schemas import MCPToolConfig, Message, ModelSettings
 
@@ -107,6 +108,8 @@ class PartState(BaseModel):
     tool_name: Optional[str] = None  # For tool calls
     server_label: Optional[str] = None  # For MCP tools
     is_mcp: bool = False  # Whether this is an MCP tool
+    is_final_result_tool: bool = False  # Whether this is the final_result tool (streamed as text)
+    stored_deltas: List[str] = []  # Store argument deltas for final_result tool
     finalized: bool = False  # Whether done events have been emitted
 
 
@@ -586,6 +589,12 @@ class OpenAIStreamingFormatter_V1:
             tool_name = event.part.tool_name
             arguments = event.part.args_as_json_str() if event.part.has_content() else ""
 
+            # Detect if this is final_result tool for later processing
+            is_final_result = tool_name == STRUCTURED_OUTPUT_TOOL_NAME
+            if is_final_result:
+                # Consider final_result tool used to build structured output as internal mcp call
+                is_mcp_tool = True
+
             # Get server label for MCP tools
             server_label = self._get_server_label(tool_name) if is_mcp_tool else None
 
@@ -598,6 +607,8 @@ class OpenAIStreamingFormatter_V1:
                 tool_name=tool_name,
                 server_label=server_label,
                 is_mcp=is_mcp_tool,
+                is_final_result_tool=is_final_result,
+                stored_deltas=[],  # Initialize empty list for storing deltas
             )
 
             if is_mcp_tool:
@@ -728,6 +739,10 @@ class OpenAIStreamingFormatter_V1:
 
                 # Accumulate arguments
                 state.accumulated_args += args_delta_str
+
+                # Store delta if this is final_result tool (for later text emission)
+                if state.is_final_result_tool:
+                    state.stored_deltas.append(args_delta_str)
 
                 # Emit mcp_call_arguments.delta
                 events.append(
@@ -939,6 +954,7 @@ class OpenAIStreamingFormatter_V1:
                     sequence_number=self._next_sequence(),
                     output_index=output_index,
                     item_id=tool_call_id,
+                    name=tool_state.tool_name,
                     arguments=arguments,
                 )
             )
@@ -976,15 +992,16 @@ class OpenAIStreamingFormatter_V1:
             return events
 
         # Format tool result as string
-        if hasattr(tool_result, "model_dump_json"):
+        if hasattr(tool_result, "model_response_str"):
+            # Handle ToolReturnPart - use model_response_str() to properly serialize content
+            # This method handles both string and non-string content (lists, dicts) correctly
+            result_str = tool_result.model_response_str()
+        elif hasattr(tool_result, "model_dump_json"):
             result_str = tool_result.model_dump_json()
         elif hasattr(tool_result, "model_dump"):
             result_str = json.dumps(tool_result.model_dump())
         elif isinstance(tool_result, dict):
             result_str = json.dumps(tool_result)
-        elif hasattr(tool_result, "content"):
-            # Handle ToolReturnPart - extract just the content field
-            result_str = tool_result.content
         else:
             result_str = str(tool_result)
 
@@ -1041,6 +1058,171 @@ class OpenAIStreamingFormatter_V1:
 
         # Mark as finalized
         tool_state.finalized = True
+
+        return events
+
+    async def _map_post_final_result_event(self) -> List[ResponseStreamEvent]:
+        events: List[ResponseStreamEvent] = []
+
+        # Find the tool call state by item_id
+        tool_state = None
+        output_index = None
+        for idx, state in self.parts_state.items():
+            if state.is_final_result_tool and state.stored_deltas:
+                tool_state = state
+                output_index = idx
+                break
+
+        logger.debug("Found tool state: %s", tool_state)
+
+        # If this is final_result tool, emit stored deltas as output_text
+        if tool_state:
+            # First, emit MCP tool completion events (that were skipped during normal flow)
+
+            # 1. Emit response.mcp_call_arguments.done
+            events.append(
+                ResponseMcpCallArgumentsDoneEvent(
+                    type="response.mcp_call_arguments.done",
+                    sequence_number=self._next_sequence(),
+                    output_index=output_index,
+                    item_id=tool_state.item_id,
+                    arguments=tool_state.accumulated_args,
+                )
+            )
+
+            # 2. Emit response.mcp_call.completed
+            events.append(
+                ResponseMcpCallCompletedEvent(
+                    type="response.mcp_call.completed",
+                    sequence_number=self._next_sequence(),
+                    output_index=output_index,
+                    item_id=tool_state.item_id,
+                )
+            )
+
+            # 3. Emit response.output_item.done (for the mcp_call)
+            events.append(
+                ResponseOutputItemDoneEvent(
+                    type="response.output_item.done",
+                    sequence_number=self._next_sequence(),
+                    output_index=output_index,
+                    item=ResponseOutputMcpCall(
+                        id=tool_state.item_id,
+                        type="mcp_call",
+                        status="completed",
+                        name=tool_state.tool_name,
+                        server_label=tool_state.server_label or "unknown",
+                        arguments=tool_state.accumulated_args,
+                        output="",  # Empty output for final_result internal tool
+                        error=None,
+                    ),
+                )
+            )
+
+            # Now emit the text output representation
+            # Create a new message output item for text representation
+            message_id = f"msg_{uuid.uuid4().hex}"
+            next_output_index = output_index + 1  # Use next output index
+
+            # 4. Emit response.output_item.added (message)
+            events.append(
+                ResponseOutputItemAddedEvent(
+                    type="response.output_item.added",
+                    sequence_number=self._next_sequence(),
+                    output_index=next_output_index,
+                    item=ResponseOutputMessage(
+                        id=message_id,
+                        type="message",
+                        role="assistant",
+                        status="in_progress",
+                        content=[],
+                    ),
+                )
+            )
+
+            # 5. Emit response.content_part.added (text part)
+            events.append(
+                ResponseContentPartAddedEvent(
+                    type="response.content_part.added",
+                    sequence_number=self._next_sequence(),
+                    output_index=next_output_index,
+                    item_id=message_id,
+                    content_index=0,
+                    part=ResponseOutputText(
+                        type="output_text",
+                        text="",
+                        annotations=[],
+                    ),
+                )
+            )
+
+            # 6. Emit response.output_text.delta for each stored delta
+            for delta_str in tool_state.stored_deltas:
+                events.append(
+                    ResponseTextDeltaEvent(
+                        type="response.output_text.delta",
+                        sequence_number=self._next_sequence(),
+                        item_id=message_id,
+                        output_index=next_output_index,
+                        content_index=0,
+                        delta=delta_str,
+                        logprobs=[],
+                    )
+                )
+
+            # 7. Emit response.output_text.done
+            complete_text = "".join(tool_state.stored_deltas)
+            events.append(
+                ResponseTextDoneEvent(
+                    type="response.output_text.done",
+                    sequence_number=self._next_sequence(),
+                    item_id=message_id,
+                    output_index=next_output_index,
+                    content_index=0,
+                    text=complete_text,
+                    logprobs=[],
+                )
+            )
+
+            # 8. Emit response.content_part.done
+            events.append(
+                ResponseContentPartDoneEvent(
+                    type="response.content_part.done",
+                    sequence_number=self._next_sequence(),
+                    item_id=message_id,
+                    output_index=next_output_index,
+                    content_index=0,
+                    part=ResponseOutputText(
+                        type="output_text",
+                        text=complete_text,
+                        annotations=[],
+                        logprobs=[],
+                    ),
+                )
+            )
+
+            # 9. Emit response.output_item.done (message)
+            events.append(
+                ResponseOutputItemDoneEvent(
+                    type="response.output_item.done",
+                    sequence_number=self._next_sequence(),
+                    output_index=next_output_index,
+                    item=ResponseOutputMessage(
+                        id=message_id,
+                        type="message",
+                        role="assistant",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                type="output_text",
+                                text=complete_text,
+                                annotations=[],
+                                logprobs=[],
+                            )
+                        ],
+                    ),
+                )
+            )
 
         return events
 
@@ -1180,7 +1362,8 @@ class OpenAIStreamingFormatter_V1:
         """Build complete output items from AgentRunResult.
 
         This reuses the non-streaming formatter's logic to parse all messages
-        and build a complete output array including MCP tools, calls, and text.
+        and build a complete output array including MCP tools, calls, text, and
+        structured output from final_result tool returns.
 
         Args:
             final_result: The AgentRunResult from pydantic-ai
@@ -1191,10 +1374,10 @@ class OpenAIStreamingFormatter_V1:
         """
         from .openai_response_formatter_v1 import OpenAIResponseFormatter_V1
 
-        # Use the non-streaming formatter to extract output items from all messages
+        # Use the non-streaming formatter to build complete output items (includes structured output)
         formatter = OpenAIResponseFormatter_V1()
         all_messages = final_result.all_messages()
-        output_items, _ = await formatter._format_output_items(all_messages, tools)
+        output_items, _ = await formatter.build_complete_output_items(all_messages, final_result, tools)
 
         return output_items
 

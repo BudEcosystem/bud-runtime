@@ -1274,7 +1274,7 @@ class SimplePromptExecutor_V1:
             rendered_system_prompt = render_template(system_prompt, context) if system_prompt else None
 
             # Handle output type and validation
-            output_type = await self._get_output_type(output_schema, output_validation)
+            output_type = await self._get_output_type(output_schema, output_validation, tools)
 
             # Load toolsets from tools configuration (only if tools are present)
             toolsets = await self._load_toolsets(tools)
@@ -1346,17 +1346,18 @@ class SimplePromptExecutor_V1:
         self,
         output_schema: Optional[Dict[str, Any]],
         output_validation: Optional[Dict[str, Any]] = None,
+        tools: Optional[List[MCPToolConfig]] = None,
     ) -> Any:
         """Extract output type from schema's content field and apply validation if needed.
 
         Args:
             output_schema: JSON schema with content field
             output_validation: Natural language validation rules with generated codes
-            stream: Whether streaming is enabled
+            tools: Optional list of tool configurations (MCP tools, etc.)
 
         Returns:
             The type of the content field, potentially enhanced with validation,
-            wrapped in NativeOutput if it contains BaseModel
+            wrapped in NativeOutput if it contains BaseModel (unless tools are present)
         """
         if output_schema is None:
             return str
@@ -1375,10 +1376,15 @@ class SimplePromptExecutor_V1:
         # Extract type from content field using Pydantic v2 field access
         output_type = output_model.__pydantic_fields__["content"].annotation
 
-        # Return NativeOutput if type contains BaseModel, otherwise return raw type
-        if contains_pydantic_model(output_type):
+        # Return NativeOutput if type contains BaseModel and tools are not present
+        # When tools are present, return raw Pydantic model for proper tool handling
+        if contains_pydantic_model(output_type) and not (tools):
+            logger.debug("Wrapping output model with NativeOutput")
             return NativeOutput(output_type)
         else:
+            if tools:
+                logger.debug("Tools detected, returning raw Pydantic model without NativeOutput")
+                # By default, Pydantic ai use Tool Output https://ai.pydantic.dev/output/#tool-output
             return output_type
 
     async def _get_input_model_with_validation(
@@ -1815,6 +1821,13 @@ class SimplePromptExecutor_V1:
             else:
                 output_items = formatter.build_final_output_items()  # Fallback to accumulated state
                 final_instructions = instructions  # Use initial instructions as fallback
+
+            # When final tool call is complete, it won't execute the FunctionToolResultEvent we need to internally handle
+            final_tool_call_events = await formatter._map_post_final_result_event()
+
+            # Emit each OpenAI event as SSE
+            for openai_event in final_tool_call_events:
+                yield formatter.format_sse_from_event(openai_event)
 
             # FINAL EVENT: response.completed (with usage and complete response)
             yield formatter.format_sse_from_event(
