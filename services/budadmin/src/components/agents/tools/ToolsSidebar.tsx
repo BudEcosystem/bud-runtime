@@ -7,12 +7,14 @@ interface ToolsSidebarProps {
   isOpen: boolean;
   onClose?: () => void;
   promptId?: string;
+  workflowId?: string;
 }
 
 export const ToolsSidebar: React.FC<ToolsSidebarProps> = ({
   isOpen,
   onClose,
   promptId,
+  workflowId,
 }) => {
   if (!isOpen) return null;
 
@@ -30,7 +32,7 @@ export const ToolsSidebar: React.FC<ToolsSidebarProps> = ({
           backgroundRepeat: 'no-repeat'
         }}
       >
-        <ToolsHome promptId={promptId} />
+        <ToolsHome promptId={promptId} workflowId={workflowId} />
       </div>
     </div>
   );
