@@ -15,6 +15,7 @@ interface RunHistoryItem {
     startedDate: string;
     duration: string;
     benchmarkScore: string;
+    runs: string;
 }
 
 interface RunsHistoryTableProps {
@@ -41,14 +42,14 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
                 <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
             ),
         },
-        {
-            title: "Trait Name",
-            dataIndex: "traitName",
-            key: "traitName",
-            render: (text: string) => (
-                <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-            ),
-        },
+        // {
+        //     title: "Trait Name",
+        //     dataIndex: "traitName",
+        //     key: "traitName",
+        //     render: (text: string) => (
+        //         <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
+        //     ),
+        // },
         {
             title: "Status",
             dataIndex: "status",
@@ -85,14 +86,37 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
             ),
         },
         {
-            title: "Trait Score",
-            dataIndex: "benchmarkScore",
-            key: "benchmarkScore",
-            render: (text: string) => (
-                <div className="flex space-x-2">
-                    <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-                </div>
-            ),
+            title: "Evaluated Benchmark and Score",
+            dataIndex: "runs",
+            key: "runs",
+            width: 300,
+            render: (text: string) => {
+                let runs: { dataset_name: string; score: string | number }[];
+                try {
+                    runs = JSON.parse(text);
+                } catch (e) {
+                    console.error("Failed to parse runs JSON:", text, e);
+                    return <Text_12_400_EEEEEE>Invalid data</Text_12_400_EEEEEE>;
+                }
+
+                if (!Array.isArray(runs)) {
+                    return <Text_12_400_EEEEEE>Invalid data format</Text_12_400_EEEEEE>;
+                }
+
+                return (
+                    <div className="flex space-x-2 flex-wrap">
+                        {runs.map((el, index) => (
+                            <ProjectTags
+                                key={index} // A unique ID from `el` would be better if available.
+                                name={`${el.dataset_name}, ${el.score || '-'}`}
+                                color={'#EEEEEE'}
+                                textClass="text-[.75rem] py-[.22rem]"
+                                tagClass="py-[0rem]"
+                            />
+                        ))}
+                    </div>
+                );
+            },
         },
     ];
 
