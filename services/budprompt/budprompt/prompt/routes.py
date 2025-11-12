@@ -22,7 +22,7 @@ from typing import Optional, Union
 
 from budmicroframe.commons.api_utils import pubsub_api_endpoint
 from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
 from ..commons.exceptions import ClientException
@@ -184,6 +184,50 @@ async def perform_prompt_cleanup(request: PromptCleanupRequest) -> Response:
             response = ErrorResponse(message="Error running prompt cleanup", code=500)
     else:
         response = await PromptCleanupWorkflow().__call__(request)
+
+    return response.to_http_response()
+
+
+@prompt_router.post(
+    "/prompt-cleanup-cron",
+    response_model=Union[SuccessResponse, ErrorResponse],
+    summary="Scheduled prompt cleanup (Dapr cron trigger)",
+    description="Periodic cleanup of expired MCP resources triggered by Dapr cron binding",
+    responses={
+        200: {
+            "description": "Cleanup executed successfully",
+            "model": SuccessResponse,
+        },
+        500: {"description": "Internal server error"},
+    },
+)
+async def perform_prompt_cleanup_cron(request: Request) -> Response:
+    """Run scheduled prompt cleanup workflow triggered by Dapr cron binding.
+
+    This endpoint is invoked periodically by the Dapr cron scheduler to cleanup
+    expired MCP resources. It automatically scans for and removes temporary
+    prompts that have exceeded their TTL.
+
+    The endpoint accepts an empty POST request from the Dapr cron binding.
+    For manual testing, you can also call this endpoint directly.
+
+    Returns:
+        HTTP response containing the cleanup results.
+    """
+    response: Union[SuccessResponse, ErrorResponse]
+
+    try:
+        logger.info("Scheduled prompt cleanup triggered by Dapr cron binding")
+
+        # Create request with empty prompts list = cleanup expired prompts
+        cleanup_request = PromptCleanupRequest(prompts=[])
+
+        # Execute cleanup workflow
+        response = await PromptCleanupWorkflow().__call__(cleanup_request)
+
+    except Exception as e:
+        logger.exception("Error running scheduled prompt cleanup: %s", str(e))
+        response = ErrorResponse(message="Error running scheduled prompt cleanup", code=500)
 
     return response.to_http_response()
 
