@@ -1822,6 +1822,13 @@ class SimplePromptExecutor_V1:
                 output_items = formatter.build_final_output_items()  # Fallback to accumulated state
                 final_instructions = instructions  # Use initial instructions as fallback
 
+            # When final tool call is complete, it won't execute the FunctionToolResultEvent we need to internally handle
+            final_tool_call_events = await formatter._map_post_final_result_event()
+
+            # Emit each OpenAI event as SSE
+            for openai_event in final_tool_call_events:
+                yield formatter.format_sse_from_event(openai_event)
+
             # FINAL EVENT: response.completed (with usage and complete response)
             yield formatter.format_sse_from_event(
                 ResponseCompletedEvent(
