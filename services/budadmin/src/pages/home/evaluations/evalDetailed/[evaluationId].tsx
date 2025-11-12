@@ -56,6 +56,7 @@ const EvalDetailed = () => {
   const evaluationId = router.query.evaluationId;
   const id = Array.isArray(evaluationId) ? evaluationId[0] : evaluationId;
 
+  // back functionality
   const goBack = () => {
     router.back();
   };
