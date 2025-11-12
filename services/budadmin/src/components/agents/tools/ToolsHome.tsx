@@ -192,10 +192,13 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     setSelectedConnector({ ...connector, isFromConnectedSection: isConnected } as Connector);
     setViewMode('details');
 
-    // Add connector ID to URL parameters
-    const params = new URLSearchParams(searchParams.toString());
+    // Add connector ID to URL parameters while preserving all existing parameters
+    const params = new URLSearchParams(window.location.search);
     params.set('connector', connector.id);
-    router.push(`?${params.toString()}`, { scroll: false });
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+
+    // Use window.history.pushState to avoid Next.js router interference
+    window.history.pushState({}, '', newUrl);
   };
 
   const handleBackToList = () => {
@@ -207,10 +210,13 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     hasSetConnectorFromUrl.current = false;
     lastConnectorIdRef.current = null;
 
-    // Remove connector parameter from URL
-    const params = new URLSearchParams(searchParams.toString());
+    // Remove connector parameter from URL while preserving all other parameters
+    const params = new URLSearchParams(window.location.search);
     params.delete('connector');
-    router.push(`?${params.toString()}`, { scroll: false });
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+
+    // Use window.history.pushState to avoid Next.js router interference
+    window.history.pushState({}, '', newUrl);
 
     // Refresh both lists when coming back
     if (promptId) {

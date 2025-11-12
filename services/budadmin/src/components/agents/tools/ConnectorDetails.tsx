@@ -118,40 +118,82 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     setIsLoadingTools(true);
     try {
       const authType = selectedConnectorDetails?.auth_type;
-      let response: any;
+      console.log('Connector auth_type:', authType);
 
-      // Use different endpoint based on auth type
-      if (authType?.toLowerCase() === 'oauth') {
-        response = await ConnectorService.fetchOAuthTools({
-          prompt_id: promptId,
-          connector_id: connector.id,
-          version: 1,
-        });
+      let allTools: Tool[] = [];
+
+      // If auth_type exists (any value), call OAuth fetch-tools first, then regular tools
+      if (authType) {
+        console.log('auth_type exists, calling POST /prompts/oauth/fetch-tools first');
+
+        try {
+          const oauthResponse = await ConnectorService.fetchOAuthTools({
+            prompt_id: promptId,
+            connector_id: connector.id,
+            version: 1,
+          });
+
+          console.log('OAuth fetch-tools response:', oauthResponse.data);
+
+          if (oauthResponse.data && oauthResponse.data.tools) {
+            allTools = oauthResponse.data.tools;
+          }
+
+          // On success, also call GET /prompts/tools
+          console.log('OAuth fetch-tools successful, now calling GET /prompts/tools');
+          const regularResponse = await ConnectorService.fetchTools({
+            prompt_id: promptId,
+            connector_id: connector.id,
+            page: 1,
+            limit: 100,
+          });
+
+          console.log('Regular tools response:', regularResponse.data);
+
+          if (regularResponse.data && regularResponse.data.tools) {
+            // Merge tools from both responses (avoiding duplicates by ID)
+            const regularTools = regularResponse.data.tools;
+            const existingIds = new Set(allTools.map(t => t.id));
+
+            regularTools.forEach((tool: Tool) => {
+              if (!existingIds.has(tool.id)) {
+                allTools.push(tool);
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error in OAuth flow:', error);
+          throw error;
+        }
       } else {
-        response = await ConnectorService.fetchTools({
+        // No auth_type, only call GET /prompts/tools
+        console.log('No auth_type, calling GET /prompts/tools only');
+        const response = await ConnectorService.fetchTools({
           prompt_id: promptId,
           connector_id: connector.id,
           page: 1,
           limit: 100,
         });
+
+        if (response.data && response.data.tools) {
+          allTools = response.data.tools;
+        }
       }
 
-      if (response.data && response.data.tools) {
-        const tools: Tool[] = response.data.tools;
-        setAvailableTools(tools);
+      // Set all collected tools
+      setAvailableTools(allTools);
 
-        // Auto-select tools that have is_added: true
-        const addedToolIds = tools
-          .filter((tool) => tool.is_added === true)
-          .map((tool) => tool.id)
-          .filter(Boolean);
+      // Auto-select tools that have is_added: true
+      const addedToolIds = allTools
+        .filter((tool) => tool.is_added === true)
+        .map((tool) => tool.id)
+        .filter(Boolean);
 
-        if (addedToolIds.length > 0) {
-          setSelectedTools(addedToolIds);
-          // Check if all tools are added
-          if (addedToolIds.length === tools.length) {
-            setSelectAll(true);
-          }
+      if (addedToolIds.length > 0) {
+        setSelectedTools(addedToolIds);
+        // Check if all tools are added
+        if (addedToolIds.length === allTools.length) {
+          setSelectAll(true);
         }
       }
     } catch (error) {
@@ -273,31 +315,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     }
   }, [selectedConnectorDetails?.url]); // Re-measure when connection URL changes (can affect height)
 
-  // Check OAuth status when component loads and OAuth is detected
-  useEffect(() => {
-    const checkOAuthStatus = async () => {
-      if (!promptId || !selectedConnectorDetails) return;
-
-      const authType = selectedConnectorDetails?.auth_type;
-
-      if (authType?.toLowerCase() === 'oauth') {
-        console.log('OAuth connector detected on load, checking OAuth status...');
-
-        try {
-          const statusResponse = await ConnectorService.checkOAuthStatus(promptId, connector.id);
-          console.log('OAuth status response:', statusResponse.data);
-
-          // TODO: Handle OAuth status response
-          // Possible statuses: pending, authorized, failed, etc.
-        } catch (error: any) {
-          console.error('Error checking OAuth status:', error);
-          // Don't show error toast on load, just log it
-        }
-      }
-    };
-
-    checkOAuthStatus();
-  }, [promptId, connector.id, selectedConnectorDetails]);
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
