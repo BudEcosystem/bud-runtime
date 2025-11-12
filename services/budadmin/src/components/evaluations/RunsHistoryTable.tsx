@@ -73,7 +73,7 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
             dataIndex: "startedDate",
             key: "startedDate",
             render: (date: string) => (
-                <Text_12_400_EEEEEE>{formatDate(date) || '-'}</Text_12_400_EEEEEE>
+                <Text_12_400_EEEEEE>{(date) || '-'}</Text_12_400_EEEEEE>
             ),
         },
         {

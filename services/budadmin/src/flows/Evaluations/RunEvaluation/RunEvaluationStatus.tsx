@@ -8,16 +8,18 @@ import { useEvaluations } from "src/hooks/useEvaluations";
 import { successToast } from "@/components/toast";
 import BudStepAlert from "src/flows/components/BudStepAlert";
 import CommonStatus from "src/flows/components/CommonStatus";
+import { useRouter } from "next/router";
 
 
 export default function RunEvaluationStatus() {
 
     const { openDrawerWithStep, closeDrawer, drawerProps } = useDrawer();
-    const { currentWorkflow } = useEvaluations();
+    const { currentWorkflow, getExperimentDetails } = useEvaluations();
     const [isFailed, setIsFailed] = React.useState(false);
     const [showAlert, setShowAlert] = React.useState(false);
-    const experimentId = currentWorkflow?.experiment_id || drawerProps?.experimentId;
-
+    const router = useRouter();
+    // const experimentId = currentWorkflow?.experiment_id || drawerProps?.experimentId;
+    const { experimentId } = router.query;
     const handleBack = () => {
         if (isFailed) {
             openDrawerWithStep("evaluation-summary");
@@ -55,6 +57,7 @@ export default function RunEvaluationStatus() {
                 success_payload_type="evaluate_model"
                 onCompleted={() => {
                     console.log("Evaluation completed");
+                    getExperimentDetails(experimentId.toString());
                     openDrawerWithStep("run-evaluation-success");
                 }}
                 onFailed={() => {
