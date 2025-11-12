@@ -11,6 +11,7 @@ interface SearchHeaderInputProps {
   initialWidth?: string;
   iconWidth?: string;
   iconHeight?: string;
+  fullWidth?: boolean
 }
 
 export default function SearchHeaderInput({
@@ -24,6 +25,7 @@ export default function SearchHeaderInput({
   // iconWidth = '.875rem',
   iconHeight = "0.93375rem",
   // iconHeight = '.885rem',
+  fullWidth = false
 }: SearchHeaderInputProps) {
   const inputRef = useRef<any>(null);
   const [isExpanded, setIsExpanded] = React.useState(expanded);
@@ -82,7 +84,7 @@ export default function SearchHeaderInput({
       onFocus={handleFocus}
       onBlur={handleBlur}
       style={{
-        width: isExpanded ? (expanded ? "100%" : "19.8125rem") : "1.7rem",
+        width: isExpanded ? (expanded ? "100%" : fullWidth? '' : "19.8125rem") : "1.7rem",
         borderColor: isExpanded ? "#757575" : "transparent",
         backgroundColor: isExpanded ? "#1f1f1f" : "transparent",
         transition: "width 0.2s ease-in-out",
