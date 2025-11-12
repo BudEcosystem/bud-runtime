@@ -63,9 +63,17 @@ interface ListItem {
   title: string;
   content: string[];
 }
-function LeaderboardDetails({datasets}) {
+type LeaderboardDetailsProps = {
+  datasets: {
+    estimated_input_tokens?: number;
+    estimated_output_tokens?: number;
+    description: string;
+    advantages_disadvantages: any;
+  } | null;
+};
+function LeaderboardDetails({datasets}: LeaderboardDetailsProps) {
   const router = useRouter();
-const [listData, setListData] = useState<ListItem[]>([
+  const [listData, setListData] = useState<ListItem[]>([
     { title: "Why Run this Eval?", content: [] },
     { title: "What to Expect?", content: [] },
     { title: "Advantages", content: [] },
@@ -166,7 +174,7 @@ const [listData, setListData] = useState<ListItem[]>([
                   Total Input tokens
                 </Text_12_400_EEEEEE>
                 <Text_12_400_EEEEEE className="ml-[.5rem] mr-[.4rem] text-nowrap">
-                  {datasets.estimated_input_tokens || 0}
+                  {datasets?.estimated_input_tokens || 0}
                 </Text_12_400_EEEEEE>
               </div>
             </div>
@@ -186,7 +194,7 @@ const [listData, setListData] = useState<ListItem[]>([
                   Expected Output
                 </Text_12_400_EEEEEE>
                 <Text_12_400_EEEEEE className="ml-[.5rem] mr-[.4rem] text-nowrap">
-                  {datasets.estimated_output_tokens || 0}
+                  {datasets?.estimated_output_tokens || 0}
                 </Text_12_400_EEEEEE>
               </div>
             </div>
