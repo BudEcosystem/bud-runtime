@@ -68,6 +68,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.run import AgentRunResult
 
+from ..commons.constants import STRUCTURED_OUTPUT_TOOL_NAME, STRUCTURED_PUTOUT_TOOL_DESCRIPTION
 from ..responses.schemas import OpenAIResponse
 from .schemas import MCPToolConfig, Message, ModelSettings
 
@@ -346,7 +347,7 @@ class OpenAIResponseFormatter_V1:
             return False
 
         # Check if Tool Output mode with final_result
-        if not result._output_tool_name or result._output_tool_name != "final_result":
+        if not result._output_tool_name or result._output_tool_name != STRUCTURED_OUTPUT_TOOL_NAME:
             return False
 
         # Check if messages exist
@@ -362,8 +363,8 @@ class OpenAIResponseFormatter_V1:
                 # Check if this is the final_result ToolReturnPart with expected content
                 if (
                     isinstance(part, ToolReturnPart)
-                    and part.tool_name == "final_result"
-                    and part.content == "Final result processed."
+                    and part.tool_name == STRUCTURED_OUTPUT_TOOL_NAME
+                    and part.content == STRUCTURED_PUTOUT_TOOL_DESCRIPTION
                 ):
                     return True
 

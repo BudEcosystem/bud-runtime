@@ -84,6 +84,7 @@ from pydantic_ai.messages import (
     ToolCallPartDelta,
 )
 
+from ..commons.constants import STRUCTURED_OUTPUT_TOOL_NAME
 from ..responses.schemas import OpenAIResponse
 from .schemas import MCPToolConfig, Message, ModelSettings
 
@@ -589,7 +590,7 @@ class OpenAIStreamingFormatter_V1:
             arguments = event.part.args_as_json_str() if event.part.has_content() else ""
 
             # Detect if this is final_result tool for later processing
-            is_final_result = tool_name == "final_result"
+            is_final_result = tool_name == STRUCTURED_OUTPUT_TOOL_NAME
             if is_final_result:
                 # Consider final_result tool used to build structured output as internal mcp call
                 is_mcp_tool = True
