@@ -939,6 +939,7 @@ class OpenAIStreamingFormatter_V1:
                     sequence_number=self._next_sequence(),
                     output_index=output_index,
                     item_id=tool_call_id,
+                    name=tool_state.tool_name,
                     arguments=arguments,
                 )
             )
@@ -976,15 +977,16 @@ class OpenAIStreamingFormatter_V1:
             return events
 
         # Format tool result as string
-        if hasattr(tool_result, "model_dump_json"):
+        if hasattr(tool_result, "model_response_str"):
+            # Handle ToolReturnPart - use model_response_str() to properly serialize content
+            # This method handles both string and non-string content (lists, dicts) correctly
+            result_str = tool_result.model_response_str()
+        elif hasattr(tool_result, "model_dump_json"):
             result_str = tool_result.model_dump_json()
         elif hasattr(tool_result, "model_dump"):
             result_str = json.dumps(tool_result.model_dump())
         elif isinstance(tool_result, dict):
             result_str = json.dumps(tool_result)
-        elif hasattr(tool_result, "content"):
-            # Handle ToolReturnPart - extract just the content field
-            result_str = tool_result.content
         else:
             result_str = str(tool_result)
 
