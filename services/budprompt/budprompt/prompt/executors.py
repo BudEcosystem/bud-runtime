@@ -1378,11 +1378,11 @@ class SimplePromptExecutor_V1:
 
         # Return NativeOutput if type contains BaseModel and tools are not present
         # When tools are present, return raw Pydantic model for proper tool handling
-        if contains_pydantic_model(output_type) and not (tools and len(tools) > 0):
+        if contains_pydantic_model(output_type) and not (tools):
             logger.debug("Wrapping output model with NativeOutput")
             return NativeOutput(output_type)
         else:
-            if tools and len(tools) > 0:
+            if tools:
                 logger.debug("Tools detected, returning raw Pydantic model without NativeOutput")
                 # By default, Pydantic ai use Tool Output https://ai.pydantic.dev/output/#tool-output
             return output_type
