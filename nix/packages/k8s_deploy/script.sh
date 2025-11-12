@@ -117,8 +117,8 @@ helm_ensure() {
 	fi
 
 	if ! k8s_apiresources_exists 'certificates' 'cert-manager.io/v1'; then
-		# NOTE: bump this when cert-manager is updated
-		kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.1/cert-manager.yaml
+		chart_version="$(yq '.dependencies[] | select(.name == "cert-manager") | .version' "$bud_repo_local/infra/helm/cert-manager/Chart.yaml")"
+		kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/$chart_version/cert-manager.crds.yaml"
 		helm_install cert-manager "" --skip-crds
 	fi
 
