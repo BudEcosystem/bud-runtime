@@ -8,9 +8,10 @@ import { ConnectorDetails } from './ConnectorDetails';
 
 interface ToolsHomeProps {
   promptId?: string;
+  workflowId?: string;
 }
 
-export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId }) => {
+export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) => {
   const {
     connectors,
     connectedTools,
@@ -133,7 +134,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId }) => {
 
   // Render details view
   if (viewMode === 'details' && selectedConnector) {
-    return <ConnectorDetails connector={selectedConnector} onBack={handleBackToList} promptId={promptId} />;
+    return <ConnectorDetails connector={selectedConnector} onBack={handleBackToList} promptId={promptId} workflowId={workflowId} />;
   }
 
   // Render list view

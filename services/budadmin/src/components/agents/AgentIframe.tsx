@@ -16,7 +16,6 @@ const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], ty
   const iframeUrl = playGroundUrl
     ? `${playGroundUrl}/chat?embedded=true&refresh_token=${refreshToken}&is_single_chat=false${promptIdsParam ? `&promptIds=${promptIdsParam}` : ''}`
     : '';
-
   useEffect(() => {
     if (typeof window !== "undefined") {
       setRefreshToken(localStorage.getItem("refresh_token") || "");
