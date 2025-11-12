@@ -65,7 +65,7 @@ k8s_clusterrole_exists() {
 k8s_apiresources_exists() {
 	name="$1"
 	api_version="$2"
-	kubectl api-resources | grep -q "${name}[[:space:]]+[a-z,]*[[:space:]]*${api_version}" >/dev/null 2>&1
+	kubectl api-resources | grep -Eq "${name}[[:space:]]+[a-z,]*[[:space:]]*${api_version}" >/dev/null 2>&1
 }
 k8s_ensure() {
 	if ! k8s_is_installed; then
@@ -117,6 +117,7 @@ helm_ensure() {
 	fi
 
 	if ! k8s_apiresources_exists 'certificates' 'cert-manager.io/v1'; then
+		# NOTE: bump this when cert-manager is updated
 		kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.1/cert-manager.yaml
 		helm_install cert-manager "" --skip-crds
 	fi
