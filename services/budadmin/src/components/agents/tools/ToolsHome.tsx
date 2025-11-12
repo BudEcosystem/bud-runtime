@@ -57,8 +57,13 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
   useEffect(() => {
     const connectorId = searchParams.get('connector');
 
-    // Prevent duplicate restoration
-    if (hasRestoredFromUrl.current || !connectorId) {
+    // Prevent duplicate restoration or unnecessary calls
+    if (!connectorId || hasRestoredFromUrl.current) {
+      return;
+    }
+
+    // Don't fetch if we already have the details for this connector
+    if (selectedConnectorDetails && selectedConnectorDetails.id === connectorId) {
       return;
     }
 
@@ -74,13 +79,19 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     };
 
     restoreFromUrl();
-  }, [searchParams, fetchConnectorDetails]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Set selected connector when details are fetched
   useEffect(() => {
     const connectorId = searchParams.get('connector');
 
     if (connectorId && selectedConnectorDetails && selectedConnectorDetails.id === connectorId) {
+      // Don't update if already selected
+      if (selectedConnector && selectedConnector.id === connectorId) {
+        return;
+      }
+
       // Check if connector is in connected tools
       const isConnected = connectedTools.some(c => c.id === connectorId);
 
@@ -90,7 +101,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
       } as Connector);
       setViewMode('details');
     }
-  }, [selectedConnectorDetails, searchParams, connectedTools]);
+  }, [selectedConnectorDetails, searchParams, connectedTools, selectedConnector]);
 
   // Handle search with debounce
   useEffect(() => {
