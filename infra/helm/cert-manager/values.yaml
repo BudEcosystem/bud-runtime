@@ -1,4 +1,4 @@
-email: root@example.com
+email: noreply@bud.studio
 
 cert-manager:
   enabled: true

@@ -117,9 +117,9 @@ helm_ensure() {
 	fi
 
 	if ! k8s_apiresources_exists 'certificates' 'cert-manager.io/v1'; then
-		chart_version="$(yq '.dependencies[] | select(.name == "cert-manager") | .version' "$bud_repo_local/infra/helm/cert-manager/Chart.yaml")"
+		chart_version="v$(yq -r '.dependencies[] | select(.name == "cert-manager") | .version' "$bud_repo_local/infra/helm/cert-manager/Chart.yaml")"
 		kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/$chart_version/cert-manager.crds.yaml"
-		helm_install cert-manager "" --skip-crds
+		helm_install cert-manager "" --skip-crds --set cert-manager.crds.enabled=false
 	fi
 
 	vim "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
@@ -159,7 +159,7 @@ nvidia_ensure() {
 }
 
 traefik_ensure() {
-	if k8s_clusterrole_exists traefik-kube-system; then
+	if k8s_apiresources_exists 'middlewares' 'traefik.io/v1alpha1'; then
 		return
 	fi
 
