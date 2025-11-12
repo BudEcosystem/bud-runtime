@@ -2,7 +2,7 @@
 "use client";
 import { Box, Flex } from "@radix-ui/themes";
 import { PlusIcon, Share1Icon } from "@radix-ui/react-icons";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import React from "react";
 import DashBoardLayout from "../layout";
 import {
@@ -52,7 +52,7 @@ const Projects = () => {
     router.push(`/projects/${item.project.id}`);
   };
 
-  const load = async (page: number, size: number, searchTerm?: string, isInfiniteScroll: boolean = false) => {
+  const load = useCallback(async (page: number, size: number, searchTerm?: string, isInfiniteScroll: boolean = false) => {
     if (hasPermission(PermissionEnum.ProjectView)) {
       // Prevent multiple simultaneous calls for infinite scroll
       if (isInfiniteScroll && isLoadingMore.current) {
@@ -63,7 +63,6 @@ const Projects = () => {
         isLoadingMore.current = true;
       }
 
-      setCurrentPage(page);
       setPageSize(size);
 
       if (!isInfiniteScroll) {
@@ -80,14 +79,15 @@ const Projects = () => {
         isLoadingMore.current = false;
       }
     }
-  };
+  }, [getGlobalProjects, hasPermission, hideLoader, showLoader, setPageSize]);
 
   // Initial load
   useEffect(() => {
-    if (isMounted && hasPermission(PermissionEnum.ProjectView)) {
+    if (isMounted) {
+      setCurrentPage(1);
       load(1, pageSize);
     }
-  }, [isMounted]);
+  }, [isMounted, load, pageSize]);
 
   // Search with debounce
   useEffect(() => {
@@ -98,10 +98,11 @@ const Projects = () => {
     lastScrollTop.current = 0;
 
     const timer = setTimeout(() => {
+      setCurrentPage(1);
       load(1, pageSize, searchTerm);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, isMounted, load, pageSize]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
@@ -128,6 +129,7 @@ const Projects = () => {
       currentPage < totalPages
     ) {
       const nextPage = currentPage + 1;
+      setCurrentPage(nextPage);
       load(nextPage, pageSize, searchTerm, true);
     }
   };

@@ -2,7 +2,7 @@
 "use client";
 import { Box, Button, Flex } from "@radix-ui/themes";
 import { ReloadIcon, Pencil1Icon, TrashIcon } from "@radix-ui/react-icons";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import React from "react";
 import DashBoardLayout from "../layout";
 // import { Marker } from "../../components/marker";
@@ -56,7 +56,7 @@ export default function Clusters() {
   const isLoadingMore = useRef(false);
   const lastScrollTop = useRef(0);
 
-  const loadClusters = async (page: number, isInfiniteScroll: boolean = false) => {
+  const loadClusters = useCallback(async (page: number, isInfiniteScroll: boolean = false) => {
     if (!hasPermission(PermissionEnum.ClusterView)) return;
 
     // Prevent multiple simultaneous calls for infinite scroll
@@ -73,14 +73,14 @@ export default function Clusters() {
     if (isInfiniteScroll) {
       isLoadingMore.current = false;
     }
-  };
+  }, [getClusters, hasPermission, pageSize]);
 
   // Initial load
   useEffect(() => {
-    if (isMounted && hasPermission(PermissionEnum.ClusterView)) {
+    if (isMounted) {
       loadClusters(1, false);
     }
-  }, [isMounted]);
+  }, [isMounted, loadClusters]);
 
   useHandleRouteChange(() => {
     notification.destroy();
