@@ -221,6 +221,8 @@ export interface GetParams {
 
 // create zustand store
 export const useCluster = create<{
+  totalPages: number;
+  totalClusters: number;
   selectedNode: Node;
   setSelectedNode: (node: Node) => void;
   recommendedCluster: ICluster;
@@ -273,6 +275,8 @@ export const useCluster = create<{
   deleteClusterSettings: (id: string) => Promise<any>;
   getClusterStorageClasses: (id: string) => Promise<any[]>;
 }>((set, get) => ({
+  totalPages: 0,
+  totalClusters: 0,
   getClusterAnalytics: async (id: string) => {
     const url = `${tempApiBaseUrl}/clusters/${id}/grafana-dashboard`;
     try {
@@ -353,7 +357,11 @@ export const useCluster = create<{
           },
         },
       );
-      set({ clusters: response.data.clusters });
+      set({
+        clusters: response.data.clusters,
+        totalPages: response.data.total_pages,
+        totalClusters: response.data.total_record,
+       });
     } catch (error) {
       console.error("Error getting clusters:", error);
     } finally {
