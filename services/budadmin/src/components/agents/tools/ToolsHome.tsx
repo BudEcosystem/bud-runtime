@@ -26,6 +26,9 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     setSearchQuery,
     fetchConnectedTools,
     fetchUnregisteredTools,
+    fetchConnectorDetails,
+    selectedConnectorDetails,
+    isLoadingDetails,
   } = useConnectors();
 
   const [connectedExpanded, setConnectedExpanded] = useState(true);
@@ -38,6 +41,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
+  const hasRestoredFromUrl = useRef(false);
 
   // Initial load - Fetch both connected and unregistered tools
   useEffect(() => {
@@ -52,18 +56,41 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
   // Restore connector state from URL on initial load
   useEffect(() => {
     const connectorId = searchParams.get('connector');
-    if (connectorId && (connectors.length > 0 || connectedTools.length > 0)) {
-      // Find connector in either list
-      const foundConnector = connectedTools.find(c => c.id === connectorId) ||
-                            connectors.find(c => c.id === connectorId);
 
-      if (foundConnector) {
-        const isConnected = connectedTools.some(c => c.id === connectorId);
-        setSelectedConnector({ ...foundConnector, isFromConnectedSection: isConnected } as Connector);
-        setViewMode('details');
-      }
+    // Prevent duplicate restoration
+    if (hasRestoredFromUrl.current || !connectorId) {
+      return;
     }
-  }, [searchParams, connectors, connectedTools]);
+
+    // Fetch connector details from API
+    const restoreFromUrl = async () => {
+      try {
+        hasRestoredFromUrl.current = true;
+        await fetchConnectorDetails(connectorId);
+      } catch (error) {
+        console.error('Error fetching connector from URL:', error);
+        hasRestoredFromUrl.current = false;
+      }
+    };
+
+    restoreFromUrl();
+  }, [searchParams, fetchConnectorDetails]);
+
+  // Set selected connector when details are fetched
+  useEffect(() => {
+    const connectorId = searchParams.get('connector');
+
+    if (connectorId && selectedConnectorDetails && selectedConnectorDetails.id === connectorId) {
+      // Check if connector is in connected tools
+      const isConnected = connectedTools.some(c => c.id === connectorId);
+
+      setSelectedConnector({
+        ...selectedConnectorDetails,
+        isFromConnectedSection: isConnected
+      } as Connector);
+      setViewMode('details');
+    }
+  }, [selectedConnectorDetails, searchParams, connectedTools]);
 
   // Handle search with debounce
   useEffect(() => {
@@ -150,6 +177,9 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     setSelectedConnector(null);
     setViewMode('list');
 
+    // Reset URL restoration flag
+    hasRestoredFromUrl.current = false;
+
     // Remove connector parameter from URL
     const params = new URLSearchParams(searchParams.toString());
     params.delete('connector');
@@ -161,6 +191,20 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
       fetchUnregisteredTools({ page: 1, prompt_id: promptId });
     }
   };
+
+  // Show loading state when fetching connector from URL
+  if (isLoadingDetails && searchParams.get('connector')) {
+    return (
+      <div className="flex flex-col h-full text-white">
+        <div className="px-[.857rem] py-4 border-b border-[#1F1F1F]">
+          <h2 className="text-lg font-medium">Tools</h2>
+        </div>
+        <div className="flex-1 flex justify-center items-center">
+          <Spin />
+        </div>
+      </div>
+    );
+  }
 
   // Render details view
   if (viewMode === 'details' && selectedConnector) {
