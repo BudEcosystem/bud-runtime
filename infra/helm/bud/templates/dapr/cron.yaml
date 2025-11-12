@@ -67,6 +67,6 @@ spec:
   - name: direction
     value: "input"
   - name: route
-    value: "/v1/prompt/prompt-cleanup"
+    value: "/v1/prompt/prompt-cleanup-cron"
 scopes:
   - budprompt
