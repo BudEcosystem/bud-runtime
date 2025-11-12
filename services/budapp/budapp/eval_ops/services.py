@@ -1311,7 +1311,7 @@ class ExperimentService:
             # Batch fetch dataset versions for all runs
             dataset_version_ids = [r.dataset_version_id for r in runs]
             dataset_versions = (
-                self.session.query(DatasetVersionModel).filter(DatasetVersionModel.id.in_(dataset_version_ids)).all()
+                self.session.query(ExpDatasetVersion).filter(ExpDatasetVersion.id.in_(dataset_version_ids)).all()
             )
             dataset_version_map = {dv.id: dv for dv in dataset_versions}
 
