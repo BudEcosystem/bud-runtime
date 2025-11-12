@@ -138,7 +138,6 @@ const EvalDetailed = () => {
           const response = await AppRequest.Get(`/experiments/datasets/${id}`);
           console.log("Datasets API Response:", response.data);
           setDatasets(response.data.dataset);
-          hideLoader();
           // If we have datasets, fetch the first dataset's details as an example
           if (response.data && response.data.datasets && response.data.datasets.length > 0) {
             const firstDatasetId = response.data.datasets[0].dataset_id;
@@ -146,6 +145,9 @@ const EvalDetailed = () => {
           }
         } catch (error) {
           console.error("Error fetching datasets:", error);
+        }
+        finally {
+          hideLoader();
         }
       }
     };

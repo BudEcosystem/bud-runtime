@@ -90,16 +90,33 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
             dataIndex: "runs",
             key: "runs",
             width: 300,
-            render: (text: any) => (
-                <div className="flex space-x-2 flex-wrap">
-                    {JSON.parse(text).map((el) => <ProjectTags
-                            name={`${el.dataset_name}, ${el.score || '-'}`}
-                            color={'#EEEEEE'}
-                            textClass="text-[.75rem] py-[.22rem]"
-                            tagClass="py-[0rem]"
-                        />)}
-                </div>
-            ),
+            render: (text: string) => {
+                let runs: { dataset_name: string; score: string | number }[];
+                try {
+                    runs = JSON.parse(text);
+                } catch (e) {
+                    console.error("Failed to parse runs JSON:", text, e);
+                    return <Text_12_400_EEEEEE>Invalid data</Text_12_400_EEEEEE>;
+                }
+
+                if (!Array.isArray(runs)) {
+                    return <Text_12_400_EEEEEE>Invalid data format</Text_12_400_EEEEEE>;
+                }
+
+                return (
+                    <div className="flex space-x-2 flex-wrap">
+                        {runs.map((el, index) => (
+                            <ProjectTags
+                                key={index} // A unique ID from `el` would be better if available.
+                                name={`${el.dataset_name}, ${el.score || '-'}`}
+                                color={'#EEEEEE'}
+                                textClass="text-[.75rem] py-[.22rem]"
+                                tagClass="py-[0rem]"
+                            />
+                        ))}
+                    </div>
+                );
+            },
         },
     ];
 
