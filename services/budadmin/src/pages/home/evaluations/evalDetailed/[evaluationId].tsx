@@ -29,6 +29,7 @@ import LeaderboardTable from "./leaderboardTable";
 import LeaderboardDetails from "./details";
 import { AppRequest } from "src/pages/api/requests";
 import { capitalize } from "@/lib/utils";
+import { useLoader } from "src/context/appContext";
 
 interface EvaluationCard {
   id: string;
@@ -55,6 +56,7 @@ const EvalDetailed = () => {
   const router = useRouter();
   const evaluationId = router.query.evaluationId;
   const id = Array.isArray(evaluationId) ? evaluationId[0] : evaluationId;
+  const { isLoading, showLoader, hideLoader } = useLoader();
 
   // back functionality
   const goBack = () => {
@@ -136,7 +138,7 @@ const EvalDetailed = () => {
           const response = await AppRequest.Get(`/experiments/datasets/${id}`);
           console.log("Datasets API Response:", response.data);
           setDatasets(response.data.dataset);
-
+          hideLoader();
           // If we have datasets, fetch the first dataset's details as an example
           if (response.data && response.data.datasets && response.data.datasets.length > 0) {
             const firstDatasetId = response.data.datasets[0].dataset_id;
