@@ -868,20 +868,28 @@ class ExperimentEvaluationsResponse(SuccessResponse):
 # ------------------------ Evaluation Listing Schemas ------------------------
 
 
-class EvaluationListItem(BaseModel):
-    """A single evaluation item in the completed evaluations list."""
+class RunDatasetScore(BaseModel):
+    """Individual run with dataset and score."""
 
-    evaluation_name: str = Field(..., description="Name of the evaluation")
+    run_id: UUID4 = Field(..., description="UUID of the run")
+    dataset_name: str = Field(..., description="Name of the dataset")
+    score: Optional[float] = Field(None, description="Score for this run")
+
+
+class EvaluationListItem(BaseModel):
+    """A single evaluation with its runs."""
+
     evaluation_id: UUID4 = Field(..., description="UUID of the evaluation")
+    evaluation_name: str = Field(..., description="Name of the evaluation")
     model_name: str = Field(..., description="Name of the model used")
-    started_date: datetime = Field(..., description="Date when the evaluation was started")
-    duration_minutes: int = Field(..., description="Duration of the evaluation in minutes")
-    trait_name: str = Field(..., description="Name of the trait")
-    trait_score: float = Field(..., description="Score for this trait")
+    deployment_name: Optional[str] = Field(None, description="Deployment/endpoint name")
+    started_date: datetime = Field(..., description="When evaluation started")
+    duration_minutes: int = Field(..., description="Duration in minutes")
     status: str = Field(
         ...,
-        description="Status of the evaluation (pending/running/completed/failed)",
+        description="Status (pending/running/completed/failed)",
     )
+    runs: List[RunDatasetScore] = Field(default_factory=list, description="Runs with dataset scores")
 
 
 class ListEvaluationsResponse(SuccessResponse):
