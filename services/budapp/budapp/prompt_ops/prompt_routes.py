@@ -834,9 +834,7 @@ async def list_connectors(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     filters: Annotated[ConnectorFilter, Depends()],
-    version: Optional[int] = Query(
-        None, ge=1, description="Version of prompt config. If not specified, uses default version"
-    ),
+    version: int = Query(default=1, ge=1, description="Version of prompt config (defaults to 1)"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=0),
     order_by: Optional[List[str]] = Depends(parse_ordering_fields),
