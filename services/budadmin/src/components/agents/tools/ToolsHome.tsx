@@ -42,6 +42,8 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
   const hasRestoredFromUrl = useRef(false);
+  const hasSetConnectorFromUrl = useRef(false);
+  const lastConnectorIdRef = useRef<string | null>(null);
 
   // Initial load - Fetch both connected and unregistered tools
   useEffect(() => {
@@ -57,6 +59,13 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
   useEffect(() => {
     const connectorId = searchParams.get('connector');
 
+    // Reset refs when connector ID changes
+    if (connectorId !== lastConnectorIdRef.current) {
+      hasRestoredFromUrl.current = false;
+      hasSetConnectorFromUrl.current = false;
+      lastConnectorIdRef.current = connectorId;
+    }
+
     // Prevent duplicate restoration or unnecessary calls
     if (!connectorId || hasRestoredFromUrl.current) {
       return;
@@ -64,6 +73,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
 
     // Don't fetch if we already have the details for this connector
     if (selectedConnectorDetails && selectedConnectorDetails.id === connectorId) {
+      hasRestoredFromUrl.current = true;
       return;
     }
 
@@ -86,22 +96,27 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
   useEffect(() => {
     const connectorId = searchParams.get('connector');
 
-    if (connectorId && selectedConnectorDetails && selectedConnectorDetails.id === connectorId) {
-      // Don't update if already selected
-      if (selectedConnector && selectedConnector.id === connectorId) {
-        return;
-      }
-
-      // Check if connector is in connected tools
-      const isConnected = connectedTools.some(c => c.id === connectorId);
-
-      setSelectedConnector({
-        ...selectedConnectorDetails,
-        isFromConnectedSection: isConnected
-      } as Connector);
-      setViewMode('details');
+    // Only proceed if we have connector ID and details loaded
+    if (!connectorId || !selectedConnectorDetails || selectedConnectorDetails.id !== connectorId) {
+      return;
     }
-  }, [selectedConnectorDetails, searchParams, connectedTools, selectedConnector]);
+
+    // Prevent duplicate setting using ref
+    if (hasSetConnectorFromUrl.current) {
+      return;
+    }
+
+    hasSetConnectorFromUrl.current = true;
+
+    // Check if connector is in connected tools
+    const isConnected = connectedTools.some(c => c.id === connectorId);
+
+    setSelectedConnector({
+      ...selectedConnectorDetails,
+      isFromConnectedSection: isConnected
+    } as Connector);
+    setViewMode('details');
+  }, [selectedConnectorDetails, searchParams, connectedTools]);
 
   // Handle search with debounce
   useEffect(() => {
@@ -188,8 +203,10 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     setSelectedConnector(null);
     setViewMode('list');
 
-    // Reset URL restoration flag
+    // Reset all URL restoration flags
     hasRestoredFromUrl.current = false;
+    hasSetConnectorFromUrl.current = false;
+    lastConnectorIdRef.current = null;
 
     // Remove connector parameter from URL
     const params = new URLSearchParams(searchParams.toString());
