@@ -426,6 +426,7 @@ class EvaluationWorkflow:
         extraction_input = {
             "eval_id": str(evaluate_model_request_json.eval_id),  # Convert UUID to string
             "completed_jobs": monitoring_result.get("completed_jobs", []),
+            "job_timing_map": monitoring_result.get("job_details", {}),
         }
 
         extraction_result = yield ctx.call_activity(
@@ -523,7 +524,8 @@ class EvaluationWorkflow:
             extract_request: JSON string with:
                 {
                     "eval_id": "...",
-                    "completed_jobs": ["job1", "job2", ...]
+                    "completed_jobs": ["job1", "job2", ...],
+                    "job_timing_map": {"job1": {"startTime": "...", "completionTime": "..."}, ...}
                 }
 
         Returns:
@@ -540,12 +542,16 @@ class EvaluationWorkflow:
         eval_id = request.get("eval_id")
         completed_jobs = request.get("completed_jobs", [])
         kubeconfig = request.get("kubeconfig")
+        job_timing_map = request.get("job_timing_map", {})
 
         logger.info(f"Extracting results for {len(completed_jobs)} completed jobs")
 
         try:
             results = AnsibleOrchestrator().extract_job_results(
-                eval_id=eval_id, run_ids=completed_jobs, kubeconfig=kubeconfig
+                eval_id=eval_id,
+                run_ids=completed_jobs,
+                kubeconfig=kubeconfig,
+                job_timing_map=job_timing_map,
             )
 
             return results

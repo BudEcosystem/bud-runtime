@@ -25,6 +25,7 @@ class MonitorRequest(TypedDict, total=False):
     attempt: int  # internal: incremented each tick
     completed_jobs: list[str]  # Track completed jobs
     failed_jobs: list[str]  # Track failed jobs
+    job_timing_map: dict[str, dict]  # Track job timing: {job_id: {startTime, completionTime, status}}
     passthrough: dict  # caller-defined bag (not used here)
 
 
@@ -33,7 +34,7 @@ class MonitorResult(TypedDict, total=False):
     completed_jobs: list[str]
     failed_jobs: list[str]
     attempts: int
-    job_details: dict
+    job_details: dict  # Timing and status info: {job_id: {startTime, completionTime, status}}
 
 
 # ---- Activity: one-shot poll (SYNC, keep it simple) --------------------------
@@ -94,6 +95,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
 
     completed_jobs = data.get("completed_jobs", [])
     failed_jobs = data.get("failed_jobs", [])
+    job_timing_map = data.get("job_timing_map", {})
 
     # Log monitoring progress
     if not ctx.is_replaying:
@@ -124,6 +126,9 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     for job_id, status_info in job_statuses.items():
         status = status_info.get("status", "").lower()
 
+        # Store timing info for all jobs
+        job_timing_map[job_id] = status_info
+
         if status == "succeeded" and job_id not in completed_jobs:
             completed_jobs.append(job_id)
             if not ctx.is_replaying:
@@ -144,6 +149,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
             "status": "completed",
             "completed_jobs": completed_jobs,
             "failed_jobs": failed_jobs,
+            "job_details": job_timing_map,
             "attempts": attempt,
         }
 
@@ -155,6 +161,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
             "status": "timeout",
             "completed_jobs": completed_jobs,
             "failed_jobs": failed_jobs,
+            "job_details": job_timing_map,
             "remaining_jobs": remaining_jobs,
             "attempts": attempt,
         }
@@ -163,6 +170,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     data["attempt"] = attempt + 1
     data["completed_jobs"] = completed_jobs
     data["failed_jobs"] = failed_jobs
+    data["job_timing_map"] = job_timing_map
     yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
     ctx.continue_as_new(json.dumps(data))
     return
