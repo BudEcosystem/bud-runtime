@@ -64,7 +64,12 @@ interface ListItem {
   content: string[];
 }
 type LeaderboardDetailsProps = {
-  datasets: any
+  datasets: {
+    estimated_input_tokens?: number;
+    estimated_output_tokens?: number;
+    description: string;
+    advantages_disadvantages: any;
+  } | null;
 };
 function LeaderboardDetails({datasets}: LeaderboardDetailsProps) {
   const router = useRouter();
