@@ -117,6 +117,7 @@ helm_ensure() {
 	fi
 
 	if ! k8s_apiresources_exists 'certificates' 'cert-manager.io/v1'; then
+		kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.1/cert-manager.yaml
 		helm_install cert-manager ""
 	fi
 
