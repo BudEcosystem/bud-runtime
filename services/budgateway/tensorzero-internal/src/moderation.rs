@@ -473,6 +473,11 @@ mod tests {
             ModerationCategory::IllicitViolent.as_str(),
             "illicit/violent"
         );
+        assert_eq!(ModerationCategory::Illegal.as_str(), "illegal");
+        assert_eq!(
+            ModerationCategory::RegulatedAdvice.as_str(),
+            "regulated-advice"
+        );
         assert_eq!(ModerationCategory::SelfHarm.as_str(), "self-harm");
         assert_eq!(
             ModerationCategory::SelfHarmIntent.as_str(),
@@ -502,13 +507,15 @@ mod tests {
     #[test]
     fn test_moderation_category_all() {
         let all_categories = ModerationCategory::all();
-        assert_eq!(all_categories.len(), 21);
+        assert_eq!(all_categories.len(), 23);
         assert!(all_categories.contains(&ModerationCategory::Hate));
         assert!(all_categories.contains(&ModerationCategory::HateThreatening));
         assert!(all_categories.contains(&ModerationCategory::Harassment));
         assert!(all_categories.contains(&ModerationCategory::HarassmentThreatening));
         assert!(all_categories.contains(&ModerationCategory::Illicit));
         assert!(all_categories.contains(&ModerationCategory::IllicitViolent));
+        assert!(all_categories.contains(&ModerationCategory::Illegal));
+        assert!(all_categories.contains(&ModerationCategory::RegulatedAdvice));
         assert!(all_categories.contains(&ModerationCategory::SelfHarm));
         assert!(all_categories.contains(&ModerationCategory::SelfHarmIntent));
         assert!(all_categories.contains(&ModerationCategory::SelfHarmInstructions));
