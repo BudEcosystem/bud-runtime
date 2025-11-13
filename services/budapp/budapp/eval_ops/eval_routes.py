@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -43,6 +43,7 @@ from budapp.eval_ops.services import (
     EvaluationWorkflowService,
     ExperimentService,
     ExperimentWorkflowService,
+    ProgressService,
 )
 from budapp.user_ops.models import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
@@ -1051,3 +1052,82 @@ async def get_experiment_evaluations(
     except Exception as e:
         logger.debug(f"Failed to get experiment evaluations: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get experiment evaluations") from e
+
+
+# ------------------------ Dapr Subscription Routes ------------------------
+
+
+@router.post("/dapr/subscribe/eval-progress")
+async def handle_eval_progress_event(
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Dapr subscription endpoint for evaluation progress events.
+
+    **Topic:** eval_progress
+    **Events:**
+    - eval.started: Evaluation begins
+    - eval.progress: Progress update (every 30 seconds)
+    - eval.completed: Evaluation finishes
+
+    This endpoint is called by Dapr when events are published to the
+    eval_progress topic from the budeval service.
+
+    Args:
+        request: FastAPI request with CloudEvent payload
+        session: Database session
+
+    Returns:
+        Success/failure response for Dapr
+    """
+    try:
+        # Parse CloudEvent from Dapr
+        cloud_event = await request.json()
+
+        logger.debug(f"📨 Received eval progress event: {cloud_event.get('type')}")
+
+        # Extract event type and data
+        event_type = cloud_event.get("type")  # eval.started, eval.progress, or eval.completed
+        event_data = cloud_event.get("data", {})
+
+        # Initialize service
+        progress_service = ProgressService(session)
+
+        # Route to appropriate handler based on event type
+        if event_type == "eval.started":
+            success = await progress_service.handle_eval_started(event_data)
+
+        elif event_type == "eval.progress":
+            success = await progress_service.handle_eval_progress(event_data)
+
+        elif event_type == "eval.completed":
+            success = await progress_service.handle_eval_completed(event_data)
+
+        else:
+            logger.warning(f"⚠️ Unknown event type: {event_type}")
+            return {"success": False, "error": f"Unknown event type: {event_type}"}
+
+        return {"success": success}
+
+    except Exception as e:
+        logger.error(f"❌ Error handling eval progress event: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/dapr/subscribe")
+async def dapr_subscriptions():
+    """Dapr subscription configuration endpoint.
+
+    Returns the list of topics this service subscribes to.
+    Dapr calls this endpoint to discover subscriptions.
+
+    Returns:
+        List of subscription configurations
+    """
+    return [
+        {
+            "pubsubname": "pubsub",
+            "topic": "eval_progress",
+            "route": "/api/v1/experiments/dapr/subscribe/eval-progress",
+        }
+    ]

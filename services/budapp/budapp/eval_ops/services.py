@@ -21,6 +21,7 @@ from budapp.commons.constants import (
 from budapp.commons.exceptions import ClientException
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.eval_ops.models import (
+    EvalProgressSnapshot,
     EvalTag,
     Evaluation,
     EvaluationStatusEnum,
@@ -4436,3 +4437,225 @@ class EvaluationWorkflowService:
             self.session.rollback()
             logger.exception(f"::EvalResult:: Failed to handle evaluation completion event: {e}")
             raise ClientException(f"::EvalResult:: Failed to process evaluation completion: {str(e)}")
+
+
+# ------------------------ Progress Tracking Service ------------------------
+
+
+class ProgressService:
+    """Service for handling evaluation progress events from budeval.
+
+    Receives events via Dapr pub/sub on the eval_progress topic and saves
+    progress snapshots to the database.
+    """
+
+    def __init__(self, session: Session):
+        self.session = session
+
+    async def handle_eval_started(self, payload: Dict[str, Any]) -> bool:
+        """Handle eval.started event from budeval.
+
+        Creates initial progress snapshot when evaluation begins.
+
+        Args:
+            payload: Event payload from Dapr
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            content = payload.get("content", {})
+            metadata = content.get("metadata", {})
+
+            # Parse UUIDs
+            experiment_id = uuid.UUID(metadata.get("experiment_id"))
+            evaluation_id_str = metadata.get("evaluation_id")
+            evaluation_id = uuid.UUID(evaluation_id_str) if evaluation_id_str else None
+
+            # Create progress snapshot
+            progress = EvalProgressSnapshot(
+                experiment_id=experiment_id,
+                evaluation_id=evaluation_id,
+                total_tasks=metadata.get("total_tasks", 0),
+                completed_tasks=0,
+                failed_tasks=0,
+                in_progress_tasks=metadata.get("total_tasks", 0),
+                progress_percentage=0.0,
+                time_elapsed_seconds=0,
+                time_remaining_seconds=metadata.get("estimated_time_seconds"),
+                status="STARTED",
+                current_task=None,
+                event_type="eval.started",
+                event_timestamp=metadata.get("timestamp"),
+                metadata=metadata,
+            )
+
+            self.session.add(progress)
+            self.session.commit()
+
+            logger.info(
+                f"✅ Saved EVAL_STARTED: experiment={experiment_id}, "
+                f"evaluation={evaluation_id}, "
+                f"total_tasks={metadata.get('total_tasks')}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Failed to handle eval.started event: {e}", exc_info=True)
+            self.session.rollback()
+            return False
+
+    async def handle_eval_progress(self, payload: Dict[str, Any]) -> bool:
+        """Handle eval.progress event from budeval.
+
+        Creates progress snapshot with current evaluation status.
+        This is called every 30 seconds during evaluation.
+
+        Args:
+            payload: Event payload from Dapr
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            content = payload.get("content", {})
+            metadata = content.get("metadata", {})
+
+            # Parse UUIDs
+            experiment_id = uuid.UUID(metadata.get("experiment_id"))
+            evaluation_id_str = metadata.get("evaluation_id")
+            evaluation_id = uuid.UUID(evaluation_id_str) if evaluation_id_str else None
+
+            # Create progress snapshot
+            progress = EvalProgressSnapshot(
+                experiment_id=experiment_id,
+                evaluation_id=evaluation_id,
+                total_tasks=metadata.get("total_tasks", 0),
+                completed_tasks=metadata.get("completed_tasks", 0),
+                failed_tasks=metadata.get("failed_tasks", 0),
+                in_progress_tasks=metadata.get("in_progress_tasks", 0),
+                progress_percentage=metadata.get("progress_percentage", 0.0),
+                time_elapsed_seconds=metadata.get("time_elapsed_seconds"),
+                time_remaining_seconds=metadata.get("time_remaining_seconds"),
+                status="RUNNING",
+                current_task=metadata.get("current_task"),
+                event_type="eval.progress",
+                event_timestamp=metadata.get("timestamp"),
+                metadata=metadata,
+            )
+
+            self.session.add(progress)
+            self.session.commit()
+
+            logger.info(
+                f"✅ Saved EVAL_PROGRESS: experiment={experiment_id}, "
+                f"evaluation={evaluation_id}, "
+                f"progress={metadata.get('progress_percentage')}%, "
+                f"completed={metadata.get('completed_tasks')}/{metadata.get('total_tasks')}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Failed to handle eval.progress event: {e}", exc_info=True)
+            self.session.rollback()
+            return False
+
+    async def handle_eval_completed(self, payload: Dict[str, Any]) -> bool:
+        """Handle eval.completed event from budeval.
+
+        Creates final progress snapshot when evaluation finishes.
+
+        Args:
+            payload: Event payload from Dapr
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            content = payload.get("content", {})
+            metadata = content.get("metadata", {})
+
+            # Parse UUIDs
+            experiment_id = uuid.UUID(metadata.get("experiment_id"))
+            evaluation_id_str = metadata.get("evaluation_id")
+            evaluation_id = uuid.UUID(evaluation_id_str) if evaluation_id_str else None
+
+            # Create final progress snapshot
+            progress = EvalProgressSnapshot(
+                experiment_id=experiment_id,
+                evaluation_id=evaluation_id,
+                total_tasks=metadata.get("total_tasks", 0),
+                completed_tasks=metadata.get("completed_tasks", 0),
+                failed_tasks=metadata.get("failed_tasks", 0),
+                in_progress_tasks=0,
+                progress_percentage=100.0,
+                time_elapsed_seconds=metadata.get("total_time_seconds"),
+                time_remaining_seconds=0,
+                status="COMPLETED",
+                current_task=None,
+                event_type="eval.completed",
+                event_timestamp=metadata.get("timestamp"),
+                metadata=metadata,
+            )
+
+            self.session.add(progress)
+            self.session.commit()
+
+            logger.info(
+                f"✅ Saved EVAL_COMPLETED: experiment={experiment_id}, "
+                f"evaluation={evaluation_id}, "
+                f"success_rate={metadata.get('success_rate')}%, "
+                f"total_time={metadata.get('total_time_seconds')}s"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Failed to handle eval.completed event: {e}", exc_info=True)
+            self.session.rollback()
+            return False
+
+    def get_latest_progress(self, experiment_id: uuid.UUID):
+        """Get the latest progress snapshot for an experiment.
+
+        Args:
+            experiment_id: Experiment UUID
+
+        Returns:
+            Latest progress snapshot or None if not found
+        """
+        from budapp.eval_ops.models import EvalProgressSnapshot
+
+        try:
+            return (
+                self.session.query(EvalProgressSnapshot)
+                .filter(EvalProgressSnapshot.experiment_id == experiment_id)
+                .order_by(EvalProgressSnapshot.event_timestamp.desc())
+                .first()
+            )
+        except Exception as e:
+            logger.error(f"❌ Failed to get latest progress: {e}", exc_info=True)
+            return None
+
+    def get_progress_history(self, experiment_id: uuid.UUID, limit: int = 100):
+        """Get progress history for an experiment.
+
+        Args:
+            experiment_id: Experiment UUID
+            limit: Maximum number of snapshots to return
+
+        Returns:
+            List of progress snapshots ordered by timestamp (newest first)
+        """
+        from budapp.eval_ops.models import EvalProgressSnapshot
+
+        try:
+            return (
+                self.session.query(EvalProgressSnapshot)
+                .filter(EvalProgressSnapshot.experiment_id == experiment_id)
+                .order_by(EvalProgressSnapshot.event_timestamp.desc())
+                .limit(limit)
+                .all()
+            )
+        except Exception as e:
+            logger.error(f"❌ Failed to get progress history: {e}", exc_info=True)
+            return []

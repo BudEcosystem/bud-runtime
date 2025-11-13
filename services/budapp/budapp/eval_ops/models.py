@@ -4,7 +4,7 @@ from enum import Enum as PyEnum
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB, NUMERIC
@@ -303,3 +303,48 @@ class EvalSyncState(Base, TimestampMixin):
     sync_metadata: Mapped[dict] = mapped_column(
         JSONB, nullable=True
     )  # Store manifest details, datasets synced, errors, etc.
+
+
+# ------------------------ Progress Tracking ------------------------
+
+
+class EvalProgressSnapshot(Base, TimestampMixin):
+    """Stores evaluation progress snapshots received from budeval service via eval_progress topic."""
+
+    __tablename__ = "eval_progress_snapshots"
+
+    id: Mapped[uuid4] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+
+    # Foreign keys
+    experiment_id: Mapped[uuid4] = mapped_column(ForeignKey("experiments.id", ondelete="CASCADE"), nullable=False)
+    evaluation_id: Mapped[Optional[uuid4]] = mapped_column(ForeignKey("evaluations.id", ondelete="CASCADE"))
+
+    # Progress metrics
+    total_tasks: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    completed_tasks: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    failed_tasks: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    in_progress_tasks: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    progress_percentage: Mapped[float] = mapped_column(NUMERIC(5, 2), nullable=False, server_default="0.0")
+
+    # Time metrics
+    time_elapsed_seconds: Mapped[Optional[int]] = mapped_column(Integer)
+    time_remaining_seconds: Mapped[Optional[int]] = mapped_column(Integer)
+
+    # Current state
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    current_task: Mapped[Optional[str]] = mapped_column(String(255))
+
+    # Event metadata
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    event_timestamp: Mapped[str] = mapped_column(String, nullable=False)
+    metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
+
+    # Indexes for efficient queries
+    __table_args__ = (
+        Index("idx_eval_progress_experiment_timestamp", "experiment_id", "event_timestamp"),
+        Index("idx_eval_progress_evaluation_timestamp", "evaluation_id", "event_timestamp"),
+        Index("idx_eval_progress_event_type_timestamp", "event_type", "event_timestamp"),
+        Index("idx_eval_progress_status", "status"),
+        Index("idx_eval_progress_experiment_id", "experiment_id"),
+        Index("idx_eval_progress_evaluation_id", "evaluation_id"),
+    )
