@@ -215,8 +215,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       return;
     }
     fetchConnectorDetails(connector.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connector.id]);
+  }, [connector.id, fetchConnectorDetails, isLoadingDetails, selectedConnectorDetails]);
 
   // Handle OAuth callback on mount
   useEffect(() => {
