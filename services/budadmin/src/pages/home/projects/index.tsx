@@ -2,7 +2,7 @@
 "use client";
 import { Box, Flex } from "@radix-ui/themes";
 import { PlusIcon, Share1Icon } from "@radix-ui/react-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import React from "react";
 import DashBoardLayout from "../layout";
 import {
@@ -44,52 +44,93 @@ const Projects = () => {
   const [pageSize, setPageSize] = useState(10);
   const { showLoader, hideLoader } = useLoader();
 
+  // Add refs to prevent multiple API calls
+  const isLoadingMore = useRef(false);
+  const lastScrollTop = useRef(0);
+
   const goToDetails = (item) => {
     router.push(`/projects/${item.project.id}`);
   };
 
-  const load = async (page: number, size: number, searchTerm?: string) => {
+  const load = useCallback(async (page: number, size: number, searchTerm?: string, isInfiniteScroll: boolean = false) => {
     if (hasPermission(PermissionEnum.ProjectView)) {
-      setCurrentPage(page);
+      // Prevent multiple simultaneous calls for infinite scroll
+      if (isInfiniteScroll && isLoadingMore.current) {
+        return;
+      }
+
+      if (isInfiniteScroll) {
+        isLoadingMore.current = true;
+      }
+
       setPageSize(size);
-      showLoader();
+
+      if (!isInfiniteScroll) {
+        showLoader();
+      }
+
       await getGlobalProjects(page, size, searchTerm);
-      hideLoader();
+
+      if (!isInfiniteScroll) {
+        hideLoader();
+      }
+
+      if (isInfiniteScroll) {
+        isLoadingMore.current = false;
+      }
     }
-  };
+  }, [getGlobalProjects, hasPermission, hideLoader, showLoader, setPageSize]);
 
-  // useEffect(() => {
-  //   load(currentPage, pageSize);
-  // }, [currentPage, pageSize]);
-
+  // Initial load
   useEffect(() => {
     if (isMounted) {
-      setTimeout(() => {
-        load(currentPage, pageSize);
-      }, 1000);
+      setCurrentPage(1);
+      load(1, pageSize);
     }
-  }, [currentPage, pageSize, isMounted]);
+  }, [isMounted, load, pageSize]);
 
+  // Search with debounce
   useEffect(() => {
-    // debounce
+    if (!isMounted) return;
+
+    // Reset loading state when search changes
+    isLoadingMore.current = false;
+    lastScrollTop.current = 0;
+
     const timer = setTimeout(() => {
-      load(1, 10, searchTerm);
+      setCurrentPage(1);
+      load(1, pageSize, searchTerm);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, isMounted, load, pageSize]);
 
-  const handleScroll = (e) => {
-    // console.log("scrolling");
-    // is at the bottom
-    const bottom =
-      document.getElementById("project-repo")?.scrollTop >
-      globalProjects?.length * 30;
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollTop = target.scrollTop;
+    const scrollHeight = target.scrollHeight;
+    const clientHeight = target.clientHeight;
+
+    // Only trigger when scrolling down
+    if (scrollTop <= lastScrollTop.current) {
+      lastScrollTop.current = scrollTop;
+      return;
+    }
+
+    lastScrollTop.current = scrollTop;
+
+    // Calculate if we're near the bottom (within 100px)
+    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
+
+    // Check if we should load more
     if (
-      bottom &&
+      isNearBottom &&
+      !isLoadingMore.current &&
       globalProjects?.length < totalProjects &&
       currentPage < totalPages
     ) {
-      setCurrentPage(currentPage + 1);
+      const nextPage = currentPage + 1;
+      setCurrentPage(nextPage);
+      load(nextPage, pageSize, searchTerm, true);
     }
   };
 

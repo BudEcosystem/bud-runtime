@@ -392,6 +392,7 @@ const ExperimentDetailsPage = () => {
                                             ).toLocaleTimeString(),
                                         duration: `${evaluation.duration_minutes}m`,
                                         benchmarkScore: `${evaluation.trait_score}`,
+                                        runs: `${JSON.stringify(evaluation.runs)}`
                                     }),
                                 ) || []
                             }
