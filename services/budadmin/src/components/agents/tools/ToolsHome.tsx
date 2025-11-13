@@ -53,7 +53,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
       // Fetch unregistered tools (is_registered: false)
       fetchUnregisteredTools({ page: 1, prompt_id: promptId });
     }
-  }, [promptId]);
+  }, [promptId, fetchConnectedTools, fetchUnregisteredTools]);
 
   // Restore connector state from URL on initial load
   useEffect(() => {
@@ -88,8 +88,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
       console.error('Error fetching connector from URL:', error);
       hasRestoredFromUrl.current = false;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, fetchConnectorDetails, isLoadingDetails, selectedConnectorDetails]);
 
   // Set selected connector when details are fetched
   useEffect(() => {
