@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Settings from "./Settings";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
-import { useAgentStore, AgentSession } from "@/stores/useAgentStore";
+import { useAgentStore, AgentSession, AgentSettings } from "@/stores/useAgentStore";
 import { AppRequest } from "src/pages/api/requests";
 import { errorToast } from "@/components/toast";
 
@@ -34,7 +34,7 @@ export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarPro
 
     try {
       // Build model_settings with only temperature (always) and modified fields
-      const modelSettings: any = {
+      const modelSettings: Partial<AgentSettings> = {
         temperature: currentSettingPreset.temperature, // Always include temperature
       };
 
@@ -44,7 +44,8 @@ export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarPro
       // Add only the fields that have been modified by the user
       modifiedFields.forEach((field) => {
         if (field !== 'temperature' && field in currentSettingPreset) {
-          modelSettings[field] = (currentSettingPreset as any)[field];
+          const key = field as keyof AgentSettings;
+          (modelSettings as any)[key] = currentSettingPreset[key];
         }
       });
 
