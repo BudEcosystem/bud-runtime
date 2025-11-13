@@ -1,0 +1,285 @@
+---
+title: "Inviting Users"
+description: "Add team members to your organization"
+---
+
+# Inviting Users
+
+Add team members to your Bud Stack organization and manage their access levels. This guide covers how to invite both Admin and Client users.
+
+## Prerequisites
+
+To invite users, you must:
+- Have an Admin account with **User Management** permission
+- Be logged into the Bud Stack dashboard
+- Have the user's email address
+
+<Warning>
+Only users with the USER_MANAGE permission can invite new users to the organization.
+</Warning>
+
+## User Types Overview
+
+Before inviting users, understand the two main user types:
+
+<CardGroup cols={2}>
+  <Card title="Admin Users" icon="user-shield">
+    Administrative users with elevated privileges for managing infrastructure, models, clusters, and other users.
+  </Card>
+  <Card title="Client Users" icon="user">
+    Regular users who can create and manage projects, deploy models, and use endpoints within their projects.
+  </Card>
+</CardGroup>
+
+## Inviting a New User
+
+<Steps>
+  <Step title="Navigate to User Management">
+    From the dashboard sidebar, click on **User Management** to access the users page.
+  </Step>
+
+  <Step title="Click 'Invite User'">
+    Click the **Invite User** or **Add User** button in the top-right corner of the users page.
+  </Step>
+
+  <Step title="Fill in User Details">
+    Complete the invitation form with the following information:
+
+    - **Name**: Full name of the user
+    - **Email**: User's email address (must be unique)
+    - **User Type**: Select either Admin or Client
+    - **Role**: (For Admin users) Select from SUPER_ADMIN, ADMIN, DEVELOPER, DEVOPS, or TESTER
+    - **Company**: (Optional) User's company name
+    - **Purpose**: (Optional) Intended use case
+  </Step>
+
+  <Step title="Send Invitation">
+    Click **Send Invitation** to create the user account and send the invitation email.
+  </Step>
+</Steps>
+
+## What Happens After Invitation?
+
+### For the New User
+
+1. **Receives Email**: The user receives an invitation email with instructions
+2. **Creates Password**: User clicks the link and sets their password in Keycloak
+3. **First Login**: User logs into Bud Stack for the first time
+4. **Account Activation**: Account status changes from **INVITED** to **ACTIVE**
+
+### For Client Users (Automatic Setup)
+
+When a Client user is invited, the system automatically:
+- ✅ Creates a default project
+- ✅ Assigns a free billing plan
+- ✅ Grants basic permissions (PROJECT_VIEW, PROJECT_MANAGE)
+- ✅ Sets up notification preferences
+
+### For Admin Users
+
+Admin users receive:
+- ✅ Module-level permissions based on their role
+- ✅ Access to admin dashboard features
+- ✅ No default project (can create as needed)
+
+## Admin Roles Explained
+
+When inviting Admin users, you can assign one of five roles:
+
+<Accordion title="SUPER_ADMIN - Highest Privileges">
+  Complete access to all platform features including:
+  - User management (create, edit, delete users)
+  - Cluster management (all clouds)
+  - Model repository access
+  - Billing and organization settings
+  - System configuration
+</Accordion>
+
+<Accordion title="ADMIN - High-Level Management">
+  Management access to most features:
+  - User management
+  - Project oversight
+  - Model and endpoint management
+  - Cluster management
+</Accordion>
+
+<Accordion title="DEVELOPER - Standard Development Access (Default)">
+  Standard development permissions:
+  - Project creation and management
+  - Model deployment
+  - Endpoint management
+  - Limited cluster access
+</Accordion>
+
+<Accordion title="DEVOPS - Infrastructure Focus">
+  Specialized for infrastructure management:
+  - Cluster management
+  - Deployment configuration
+  - Performance optimization
+  - Infrastructure monitoring
+</Accordion>
+
+<Accordion title="TESTER - QA and Testing">
+  Testing and validation focus:
+  - Evaluation access
+  - Benchmark running
+  - Model testing
+  - Playground access
+</Accordion>
+
+<Note>
+The DEVELOPER role is the default for newly created Admin users. You can change roles later from the user edit page.
+</Note>
+
+## Invitation Email Content
+
+The invitation email contains:
+- Welcome message
+- Link to set up password
+- Instructions for first login
+- Support contact information
+
+<Tip>
+Invitation links typically expire after 24-48 hours. If a user doesn't activate their account in time, you can resend the invitation or manually activate their account.
+</Tip>
+
+## Managing Pending Invitations
+
+### View Invitation Status
+
+On the User Management page, you can see user status:
+- 🟢 **ACTIVE**: User has completed setup and logged in
+- 🟡 **INVITED**: Invitation sent, awaiting user activation
+- 🔴 **DELETED**: User account has been deactivated
+
+### Resend Invitation
+
+If a user hasn't received the invitation email:
+
+1. Find the user in the users list
+2. Click the **Actions** menu (⋮)
+3. Select **Resend Invitation**
+4. A new invitation email will be sent
+
+### Cancel Invitation
+
+To cancel a pending invitation:
+
+1. Find the user with INVITED status
+2. Click the **Actions** menu (⋮)
+3. Select **Delete User**
+4. Confirm the deletion
+
+## Bulk User Invitation
+
+<Info>
+Currently, users must be invited individually through the UI. Bulk import via CSV or API is planned for a future release.
+</Info>
+
+For large organizations, you can use the API to automate user creation:
+
+```bash
+curl -X POST https://api.bud.studio/users/ \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Jane Smith",
+    "email": "jane@company.com",
+    "user_type": "CLIENT",
+    "role": "DEVELOPER"
+  }'
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Descriptive Names" icon="signature">
+    Use full names to make it easier to identify users in activity logs and audit trails.
+  </Card>
+
+  <Card title="Choose Appropriate Roles" icon="user-tag">
+    Assign the minimum necessary permissions. Start with DEVELOPER role for Admin users.
+  </Card>
+
+  <Card title="Verify Email Addresses" icon="envelope-circle-check">
+    Double-check email addresses before sending invitations to avoid security issues.
+  </Card>
+
+  <Card title="Document Purpose" icon="clipboard-list">
+    Use the "Purpose" field to track why each user was added to the organization.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### User Didn't Receive Invitation Email
+
+1. Check spam/junk folders
+2. Verify email address is correct
+3. Resend invitation from the UI
+4. Contact support if issue persists
+
+### User Can't Activate Account
+
+1. Ensure invitation link hasn't expired
+2. Check if user already has a Keycloak account with that email
+3. Try resending invitation
+4. Contact support for manual activation
+
+### Permission Errors After Invitation
+
+If a user reports missing permissions:
+1. Verify their user type and role are correct
+2. Check their permissions in User Management
+3. User may need to log out and log back in
+4. Refer to [Roles & Permissions](/user-management/roles-permissions) guide
+
+## Related Pages
+
+- [Roles & Permissions](/user-management/roles-permissions) - Detailed permission system
+- [User Activity](/user-management/user-activity) - Monitor user actions
+- [SSO Integration](/user-management/sso-integration) - Enterprise authentication
+- [Organization Settings](/settings/organization-settings) - Manage organization
+
+## API Reference
+
+For developers integrating user invitation programmatically:
+
+```python
+import requests
+
+# Create a new user
+response = requests.post(
+    "https://api.bud.studio/users/",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "name": "John Doe",
+        "email": "john@example.com",
+        "user_type": "CLIENT",  # or "ADMIN"
+        "role": "DEVELOPER",     # for Admin users only
+        "company": "Acme Corp",
+        "purpose": "Model deployment"
+    }
+)
+
+if response.status_code == 201:
+    user = response.json()
+    print(f"User created with ID: {user['id']}")
+else:
+    print(f"Error: {response.json()}")
+```
+
+<Note>
+Requires API key with USER_MANAGE permission. See [API Keys](/api-keys/creating-api-keys) for setup.
+</Note>
+
+## Next Steps
+
+After inviting users:
+1. Share onboarding documentation with new users
+2. Set up project permissions for Client users
+3. Configure SSO if needed for enterprise
+4. Monitor user activity in audit logs

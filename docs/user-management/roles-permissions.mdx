@@ -1,0 +1,93 @@
+---
+title: "User Types & Permissions"
+description: "Understanding access control and user types in Bud Stack"
+---
+
+# User Types & Permissions
+
+Bud Stack uses a straightforward permission system based on **user types** and **resource-level access**. The platform has two main user types, each with access to different dashboards and capabilities.
+
+<CardGroup cols={2}>
+  <Card title="Admin Users" icon="user-shield">
+    Administrative users who access the **Admin Dashboard** for platform management, infrastructure control, user management, and cluster operations.
+  </Card>
+  <Card title="Client Users" icon="user">
+    Standard users who access the **Customer Dashboard** for deploying AI/ML models, managing projects, creating endpoints, and monitoring their deployments.
+  </Card>
+</CardGroup>
+
+## Permission System Overview
+
+Bud Stack implements a simple, effective permission model:
+
+<CardGroup cols={2}>
+  <Card title="User Type Permissions" icon="shield-halved">
+    Your user type (ADMIN or CLIENT) determines which dashboard you access and your base capabilities.
+  </Card>
+  <Card title="Resource-Level Permissions" icon="lock">
+    Specific resources (like projects) can be shared with you with either **view** or **manage** access.
+  </Card>
+</CardGroup>
+
+## User Type Comparison
+
+The table below shows the differences between the two types of users:
+
+| Feature | Admin Users | Client Users |
+|---------|-------------|--------------|
+| **Dashboard Access** | **Admin Dashboard** | **Customer Dashboard** |
+| **Primary Focus** | Foundry usage and management | Model usage and tracking |
+| **User Management** | ✅ Can invite & manage users | ❌ Cannot manage users |
+| **Cluster Management** | ✅ Can register & manage clusters | ❌ Cannot view clusters |
+| **Model Repository** | ✅ Full access to add/edit models | ✅ View published models |
+| **Project Management** | ✅ Create & manage multiple projects | ✅ Create & manage own projects |
+| **Deployment Management** | ✅ Create & manage deployment | ✅ View published models |
+| **Playground Access** | ✅ Test models interactively | ✅ Test models interactively |
+| **Observability** | ✅ View all org metrics | ✅ View own project metrics |
+| **API Keys** | ✅ Create & manage API keys | ✅ Create & manage API keys |
+| **Billing Access** | ✅ View & manage org billing | ✅ View own usage only |
+| **Default Setup** | No default project or billing | Auto-created default project + free billing plan |
+
+## Resource-Level Permissions
+
+Resource-level permissions allow you to share specific resources with other users, granting them either **view** (read-only) or **manage** (full access) permissions.
+
+
+| Resource Type | Permission Types | What Gets Shared |
+|---------------|------------------|------------------|
+| Models | `view`, `manage` | Access to model registry |
+| Clusters | `view`, `manage` | Access to clusters |
+| Projects | `view`, `manage` | Project + all deployments, and data within |
+| Deployments | `view`, `manage` | Access within a project |
+| User | `view`, `manage` | Access to user management |
+
+<Note>
+**Deployments** belong to projects, so access is automatically inherited from project permissions. If you share a project with someone, they get access to all deployments within that project.
+</Note>
+
+### Permission Types
+
+<CardGroup cols={2}>
+  <Card title="View Permission" icon="eye">
+    **Read-only access** to a project. Users can see the project, deployments, and metrics but cannot make changes.
+  </Card>
+  <Card title="Manage Permission" icon="pen-to-square">
+    **Full access** to a project. Users can view, edit, delete, deploy models, and configure everything within the project.
+  </Card>
+</CardGroup>
+
+### How Resource Permissions Work
+
+Resource permissions allow you to share specific **projects** with other users:
+
+1. **Project Owner**: Automatically gets `manage` permission on projects they create
+2. **Collaborators**: Can be granted `view` or `manage` permission on shared projects
+3. **Inheritance**: Project permissions automatically apply to all sub-resources (deployments within the project)
+
+
+## Related Pages
+
+- [Inviting Users](/user-management/inviting-users) - How to add team members
+- [User Activity](/user-management/user-activity) - Monitor user actions
+- [API Keys](/api-keys/creating-api-keys) - Create API keys with user permissions
+- [Organization Settings](/settings/organization-settings) - Manage organization
