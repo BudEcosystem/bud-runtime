@@ -434,6 +434,8 @@ class AdapterRequest(CloudEventBase):
     endpoint_name: str
     action: Literal["add", "delete"]
     adapter_id: Optional[UUID] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
 
 
 class DeployAdapterActivityRequest(BaseModel):
@@ -444,6 +446,8 @@ class DeployAdapterActivityRequest(BaseModel):
     adapters: List[Dict[str, Any]]
     endpoint_name: str
     ingress_url: str
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
 
 
 class UpdateAdapterStatusRequest(AdapterRequest):

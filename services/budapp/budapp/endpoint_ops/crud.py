@@ -17,7 +17,7 @@
 """The crud package, containing essential business logic, services, and routing configurations for the endpoint ops."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
 from sqlalchemy import and_, asc, case, cast, desc, distinct, func, literal, or_, select, update
@@ -69,14 +69,26 @@ class EndpointDataManager(DataManagerUtils):
 
     async def get_all_active_endpoints(
         self,
-        project_id: Optional[UUID],
+        project_id: Optional[Union[UUID, List[UUID]]],
         offset: int = 0,
         limit: int = 10,
         filters: Dict[str, Any] = {},
         order_by: List[Tuple[str, str]] = [],
         search: bool = False,
     ) -> Tuple[List[EndpointModel], int]:
-        """Get all active endpoints from the database."""
+        """Get all active endpoints from the database.
+
+        Args:
+            project_id: Single UUID for specific project, list of UUIDs for multiple projects, or None
+            offset: Pagination offset
+            limit: Pagination limit
+            filters: Additional filters to apply
+            order_by: Ordering fields
+            search: Whether to perform search
+
+        Returns:
+            Tuple of endpoint list and total count
+        """
         await self.validate_fields(EndpointModel, filters)
 
         # explicit conditions for order by model_name, cluster_name, modality
@@ -134,8 +146,14 @@ class EndpointDataManager(DataManagerUtils):
             stmt = stmt.filter(EndpointModel.status != EndpointStatusEnum.DELETED)
             count_stmt = count_stmt.filter(EndpointModel.status != EndpointStatusEnum.DELETED)
             if project_id:
-                stmt = stmt.filter(EndpointModel.project_id == project_id)
-                count_stmt = count_stmt.filter(EndpointModel.project_id == project_id)
+                # Handle both single UUID and list of UUIDs
+                if isinstance(project_id, list):
+                    if project_id:  # Only filter if list is not empty
+                        stmt = stmt.filter(EndpointModel.project_id.in_(project_id))
+                        count_stmt = count_stmt.filter(EndpointModel.project_id.in_(project_id))
+                else:
+                    stmt = stmt.filter(EndpointModel.project_id == project_id)
+                    count_stmt = count_stmt.filter(EndpointModel.project_id == project_id)
 
         # Calculate count before applying limit and offset
         count = self.execute_scalar(count_stmt)
@@ -802,13 +820,23 @@ class AdapterDataManager(DataManagerUtils):
         return result, count
 
     async def get_all_adapters_in_project(self, project_id: UUID) -> Tuple[List[AdapterModel], int]:
-        """Get all adapters in a project."""
-        stmt = select(AdapterModel).join(EndpointModel).filter(EndpointModel.project_id == project_id)
+        """Get all adapters in a project, excluding deleted adapters."""
+        stmt = (
+            select(AdapterModel)
+            .join(EndpointModel)
+            .filter(
+                EndpointModel.project_id == project_id,
+                AdapterModel.status != AdapterStatusEnum.DELETED,
+            )
+        )
         count_stmt = (
             select(func.count())
             .select_from(AdapterModel)
             .join(EndpointModel)
-            .filter(EndpointModel.project_id == project_id)
+            .filter(
+                EndpointModel.project_id == project_id,
+                AdapterModel.status != AdapterStatusEnum.DELETED,
+            )
         )
         count = self.execute_scalar(count_stmt)
         result = self.scalars_all(stmt)

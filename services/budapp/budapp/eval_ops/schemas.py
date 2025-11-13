@@ -144,7 +144,8 @@ class CreateExperimentRequest(BaseModel):
     )
     description: Optional[str] = Field(None, max_length=500, description="The description of the experiment.")
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment (optional).")
-    tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
+    tags: Optional[List[str]] = Field(None, description="DEPRECATED: List of tag names. Use tag_ids instead.")
+    tag_ids: Optional[List[UUID4]] = Field(None, description="List of EvalTag IDs to associate with experiment.")
 
     @field_validator("name")
     @classmethod
@@ -213,7 +214,12 @@ class Experiment(BaseModel):
     name: str = Field(..., description="The name of the experiment.")
     description: Optional[str] = Field(None, description="The description of the experiment.")
     project_id: Optional[UUID4] = Field(None, description="The project ID for the experiment.")
-    tags: Optional[List[str]] = Field(None, description="List of tags for the experiment.")
+    tags: Optional[List[str]] = Field(
+        None,
+        description="DEPRECATED: List of tag names. Use tag_objects instead.",
+    )
+    tag_ids: Optional[List[UUID4]] = Field(None, description="List of EvalTag IDs.")
+    tag_objects: Optional[List["EvalTag"]] = Field(None, description="Complete tag objects with details.")
     status: Optional[str] = Field(
         None,
         description="Computed status based on runs (running/failed/completed/pending/no_runs).",
@@ -309,7 +315,7 @@ class Run(BaseModel):
     id: UUID4 = Field(..., description="The UUID of the run.")
     experiment_id: UUID4 = Field(..., description="The UUID of the parent experiment.")
     run_index: int = Field(..., description="Auto-incrementing index within the experiment.")
-    model_id: UUID4 = Field(..., description="The UUID of the model being evaluated.")
+    endpoint_id: UUID4 = Field(..., description="The UUID of the endpoint being evaluated.")
     dataset_version_id: UUID4 = Field(..., description="The UUID of the dataset version.")
     status: RunStatusEnum = Field(..., description="Current status of the run.")
     config: Optional[dict] = Field(None, description="Run-specific configuration.")
@@ -328,7 +334,8 @@ class RunWithResults(BaseModel):
     id: UUID4 = Field(..., description="The UUID of the run.")
     experiment_id: UUID4 = Field(..., description="The UUID of the parent experiment.")
     run_index: int = Field(..., description="Auto-incrementing index within the experiment.")
-    model_id: UUID4 = Field(..., description="The UUID of the model being evaluated.")
+    endpoint_id: UUID4 = Field(..., description="The UUID of the endpoint being evaluated.")
+
     dataset_version_id: UUID4 = Field(..., description="The UUID of the dataset version.")
     status: RunStatusEnum = Field(..., description="Current status of the run.")
     config: Optional[dict] = Field(None, description="Run-specific configuration.")
@@ -413,7 +420,8 @@ class DeleteRunResponse(SuccessResponse):
 class ConfigureRunsRequest(BaseModel):
     """Request to configure runs for an experiment."""
 
-    model_ids: List[UUID4] = Field(..., description="List of model IDs to evaluate.")
+    endpoint_ids: List[UUID4] = Field(..., description="List of endpoint IDs to evaluate.")
+
     dataset_ids: List[UUID4] = Field(..., description="List of dataset IDs to evaluate against.")
     evaluation_config: Optional[dict] = Field(None, description="Default evaluation configuration for runs.")
 
@@ -481,6 +489,78 @@ class Trait(BaseModel):
         from_attributes = True
 
 
+# ------------------------ EvalTag Schemas ------------------------
+
+
+class EvalTagBase(BaseModel):
+    """Base schema for EvalTag."""
+
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=20,
+        description="Tag name (alphanumeric, hyphens, underscores)",
+    )
+    description: Optional[str] = Field(None, max_length=255, description="Tag description")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate tag name format."""
+        v = v.strip()
+        if not re.match(r"^[a-zA-Z0-9\-_]+$", v):
+            raise ValueError("Tag name can only contain letters, numbers, hyphens, and underscores")
+        return v
+
+
+class EvalTag(EvalTagBase):
+    """Complete EvalTag schema with ID and timestamps."""
+
+    id: UUID4 = Field(..., description="The UUID of the tag.")
+    created_at: datetime = Field(..., description="Timestamp when the tag was created")
+    modified_at: datetime = Field(..., description="Last modification timestamp")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class EvalTagCreate(BaseModel):
+    """Schema for creating a new EvalTag."""
+
+    name: str = Field(..., min_length=1, max_length=20, description="Tag name")
+    description: Optional[str] = Field(None, max_length=255, description="Tag description")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate tag name format."""
+        v = v.strip()
+        if not re.match(r"^[a-zA-Z0-9\-_]+$", v):
+            raise ValueError("Tag name can only contain letters, numbers, hyphens, and underscores")
+        return v
+
+
+class EvalTagSearchResponse(SuccessResponse):
+    """Response schema for tag search."""
+
+    tags: List[EvalTag] = Field(..., description="List of matching tags")
+    total: int = Field(..., description="Total number of matches")
+
+
+class EvalTagListResponse(PaginatedSuccessResponse):
+    """Response schema for listing tags with pagination."""
+
+    tags: List[EvalTag] = Field(..., description="List of tags")
+
+
+class CreateEvalTagResponse(SuccessResponse):
+    """Response schema for creating a tag."""
+
+    tag: EvalTag = Field(..., description="The created tag")
+
+
 class ListTraitsResponse(SuccessResponse):
     """The response schema for listing traits."""
 
@@ -514,6 +594,10 @@ class ExpDataset(BaseModel):
         None,
         description="Advantages and disadvantages with structure {'advantages': ['str1'], 'disadvantages': ['str2']}.",
     )
+    eval_types: Optional[dict] = Field(
+        None,
+        description="Evaluation type configurations like {'gen': 'gsm8k_gen', 'agent': 'gsm8k_agent'}.",
+    )
     traits: List[Trait] = Field([], description="Traits associated with this dataset.")
 
     class Config:
@@ -545,6 +629,10 @@ class DatasetFilter(BaseModel):
     language: Optional[List[str]] = Field(None, description="Filter by languages.")
     domains: Optional[List[str]] = Field(None, description="Filter by domains.")
     trait_ids: Optional[List[UUID4]] = Field(None, description="Filter by trait UUIDs.")
+    has_gen_eval_type: Optional[bool] = Field(
+        None,
+        description="Filter datasets that have 'gen' key in eval_types. True to include only datasets with 'gen' key.",
+    )
 
 
 class CreateDatasetRequest(BaseModel):
@@ -654,7 +742,7 @@ class ExperimentWorkflowStepData(BaseModel):
     tags: Optional[List[str]] = None
 
     # Step 2 data - Model Selection
-    model_ids: Optional[List[UUID4]] = None
+    endpoint_ids: Optional[List[UUID4]] = None
 
     # Step 3 data - Traits Selection
     trait_ids: Optional[List[UUID4]] = None
@@ -780,20 +868,28 @@ class ExperimentEvaluationsResponse(SuccessResponse):
 # ------------------------ Evaluation Listing Schemas ------------------------
 
 
-class EvaluationListItem(BaseModel):
-    """A single evaluation item in the completed evaluations list."""
+class RunDatasetScore(BaseModel):
+    """Individual run with dataset and score."""
 
-    evaluation_name: str = Field(..., description="Name of the evaluation")
+    run_id: UUID4 = Field(..., description="UUID of the run")
+    dataset_name: str = Field(..., description="Name of the dataset")
+    score: Optional[float] = Field(None, description="Score for this run")
+
+
+class EvaluationListItem(BaseModel):
+    """A single evaluation with its runs."""
+
     evaluation_id: UUID4 = Field(..., description="UUID of the evaluation")
+    evaluation_name: str = Field(..., description="Name of the evaluation")
     model_name: str = Field(..., description="Name of the model used")
-    started_date: datetime = Field(..., description="Date when the evaluation was started")
-    duration_minutes: int = Field(..., description="Duration of the evaluation in minutes")
-    trait_name: str = Field(..., description="Name of the trait")
-    trait_score: float = Field(..., description="Score for this trait")
+    deployment_name: Optional[str] = Field(None, description="Deployment/endpoint name")
+    started_date: datetime = Field(..., description="When evaluation started")
+    duration_minutes: int = Field(..., description="Duration in minutes")
     status: str = Field(
         ...,
-        description="Status of the evaluation (pending/running/completed/failed)",
+        description="Status (pending/running/completed/failed)",
     )
+    runs: List[RunDatasetScore] = Field(default_factory=list, description="Runs with dataset scores")
 
 
 class ListEvaluationsResponse(SuccessResponse):

@@ -1,0 +1,30 @@
+apiVersion: v2
+
+name: harbor
+description: Harbor Chart for Bud
+type: application
+version: 0.1.0
+
+maintainers:
+  - name: "sinanmohd"
+    email: "sinan@sinanmohd.com"
+    url: "https://www.sinanmohd.com"
+
+dependencies:
+  - name: harbor
+    version: 1.18.0
+    repository: https://helm.goharbor.io
+    condition: harbor.enabled
+  - name: valkey
+    version: 0.6.1
+    repository: oci://registry-1.docker.io/cloudpirates
+    condition: valkey.enabled
+  - name: postgres
+    version: 0.10.0
+    repository: oci://registry-1.docker.io/cloudpirates
+    condition: postgres.enabled
+  - name: common
+    alias: cloudpirates
+    version: 2.0.0
+    repository: oci://registry-1.docker.io/cloudpirates
+    condition: cloudpirates.enabled

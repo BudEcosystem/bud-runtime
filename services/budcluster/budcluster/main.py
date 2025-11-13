@@ -29,9 +29,11 @@ from .cluster_ops.workflows import *  # noqa: F403, E402
 from .deployment.routes import deployment_router  # noqa: E402
 from .deployment.workflows import *  # noqa: F403, E402
 from .jobs.routes import job_router  # noqa: E402
+from .metrics_collector.routes import metrics_router  # noqa: E402
 
 
 app.include_router(deployment_router)
 app.include_router(cluster_router)
 app.include_router(benchmark_router)
 app.include_router(job_router)
+app.include_router(metrics_router)

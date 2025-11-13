@@ -26,6 +26,7 @@ import { format } from "date-fns";
 import { formatTimestampWithTZ } from "@/utils/formatDateNew";
 import { AppRequest } from "@/services/api/requests";
 import { useLoaderOnLoading } from "@/hooks/useLoaderOnLoading";
+import { copyToClipboard } from "@/utils/clipboard";
 import {
   Text_11_400_808080,
   Text_12_400_B3B3B3,
@@ -205,12 +206,18 @@ export default function ObservabilityDetailPage({
     }
   };
 
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => {
-      setCopiedId(null);
-    }, 2000);
+  const handleCopyToClipboard = async (text: string, id: string) => {
+    await copyToClipboard(text, {
+      onSuccess: () => {
+        setCopiedId(id);
+        setTimeout(() => {
+          setCopiedId(null);
+        }, 2000);
+      },
+      onError: () => {
+        message.error("Failed to copy to clipboard");
+      },
+    });
   };
 
   const downloadJson = (data: any, filename: string) => {
@@ -334,7 +341,7 @@ export default function ObservabilityDetailPage({
                       size="small"
                       icon={<CopyOutlined />}
                       onClick={() =>
-                        copyToClipboard(
+                        handleCopyToClipboard(
                           inferenceData.inference_id,
                           "inference_id",
                         )
@@ -917,7 +924,7 @@ export default function ObservabilityDetailPage({
                                 2,
                               );
                             }
-                            copyToClipboard(textToCopy, `message_${index}`);
+                            handleCopyToClipboard(textToCopy, `message_${index}`);
                           }}
                           className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                         />
@@ -989,7 +996,7 @@ export default function ObservabilityDetailPage({
                       icon={<CopyOutlined />}
                       onClick={() => {
                         try {
-                          copyToClipboard(
+                          handleCopyToClipboard(
                             JSON.stringify(
                               inferenceData.gateway_request,
                               null,
@@ -998,7 +1005,7 @@ export default function ObservabilityDetailPage({
                             "gateway_request",
                           );
                         } catch {
-                          copyToClipboard(
+                          handleCopyToClipboard(
                             JSON.stringify(inferenceData.gateway_request),
                             "gateway_request",
                           );
@@ -1070,7 +1077,7 @@ export default function ObservabilityDetailPage({
                       icon={<CopyOutlined />}
                       onClick={() => {
                         try {
-                          copyToClipboard(
+                          handleCopyToClipboard(
                             JSON.stringify(
                               inferenceData.gateway_response,
                               null,
@@ -1079,7 +1086,7 @@ export default function ObservabilityDetailPage({
                             "gateway_response",
                           );
                         } catch {
-                          copyToClipboard(
+                          handleCopyToClipboard(
                             JSON.stringify(inferenceData.gateway_response),
                             "gateway_response",
                           );

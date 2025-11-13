@@ -340,7 +340,7 @@ class EvaluationWorkflow:
         monitor_input = {
             "job_ids": run_ids,
             "poll_interval": 30,  # keep it simple
-            "max_attempts": 240,  # ~2h cap
+            "max_attempts": 1000,  # ~2h cap
         }
 
         monitoring_result = yield ctx.call_child_workflow(
@@ -358,6 +358,32 @@ class EvaluationWorkflow:
                 title="Job Monitoring Failed",
                 message="Some evaluation jobs failed or monitoring timed out",
                 status=WorkflowStatus.FAILED,
+            )
+            dapr_workflows.publish_notification(
+                workflow_id=instance_id,
+                notification=notification_req,
+                target_topic_name=evaluate_model_request_json.source_topic,
+                target_name=evaluate_model_request_json.source,
+            )
+
+            return
+
+        # Look if all the jobs are failed
+        if (
+            (not monitoring_result.get("completed_jobs") or len(monitoring_result.get("completed_jobs", [])) == 0)
+            and monitoring_result.get("failed_jobs")
+            and len(monitoring_result.get("failed_jobs", [])) > 0
+        ):
+            # All jobs failed - no successful completions
+            failed_job_ids = monitoring_result.get("failed_jobs", [])
+            notification_req.payload.event = "monitor_eval_job_progress"
+            notification_req.payload.content = NotificationContent(
+                title="All Evaluation Jobs Failed",
+                message=f"All {len(failed_job_ids)} evaluation job(s) failed. Failed job IDs: {', '.join(failed_job_ids)}",
+                status=WorkflowStatus.FAILED,
+                result={
+                    "evaluation_id": str(evaluate_model_request_json.eval_id),
+                },
             )
             dapr_workflows.publish_notification(
                 workflow_id=instance_id,
@@ -400,6 +426,7 @@ class EvaluationWorkflow:
         extraction_input = {
             "eval_id": str(evaluate_model_request_json.eval_id),  # Convert UUID to string
             "completed_jobs": monitoring_result.get("completed_jobs", []),
+            "job_timing_map": monitoring_result.get("job_details", {}),
         }
 
         extraction_result = yield ctx.call_activity(
@@ -412,7 +439,10 @@ class EvaluationWorkflow:
         if extraction_result.get("success"):
             update_workflow_data_in_statestore(
                 instance_id,
-                {"extraction_results": extraction_result.get("results", []), "extraction_status": "completed"},
+                {
+                    "extraction_results": extraction_result.get("results", []),
+                    "extraction_status": "completed",
+                },
             )
 
             # Build results summary for notification
@@ -494,7 +524,8 @@ class EvaluationWorkflow:
             extract_request: JSON string with:
                 {
                     "eval_id": "...",
-                    "completed_jobs": ["job1", "job2", ...]
+                    "completed_jobs": ["job1", "job2", ...],
+                    "job_timing_map": {"job1": {"startTime": "...", "completionTime": "..."}, ...}
                 }
 
         Returns:
@@ -511,12 +542,16 @@ class EvaluationWorkflow:
         eval_id = request.get("eval_id")
         completed_jobs = request.get("completed_jobs", [])
         kubeconfig = request.get("kubeconfig")
+        job_timing_map = request.get("job_timing_map", {})
 
         logger.info(f"Extracting results for {len(completed_jobs)} completed jobs")
 
         try:
             results = AnsibleOrchestrator().extract_job_results(
-                eval_id=eval_id, run_ids=completed_jobs, kubeconfig=kubeconfig
+                eval_id=eval_id,
+                run_ids=completed_jobs,
+                kubeconfig=kubeconfig,
+                job_timing_map=job_timing_map,
             )
 
             return results

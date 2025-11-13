@@ -160,11 +160,29 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
     }
   }, [currentPage, totalPages, isLoadingMore, searchValue, fetchModels]);
 
-  const handleSelectModel = (endpoint: ModelWrapper | Model) => {
+  const handleSelectModel = async (endpoint: ModelWrapper | Model) => {
     // Handle both direct model object and wrapped model object
-    const modelData = 'model' in endpoint ? endpoint.model : endpoint;
+    const modelData = 'model' in endpoint ? endpoint : endpoint;
     // Get the endpoint ID from the root level (for wrapped objects)
     const endpointId = 'model' in endpoint ? endpoint.id : endpoint.id;
+
+    try {
+      // Call the prompt-config API with the deployment name and prompt_id
+      const payload = {
+        prompt_id: session?.promptId,
+        deployment_name: modelData.name,
+        stream: session?.settings?.stream ?? false
+      };
+
+      console.log("=== LoadModel Prompt Config Payload ===");
+      console.log("Stream enabled:", session?.settings?.stream ?? false);
+      console.log("Full payload:", payload);
+
+      await AppRequest.Post(`${tempApiBaseUrl}/prompts/prompt-config`, payload);
+    } catch (error) {
+      console.error("Error calling prompt-config API:", error);
+      errorToast("Failed to configure prompt for selected deployment");
+    }
 
     updateSession(sessionId, {
       modelId: modelData.id,
@@ -325,12 +343,11 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
           </Button>
         ) : (
           <Button
-            type="primary"
-            className="w-[12.25rem] h-[2rem] flex items-center justify-center"
+            type="default"
+            className="w-[12.25rem] h-[2rem] border-[1px] border-[#1F1F1F] bg-transparent hover:bg-[#1A1A1A] flex items-center justify-center gap-2"
             onClick={() => setOpen(!open)}
             style={{
-              backgroundColor: '#965CDE',
-              borderColor: '#965CDE',
+              backgroundColor: 'transparent',
               color: '#FFFFFF'
             }}
           >

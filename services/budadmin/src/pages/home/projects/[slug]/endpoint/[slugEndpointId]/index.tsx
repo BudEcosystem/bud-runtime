@@ -3,6 +3,7 @@ import BarChart from "@/components/charts/barChart";
 import GaugeChart from "@/components/charts/gaugeChart";
 import ScoreChart from "@/components/charts/scoreChart";
 import { errorToast, successToast } from "@/components/toast";
+import { copyToClipboard } from "@/utils/clipboard";
 import { ButtonInput } from "@/components/ui/button";
 import { SelectInput } from "@/components/ui/input";
 import {
@@ -328,12 +329,10 @@ export default function EndpointDashboard() {
       text = js;
     }
 
-    try {
-      await navigator.clipboard.writeText(text);
-      successToast("Copied..");
-    } catch (err) {
-      errorToast("Failed to copy");
-    }
+    await copyToClipboard(text, {
+      onSuccess: () => successToast("Copied.."),
+      onError: () => errorToast("Failed to copy"),
+    });
   };
 
   useEffect(() => {

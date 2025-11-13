@@ -8,7 +8,8 @@ import { ChevronDown } from "lucide-react";
 import ModelTags from "@/components/ui/ModelTags";
 import dayjs from "dayjs";
 import { Model } from "@/hooks/useModels";
-import { successToast } from "@/components/toast";
+import { successToast, errorToast } from "@/components/toast";
+import { copyToClipboard } from "@/utils/clipboard";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import DrawerBreadCrumbNavigation from "@/components/ui/bud/card/DrawerBreadCrumbNavigation";
@@ -96,9 +97,11 @@ export const ModelDetailContent: React.FC<{
   const [filteredItems, setFilteredItems] = useState<TabsProps["items"]>([]);
   const assetBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    successToast("Copied to clipboard");
+  const handleCopyToClipboard = async (text: string) => {
+    await copyToClipboard(text, {
+      onSuccess: () => successToast("Copied to clipboard"),
+      onError: () => errorToast("Failed to copy to clipboard"),
+    });
   };
 
   const getModelIcon = (model: any) => {
@@ -374,7 +377,7 @@ export const ModelDetailContent: React.FC<{
                   {model.uri}
                 </Text_12_400_EEEEEE>
                 <button
-                  onClick={() => copyToClipboard(model.uri)}
+                  onClick={() => handleCopyToClipboard(model.uri)}
                   className="text-[#757575] hover:text-[#EEEEEE] transition-colors shrink-0"
                 >
                   <CopyOutlined />
@@ -651,18 +654,19 @@ fetch('${apiUrl}', {
       setSelectedText(codeSnippets[type]);
     };
 
-    const handleCopy = (text: string) => {
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
+    const handleCopy = async (text: string) => {
+      await copyToClipboard(text, {
+        onSuccess: () => {
           setCopyText("Copied!");
           setTimeout(() => {
             setCopyText("Copy");
           }, 2000);
-        })
-        .catch(() => {
+        },
+        onError: () => {
           setCopyText("Failed to copy");
-        });
+          errorToast("Failed to copy to clipboard");
+        },
+      });
     };
 
     return (

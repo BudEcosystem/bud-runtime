@@ -10,7 +10,7 @@ interface AuthGuardProps {
 }
 
 // List of public routes that don't require authentication
-const publicRoutes = ["/login", "/register", "/auth/resetPassword", "/auth/reset-password"];
+const publicRoutes = ["/login", "/register", "/resetPassword", "/reset-password"];
 
 export default function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();

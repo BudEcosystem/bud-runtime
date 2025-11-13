@@ -62,7 +62,7 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({ data }) => {
           },
         },
         grid: {
-          left: "0%",
+          left: "5px",
           right: "0%",
           bottom: "10px",
           top: "10px",

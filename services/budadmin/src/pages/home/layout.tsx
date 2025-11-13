@@ -28,6 +28,7 @@ import {
   Text_15_400_B3B3B3,
 } from "@/components/ui/text";
 import { Icon } from "@iconify/react";
+import { branding } from "@/components/environment";
 import { useShortCut } from "../../hooks/useShortCut";
 import { useRouter } from "next/router";
 import { useDrawer } from "src/hooks/useDrawer";
@@ -179,6 +180,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       icon: '/icons/guard.png',
       iconWhite: '/icons/guardWhite.png',
       cmd: "10",
+      hide: !enableDevMode,
     },
   ]
 
@@ -338,7 +340,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
         <div className="dashboardWrapper flex justify-between relative">
           <div className={`dashboardOverlay absolute w-full h-full top-0 left-0 z-[1200] ${isVisible ? 'block' : 'hidden'}`}></div>
           <div
-            className="flex flex-col justify-between items-start gap-[2rem] leftDiv py-[1.55em] pb-[.7em] scroll-smooth custom-scrollbar overflow-auto open-sans"
+            className="flex flex-col justify-between items-start gap-[1rem] leftDiv py-[1.55em] pb-[.7em] scroll-smooth custom-scrollbar overflow-auto open-sans"
           >
             <div className="w-full 1680px:text-[1rem]">
               <div className="flex justify-center leftLogo px-[7%] pb-[1.65rem]">
@@ -346,12 +348,11 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                   preview={false}
                   className="mainLogo"
                   style={{ width: 'auto', height: '1.4rem' }}
-                  src="/images/logo.svg"
-                  // src="/images/BudLogo.png"
-                  alt="Logo"
+                  src={branding.logoUrl}
+                  alt="Bud Logo"
                 />
               </div>
-              <div className="px-[.75rem] mb-[7%]">
+              <div className="px-[.75rem] mb-[3%]">
                 <BudIsland />
               </div>
               <div
@@ -363,7 +364,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
 
                   return (
                     <Link
-                      className="linkLink mb-[.62rem]"
+                      className="linkLink mb-[.5rem]"
                       key={tab.route}
                       href={tab.route}
                       passHref

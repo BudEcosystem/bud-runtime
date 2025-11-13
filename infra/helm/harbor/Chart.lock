@@ -1,0 +1,15 @@
+dependencies:
+- name: harbor
+  repository: https://helm.goharbor.io
+  version: 1.18.0
+- name: valkey
+  repository: oci://registry-1.docker.io/cloudpirates
+  version: 0.6.1
+- name: postgres
+  repository: oci://registry-1.docker.io/cloudpirates
+  version: 0.10.0
+- name: common
+  repository: oci://registry-1.docker.io/cloudpirates
+  version: 2.0.0
+digest: sha256:3e8c732e8130b693a35cd0ccd48ed44376c2b01fa55a5f15abbbc6bb4be667b6
+generated: "2025-10-22T11:17:36.93939755+05:30"

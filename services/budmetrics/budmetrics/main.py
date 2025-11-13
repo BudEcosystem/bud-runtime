@@ -22,6 +22,7 @@ from budmicroframe.main import configure_app, dapr_lifespan
 from fastapi import FastAPI
 from starlette_compress import CompressMiddleware
 
+from .cluster_metrics.routes import router as cluster_metrics_router
 from .commons.config import app_settings, secrets_settings
 from .commons.profiling_utils import performance_logger
 from .observability.routes import observability_router
@@ -51,3 +52,4 @@ app.add_middleware(CompressMiddleware, minimum_size=1000, zstd_level=4, brotli_q
 
 app.include_router(observability_router)
 app.include_router(usage_router, prefix="/observability")
+app.include_router(cluster_metrics_router)

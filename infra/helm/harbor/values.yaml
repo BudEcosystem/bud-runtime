@@ -1,0 +1,42 @@
+# Main
+harbor:
+  enabled: true
+  externalURL: https://harbor.bud.studio
+  expose:
+    type: ingress
+    tls:
+      enabled: true
+    ingress:
+      hosts:
+        core: harbor.bud.studio
+      annotations:
+        kubernetes.io/tls-acme: "true"
+  database:
+    type: external
+    external:
+      host: harbor-postgres
+      coreDatabase: harbor
+      username: harbor
+      existingSecret: "harbor-postgres"
+  trivy:
+    enabled: false
+  redis:
+    type: external
+    external:
+      addr: "harbor-valkey:6379"
+
+# Dependencies
+cloudpirates:
+  enabled: true
+valkey:
+  enabled: true
+  auth:
+    enabled: false
+postgres:
+  enabled: true
+  auth:
+    username: harbor
+    database: harbor
+    existingSecret: "harbor-postgres"
+    secretKeys:
+      passwordKey: password

@@ -20,6 +20,7 @@ import CustomPopover from "../components/customPopover";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useDrawer } from "src/hooks/useDrawer";
+import { copyToClipboard } from "@/utils/clipboard";
 
 type EndpointTemplate = {
   id: string;
@@ -268,9 +269,9 @@ export default function UseModel() {
   const tags = [
     {
       name:
-        drawerProps?.endpoint?.model?.name ||
+        drawerProps?.endpoint?.name ||
         drawerProps?.name ||
-        clusterDetails?.model?.name,
+        clusterDetails?.name,
       color: "#D1B854",
     },
     {
@@ -283,10 +284,8 @@ export default function UseModel() {
   ];
 
   const modelNameForPayload =
-    drawerProps?.endpoint?.model?.name ||
     drawerProps?.endpoint?.name ||
     drawerProps?.name ||
-    clusterDetails?.model?.name ||
     clusterDetails?.name ||
     "MODEL_NAME";
 
@@ -450,15 +449,11 @@ export default function UseModel() {
     setSelectedText(codeSnippets[type] ?? "");
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        setCopiedText("Copied..");
-      })
-      .catch(() => {
-        setCopiedText("Failed to copy");
-      });
+  const handleCopy = async (text: string) => {
+    await copyToClipboard(text, {
+      onSuccess: () => setCopiedText("Copied.."),
+      onError: () => setCopiedText("Failed to copy"),
+    });
   };
 
   useEffect(() => {

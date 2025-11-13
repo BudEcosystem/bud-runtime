@@ -18,6 +18,7 @@ import { CheckIcon } from "@radix-ui/react-icons";
 import globeIcn from "./../../../../../public/icons/Globe.png";
 import copyIcn from "./../../../../../public/icons/copy.png";
 import PasswordGenerator from "src/utils/randomPasswordGenerator";
+import { copyToClipboard } from "@/utils/clipboard";
 import { CopyToClipboard } from "react-copy-to-clipboard";
 import { Text_12_400_6A6E76 } from "@/components/ui/text";
 
@@ -142,17 +143,19 @@ const GeneratePassPopup: React.FC<GeneratePassPopupProps> = ({
       Click this link to login: https://bud.studio`);
   };
   const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(adminMessage);
-      setIsCopy(true);
-      setCopyMessage("Copied..");
-      setTimeout(() => {
-        setCopyMessage("click to copy");
-        setIsCopy(false);
-      }, 10000);
-    } catch (err) {
-      setCopyMessage("Failed to copy: ");
-    }
+    await copyToClipboard(adminMessage, {
+      onSuccess: () => {
+        setIsCopy(true);
+        setCopyMessage("Copied..");
+        setTimeout(() => {
+          setCopyMessage("click to copy");
+          setIsCopy(false);
+        }, 10000);
+      },
+      onError: () => {
+        setCopyMessage("Failed to copy");
+      },
+    });
   };
   useEffect(() => {
     if (initialValues) {

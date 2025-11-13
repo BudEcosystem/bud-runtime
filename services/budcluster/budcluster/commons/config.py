@@ -71,6 +71,20 @@ class AppConfig(BaseAppConfig):
     # Prometheus Primary Cluster Write URL
     prometheus_url: str = Field(..., alias="PROMETHEUS_URL")
 
+    # Metrics Collection Configuration
+    metrics_collection_enabled: bool = Field(True, alias="METRICS_COLLECTION_ENABLED")
+    metrics_collection_timeout: int = Field(30, alias="METRICS_COLLECTION_TIMEOUT")
+    metrics_batch_size: int = Field(20000, alias="METRICS_BATCH_SIZE")
+
+    # OpenTelemetry Collector Configuration
+    otel_collector_endpoint: Optional[str] = Field("http://localhost:4318", alias="OTEL_COLLECTOR_ENDPOINT")
+    otel_config_path: Optional[str] = Field("/etc/otel/config.yaml", alias="OTEL_CONFIG_PATH")
+
+    # Prometheus configuration
+    prometheus_service_name: str = Field("bud-metrics-kube-prometheu-prometheus", alias="PROMETHEUS_SERVICE_NAME")
+    prometheus_namespace: str = Field("bud-system", alias="PROMETHEUS_NAMESPACE")
+    prometheus_port: int = Field(9090, alias="PROMETHEUS_PORT")
+
     # Bud Services
     bud_app_id: str = Field("budapp", alias="BUD_APP_ID")
 

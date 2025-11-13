@@ -112,6 +112,7 @@ class RetrieveWorkflowStepData(BaseModel):
     rate_limit_value: int | None = None
     bud_prompt_id: str | None = None
     bud_prompt_version: int | str | None = None
+    discarded_prompt_ids: list[dict] | None = None
     prompt_schema_events: dict | None = None
     # Parser metadata from cluster/simulator
     tool_calling_parser_type: str | None = None
@@ -120,6 +121,9 @@ class RetrieveWorkflowStepData(BaseModel):
     # User preferences for parsers
     enable_tool_calling: bool | None = None
     enable_reasoning: bool | None = None
+    # Engine capability flags from simulator
+    supports_lora: bool | None = None
+    supports_pipeline_parallelism: bool | None = None
 
 
 class RetrieveWorkflowDataResponse(SuccessResponse):

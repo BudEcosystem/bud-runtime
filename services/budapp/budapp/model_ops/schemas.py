@@ -710,6 +710,7 @@ class ModelFilter(BaseModel):
     table_source: Literal["cloud_model", "model"] = "cloud_model"
     base_model: str | None = None
     base_model_relation: BaseModelRelationEnum | None = None
+    exclude_adapters: bool | None = Field(None, description="Exclude adapter-type models from results")
     supported_endpoints: List[ModelEndpointEnum] | None = None
 
     # @field_validator("source")
@@ -1081,6 +1082,9 @@ class ModelDeployStepRequest(BaseModel):
     tool_calling_parser_type: str | None = None
     reasoning_parser_type: str | None = None
     chat_template: str | None = None
+    # Engine capability flags from simulator
+    supports_lora: bool | None = None
+    supports_pipeline_parallelism: bool | None = None
 
     @field_validator("endpoint_name")
     @classmethod
@@ -1149,6 +1153,9 @@ class DeploymentWorkflowStepData(BaseModel):
     tool_calling_parser_type: str | None = None
     reasoning_parser_type: str | None = None
     chat_template: str | None = None
+    # Engine capability flags from simulator
+    supports_lora: bool | None = None
+    supports_pipeline_parallelism: bool | None = None
 
 
 class ModelDeploymentRequest(BaseModel):

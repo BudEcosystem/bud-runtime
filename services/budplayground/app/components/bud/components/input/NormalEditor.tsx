@@ -10,6 +10,7 @@ export interface EditorProps {
   disabled?: boolean;
   stop?: () => void;
   handleInputChange: (e: any) => void;
+  isPromptMode?: boolean; // Indicates if we're using prompt IDs (don't show "Select deployment" message)
 }
 
 function NormalEditor({
@@ -20,6 +21,7 @@ function NormalEditor({
   stop,
   error,
   handleInputChange,
+  isPromptMode = false,
 }: EditorProps) {
   const [toggleFormat, setToggleFormat] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState<boolean>(false);
@@ -31,7 +33,7 @@ function NormalEditor({
     }}
     >
       <form
-        className="chat-message-form   w-full  flex items-center justify-center  border-t-2 hover:border-[#333333] rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden max-w-5xl px-[1rem]"
+        className="chat-message-form w-full  flex items-center justify-center  border-t-2 hover:border-[#333333] rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden max-w-5xl px-[1rem]"
         onSubmit={handleSubmit}
       >
         <div className="blur-[0.5rem] absolute top-0 left-0 right-0 bottom-0 bg-[#FFFFFF03] rounded-[0.5rem] " />
@@ -50,11 +52,14 @@ function NormalEditor({
              style={{
               cursor: disabled ? "not-allowed" : "auto",
             }}
-            className=" w-full  p-2 border border-gray-300 rounded shadow-xl placeholder-[#757575] placeholder-[.625rem] text-[1rem] bg-transparent  border-[#e5e5e5] outline-none border-none text-[#FFFFFF] z-10"
+            className=" w-full  p-2 border border-gray-300 rounded shadow-xl placeholder-[#757575] placeholder-[.625rem] text-[1rem] bg-transparent  border-[#e5e5e5] outline-none border-none text-[#FFFFFF] z-10 !shadow-none"
             value={input}
             rows={2}
-            placeholder={disabled ? "Select a deployment to chat"
-              : "Type a message and press Enter to send"}
+            placeholder={
+              disabled && !isPromptMode
+                ? "Select a deployment to chat"
+                : "Type a message and press Enter to send"
+            }
             onChange={(e) => handleInputChange(e)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {

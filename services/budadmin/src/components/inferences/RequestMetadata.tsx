@@ -15,6 +15,7 @@ import {
   SecurityScanOutlined,
 } from "@ant-design/icons";
 import { RequestMetadata as RequestMetadataType } from "@/stores/useInferences";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const { Text, Title } = Typography;
 
@@ -28,11 +29,11 @@ const RequestMetadata: React.FC<RequestMetadataProps> = ({ data, onCopy }) => {
     return <Empty description="No request metadata available" />;
   }
 
-  const handleCopy = (content: string, label: string) => {
+  const handleCopy = async (content: string, label: string) => {
     if (onCopy) {
       onCopy(content, label);
     } else {
-      navigator.clipboard.writeText(content);
+      await copyToClipboard(content);
     }
   };
 

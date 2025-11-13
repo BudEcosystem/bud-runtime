@@ -39,7 +39,6 @@ from budapp.credential_ops.models import CloudCredentials
 from budapp.endpoint_ops.crud import EndpointDataManager
 from budapp.endpoint_ops.models import Endpoint as EndpointModel
 from budapp.shared.grafana import Grafana
-from budapp.shared.promql_service import PrometheusMetricsClient
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -85,7 +84,6 @@ from .schemas import (
     MetricTypeEnum,
     ModelClusterRecommendedCreate,
     ModelClusterRecommendedUpdate,
-    PrometheusConfig,
     RecommendedCluster,
     RecommendedClusterData,
 )
@@ -780,7 +778,7 @@ class ClusterService(SessionMixin):
         # Check if cluster is already in deleting state
         if db_cluster.status == ClusterStatusEnum.DELETING:
             # Check how long the cluster has been in deleting state
-            time_in_deleting = datetime.now(timezone.utc) - db_cluster.updated_at
+            time_in_deleting = datetime.now(timezone.utc) - db_cluster.modified_at
 
             if time_in_deleting > timedelta(days=1):
                 # Move to ERROR state if stuck in DELETING for more than 24 hours
@@ -1630,25 +1628,190 @@ class ClusterService(SessionMixin):
         # Get cluster details to verify it exists
         db_cluster = await self.get_cluster_details(cluster_id)
 
-        config = PrometheusConfig(base_url=app_settings.prometheus_url, cluster_id=str(db_cluster.cluster_id))
-
         try:
-            client = PrometheusMetricsClient(config)
-            nodes_status = client.get_nodes_status()
-            nodes_data = await self._perform_get_cluster_nodes_request(db_cluster.cluster_id)
-            node_name_id_mapping = {
-                node["name"]: {"id": node["id"], "devices": node["hardware_info"]}
-                for node in nodes_data.get("nodes", [])
-            }
-            for _, value in nodes_status.get("nodes", {}).items():
-                hostname = value["hostname"]
-                node_map = node_name_id_mapping.get(hostname)
-                value["id"] = node_map["id"]
-                value["devices"] = node_map["devices"]
-        except Exception as e:
-            raise ClientException(f"Failed to get node metrics: {str(e)}")
+            # Call budmetrics service to get ClickHouse-based node metrics
+            metrics_endpoint = (
+                f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/"
+                f"method/cluster-metrics/{db_cluster.cluster_id}/nodes"
+            )
 
-        return nodes_status
+            # Call budcluster service to get node details
+            nodes_data = await self._perform_get_cluster_nodes_request(db_cluster.cluster_id)
+
+            # Fetch metrics from budmetrics and event counts from budcluster in parallel
+            events_endpoint = (
+                f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/"
+                f"method/cluster/{db_cluster.cluster_id}/events-count-by-node"
+            )
+
+            async with aiohttp.ClientSession() as http_session:
+                # Fetch metrics and events in parallel
+                metrics_task = http_session.get(metrics_endpoint)
+                events_task = http_session.get(events_endpoint)
+
+                async with metrics_task as metrics_resp, events_task as events_resp:
+                    # Handle metrics response
+                    if metrics_resp.status != 200:
+                        error_data = await metrics_resp.json()
+                        logger.error(f"Failed to get node metrics from budmetrics: {error_data}")
+                        raise ClientException(
+                            f"Failed to get node metrics: {error_data.get('detail', 'Unknown error')}"
+                        )
+
+                    metrics_response = await metrics_resp.json()
+
+                    # Handle events response (non-blocking, log error but continue)
+                    events_by_hostname = {}
+                    if events_resp.status == 200:
+                        events_response = await events_resp.json()
+                        events_by_hostname = events_response.get("data", {})
+                    else:
+                        logger.warning(f"Failed to get event counts from budcluster: status {events_resp.status}")
+
+            # Helper function to extract system info from kernel_info
+            def extract_system_info(node: dict) -> dict:
+                """Extract system info from budcluster node kernel_info."""
+                kernel_info = node.get("kernel_info", {})
+                return {
+                    "os": kernel_info.get("os_release", kernel_info.get("os", "N/A")),
+                    "kernel": kernel_info.get("kernel_version", "N/A"),
+                    "architecture": kernel_info.get("architecture", "N/A"),
+                }
+
+            # Helper function to extract GPU count from hardware_info
+            def extract_gpu_count(devices: list) -> int:
+                """Extract total GPU count from hardware_info devices list."""
+                gpu_count = 0
+                for device in devices:
+                    # Check if device is a GPU (has 'vendor' field with GPU vendors)
+                    vendor = device.get("vendor", "").lower()
+                    if vendor in ["nvidia", "amd", "intel"] and "raw_name" in device:
+                        # Check if it's actually a GPU (not CPU/HPU)
+                        raw_name = device.get("raw_name", "").lower()
+                        if any(
+                            gpu_indicator in raw_name
+                            for gpu_indicator in ["gpu", "geforce", "tesla", "rtx", "gtx", "radeon", "mi250", "mi300"]
+                        ):
+                            gpu_count += device.get("count", 1)
+                return gpu_count
+
+            # Create node mapping from budcluster data
+            # Use IP-based matching now that internal_ip field is available in budcluster schema
+            budcluster_nodes = nodes_data.get("nodes", [])
+
+            # Create IP-to-node-info mapping for reliable matching
+            node_info_by_ip = {}
+            nodes_without_ip = []
+
+            for node in budcluster_nodes:
+                node_info = {
+                    "id": node["id"],
+                    "hostname": node["name"],
+                    "devices": node["hardware_info"],
+                    "status": "Ready" if node.get("status", False) else "NotReady",
+                    "system_info": extract_system_info(node),
+                    "gpu_count": extract_gpu_count(node["hardware_info"]),
+                }
+
+                internal_ip = node.get("internal_ip")
+                if internal_ip:
+                    node_info_by_ip[internal_ip] = node_info
+                else:
+                    # Track nodes without IP for logging
+                    nodes_without_ip.append(node["name"])
+
+            # Log warning if some nodes don't have internal_ip (backwards compatibility)
+            if nodes_without_ip:
+                logger.warning(
+                    f"Nodes without internal_ip in cluster {db_cluster.cluster_id}: {nodes_without_ip}. "
+                    "Metrics may not be associated correctly. Please refresh node info."
+                )
+
+            # Transform metrics data into the expected format
+            nodes_status = {"nodes": {}}
+
+            metrics_nodes = metrics_response.get("nodes", [])
+
+            # Match metrics to budcluster nodes using IP-based lookup
+            # This is reliable and ordering-independent
+            for node_metric in metrics_nodes:
+                node_ip = node_metric["node_name"]  # This is the IP address from ClickHouse
+
+                # Try to get corresponding budcluster node info by IP
+                node_info = node_info_by_ip.get(node_ip)
+
+                if not node_info:
+                    # Fallback to defaults if no IP match found
+                    logger.debug(f"No node info found for IP {node_ip}, using defaults")
+                    node_info = {
+                        "id": "",
+                        "hostname": node_ip,
+                        "devices": [],
+                        "status": "Unknown",
+                        "system_info": {"os": "N/A", "kernel": "N/A", "architecture": "N/A"},
+                        "gpu_count": 0,
+                    }
+
+                # Get network bandwidth time series from budmetrics
+                network_bandwidth_time_series = node_metric.get("network_bandwidth_time_series", [])
+
+                # If no time series data, create a fallback single point with average values
+                if not network_bandwidth_time_series:
+                    network_receive_bps = node_metric.get("network_receive_bytes_per_sec", 0)
+                    network_transmit_bps = node_metric.get("network_transmit_bytes_per_sec", 0)
+                    total_bandwidth_bytes_per_sec = network_receive_bps + network_transmit_bps
+                    total_bandwidth_mbps = round((total_bandwidth_bytes_per_sec * 8) / 1_000_000, 2)
+
+                    network_bandwidth_time_series = [
+                        {"timestamp": int(datetime.now(timezone.utc).timestamp()), "mbps": total_bandwidth_mbps}
+                    ]
+
+                # Use IP as the key (current API contract, matches frontend expectation)
+                # Display the actual hostname from budcluster when available
+                node_response = {
+                    "hostname": node_info["hostname"],  # Actual Kubernetes hostname
+                    "status": node_info["status"],  # "Ready" or "NotReady"
+                    "system_info": node_info["system_info"],  # Extracted from kernel_info
+                    "pods": {
+                        "current": 0,  # Not available from ClickHouse metrics yet
+                        "max": 0,
+                    },
+                    "cpu": {
+                        "current": round(node_metric["cpu_usage_percent"], 2),
+                        "capacity": node_metric["cpu_cores"],
+                    },
+                    "memory": {
+                        "current": round(node_metric["memory_used_gb"], 2),
+                        "capacity": round(node_metric["memory_total_gb"], 2),
+                    },
+                    "network": {"bandwidth": network_bandwidth_time_series},
+                    "events_count": events_by_hostname.get(node_info["hostname"], 0),
+                    "capacity": {
+                        "cpu": str(node_metric["cpu_cores"]),
+                        "memory": f"{int(node_metric['memory_total_gb'])}Gi",
+                        "disk": f"{int(node_metric['disk_total_gb'])}Gi",
+                    },
+                    "id": node_info["id"],
+                    "devices": node_info["devices"],
+                }
+
+                # Add GPU field if node has GPUs
+                gpu_count = node_info.get("gpu_count", 0)
+                if gpu_count > 0:
+                    node_response["gpu"] = {
+                        "current": 0,  # No usage data available from hardware_info
+                        "capacity": gpu_count,
+                    }
+
+                nodes_status["nodes"][node_ip] = node_response
+
+            return nodes_status
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception(f"Failed to get node metrics: {e}")
+            raise ClientException(f"Failed to get node metrics: {str(e)}")
 
     async def get_node_wise_events_by_hostname(self, cluster_id: UUID, node_hostname: str) -> Dict[str, Any]:
         """Get node-wise events for a cluster by hostname.
@@ -1966,6 +2129,9 @@ class ClusterService(SessionMixin):
                     tool_calling_parser_type=recommended_cluster_data.get("tool_calling_parser_type"),
                     reasoning_parser_type=recommended_cluster_data.get("reasoning_parser_type"),
                     chat_template=recommended_cluster_data.get("chat_template"),
+                    # Add engine capability flags from simulator
+                    supports_lora=recommended_cluster_data.get("supports_lora"),
+                    supports_pipeline_parallelism=recommended_cluster_data.get("supports_pipeline_parallelism"),
                 )
             )
 

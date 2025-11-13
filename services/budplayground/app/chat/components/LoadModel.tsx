@@ -17,7 +17,7 @@ interface LoadModelProps {
 
 
 export default function LoadModel(props: LoadModelProps) {
-    const { endpoints, getEndPoints } = useEndPoints();
+    const { endpoints, getEndPoints, isReady } = useEndPoints();
     const chat = useChatStore.getState().getChat(props.chatId);
     const { setDeployment } = useChatStore();
 
@@ -32,9 +32,13 @@ export default function LoadModel(props: LoadModelProps) {
     React.useEffect(() => {
         document.documentElement.scrollTop = document.documentElement.clientHeight;
         document.documentElement.scrollLeft = document.documentElement.clientWidth;
+    }, []);
 
-        getEndPoints({ page: 1, limit: 25 });
-    }, [getEndPoints]);
+    useEffect(() => {
+        if (props.open && isReady) {
+            getEndPoints({ page: 1, limit: 25 });
+        }
+    }, [props.open, isReady, getEndPoints]);
 
     useEffect(() => {
 

@@ -15,3 +15,10 @@
 #  -----------------------------------------------------------------------------
 
 """The constants used in the budprompt module."""
+
+# MCP Cleanup Registry
+CLEANUP_REGISTRY_KEY = "prompt:cleanup_registry"
+
+# Default internal tool name, description in pydantic ai to generate structured output
+STRUCTURED_OUTPUT_TOOL_NAME = "final_result"
+STRUCTURED_PUTOUT_TOOL_DESCRIPTION = "Final result processed."

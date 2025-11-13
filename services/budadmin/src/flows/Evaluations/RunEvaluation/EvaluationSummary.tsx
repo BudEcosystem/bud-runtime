@@ -49,8 +49,8 @@ export default function EvaluationSummary() {
           // Check for model in workflow_steps.model first (prioritize currentWorkflow)
           if (currentWorkflow?.workflow_steps?.model) {
             setSelectedModelData(currentWorkflow.workflow_steps.model);
-          } else if (data.workflow_steps?.model) {
-            setSelectedModelData(data.workflow_steps.model);
+          } else if (data.workflow_steps?.endpoint) {
+            setSelectedModelData(data.workflow_steps.endpoint);
           } else if (data.selected_model) {
             setSelectedModelData(data.selected_model);
           } else if (data.workflow_steps?.stage_data?.selected_model) {

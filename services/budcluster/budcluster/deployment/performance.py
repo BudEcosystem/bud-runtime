@@ -5,7 +5,7 @@ from budmicroframe.commons.logging import get_logger
 from llm_benchmark.benchmark import tools as benchmark_tools
 from llm_benchmark.benchmark.litellm_proxy.utils import compute_latency_factors
 
-from ..commons.config import app_settings, secrets_settings
+from ..commons.config import secrets_settings
 from .utils import format_litellm_error_message
 
 
@@ -24,6 +24,7 @@ class DeploymentPerformance:
     def __init__(
         self,
         deployment_url: str,
+        deployment_name: str,
         model: str,
         concurrency: int,
         input_tokens: Optional[int],
@@ -50,6 +51,7 @@ class DeploymentPerformance:
         else:
             self.benchmark_script = "vllm" if provider_type == "local" else "litellm_proxy"
         self.deployment_url = deployment_url
+        self.deployment_name = deployment_name
         self.model = model
         self.target_ttft = target_ttft
         self.target_e2e_latency = target_e2e_latency
@@ -93,8 +95,8 @@ class DeploymentPerformance:
                     "api_base": self.deployment_url + "/v1",
                 }
                 try:
-                    latency_factors = compute_latency_factors(self.model, request_metadata, llm_api="openai")
-                    print(f"Latency factors: {latency_factors}")
+                    latency_factors = compute_latency_factors(self.deployment_name, request_metadata, llm_api="openai")
+                    logger.info(f"Latency factors: {latency_factors}")
                 except Exception as e:
                     print(f"Error computing latency factors: {e}")
                     import traceback
@@ -103,13 +105,13 @@ class DeploymentPerformance:
                     raise e
 
             result = benchmark_tools.run_benchmark(
-                self.model,
+                self.deployment_name,
                 self.deployment_url + "/v1",
                 self.input_tokens,
                 self.output_tokens,
                 self.concurrency,
                 self.benchmark_script,
-                tokenizer=app_settings.model_registry_path + self.model,
+                tokenizer=self.model,
                 endpoint="/completions",
                 env_values=env_values,
                 latency_factors=latency_factors,

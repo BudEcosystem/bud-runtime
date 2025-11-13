@@ -74,6 +74,23 @@ services:
         size: "100M"
         mode: 777
     user: "root"
+
+  otel-collector:
+    container_name: bud-mf-$NAMESPACE-otel-collector
+    image: otel/opentelemetry-collector-contrib:0.91.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ../otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - ~/.kube:/home/collector/.kube:ro  # For kubectl access if needed
+    environment:
+      - CLICKHOUSE_ENDPOINT=${CLICKHOUSE_HOST:-clickhouse}:${CLICKHOUSE_PORT:-9000}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-metrics}
+    ports:
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # OTel metrics endpoint
+    network_mode: host
 # networks:
 #   bud-microframe-nw:
 #     name: bud-microframe-$NAMESPACE

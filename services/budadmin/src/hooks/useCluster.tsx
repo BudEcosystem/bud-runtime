@@ -75,8 +75,6 @@ export enum MetricType {
   STORAGE = "storage",
   GPU = "gpu",
   HPU = "hpu",
-  NETWORK_IN = "network_in",
-  NETWORK_OUT = "network_out",
   NETWORK_BANDWIDTH = "network_bandwidth",
   ALL = "all",
 }
@@ -153,6 +151,9 @@ export type Cluster = {
   tool_calling_parser_type?: string | null;
   reasoning_parser_type?: string | null;
   chat_template?: string | null;
+  // Engine capability flags from simulator
+  supports_lora?: boolean | null;
+  supports_pipeline_parallelism?: boolean | null;
   required_devices?: {
     device_type: string;
     num_replicas: number;
@@ -220,6 +221,8 @@ export interface GetParams {
 
 // create zustand store
 export const useCluster = create<{
+  totalPages: number;
+  totalClusters: number;
   selectedNode: Node;
   setSelectedNode: (node: Node) => void;
   recommendedCluster: ICluster;
@@ -272,6 +275,8 @@ export const useCluster = create<{
   deleteClusterSettings: (id: string) => Promise<any>;
   getClusterStorageClasses: (id: string) => Promise<any[]>;
 }>((set, get) => ({
+  totalPages: 0,
+  totalClusters: 0,
   getClusterAnalytics: async (id: string) => {
     const url = `${tempApiBaseUrl}/clusters/${id}/grafana-dashboard`;
     try {
@@ -352,7 +357,11 @@ export const useCluster = create<{
           },
         },
       );
-      set({ clusters: response.data.clusters });
+      set({
+        clusters: response.data.clusters,
+        totalPages: response.data.total_pages,
+        totalClusters: response.data.total_record,
+       });
     } catch (error) {
       console.error("Error getting clusters:", error);
     } finally {

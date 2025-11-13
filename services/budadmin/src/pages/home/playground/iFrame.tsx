@@ -3,7 +3,6 @@ import React, { useEffect, useRef, useState } from "react";
 
 const EmbeddedIframe = ({singleChat = false}: {singleChat?: boolean}) => {
   const [_refreshToken, _setRefreshToken] = useState("");
-
   const iframeRef = useRef(null);
   let iframeUrl = `${playGroundUrl}/login?embedded=true&refresh_token=${_refreshToken}&is_single_chat=${singleChat}`
   if(singleChat){

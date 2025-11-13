@@ -197,14 +197,16 @@ function EvaluationResultsTable() {
         }}
         showSorterTooltip={true}
         title={() => (
-          <div className="flex justify-between items-center px-[0.75rem] py-[1rem]">
-            <Text_16_600_FFFFFF className="text-[#EEEEEE]">
+          <div className="flex justify-between items-center px-[0.75rem] py-[1rem] gap-x-[.4rem]">
+            <Text_16_600_FFFFFF className="text-[#EEEEEE] whitespace-nowrap">
               Evaluation Results
             </Text_16_600_FFFFFF>
             <div className="flex items-center justify-between gap-x-[.4rem]">
               <SearchHeaderInput
                 placeholder={"Search by name"}
                 searchValue={searchValue}
+                classNames={'flex-1'}
+                fullWidth={true}
                 setSearchValue={setSearchValue}
               />
               {hasPermission(PermissionEnum.ModelManage) && (

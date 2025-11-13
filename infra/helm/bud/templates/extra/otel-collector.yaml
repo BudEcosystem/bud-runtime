@@ -1,0 +1,231 @@
+{{- if .Values.otelCollector.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-otel-collector-config
+data:
+  otel-collector-config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      batch:
+        send_batch_size: {{ .Values.otelCollector.batchSize | default 10000 }}
+        timeout: {{ .Values.otelCollector.batchTimeout | default "10s" }}
+
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: {{ .Values.otelCollector.memoryLimit | default 2048 }}
+        spike_limit_mib: {{ .Values.otelCollector.memorySpikeLimit | default 512 }}
+
+      resource:
+        attributes:
+          - key: service.namespace
+            value: {{ .Release.Namespace }}
+            action: upsert
+          - key: deployment.environment
+            value: {{ .Values.environment | default "dev" }}
+            action: upsert
+
+    exporters:
+      clickhouse:
+        endpoint: tcp://{{ .Release.Name }}-clickhouse:{{ .Values.otelCollector.clickhouse.port }}
+        database: {{ .Values.otelCollector.clickhouse.database }}
+        ttl: {{ .Values.otelCollector.clickhouse.ttl | default "2160h" }}
+        logs_table_name: otel_logs
+        traces_table_name: otel_traces
+        metrics_table_name: otel_metrics
+        username: {{ .Values.clickhouse.auth.username | default "default" }}
+        password: {{ .Values.clickhouse.auth.password | default "" | quote }}
+        timeout: 30s
+        retry_on_failure:
+          enabled: true
+          initial_interval: 5s
+          max_interval: 30s
+          max_elapsed_time: 300s
+
+      # Debug exporter for troubleshooting
+      debug:
+        verbosity: detailed
+        sampling_initial: 5
+        sampling_thereafter: 200
+
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+
+    service:
+      pipelines:
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource]
+          exporters: [clickhouse{{ if .Values.otelCollector.debug }}, debug{{ end }}]
+
+        # Future support for traces and logs
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource]
+          exporters: [clickhouse{{ if .Values.otelCollector.debug }}, debug{{ end }}]
+
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource]
+          exporters: [clickhouse{{ if .Values.otelCollector.debug }}, debug{{ end }}]
+
+      extensions: [health_check]
+
+      telemetry:
+        logs:
+          level: {{ .Values.otelCollector.logLevel | default "info" }}
+        metrics:
+          level: detailed
+          address: 0.0.0.0:8888
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-otel-collector
+  labels:
+    app: {{ .Release.Name }}-otel-collector
+    component: observability
+spec:
+  replicas: {{ .Values.otelCollector.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-otel-collector
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-otel-collector
+        component: observability
+      annotations:
+        checksum/config: {{ .Values.otelCollector | toYaml | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}-otel-collector
+      {{- with .Values.otelCollector.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.otelCollector.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: otel-collector
+        image: {{ .Values.otelCollector.image.repository }}:{{ .Values.otelCollector.image.tag }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        command:
+          - "/otelcol-contrib"
+          - "--config=/conf/otel-collector-config.yaml"
+        ports:
+        - name: otlp-grpc
+          containerPort: 4317
+          protocol: TCP
+        - name: otlp-http
+          containerPort: 4318
+          protocol: TCP
+        - name: metrics
+          containerPort: 8888
+          protocol: TCP
+        volumeMounts:
+        - name: otel-collector-config
+          mountPath: /conf
+        env:
+        - name: GOGC
+          value: "80"
+        resources:
+          limits:
+            memory: {{ .Values.otelCollector.resources.limits.memory | default "2Gi" }}
+            cpu: {{ .Values.otelCollector.resources.limits.cpu | default "1000m" }}
+          requests:
+            memory: {{ .Values.otelCollector.resources.requests.memory | default "512Mi" }}
+            cpu: {{ .Values.otelCollector.resources.requests.cpu | default "100m" }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 13133
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 13133
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: otel-collector-config
+        configMap:
+          name: {{ .Release.Name }}-otel-collector-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-otel-collector
+  labels:
+    app: {{ .Release.Name }}-otel-collector
+    component: observability
+spec:
+  type: ClusterIP
+  ports:
+  - name: otlp-grpc
+    port: 4317
+    targetPort: 4317
+    protocol: TCP
+  - name: otlp-http
+    port: 4318
+    targetPort: 4318
+    protocol: TCP
+  - name: metrics
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
+  selector:
+    app: {{ .Release.Name }}-otel-collector
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-otel-collector
+  labels:
+    app: {{ .Release.Name }}-otel-collector
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-otel-collector
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/proxy
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-otel-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Name }}-otel-collector
+subjects:
+- kind: ServiceAccount
+  name: {{ .Release.Name }}-otel-collector
+  namespace: {{ .Release.Namespace }}
+{{- end }}

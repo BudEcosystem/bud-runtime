@@ -2,8 +2,11 @@ name: "BudApp: Build and Push Docker Image on Release"
 
 on:
   workflow_dispatch:
-  release:
-    types: [created]
+    inputs:
+      release_tag:
+        description: 'Release version (e.g., 0.25.0)'
+        required: true
+        type: string
 
 jobs:
   build-and-push:
@@ -25,13 +28,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract tag name
-        id: extract_tag
-        run: |
-          RAW_TAG="${GITHUB_REF#refs/tags/}"
-          CLEAN_TAG="${RAW_TAG#v}"
-          echo "RELEASE_TAG=$CLEAN_TAG" >> "$GITHUB_ENV"
-
       - name: Save private key to file
         run: |
           echo "${{ secrets.PRIVATE_KEY }}" > private_key.pem
@@ -48,4 +44,6 @@ jobs:
           context: ./services/budapp
           push: true
           file: ./services/budapp/deploy/Dockerfile
-          tags: budstudio/budapp:${{ env.RELEASE_TAG }}
+          tags: |
+            budstudio/budapp:${{ inputs.release_tag }}
+            budstudio/budapp:latest

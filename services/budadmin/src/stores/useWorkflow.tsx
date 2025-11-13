@@ -168,8 +168,7 @@ export type WorkflowType = {
         trait_ids?: string;
         traits_details?: any;
         experiment_id?: string;
-        bud_prompt_id?: string;
-    }
+        bud_prompt_id?: string;    }
     template_id?: string;
 }
 

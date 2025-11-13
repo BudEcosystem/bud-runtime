@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
@@ -6,14 +6,18 @@ import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 import TagsInput from "@/components/ui/bud/dataEntry/TagsInput";
-import { successToast, errorToast } from "@/components/toast";
+import { successToast } from "@/components/toast";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useEvaluations } from "src/hooks/useEvaluations";
-import { useProjects } from "src/hooks/useProjects";
 import TextInput from "src/flows/components/TextInput";
 
 const NewExperimentForm = React.memo(function NewExperimentForm() {
-  const [options] = useState([]);
+  const { experimentTags, getExperimentTags } = useEvaluations();
+
+
+  React.useEffect(() => {
+    getExperimentTags();
+  }, []);
 
   return (
     <DrawerCard>
@@ -51,7 +55,7 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
       <TagsInput
         label="Tags"
         required
-        options={options}
+        options={experimentTags}
         info="Add keywords to help organize and find your experiment later. Max 10 tags, 20 characters each."
         name="tags"
         placeholder="Select or Create tags that are relevant"
@@ -120,7 +124,6 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
 export default function NewExperimentDrawer() {
   const { openDrawerWithStep } = useDrawer();
   const { createExperiment, getExperiments } = useEvaluations();
-  const { selectedProject } = useProjects();
 
   const handleSubmit = async (values: any) => {
     try {
@@ -190,7 +193,7 @@ export default function NewExperimentDrawer() {
         <BudDrawerLayout>
           <DrawerTitleCard
             title="New Experiment"
-            description="A route allows you to create a custom OpenAI Compatible endpoint, with a swarm of models working together based on"
+            description="Create a new experiment to evaluate and compare model performance across different configurations, prompts, and datasets."
           />
           <NewExperimentForm />
         </BudDrawerLayout>

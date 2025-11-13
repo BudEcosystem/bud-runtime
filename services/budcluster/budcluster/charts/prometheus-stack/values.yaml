@@ -4,23 +4,35 @@ kube-prometheus-stack:
     service:
       port: 9100
       targetPort: 9100
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "50m"
+      limits:
+        memory: "64Mi"
+        cpu: "100m"
 
   prometheus:
     enabled: true
     prometheusSpec:
+      # External labels will be added to all metrics
+      # These can be overridden via Ansible variables during deployment
       externalLabels:
         cluster: "remote-cluster-1"
-      remoteWrite:
-        - url: "https://metric.bud.studio/api/v1/write"
-          queueConfig:
-            maxSamplesPerSend: 1000
-            capacity: 2500
-            maxShards: 200
-            minShards: 1
-            maxRetries: 10
-            minBackoff: 30ms
-            maxBackoff: 5s
+        cluster_name: ""
+
+      # Remote write disabled - metrics collected via pull mechanism from budcluster
+      # Pull-based collection allows for:
+      # - Better control over data flow
+      # - Centralized metrics processing
+      # - Per-cluster collection scheduling
+      # - Error handling and retry logic
+      remoteWrite: []
+
+      # Metrics retention period
       retention: 24h
+
+      # Resource allocation
       resources:
         requests:
           memory: "1Gi"
@@ -28,6 +40,8 @@ kube-prometheus-stack:
         limits:
           memory: "2Gi"
           cpu: "500m"
+
+      # Storage configuration
       storageSpec:
         volumeClaimTemplate:
           spec:
@@ -35,6 +49,29 @@ kube-prometheus-stack:
             resources:
               requests:
                 storage: 20Gi
+
+      # Service discovery configuration
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+
+      # Additional scrape configs for custom metrics
+      additionalScrapeConfigs:
+        # Scrape DCGM metrics if GPU nodes are present
+        - job_name: 'dcgm-exporter'
+          kubernetes_sd_configs:
+            - role: endpoints
+              namespaces:
+                names:
+                  - 'bud-system'
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_service_name]
+              action: keep
+              regex: dcgm-exporter
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              regex: 'DCGM_.*'
+              action: keep
 
   kube-state-metrics:
     enabled: true
@@ -46,11 +83,24 @@ kube-prometheus-stack:
         memory: "128Mi"
         cpu: "200m"
 
+  # Disable Grafana as we'll use our own visualization
   grafana:
     enabled: false
 
+  # Disable Alertmanager for now
   alertmanager:
     enabled: false
 
+  # Network policies
   networkPolicy:
     enabled: false
+
+  # Prometheus Operator configuration
+  prometheusOperator:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+      limits:
+        cpu: 200m
+        memory: 200Mi

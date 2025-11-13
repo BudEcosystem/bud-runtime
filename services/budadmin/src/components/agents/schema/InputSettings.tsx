@@ -16,6 +16,7 @@ interface InputSettingsProps {
   onDeleteVariable: (variableId: string) => void;
   onSavePromptSchema?: () => void;
   isSaving?: boolean;
+  onStructuredInputEnabledChange?: (enabled: boolean) => void;
 }
 
 export const InputSettings: React.FC<InputSettingsProps> = ({
@@ -25,7 +26,8 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
   onVariableChange,
   onDeleteVariable,
   onSavePromptSchema,
-  isSaving
+  isSaving,
+  onStructuredInputEnabledChange
 }) => {
   const [isOpen, setIsOpen] = React.useState(true);
   const [structuredInputEnabled, setStructuredInputEnabled] = React.useState(false);
@@ -42,6 +44,11 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
     });
     setValidationEnabled(prev => ({ ...prev, ...newValidationEnabled }));
   }, [inputVariables]);
+
+  // Notify parent when structuredInputEnabled changes
+  React.useEffect(() => {
+    onStructuredInputEnabledChange?.(structuredInputEnabled);
+  }, [structuredInputEnabled, onStructuredInputEnabledChange]);
 
   return (
     <div className="flex flex-col justify-between h-full w-full">
@@ -236,16 +243,16 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
         borderTop: '0.5px solid #1F1F1F',
         background: 'rgba(255, 255, 255, 0.03)',
         backdropFilter: 'blur(5px)'
-      }} className='flex justify-center items-center'>
+      }} className='flex justify-end items-center px-[1rem]'>
         <PrimaryButton
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation();
             onSavePromptSchema?.();
           }}
           loading={isSaving}
-          disabled={isSaving}
+          disabled={isSaving || !structuredInputEnabled}
           style={{
-            cursor: isSaving ? 'not-allowed' : 'pointer',
+            cursor: (isSaving || !structuredInputEnabled) ? 'not-allowed' : 'pointer',
           }}
           classNames="h-[1.375rem] rounded-[0.375rem]"
           textClass="!text-[0.625rem] !font-[400]"

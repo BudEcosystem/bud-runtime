@@ -22,13 +22,15 @@ from typing import Optional, Union
 
 from budmicroframe.commons.api_utils import pubsub_api_endpoint
 from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
 from ..commons.exceptions import ClientException
 from .schemas import (
+    PromptCleanupRequest,
     PromptConfigCopyRequest,
     PromptConfigCopyResponse,
+    PromptConfigGetRawResponse,
     PromptConfigGetResponse,
     PromptConfigRequest,
     PromptConfigResponse,
@@ -37,8 +39,8 @@ from .schemas import (
     PromptSchemaRequest,
     PromptSetDefaultVersionRequest,
 )
-from .services import PromptConfigurationService, PromptExecutorService, PromptService
-from .workflows import PromptSchemaWorkflow
+from .services import PromptCleanupService, PromptConfigurationService, PromptExecutorService, PromptService
+from .workflows import PromptCleanupWorkflow, PromptSchemaWorkflow
 
 
 logger = logging.getLogger(__name__)
@@ -156,6 +158,80 @@ async def perform_prompt_schema(request: PromptSchemaRequest) -> Response:
     return response.to_http_response()
 
 
+@prompt_router.post("/prompt-cleanup")
+@pubsub_api_endpoint(request_model=PromptCleanupRequest)
+async def perform_prompt_cleanup(request: PromptCleanupRequest) -> Response:
+    """Run a prompt cleanup workflow.
+
+    This endpoint processes MCP resource cleanup for temporary prompts.
+    It can cleanup specific prompts or scan for expired prompts.
+
+    Args:
+        request (PromptCleanupRequest): The cleanup request containing
+        optional list of prompts to cleanup. Empty list means cleanup expired prompts.
+
+    Returns:
+        HTTP response containing the cleanup results.
+    """
+    response: Union[SuccessResponse, ErrorResponse]
+
+    if request.debug:
+        try:
+            logger.debug("Running prompt cleanup in debug mode", request.model_dump())
+            response = PromptCleanupService().__call__(request, workflow_id=str(uuid.uuid4()))
+        except Exception as e:
+            logger.exception("Error running prompt cleanup: %s", str(e))
+            response = ErrorResponse(message="Error running prompt cleanup", code=500)
+    else:
+        response = await PromptCleanupWorkflow().__call__(request)
+
+    return response.to_http_response()
+
+
+@prompt_router.post(
+    "/prompt-cleanup-cron",
+    response_model=Union[SuccessResponse, ErrorResponse],
+    summary="Scheduled prompt cleanup (Dapr cron trigger)",
+    description="Periodic cleanup of expired MCP resources triggered by Dapr cron binding",
+    responses={
+        200: {
+            "description": "Cleanup executed successfully",
+            "model": SuccessResponse,
+        },
+        500: {"description": "Internal server error"},
+    },
+)
+async def perform_prompt_cleanup_cron(request: Request) -> Response:
+    """Run scheduled prompt cleanup workflow triggered by Dapr cron binding.
+
+    This endpoint is invoked periodically by the Dapr cron scheduler to cleanup
+    expired MCP resources. It automatically scans for and removes temporary
+    prompts that have exceeded their TTL.
+
+    The endpoint accepts an empty POST request from the Dapr cron binding.
+    For manual testing, you can also call this endpoint directly.
+
+    Returns:
+        HTTP response containing the cleanup results.
+    """
+    response: Union[SuccessResponse, ErrorResponse]
+
+    try:
+        logger.info("Scheduled prompt cleanup triggered by Dapr cron binding")
+
+        # Create request with empty prompts list = cleanup expired prompts
+        cleanup_request = PromptCleanupRequest(prompts=[])
+
+        # Execute cleanup workflow
+        response = await PromptCleanupWorkflow().__call__(cleanup_request)
+
+    except Exception as e:
+        logger.exception("Error running scheduled prompt cleanup: %s", str(e))
+        response = ErrorResponse(message="Error running scheduled prompt cleanup", code=500)
+
+    return response.to_http_response()
+
+
 @prompt_router.post(
     "/prompt-config",
     response_model=Union[PromptConfigResponse, ErrorResponse],
@@ -230,7 +306,8 @@ async def save_prompt_config(
 async def get_prompt_config(
     prompt_id: str,
     version: Optional[int] = Query(None, description="Version of the configuration to retrieve", ge=1),
-) -> Union[PromptConfigGetResponse, ErrorResponse]:
+    raw_data: bool = Query(False, description="Return raw Redis data without Pydantic processing"),
+) -> Union[PromptConfigGetResponse, PromptConfigGetRawResponse, ErrorResponse]:
     """Get prompt configuration by ID.
 
     Args:
@@ -250,7 +327,7 @@ async def get_prompt_config(
         prompt_service = PromptService()
 
         # Get the configuration
-        result = await prompt_service.get_prompt_config(prompt_id, version)
+        result = await prompt_service.get_prompt_config(prompt_id, version, raw_data)
 
         return result.to_http_response()
 

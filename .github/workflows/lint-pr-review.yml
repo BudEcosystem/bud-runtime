@@ -114,11 +114,35 @@ jobs:
             cd services/budCustomer && pnpm install && cd ../..
           fi
 
-      - name: Run pre-commit on changed files
+      - name: Fetch base branch
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1 || true
+          fi
+
+      - name: Run pre-commit on changed files (robust)
         run: |
           echo "::group::Running pre-commit checks"
-          pre-commit run --from-ref origin/${{ github.base_ref }} --to-ref HEAD --show-diff-on-failure
+          if git show-ref --verify --quiet "refs/remotes/origin/${GITHUB_BASE_REF:-}"; then
+            BASE_REF="origin/${GITHUB_BASE_REF}"
+          else
+            BASE_REF="$(git merge-base HEAD HEAD~1)"
+          fi
+          echo "Using BASE_REF=${BASE_REF}"
+          pre-commit run --from-ref "${BASE_REF}" --to-ref HEAD --show-diff-on-failure 2>&1 | tee pre-commit.log
+          PRE_COMMIT_EXIT=${PIPESTATUS[0]}
           echo "::endgroup::"
+          if [ $PRE_COMMIT_EXIT -ne 0 ]; then
+            exit $PRE_COMMIT_EXIT
+          fi
+
+      - name: Upload pre-commit logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-commit-log
+          path: pre-commit.log
+          if-no-files-found: ignore
 
   dependency-security:
     name: Python Dependency Security Check
@@ -154,25 +178,31 @@ jobs:
 
     steps:
       - name: Check pre-commit results
+        if: ${{ needs.pre-commit.result == 'failure' }}
         run: |
-          if [[ "${{ needs.pre-commit.result }}" == "failure" ]]; then
-            echo "❌ Pre-commit checks failed"
-            exit 1
-          fi
+          echo "❌ Pre-commit checks failed"
+          exit 1
 
-          # Only check dependency-security if it was supposed to run (Python files changed)
-          if [[ "${{ needs.detect-changes.outputs.python }}" == "true" ]]; then
-            if [[ "${{ needs.dependency-security.result }}" == "failure" ]]; then
-              echo "❌ Dependency security check failed"
-              exit 1
-            elif [[ "${{ needs.dependency-security.result }}" == "skipped" ]]; then
-              echo "⚠️ Dependency security check was skipped unexpectedly"
-              exit 1
-            else
-              echo "✅ Dependency security check passed"
-            fi
-          else
-            echo "ℹ️ Dependency security check skipped (no Python files changed)"
-          fi
+      - name: Dependency security check failed
+        if: ${{ needs.detect-changes.outputs.python == 'true' && needs.dependency-security.result == 'failure' }}
+        run: |
+          echo "❌ Dependency security check failed"
+          exit 1
 
-          echo "✅ All required code quality checks passed!"
+      - name: Dependency security check skipped unexpectedly
+        if: ${{ needs.detect-changes.outputs.python == 'true' && needs.dependency-security.result == 'skipped' }}
+        run: |
+          echo "⚠️ Dependency security check was skipped unexpectedly"
+          exit 1
+
+      - name: Dependency security check passed
+        if: ${{ needs.detect-changes.outputs.python == 'true' && needs.dependency-security.result == 'success' }}
+        run: echo "✅ Dependency security check passed"
+
+      - name: Dependency security check skipped (no Python changes)
+        if: ${{ needs.detect-changes.outputs.python != 'true' }}
+        run: echo "ℹ️ Dependency security check skipped (no Python files changed)"
+
+      - name: All required code quality checks passed
+        if: ${{ needs.pre-commit.result == 'success' && (needs.detect-changes.outputs.python != 'true' || needs.dependency-security.result == 'success') }}
+        run: echo "✅ All required code quality checks passed!"

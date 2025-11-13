@@ -1,23 +1,27 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Input, InputNumber, Checkbox, Button, Slider } from 'antd';
-import { Image } from "antd";
-import { PrimaryButton } from '@/app/components/uiComponents/inputs';
+import { Input, InputNumber, Checkbox, Image, message } from 'antd';
 import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
+import { useChatStore } from '@/app/store/chat';
 
 interface PromptFormProps {
   promptIds?: string[];
+  chatId?: string;
   onSubmit: (data: any) => void;
   onClose?: () => void;
 }
 
-export default function PromptForm({ promptIds = [], onSubmit, onClose }: PromptFormProps) {
+export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: _onClose }: PromptFormProps) {
   const { apiKey, accessKey } = useAuth();
+  const getChat = useChatStore((state) => state.getChat);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [inputSchema, setInputSchema] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isHovered, setIsHovered] = useState<boolean>(false);
+  const [promptVersion, setPromptVersion] = useState<string | undefined>();
+  const [promptDeployment, setPromptDeployment] = useState<string | undefined>();
 
   // Fetch prompt configurations on mount
   useEffect(() => {
@@ -28,24 +32,61 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
       }
 
       try {
-        // Fetch config for the first promptId (you can extend this to handle multiple)
         const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
 
         if (config && config.data) {
-          setInputSchema(config.data.input_schema || {});
+          const version =
+            config.data?.version ?? config.data?.prompt?.version ?? undefined;
+          setPromptVersion(
+            version !== undefined && version !== null ? String(version) : undefined
+          );
+
+          setPromptDeployment(
+            typeof config.data?.deployment_name === 'string'
+              ? config.data.deployment_name
+              : undefined
+          );
+
+          // Handle JSON schema format - extract properties from $defs
+          let schemaToUse: any = config.data.input_schema ?? null;
+
+          // If it's a JSON schema with $defs, flatten it for the form
+          if (schemaToUse && schemaToUse.$defs && schemaToUse.$defs.InputSchema) {
+            schemaToUse = schemaToUse.$defs.InputSchema.properties || {};
+          }
+
+          if (
+            schemaToUse &&
+            typeof schemaToUse === 'object' &&
+            Object.keys(schemaToUse).length === 0
+          ) {
+            schemaToUse = null;
+          }
+
+          setInputSchema(schemaToUse);
 
           // Initialize form data with default values
           const initialData: Record<string, any> = {};
-          if (config.data.input_schema) {
-            Object.keys(config.data.input_schema).forEach(key => {
-              const field = config.data.input_schema[key];
-              initialData[key] = field.default || '';
+          if (schemaToUse && typeof schemaToUse === 'object') {
+            Object.keys(schemaToUse).forEach((key: string) => {
+              const field = schemaToUse[key];
+              initialData[key] = field?.default || '';
             });
+          } else {
+            initialData['unstructuredSchema'] = '';
           }
           setFormData(initialData);
+        } else {
+          setInputSchema(null);
+          setFormData({ unstructuredSchema: '' });
+          setPromptVersion(undefined);
         }
       } catch (error) {
         console.error('Error fetching prompt config:', error);
+        setInputSchema(null);
+        setFormData({ unstructuredSchema: '' });
+        setPromptVersion(undefined);
+        setPromptDeployment(undefined);
       } finally {
         setLoading(false);
       }
@@ -61,15 +102,68 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
     }));
   };
 
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+
+    if (promptIds.length === 0) {
+      console.error('No prompt ID available');
+      return;
+    }
+
+    const promptId = promptIds[0];
+
+    const payload: {
+      prompt: {
+        id: string;
+        version?: string;
+        variables?: Record<string, any>;
+      };
+      input?: string;
+      model?: string;
+      promptId?: string;
+      variables?: Record<string, any>;
+    } = {
+      prompt: {
+        id: promptId,
+      },
+      promptId,
+    };
+
+    if (promptVersion) {
+      payload.prompt.version = promptVersion;
+    }
+    if (promptDeployment) {
+      payload.model = promptDeployment;
+    }
+
+    // Check if it's structured or unstructured input
+    if (inputSchema && Object.keys(inputSchema).length > 0) {
+      // Structured input - send variables
+      const variables: Record<string, any> = {};
+      Object.keys(formData).forEach(key => {
+        if (formData[key] !== undefined && formData[key] !== '') {
+          variables[key] = formData[key];
+        }
+      });
+
+      if (Object.keys(variables).length > 0) {
+        payload.prompt.variables = variables;
+        payload.variables = variables;
+      }
+    } else {
+      // Unstructured input - send input field
+      payload.input = formData['unstructuredSchema'] || '';
+    }
+
+    // Pass the prompt data to parent to initiate chat
+    onSubmit(payload);
   };
 
   const renderInput = (fieldName: string, fieldSchema: any) => {
-    const { type, title, description, placeholder, minimum, maximum, enum: enumValues } = fieldSchema;
+    const { type, title, placeholder, minimum, maximum } = fieldSchema;
 
-    const inputClassName = "bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] px-0 py-2";
+    const inputClassName = "bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] !px-0 py-2";
 
     switch (type) {
       case 'string':
@@ -77,7 +171,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
           <Input
             value={formData[fieldName] || ''}
             onChange={(e) => handleChange(fieldName, e.target.value)}
-            placeholder={placeholder || `Enter ${title || fieldName}`}
+            placeholder={placeholder || title || fieldName}
             className={inputClassName}
             style={{ boxShadow: 'none' }}
           />
@@ -89,7 +183,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
           <InputNumber
             value={formData[fieldName]}
             onChange={(value) => handleChange(fieldName, value)}
-            placeholder={placeholder || `Enter ${title || fieldName}`}
+            placeholder={placeholder || title || fieldName}
             min={minimum}
             max={maximum}
             className={inputClassName}
@@ -113,7 +207,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
           <Input
             value={formData[fieldName] || ''}
             onChange={(e) => handleChange(fieldName, e.target.value)}
-            placeholder={placeholder || `Enter ${title || fieldName}`}
+            placeholder={placeholder || title || fieldName}
             className={inputClassName}
             style={{ boxShadow: 'none' }}
           />
@@ -133,8 +227,8 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-50 flex items-end justify-center p-[0.9375rem] pb-[.5rem]">
-      <div className="w-full max-w-[800px] bg-[#0c0c0d] rounded-[1rem] border border-[#1F1F1F] p-8 shadow-2xl">
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="chat-message-form p-[2.5rem] pb-[1.5rem]  w-full  flex items-center justify-center  border-t-2 hover:border-[#333333] rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden max-w-5xl">
+        <form onSubmit={handleSubmit} className="space-y-6 w-full">
           {/* Title */}
           <h2 className="text-white text-[1.25rem] font-[400] mb-6">
             {inputSchema?.title || 'Please enter the following details'}
@@ -148,7 +242,7 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
             return (
               <div key={fieldName} className="space-y-2">
                 <label className="text-white text-[0.875rem] font-[400] block">
-                  {fieldSchema.title || fieldName}
+                  {fieldName}
                 </label>
                 {renderInput(fieldName, fieldSchema)}
                 {fieldSchema.description && (
@@ -159,30 +253,42 @@ export default function PromptForm({ promptIds = [], onSubmit, onClose }: Prompt
           })}
 
           {/* Fallback to default fields if no input schema */}
+
           {!inputSchema && (
             <>
               <div className="space-y-2">
                 <label className="text-white text-[0.875rem] font-[400] block">
-                  First Name
+                  Unstructured Input
                 </label>
                 <Input
-                  value={formData['firstName'] || ''}
-                  onChange={(e) => handleChange('firstName', e.target.value)}
-                  placeholder="Enter first name"
-                  className="bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] px-0 py-2"
+                  value={formData['unstructuredSchema'] || ''}
+                  onChange={(e) => handleChange('unstructuredSchema', e.target.value)}
+                  placeholder="Enter the details here"
+                  className="bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] !px-0 py-2"
                   style={{ boxShadow: 'none' }}
                 />
               </div>
             </>
           )}
 
-          {/* Next Button */}
-          <div className="flex justify-end">
-            <PrimaryButton classNames='!h-[1.75rem] !px-[.75rem] !mr-0' htmlType="submit">
-              <div className='flex items-center'>
-                <span>Next</span>
+          {/* Buttons */}
+          <div className="flex justify-end items-center">
+            {/* Next Button */}
+            <button
+              className="Open-Sans cursor-pointer text-[400] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF] flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF]"
+              type="submit"
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+            >
+              Next
+              <div className="w-[1.25rem] h-[1.25rem]">
+                <Image
+                  src={isHovered ? "icons/send-white.png" : "icons/send.png"}
+                  alt="send"
+                  preview={false}
+                />
               </div>
-            </PrimaryButton>
+            </button>
           </div>
         </form>
       </div>

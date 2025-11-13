@@ -106,6 +106,9 @@ class AppConfig(BaseAppConfig):
     # default non master realm name
     default_realm_name: str = Field(alias="DEFAULT_REALM_NAME", default="bud")
 
+    # default client name for bud-stack in shared realm
+    default_client_name: str = Field(alias="DEFAULT_CLIENT_NAME", default="default-internal-client")
+
     # Token
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_minutes: int = Field(60 * 24 * 7, alias="REFRESH_TOKEN_EXPIRE_MINUTES")
@@ -143,6 +146,10 @@ class AppConfig(BaseAppConfig):
 
     # Prometheus URL
     prometheus_url: str = Field(alias="PROMETHEUS_URL", default="https://metrics.fmops.in")
+
+    # Metrics backend configuration
+    use_budmetrics_backend: bool = Field(alias="USE_BUDMETRICS_BACKEND", default=False)
+    budmetrics_app_id: str = Field(alias="BUDMETRICS_APP_ID", default="budmetrics")
 
     # Add model directory
     add_model_dir: DirectoryPath = Field(os.path.expanduser("~/.cache"), alias="ADD_MODEL_DIR")
@@ -207,6 +214,9 @@ class AppConfig(BaseAppConfig):
 
     # Bud Sentinel
     bud_sentinel_base_url: AnyHttpUrl = Field(alias="BUD_SENTINEL_BASE_URL")
+    # MCP Foundry
+    mcp_foundry_base_url: AnyHttpUrl = Field(alias="MCP_FOUNDRY_BASE_URL")
+    mcp_foundry_api_key: str = Field(alias="MCP_FOUNDRY_API_KEY")
 
     @computed_field
     def static_dir(self) -> str:

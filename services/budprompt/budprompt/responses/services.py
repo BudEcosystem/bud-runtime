@@ -21,15 +21,13 @@ import logging
 from typing import Any, Dict, Optional
 
 from fastapi.responses import StreamingResponse
+from openai.types.responses import ResponsePrompt
 from pydantic import ValidationError
 
 from budprompt.commons.exceptions import ClientException, OpenAIResponseException
 from budprompt.shared.redis_service import RedisService
 
-from ..prompt.openai_response_formatter import (
-    OpenAIPromptInfo,
-    extract_validation_error_details,
-)
+from ..prompt.openai_response_formatter import extract_validation_error_details
 from ..prompt.schemas import PromptExecuteData
 from ..prompt.services import PromptExecutorService
 from .schemas import ResponsePromptParam
@@ -122,7 +120,11 @@ class ResponsesService:
 
             input_data = prompt_params.variables if prompt_params.variables else input
 
-            result = await PromptExecutorService().execute_prompt(prompt_execute_data, input_data, api_key=api_key)
+            result = await PromptExecutorService().execute_prompt(
+                prompt_execute_data,
+                input_data,
+                api_key=api_key,
+            )
 
             # Log successful execution
             logger.info(f"Successfully executed prompt: {prompt_id}")
@@ -140,10 +142,14 @@ class ResponsesService:
                 )
             else:
                 # Add prompt info to non-streaming OpenAI-formatted response
-                result.prompt = OpenAIPromptInfo(
-                    id=prompt_id,
-                    variables=prompt_params.variables,
-                    version=version,
+                result = result.model_copy(
+                    update={
+                        "prompt": ResponsePrompt(
+                            id=prompt_id,
+                            variables=prompt_params.variables,
+                            version=version,
+                        )
+                    }
                 )
                 return result
 

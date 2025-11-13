@@ -21,6 +21,7 @@ import Tags from "src/flows/components/DrawerTags";
 import GuageChart from "@/components/charts/GuageChart";
 import BarChart from "@/components/charts/barChart";
 import LineChart from "@/components/charts/lineChart";
+import MultiSeriesLineChart from "@/components/charts/MultiSeriesLineChart";
 import { formatStorageSize, getCategories, getChartData } from "@/lib/utils";
 import { useRouter } from "next/router";
 import ComingSoon from "@/components/ui/comingSoon";
@@ -42,6 +43,8 @@ type GaugeChartProps = {
   chartData?: any;
   metricType: MetricType;
   field: string;
+  metrics?: ClusterMetrics | null;
+  selectedSegment?: ClusterFilter;
 };
 
 type ChartUsageCardProps = {
@@ -56,6 +59,7 @@ type ChartUsageCardProps = {
 
 interface GeneralProps {
   data: Cluster;
+  isActive?: boolean;
 }
 
 type GeneralCardsProps = {
@@ -156,131 +160,83 @@ const ChartUsageCard = ({
   );
 };
 
-function NetworkInUsage() {
-  const [data, setData] = useState<ClusterMetrics>(null);
-  const [selectedSegment, setSelectedSegment] =
-    useState<ClusterFilter>("today");
-
-  return (
-    <ChartUsageCard
-      onChange={(value, segment) => {
-        setData(value);
-        setSelectedSegment(segment);
-      }}
-      data={{
-        title: "Network In",
-        description: "Amount of data over time",
-        value: `${
-          data?.cluster_summary?.network_in?.inbound_mbps?.toFixed(2) || 0
-        } Mbps`,
-        percentage: 0,
-        chartData: (
-          <LineChart
-            data={{
-              color: "#FFC442",
-              categories: getCategories(
-                selectedSegment,
-                data?.cluster_summary?.network_in?.time_series,
-              ),
-              data: getChartData(
-                selectedSegment,
-                data?.cluster_summary?.network_in?.time_series,
-              ),
-              label1: "",
-              label2: "",
-              smooth: true,
-            }}
-          />
-        ),
-        arrow: true,
-        metricType: MetricType.NETWORK_IN,
-      }}
-    />
-  );
+interface NetworkBandwidthUsageProps {
+  metrics: ClusterMetrics | null;
+  selectedSegment: ClusterFilter;
 }
 
-function NetworkOutUsage() {
-  const [data, setData] = useState<ClusterMetrics>(null);
-  const [selectedSegment, setSelectedSegment] =
-    useState<ClusterFilter>("today");
+function NetworkBandwidthUsage({ metrics, selectedSegment }: NetworkBandwidthUsageProps) {
   return (
-    <ChartUsageCard
-      onChange={(value, segment) => {
-        setData(value);
-        setSelectedSegment(segment);
-      }}
-      data={{
-        title: "Network Out",
-        description: "Amount of data over time",
-        value: `${
-          data?.cluster_summary?.network_out?.outbound_mbps?.toFixed(2) || 0
-        } Mbps`,
-        percentage: 0,
-        chartData: (
-          <LineChart
-            data={{
-              color: "#FFC442",
-              categories: getCategories(
-                selectedSegment,
-                data?.cluster_summary?.network_out?.time_series,
-              ),
-              data: getChartData(
-                selectedSegment,
-                data?.cluster_summary?.network_out?.time_series,
-              ),
-              label1: "",
-              label2: "",
-              smooth: true,
-            }}
+    <div
+      className={`cardBG w-[49.1%] h-[23.75rem] py-[2rem] pb-[.5rem] px-[1.5rem] border border-[#1F1F1F] rounded-md relative`}
+    >
+      <div className="flex justify-between align-center">
+        <div>
+          <Text_19_600_EEEEEE>Network Bandwidth</Text_19_600_EEEEEE>
+        </div>
+      </div>
+      <div className="mt-[.7rem]">
+        <Text_13_400_757575>Inbound and outbound network traffic (Mbps)</Text_13_400_757575>
+      </div>
+      <div className="flex flex-col items-start mt-[1.7rem]">
+        <Text_26_400_EEEEEE className="">{`${
+          metrics?.cluster_summary?.network_bandwidth?.total_mbps?.toFixed(2) || 0
+        } Mbps`}</Text_26_400_EEEEEE>
+        <Text_13_400_757575 className="mt-[.3rem]">{`In: ${
+          metrics?.cluster_summary?.network_in?.inbound_mbps?.toFixed(2) || 0
+        } | Out: ${
+          metrics?.cluster_summary?.network_out?.outbound_mbps?.toFixed(2) || 0
+        }`}</Text_13_400_757575>
+        <div
+          className="flex  rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem] mt-[0.35rem]"
+          style={{
+            backgroundColor: "#122F1140",
+            color: "#479D5F",
+          }}
+        >
+          <span className=" font-[400] text-[0.8125rem] leading-[100%]">Avg. 0</span>
+          <Image
+            preview={false}
+            width={12}
+            src="/images/dashboard/greenArrow.png"
+            className="ml-[.2rem]"
+            alt=""
           />
-        ),
-        arrow: true,
-        metricType: MetricType.NETWORK_OUT,
-      }}
-    />
-  );
-}
-
-function NetworkBandwidthUsage() {
-  const [data, setData] = useState<ClusterMetrics>(null);
-  const [selectedSegment, setSelectedSegment] =
-    useState<ClusterFilter>("today");
-
-  return (
-    <ChartUsageCard
-      onChange={(value, segment) => {
-        setData(value);
-        setSelectedSegment(segment);
-      }}
-      data={{
-        title: "Network Bandwidth",
-        description: "% Bandwidth used vs total bandwidth",
-        value: `${
-          data?.cluster_summary?.network_bandwidth?.total_mbps?.toFixed(2) || 0
-        } Mbps`,
-        percentage: 0,
-        chartData: (
-          <LineChart
-            data={{
-              color: "#FFC442",
-              categories: getCategories(
-                selectedSegment,
-                data?.cluster_summary?.network_bandwidth?.time_series,
-              ),
-              data: getChartData(
-                selectedSegment,
-                data?.cluster_summary?.network_bandwidth?.time_series,
-              ),
-              label1: "",
-              label2: "",
-              smooth: true,
-            }}
-          />
-        ),
-        arrow: true,
-        metricType: MetricType.NETWORK_BANDWIDTH,
-      }}
-    />
+        </div>
+      </div>
+      <div className="h-[11.25rem]">
+        <MultiSeriesLineChart
+          data={{
+            categories: getCategories(
+              selectedSegment,
+              metrics?.cluster_summary?.network_in?.time_series,
+            ),
+            series: [
+              {
+                name: "Network In",
+                data: getChartData(
+                  selectedSegment,
+                  metrics?.cluster_summary?.network_in?.time_series,
+                ),
+                color: "#3F8EF7", // Blue for inbound
+              },
+              {
+                name: "Network Out",
+                data: getChartData(
+                  selectedSegment,
+                  metrics?.cluster_summary?.network_out?.time_series,
+                ),
+                color: "#FFC442", // Yellow for outbound
+              },
+            ],
+            label1: "",
+            label2: "",
+            yAxisUnit: " Mbps",
+            yAxisAutoScale: true,
+          }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -323,27 +279,9 @@ const GuageCharts = ({
   percentage,
   metricType,
   field,
+  metrics,
+  selectedSegment,
 }: GaugeChartProps) => {
-  const [selectedSegment, setSelectedSegment] =
-    useState<ClusterFilter>("today");
-  const [metrics, setMetrics] = useState<ClusterMetrics>(null);
-
-  const { clustersId } = useRouter().query;
-  const { getClusterMetrics } = useCluster();
-
-  useEffect(() => {
-    if (clustersId) {
-      getClusterMetrics(clustersId as string, selectedSegment, metricType).then(
-        (res) => {
-          setMetrics(res);
-        },
-      );
-    }
-  }, [selectedSegment, clustersId]);
-
-  useEffect(() => {
-    console.log("metrics", metrics);
-  }, [metrics]);
 
   return (
     <div className=" w-[49.1%] cardSetTwo h-[23.75rem]  py-[2rem] px-[1.5rem] border border-[#1F1F1F] rounded-md bg-[#101010]">
@@ -352,16 +290,6 @@ const GuageCharts = ({
         <Text_19_600_EEEEEE className="tracking-[.005rem]">
           {title}
         </Text_19_600_EEEEEE>
-        <Segmented
-          options={segmentOptions?.map((item) => ({
-            label: segmentOptionsMap[item],
-            value: item,
-          }))}
-          onChange={(value) => {
-            setSelectedSegment(value as ClusterFilter);
-          }}
-          className="antSegmented general text-[#EEEEEE] font-[400] bg-[transparent] border border-[#4D4D4D] border-[.53px] rounded-[5px] p-[0] mt-[.05rem]"
-        />
       </div>
       <div className="mt-[.7rem]">
         <Text_13_400_757575>{description}</Text_13_400_757575>
@@ -386,8 +314,10 @@ const GuageCharts = ({
 
 const ClusterGeneral: React.FC<GeneralProps> = ({
   data,
+  isActive = false,
 }: {
   data?: Cluster;
+  isActive?: boolean;
 }) => {
   const [isHydrated, setIsHydrated] = useState(false);
   const [selectedSegment, setSelectedSegment] =
@@ -396,6 +326,7 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
   const { clustersId } = router.query;
   const [metrics, setMetrics] = useState<ClusterMetrics>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [chartRefreshKey, setChartRefreshKey] = useState<number>(0);
 
   const { getClusterMetrics } = useCluster();
   useLoaderOnLoding(loading);
@@ -412,7 +343,16 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
           setLoading(false);
         });
     }
-  }, [router.isReady, clustersId]);
+  }, [router.isReady, clustersId, selectedSegment]);
+
+  // Refresh charts when tab becomes active
+  useEffect(() => {
+    if (isActive && isHydrated) {
+      // Trigger chart refresh by updating the key
+      // This forces charts to remount and reinitialize with correct dimensions
+      setChartRefreshKey((prev) => prev + 1);
+    }
+  }, [isActive, isHydrated]);
   const GeneralCardData: GeneralCardsProps[] = data && [
     {
       name: "Nodes",
@@ -432,14 +372,19 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
         tagColor: "#479D5F",
       },
     },
+    // {
+    //   name: "Workers",
+    //   bg: "/images/cluster/bg-workers.png",
+    //   value: data?.total_workers_count,
+    //   tag: {
+    //     value: `${data?.active_workers_count || 0} Active`,
+    //     tagColor: "#479D5F",
+    //   },
+    // },
     {
-      name: "Workers",
-      bg: "/images/cluster/bg-workers.png",
-      value: data?.total_workers_count,
-      tag: {
-        value: `${data?.active_workers_count || 0} Active`,
-        tagColor: "#479D5F",
-      },
+      name: "Device Types",
+      bg: "/images/cluster/bg-device.png",
+      value: data?.hardware_type?.join(", ") || "N/A",
     },
     {
       name: "Disk Space",
@@ -457,27 +402,41 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
       },
     }, // TODO: Change the value to actual data
     {
-      name: "VRAM",
-      bg: "/images/cluster/bg-vram.png",
-      value: formatStorageSize(
-        metrics?.cluster_summary?.memory?.total_gib || 0,
-        "GB",
-      ),
-    },
-    {
       name: "RAM",
       bg: "/images/cluster/bg-ram.png",
       value: formatStorageSize(
         metrics?.cluster_summary?.memory?.total_gib || 0,
         "GB",
       ),
+      tag: {
+        value: `${formatStorageSize(
+          metrics?.cluster_summary?.memory?.available_gib || 0,
+          "GB",
+        )} Available`,
+        tagColor: "#4077E6",
+      },
     },
-    { name: "TFLOPs", bg: "/images/cluster/bg-flop.png", value: "0" }, // TODO: Change the value to actual data
     {
-      name: "Device Types",
-      bg: "/images/cluster/bg-device.png",
-      value: data?.hardware_type?.join(", ") || "N/A",
+      name: "VRAM",
+      bg: "/images/cluster/bg-vram.png",
+      value: data?.hardware_type?.includes("GPU")
+        ? formatStorageSize(
+            metrics?.cluster_summary?.memory?.total_gib || 0,
+            "GB",
+          )
+        : "N/A",
+      ...(data?.hardware_type?.includes("GPU") && {
+        tag: {
+          value: `${formatStorageSize(
+            metrics?.cluster_summary?.memory?.available_gib || 0,
+            "GB",
+          )} Available`,
+          tagColor: "#4077E6",
+        },
+      }),
     },
+    // { name: "TFLOPs", bg: "/images/cluster/bg-flop.png", value: "0" }, // TODO: Change the value to actual data
+
   ];
 
   const GeneralCards = ({ name, bg, value, tag }: GeneralCardsProps) => {
@@ -580,18 +539,42 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
           <CardWithBgAndTag key={index} {...item} />
         ))}
       </div>
+
+      {/* Metrics Section with Time Period Filter */}
       {isHydrated && (
         <div className="mt-[1.55rem]">
+          <div className="flex justify-between items-center mb-[1.2rem]">
+            <Text_19_600_EEEEEE>Performance Metrics</Text_19_600_EEEEEE>
+            <Segmented
+              options={segmentOptions?.map((item) => ({
+                label: segmentOptionsMap[item],
+                value: item,
+              }))}
+              value={selectedSegment}
+              onChange={(value) => {
+                setSelectedSegment(value as ClusterFilter);
+              }}
+              className="antSegmented general rounded-md text-[#EEEEEE] font-[400] bg-[transparent] border border-[#4D4D4D] border-[.53px] p-[0]"
+            />
+          </div>
           <div className="flex justify-between flex-wrap gap-x-[.8rem] gap-y-[1.4rem] ">
-            <PowerConsumption />
-            <NetworkInUsage />
-            <NetworkOutUsage />
-            <NetworkBandwidthUsage />
+            {/* <PowerConsumption /> */}
+            {/* <NetworkBandwidthUsage /> */}
           </div>
           <div className="flex justify-between flex-wrap gap-x-[.8rem] gap-y-[1.4rem] mt-[1.4rem]">
             {GuageChartCardData.map((item, index) => (
-              <GuageCharts key={index} {...item} />
+              <GuageCharts
+                key={`${index}-${chartRefreshKey}`}
+                {...item}
+                metrics={metrics}
+                selectedSegment={selectedSegment}
+              />
             ))}
+            <NetworkBandwidthUsage
+              key={`network-${chartRefreshKey}`}
+              metrics={metrics}
+              selectedSegment={selectedSegment}
+            />
           </div>
         </div>
       )}

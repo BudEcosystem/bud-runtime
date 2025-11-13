@@ -23,6 +23,22 @@ from budmetrics.observability.models import ClickHouseClient, ClickHouseConfig
 logger = logging.get_logger(__name__)
 
 
+def get_cluster_metrics_ttl_days(default: int = 30) -> int:
+    """Get TTL in days for cluster metrics from environment variable.
+
+    Args:
+        default: Default TTL in days if env var is not set or invalid
+
+    Returns:
+        TTL value in days
+    """
+    try:
+        return int(os.getenv("CLICKHOUSE_TTL_CLUSTER_METRICS", default))
+    except ValueError:
+        logger.warning(f"Invalid CLICKHOUSE_TTL_CLUSTER_METRICS value, using default: {default} days")
+        return default
+
+
 def get_clickhouse_config() -> ClickHouseConfig:
     """Get ClickHouse configuration from environment variables."""
     # Check required environment variables
@@ -616,9 +632,202 @@ class ClickHouseMigration:
             logger.error(f"Error adding authentication metadata columns: {e}")
             raise
 
+    async def create_cluster_metrics_tables(self):
+        """Create tables for cluster metrics collected via OTel."""
+        logger.info("Creating cluster metrics tables...")
+
+        # Ensure metrics database exists (for cluster metrics tables)
+        try:
+            await self.client.execute_query("CREATE DATABASE IF NOT EXISTS metrics")
+            logger.info("Database 'metrics' created or already exists")
+        except Exception as e:
+            logger.error(f"Error creating metrics database: {e}")
+            raise
+
+        # Main cluster metrics table (raw metrics from OTel)
+        ttl_days = get_cluster_metrics_ttl_days()
+        query_cluster_metrics = f"""
+        CREATE TABLE IF NOT EXISTS metrics.ClusterMetrics
+        (
+            ts DateTime64(3) CODEC(Delta, ZSTD),
+            cluster_id String,
+            cluster_name String,
+            cluster_platform String,
+            metric_name String,
+            value Float64 CODEC(Gorilla, ZSTD),
+            labels Map(String, String)
+        )
+        ENGINE = ReplacingMergeTree()
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (cluster_id, metric_name, ts)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query_cluster_metrics)
+            logger.info("ClusterMetrics table created successfully")
+
+            # Add indexes for ClusterMetrics (matching SQL file conventions)
+            indexes = [
+                "ALTER TABLE metrics.ClusterMetrics ADD INDEX IF NOT EXISTS idx_cluster_metric_time (cluster_id, metric_name, ts) TYPE minmax GRANULARITY 1",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating ClusterMetrics table: {e}")
+            raise
+
+        # Node-level aggregated metrics
+        query_node_metrics = f"""
+        CREATE TABLE IF NOT EXISTS metrics.NodeMetrics
+        (
+            ts DateTime64(3) CODEC(Delta, ZSTD),
+            cluster_id String,
+            cluster_name String,
+            node_name String,
+            cpu_cores Float64,
+            cpu_usage_percent Float64 CODEC(Gorilla),
+            memory_total_bytes Float64,
+            memory_used_bytes Float64,
+            memory_usage_percent Float64 CODEC(Gorilla),
+            disk_total_bytes Float64,
+            disk_used_bytes Float64,
+            disk_usage_percent Float64 CODEC(Gorilla),
+            load_1 Float64,
+            load_5 Float64,
+            load_15 Float64,
+            network_receive_bytes_per_sec Float64 DEFAULT 0,
+            network_transmit_bytes_per_sec Float64 DEFAULT 0
+        )
+        ENGINE = ReplacingMergeTree()
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (cluster_id, node_name, ts)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query_node_metrics)
+            logger.info("NodeMetrics table created successfully")
+
+            # Add indexes for NodeMetrics (matching SQL file conventions)
+            indexes = [
+                "ALTER TABLE metrics.NodeMetrics ADD INDEX IF NOT EXISTS idx_cluster_node_time (cluster_id, node_name, ts) TYPE minmax GRANULARITY 1",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating NodeMetrics table: {e}")
+            raise
+
+        # Pod/Container metrics
+        query_pod_metrics = f"""
+        CREATE TABLE IF NOT EXISTS metrics.PodMetrics
+        (
+            ts DateTime64(3) CODEC(Delta, ZSTD),
+            cluster_id String,
+            cluster_name String,
+            namespace String,
+            pod_name String,
+            container_name String,
+            cpu_requests Float64,
+            cpu_limits Float64,
+            cpu_usage Float64 CODEC(Gorilla),
+            memory_requests_bytes Float64,
+            memory_limits_bytes Float64,
+            memory_usage_bytes Float64,
+            restarts Int32,
+            status String
+        )
+        ENGINE = ReplacingMergeTree()
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (cluster_id, namespace, pod_name, ts)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query_pod_metrics)
+            logger.info("PodMetrics table created successfully")
+
+            # Add indexes for PodMetrics (matching SQL file conventions)
+            indexes = [
+                "ALTER TABLE metrics.PodMetrics ADD INDEX IF NOT EXISTS idx_cluster_ns_pod_time (cluster_id, namespace, pod_name, ts) TYPE minmax GRANULARITY 1",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating PodMetrics table: {e}")
+            raise
+
+        # GPU metrics (optional)
+        query_gpu_metrics = f"""
+        CREATE TABLE IF NOT EXISTS metrics.GPUMetrics
+        (
+            ts DateTime64(3) CODEC(Delta, ZSTD),
+            cluster_id String,
+            cluster_name String,
+            node_name String,
+            gpu_index UInt8,
+            gpu_model String,
+            utilization_percent Float64 CODEC(Gorilla),
+            memory_used_bytes Float64,
+            memory_total_bytes Float64,
+            temperature_celsius Float64,
+            power_watts Float64
+        )
+        ENGINE = ReplacingMergeTree()
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (cluster_id, node_name, gpu_index, ts)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query_gpu_metrics)
+            logger.info("GPUMetrics table created successfully")
+
+            # Add indexes for GPUMetrics (matching SQL file conventions)
+            indexes = [
+                "ALTER TABLE metrics.GPUMetrics ADD INDEX IF NOT EXISTS idx_cluster_gpu_time (cluster_id, node_name, gpu_index, ts) TYPE minmax GRANULARITY 1",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating GPUMetrics table: {e}")
+            raise
+
+        logger.info("All cluster metrics tables created successfully")
+
     async def verify_tables(self):
         """Verify that tables were created successfully."""
-        tables_to_check = [
+        # Tables in budproxy database (or configured database)
+        budproxy_tables = [
             "ModelInferenceDetails",
             "EmbeddingInference",
             "AudioInference",
@@ -627,10 +836,20 @@ class ClickHouseMigration:
             "GatewayAnalytics",
             "GatewayBlockingEvents",
         ]
-        if self.include_model_inference:
-            tables_to_check.append("ModelInference")
+        # Cluster metrics tables in metrics database
+        metrics_tables = [
+            "metrics.ClusterMetrics",
+            "metrics.NodeMetrics",
+            "metrics.PodMetrics",
+            "metrics.GPUMetrics",
+        ]
 
-        for table in tables_to_check:
+        if self.include_model_inference:
+            budproxy_tables.append("ModelInference")
+
+        all_tables = budproxy_tables + metrics_tables
+
+        for table in all_tables:
             try:
                 result = await self.client.execute_query(f"EXISTS TABLE {table}")
                 if result and result[0][0]:
@@ -754,6 +973,133 @@ class ClickHouseMigration:
 
         logger.info("Error tracking columns migration completed successfully")
 
+    async def setup_cluster_metrics_materialized_views(self):
+        """Set up materialized views for cluster metrics.
+
+        This executes the setup_cluster_metrics_materialized_views.sql script
+        which creates materialized views that automatically populate NodeMetrics,
+        PodMetrics, and ClusterMetrics tables from otel_metrics_gauge.
+        """
+        logger.info("Setting up cluster metrics materialized views...")
+
+        sql_file_path = Path(__file__).parent / "setup_cluster_metrics_materialized_views.sql"
+
+        if not sql_file_path.exists():
+            logger.warning(
+                f"Cluster metrics materialized views SQL file not found at {sql_file_path}. "
+                "Skipping materialized views setup."
+            )
+            return
+
+        try:
+            # Read the SQL file
+            with open(sql_file_path, "r") as f:
+                sql_content = f.read()
+
+            # Split into individual statements (separated by semicolons)
+            # Remove comments and empty lines
+            statements = []
+            for statement in sql_content.split(";"):
+                # Remove SQL comments (-- style)
+                lines = []
+                for line in statement.split("\n"):
+                    # Remove inline comments
+                    if "--" in line:
+                        line = line[: line.index("--")]
+                    line = line.strip()
+                    if line:
+                        lines.append(line)
+
+                clean_statement = " ".join(lines)
+                if clean_statement and not clean_statement.startswith("--"):
+                    statements.append(clean_statement)
+
+            # Execute each statement
+            logger.info(f"Executing {len(statements)} SQL statements from materialized views script...")
+
+            for i, statement in enumerate(statements, 1):
+                try:
+                    # Skip comments and empty statements
+                    if not statement.strip() or statement.strip().startswith("--"):
+                        continue
+
+                    # Log what we're executing (first 100 chars)
+                    preview = statement[:100] + ("..." if len(statement) > 100 else "")
+                    logger.info(f"  [{i}/{len(statements)}] {preview}")
+
+                    await self.client.execute_query(statement)
+
+                except Exception as e:
+                    # Some statements may fail if objects already exist - that's okay
+                    error_msg = str(e).lower()
+                    if "already exists" in error_msg or "duplicate" in error_msg:
+                        logger.info("    Skipped (already exists)")
+                    else:
+                        logger.warning(f"    Statement execution warning: {e}")
+
+            logger.info("✓ Cluster metrics materialized views setup completed successfully")
+
+        except Exception as e:
+            logger.error(f"Error setting up cluster metrics materialized views: {e}")
+            raise
+
+    async def migrate_node_metrics_network_columns(self):
+        """Add network columns to existing NodeMetrics table for legacy deployments.
+
+        This migration adds network_receive_bytes_per_sec and network_transmit_bytes_per_sec
+        columns to NodeMetrics tables that were created before these columns were added.
+        """
+        logger.info("Checking if NodeMetrics network columns migration is needed...")
+
+        # Check if NodeMetrics table exists (check both budproxy and metrics databases)
+        try:
+            # Check in metrics database first (new location)
+            table_exists = await self.client.execute_query("EXISTS TABLE metrics.NodeMetrics")
+            database = "metrics"
+            if not table_exists or not table_exists[0][0]:
+                # Fallback to budproxy database (legacy location)
+                table_exists = await self.client.execute_query("EXISTS TABLE NodeMetrics")
+                database = self.config.database
+                if not table_exists or not table_exists[0][0]:
+                    logger.info("NodeMetrics table does not exist yet. Skipping network columns migration.")
+                    return
+        except Exception as e:
+            logger.warning(f"Error checking if NodeMetrics table exists: {e}")
+            return
+
+        # Check which network columns are missing
+        check_columns_query = f"""
+        SELECT name FROM system.columns
+        WHERE database = '{database}'
+        AND table = 'NodeMetrics'
+        AND name IN ('network_receive_bytes_per_sec', 'network_transmit_bytes_per_sec')
+        """
+
+        try:
+            existing_columns_result = await self.client.execute_query(check_columns_query)
+            existing_columns = {row[0] for row in existing_columns_result} if existing_columns_result else set()
+
+            columns_to_add = []
+            if "network_receive_bytes_per_sec" not in existing_columns:
+                columns_to_add.append("ADD COLUMN IF NOT EXISTS network_receive_bytes_per_sec Float64 DEFAULT 0")
+            if "network_transmit_bytes_per_sec" not in existing_columns:
+                columns_to_add.append("ADD COLUMN IF NOT EXISTS network_transmit_bytes_per_sec Float64 DEFAULT 0")
+
+            if columns_to_add:
+                # Add the missing columns
+                table_ref = f"{database}.NodeMetrics" if database != self.config.database else "NodeMetrics"
+                alter_query = f"ALTER TABLE {table_ref} {', '.join(columns_to_add)}"
+                await self.client.execute_query(alter_query)
+                logger.info(
+                    f"✓ Added network columns to NodeMetrics: {', '.join(col.split()[-3] for col in columns_to_add)}"
+                )
+            else:
+                logger.info("✓ NodeMetrics already has network columns")
+
+        except Exception as e:
+            logger.error(f"Error adding network columns to NodeMetrics: {e}")
+            raise
+
     async def run_migration(self):
         """Run the complete migration process."""
         try:
@@ -767,6 +1113,9 @@ class ClickHouseMigration:
             await self.create_moderation_inference_table()
             await self.create_gateway_analytics_table()
             await self.create_gateway_blocking_events_table()
+            await self.create_cluster_metrics_tables()  # Add cluster metrics tables
+            await self.migrate_node_metrics_network_columns()  # Add network columns to NodeMetrics (legacy migration)
+            await self.setup_cluster_metrics_materialized_views()  # Set up materialized views for cluster metrics
             await self.add_auth_metadata_columns()  # Add auth metadata columns migration
             await self.update_api_key_project_id()  # Update api_key_project_id where null
             await self.add_error_tracking_columns()  # Add error tracking columns for failed inferences

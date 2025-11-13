@@ -2,6 +2,7 @@ import React from "react";
 import CustomDropdownMenu from "../ui/dropDown";
 const selectItems = ["Copy for curl", "Copy for python", "Copy for javascript"];
 import { errorToast, successToast } from "../toast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
   // Function to determine the appropriate endpoint and payload
@@ -155,12 +156,10 @@ const CopyQuery = ({ Data, RenderItem, triggerClassNames }: any) => {
       text = js;
     }
 
-    try {
-      await navigator.clipboard.writeText(text);
-      successToast("Copied..");
-    } catch (err) {
-      errorToast("Failed to copy");
-    }
+    await copyToClipboard(text, {
+      onSuccess: () => successToast("Copied.."),
+      onError: () => errorToast("Failed to copy"),
+    });
   };
 
   return (

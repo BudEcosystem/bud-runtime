@@ -118,3 +118,103 @@ class RedisService:
             except Exception as e:
                 logger.exception(f"Error getting TTL for Redis key: {e}")
                 raise RedisException(f"Error getting TTL for Redis key {name}") from e
+
+    async def hset(self, name: KeyT, key: str, value: EncodableT) -> ResponseT:
+        """Set a hash field value (atomic operation).
+
+        Args:
+            name: The Redis hash key
+            key: The field name within the hash
+            value: The value to set
+
+        Returns:
+            Number of fields that were added (0 if field existed and was updated, 1 if new field)
+
+        Raises:
+            RedisException: If the operation fails
+        """
+        async with self.redis_singleton as redis:
+            try:
+                return await redis.hset(name, key, value)
+            except Exception as e:
+                logger.exception(f"Error setting Redis hash field: {e}")
+                raise RedisException(f"Error setting hash field {key} in {name}") from e
+
+    async def hget(self, name: KeyT, key: str) -> ResponseT:
+        """Get a hash field value.
+
+        Args:
+            name: The Redis hash key
+            key: The field name within the hash
+
+        Returns:
+            The value of the field, or None if field doesn't exist
+
+        Raises:
+            RedisException: If the operation fails
+        """
+        async with self.redis_singleton as redis:
+            try:
+                return await redis.hget(name, key)
+            except Exception as e:
+                logger.exception(f"Error getting Redis hash field: {e}")
+                raise RedisException(f"Error getting hash field {key} from {name}") from e
+
+    async def hgetall(self, name: KeyT) -> ResponseT:
+        """Get all hash fields and values (atomic snapshot).
+
+        Args:
+            name: The Redis hash key
+
+        Returns:
+            Dictionary of all fields and values in the hash
+
+        Raises:
+            RedisException: If the operation fails
+        """
+        async with self.redis_singleton as redis:
+            try:
+                return await redis.hgetall(name)
+            except Exception as e:
+                logger.exception(f"Error getting all Redis hash fields: {e}")
+                raise RedisException(f"Error getting all hash fields from {name}") from e
+
+    async def hdel(self, name: KeyT, *keys: str) -> ResponseT:
+        """Delete one or more hash fields (atomic operation).
+
+        Args:
+            name: The Redis hash key
+            *keys: One or more field names to delete
+
+        Returns:
+            Number of fields that were removed
+
+        Raises:
+            RedisException: If the operation fails
+        """
+        async with self.redis_singleton as redis:
+            try:
+                return await redis.hdel(name, *keys)
+            except Exception as e:
+                logger.exception(f"Error deleting Redis hash fields: {e}")
+                raise RedisException(f"Error deleting hash fields from {name}") from e
+
+    async def hexists(self, name: KeyT, key: str) -> ResponseT:
+        """Check if a hash field exists.
+
+        Args:
+            name: The Redis hash key
+            key: The field name to check
+
+        Returns:
+            1 if field exists, 0 if it doesn't
+
+        Raises:
+            RedisException: If the operation fails
+        """
+        async with self.redis_singleton as redis:
+            try:
+                return await redis.hexists(name, key)
+            except Exception as e:
+                logger.exception(f"Error checking Redis hash field existence: {e}")
+                raise RedisException(f"Error checking hash field {key} in {name}") from e

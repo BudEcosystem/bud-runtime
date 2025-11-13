@@ -18,6 +18,33 @@ microservices:
     budadmin:
         env:
             NEXT_PUBLIC_ENABLE_DEV_MODE: "true"
+        image: budstudio/budadmin:nightly
+    budcustomer:
+        image: budstudio/budcustomer:nightly
+    budplayground:
+        image: budstudio/budplayground:nightly
+    budgateway:
+        image: budstudio/budgateway:nightly
+    askbud:
+        image: budstudio/askbud:nightly
+    budapp:
+        image: budstudio/budapp:nightly
+    budcluster:
+        image: budstudio/budcluster:nightly
+    budmetrics:
+        image: budstudio/budmetrics:nightly
+    budmodel:
+        image: budstudio/budmodel:nightly
+    budeval:
+        image: budstudio/budeval:nightly
+    budsim:
+        image: budstudio/budsim:nightly
+    buddoc:
+        image: budstudio/buddoc:nightly
+    budnotify:
+        image: budstudio/budnotify:nightly
+    budprompt:
+        image: budstudio/budprompt:nightly
 
 imagePullPolicy: "Always"
 deploymentAnnotations:

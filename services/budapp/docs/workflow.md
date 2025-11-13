@@ -366,3 +366,45 @@ curl --location 'https://<base_url>/clusters/clusters' \
   "notification_metadata": null
 }
 ```
+
+## Create Prompt Schema
+
+```json
+// Select provider type
+{
+  "step_number": 1,
+  "trigger_workflow": true,
+  "workflow_total_steps": 2,
+  "version": 1,
+  "set_default": true,
+  "schema": {
+    "schema": {
+            "$defs": {
+                "Person": {
+                    "properties": {
+                        "name": {"type": "string"},
+                        "age": {"type": "integer"},
+                        "email": {"format": "email", "type": "string"}
+                    },
+                    "required": ["name", "age", "email"],
+                    "title": "Person",
+                    "type": "object"
+                }
+            },
+            "properties": {
+                "content": {"$ref": "#/$defs/Person"}
+            },
+            "required": ["content"],
+            "title": "Schema",
+            "type": "object"
+        }},
+  "validations": {
+    "Person": {
+                "name": "Name must be at least 3 characters",
+                "age": "Age must be between 18 and 100"
+            }
+  },
+  "type": "output",
+  "deployment_name": "o3-mini"
+}
+```

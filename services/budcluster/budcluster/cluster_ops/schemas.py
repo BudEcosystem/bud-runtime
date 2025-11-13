@@ -116,6 +116,7 @@ class ClusterNodeInfo(BaseModel):
 
     cluster_id: UUID
     name: str
+    internal_ip: Optional[str] = None
     type: ClusterNodeTypeEnum
     total_workers: Optional[int] = 0
     available_workers: Optional[int] = 0

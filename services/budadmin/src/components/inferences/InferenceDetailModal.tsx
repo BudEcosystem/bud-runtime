@@ -18,6 +18,7 @@ import {
 import { CopyOutlined, DownloadOutlined } from "@ant-design/icons";
 import { format } from "date-fns";
 import { formatTimestamp, formatTimestampWithTZ } from "@/utils/formatDate";
+import { copyToClipboard as copyText } from "@/utils/clipboard";
 import { useInferences } from "@/stores/useInferences";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { monokai } from "react-syntax-highlighter/dist/cjs/styles/hljs";
@@ -69,9 +70,11 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
     clearSelectedInference,
   ]);
 
-  const copyToClipboard = (text: string, label: string = "Content") => {
-    navigator.clipboard.writeText(text);
-    message.success(`${label} copied to clipboard`);
+  const copyToClipboard = async (text: string, label: string = "Content") => {
+    await copyText(text, {
+      onSuccess: () => message.success(`${label} copied to clipboard`),
+      onError: () => message.error(`Failed to copy ${label}`),
+    });
   };
 
   const downloadAsFile = (content: string, filename: string) => {
@@ -748,137 +751,6 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
           <TabPane tab="Performance" key="performance">
             <div style={{ padding: 24 }}>{renderPerformanceMetrics()}</div>
           </TabPane>
-          {(selectedInference.is_success === false) && (
-            <TabPane tab="Error Details" key="error">
-              <div style={{ padding: 24 }}>
-                <Alert
-                  message="Request Failed"
-                  description={`This inference request failed with error code ${selectedInference.error_code || 'unknown'}`}
-                  type="error"
-                  showIcon
-                  style={{ marginBottom: 24 }}
-                />
-
-                <Descriptions bordered column={1}>
-                  {selectedInference.error_code && (
-                    <Descriptions.Item label="Error Code">
-                      <Tag color="error" style={{ fontSize: 14 }}>
-                        {selectedInference.error_code}
-                      </Tag>
-                    </Descriptions.Item>
-                  )}
-
-                  {selectedInference.error_type && (
-                    <Descriptions.Item label="Error Type">
-                      <Text type="danger" strong>
-                        {selectedInference.error_type}
-                      </Text>
-                    </Descriptions.Item>
-                  )}
-
-                  {selectedInference.error_message && (
-                    <Descriptions.Item label="Error Message">
-                      <div
-                        style={{
-                          backgroundColor: "#fff2f0",
-                          border: "1px solid #ffccc7",
-                          borderRadius: 4,
-                          padding: 12,
-                          marginTop: 8,
-                        }}
-                      >
-                        <Text
-                          type="danger"
-                          style={{
-                            fontFamily: "monospace",
-                            fontSize: 13,
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {selectedInference.error_message}
-                        </Text>
-                      </div>
-                    </Descriptions.Item>
-                  )}
-
-                  <Descriptions.Item label="Failed Request ID">
-                    <Text copyable style={{ fontFamily: "monospace", fontSize: 12 }}>
-                      {selectedInference.inference_id}
-                    </Text>
-                  </Descriptions.Item>
-
-                  <Descriptions.Item label="Failed At">
-                    {formatTimestampWithTZ(selectedInference.timestamp)}
-                  </Descriptions.Item>
-
-                  {selectedInference.model_name && (
-                    <Descriptions.Item label="Model Attempted">
-                      {selectedInference.model_display_name || selectedInference.model_name}
-                    </Descriptions.Item>
-                  )}
-
-                  {selectedInference.model_provider && (
-                    <Descriptions.Item label="Provider">
-                      {selectedInference.model_provider}
-                    </Descriptions.Item>
-                  )}
-
-                  {selectedInference.endpoint_name && (
-                    <Descriptions.Item label="Endpoint">
-                      {selectedInference.endpoint_name}
-                    </Descriptions.Item>
-                  )}
-                </Descriptions>
-
-                {selectedInference.messages && selectedInference.messages.length > 0 && (
-                  <div style={{ marginTop: 24 }}>
-                    <Title level={5}>Failed Request Preview</Title>
-                    <div
-                      style={{
-                        backgroundColor: "#f5f5f5",
-                        border: "1px solid #d9d9d9",
-                        borderRadius: 4,
-                        padding: 12,
-                        marginTop: 8,
-                      }}
-                    >
-                      <Text style={{ fontFamily: "monospace", fontSize: 13 }}>
-                        {JSON.stringify(selectedInference.messages[0], null, 2).substring(0, 200)}...
-                      </Text>
-                    </div>
-                  </div>
-                )}
-
-                {selectedInference.raw_response && (
-                  <div style={{ marginTop: 24 }}>
-                    <Title level={5}>Error Response Details</Title>
-                    <div
-                      style={{
-                        backgroundColor: "#fff2f0",
-                        border: "1px solid #ffccc7",
-                        borderRadius: 4,
-                        padding: 12,
-                        marginTop: 8,
-                      }}
-                    >
-                      <Text
-                        type="danger"
-                        style={{
-                          fontFamily: "monospace",
-                          fontSize: 12,
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                        }}
-                      >
-                        {selectedInference.raw_response}
-                      </Text>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </TabPane>
-          )}
 
           <TabPane tab="Gateway Data" key="raw">
             <div style={{ padding: 24 }}>{renderRawData()}</div>

@@ -16,6 +16,7 @@ interface OutputSettingsProps {
   onDeleteVariable: (variableId: string) => void;
   onSaveOutputSchema?: () => void;
   isSavingOutput?: boolean;
+  onStructuredOutputEnabledChange?: (enabled: boolean) => void;
 }
 
 export const OutputSettings: React.FC<OutputSettingsProps> = ({
@@ -25,7 +26,8 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
   onVariableChange,
   onDeleteVariable,
   onSaveOutputSchema,
-  isSavingOutput
+  isSavingOutput,
+  onStructuredOutputEnabledChange
 }) => {
   const [isOpen, setIsOpen] = React.useState(true);
   const [structuredOutputEnabled, setStructuredOutputEnabled] = React.useState(false);
@@ -42,6 +44,11 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
     });
     setValidationEnabled(prev => ({ ...prev, ...newValidationEnabled }));
   }, [outputVariables]);
+
+  // Notify parent when structuredOutputEnabled changes
+  React.useEffect(() => {
+    onStructuredOutputEnabledChange?.(structuredOutputEnabled);
+  }, [structuredOutputEnabled, onStructuredOutputEnabledChange]);
 
   return (
     <div className="flex flex-col justify-between h-full w-full">
@@ -229,16 +236,16 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
         borderTop: '0.5px solid #1F1F1F',
         background: 'rgba(255, 255, 255, 0.03)',
         backdropFilter: 'blur(5px)'
-      }} className='flex justify-center items-center'>
+      }} className='flex justify-end items-center px-[1rem]'>
         <PrimaryButton
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation();
             onSaveOutputSchema?.();
           }}
           loading={isSavingOutput}
-          disabled={isSavingOutput}
+          disabled={isSavingOutput || !structuredOutputEnabled}
           style={{
-            cursor: isSavingOutput ? 'not-allowed' : 'pointer',
+            cursor: (isSavingOutput || !structuredOutputEnabled) ? 'not-allowed' : 'pointer',
           }}
           classNames="h-[1.375rem] rounded-[0.375rem]"
           textClass="!text-[0.625rem] !font-[400]"

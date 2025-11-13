@@ -36,7 +36,7 @@ class BaseKeycloakSeeder(BaseSeeder):
 
         # Get the default realm name
         default_realm_name = app_settings.default_realm_name
-        default_client_id = "default-internal-client"
+        default_client_id = app_settings.default_client_name
 
         # Check if realm exists in Keycloak
         keycloak_realm_exists = keycloak_manager.realm_exists(default_realm_name)
@@ -77,6 +77,45 @@ class BaseKeycloakSeeder(BaseSeeder):
                     )
 
             if tenant_client:
+                # Verify client exists in Keycloak before syncing permissions
+                if not keycloak_manager.client_exists(tenant_client.client_id, default_realm_name):
+                    logger.warning(
+                        f"::KEYCLOAK::Client {default_client_id} record exists in DB but not in Keycloak. Creating..."
+                    )
+                    # Create the client in Keycloak
+                    new_client_id, client_secret = await keycloak_manager.create_client(
+                        default_client_id, default_realm_name
+                    )
+                    # Update the tenant_client record with new client info
+                    tenant_client.client_id = new_client_id
+                    await tenant_client.set_client_secret(client_secret)
+                    UserDataManager(session).update_one(tenant_client)
+                    logger.info(f"::KEYCLOAK::Client created with ID {new_client_id}")
+
+                # Verify user exists in Keycloak before syncing permissions
+                if not keycloak_manager.user_exists_in_realm(str(db_user.auth_id), default_realm_name):
+                    logger.warning(
+                        f"::KEYCLOAK::User {db_user.email} (auth_id: {db_user.auth_id}) exists in DB but not in Keycloak. Creating..."
+                    )
+
+                    # Ensure realm has required roles before creating admin user
+                    await keycloak_manager.ensure_realm_roles_exist(default_realm_name)
+
+                    # Create user in Keycloak
+                    decrypted_secret = await tenant_client.get_decrypted_client_secret()
+                    keycloak_user_id = await keycloak_manager.create_realm_admin(
+                        username=db_user.email,
+                        email=db_user.email,
+                        password=app_settings.superuser_password,
+                        realm_name=default_realm_name,
+                        client_id=tenant_client.client_id,
+                        client_secret=decrypted_secret,
+                    )
+                    # Update the user record with new Keycloak ID
+                    db_user.auth_id = keycloak_user_id
+                    UserDataManager(session).update_one(db_user)
+                    logger.info(f"::KEYCLOAK::User created in Keycloak with new auth_id {keycloak_user_id}")
+
                 # Sync permissions for the super user
                 await keycloak_manager.sync_user_permissions(
                     user_id=db_user.auth_id,

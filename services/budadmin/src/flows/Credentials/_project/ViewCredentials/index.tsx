@@ -28,6 +28,7 @@ import CustomPopover from "src/flows/components/customPopover";
 import { useOverlay } from "src/context/overlayContext";
 import BudStepAlert from "src/flows/components/BudStepAlert";
 import { successToast } from "@/components/toast";
+import { copyToClipboard } from "@/utils/clipboard";
 
 function SortIcon({ sortOrder }: { sortOrder: string }) {
   return sortOrder ? (
@@ -101,17 +102,11 @@ export default function ViewProjectCredential() {
 
     fetchDecryptedKey();
   }, [selectedCredential]);
-  const handleCopy = (text: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        // message.success('Text copied to clipboard!');
-        setCopiedText("Copied");
-      })
-      .catch(() => {
-        // message.error('Failed to copy text.');
-        setCopiedText("Failed to copy");
-      });
+  const handleCopy = async (text: string) => {
+    await copyToClipboard(text, {
+      onSuccess: () => setCopiedText("Copied"),
+      onError: () => setCopiedText("Failed to copy"),
+    });
   };
 
   useEffect(() => {

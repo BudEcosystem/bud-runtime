@@ -349,14 +349,14 @@ const ClusterDetailsPage = () => {
                 {hasPermission(PermissionEnum.ClusterManage) && (
                   <div className="w-[80px]">
                     <div className="flex justify-end items-center">
-                      {selectedCluster.status == "available" && (
+                      {/* {selectedCluster.status == "available" && (
                         <Button
                           className="group bg-transparent px-[0.25em] py-0 h-[1.5em] border-none hover:border-transparent"
                           // onClick={() => refreshCluster(item)}
                         >
                           <ReloadIcon className="text-[#B3B3B3] group-hover:text-[#FFFFFF] text-[0.875em] w-[0.875rem] h-[0.875rem]" />
                         </Button>
-                      )}
+                      )} */}
                       {contextHolder}
                       <button
                         className="group bg-transparent px-[0.25em] py-0 h-[1.5rem] border-none hover:border-transparent"
@@ -416,7 +416,7 @@ const ClusterDetailsPage = () => {
                   </div>
                 ),
                 key: "1",
-                children: <ClusterGeneral data={selectedCluster} />,
+                children: <ClusterGeneral data={selectedCluster} isActive={activeTab === "1"} />,
               },
               {
                 label: (
@@ -444,7 +444,7 @@ const ClusterDetailsPage = () => {
                 key: "2",
                 children: <DeploymentListTable />,
               },
-              ...(enableDevMode ? [{
+              {
                 label: (
                   <div className="flex items-center gap-[0.375rem]">
                     <div className="w-[.975rem] pt-[.15rem]">
@@ -467,7 +467,7 @@ const ClusterDetailsPage = () => {
                 ),
                 key: "3",
                 children: <ClusterNodes data={selectedCluster} />,
-              }] : []),
+              },
               // {
               //   label: <div className="flex items-center gap-[0.375rem]">
               //     <div className="w-[.975rem] pt-[.15rem]">

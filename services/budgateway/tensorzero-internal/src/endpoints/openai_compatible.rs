@@ -14,7 +14,7 @@ use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::debug_handler;
-use axum::extract::{Multipart, Path, Query, State};
+use axum::extract::{Extension, Multipart, Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, Sse};
 use axum::response::{IntoResponse, Response};
@@ -25,6 +25,7 @@ use serde_json::{json, Map, Value};
 use url::Url;
 use uuid::Uuid;
 
+use crate::analytics::RequestAnalytics;
 use crate::cache::CacheParamsOptions;
 use crate::endpoints::inference::{
     inference, write_inference, ChatCompletionInferenceParams, InferenceClients,
@@ -193,6 +194,7 @@ pub async fn inference_handler(
         guardrails,
         ..
     }): AppState,
+    analytics: Option<Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>>,
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleParams>,
 ) -> Result<Response<Body>, Error> {
@@ -627,6 +629,7 @@ pub async fn inference_handler(
         kafka_connection_info.clone(),
         model_credential_store.clone(),
         params,
+        analytics.as_ref().map(|ext| ext.0.clone()),
     )
     .await?;
 
@@ -1104,7 +1107,8 @@ pub async fn inference_handler(
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Default)]
 pub struct OpenAICompatibleFunctionCall {
-    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     pub arguments: String,
 }
 
@@ -1371,8 +1375,10 @@ struct OpenAICompatibleResponse {
     choices: Vec<OpenAICompatibleChoice>,
     created: u32,
     model: String,
-    system_fingerprint: String,
-    service_tier: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    system_fingerprint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    service_tier: Option<String>,
     object: String,
     usage: OpenAICompatibleUsage,
 }
@@ -1722,8 +1728,9 @@ impl TryFrom<Vec<OpenAICompatibleMessage>> for Input {
                     }
                     if let Some(tool_calls) = msg.tool_calls {
                         for tool_call in tool_calls {
-                            tool_call_id_to_name
-                                .insert(tool_call.id.clone(), tool_call.function.name.clone());
+                            if let Some(name) = &tool_call.function.name {
+                                tool_call_id_to_name.insert(tool_call.id.clone(), name.clone());
+                            }
                             message_content.push(InputMessageContent::ToolCall(tool_call.into()));
                         }
                     }
@@ -1923,7 +1930,7 @@ impl From<OpenAICompatibleToolCall> for ToolCall {
     fn from(tool_call: OpenAICompatibleToolCall) -> Self {
         ToolCall {
             id: tool_call.id,
-            name: tool_call.function.name,
+            name: tool_call.function.name.unwrap_or_default(),
             arguments: tool_call.function.arguments,
         }
     }
@@ -1952,8 +1959,8 @@ impl From<(InferenceResponse, String)> for OpenAICompatibleResponse {
                     }],
                     created: current_timestamp() as u32,
                     model: model_name.clone(),
-                    service_tier: "".to_string(),
-                    system_fingerprint: "".to_string(),
+                    service_tier: None,
+                    system_fingerprint: None,
                     object: "chat.completion".to_string(),
                     usage: response.usage.into(),
                     episode_id: response.episode_id.to_string(),
@@ -1975,8 +1982,8 @@ impl From<(InferenceResponse, String)> for OpenAICompatibleResponse {
                 }],
                 created: current_timestamp() as u32,
                 model: model_name,
-                system_fingerprint: "".to_string(),
-                service_tier: "".to_string(),
+                system_fingerprint: None,
+                service_tier: None,
                 object: "chat.completion".to_string(),
                 usage: OpenAICompatibleUsage {
                     prompt_tokens: response.usage.input_tokens,
@@ -2039,7 +2046,7 @@ impl From<ToolCallOutput> for OpenAICompatibleToolCall {
             id: tool_call.id,
             r#type: "function".to_string(),
             function: OpenAICompatibleFunctionCall {
-                name: tool_call.raw_name,
+                name: Some(tool_call.raw_name),
                 arguments: tool_call.raw_arguments,
             },
         }
@@ -2063,8 +2070,10 @@ struct OpenAICompatibleResponseChunk {
     choices: Vec<OpenAICompatibleChoiceChunk>,
     created: u32,
     model: String,
-    system_fingerprint: String,
-    service_tier: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    system_fingerprint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    service_tier: Option<String>,
     object: String,
     usage: Option<OpenAICompatibleUsage>,
 }
@@ -2115,9 +2124,9 @@ fn convert_inference_response_chunk_to_openai_compatible(
                     },
                 }],
                 created: current_timestamp() as u32,
-                service_tier: "".to_string(),
+                service_tier: None,
                 model: model_name.to_string(),
-                system_fingerprint: "".to_string(),
+                system_fingerprint: None,
                 object: "chat.completion.chunk".to_string(),
                 // We emit a single chunk containing 'usage' at the end of the stream
                 usage: None,
@@ -2137,9 +2146,9 @@ fn convert_inference_response_chunk_to_openai_compatible(
                 },
             }],
             created: current_timestamp() as u32,
-            service_tier: "".to_string(),
+            service_tier: None,
             model: model_name.to_string(),
-            system_fingerprint: "".to_string(),
+            system_fingerprint: None,
             object: "chat.completion.chunk".to_string(),
             // We emit a single chunk containing 'usage' at the end of the stream
             usage: None,
@@ -2175,7 +2184,11 @@ fn process_chat_content_chunk(
                     index: *index,
                     r#type: "function".to_string(),
                     function: OpenAICompatibleFunctionCall {
-                        name: tool_call.raw_name,
+                        name: if is_new {
+                            Some(tool_call.raw_name)
+                        } else {
+                            None
+                        },
                         arguments: tool_call.raw_arguments,
                     },
                 });
@@ -2520,7 +2533,6 @@ impl OpenAICompatibleStreamProcessor {
                             .unwrap()
                             .as_secs(),
                         "model": self.model_name,
-                        "system_fingerprint": serde_json::Value::Null,
                         "object": "chat.completion.chunk",
                         "usage": total_usage
                     });
@@ -2600,7 +2612,7 @@ impl From<ToolCallChunk> for OpenAICompatibleToolCall {
             id: tool_call.id,
             r#type: "function".to_string(),
             function: OpenAICompatibleFunctionCall {
-                name: tool_call.raw_name,
+                name: Some(tool_call.raw_name),
                 arguments: tool_call.raw_arguments,
             },
         }
@@ -3049,6 +3061,81 @@ struct OpenAICompatibleEmbeddingResponse {
     data: Vec<OpenAICompatibleEmbeddingData>,
     model: String,
     usage: OpenAICompatibleEmbeddingUsage,
+}
+
+/// Response for a single model in the list
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ModelObject {
+    pub id: String,
+    pub created: u64,
+    pub object: &'static str,
+    pub owned_by: &'static str,
+}
+
+/// Response for the /v1/models endpoint
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ListModelsResponse {
+    pub object: &'static str,
+    pub data: Vec<ModelObject>,
+}
+
+/// A handler for the OpenAI-compatible list models endpoint
+#[debug_handler(state = AppStateData)]
+pub async fn list_models(
+    State(AppStateData { config, .. }): AppState,
+    headers: HeaderMap,
+) -> Result<Json<ListModelsResponse>, Error> {
+    // Check if the request is authenticated by looking for the auth metadata header
+    let is_authenticated = headers.contains_key("x-tensorzero-endpoint-id");
+
+    // Get all models
+    let models = config.models.read().await;
+
+    // Filter models based on authentication
+    let model_list: Vec<ModelObject> = if is_authenticated {
+        // Authenticated: return all models available to this API key
+        // The auth middleware provides these as a comma-separated list
+        headers
+            .get("x-tensorzero-available-models")
+            .and_then(|header| header.to_str().ok())
+            .map(|models_str| {
+                models_str
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|model_name| ModelObject {
+                        id: model_name.to_string(),
+                        created: 0,
+                        object: "model",
+                        owned_by: "bud",
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|| {
+                // No available models header or failed to parse
+                tracing::warn!(
+                    "Authenticated /v1/models request missing x-tensorzero-available-models header"
+                );
+                vec![]
+            })
+    } else {
+        // Unauthenticated (when auth is disabled): return all models
+        models
+            .iter_static_models()
+            .map(|(model_id, _model_config)| ModelObject {
+                id: model_id.to_string(),
+                created: 0,
+                object: "model",
+                owned_by: "bud",
+            })
+            .collect()
+    };
+
+    let response = ListModelsResponse {
+        object: "list",
+        data: model_list,
+    };
+
+    Ok(Json(response))
 }
 
 /// A handler for the OpenAI-compatible embedding endpoint
@@ -7098,7 +7185,7 @@ mod tests {
                     id: "1".to_string(),
                     r#type: "function".to_string(),
                     function: OpenAICompatibleFunctionCall {
-                        name: "test_tool".to_string(),
+                        name: Some("test_tool".to_string()),
                         arguments: "{}".to_string(),
                     },
                 }]),
@@ -7271,7 +7358,7 @@ mod tests {
         assert_eq!(content_str, Some("Hello, world!".to_string()));
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].id, "1");
-        assert_eq!(tool_calls[0].function.name, "test_tool");
+        assert_eq!(tool_calls[0].function.name, Some("test_tool".to_string()));
         assert_eq!(tool_calls[0].function.arguments, "{}");
         assert_eq!(reasoning_content, None);
         let content: Vec<ContentBlockChatOutput> = vec![];
@@ -7308,7 +7395,7 @@ mod tests {
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(reasoning_content, None);
         assert_eq!(tool_calls[0].id, "123");
-        assert_eq!(tool_calls[0].function.name, "middle_tool");
+        assert_eq!(tool_calls[0].function.name, Some("middle_tool".to_string()));
         assert_eq!(tool_calls[0].function.arguments, "{\"key\": \"value\"}");
     }
 
@@ -7336,7 +7423,7 @@ mod tests {
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].id, Some("1".to_string()));
         assert_eq!(tool_calls[0].index, 0);
-        assert_eq!(tool_calls[0].function.name, "test_tool");
+        assert_eq!(tool_calls[0].function.name, Some("test_tool".to_string()));
         assert_eq!(tool_calls[0].function.arguments, "{}");
         assert_eq!(reasoning_content, None);
 
@@ -7385,11 +7472,11 @@ mod tests {
         assert_eq!(reasoning_content, None);
         assert_eq!(tool_calls[0].id, Some("123".to_string()));
         assert_eq!(tool_calls[0].index, 0);
-        assert_eq!(tool_calls[0].function.name, "middle_tool");
+        assert_eq!(tool_calls[0].function.name, Some("middle_tool".to_string()));
         assert_eq!(tool_calls[0].function.arguments, "{\"key\": \"value\"}");
         assert_eq!(tool_calls[1].id, Some("5".to_string()));
         assert_eq!(tool_calls[1].index, 1);
-        assert_eq!(tool_calls[1].function.name, "last_tool");
+        assert_eq!(tool_calls[1].function.name, Some("last_tool".to_string()));
         assert_eq!(tool_calls[1].function.arguments, "{\"key\": \"value\"}");
     }
 
@@ -8274,6 +8361,7 @@ struct AnthropicMetadata {
 #[debug_handler(state = AppStateData)]
 pub async fn anthropic_messages_handler(
     State(app_state): AppState,
+    analytics: Option<Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>>,
     headers: HeaderMap,
     StructuredJson(anthropic_params): StructuredJson<AnthropicMessagesParams>,
 ) -> Result<Response<Body>, Error> {
@@ -8288,8 +8376,13 @@ pub async fn anthropic_messages_handler(
     let openai_params = convert_anthropic_to_openai(anthropic_params)?;
 
     // Call the existing inference handler with converted parameters
-    let response =
-        inference_handler(State(app_state), headers, StructuredJson(openai_params)).await?;
+    let response = inference_handler(
+        State(app_state),
+        analytics,
+        headers,
+        StructuredJson(openai_params),
+    )
+    .await?;
 
     // Convert the response from OpenAI format to Anthropic format
     convert_openai_response_to_anthropic(response).await

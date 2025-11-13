@@ -10,7 +10,6 @@ locals {
     "ditto",
     "adarsh",
     "varun",
-    "netweb",
   ]
 
   # a service can be only removed if it's not required by all the environments
@@ -32,6 +31,11 @@ locals {
     "temp",
   ]
 
+  services_standalone = [
+    "harbor",
+    "connect.dev"
+  ]
+
   services_with_envs = toset(concat(
     flatten([
       for env in local.environments : [
@@ -45,7 +49,12 @@ locals {
         for srv in concat(local.services_pde, local.services) :
         srv == "" ? "${env}.${var.zone.domain}" : "${srv}.${env}.${var.zone.domain}"
       ]
-    ])
+    ]),
+    flatten([
+      for srv in local.services_standalone : [
+        "${srv}.${var.zone.domain}"
+      ]
+    ]),
   ))
   ingress_ipv4 = { for ip in toset(concat(
     [for _, ip in module.azure.ip.ingress.v4 : ip],

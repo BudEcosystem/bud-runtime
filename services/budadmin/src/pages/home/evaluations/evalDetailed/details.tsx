@@ -59,27 +59,51 @@ const lsitData = [
     ],
   },
 ];
-
-function LeaderboardDetails() {
+interface ListItem {
+  title: string;
+  content: string[];
+}
+type LeaderboardDetailsProps = {
+  datasets: {
+    estimated_input_tokens?: number;
+    estimated_output_tokens?: number;
+    description: string;
+    advantages_disadvantages: any;
+  } | null;
+};
+function LeaderboardDetails({datasets}: LeaderboardDetailsProps) {
   const router = useRouter();
+  const [listData, setListData] = useState<ListItem[]>([
+    { title: "Why Run this Eval?", content: [] },
+    { title: "What to Expect?", content: [] },
+    { title: "Advantages", content: [] },
+    { title: "Constraints", content: [] },
+  ]);
+  useEffect(()=> {
+    const updatedList = [
+      { title: "Why Run this Eval?", content: datasets?.advantages_disadvantages?.why_run_eval || [] },
+      { title: "What to Expect?", content: datasets?.advantages_disadvantages?.what_to_expect || [] },
+      { title: "Advantages", content: datasets?.advantages_disadvantages?.advantages || [] },
+      { title: "Constraints", content: datasets?.advantages_disadvantages?.disadvantages || [] },
+    ];
 
+    setListData(updatedList);
+  }, [datasets])
   return (
     <div className="pb-[60px] flex justify-between items-start ">
       <div className="w-[63.5%]">
         <div className="pb-[1.5rem]">
           <Text_24_400_EEEEEE>Introduction</Text_24_400_EEEEEE>
           <Text_12_400_757575 className="leading-[140%] pt-[.25rem]">
-            LiveMathBench can capture LLM capabilities in complex reasoning
-            tasks, including challenging latest question sets from various
-            mathematical competitions. pture LLM capa..
+            {datasets?.description}
           </Text_12_400_757575>
         </div>
         <div className="hR"></div>
         <div>
-          {lsitData.map((data, index) => (
+          {listData.map((data, index) => (
             <div className="pt-[1.2rem]" key={index}>
               <Text_16_400_EEEEEE>{data.title}</Text_16_400_EEEEEE>
-              <ul className="custom-bullet-list mt-[.5rem] !pl-[0]">
+              {data.content.length > 0 ? <ul className="custom-bullet-list mt-[.5rem] !pl-[0]">
                 {data.content.map((data, index) => (
                   <li className="mb-[.6rem]" key={index}>
                     <Text_12_400_EEEEEE className="leading-[140%] indent-0 pl-[.5rem]">
@@ -87,7 +111,7 @@ function LeaderboardDetails() {
                     </Text_12_400_EEEEEE>
                   </li>
                 ))}
-              </ul>
+              </ul>: <div className="pt-[.5rem]"><Text_12_400_757575 className="leading-[140%] pt-[.25rem]">No Data Found</Text_12_400_757575></div>}
               <div className="hR mt-[1.2rem]"></div>
             </div>
           ))}
@@ -150,7 +174,7 @@ function LeaderboardDetails() {
                   Total Input tokens
                 </Text_12_400_EEEEEE>
                 <Text_12_400_EEEEEE className="ml-[.5rem] mr-[.4rem] text-nowrap">
-                  50k
+                  {datasets?.estimated_input_tokens || 0}
                 </Text_12_400_EEEEEE>
               </div>
             </div>
@@ -170,7 +194,7 @@ function LeaderboardDetails() {
                   Expected Output
                 </Text_12_400_EEEEEE>
                 <Text_12_400_EEEEEE className="ml-[.5rem] mr-[.4rem] text-nowrap">
-                  900k
+                  {datasets?.estimated_output_tokens || 0}
                 </Text_12_400_EEEEEE>
               </div>
             </div>

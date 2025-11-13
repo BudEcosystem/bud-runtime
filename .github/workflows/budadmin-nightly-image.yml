@@ -34,3 +34,5 @@ jobs:
           context: ./services/budadmin
           file: ./services/budadmin/Dockerfile
           tags: budstudio/budadmin:nightly
+          build-args: |
+            NEXT_PUBLIC_ENABLE_DEV_MODE=true

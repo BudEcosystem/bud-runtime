@@ -20,6 +20,7 @@ import {
   AimOutlined,
 } from "@ant-design/icons";
 import { GeographicInfo as GeographicInfoType } from "@/stores/useInferences";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const { Text, Title } = Typography;
 
@@ -33,11 +34,11 @@ const GeographicInfo: React.FC<GeographicInfoProps> = ({ data, onCopy }) => {
     return <Empty description="No geographic information available" />;
   }
 
-  const handleCopy = (content: string, label: string) => {
+  const handleCopy = async (content: string, label: string) => {
     if (onCopy) {
       onCopy(content, label);
     } else {
-      navigator.clipboard.writeText(content);
+      await copyToClipboard(content);
     }
   };
 

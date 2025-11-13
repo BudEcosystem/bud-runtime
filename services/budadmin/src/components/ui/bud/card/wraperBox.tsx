@@ -8,6 +8,7 @@ export interface BudProps {
   children: React.ReactNode;
   classNames?: any;
   center?: boolean;
+  onScroll?: (e: React.UIEvent<HTMLDivElement>) => void;
 }
 
 export function BudWraperBox(props: BudProps) {
@@ -28,6 +29,7 @@ export function BudWraperBox(props: BudProps) {
     <>
       <div
         className={`BudWraperBox scrollBox py-[20px] overflow-y-auto h-full  ${expandedStep && !isExpandedView ? "blur-removethistoaddblur-[.25rem]" : ""}  ${loading || performanceLoading ? "blur" : ""} ${props.classNames} ${props.center && "flex flex-col	justify-center mt-[0]"}`}
+        onScroll={props.onScroll}
       >
         {props.children}
       </div>

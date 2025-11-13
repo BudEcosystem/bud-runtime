@@ -838,6 +838,27 @@ class ProjectDataManager(DataManagerUtils):
         count = self.scalar_one_or_none(stmt)
         return count > 0 if count is not None else False
 
+    async def get_user_project_ids(self, user_id: UUID) -> List[UUID]:
+        """Get all project IDs that a user is associated with.
+
+        Args:
+            user_id: The user ID
+
+        Returns:
+            List of project IDs the user has access to
+        """
+        stmt = (
+            select(project_user_association.c.project_id)
+            .select_from(project_user_association)
+            .join(Project, project_user_association.c.project_id == Project.id)
+            .where(
+                project_user_association.c.user_id == user_id,
+                Project.status == ProjectStatusEnum.ACTIVE,
+            )
+        )
+        result = self.scalars_all(stmt)
+        return result if result else []
+
     async def check_duplicate_name_for_user_projects(
         self, project_name: str, user_id: UUID, project_type: str, exclude_project_id: Optional[UUID] = None
     ) -> bool:

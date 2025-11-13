@@ -53,7 +53,6 @@ from .crud import ClusterDataManager, ClusterNodeInfoDataManager
 from .device_extractor import DeviceExtractor
 from .models import Cluster as ClusterModel
 from .models import ClusterNodeInfo as ClusterNodeInfoModel
-from .models import ClusterNodeInfoCRUD
 from .nfd_handler import NFDSchedulableResourceDetector
 from .schemas import (
     ClusterCreate,
@@ -340,6 +339,7 @@ class ClusterOpsService:
                     ClusterNodeInfo(
                         cluster_id=cluster_id,
                         name=node["node_name"],
+                        internal_ip=node.get("internal_ip"),
                         type=device_type,
                         hardware_info=hardware_info,
                         status=node_status,
@@ -495,6 +495,7 @@ class ClusterOpsService:
                             ClusterNodeInfo(
                                 cluster_id=cluster_id,
                                 name=node_info["name"],
+                                internal_ip=node_info.get("internal_ip"),
                                 type=cls._determine_primary_device_type(node_info["devices"]),
                                 hardware_info=hardware_info,
                                 status=node_info["status"],
@@ -817,6 +818,7 @@ class ClusterOpsService:
             node_update = {
                 "cluster_id": cluster_id,
                 "name": node_info["name"],
+                "internal_ip": node_info.get("internal_ip"),
                 "type": cls._determine_primary_device_type(node_info["devices"]),
                 "hardware_info": hardware_info,
                 "status": node_info["status"],
@@ -1066,6 +1068,7 @@ class ClusterOpsService:
                     ClusterNodeInfo(
                         cluster_id=cluster_id,
                         name=node["node_name"],
+                        internal_ip=node.get("internal_ip"),
                         type=device_type,
                         hardware_info=hardware_info,
                         status=node_status,
@@ -1712,9 +1715,8 @@ class ClusterService(SessionMixin):
 
     async def get_cluster_nodes(self, cluster_id: UUID) -> Union[SuccessResponse, ErrorResponse]:
         """Get cluster nodes."""
-        with ClusterNodeInfoCRUD() as crud:
-            nodes, _ = crud.fetch_many(conditions={"cluster_id": cluster_id})
-            nodes_list = [ClusterNodeInfoResponse.model_validate(node) for node in nodes]
+        nodes = await ClusterNodeInfoDataManager(self.session).get_cluster_node_info_by_cluster_id(cluster_id)
+        nodes_list = [ClusterNodeInfoResponse.model_validate(node) for node in nodes]
         return SuccessResponse(param={"nodes": nodes_list}, message="Cluster nodes fetched successfully")
 
     async def get_cluster_config(self, cluster_id: UUID) -> Union[SuccessResponse, ErrorResponse]:

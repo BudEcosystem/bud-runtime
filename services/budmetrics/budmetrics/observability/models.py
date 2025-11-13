@@ -1106,6 +1106,7 @@ class QueryBuilder:
         cte_clauses = []
 
         # Add topk CTE if needed (only when group_by is specified)
+        topk_join_clause = ""
         if topk and group_fields:
             topk_cte = self._build_topk_cte(
                 metric_definitions,
@@ -1119,14 +1120,14 @@ class QueryBuilder:
             if topk_cte:
                 cte_clauses.append(topk_cte)
 
-                # Add condition to filter by topk entities
-                topk_conditions = []
+                # Build JOIN clause instead of WHERE subquery to avoid asynch driver issues
+                # The asynch library cannot handle nested subqueries in WHERE clauses
+                topk_join_conditions = []
                 for group_field in group_by:
                     col = self._MAPPING_COLUMNS[group_field]
-                    # Extract just the column name without alias for the subquery
                     col_name = col.split(".")[-1]
-                    topk_conditions.append(f"{col} IN (SELECT {col_name} FROM topk_entities)")
-                conditions.append(f"({' AND '.join(topk_conditions)})")
+                    topk_join_conditions.append(f"{col} = te.{col_name}")
+                topk_join_clause = f"INNER JOIN topk_entities te ON {' AND '.join(topk_join_conditions)}"
 
         if cte_registry:
             for cte_name, cte_def in cte_registry.items():
@@ -1147,6 +1148,7 @@ class QueryBuilder:
         SELECT
             {", ".join(select_parts)}
         {self._get_table_join_clause(required_tables, cte_registry, group_fields)}
+        {topk_join_clause}
         WHERE {" AND ".join(conditions)}
         GROUP BY {", ".join(group_by_parts)}
         ORDER BY {time_bucket_alias} DESC
@@ -1340,6 +1342,10 @@ class ClickHouseClient:
                 await cursor.execute(query, params or {})
                 result = await cursor.fetchall()
 
+                # Clean up any remaining cursor state to prevent "records not fetched" errors
+                # when connection is returned to pool and reused for next query
+                await self._cleanup_cursor_state(cursor)
+
                 if with_column_types:
                     return result, cursor.description
                 else:
@@ -1350,7 +1356,20 @@ class ClickHouseClient:
             except Exception as e:
                 # Ensure cursor is properly closed on errors
                 logger.error(f"Query execution failed: {e}. Query: {query[:100]}...")
+                # Try to clean up cursor state before raising
+                try:
+                    await self._cleanup_cursor_state(cursor)
+                except Exception as cleanup_error:
+                    logger.warning(f"Cursor cleanup failed during error handling: {cleanup_error}")
                 raise
+            finally:
+                # Ensure all remaining results are consumed to avoid "records not fetched" errors
+                try:
+                    while await cursor.fetchone():
+                        pass  # Consume all remaining records
+                except Exception as e:
+                    # Ignore errors when consuming remaining results
+                    logger.warning(f"Failed to consume remaining cursor results: {e}")
 
     async def execute_iter(
         self,

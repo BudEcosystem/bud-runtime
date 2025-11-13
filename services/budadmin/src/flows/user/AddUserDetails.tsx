@@ -166,14 +166,14 @@ export default function AddUserDetails() {
                     </Text_13_300_FFFFFF>
                   </div>
                 </div>
-                <div className="mt-3 flex gap-[.6rem]">
+                {/* <div className="mt-3 flex gap-[.6rem]">
                   <Text_12_400_B3B3B3>
                     Click this link login:{" "}
                   </Text_12_400_B3B3B3>
                   <Text_13_300_FFFFFF>
                     <a>https://bud.studio</a>
                   </Text_13_300_FFFFFF>
-                </div>
+                </div> */}
               </div>
             </div>
           </DrawerCard>

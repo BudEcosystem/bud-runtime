@@ -28,7 +28,12 @@ is_nixos() {
 
 dir_ensure() {
 	if [ -d "$bud_repo_local" ]; then
+		output="$(git -C "$bud_repo_local" stash push)" || exit 1
 		git -C "$bud_repo_local" pull || exit 1
+
+		if ! echo "$output" | grep -q 'No local changes to save'; then
+			git -C "$bud_repo_local" stash pop || exit 1
+		fi
 	else
 		git clone "$bud_repo" "$bud_repo_local" || exit 1
 	fi
@@ -42,6 +47,7 @@ k8s_is_installed() {
 		return 0
 	fi
 
+	sudo chown "$(whoami)" "$k3s_kubeconfig_path" >/dev/null 2>&1
 	if KUBECONFIG="$k3s_kubeconfig_path" kubectl get ns >/dev/null 2>&1; then
 		export KUBECONFIG="$k3s_kubeconfig_path"
 		return 0
@@ -50,8 +56,16 @@ k8s_is_installed() {
 	return 1
 }
 k3s_install() {
-	curl -sfL https://get.k3s.io | sh -
+	curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--write-kubeconfig-group $(id -gn) --write-kubeconfig-mode 0640" sh -
 	export KUBECONFIG="$k3s_kubeconfig_path"
+}
+k8s_clusterrole_exists() {
+	kubectl get clusterrole "$1" >/dev/null 2>&1
+}
+k8s_apiresources_exists() {
+	name="$1"
+	api_version="$2"
+	kubectl api-resources | grep -Eq "${name}[[:space:]]+[a-z,]*[[:space:]]*${api_version}" >/dev/null 2>&1
 }
 k8s_ensure() {
 	if ! k8s_is_installed; then
@@ -65,14 +79,21 @@ k8s_ensure() {
 
 helm_install() {
 	name="$1"
-	shift
+	namespace_and_releasename="$2"
+	shift 2
 
 	chart_path="$bud_repo_local/infra/helm/$name"
 	values_path="$chart_path/values.yaml"
 	scid_path="$chart_path/scid.toml"
 
-	namespace="$(tq -f "$scid_path" '.namespace')"
-	release_name="$(tq -f "$scid_path" '.release_name')"
+	if [ -z "$namespace_and_releasename" ]; then
+		namespace="$(tq -f "$scid_path" '.namespace')"
+		release_name="$(tq -f "$scid_path" '.release_name')"
+	else
+		namespace="$namespace_and_releasename"
+		release_name="$namespace_and_releasename"
+	fi
+
 	if tq -f "$scid_path" '.chart_path_override' >/dev/null 2>&1; then
 		chart_path="$chart_path/$(tq -f "$scid_path" '.chart_path_override')"
 	fi
@@ -87,16 +108,31 @@ helm_install() {
 		"$@"
 }
 helm_ensure() {
-	helm_install keel -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
-	helm_install dapr
+	if ! k8s_clusterrole_exists keel; then
+		helm_install keel "" -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
+	fi
+
+	if ! k8s_apiresources_exists 'components' 'dapr.io/v1alpha1'; then
+		helm_install dapr ""
+	fi
+
+	if ! k8s_apiresources_exists 'certificates' 'cert-manager.io/v1'; then
+		chart_version="v$(yq -r '.dependencies[] | select(.name == "cert-manager") | .version' "$bud_repo_local/infra/helm/cert-manager/Chart.yaml")"
+		kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/$chart_version/cert-manager.crds.yaml"
+		helm_install cert-manager "" --skip-crds --set cert-manager.crds.enabled=false
+	fi
 
 	vim "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
-	helm_install bud \
+	helm_install bud bud \
 		-f "$bud_repo_local/infra/helm/bud/example.standalone.yaml" \
 		-f "$bud_repo_local/infra/helm/bud/example.secrets.yaml"
 }
 
 nvidia_ensure() {
+	if k8s_clusterrole_exists nvidia-operator-validator; then
+		return
+	fi
+
 	if ! lspci | grep NVIDIA -q >/dev/null 2>&1; then
 		die "No Nvidia devices detected"
 	fi
@@ -122,6 +158,18 @@ nvidia_ensure() {
 		$flags
 }
 
+traefik_ensure() {
+	if k8s_apiresources_exists 'middlewares' 'traefik.io/v1alpha1'; then
+		return
+	fi
+
+	helm repo add traefik https://traefik.github.io/charts
+	helm upgrade \
+		--install \
+		-n traefik --create-namespace \
+		traefik traefik/traefik
+}
+
 ##########
 ## MAIN ##
 ##########
@@ -130,6 +178,7 @@ case "$1" in
 runtime)
 	dir_ensure
 	k8s_ensure
+	traefik_ensure
 	helm_ensure
 	;;
 nvidia)

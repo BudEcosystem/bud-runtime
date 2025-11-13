@@ -23,6 +23,7 @@ import {
 } from "@ant-design/icons";
 import { format } from "date-fns";
 import { formatTimestampWithTZ } from "@/utils/formatDate";
+import { copyToClipboard as copyText } from "@/utils/clipboard";
 import { AppRequest } from "src/pages/api/requests";
 import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
 import {
@@ -200,12 +201,16 @@ const ObservabilityDetailPage: React.FC = () => {
     }
   };
 
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => {
-      setCopiedId(null);
-    }, 2000);
+  const copyToClipboard = async (text: string, id: string) => {
+    await copyText(text, {
+      onSuccess: () => {
+        setCopiedId(id);
+        setTimeout(() => {
+          setCopiedId(null);
+        }, 2000);
+      },
+      onError: () => message.error("Failed to copy to clipboard"),
+    });
   };
 
   const downloadJson = (data: any, filename: string) => {
@@ -719,108 +724,6 @@ const ObservabilityDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Error Details - Only show for failed requests */}
-          {inferenceData.is_success === false && (
-            <div className="flex items-center flex-col border border-red-500 rounded-[.4rem] px-[1.4rem] py-[1.3rem] pb-[1.1rem] w-full bg-red-950/20 mb-[1.6rem]">
-              <div className="w-full">
-                <Alert
-                  message="Request Failed"
-                  description={`This inference request failed with error code ${inferenceData.error_code || 'unknown'}`}
-                  type="error"
-                  showIcon
-                  className="mb-4"
-                />
-
-                <Text_14_600_EEEEEE className="text-red-400 mb-4">
-                  Error Details
-                </Text_14_600_EEEEEE>
-
-                <div className="space-y-3">
-                  {inferenceData.error_code && (
-                    <div>
-                      <Text_12_400_B3B3B3 className="mb-1">
-                        Error Code
-                      </Text_12_400_B3B3B3>
-                      <Tag color="error" className="text-base">
-                        {inferenceData.error_code}
-                      </Tag>
-                    </div>
-                  )}
-
-                  {inferenceData.error_type && (
-                    <div>
-                      <Text_12_400_B3B3B3 className="mb-1">
-                        Error Type
-                      </Text_12_400_B3B3B3>
-                      <Text_12_600_EEEEEE className="text-red-400">
-                        {inferenceData.error_type}
-                      </Text_12_600_EEEEEE>
-                    </div>
-                  )}
-
-                  {inferenceData.error_message && (
-                    <div>
-                      <Text_12_400_B3B3B3 className="mb-1">
-                        Error Message
-                      </Text_12_400_B3B3B3>
-                      <div className="bg-red-950/30 border border-red-800 rounded-md p-3 mt-1">
-                        <Text_12_600_EEEEEE className="text-red-300 font-mono whitespace-pre-wrap">
-                          {inferenceData.error_message}
-                        </Text_12_600_EEEEEE>
-                      </div>
-                    </div>
-                  )}
-
-                  {inferenceData.raw_response && (
-                    <div>
-                      <Text_12_400_B3B3B3 className="mb-1">
-                        Error Response Details
-                      </Text_12_400_B3B3B3>
-                      <div className="bg-red-950/30 border border-red-800 rounded-md p-3 mt-1 max-h-64 overflow-auto">
-                        <Text_12_600_EEEEEE className="text-red-300 font-mono text-xs whitespace-pre-wrap">
-                          {inferenceData.raw_response}
-                        </Text_12_600_EEEEEE>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4 mt-3">
-                    <div>
-                      <Text_12_400_B3B3B3 className="mb-1">
-                        Failed Request ID
-                      </Text_12_400_B3B3B3>
-                      <Text_12_600_EEEEEE className="font-mono text-xs">
-                        {inferenceData.inference_id}
-                      </Text_12_600_EEEEEE>
-                    </div>
-
-                    <div>
-                      <Text_12_400_B3B3B3 className="mb-1">
-                        Failed At
-                      </Text_12_400_B3B3B3>
-                      <Text_12_600_EEEEEE>
-                        {formatTimestampWithTZ(inferenceData.timestamp)}
-                      </Text_12_600_EEEEEE>
-                    </div>
-                  </div>
-
-                  {inferenceData.messages && inferenceData.messages.length > 0 && (
-                    <div>
-                      <Text_12_400_B3B3B3 className="mb-1">
-                        Failed Request Preview
-                      </Text_12_400_B3B3B3>
-                      <div className="bg-[#1A1A1A] border border-[#2F2F2F] rounded-md p-3 mt-1">
-                        <Text_12_600_EEEEEE className="font-mono text-xs">
-                          {JSON.stringify(inferenceData.messages[0], null, 2).substring(0, 200)}...
-                        </Text_12_600_EEEEEE>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Conversation - Only show for chat endpoint type */}
           {(!inferenceData.endpoint_type ||

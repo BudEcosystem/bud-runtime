@@ -11,11 +11,15 @@ from budapp.commons.schemas import ErrorResponse
 from budapp.eval_ops.schemas import (
     ConfigureRunsRequest,
     ConfigureRunsResponse,
+    CreateEvalTagResponse,
     CreateExperimentRequest,
     CreateExperimentResponse,
     DatasetFilter,
     DeleteExperimentResponse,
     DeleteRunResponse,
+    EvalTagCreate,
+    EvalTagListResponse,
+    EvalTagSearchResponse,
     EvaluationWorkflowResponse,
     EvaluationWorkflowStepRequest,
     ExperimentEvaluationsResponse,
@@ -35,6 +39,7 @@ from budapp.eval_ops.schemas import (
     UpdateRunResponse,
 )
 from budapp.eval_ops.services import (
+    EvalTagService,
     EvaluationWorkflowService,
     ExperimentService,
     ExperimentWorkflowService,
@@ -102,6 +107,9 @@ def list_experiments(
     current_user: Annotated[User, Depends(get_current_active_user)],
     project_id: Annotated[Optional[uuid.UUID], Query(description="Filter by project ID")] = None,
     id: Annotated[Optional[uuid.UUID], Query(description="Filter by experiment ID")] = None,
+    search: Annotated[
+        Optional[str], Query(min_length=1, max_length=100, description="Search experiments by name (case-insensitive)")
+    ] = None,
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
 ):
@@ -109,6 +117,7 @@ def list_experiments(
 
     - **session**: Database session dependency.
     - **current_user**: The authenticated user whose experiments are listed.
+    - **search**: Optional search query to filter by experiment name (case-insensitive substring match).
     - **project_id**: Optional filter by project ID.
     - **id**: Optional filter by experiment ID.
     - **page**: Page number (default: 1).
@@ -122,6 +131,7 @@ def list_experiments(
             user_id=current_user.id,
             project_id=project_id,
             experiment_id=id,
+            search_query=search,
             offset=offset,
             limit=limit,
         )
@@ -202,8 +212,15 @@ def list_datasets(
         Optional[str],
         Query(description="Filter by trait UUIDs (comma-separated)"),
     ] = None,
+    has_gen_eval_type: Annotated[
+        bool,
+        Query(description="Filter datasets with 'gen' key in eval_types. Set to false to show all datasets."),
+    ] = True,
 ):
-    """List datasets with optional filtering and pagination."""
+    """List datasets with optional filtering and pagination.
+
+    By default, only datasets with 'gen' evaluation type are returned. Set `has_gen_eval_type=false` to see all datasets.
+    """
     try:
         offset = (page - 1) * limit
 
@@ -227,6 +244,7 @@ def list_datasets(
             language=language.split(",") if language else None,
             domains=domains.split(",") if domains else None,
             trait_ids=trait_id_list,
+            has_gen_eval_type=has_gen_eval_type,
         )
 
         datasets, total_count = ExperimentService(session).list_datasets(offset=offset, limit=limit, filters=filters)
@@ -242,6 +260,143 @@ def list_datasets(
         page=page,
         limit=limit,
     )
+
+
+# ------------------------ Tag Management Routes ------------------------
+
+
+@router.get(
+    "/tags",
+    response_model=EvalTagListResponse,
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse}},
+)
+def list_tags(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 50,
+):
+    """List all evaluation tags with pagination.
+
+    Tags are global and shared across all users. This endpoint returns
+    all tags ordered alphabetically.
+
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user.
+    - **page**: Page number (default: 1).
+    - **limit**: Items per page (default: 50, max: 100).
+
+    Returns an `EvalTagListResponse` containing a paginated list of tags.
+    """
+    try:
+        offset = (page - 1) * limit
+        tags, total = EvalTagService(session).list_tags(offset, limit)
+
+        return EvalTagListResponse(
+            code=status.HTTP_200_OK,
+            object="eval_tag.list",
+            message="Successfully listed tags",
+            tags=tags,
+            total_record=total,
+            page=page,
+            limit=limit,
+        )
+    except Exception as e:
+        logger.debug(f"Failed to list tags: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list tags") from e
+
+
+@router.get(
+    "/tags/search",
+    response_model=EvalTagSearchResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def search_tags(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    q: Annotated[str, Query(min_length=1, description="Search query")],
+    limit: Annotated[int, Query(ge=1, le=50, description="Maximum results")] = 10,
+):
+    """Search tags by name with character-by-character autocomplete.
+
+    Performs case-insensitive prefix matching on tag names. This is designed
+    for autocomplete functionality where the search query is updated as the
+    user types.
+
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user.
+    - **q**: Search query string (minimum 1 character).
+    - **limit**: Maximum number of results (default: 10, max: 50).
+
+    Returns an `EvalTagSearchResponse` with matching tags and total count.
+    """
+    try:
+        tags, total = EvalTagService(session).search_tags(q, limit)
+
+        return EvalTagSearchResponse(
+            code=status.HTTP_200_OK,
+            object="eval_tag.search",
+            message="Successfully searched tags",
+            tags=tags,
+            total=total,
+        )
+    except Exception as e:
+        logger.debug(f"Failed to search tags: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to search tags") from e
+
+
+@router.post(
+    "/tags",
+    response_model=CreateEvalTagResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def create_tag(
+    request: EvalTagCreate,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Create a new evaluation tag or return existing tag if name already exists.
+
+    Tag names are case-insensitive and must be unique. If a tag with the same
+    name (case-insensitive) already exists, the existing tag is returned instead
+    of creating a duplicate.
+
+    - **request**: Tag creation request with name and optional description.
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user creating the tag.
+
+    Returns a `CreateEvalTagResponse` with the created or existing tag.
+
+    **Validation rules:**
+    - Name: 1-20 characters, alphanumeric, hyphens, and underscores only
+    - Description: Optional, max 255 characters
+    """
+    try:
+        tag = EvalTagService(session).create_tag(request.name, request.description)
+        session.commit()
+
+        return CreateEvalTagResponse(
+            code=status.HTTP_201_CREATED,
+            object="eval_tag.create",
+            message="Successfully created tag",
+            tag=tag,
+        )
+    except ValueError as e:
+        logger.debug(f"Tag validation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        session.rollback()
+        logger.debug(f"Failed to create tag: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create tag") from e
 
 
 @router.get(
@@ -383,8 +538,8 @@ async def experiment_workflow_step(
     - Required: name, project_id
     - Optional: description
 
-    **Step 2: Model Selection**
-    - Required: model_ids (list of model UUIDs)
+    **Step 2: Endpoint Selection**
+    - Required: endpoint_ids (list of endpoint UUIDs)
 
     **Step 3: Traits Selection**
     - Required: trait_ids (list of trait UUIDs)
@@ -565,7 +720,7 @@ def configure_runs(
     """Configure runs for an experiment by creating model-dataset combinations.
 
     - **experiment_id**: UUID of the experiment to configure runs for.
-    - **request**: Payload containing model_ids, dataset_ids, and optional evaluation_config.
+    - **request**: Payload containing endpoint_ids, dataset_ids, and optional evaluation_config.
     - **session**: Database session dependency.
     - **current_user**: The authenticated user.
 
@@ -766,8 +921,8 @@ async def evaluation_workflow_step(
     - `workflow_id` should be null for first step
     - `workflow_total_steps` should be 5
 
-    **Step 2: Model Selection**
-    - Provide `model_id` in `stage_data` (select one model from experiment's existing runs)
+    **Step 2: Endpoint Selection**
+    - Provide `endpoint_id` in `stage_data` (select one endpoint from experiment's existing runs)
     - `workflow_id` from step 1 response required
 
     **Step 3: Trait Selection**

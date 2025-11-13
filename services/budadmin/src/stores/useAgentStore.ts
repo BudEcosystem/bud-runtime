@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { infoToast } from "@/components/toast";
 
 export interface AgentVariable {
   id: string;
@@ -10,6 +11,32 @@ export interface AgentVariable {
   defaultValue?: string;
   required?: boolean;
   validation?: string;
+}
+
+export interface AgentSettings {
+  id: string;
+  name: string;
+  temperature: number;
+  max_tokens: number;
+  top_p: number;
+  frequency_penalty: number;
+  presence_penalty: number;
+  stop_sequences: string[];
+  seed: number;
+  timeout: number;
+  parallel_tool_calls: boolean;
+  logprobs: boolean;
+  logit_bias: Record<string, number>;
+  extra_headers: Record<string, string>;
+  max_completion_tokens: number;
+  stream_options: Record<string, any>;
+  response_format: Record<string, any>;
+  tool_choice: string;
+  chat_template: string;
+  chat_template_kwargs: Record<string, any>;
+  mm_processor_kwargs: Record<string, any>;
+  created_at: string;
+  modified_at: string;
 }
 
 export interface AgentSession {
@@ -36,6 +63,7 @@ export interface AgentSession {
     temperature?: number;
     maxTokens?: number;
     topP?: number;
+    stream?: boolean;
   };
 }
 
@@ -43,6 +71,10 @@ interface AgentStore {
   // Sessions
   sessions: AgentSession[];
   activeSessionIds: string[];
+
+  // Settings
+  settingPresets: AgentSettings[];
+  currentSettingPreset: AgentSettings | null;
 
   // UI State
   isAgentDrawerOpen: boolean;
@@ -52,6 +84,9 @@ interface AgentStore {
     isInWorkflow: boolean;
     nextStep: string | null;
   };
+
+  // Deleted prompts tracking
+  deletedPromptIds: Array<{sessionId: string; promptId: string}>;
 
   // Session Management
   createSession: () => string;
@@ -65,6 +100,11 @@ interface AgentStore {
   updateVariable: (sessionId: string, variableId: string, updates: Partial<AgentVariable>) => void;
   deleteVariable: (sessionId: string, variableId: string) => void;
 
+  // Settings Management
+  addSettingPreset: (preset: AgentSettings) => void;
+  updateSettingPreset: (preset: AgentSettings) => void;
+  setCurrentSettingPreset: (preset: AgentSettings) => void;
+
   // UI Actions
   openAgentDrawer: (workflowId?: string, nextStep?: string) => void;
   closeAgentDrawer: () => void;
@@ -75,6 +115,9 @@ interface AgentStore {
   // Bulk Actions
   clearAllSessions: () => void;
   setActiveSessionIds: (ids: string[]) => void;
+
+  // Prompt cleanup tracking
+  addDeletedPromptId: (sessionId: string, promptId: string) => void;
 }
 
 const generateId = () => {
@@ -132,6 +175,8 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       // Initial State
       sessions: [],
       activeSessionIds: [],
+      settingPresets: [],
+      currentSettingPreset: null,
       isAgentDrawerOpen: false,
       selectedSessionId: null,
       isModelSelectorOpen: false,
@@ -139,16 +184,25 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         isInWorkflow: false,
         nextStep: null,
       },
+      deletedPromptIds: [],
 
       // Session Management
       createSession: () => {
+        const activeSessionIds = get().activeSessionIds;
+
+        // Limit to maximum 3 active sessions
+        if (activeSessionIds.length >= 3) {
+          infoToast("Maximum of 3 agent boxes allowed");
+          return activeSessionIds[activeSessionIds.length - 1];
+        }
+
         const newSession = createDefaultSession();
         const currentSessions = get().sessions;
         newSession.position = currentSessions.length;
 
         set({
           sessions: [...currentSessions, newSession],
-          activeSessionIds: [...get().activeSessionIds, newSession.id],
+          activeSessionIds: [...activeSessionIds, newSession.id],
           selectedSessionId: newSession.id
         });
 
@@ -298,6 +352,25 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         });
       },
 
+      // Settings Management
+      addSettingPreset: (preset) => {
+        set({
+          settingPresets: [...get().settingPresets, preset]
+        });
+      },
+
+      updateSettingPreset: (preset) => {
+        set({
+          settingPresets: get().settingPresets.map(p =>
+            p.id === preset.id ? preset : p
+          )
+        });
+      },
+
+      setCurrentSettingPreset: (preset) => {
+        set({ currentSettingPreset: preset });
+      },
+
       // UI Actions
       openAgentDrawer: (workflowId?: string, nextStep?: string) => {
         const sessions = get().sessions;
@@ -379,5 +452,12 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
       setActiveSessionIds: (ids) => {
         set({ activeSessionIds: ids });
+      },
+
+      // Prompt cleanup tracking
+      addDeletedPromptId: (sessionId, promptId) => {
+        set({
+          deletedPromptIds: [...get().deletedPromptIds, { sessionId, promptId }]
+        });
       }
     }));

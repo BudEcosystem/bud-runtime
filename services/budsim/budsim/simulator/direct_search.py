@@ -67,6 +67,7 @@ class DirectSearchOptimizer:
         use_heuristic: bool = False,
         concurrency_step: int = 5,  # Step size for concurrency reduction
         max_evaluations: int = 200,  # Safety limit
+        supports_pipeline_parallelism: bool = False,
     ):
         """Initialize DirectSearchOptimizer."""
         self.model = model
@@ -84,6 +85,7 @@ class DirectSearchOptimizer:
         self.use_heuristic = use_heuristic
         self.concurrency_step = concurrency_step
         self.max_evaluations = max_evaluations
+        self.supports_pipeline_parallelism = supports_pipeline_parallelism
 
         self.engine_config = get_engine_properties(self.engine_name, {"model": self.model})
 
@@ -132,6 +134,11 @@ class DirectSearchOptimizer:
             logger.warning(
                 f"Using fallback search space (individual device): max_tp={self.max_tp}, max_pp={self.max_pp}"
             )
+
+        # Override max_pp to 1 if engine doesn't support pipeline parallelism
+        if not self.supports_pipeline_parallelism:
+            logger.info("Engine does not support pipeline parallelism - constraining PP to 1")
+            self.max_pp = 1
 
         # Find minimum TP required to run the model (even with concurrency=1)
         self.min_tp = self._find_minimum_tp_required()
@@ -361,6 +368,37 @@ class DirectSearchOptimizer:
 
     def _prepare_predictor_data(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare data for predictor (similar to Evolution's method)."""
+        # Optimization: Skip expensive ModelAnalysis when using heuristic calculator
+        if self.use_heuristic:
+            # Heuristic calculator only needs basic simulation parameters and device info
+            data = {
+                "concurrent_requests": config["concurrency"],
+                "tensor_parallel_size": config["tensor_parallel_size"],
+                "pipeline_parallel_size": config.get("pipeline_parallel_size", 1),
+                "mean_input_tokens": self.input_tokens,
+                "mean_output_tokens": self.output_tokens,
+                "model": self.model,
+                "target_device": config.get("target_device", "cpu"),
+                "memory_in_GB": (
+                    self.device_config.get("mem_per_gpu_in_gb")
+                    or self.device_config.get("mem_per_GPU_in_GB")
+                    or self.device_config.get("memory")
+                    or self.device_config.get("memory_gb")
+                    or self.device_config.get("gpu_memory_gb")
+                    or 0
+                ),
+                # Device identification fields for hardware matching
+                "device_model": self.device_config.get("device_model", ""),
+                "device_name": self.device_config.get("device_name", ""),
+                "raw_name": self.device_config.get("raw_name", ""),
+                "quantization": self.dtype or "",  # Default to empty string if dtype is None
+            }
+            # Calculate KV cache memory using heuristic calculator
+            kv_cache_memory_per_gpu = self.heuristic_calculator.get_kv_cache_memory(data)
+            data["kv_cache_memory_per_gpu"] = kv_cache_memory_per_gpu
+            return data
+
+        # ML-based predictor needs full ModelAnalysis
         device_config = self.device_config.copy()
         # Clean device config for ModelAnalysis
         for field in [
