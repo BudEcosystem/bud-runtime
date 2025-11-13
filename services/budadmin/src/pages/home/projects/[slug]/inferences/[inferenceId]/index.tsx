@@ -161,7 +161,7 @@ const InferenceDetailPage: React.FC = () => {
           <Flex align="center" justify="start">
             <BackButton onClick={goBack} />
             <CustomBreadcrumb
-              data={["Projects", `${inferenceData?.project_name || slug}`, "Observability", "Details"]}
+              data={["Projects", `${inferenceData?.project_name || slug || ""}`, "Observability", "Details"]}
               urls={["/projects", `/projects/${slug}`, "", ""]}
             />
           </Flex>
