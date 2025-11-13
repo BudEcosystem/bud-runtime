@@ -79,7 +79,8 @@ export async function GET(
     }
 
     // Generic error fallback
-    const statusCode = error.status || 500;
+    // For axios errors, status is at error.response.status
+    const statusCode = error.response?.status || error.status || 500;
     const errorMessage = error.message || 'Unknown error';
     const categorized = categorizeError(statusCode, errorMessage);
 
