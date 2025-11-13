@@ -32,12 +32,15 @@ export class Logger {
     const sanitized = { ...headers };
     const sensitiveKeys = ['authorization', 'api-key', 'cookie', 'set-cookie'];
 
-    sensitiveKeys.forEach(key => {
-      if (sanitized[key]) {
-        // Show only first 10 chars for debugging
-        sanitized[key] = sanitized[key].substring(0, 10) + '...[REDACTED]';
+    // HTTP headers are case-insensitive, so check case-insensitively
+    for (const key in sanitized) {
+      if (sensitiveKeys.includes(key.toLowerCase())) {
+        if (sanitized[key]) {
+          // Show only first 10 chars for debugging
+          sanitized[key] = sanitized[key].substring(0, 10) + '...[REDACTED]';
+        }
       }
-    });
+    }
 
     return sanitized;
   }
