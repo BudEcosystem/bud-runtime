@@ -56,7 +56,7 @@ const saveOAuthState = (state: OAuthState) => {
   try {
     localStorage.setItem(OAUTH_STATE_KEY, JSON.stringify(state));
   } catch (error) {
-    console.error('Failed to save OAuth state:', error);
+    // Silently fail - localStorage might not be available
   }
 };
 
@@ -74,7 +74,6 @@ const getOAuthState = (): OAuthState | null => {
 
     return state;
   } catch (error) {
-    console.error('Failed to get OAuth state:', error);
     return null;
   }
 };
@@ -83,7 +82,7 @@ const clearOAuthState = () => {
   try {
     localStorage.removeItem(OAUTH_STATE_KEY);
   } catch (error) {
-    console.error('Failed to clear OAuth state:', error);
+    // Silently fail - localStorage might not be available
   }
 };
 
@@ -118,14 +117,11 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     setIsLoadingTools(true);
     try {
       const authType = selectedConnectorDetails?.auth_type;
-      console.log('Connector auth_type:', authType);
 
       let allTools: Tool[] = [];
 
       // If auth_type exists (any value), call OAuth fetch-tools first, then regular tools
       if (authType) {
-        console.log('auth_type exists, calling POST /prompts/oauth/fetch-tools first');
-
         try {
           const oauthResponse = await ConnectorService.fetchOAuthTools({
             prompt_id: promptId,
@@ -133,22 +129,17 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             version: 1,
           });
 
-          console.log('OAuth fetch-tools response:', oauthResponse.data);
-
           if (oauthResponse.data && oauthResponse.data.tools) {
             allTools = oauthResponse.data.tools;
           }
 
           // On success, also call GET /prompts/tools
-          console.log('OAuth fetch-tools successful, now calling GET /prompts/tools');
           const regularResponse = await ConnectorService.fetchTools({
             prompt_id: promptId,
             connector_id: connector.id,
             page: 1,
             limit: 100,
           });
-
-          console.log('Regular tools response:', regularResponse.data);
 
           if (regularResponse.data && regularResponse.data.tools) {
             // Merge tools from both responses (avoiding duplicates by ID)
@@ -162,12 +153,10 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             });
           }
         } catch (error) {
-          console.error('Error in OAuth flow:', error);
           throw error;
         }
       } else {
         // No auth_type, only call GET /prompts/tools
-        console.log('No auth_type, calling GET /prompts/tools only');
         const response = await ConnectorService.fetchTools({
           prompt_id: promptId,
           connector_id: connector.id,
@@ -197,7 +186,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error fetching tools:', error);
       errorToast('Failed to fetch tools');
     } finally {
       setIsLoadingTools(false);
@@ -222,7 +210,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     const handleOAuthCallback = async () => {
       // Prevent multiple executions
       if (oauthCallbackProcessed.current) {
-        console.log('OAuth callback already processed, skipping');
         return;
       }
 
@@ -233,21 +220,15 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
       if (!code || !state) return;
 
-      console.log('OAuth callback detected with code and state');
-
       // Get saved state
       const savedState = getOAuthState();
 
       if (!savedState) {
-        console.log('No saved OAuth state found');
         return;
       }
 
-      console.log('Saved OAuth state:', savedState);
-
       // Verify this callback is for the current connector
       if (savedState.connectorId !== connector.id) {
-        console.log('OAuth callback is for different connector, ignoring');
         return;
       }
 
@@ -258,15 +239,12 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       try {
         setIsRegistering(true);
 
-        console.log('Completing OAuth callback...');
-        const response = await ConnectorService.completeOAuthCallback(
+        await ConnectorService.completeOAuthCallback(
           savedState.promptId,
           savedState.connectorId,
           code,
           state
         );
-
-        console.log('OAuth callback response:', response.data);
 
         // Clean up URL params
         const cleanUrl = window.location.pathname;
@@ -283,7 +261,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
         successToast('OAuth authorization successful');
       } catch (error: any) {
-        console.error('Error completing OAuth callback:', error);
         errorToast(error?.response?.data?.message || 'Failed to complete OAuth authorization');
 
         // Clean up URL params even on error
@@ -403,27 +380,14 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         version: 1
       };
 
-      console.log('Registering connector with payload:', payload);
-
       // Step 1: Register the connector first
       const response = await ConnectorService.registerConnector(promptId, connector.id, payload);
 
-      console.log('Registration response status:', response.status);
-      console.log('Registration response:', response.data);
-
       if (response.status === 200 || response.status === 201) {
-        console.log('Registration successful');
-
         // Step 2: Check if OAuth authentication is required
         const authType = selectedConnectorDetails?.auth_type;
-        console.log('Auth Type from connector details:', authType);
-        console.log('Is OAuth?:', authType?.toLowerCase() === 'oauth');
 
         if (authType?.toLowerCase() === 'oauth') {
-          console.log('OAuth connector detected, initiating OAuth flow...');
-          console.log('Current promptId:', promptId);
-          console.log('Current workflowId:', workflowId);
-
           try {
             const oauthPayload = {
               prompt_id: promptId,
@@ -432,18 +396,12 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
               version: 1
             };
 
-            console.log('Calling OAuth initiate API with payload:', oauthPayload);
-
             const oauthResponse = await ConnectorService.initiateOAuth(oauthPayload);
-
-            console.log('OAuth initiate response:', oauthResponse.data);
 
             // Redirect to the authorization URL from the response
             const authorizationUrl = oauthResponse.data?.authorization_url;
 
             if (authorizationUrl) {
-              console.log('Redirecting to authorization URL:', authorizationUrl);
-
               // Save state before redirecting
               saveOAuthState({
                 promptId: promptId,
@@ -457,19 +415,15 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
               // Redirect to OAuth provider
               window.location.href = authorizationUrl;
             } else {
-              console.error('No authorization_url in OAuth response');
               errorToast('OAuth authorization URL not found');
             }
 
             return;
           } catch (oauthError: any) {
-            console.error('Error initiating OAuth:', oauthError);
             errorToast(oauthError?.response?.data?.message || 'Failed to initiate OAuth');
             return;
           }
         } else {
-          console.log('Non-OAuth connector, proceeding to step 2');
-
           // For non-OAuth connectors, proceed normally to step 2
           setStep(2);
 
@@ -478,7 +432,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         }
       }
     } catch (error: any) {
-      console.error('Error registering connector:', error);
       errorToast(error?.response?.data?.message || 'Failed to register connector');
     } finally {
       setIsRegistering(false);
@@ -525,7 +478,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         await fetchTools();
       }
     } catch (error: any) {
-      console.error('Error connecting tools:', error);
       errorToast(error?.response?.data?.message || 'Failed to connect tools');
     } finally {
       setIsConnecting(false);
@@ -549,7 +501,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         onBack();
       }
     } catch (error: any) {
-      console.error('Error disconnecting connector:', error);
       errorToast(error?.response?.data?.message || 'Failed to disconnect connector');
     } finally {
       setIsDisconnecting(false);

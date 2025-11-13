@@ -84,8 +84,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
 
     // Fetch connector details from API (only once)
     hasRestoredFromUrl.current = true;
-    fetchConnectorDetails(connectorId).catch((error) => {
-      console.error('Error fetching connector from URL:', error);
+    fetchConnectorDetails(connectorId).catch(() => {
       hasRestoredFromUrl.current = false;
     });
   }, [searchParams, fetchConnectorDetails, isLoadingDetails, selectedConnectorDetails]);
