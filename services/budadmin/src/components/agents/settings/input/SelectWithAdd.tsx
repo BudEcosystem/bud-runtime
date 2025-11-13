@@ -27,7 +27,7 @@ export default function SelectWithAdd(props: SelectWithAddProps) {
         <Select
             placeholder="Select preset"
             defaultValue={props.defaultValue}
-            dropdownRender={(menu) => (
+            popupRender={(menu) => (
                 <>
                     {menu}
                     <Divider style={{ margin: '8px 0' }} />
