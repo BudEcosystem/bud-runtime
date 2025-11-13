@@ -96,12 +96,17 @@ export default function Settings({ onClose }: SettingsProps) {
                 mm_processor_kwargs: {},
                 created_at: new Date().toISOString(),
                 modified_at: new Date().toISOString(),
+                modifiedFields: new Set<string>(), // Initialize with empty set
             };
             addSettingPreset(defaultSettings);
             setSettings(defaultSettings);
             setCurrentSettingPreset(defaultSettings);
         } else {
-            setSettings(currentSettingPreset);
+            // Ensure modifiedFields exists when loading from store
+            const settingsWithModifiedFields = currentSettingPreset
+                ? { ...currentSettingPreset, modifiedFields: currentSettingPreset.modifiedFields || new Set<string>() }
+                : null;
+            setSettings(settingsWithModifiedFields);
         }
     }, [hasHydrated, addSettingPreset, currentSettingPreset, setCurrentSettingPreset, settingPresets.length]);
 
@@ -131,6 +136,7 @@ export default function Settings({ onClose }: SettingsProps) {
             mm_processor_kwargs: settings?.mm_processor_kwargs || {},
             created_at: new Date().toISOString(),
             modified_at: new Date().toISOString(),
+            modifiedFields: new Set<string>(settings?.modifiedFields || []), // Copy modifiedFields from current settings
         };
         addSettingPreset(newPreset);
         setSettings(newPreset);
@@ -139,17 +145,30 @@ export default function Settings({ onClose }: SettingsProps) {
     const changePreset = useCallback((id: string) => {
         const preset = settingPresets.find((preset) => preset.id === id);
         if (preset) {
-            setSettings(preset);
-            setCurrentSettingPreset(preset);
+            // Ensure modifiedFields exists when loading a preset
+            const presetWithModifiedFields = {
+                ...preset,
+                modifiedFields: preset.modifiedFields || new Set<string>()
+            };
+            setSettings(presetWithModifiedFields);
+            setCurrentSettingPreset(presetWithModifiedFields);
         }
     }, [settingPresets, setCurrentSettingPreset]);
 
-    const handleChange = useCallback((params: any) => {
+    const handleChange = useCallback((params: Partial<AgentSettings>) => {
         if (!settings) return;
+
+        // Track which fields are being modified
+        const modifiedFields = new Set<string>(settings.modifiedFields || []);
+        Object.keys(params).forEach(key => {
+            modifiedFields.add(key);
+        });
+
         const newSettings = {
             ...settings,
             ...params,
             modified_at: new Date().toISOString(),
+            modifiedFields, // Include the updated set of modified fields
         } as AgentSettings;
         setSettings(newSettings);
         updateSettingPreset(newSettings);

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Settings from "./Settings";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
-import { useAgentStore, AgentSession } from "@/stores/useAgentStore";
+import { useAgentStore, AgentSession, AgentSettings } from "@/stores/useAgentStore";
 import { AppRequest } from "src/pages/api/requests";
 import { errorToast } from "@/components/toast";
 
@@ -33,30 +33,25 @@ export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarPro
     setIsUpdating(true);
 
     try {
-      // Map the current settings to the API payload format
+      // Build model_settings with only temperature (always) and modified fields
+      const modelSettings: Partial<AgentSettings> = {
+        temperature: currentSettingPreset.temperature, // Always include temperature
+      };
+
+      // Get modified fields from the preset
+      const modifiedFields = currentSettingPreset.modifiedFields || new Set<string>();
+
+      // Add only the fields that have been modified by the user
+      modifiedFields.forEach((field) => {
+        if (field !== 'temperature' && field in currentSettingPreset) {
+          const key = field as keyof AgentSettings;
+          (modelSettings as any)[key] = currentSettingPreset[key];
+        }
+      });
+
       const payload = {
         prompt_id: session.promptId,
-        model_settings: {
-          temperature: currentSettingPreset.temperature,
-          max_tokens: currentSettingPreset.max_tokens,
-          top_p: currentSettingPreset.top_p,
-          frequency_penalty: currentSettingPreset.frequency_penalty,
-          presence_penalty: currentSettingPreset.presence_penalty,
-          stop_sequences: currentSettingPreset.stop_sequences,
-          seed: currentSettingPreset.seed,
-          timeout: currentSettingPreset.timeout,
-          parallel_tool_calls: currentSettingPreset.parallel_tool_calls,
-          logprobs: currentSettingPreset.logprobs,
-          logit_bias: currentSettingPreset.logit_bias,
-          extra_headers: currentSettingPreset.extra_headers,
-          max_completion_tokens: currentSettingPreset.max_completion_tokens,
-          stream_options: currentSettingPreset.stream_options,
-          response_format: currentSettingPreset.response_format,
-          tool_choice: currentSettingPreset.tool_choice,
-          chat_template: currentSettingPreset.chat_template,
-          chat_template_kwargs: currentSettingPreset.chat_template_kwargs,
-          mm_processor_kwargs: currentSettingPreset.mm_processor_kwargs,
-        },
+        model_settings: modelSettings,
       };
 
       await AppRequest.Post("/prompts/prompt-config", payload);

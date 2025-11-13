@@ -37,6 +37,7 @@ export interface AgentSettings {
   mm_processor_kwargs: Record<string, any>;
   created_at: string;
   modified_at: string;
+  modifiedFields?: Set<string>; // Track which fields have been modified by user
 }
 
 export interface AgentSession {

@@ -53,7 +53,6 @@ export const ToolDetails: React.FC<ToolDetailsProps> = ({
           setToolData(response.data.tool);
         }
       } catch (error) {
-        console.error('Error fetching tool details:', error);
         errorToast('Failed to fetch tool details');
       } finally {
         setIsLoading(false);
