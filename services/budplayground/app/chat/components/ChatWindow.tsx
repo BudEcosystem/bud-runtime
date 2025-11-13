@@ -374,25 +374,55 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             {(status === "submitted" || status === "streaming") && (
               <MessageLoading />
             )}
-            {error && (
-              <div className="mt-4 pb-4">
-                <div
-                  className="text-[#FF0000] text-[.75rem] font-[400]
+            {error && (() => {
+              // Parse error message if it's a JSON string
+              let errorMessage = error.message || 'An unexpected error occurred';
+              let errorDetails = null;
 
-                "
-                >
-                  {error.message}
+              try {
+                const parsed = JSON.parse(errorMessage);
+                if (parsed.error) {
+                  errorMessage = parsed.error;
+                  errorDetails = parsed.details;
+                }
+              } catch (e) {
+                // Not a JSON string, use as is
+              }
+
+              return (
+                <div className="mt-4 pb-4 border border-[#FF000040] bg-[#FF000010] rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="10" cy="10" r="9" stroke="#FF0000" strokeWidth="1.5"/>
+                        <path d="M10 6V11" stroke="#FF0000" strokeWidth="1.5" strokeLinecap="round"/>
+                        <circle cx="10" cy="14" r="0.75" fill="#FF0000"/>
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-[#FF4444] text-[.875rem] font-[500] mb-2">
+                        Error Processing Request
+                      </div>
+                      <div className="text-[#FFAAAA] text-[.75rem] font-[400] leading-relaxed">
+                        {errorMessage}
+                        {errorDetails && (
+                          <span className="block mt-1 text-[#FF8888]">
+                            details: "{errorDetails}"
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="px-[.75rem] py-[.5rem] mt-4 text-[#fff] border border-[#965cde] rounded-md bg-[#965cde] text-[.75rem] font-[500] hover:bg-[#8a4dcc] hover:border-[#8a4dcc] transition-colors focus:outline-none focus:ring-2 focus:ring-[#965cde] focus:ring-offset-2 focus:ring-offset-[#101010] cursor-pointer"
+                    onClick={() => reload()}
+                  >
+                    Try Again
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="px-[.5rem] p-[.25rem] mt-4 text-[#fff] border border-[#757575] rounded-sm bg-[#965cde] text-[.75rem] font-[400] hover:bg-[#965cde] hover:text-[
-                  #fff] focus:outline-none cursor-pointer"
-                  onClick={() => reload()}
-                >
-                  Retry
-                </button>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </Content>
         <Footer className="sticky bottom-0 !px-[2.6875rem]">
