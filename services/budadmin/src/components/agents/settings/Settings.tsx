@@ -155,7 +155,7 @@ export default function Settings({ onClose }: SettingsProps) {
         }
     }, [settingPresets, setCurrentSettingPreset]);
 
-    const handleChange = useCallback((params: any) => {
+    const handleChange = useCallback((params: Partial<AgentSettings>) => {
         if (!settings) return;
 
         // Track which fields are being modified
