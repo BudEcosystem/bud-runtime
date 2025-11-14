@@ -184,10 +184,10 @@ export const usePromptSchemaWorkflow = ({
     console.log(`[usePromptSchemaWorkflow] Manually setting status to success`);
     setStatus('success');
     // Auto-reset after 3 seconds
-    timeoutRef.current = setTimeout(() => {
+    timeoutRef.current = window.setTimeout(() => {
       console.log(`[usePromptSchemaWorkflow] Auto-resetting status to idle`);
       setStatus('idle');
-    }, 3000) as unknown as number;
+    }, 3000);
   }, []);
 
   // Method to manually set failed status (for operations without workflow events)
@@ -195,10 +195,10 @@ export const usePromptSchemaWorkflow = ({
     console.log(`[usePromptSchemaWorkflow] Manually setting status to failed`);
     setStatus('failed');
     // Auto-reset after 3 seconds
-    timeoutRef.current = setTimeout(() => {
+    timeoutRef.current = window.setTimeout(() => {
       console.log(`[usePromptSchemaWorkflow] Auto-resetting status to idle`);
       setStatus('idle');
-    }, 3000) as unknown as number;
+    }, 3000);
   }, []);
 
   return {
