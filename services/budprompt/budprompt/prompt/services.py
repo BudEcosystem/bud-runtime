@@ -1493,6 +1493,46 @@ class PromptService:
             await self.redis_service.set(default_key, versioned_key)
             logger.debug(f"Set version key {versioned_key} as default for prompt_id: {prompt_id}")
 
+            # Update database if this is a permanent prompt (exists in database)
+            try:
+                with PromptCRUD() as prompt_crud:
+                    prompt_record = prompt_crud.fetch_one(conditions={"name": prompt_id})
+
+                if prompt_record:
+                    # This is a permanent prompt, validate version exists in database
+                    with PromptVersionCRUD() as version_crud:
+                        version_record = version_crud.fetch_one(
+                            conditions={"prompt_id": prompt_record.id, "version": version}
+                        )
+
+                    if version_record:
+                        # Update default_version_id in database
+                        with PromptCRUD() as prompt_crud:
+                            prompt_record.default_version_id = version_record.id
+                            prompt_crud.update(data=prompt_record, conditions={"id": prompt_record.id})
+
+                        logger.debug(
+                            f"Database: Updated default version for {prompt_id} to v{version} "
+                            f"(version_id: {version_record.id})"
+                        )
+                    else:
+                        logger.warning(
+                            f"Version {version} exists in Redis but not in database for {prompt_id}. "
+                            f"Skipping database update (inconsistent state)."
+                        )
+                else:
+                    # Temporary prompt (not in database), skip database update
+                    logger.debug(
+                        f"Prompt {prompt_id} not found in database, skipping database update (temporary prompt)"
+                    )
+
+            except Exception as db_error:
+                # Log warning but don't fail the request (eventual consistency)
+                logger.warning(
+                    f"Failed to update default version in database: {str(db_error)}. "
+                    f"Redis operation succeeded for {prompt_id}:v{version}"
+                )
+
             return SuccessResponse(message=f"Successfully set version {version} as default for prompt_id: {prompt_id}")
 
         except ClientException:
