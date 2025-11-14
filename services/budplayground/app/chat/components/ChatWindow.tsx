@@ -141,7 +141,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, []);
+  }, [getPromptIds]);
 
 
 
@@ -249,13 +249,19 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     setPromptFormSubmitted(true);
 
     // Create a user message with the prompt input
-    const userMessage =
-      data.input ||
-      (data.prompt?.variables
-        ? Object.entries(data.prompt.variables)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join('\n')
-        : '');
+    let userMessage = '';
+
+    if (data.input) {
+      // Unstructured input
+      userMessage = data.input;
+    } else if (data.prompt?.variables) {
+      // Structured input - need to unwrap 'content' if it exists
+      const variables = data.prompt.variables.content || data.prompt.variables;
+
+      userMessage = Object.entries(variables)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n');
+    }
 
     // Append the message to trigger the chat with prompt context
     append({
