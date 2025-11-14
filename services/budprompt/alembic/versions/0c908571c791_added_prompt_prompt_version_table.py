@@ -1,8 +1,8 @@
 """Added Prompt Prompt Version Table
 
-Revision ID: 7a6a5dc76d63
+Revision ID: 0c908571c791
 Revises: b6c2eb9ea3bc
-Create Date: 2025-11-13 08:58:26.234908
+Create Date: 2025-11-14 02:29:20.089512
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '7a6a5dc76d63'
+revision: str = '0c908571c791'
 down_revision: Union[str, None] = 'b6c2eb9ea3bc'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -24,8 +24,8 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('default_version_id', sa.UUID(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('modified_at', sa.DateTime(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['default_version_id'], ['prompt_version.id'], ondelete='SET NULL', use_alter=True),
     sa.PrimaryKeyConstraint('id')
     )
@@ -48,8 +48,8 @@ def upgrade() -> None:
     sa.Column('allow_multiple_calls', sa.Boolean(), nullable=True),
     sa.Column('system_prompt_role', sa.String(length=50), nullable=True),
     sa.Column('tools', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('modified_at', sa.DateTime(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['prompt_id'], ['prompt.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('prompt_id', 'version', name='uq_prompt_version')

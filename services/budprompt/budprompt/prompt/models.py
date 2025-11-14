@@ -16,14 +16,13 @@
 
 """Database models for prompt storage."""
 
-from budmicroframe.shared.psql_service import PSQLBase
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from budmicroframe.shared.psql_service import PSQLBase, TimestampMixin
+from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 
 
-class Prompt(PSQLBase):
+class Prompt(PSQLBase, TimestampMixin):
     """Prompt model for permanent storage."""
 
     __tablename__ = "prompt"
@@ -35,8 +34,6 @@ class Prompt(PSQLBase):
         ForeignKey("prompt_version.id", ondelete="SET NULL", use_alter=True),
         nullable=True,
     )
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     versions = relationship(
@@ -52,7 +49,7 @@ class Prompt(PSQLBase):
         return f"<Prompt(id={self.id}, name={self.name})>"
 
 
-class PromptVersion(PSQLBase):
+class PromptVersion(PSQLBase, TimestampMixin):
     """Prompt version model storing full configuration."""
 
     __tablename__ = "prompt_version"
@@ -76,9 +73,6 @@ class PromptVersion(PSQLBase):
     allow_multiple_calls = Column(Boolean, nullable=True)
     system_prompt_role = Column(String(50), nullable=True)
     tools = Column(JSONB, nullable=False, default=list)
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     prompt = relationship("Prompt", back_populates="versions", foreign_keys=[prompt_id])

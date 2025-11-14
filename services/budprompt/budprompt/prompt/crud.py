@@ -43,9 +43,9 @@ class PromptCRUD(CRUDMixin[Prompt, None, None]):
         super().__init__(self.__model__)
 
     def upsert_prompt(self, prompt_id: str, default_version_id: Optional[UUID] = None) -> Prompt:
-        """Upsert a prompt record.
+        """Upsert a prompt record using CRUDMixin's methods.
 
-        Creates a new prompt if it doesn't exist, or returns existing one.
+        Creates a new prompt if it doesn't exist, or updates existing one.
         The prompt_id string is used as the unique name field.
 
         Args:
@@ -54,42 +54,27 @@ class PromptCRUD(CRUDMixin[Prompt, None, None]):
 
         Returns:
             Prompt record (new or existing)
-
-        Raises:
-            SQLAlchemyError: If database operation fails
         """
-        session = self.get_session()
+        # Check if prompt exists by name
+        existing_prompt = self.fetch_one(conditions={"name": prompt_id})
 
-        try:
-            # Check if prompt exists by name
-            existing_prompt = session.query(Prompt).filter(Prompt.name == prompt_id).first()
-
-            if existing_prompt:
-                # Update default_version_id if provided
-                if default_version_id is not None:
-                    existing_prompt.default_version_id = default_version_id
-                    session.commit()
-                    logger.debug(f"Updated default_version_id for prompt {prompt_id}")
-
-                return existing_prompt
-            else:
-                # Create new prompt
-                new_prompt = Prompt(
-                    id=uuid4(),
-                    name=prompt_id,
-                    default_version_id=default_version_id,
-                )
-                session.add(new_prompt)
-                session.commit()
-                session.refresh(new_prompt)
-                logger.debug(f"Created new prompt {prompt_id} with id {new_prompt.id}")
-
-                return new_prompt
-
-        except Exception as e:
-            session.rollback()
-            logger.error(f"Failed to upsert prompt {prompt_id}: {str(e)}")
-            raise
+        if existing_prompt:
+            # Update default_version_id if provided
+            if default_version_id is not None:
+                existing_prompt.default_version_id = default_version_id
+                self.update(data=existing_prompt, conditions={"id": existing_prompt.id})
+                logger.debug(f"Updated default_version_id for prompt {prompt_id}")
+            return existing_prompt
+        else:
+            # Create new prompt using insert method
+            new_prompt = Prompt(
+                id=uuid4(),
+                name=prompt_id,
+                default_version_id=default_version_id,
+            )
+            result = self.insert(data=new_prompt)
+            logger.debug(f"Created new prompt {prompt_id} with id {result.id}")
+            return result
 
 
 class PromptVersionCRUD(CRUDMixin[PromptVersion, None, None]):
@@ -108,7 +93,7 @@ class PromptVersionCRUD(CRUDMixin[PromptVersion, None, None]):
     def upsert_prompt_version(
         self, prompt_db_id: UUID, version: int, config_data: PromptConfigurationData
     ) -> PromptVersion:
-        """Upsert a prompt version record.
+        """Upsert a prompt version record using CRUDMixin's methods.
 
         Creates a new version if (prompt_id, version) doesn't exist, or updates existing.
 
@@ -119,49 +104,29 @@ class PromptVersionCRUD(CRUDMixin[PromptVersion, None, None]):
 
         Returns:
             PromptVersion record (new or updated)
-
-        Raises:
-            SQLAlchemyError: If database operation fails
         """
-        session = self.get_session()
+        # Convert config data to dict (properly handles Pydantic models to JSONB)
+        version_data = config_data.model_dump(exclude_none=True)
 
-        try:
-            # Check if version exists
-            existing_version = (
-                session.query(PromptVersion)
-                .filter(PromptVersion.prompt_id == prompt_db_id, PromptVersion.version == version)
-                .first()
+        # Check if version exists
+        existing_version = self.fetch_one(conditions={"prompt_id": prompt_db_id, "version": version})
+
+        if existing_version:
+            # Update existing version
+            for key, value in version_data.items():
+                setattr(existing_version, key, value)
+            self.update(data=existing_version, conditions={"id": existing_version.id})
+            logger.debug(f"Updated prompt version {prompt_db_id}:v{version}")
+            # Fetch updated version to return
+            return self.fetch_one(conditions={"id": existing_version.id})
+        else:
+            # Create new version using insert method
+            new_version = PromptVersion(
+                id=uuid4(),
+                prompt_id=prompt_db_id,
+                version=version,
+                **version_data,
             )
-
-            # Convert config data to dict
-            version_data = config_data.model_dump()
-
-            if existing_version:
-                # Update existing version
-                for key, value in version_data.items():
-                    setattr(existing_version, key, value)
-
-                session.commit()
-                session.refresh(existing_version)
-                logger.debug(f"Updated prompt version {prompt_db_id}:v{version}")
-
-                return existing_version
-            else:
-                # Create new version
-                new_version = PromptVersion(
-                    id=uuid4(),
-                    prompt_id=prompt_db_id,
-                    version=version,
-                    **version_data,
-                )
-                session.add(new_version)
-                session.commit()
-                session.refresh(new_version)
-                logger.debug(f"Created new prompt version {prompt_db_id}:v{version} with id {new_version.id}")
-
-                return new_version
-
-        except Exception as e:
-            session.rollback()
-            logger.error(f"Failed to upsert prompt version {prompt_db_id}:v{version}: {str(e)}")
-            raise
+            result = self.insert(data=new_version)
+            logger.debug(f"Created new prompt version {prompt_db_id}:v{version} with id {result.id}")
+            return result
