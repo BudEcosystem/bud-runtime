@@ -1402,6 +1402,47 @@ class PromptService:
                 f"to {request.target_prompt_id}:v{request.target_version}"
             )
 
+            # Persist to database (copy operation always creates permanent storage)
+            try:
+                # Use context manager for CRUD operations
+                with PromptCRUD() as prompt_crud:
+                    prompt_record = prompt_crud.upsert_prompt(
+                        prompt_id=request.target_prompt_id, default_version_id=None
+                    )
+
+                with PromptVersionCRUD() as version_crud:
+                    version_record = version_crud.upsert_prompt_version(
+                        prompt_db_id=prompt_record.id,
+                        version=request.target_version,
+                        version_data=final_data,
+                    )
+
+                # Update default_version_id if requested
+                if request.set_as_default:
+                    with PromptCRUD() as prompt_crud:
+                        prompt_record.default_version_id = version_record.id
+                        prompt_crud.update(data=prompt_record, conditions={"id": prompt_record.id})
+
+                    logger.debug(
+                        f"Database: Stored copied prompt {request.target_prompt_id}:v{request.target_version} "
+                        f"and set as default (version_id: {version_record.id})"
+                    )
+                else:
+                    logger.debug(
+                        f"Database: Stored copied prompt {request.target_prompt_id}:v{request.target_version}"
+                    )
+
+            except Exception as db_error:
+                # Log warning but don't fail the request (eventual consistency)
+                logger.warning(
+                    f"Failed to persist copied prompt to database: {str(db_error)}. "
+                    f"Redis operation succeeded, but database sync failed for "
+                    f"{request.target_prompt_id}:v{request.target_version}"
+                )
+
+            # Remove from cleanup registry if exists (permanent prompts don't need cleanup)
+            await self._remove_from_cleanup_registry(target_key)
+
             # Parse final_data as PromptConfigurationData for response
             final_config_data = PromptConfigurationData.model_validate(final_data)
 
