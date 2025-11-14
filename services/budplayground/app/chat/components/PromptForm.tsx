@@ -51,8 +51,13 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
           let schemaToUse: any = config.data.input_schema ?? null;
 
           // If it's a JSON schema with $defs, flatten it for the form
-          if (schemaToUse && schemaToUse.$defs && schemaToUse.$defs.InputSchema) {
-            schemaToUse = schemaToUse.$defs.InputSchema.properties || {};
+          // Check for both "Input" and "InputSchema" in $defs
+          if (schemaToUse && schemaToUse.$defs) {
+            if (schemaToUse.$defs.Input) {
+              schemaToUse = schemaToUse.$defs.Input.properties || {};
+            } else if (schemaToUse.$defs.InputSchema) {
+              schemaToUse = schemaToUse.$defs.InputSchema.properties || {};
+            }
           }
 
           if (
@@ -139,7 +144,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
 
     // Check if it's structured or unstructured input
     if (inputSchema && Object.keys(inputSchema).length > 0) {
-      // Structured input - send variables
+      // Structured input - send variables wrapped in content object
       const variables: Record<string, any> = {};
       Object.keys(formData).forEach(key => {
         if (formData[key] !== undefined && formData[key] !== '') {
@@ -148,8 +153,10 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
       });
 
       if (Object.keys(variables).length > 0) {
-        payload.prompt.variables = variables;
-        payload.variables = variables;
+        // Wrap variables in content object to match schema structure
+        const wrappedVariables = { content: variables };
+        payload.prompt.variables = wrappedVariables;
+        payload.variables = wrappedVariables;
       }
     } else {
       // Unstructured input - send input field

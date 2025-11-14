@@ -40,12 +40,42 @@ function UserMessage(props: MessageProps & { onEdit: (message: string) => void }
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(props.content);
 
+  // Helper function to format the content for display
+  const formatContent = (content: string): string => {
+    // Check if content looks like "key: [object Object]" pattern
+    const objectPattern = /content:\s*\[object Object\]/i;
+    if (objectPattern.test(content)) {
+      // Try to extract variables from the message data
+      if (props.data?.experimental_attachments) {
+        try {
+          const variables = props.data.experimental_attachments;
+          if (typeof variables === 'object' && variables !== null) {
+            return Object.entries(variables)
+              .map(([key, value]) => `${key}: ${value}`)
+              .join('\n');
+          }
+        } catch (e) {
+          console.error('Failed to parse variables:', e);
+        }
+      }
+    }
+
+    // If content contains line breaks with key: value format, return as is
+    if (content.includes('\n') && content.includes(':')) {
+      return content;
+    }
+
+    return content;
+  };
+
+  const displayContent = formatContent(props.content);
+
   return (
     <div className="w-[100%]">
       {!isEditing && <div className="flex flex-row items-center justify-end gap-[.5rem] break-words">
       <div className="flex items-center justify-end gap-[.5rem] ">
         <button>
-          <CopyText text={props.content} />
+          <CopyText text={displayContent} />
         </button>
         <button>
           <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]" onClick={()=> setIsEditing(true)}>
@@ -67,7 +97,7 @@ function UserMessage(props: MessageProps & { onEdit: (message: string) => void }
       <span className="message-text user-message relative  p-[.8rem] py-[1rem] rounded-[0.5rem] border-[#1F1F1F4D] border-[1px] text-[#EEEEEE] font-[400] text-[.85rem] text-right Open-Sans z-[2]">
         <div className="absolute z-[1] w-[100%] h-[100%] top-0 left-0 right-0 bottom-0 !bg-[#1C1C1C] rounded-[0.5rem] border-[1px] border-[#1F1F1F]" />
 
-        <div className="relative z-[2]">{props.content}</div>
+        <div className="relative z-[2] whitespace-pre-wrap">{displayContent}</div>
       </span>
       </div>}
       {isEditing && <div className="relative w-[100%] bg-[#101010] rounded-[0.5rem] border-[1px] border-[#1F1F1F] hover:border-[#333333] p-[1rem]">
