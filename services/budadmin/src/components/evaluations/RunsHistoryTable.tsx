@@ -35,6 +35,14 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
 
     const columns: ColumnsType<RunHistoryItem> = [
         {
+            title: "S.No",
+            dataIndex: "index",
+            key: "index",
+            render: (_: any, __: any, index: number) => (
+                <Text_12_400_EEEEEE>{index + 1}</Text_12_400_EEEEEE>
+            ),
+        },
+        {
             title: "Model",
             dataIndex: "model",
             key: "model",
@@ -73,9 +81,28 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
             title: "Started Date",
             dataIndex: "startedDate",
             key: "startedDate",
-            render: (date: string) => (
-                <Text_12_400_EEEEEE>{(date) || '-'}</Text_12_400_EEEEEE>
-            ),
+            render: (date: string) => {
+                if (!date) return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+
+                    const d = new Date(date);
+                    const formattedDate = d.toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                    }); // → "11 Nov 2025"
+
+                    const formattedTime = d.toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true,
+                    }); // → "8:01 PM"
+
+                    return (
+                    <Text_12_400_EEEEEE>
+                        {`${formattedDate}, ${formattedTime}`}
+                    </Text_12_400_EEEEEE>
+                    );
+                },
         },
         {
             title: "Duration",

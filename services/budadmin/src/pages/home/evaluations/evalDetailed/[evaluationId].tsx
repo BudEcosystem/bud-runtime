@@ -48,7 +48,7 @@ const defaultTags = [
 
 const EvalDetailed = () => {
   const [isMounted, setIsMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState("3");
+  const [activeTab, setActiveTab] = useState("1");
   const [showAllTags, setShowAllTags] = useState(false);
   const [datasets, setDatasets] = useState<any>(null);
   const [datasetDetails, setDatasetDetails] = useState<any>(null);
