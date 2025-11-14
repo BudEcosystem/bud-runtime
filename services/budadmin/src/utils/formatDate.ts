@@ -118,18 +118,26 @@ export const formatMonthYear = (dateString: string | Date | number): string => {
 };
 
 export const formatDateWithTime = (date: string) => {
+  if (!date) {
+    return "";
+  }
   const d = new Date(date);
+  if (isNaN(d.getTime())) {
+    console.error("Invalid date provided to formatDateWithTime:", date);
+    return "";
+  }
+
   const formattedDate = d.toLocaleDateString("en-GB", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 
   const formattedTime = d.toLocaleTimeString([], {
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   });
 
-  return `${formattedDate}, ${formattedTime}`
+  return `${formattedDate}, ${formattedTime}`;
 }
