@@ -16,6 +16,7 @@
 
 """Pydantic schemas for the prompt ops module."""
 
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
@@ -345,6 +346,27 @@ class CreatePromptWorkflowRequest(BaseModel):
     discarded_prompt_ids: Optional[List[PromptCleanupItem]] = Field(
         None, description="List of temporary prompt IDs discarded by user that need cleanup"
     )
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str | None) -> str | None:
+        """Validate and transform name."""
+        if v is None:
+            return None
+
+        # Replace spaces with hyphens
+        v = v.replace(" ", "-")
+
+        # Define allowed pattern: alphanumeric, hyphens
+        pattern = r"^[a-zA-Z0-9-]+$"
+
+        if not re.match(pattern, v):
+            raise ValueError("Prompt name can only contain letters, numbers, hyphens (-)")
+
+        # strip leading and trailing hyphens and spaces convert it to lowercase
+        v = v.strip("- ").lower()
+
+        return v
 
     @model_validator(mode="after")
     def validate_fields(self):
