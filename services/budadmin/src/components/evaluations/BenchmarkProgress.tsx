@@ -181,7 +181,11 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
             <div>
               <ProjectTags
                 name={capitalize(benchmark.status)}
-                color={endpointStatusMapping[capitalize(benchmark.status)]}
+                color={endpointStatusMapping[
+                    capitalize(benchmark.status) === "Running"
+                        ? capitalize(benchmark.status) + "-yellow"
+                        : capitalize(benchmark.status)
+                ]}
                 textClass="text-[.75rem]"
               />
             </div>

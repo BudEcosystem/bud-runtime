@@ -4,6 +4,8 @@ import { ColumnsType } from "antd/es/table";
 import { Text_12_400_EEEEEE } from "@/components/ui/text";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { formatDate } from "@/utils/formatDate";
+import { endpointStatusMapping } from "@/lib/colorMapping";
+import { capitalize } from "@/lib/utils";
 
 interface CurrentMetricItem {
     evaluation: string;
@@ -135,6 +137,25 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
             },
             sorter: (a, b) =>
                 new Date(a.last_run).getTime() - new Date(b.last_run).getTime(),
+        },
+        {
+            title: "Status",
+            dataIndex: "status",
+            key: "status",
+            render: (status: string) => (
+                <ProjectTags
+                    name={capitalize(status)}
+                    color={
+                        endpointStatusMapping[
+                            capitalize(status) === "Running"
+                                ? capitalize(status) + "-yellow"
+                                : capitalize(status)
+                        ]
+                    }
+                    textClass="text-[.75rem] py-[.22rem]"
+                    tagClass="py-[0rem]"
+                />
+            ),
         },
     ];
 
