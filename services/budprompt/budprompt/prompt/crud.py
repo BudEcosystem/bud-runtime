@@ -124,3 +124,15 @@ class PromptVersionCRUD(CRUDMixin[PromptVersion, None, None]):
             result = self.insert(data=new_version)
             logger.debug(f"Created new prompt version {prompt_db_id}:v{version} with id {result.id}")
             return result
+
+    def count_versions(self, prompt_db_id: UUID) -> int:
+        """Count remaining versions for a prompt.
+
+        Args:
+            prompt_db_id: UUID of the parent Prompt record
+
+        Returns:
+            Number of versions remaining
+        """
+        _session = self.get_session()
+        return _session.query(PromptVersion).filter_by(prompt_id=prompt_db_id).count()

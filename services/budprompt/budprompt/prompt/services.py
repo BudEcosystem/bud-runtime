@@ -1587,6 +1587,34 @@ class PromptService:
                 await self.redis_service.delete(versioned_key)
                 logger.debug(f"Deleted version {version} for prompt_id: {prompt_id}")
 
+                # Delete from database if permanent prompt
+                try:
+                    with PromptCRUD() as prompt_crud:
+                        prompt_record = prompt_crud.fetch_one(conditions={"name": prompt_id})
+
+                    if prompt_record:
+                        with PromptVersionCRUD() as version_crud:
+                            version_crud.delete(conditions={"prompt_id": prompt_record.id, "version": version})
+
+                        logger.debug(f"Database: Deleted version {version} for prompt '{prompt_id}'")
+
+                        # Check if any versions remain for this prompt
+                        with PromptVersionCRUD() as version_crud:
+                            remaining_versions = version_crud.count_versions(prompt_record.id)
+
+                        if remaining_versions == 0:
+                            with PromptCRUD() as prompt_crud:
+                                prompt_crud.delete(conditions={"id": prompt_record.id})
+
+                            logger.info(f"Database: Auto-deleted prompt '{prompt_id}' as it had no remaining versions")
+                    else:
+                        logger.debug(f"Prompt '{prompt_id}' not found in database, skipping database deletion ")
+
+                except Exception as db_error:
+                    logger.warning(
+                        f"Failed to delete version {version} from database for prompt '{prompt_id}': {str(db_error)}. "
+                    )
+
                 return SuccessResponse(message=f"Successfully deleted version {version} for prompt_id: {prompt_id}")
 
             else:
@@ -1607,6 +1635,22 @@ class PromptService:
                     )
 
                 logger.debug(f"Deleted all {total_deleted} configurations for prompt_id: {prompt_id}")
+
+                # Delete from database if permanent prompt
+                try:
+                    with PromptCRUD() as prompt_crud:
+                        prompt_record = prompt_crud.fetch_one(conditions={"name": prompt_id})
+
+                    if prompt_record:
+                        with PromptCRUD() as prompt_crud:
+                            prompt_crud.delete(conditions={"id": prompt_record.id})
+
+                        logger.debug(f"Database: Deleted prompt '{prompt_id}' and all associated versions ")
+                    else:
+                        logger.debug(f"Prompt '{prompt_id}' not found in database, skipping database deletion ")
+
+                except Exception as db_error:
+                    logger.warning(f"Failed to delete prompt '{prompt_id}' from database: {str(db_error)}. ")
 
                 return SuccessResponse(message=f"Successfully deleted all configurations for prompt_id: {prompt_id}")
 
