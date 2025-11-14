@@ -335,6 +335,7 @@ impl RedisClient {
                         tracing::error!("Failed to parse API keys from redis (key: {key}): {e}")
                     }
                 }
+                tracing::info!("Redis key updated ***************DEBUG ONLY***************: {}", key);
             }
             k if k.starts_with(MODEL_TABLE_KEY_PREFIX) => {
                 let value = Self::get_with_retry::<String>(conn, key, DEFAULT_CONFIG_GET_RETRIES)
