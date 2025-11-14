@@ -44,7 +44,7 @@ from ..commons.exceptions import (
 from ..commons.helpers import run_async
 from ..commons.security import HashManager
 from ..shared.mcp_foundry_service import mcp_foundry_service
-from ..shared.redis_service import RedisService
+from ..shared.redis_service import RedisService, TensorZeroRedisService
 from .crud import PromptCRUD, PromptVersionCRUD
 from .executors import SimplePromptExecutor_V1
 from .revised_code.field_validation import generate_validation_function
@@ -407,7 +407,7 @@ class PromptConfigurationService:
             api_key_project_id: The API key project ID
             ttl: Time to live in seconds (default 3600 seconds = 1 hour)
         """
-        redis_service = RedisService()
+        redis_service = TensorZeroRedisService()
 
         # Build cache data structure matching budapp format
         cache_data = {
@@ -437,7 +437,7 @@ class PromptConfigurationService:
         Args:
             hashed_token: The hashed JWT token
         """
-        redis_service = RedisService()
+        redis_service = TensorZeroRedisService()
         redis_key = f"api_key:{hashed_token}"
 
         run_async(redis_service.delete(redis_key))
