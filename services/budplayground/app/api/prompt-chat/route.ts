@@ -133,14 +133,6 @@ export async function POST(req: Request) {
   // Only treat as follow-up if we have messages AND it's NOT a prompt form submission
   const isFollowUpMessage = !isPromptFormSubmission && body.messages && body.messages.length > 1;
 
-  console.log('[Request Type Detection]', {
-    isPromptFormSubmission,
-    isFollowUpMessage,
-    hasPromptVariables,
-    hasPromptInput,
-    messagesCount: body.messages?.length || 0
-  });
-
   // For initial prompt submission, we need prompt input
   // For follow-up messages, we rely on the messages array
   if (!promptInput && !isFollowUpMessage) {
@@ -184,10 +176,6 @@ export async function POST(req: Request) {
         // Unwrap variables from content wrapper
         const sourceVariables = unwrapVariables(body.prompt.variables);
 
-        // Debug: Check unwrapping
-        console.log('[DEBUG] Original variables:', JSON.stringify(body.prompt.variables));
-        console.log('[DEBUG] Unwrapped variables:', JSON.stringify(sourceVariables));
-
         if (hasStructuredInput && sourceVariables) {
           // STRUCTURED INPUT: Send ONLY prompt.variables (no input field)
           requestBody.prompt = {
@@ -223,10 +211,6 @@ export async function POST(req: Request) {
     const gatewayUrl = `${baseURL}/responses`;
     logger.logGatewayRequest(gatewayUrl, 'POST', gatewayHeaders, requestBody);
 
-    console.log('\n=== Gateway Request to /v1/responses ===');
-    console.log('Payload:', JSON.stringify(requestBody, null, 2));
-    console.log('========================================\n');
-
     const response = await fetch(gatewayUrl, {
       method: 'POST',
       headers: gatewayHeaders,
@@ -238,11 +222,6 @@ export async function POST(req: Request) {
     if (!response.ok) {
       const errorText = await response.text();
       logger.logGatewayResponse(response.status, errorText);
-
-      console.log('\n=== Gateway Response from /v1/responses ===');
-      console.log('Status:', response.status);
-      console.log('Error:', errorText);
-      console.log('==========================================\n');
 
       // Parse error message properly
       let errorMessage = 'Failed to generate response';
@@ -278,11 +257,6 @@ export async function POST(req: Request) {
     // Get the response as text first
     const responseText = await response.text();
     logger.logGatewayResponse(response.status, responseText);
-
-    console.log('\n=== Gateway Response from /v1/responses ===');
-    console.log('Status:', response.status);
-    console.log('Response (first 500 chars):', responseText.substring(0, 500));
-    console.log('==========================================\n');
 
     let text = '';
     let usage: any = null;
