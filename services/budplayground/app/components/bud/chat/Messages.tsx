@@ -42,29 +42,23 @@ function UserMessage(props: MessageProps & { onEdit: (message: string) => void }
 
   // Helper function to format the content for display
   const formatContent = (content: string): string => {
-    // Check if content looks like "key: [object Object]" pattern
-    const objectPattern = /content:\s*\[object Object\]/i;
-    if (objectPattern.test(content)) {
-      // Try to extract variables from the message data
-      if (props.data?.experimental_attachments) {
-        try {
-          const variables = props.data.experimental_attachments;
-          if (typeof variables === 'object' && variables !== null) {
-            return Object.entries(variables)
-              .map(([key, value]) => `${key}: ${value}`)
-              .join('\n');
-          }
-        } catch (e) {
-          console.error('Failed to parse variables:', e);
+    if (props.data?.experimental_attachments) {
+      try {
+        const rawVars = props.data.experimental_attachments;
+        const variables = (rawVars && rawVars.content) || rawVars;
+
+        if (variables && typeof variables === 'object' && Object.keys(variables).length > 0) {
+          return Object.entries(variables)
+            .map(([key, value]) => {
+              const valueStr = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : value;
+              return `${key}: ${valueStr}`;
+            })
+            .join('\n');
         }
+      } catch (e) {
+        console.error('Failed to parse variables from attachments:', e);
       }
     }
-
-    // If content contains line breaks with key: value format, return as is
-    if (content.includes('\n') && content.includes(':')) {
-      return content;
-    }
-
     return content;
   };
 
