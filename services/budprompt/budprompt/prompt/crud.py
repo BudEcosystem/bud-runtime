@@ -23,7 +23,6 @@ from uuid import UUID, uuid4
 from budmicroframe.shared.psql_service import CRUDMixin
 
 from .models import Prompt, PromptVersion
-from .schemas import PromptConfigurationData
 
 
 logger = logging.getLogger(__name__)
@@ -90,9 +89,7 @@ class PromptVersionCRUD(CRUDMixin[PromptVersion, None, None]):
         """
         super().__init__(self.__model__)
 
-    def upsert_prompt_version(
-        self, prompt_db_id: UUID, version: int, config_data: PromptConfigurationData
-    ) -> PromptVersion:
+    def upsert_prompt_version(self, prompt_db_id: UUID, version: int, version_data: dict) -> PromptVersion:
         """Upsert a prompt version record using CRUDMixin's methods.
 
         Creates a new version if (prompt_id, version) doesn't exist, or updates existing.
@@ -105,9 +102,6 @@ class PromptVersionCRUD(CRUDMixin[PromptVersion, None, None]):
         Returns:
             PromptVersion record (new or updated)
         """
-        # Convert config data to dict (properly handles Pydantic models to JSONB)
-        version_data = config_data.model_dump(exclude_none=True)
-
         # Check if version exists
         existing_version = self.fetch_one(conditions={"prompt_id": prompt_db_id, "version": version})
 

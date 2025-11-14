@@ -710,6 +710,40 @@ class PromptConfigurationService:
                 prompt_service = PromptService()
                 run_async(prompt_service._remove_from_cleanup_registry(redis_key))
 
+            # Persist to database for permanent prompts
+            if permanent:
+                try:
+                    # Use context managers for CRUD operations
+                    with PromptCRUD() as prompt_crud:
+                        prompt_record = prompt_crud.upsert_prompt(prompt_id=prompt_id, default_version_id=None)
+
+                    with PromptVersionCRUD() as version_crud:
+                        version_record = version_crud.upsert_prompt_version(
+                            prompt_db_id=prompt_record.id,
+                            version=version,
+                            version_data=config_data.model_dump(exclude_none=True, exclude_unset=True),
+                        )
+
+                    # Update default_version_id if requested
+                    if set_default:
+                        with PromptCRUD() as prompt_crud:
+                            prompt_record.default_version_id = version_record.id
+                            prompt_crud.update(data=prompt_record, conditions={"id": prompt_record.id})
+
+                        logger.debug(
+                            f"Database: Stored permanent prompt {prompt_id}:v{version} "
+                            f"and set as default (version_id: {version_record.id})"
+                        )
+                    else:
+                        logger.debug(f"Database: Stored permanent prompt {prompt_id}:v{version}")
+
+                except Exception as db_error:
+                    # Log warning but don't fail the request (eventual consistency)
+                    logger.warning(
+                        f"Failed to persist permanent prompt to database: {str(db_error)}. "
+                        f"Redis operation succeeded, but database sync failed for {prompt_id}:v{version}"
+                    )
+
             notification_req.payload.content = NotificationContent(
                 title="Successfully stored prompt configuration",
                 message="Prompt configuration has been stored in Redis",
@@ -1147,7 +1181,9 @@ class PromptService:
 
                     with PromptVersionCRUD() as version_crud:
                         version_record = version_crud.upsert_prompt_version(
-                            prompt_db_id=prompt_record.id, version=version, config_data=config_data
+                            prompt_db_id=prompt_record.id,
+                            version=version,
+                            version_data=config_data.model_dump(exclude_none=True, exclude_unset=True),
                         )
 
                     # Update default_version_id if requested
