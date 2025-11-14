@@ -46,7 +46,11 @@ export interface AgentSession {
   active: boolean;
   modelId?: string;
   modelName?: string;
-  workflowId?: string;
+  workflowId?: string; // Deprecated: kept for backward compatibility
+  inputWorkflowId?: string;
+  outputWorkflowId?: string;
+  systemPromptWorkflowId?: string;
+  promptMessagesWorkflowId?: string;
   promptId?: string;
   selectedDeployment?: {
     id: string;

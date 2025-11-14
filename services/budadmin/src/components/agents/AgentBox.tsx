@@ -102,17 +102,17 @@ function AgentBoxInner({
     return workflow;
   };
 
-  // Initialize all workflow handlers
-  const inputWorkflow = useWorkflowHandler('Input', session?.workflowId);
-  const outputWorkflow = useWorkflowHandler('Output', session?.workflowId);
-  const systemPromptWorkflow = useWorkflowHandler('System prompt', session?.workflowId);
-  const promptMessagesWorkflow = useWorkflowHandler('Prompt messages', session?.workflowId);
+  // Initialize all workflow handlers with separate workflow IDs
+  const inputWorkflow = useWorkflowHandler('Input', session?.inputWorkflowId);
+  const outputWorkflow = useWorkflowHandler('Output', session?.outputWorkflowId);
+  const systemPromptWorkflow = useWorkflowHandler('System prompt', session?.systemPromptWorkflowId);
+  const promptMessagesWorkflow = useWorkflowHandler('Prompt messages', session?.promptMessagesWorkflowId);
 
   // Destructure for backward compatibility (resetStatus handled internally by useWorkflowHandler)
   const { status: workflowStatus, startWorkflow } = inputWorkflow;
   const { status: outputWorkflowStatus, startWorkflow: startOutputWorkflow } = outputWorkflow;
-  const { status: systemPromptWorkflowStatus, startWorkflow: startSystemPromptWorkflow } = systemPromptWorkflow;
-  const { status: promptMessagesWorkflowStatus, startWorkflow: startPromptMessagesWorkflow } = promptMessagesWorkflow;
+  const { status: systemPromptWorkflowStatus, startWorkflow: startSystemPromptWorkflow, setSuccess: setSystemPromptSuccess, setFailed: setSystemPromptFailed } = systemPromptWorkflow;
+  const { status: promptMessagesWorkflowStatus, startWorkflow: startPromptMessagesWorkflow, setSuccess: setPromptMessagesSuccess, setFailed: setPromptMessagesFailed } = promptMessagesWorkflow;
 
   // Use the settings context (schema settings)
   const { isOpen: isSettingsOpen, activeSettings, openSettings, closeSettings, toggleSettings: toggleSettingsOriginal } = useSettings();
@@ -135,7 +135,7 @@ function AgentBoxInner({
       closeModelSettings();
     }
     toggleSettingsOriginal();
-  }, [isToolsOpen, closeTools, toggleSettingsOriginal]);
+  }, [isToolsOpen, closeTools, isModelSettingsOpen, closeModelSettings, toggleSettingsOriginal]);
 
   const toggleTools = React.useCallback(() => {
     if (isSettingsOpen) {
@@ -145,7 +145,7 @@ function AgentBoxInner({
       closeModelSettings();
     }
     toggleToolsOriginal();
-  }, [isSettingsOpen, closeSettings, toggleToolsOriginal]);
+  }, [isSettingsOpen, closeSettings, isModelSettingsOpen, closeModelSettings, toggleToolsOriginal]);
 
   const toggleModelSettings = () => {
     if (isSettingsOpen) {
@@ -340,15 +340,9 @@ function AgentBoxInner({
         if (workflowId) {
           console.log("Got workflow_id from response:", workflowId);
 
-          // Make GET call to /workflows/{workflow_id}
-          try {
-            const workflowResponse = await AppRequest.Get(
-              `${tempApiBaseUrl}/workflows/${workflowId}`
-            );
-            console.log("Workflow status response:", workflowResponse.data);
-          } catch (workflowError) {
-            console.error("Error fetching workflow status:", workflowError);
-          }
+          // Store workflow_id in session for input schema status tracking
+          updateSession(session.id, { inputWorkflowId: workflowId });
+          console.log("Stored inputWorkflowId in session");
         }
 
         // successToast("Input schema saved successfully"); // Removed: No toast needed
@@ -417,15 +411,9 @@ function AgentBoxInner({
         if (workflowId) {
           console.log("Got workflow_id from response:", workflowId);
 
-          // Make GET call to /workflows/{workflow_id}
-          try {
-            const workflowResponse = await AppRequest.Get(
-              `${tempApiBaseUrl}/workflows/${workflowId}`
-            );
-            console.log("Workflow status response:", workflowResponse.data);
-          } catch (workflowError) {
-            console.error("Error fetching workflow status:", workflowError);
-          }
+          // Store workflow_id in session for output schema status tracking
+          updateSession(session.id, { outputWorkflowId: workflowId });
+          console.log("Stored outputWorkflowId in session");
         }
 
         // successToast("Output schema saved successfully"); // Removed: No toast needed
@@ -522,22 +510,19 @@ function AgentBoxInner({
       if (response && response.data) {
         console.log("System prompt save response:", response.data);
 
-        // Extract workflow_id from response
+        // Extract workflow_id from response (optional for prompt-config)
         const workflowId = response.data.workflow_id;
 
         if (workflowId) {
           console.log("Got workflow_id from response:", workflowId);
 
-          // Make GET call to /workflows/{workflow_id}
-          try {
-            const workflowResponse = await AppRequest.Get(
-              `${tempApiBaseUrl}/workflows/${workflowId}`
-            );
-            console.log("Workflow status response:", workflowResponse.data);
-          } catch (workflowError) {
-            console.error("Error fetching workflow status:", workflowError);
-          }
+          // Store workflow_id in session for system prompt status tracking
+          updateSession(session.id, { systemPromptWorkflowId: workflowId });
+          console.log("Stored systemPromptWorkflowId in session");
         }
+
+        // Manually set success status (prompt-config doesn't have workflow events)
+        setSystemPromptSuccess();
 
         // successToast("System prompt saved successfully"); // Removed: No toast needed
 
@@ -546,6 +531,10 @@ function AgentBoxInner({
       }
     } catch (error: any) {
       console.error("Error saving system prompt:", error);
+
+      // Manually set failed status
+      setSystemPromptFailed();
+
       // Handle validation errors better
       if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
         const firstError = error.response.data.detail[0];
@@ -631,22 +620,19 @@ function AgentBoxInner({
       if (response && response.data) {
         console.log("Prompt messages save response:", response.data);
 
-        // Extract workflow_id from response
+        // Extract workflow_id from response (optional for prompt-config)
         const workflowId = response.data.workflow_id;
 
         if (workflowId) {
           console.log("Got workflow_id from response:", workflowId);
 
-          // Make GET call to /workflows/{workflow_id}
-          try {
-            const workflowResponse = await AppRequest.Get(
-              `${tempApiBaseUrl}/workflows/${workflowId}`
-            );
-            console.log("Workflow status response:", workflowResponse.data);
-          } catch (workflowError) {
-            console.error("Error fetching workflow status:", workflowError);
-          }
+          // Store workflow_id in session for prompt messages status tracking
+          updateSession(session.id, { promptMessagesWorkflowId: workflowId });
+          console.log("Stored promptMessagesWorkflowId in session");
         }
+
+        // Manually set success status (prompt-config doesn't have workflow events)
+        setPromptMessagesSuccess();
 
         // successToast("Prompt messages saved successfully"); // Removed: No toast needed
 
@@ -655,6 +641,10 @@ function AgentBoxInner({
       }
     } catch (error: any) {
       console.error("Error saving prompt messages:", error);
+
+      // Manually set failed status
+      setPromptMessagesFailed();
+
       // Handle validation errors better
       if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
         const firstError = error.response.data.detail[0];
