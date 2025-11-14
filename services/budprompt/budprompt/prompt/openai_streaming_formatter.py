@@ -23,15 +23,16 @@ Similar to OpenAIResponseFormatter but for incremental streaming output.
 """
 
 import json
-import logging
 import time
 import uuid
 from typing import Any, Dict, List, Optional
 
+from budmicroframe.commons import logging
+
 from .schemas import Message, ModelSettings
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class OpenAIStreamingFormatter:

@@ -18,12 +18,12 @@
 
 import asyncio
 import json
-import logging
 import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, Optional, Union
 
+from budmicroframe.commons import logging
 from budmicroframe.commons.constants import WorkflowStatus
 from budmicroframe.commons.schemas import (
     NotificationContent,
@@ -68,7 +68,7 @@ from .schemas import (
 from .utils import clean_model_cache
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 dapr_workflow = DaprWorkflow()
 

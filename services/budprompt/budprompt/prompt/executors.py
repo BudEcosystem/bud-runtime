@@ -17,11 +17,11 @@
 """Prompt executors for running AI prompts."""
 
 import json
-import logging
 from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional, Type, Union
 
+from budmicroframe.commons import logging
 from openai.types.responses import (
     ResponseCompletedEvent,
     ResponseCreatedEvent,
@@ -68,7 +68,7 @@ from .utils import PydanticResultSerializer, contains_pydantic_model, validate_i
 from .validation import add_validator_to_model_async
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class SimplePromptExecutorDeprecated:

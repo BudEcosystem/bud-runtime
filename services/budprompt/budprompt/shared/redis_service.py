@@ -1,7 +1,7 @@
-import logging
 from typing import Optional, Union
 
 import redis.asyncio as aioredis
+from budmicroframe.commons import logging
 from redis.typing import AbsExpiryT, EncodableT, ExpiryT, KeyT, PatternT, ResponseT
 
 from ..commons.config import app_settings
@@ -9,7 +9,7 @@ from ..commons.exceptions import RedisException
 from .singleton import SingletonMeta
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class RedisSingleton(metaclass=SingletonMeta):

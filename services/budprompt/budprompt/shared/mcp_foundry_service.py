@@ -17,17 +17,17 @@
 """Service class for interacting with MCP Foundry API."""
 
 import asyncio
-import logging
 from typing import Any, Dict, Optional
 
 import aiohttp
+from budmicroframe.commons import logging
 
 from ..commons.config import app_settings
 from ..commons.exceptions import MCPFoundryException
 from ..shared.singleton import SingletonMeta
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class MCPFoundryService(metaclass=SingletonMeta):

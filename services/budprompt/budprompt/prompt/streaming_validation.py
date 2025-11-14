@@ -16,9 +16,9 @@
 
 """Streaming validation module for dynamic field validator generation using natural language prompts."""
 
-import logging
 from typing import Tuple, Type
 
+from budmicroframe.commons import logging
 from pydantic import BaseModel, Field, field_validator
 from pydantic_ai import Agent
 from pydantic_ai.output import NativeOutput
@@ -28,7 +28,7 @@ from budprompt.commons.config import app_settings
 from budprompt.shared.providers import BudServeProvider
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class FieldValidatorOutput(BaseModel):

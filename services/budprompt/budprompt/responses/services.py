@@ -17,9 +17,9 @@
 """Services for responses module - OpenAI-compatible API."""
 
 import json
-import logging
 from typing import Any, Dict, Optional
 
+from budmicroframe.commons import logging
 from fastapi.responses import StreamingResponse
 from openai.types.responses import ResponsePrompt
 from pydantic import ValidationError
@@ -33,7 +33,7 @@ from ..prompt.services import PromptExecutorService
 from .schemas import ResponsePromptParam
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class ResponsesService:

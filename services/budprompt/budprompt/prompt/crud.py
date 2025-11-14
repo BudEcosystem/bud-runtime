@@ -16,16 +16,16 @@
 
 """CRUD operations for prompt storage."""
 
-import logging
 from typing import Optional
 from uuid import UUID, uuid4
 
+from budmicroframe.commons import logging
 from budmicroframe.shared.psql_service import CRUDMixin
 
 from .models import Prompt, PromptVersion
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class PromptCRUD(CRUDMixin[Prompt, None, None]):

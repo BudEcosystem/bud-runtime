@@ -17,10 +17,10 @@
 """The main entry point for the application, initializing the FastAPI app and setting up the application's lifespan management, including configuration and secret syncs."""
 
 import asyncio
-import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
+from budmicroframe.commons import logging
 from budmicroframe.main import configure_app, schedule_secrets_and_config_sync
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 from fastapi import FastAPI
@@ -30,7 +30,7 @@ from .prompt.routes import prompt_router
 from .responses.routes import responses_router
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 @asynccontextmanager

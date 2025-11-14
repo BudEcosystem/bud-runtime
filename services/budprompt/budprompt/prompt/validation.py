@@ -16,9 +16,9 @@
 
 """Validation module for dynamic model validation using natural language prompts."""
 
-import logging
 from typing import Type
 
+from budmicroframe.commons import logging
 from pydantic import BaseModel, model_validator
 from pydantic_ai import Agent
 from pydantic_ai.settings import ModelSettings
@@ -27,7 +27,7 @@ from budprompt.commons.config import app_settings
 from budprompt.shared.providers import BudServeProvider
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 def format_schema_for_llm(model_class: Type[BaseModel]) -> str:

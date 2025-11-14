@@ -16,11 +16,11 @@
 
 """OpenAI Response Formatter for converting pydantic-ai responses to OpenAI format."""
 
-import logging
 import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
+from budmicroframe.commons import logging
 from openai.types.responses import (
     ResponseTextConfig,
     ResponseUsage,
@@ -73,7 +73,7 @@ from ..responses.schemas import OpenAIResponse
 from .schemas import MCPToolConfig, Message, ModelSettings
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 __all__ = [
     "OpenAIResponseFormatter_V1",

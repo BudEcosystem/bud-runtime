@@ -17,17 +17,17 @@
 """OpenAI Response Formatter for converting pydantic-ai responses to OpenAI format."""
 
 import json
-import logging
 import time
 import uuid
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
+from budmicroframe.commons import logging
 from pydantic import BaseModel, Field, ValidationError
 
 from .schemas import MCPToolConfig, Message, ModelSettings
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 __all__ = [
     "OpenAIResponseSchema",
