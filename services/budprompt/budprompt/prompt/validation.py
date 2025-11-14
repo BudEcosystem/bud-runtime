@@ -25,6 +25,8 @@ from pydantic_ai.settings import ModelSettings
 
 from budprompt.shared.providers import BudServeProvider
 
+from ..commons.constants import VALIDATION_MODEL_NAME
+
 
 logger = logging.get_logger(__name__)
 
@@ -131,7 +133,7 @@ async def generate_model_validator_code_async(validation_prompt: str, model_clas
     # Create provider and model using default model from config
     provider = BudServeProvider()
     # model = provider.get_model(model_name=app_settings.bud_default_model_name, settings=ModelSettings(temperature=0.1))
-    model = provider.get_model(model_name="qwen3-32b", settings=ModelSettings(temperature=0.1))
+    model = provider.get_model(model_name=VALIDATION_MODEL_NAME, settings=ModelSettings(temperature=0.1))
 
     # Create a code generation agent
     code_gen_agent = Agent(
@@ -189,7 +191,7 @@ async def enhance_validator_error_messages_async(
 
     provider = BudServeProvider()
     # model = provider.get_model(model_name=app_settings.bud_default_model_name, settings=ModelSettings(temperature=0.1))
-    model = provider.get_model(model_name="qwen3-32b", settings=ModelSettings(temperature=0.1))
+    model = provider.get_model(model_name=VALIDATION_MODEL_NAME, settings=ModelSettings(temperature=0.1))
 
     enhancement_agent = Agent(
         model=model,

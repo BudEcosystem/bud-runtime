@@ -26,6 +26,8 @@ from pydantic_ai.settings import ModelSettings
 
 from budprompt.shared.providers import BudServeProvider
 
+from ..commons.constants import VALIDATION_MODEL_NAME
+
 
 logger = logging.get_logger(__name__)
 
@@ -143,7 +145,7 @@ async def generate_field_validator_code(validation_prompt: str, model_class: Typ
     #     settings=ModelSettings(temperature=0.1),  # Lower temperature for consistent code generation
     # )
     model = provider.get_model(
-        model_name="qwen3-32b",
+        model_name=VALIDATION_MODEL_NAME,
         settings=ModelSettings(temperature=0.1),  # Lower temperature for consistent code generation
     )
 
