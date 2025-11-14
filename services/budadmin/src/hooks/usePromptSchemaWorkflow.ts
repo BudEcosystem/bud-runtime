@@ -79,7 +79,7 @@ export const usePromptSchemaWorkflow = ({
     if (workflowId) {
       getWorkflow();
     }
-  }, [workflowId]);
+  }, [workflowId, getWorkflow]);
 
   const handleNotification = useCallback(async (data: any) => {
     try {
