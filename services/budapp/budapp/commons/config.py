@@ -160,6 +160,7 @@ class AppConfig(BaseAppConfig):
     cache_max_size: int = Field(alias="CACHE_MAX_SIZE", default=1000)
     cache_ttl: Optional[int] = Field(alias="CACHE_TTL", default=None)
     cache_score_threshold: float = Field(alias="CACHE_SCORE_THRESHOLD", default=0.1)
+    prompt_config_redis_ttl: int = Field(alias="PROMPT_CONFIG_REDIS_TTL", default=86400)
     litellm_proxy_master_key: str = Field(alias="LITELLM_PROXY_MASTER_KEY", default="sk-1234")
 
     # Frontend URL

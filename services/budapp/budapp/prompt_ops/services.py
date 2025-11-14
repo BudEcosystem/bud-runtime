@@ -397,10 +397,12 @@ class PromptService(SessionMixin):
             draft_key = f"draft_prompt:{current_user_id}:{prompt_id}"
             draft_value = json.dumps({"prompt_id": prompt_id, "user_id": str(current_user_id)})
             # Set TTL to 24 hours (86400 seconds) - matching budprompt temporary storage
-            await redis_service.set(draft_key, draft_value, ex=86400)
+            await redis_service.set(draft_key, draft_value, ex=app_settings.prompt_config_redis_ttl)
 
             # Add to proxy cache for routing (prompt_name = prompt_id for draft prompts)
-            await PromptWorkflowService(self.session).add_prompt_to_proxy_cache(prompt_id, prompt_id)
+            await PromptWorkflowService(self.session).add_prompt_to_proxy_cache(
+                prompt_id, prompt_id, ex=app_settings.prompt_config_redis_ttl
+            )
             logger.debug(f"Added draft prompt {prompt_id} to cache for user {current_user_id}")
         except Exception as e:
             logger.error(f"Failed to cache draft prompt: {e}")
@@ -2949,14 +2951,14 @@ class PromptWorkflowService(SessionMixin):
                     }
                 )
                 # Set TTL to 24 hours (86400 seconds) - matching budprompt temporary storage
-                await redis_service.set(draft_key, draft_value, ex=86400)
+                await redis_service.set(draft_key, draft_value, ex=app_settings.prompt_config_redis_ttl)
         except Exception as e:
             logger.error(f"Failed to cache draft prompt: {e}")
             # Don't fail the notification handler
 
         # Add prompt to proxy cache for routing
         try:
-            await self.add_prompt_to_proxy_cache(prompt_id, prompt_id)
+            await self.add_prompt_to_proxy_cache(prompt_id, prompt_id, ex=app_settings.prompt_config_redis_ttl)
             logger.debug(f"Added prompt {prompt_id} to proxy cache")
         except Exception as e:
             logger.error(f"Failed to add prompt to proxy cache: {e}")
@@ -2978,7 +2980,9 @@ class PromptWorkflowService(SessionMixin):
             db_workflow, {"status": WorkflowStatusEnum.COMPLETED, "current_step": workflow_current_step}
         )
 
-    async def add_prompt_to_proxy_cache(self, prompt_id: Union[UUID, str], prompt_name: str) -> None:
+    async def add_prompt_to_proxy_cache(
+        self, prompt_id: Union[UUID, str], prompt_name: str, ex: Optional[int] = None
+    ) -> None:
         """Add prompt to proxy cache for routing through budgateway.
 
         Args:
@@ -3010,7 +3014,9 @@ class PromptWorkflowService(SessionMixin):
             # Store in Redis with key pattern matching endpoints
             redis_service = RedisService()
             await redis_service.set(
-                f"model_table:{prompt_id}", json.dumps({str(prompt_id): model_config.model_dump(exclude_none=True)})
+                f"model_table:{prompt_id}",
+                json.dumps({str(prompt_id): model_config.model_dump(exclude_none=True)}),
+                ex=ex,
             )
             logger.debug(f"Added prompt {prompt_name} to proxy cache with key model_table:{prompt_id}")
 
