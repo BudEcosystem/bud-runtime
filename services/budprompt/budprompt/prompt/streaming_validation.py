@@ -24,7 +24,6 @@ from pydantic_ai import Agent
 from pydantic_ai.output import NativeOutput
 from pydantic_ai.settings import ModelSettings
 
-from budprompt.commons.config import app_settings
 from budprompt.shared.providers import BudServeProvider
 
 
@@ -139,8 +138,12 @@ async def generate_field_validator_code(validation_prompt: str, model_class: Typ
 
     # Create provider and model with consistent temperature for reliable generation
     provider = BudServeProvider()
+    # model = provider.get_model(
+    #     model_name=app_settings.bud_default_model_name,
+    #     settings=ModelSettings(temperature=0.1),  # Lower temperature for consistent code generation
+    # )
     model = provider.get_model(
-        model_name=app_settings.bud_default_model_name,
+        model_name="qwen3-32b",
         settings=ModelSettings(temperature=0.1),  # Lower temperature for consistent code generation
     )
 
