@@ -135,10 +135,7 @@ export const usePromptSchemaWorkflow = ({
         if (payload.event === "results" && eventStatus === "COMPLETED") {
           console.log(`[usePromptSchemaWorkflow] Workflow completed successfully`);
           setStatus('success');
-          timeoutRef.current = setTimeout(() => {
-            console.log(`[usePromptSchemaWorkflow] Calling onCompleted callback`);
-            onCompleted?.();
-          }, 3000) as unknown as number;
+          onCompleted?.();
         }
 
         // Check for failure
