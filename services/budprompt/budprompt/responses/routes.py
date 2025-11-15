@@ -73,7 +73,7 @@ async def create_response(
         OpenAIResponse on success or JSONResponse with error status code and
         OpenAI-compatible error format on failure
     """
-    logger.info(f"Received response creation request for prompt: {request.prompt.id}")
+    logger.debug("Received response creation request: %s", request.model_dump(mode="json"))
 
     # Extract bearer token from credentials if present
     api_key = credentials.credentials if credentials else None
