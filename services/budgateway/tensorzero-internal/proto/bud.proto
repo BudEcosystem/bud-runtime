@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package bud;
+
+service BudService {
+  rpc CreateProfile(ProfileRequest) returns (ProfileResponse);
+  rpc GetProfile(GetProfileRequest) returns (ProfileResponse);
+  rpc ListProfiles(ListProfilesRequest) returns (ListProfilesResponse);
+  rpc UpdateProfile(ProfileRequest) returns (ProfileResponse);
+  rpc DeleteProfile(DeleteProfileRequest) returns (DeleteProfileResponse);
+  rpc Moderate(ModerationRequest) returns (ModerationResponse);
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+message Profile {
+  string id = 1;
+  string strategy_id = 2;
+  string description = 3;
+  string version = 4;
+  repeated string enabled_rules = 5;
+  repeated string enabled_probes = 6;
+  optional float severity_threshold = 7;
+  string metadata_json = 8;
+  string rule_overrides_json = 9;
+}
+
+message ProfileRequest {
+  Profile profile = 1;
+}
+
+message ProfileResponse {
+  Profile profile = 1;
+}
+
+message GetProfileRequest {
+  string id = 1;
+}
+
+message ListProfilesRequest {}
+
+message ListProfilesResponse {
+  repeated Profile profiles = 1;
+}
+
+message DeleteProfileRequest {
+  string id = 1;
+}
+
+message DeleteProfileResponse {}
+
+message ModerationRequest {
+  string profile_id = 1;
+  repeated string inputs = 2;
+  optional float severity_threshold = 3;
+}
+
+message ModerationResponse {
+  string model = 1;
+  repeated ModerationResult results = 2;
+}
+
+message ModerationResult {
+  bool flagged = 1;
+  map<string, bool> categories = 2;
+  map<string, double> category_scores = 3;
+  repeated Finding findings = 4;
+}
+
+message Finding {
+  string rule_id = 1;
+  bool triggered = 2;
+  oneof signal {
+    ClassificationFinding classification = 3;
+    PatternFinding pattern = 4;
+  }
+}
+
+message ClassificationFinding {
+  string label = 1;
+  double confidence = 2;
+  bool triggered = 3;
+}
+
+message PatternFinding {
+  repeated PatternMatch matches = 1;
+}
+
+message PatternMatch {
+  uint64 start = 1;
+  uint64 end = 2;
+  string value = 3;
+  double score = 4;
+  bool triggered = 5;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool ready = 1;
+  bool warmup_in_progress = 2;
+  bool catalog_loaded = 3;
+  uint64 profile_count = 4;
+  string last_error = 5;
+}

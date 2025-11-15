@@ -27,6 +27,7 @@ async fn select_embedding_inference_clickhouse(
     Ok(Some(json))
 }
 
+#[allow(dead_code)]
 async fn select_audio_inference_clickhouse(
     inference_id: Uuid,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {

@@ -26,6 +26,7 @@ use crate::inference::providers::aws_sagemaker::AWSSagemakerProvider;
 use crate::inference::providers::dummy::DummyProvider;
 use crate::inference::providers::google_ai_studio_gemini::GoogleAIStudioGeminiProvider;
 
+use crate::inference::providers::bud_sentinel::BudSentinelProvider;
 use crate::inference::providers::buddoc::BudDocProvider;
 use crate::inference::providers::budprompt::BudPromptProvider;
 use crate::inference::providers::helpers::peek_first_chunk;
@@ -1650,6 +1651,7 @@ impl ModelProvider {
             ProviderConfig::AzureContentSafety(_) => "azure_content_safety",
             ProviderConfig::BudDoc(_) => "buddoc",
             ProviderConfig::BudPrompt(_) => "budprompt",
+            ProviderConfig::BudSentinel(_) => "bud_sentinel",
             ProviderConfig::Fireworks(_) => "fireworks",
             ProviderConfig::GCPVertexAnthropic(_) => "gcp_vertex_anthropic",
             ProviderConfig::GCPVertexGemini(_) => "gcp_vertex_gemini",
@@ -1695,6 +1697,7 @@ impl ModelProvider {
             ProviderConfig::DeepSeek(provider) => Some(provider.model_name()),
             ProviderConfig::BudDoc(_) => None, // BudDoc doesn't have a model name in the inference sense
             ProviderConfig::BudPrompt(_) => None, // BudPrompt doesn't have a model name in the provider
+            ProviderConfig::BudSentinel(_) => None,
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => Some(provider.model_name()),
         }
@@ -1727,6 +1730,7 @@ pub enum ProviderConfig {
     AzureContentSafety(AzureContentSafetyProvider),
     BudDoc(BudDocProvider),
     BudPrompt(BudPromptProvider),
+    BudSentinel(BudSentinelProvider),
     DeepSeek(DeepSeekProvider),
     Fireworks(FireworksProvider),
     GCPVertexAnthropic(GCPVertexAnthropicProvider),
@@ -1803,6 +1807,16 @@ pub(super) enum UninitializedProviderConfig {
         model_name: String,
         api_base: Url,
         api_key_location: Option<CredentialLocation>,
+    },
+    #[strum(serialize = "bud_sentinel")]
+    #[serde(rename = "bud_sentinel")]
+    BudSentinel {
+        endpoint: Url,
+        api_key_location: Option<CredentialLocation>,
+        #[serde(default)]
+        profile_id: Option<String>,
+        #[serde(default)]
+        severity_threshold: Option<f32>,
     },
     #[strum(serialize = "gcp_vertex_anthropic")]
     #[serde(rename = "gcp_vertex_anthropic")]
@@ -1986,6 +2000,17 @@ impl UninitializedProviderConfig {
             } => ProviderConfig::BudPrompt(BudPromptProvider::new(
                 api_base.clone(),
                 api_key_location,
+            )?),
+            UninitializedProviderConfig::BudSentinel {
+                endpoint,
+                api_key_location,
+                profile_id,
+                severity_threshold,
+            } => ProviderConfig::BudSentinel(BudSentinelProvider::new(
+                endpoint,
+                api_key_location,
+                profile_id,
+                severity_threshold,
             )?),
             UninitializedProviderConfig::Fireworks {
                 model_name,
@@ -2179,6 +2204,11 @@ impl ModelProvider {
                     message: "BudPrompt provider does not support inference operations, only v1/responses endpoint".to_string(),
                 }))
             }
+            ProviderConfig::BudSentinel(_) => {
+                return Err(Error::new(ErrorDetails::Config {
+                    message: "Bud Sentinel provider does not support inference operations".to_string(),
+                }))
+            }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider.infer(request, client, api_keys, self).await
@@ -2272,6 +2302,11 @@ impl ModelProvider {
             ProviderConfig::BudPrompt(_) => {
                 return Err(Error::new(ErrorDetails::Config {
                     message: "BudPrompt provider does not support streaming inference, only v1/responses endpoint".to_string(),
+                }))
+            }
+            ProviderConfig::BudSentinel(_) => {
+                return Err(Error::new(ErrorDetails::Config {
+                    message: "Bud Sentinel provider does not support streaming inference".to_string(),
                 }))
             }
             #[cfg(any(test, feature = "e2e_tests"))]
@@ -2396,6 +2431,9 @@ impl ModelProvider {
             ProviderConfig::BudPrompt(_) => Err(Error::new(ErrorDetails::Config {
                 message: "BudPrompt provider does not support batch inference".to_string(),
             })),
+            ProviderConfig::BudSentinel(_) => Err(Error::new(ErrorDetails::Config {
+                message: "Bud Sentinel provider does not support batch inference".to_string(),
+            })),
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
@@ -2513,6 +2551,9 @@ impl ModelProvider {
             })),
             ProviderConfig::BudPrompt(_) => Err(Error::new(ErrorDetails::Config {
                 message: "BudPrompt provider does not support batch inference".to_string(),
+            })),
+            ProviderConfig::BudSentinel(_) => Err(Error::new(ErrorDetails::Config {
+                message: "Bud Sentinel provider does not support batch inference".to_string(),
             })),
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {

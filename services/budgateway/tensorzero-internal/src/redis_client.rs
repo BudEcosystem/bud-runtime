@@ -1,18 +1,24 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::StreamExt;
 use redis::aio::MultiplexedConnection;
 use redis::AsyncCommands;
 use secrecy::SecretString;
 use tracing::instrument;
+use url::Url;
 
 use crate::auth::{APIConfig, ApiKeyMetadata, Auth, PublishedModelInfo};
 use crate::config_parser::ProviderTypesConfig;
 use crate::encryption::{decrypt_api_key, is_decryption_enabled, load_private_key};
+use crate::endpoints::inference::InferenceCredentials;
 use crate::error::{Error, ErrorDetails};
 use crate::gateway_util::AppStateData;
-use crate::model::{ModelTable, UninitializedModelConfig};
+use crate::guardrail::build_bud_sentinel_profile;
+use crate::guardrail_table::GuardrailConfig;
+use crate::inference::providers::bud_sentinel::BudSentinelProvider;
+use crate::model::{CredentialLocation, ModelTable, UninitializedModelConfig};
 
 const MODEL_TABLE_KEY_PREFIX: &str = "model_table:";
 const API_KEY_KEY_PREFIX: &str = "api_key:";
@@ -297,7 +303,280 @@ impl RedisClient {
         }
 
         // Load the configuration
-        uninitialized_config.load(guardrail_id)
+        let mut config = uninitialized_config.load(guardrail_id)?;
+        Self::sync_bud_sentinel_profiles(guardrail_id, &mut config, app_state).await?;
+        Ok(config)
+    }
+
+    fn collect_credentials(app_state: &AppStateData) -> Result<InferenceCredentials, Error> {
+        let credential_store = app_state.model_credential_store.read().map_err(|_| {
+            Error::new(ErrorDetails::InternalError {
+                message: "Credential store lock is poisoned".to_string(),
+            })
+        })?;
+
+        let mut credentials = InferenceCredentials::default();
+        for (key, value) in credential_store.iter() {
+            credentials.insert(key.clone(), value.clone());
+        }
+
+        Ok(credentials)
+    }
+
+    async fn sync_bud_sentinel_profiles(
+        guardrail_id: &str,
+        config: &mut GuardrailConfig,
+        app_state: &AppStateData,
+    ) -> Result<(), Error> {
+        if !config
+            .providers
+            .iter()
+            .any(|provider| provider.provider_type == "bud_sentinel")
+        {
+            return Ok(());
+        }
+
+        let credentials = Self::collect_credentials(app_state)?;
+
+        for provider in &mut config.providers {
+            if provider.provider_type != "bud_sentinel" {
+                continue;
+            }
+
+            let provider_config_snapshot = provider
+                .provider_config
+                .as_object()
+                .ok_or_else(|| Error::new(ErrorDetails::Config {
+                    message: format!(
+                        "Bud Sentinel provider configuration for guardrail '{guardrail_id}' must be a JSON object"
+                    ),
+                }))?
+                .clone();
+
+            let endpoint = provider_config_snapshot
+                .get("endpoint")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    Error::new(ErrorDetails::Config {
+                        message: format!(
+                            "Missing 'endpoint' for Bud Sentinel provider in guardrail '{guardrail_id}'"
+                        ),
+                    })
+                })?
+                .to_string();
+
+            let api_key_location = provider_config_snapshot
+                .get("api_key_location")
+                .cloned()
+                .and_then(|value| serde_json::from_value::<CredentialLocation>(value).ok());
+
+            let provider_severity = provider_config_snapshot
+                .get("severity_threshold")
+                .and_then(|v| v.as_f64())
+                .map(|v| v as f32);
+
+            let mut profile = build_bud_sentinel_profile(
+                guardrail_id,
+                config.severity_threshold,
+                &provider.enabled_probes,
+                &provider.enabled_rules,
+                &provider_config_snapshot,
+            )?;
+
+            let endpoint_url = Url::parse(&endpoint).map_err(|e| {
+                Error::new(ErrorDetails::Config {
+                    message: format!(
+                        "Invalid Bud Sentinel endpoint '{endpoint}' for guardrail '{guardrail_id}': {e}"
+                    ),
+                })
+            })?;
+
+            let sentinel_provider = BudSentinelProvider::new(
+                endpoint_url,
+                api_key_location.clone(),
+                Some(profile.id.clone()),
+                provider_severity,
+            )?;
+
+            let mut sync_pending = false;
+            let ensured_profile = {
+                let mut attempt = 0usize;
+                let mut backoff = Duration::from_millis(100);
+
+                loop {
+                    match sentinel_provider
+                        .ensure_profile(profile.clone(), &credentials)
+                        .await
+                    {
+                        Ok(p) => break Ok(p),
+                        Err(err) => {
+                            attempt += 1;
+                            let err_display = err.to_string();
+                            if attempt >= 3 {
+                                break Err(err);
+                            }
+                            tracing::warn!(
+                                guardrail_id,
+                                attempt,
+                                error = err_display.as_str(),
+                                "Bud Sentinel profile sync attempt {attempt} failed; retrying"
+                            );
+                            tokio::time::sleep(backoff).await;
+                            backoff = (backoff * 2).min(Duration::from_secs(2));
+                        }
+                    }
+                }
+            };
+
+            match ensured_profile {
+                Ok(updated_profile) => {
+                    profile = updated_profile;
+                    tracing::info!(
+                        guardrail_id,
+                        profile_id = profile.id,
+                        "Bud Sentinel profile synchronized"
+                    );
+                }
+                Err(err) => {
+                    sync_pending = true;
+                    tracing::warn!(
+                        guardrail_id,
+                        profile_id = profile.id,
+                        "Unable to synchronize Bud Sentinel profile; guardrail will retry lazily: {err}"
+                    );
+                }
+            }
+
+            let config_obj = provider
+                .provider_config
+                .as_object_mut()
+                .ok_or_else(|| Error::new(ErrorDetails::Config {
+                    message: format!(
+                        "Bud Sentinel provider configuration for guardrail '{guardrail_id}' must be a JSON object"
+                    ),
+                }))?;
+
+            config_obj.insert(
+                "profile_id".to_string(),
+                serde_json::Value::String(profile.id.clone()),
+            );
+
+            if let Some(threshold) = profile.severity_threshold {
+                if let Some(number) = serde_json::Number::from_f64(threshold as f64) {
+                    config_obj.insert(
+                        "severity_threshold".to_string(),
+                        serde_json::Value::Number(number),
+                    );
+                }
+            }
+
+            config_obj.insert(
+                "strategy_id".to_string(),
+                serde_json::Value::String(profile.strategy_id.clone()),
+            );
+            config_obj.insert(
+                "description".to_string(),
+                serde_json::Value::String(profile.description.clone()),
+            );
+            config_obj.insert(
+                "version".to_string(),
+                serde_json::Value::String(profile.version.clone()),
+            );
+            config_obj.insert(
+                "metadata_json".to_string(),
+                serde_json::Value::String(profile.metadata_json.clone()),
+            );
+            config_obj.insert(
+                "rule_overrides_json".to_string(),
+                serde_json::Value::String(profile.rule_overrides_json.clone()),
+            );
+            config_obj.insert(
+                "profile_sync_pending".to_string(),
+                serde_json::Value::Bool(sync_pending),
+            );
+        }
+
+        Ok(())
+    }
+
+    async fn delete_bud_sentinel_profiles(
+        guardrail_id: &str,
+        app_state: &AppStateData,
+    ) -> Result<(), Error> {
+        let guardrails = app_state.guardrails.read().await;
+        let Some(config) = guardrails.get(guardrail_id).cloned() else {
+            return Ok(());
+        };
+        drop(guardrails);
+
+        let credentials = Self::collect_credentials(app_state)?;
+
+        for provider in &config.providers {
+            if provider.provider_type != "bud_sentinel" {
+                continue;
+            }
+
+            let config_obj = provider.provider_config.as_object().ok_or_else(|| {
+                Error::new(ErrorDetails::Config {
+                    message: format!(
+                        "Bud Sentinel provider configuration for guardrail '{guardrail_id}' must be a JSON object"
+                    ),
+                })
+            })?;
+
+            let endpoint = config_obj
+                .get("endpoint")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    Error::new(ErrorDetails::Config {
+                        message: format!(
+                        "Missing 'endpoint' for Bud Sentinel provider in guardrail '{guardrail_id}'"
+                    ),
+                    })
+                })?
+                .to_string();
+
+            let api_key_location = config_obj
+                .get("api_key_location")
+                .cloned()
+                .and_then(|value| serde_json::from_value::<CredentialLocation>(value).ok());
+
+            let Some(profile_id) = config_obj
+                .get("profile_id")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+            else {
+                continue;
+            };
+
+            let endpoint_url = Url::parse(&endpoint).map_err(|e| {
+                Error::new(ErrorDetails::Config {
+                    message: format!(
+                        "Invalid Bud Sentinel endpoint '{endpoint}' for guardrail '{guardrail_id}': {e}"
+                    ),
+                })
+            })?;
+
+            let provider_instance = BudSentinelProvider::new(
+                endpoint_url,
+                api_key_location.clone(),
+                Some(profile_id.clone()),
+                None,
+            )?;
+
+            if let Err(e) = provider_instance
+                .delete_profile(&profile_id, &credentials)
+                .await
+            {
+                tracing::warn!(
+                    guardrail_id,
+                    profile_id,
+                    "Failed to delete Bud Sentinel profile during guardrail removal: {e}"
+                );
+            }
+        }
+
+        Ok(())
     }
 
     async fn handle_set_key_event(
@@ -471,6 +750,12 @@ impl RedisClient {
             }
             k if k.starts_with(GUARDRAIL_KEY_PREFIX) => {
                 let guardrail_id = key.strip_prefix(GUARDRAIL_KEY_PREFIX).unwrap_or(key);
+                if let Err(e) = Self::delete_bud_sentinel_profiles(guardrail_id, app_state).await {
+                    tracing::warn!(
+                        guardrail_id,
+                        "Failed to clean up Bud Sentinel profile for guardrail removal: {e}"
+                    );
+                }
                 app_state.remove_guardrail(guardrail_id).await;
                 tracing::info!("Deleted guardrail: {guardrail_id}");
             }

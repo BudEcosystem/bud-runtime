@@ -73,7 +73,7 @@ use crate::openai_batch::{
 };
 use crate::realtime::{RealtimeSessionRequest, RealtimeTranscriptionRequest};
 use secrecy::SecretString;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// Helper function to merge credentials from the model credential store
 /// This eliminates code duplication across multiple endpoint handlers
@@ -384,229 +384,239 @@ pub async fn inference_handler(
                 let guardrail_config = guardrail_config.clone();
                 drop(guardrails_read);
 
-                // Prepare credentials
-                let credentials = merge_credentials_from_store(&model_credential_store);
+                if guardrail_config
+                    .guard_types
+                    .contains(&crate::guardrail_table::GuardType::Input)
+                {
+                    // Prepare credentials
+                    let credentials = merge_credentials_from_store(&model_credential_store);
 
-                // Create inference clients for guardrail execution
-                let cache_options = crate::cache::CacheOptions {
-                    enabled: crate::cache::CacheEnabledMode::Off,
-                    max_age_s: None,
-                };
-                let clients = super::inference::InferenceClients {
-                    http_client: &http_client,
-                    credentials: &credentials,
-                    clickhouse_connection_info: &clickhouse_connection_info,
-                    cache_options: &cache_options,
-                };
+                    // Create inference clients for guardrail execution
+                    let cache_options = crate::cache::CacheOptions {
+                        enabled: crate::cache::CacheEnabledMode::Off,
+                        max_age_s: None,
+                    };
+                    let clients = super::inference::InferenceClients {
+                        http_client: &http_client,
+                        credentials: &credentials,
+                        clickhouse_connection_info: &clickhouse_connection_info,
+                        cache_options: &cache_options,
+                    };
 
-                // Execute input guardrail with timing
-                let input_scan_start = tokio::time::Instant::now();
-                let guardrail_result = crate::guardrail::execute_guardrail(
-                    &guardrail_config,
-                    moderation_input.clone(),
-                    crate::guardrail_table::GuardType::Input,
-                    &clients,
-                    None,
-                )
-                .await?;
-                let input_scan_duration = input_scan_start.elapsed();
+                    // Execute input guardrail with timing
+                    let input_scan_start = tokio::time::Instant::now();
+                    let guardrail_result = crate::guardrail::execute_guardrail(
+                        &guardrail_config,
+                        moderation_input.clone(),
+                        crate::guardrail_table::GuardType::Input,
+                        &clients,
+                        None,
+                        false,
+                    )
+                    .await?;
+                    let input_scan_duration = input_scan_start.elapsed();
 
-                // Store the input guardrail result for later (we need the inference_id from the response)
-                // For now, store with a placeholder UUID
-                let placeholder_id = uuid::Uuid::nil();
-                let scan_record = crate::guardrail::GuardrailInferenceDatabaseInsert::from_result(
-                    placeholder_id,
-                    guardrail_profile.to_string(),
-                    crate::guardrail_table::GuardType::Input,
-                    "l1".to_string(),
-                    crate::guardrail::ScanMode::Single,
-                    &guardrail_result,
-                    Some(input_scan_duration),
-                    &input_texts.join(" "),
-                    None,
-                );
-                guardrail_context.add_scan_record(scan_record);
-
-                // If input is flagged, handle the blocked request with full observability
-                if guardrail_result.flagged {
-                    guardrail_context.response_terminated = true;
-
-                    // Generate IDs for tracking the blocked request
-                    let blocked_inference_id = uuid::Uuid::now_v7();
-                    let episode_id = uuid::Uuid::now_v7();
-
-                    // Update guardrail records with the actual inference_id
-                    for record in &mut guardrail_context.scan_records {
-                        record.inference_id = blocked_inference_id;
-                    }
-
-                    // Write blocked inference with guardrail records
-                    if config.gateway.observability.enabled.unwrap_or(true) {
-                        // Get model info or use defaults if model not found
-                        let (model_name, model_provider) = if let Some(name) = &resolved_model_name
-                        {
-                            (name.clone(), "openai".to_string())
-                        } else {
-                            ("unknown".to_string(), "unknown".to_string())
-                        };
-
-                        let clickhouse = clickhouse_connection_info.clone();
-                        let kafka = kafka_connection_info.clone();
-                        let config_clone = config.clone();
-                        let records = guardrail_context.scan_records.clone();
-                        let async_writes = config.gateway.observability.async_writes;
-                        let obs_metadata = observability_metadata.clone();
-
-                        // Get the resolved input and gateway request before moving params
-                        let resolved_input = params
-                            .input
-                            .resolve(&crate::inference::types::FetchContext {
-                                client: &http_client,
-                                object_store_info: &config.object_store_info,
-                            })
-                            .await
-                            .unwrap_or_else(|_| crate::inference::types::ResolvedInput {
-                                system: None,
-                                messages: vec![],
-                            });
-                        let gateway_request = params.gateway_request.clone();
-
-                        let write_future = tokio::spawn(async move {
-                            use crate::endpoints::inference::InferenceParams;
-                            use crate::inference::types::{
-                                current_timestamp, ChatInferenceResult, ContentBlockOutput,
-                                Latency, ModelInferenceResponseWithMetadata, RequestMessage, Text,
-                            };
-
-                            // Create blocked content
-                            let blocked_content = vec![ContentBlockChatOutput::Text(Text {
-                                text: "Request blocked by content policy".to_string(),
-                            })];
-
-                            // Create the gateway response that would be sent to the client
-                            let (_, gateway_response_json) = create_guardrail_error_response(
-                                "Input content violates content policy",
-                                true,
+                    // Store the input guardrail result for later (we need the inference_id from the response)
+                    // For now, store with a placeholder UUID
+                    if !guardrail_result.provider_results.is_empty() {
+                        // Only persist a scan record when a provider actually executed.
+                        let placeholder_id = uuid::Uuid::nil();
+                        let scan_record =
+                            crate::guardrail::GuardrailInferenceDatabaseInsert::from_result(
+                                placeholder_id,
+                                guardrail_profile.to_string(),
+                                crate::guardrail_table::GuardType::Input,
+                                "l1".to_string(),
+                                crate::guardrail::ScanMode::Single,
+                                &guardrail_result,
+                                Some(input_scan_duration),
+                                &input_texts.join(" "),
+                                None,
                             );
-                            let gateway_response_str = gateway_response_json.to_string();
-
-                            // Create blocked model inference response
-                            let model_response = ModelInferenceResponseWithMetadata {
-                                id: Uuid::now_v7(),
-                                created: current_timestamp(),
-                                output: vec![ContentBlockOutput::Text(Text {
-                                    text: "Request blocked by content policy".to_string(),
-                                })],
-                                system: resolved_input
-                                    .system
-                                    .clone()
-                                    .and_then(|v| v.as_str().map(|s| s.to_string())),
-                                input_messages: resolved_input
-                                    .messages
-                                    .iter()
-                                    .map(|msg| RequestMessage {
-                                        role: msg.role.clone(),
-                                        content: vec![], // Empty content for blocked messages
-                                    })
-                                    .collect(),
-                                // Since we never made it to the provider, we don't have a raw request/response
-                                // Use empty objects to indicate no provider interaction occurred
-                                raw_request: "{}".to_string(),
-                                raw_response: "{}".to_string(),
-                                usage: Usage::default(),
-                                latency: Latency::NonStreaming {
-                                    response_time: std::time::Duration::from_millis(0),
-                                },
-                                model_provider_name: model_provider.to_string().into(),
-                                model_name: model_name.to_string().into(),
-                                cached: false,
-                                finish_reason: Some(FinishReason::ContentFilter),
-                                gateway_request: gateway_request.clone(),
-                                gateway_response: Some(gateway_response_str.clone()),
-                                guardrail_scan_summary: if !records.is_empty() {
-                                    let context = crate::guardrail::GuardrailExecutionContext {
-                                        scan_records: records.clone(),
-                                        input_scan_time_ms: records
-                                            .iter()
-                                            .filter(|r| r.guard_type == 1) // Input guard type
-                                            .filter_map(|r| r.scan_latency_ms)
-                                            .sum::<u32>()
-                                            .into(),
-                                        output_scan_time_ms: None,
-                                        response_terminated: true,
-                                    };
-                                    Some(
-                                        serde_json::to_string(&context.build_summary())
-                                            .unwrap_or_default(),
-                                    )
-                                } else {
-                                    None
-                                },
-                            };
-
-                            // Create blocked result
-                            let blocked_result = InferenceResult::Chat(ChatInferenceResult {
-                                inference_id: blocked_inference_id,
-                                created: current_timestamp(),
-                                content: blocked_content,
-                                usage: Usage::default(),
-                                model_inference_results: vec![model_response],
-                                inference_params: InferenceParams::default(),
-                                original_response: None,
-                                finish_reason: Some(FinishReason::ContentFilter),
-                            });
-
-                            // Create metadata
-                            let metadata = super::inference::InferenceDatabaseInsertMetadata {
-                                function_name: "openai_compatible".to_string(),
-                                variant_name: model_name.to_string(),
-                                episode_id,
-                                tool_config: None,
-                                processing_time: Some(std::time::Duration::from_millis(0)),
-                                tags: HashMap::new(),
-                                extra_body: UnfilteredInferenceExtraBody::default(),
-                                extra_headers: UnfilteredInferenceExtraHeaders::default(),
-                            };
-
-                            // Write inference and guardrail records
-                            super::inference::write_inference(
-                                &clickhouse,
-                                &kafka,
-                                &config_clone,
-                                resolved_input,
-                                blocked_result,
-                                metadata,
-                                obs_metadata,
-                                gateway_request, // Pass the actual gateway_request
-                                Some(gateway_response_str), // Pass the actual gateway_response
-                                model_pricing,
-                                Some(records),
-                            )
-                            .await;
-                        });
-
-                        if !async_writes {
-                            write_future.await.map_err(|e| {
-                                Error::new(ErrorDetails::InternalError {
-                                    message: format!(
-                                        "Failed to join blocked inference write task: {e}"
-                                    ),
-                                })
-                            })?;
-                        }
+                        guardrail_context.add_scan_record(scan_record);
                     }
 
-                    // Return OpenAI-compatible error response
-                    let (status_code, error_response) = create_guardrail_error_response(
-                        "Input content violates content policy",
-                        true,
-                    );
+                    // If input is flagged, handle the blocked request with full observability
+                    if guardrail_result.flagged {
+                        guardrail_context.response_terminated = true;
 
-                    return Ok(Response::builder()
-                        .status(status_code)
-                        .header("Content-Type", "application/json")
-                        .body(Body::from(error_response.to_string()))
-                        .unwrap());
+                        // Generate IDs for tracking the blocked request
+                        let blocked_inference_id = uuid::Uuid::now_v7();
+                        let episode_id = uuid::Uuid::now_v7();
+
+                        // Update guardrail records with the actual inference_id
+                        for record in &mut guardrail_context.scan_records {
+                            record.inference_id = blocked_inference_id;
+                        }
+
+                        // Write blocked inference with guardrail records
+                        if config.gateway.observability.enabled.unwrap_or(true) {
+                            // Get model info or use defaults if model not found
+                            let (model_name, model_provider) =
+                                if let Some(name) = &resolved_model_name {
+                                    (name.clone(), "openai".to_string())
+                                } else {
+                                    ("unknown".to_string(), "unknown".to_string())
+                                };
+
+                            let clickhouse = clickhouse_connection_info.clone();
+                            let kafka = kafka_connection_info.clone();
+                            let config_clone = config.clone();
+                            let records = guardrail_context.scan_records.clone();
+                            let async_writes = config.gateway.observability.async_writes;
+                            let obs_metadata = observability_metadata.clone();
+
+                            // Get the resolved input and gateway request before moving params
+                            let resolved_input = params
+                                .input
+                                .resolve(&crate::inference::types::FetchContext {
+                                    client: &http_client,
+                                    object_store_info: &config.object_store_info,
+                                })
+                                .await
+                                .unwrap_or_else(|_| crate::inference::types::ResolvedInput {
+                                    system: None,
+                                    messages: vec![],
+                                });
+                            let gateway_request = params.gateway_request.clone();
+
+                            let write_future = tokio::spawn(async move {
+                                use crate::endpoints::inference::InferenceParams;
+                                use crate::inference::types::{
+                                    current_timestamp, ChatInferenceResult, ContentBlockOutput,
+                                    Latency, ModelInferenceResponseWithMetadata, RequestMessage,
+                                    Text,
+                                };
+
+                                // Create blocked content
+                                let blocked_content = vec![ContentBlockChatOutput::Text(Text {
+                                    text: "Request blocked by content policy".to_string(),
+                                })];
+
+                                // Create the gateway response that would be sent to the client
+                                let (_, gateway_response_json) = create_guardrail_error_response(
+                                    "Input content violates content policy",
+                                    true,
+                                );
+                                let gateway_response_str = gateway_response_json.to_string();
+
+                                // Create blocked model inference response
+                                let model_response = ModelInferenceResponseWithMetadata {
+                                    id: Uuid::now_v7(),
+                                    created: current_timestamp(),
+                                    output: vec![ContentBlockOutput::Text(Text {
+                                        text: "Request blocked by content policy".to_string(),
+                                    })],
+                                    system: resolved_input
+                                        .system
+                                        .clone()
+                                        .and_then(|v| v.as_str().map(|s| s.to_string())),
+                                    input_messages: resolved_input
+                                        .messages
+                                        .iter()
+                                        .map(|msg| RequestMessage {
+                                            role: msg.role.clone(),
+                                            content: vec![], // Empty content for blocked messages
+                                        })
+                                        .collect(),
+                                    // Since we never made it to the provider, we don't have a raw request/response
+                                    // Use empty objects to indicate no provider interaction occurred
+                                    raw_request: "{}".to_string(),
+                                    raw_response: "{}".to_string(),
+                                    usage: Usage::default(),
+                                    latency: Latency::NonStreaming {
+                                        response_time: std::time::Duration::from_millis(0),
+                                    },
+                                    model_provider_name: model_provider.to_string().into(),
+                                    model_name: model_name.to_string().into(),
+                                    cached: false,
+                                    finish_reason: Some(FinishReason::ContentFilter),
+                                    gateway_request: gateway_request.clone(),
+                                    gateway_response: Some(gateway_response_str.clone()),
+                                    guardrail_scan_summary: if !records.is_empty() {
+                                        let context = crate::guardrail::GuardrailExecutionContext {
+                                            scan_records: records.clone(),
+                                            input_scan_time_ms: records
+                                                .iter()
+                                                .filter(|r| r.guard_type == 1) // Input guard type
+                                                .filter_map(|r| r.scan_latency_ms)
+                                                .sum::<u32>()
+                                                .into(),
+                                            output_scan_time_ms: None,
+                                            response_terminated: true,
+                                        };
+                                        Some(
+                                            serde_json::to_string(&context.build_summary())
+                                                .unwrap_or_default(),
+                                        )
+                                    } else {
+                                        None
+                                    },
+                                };
+
+                                // Create blocked result
+                                let blocked_result = InferenceResult::Chat(ChatInferenceResult {
+                                    inference_id: blocked_inference_id,
+                                    created: current_timestamp(),
+                                    content: blocked_content,
+                                    usage: Usage::default(),
+                                    model_inference_results: vec![model_response],
+                                    inference_params: InferenceParams::default(),
+                                    original_response: None,
+                                    finish_reason: Some(FinishReason::ContentFilter),
+                                });
+
+                                // Create metadata
+                                let metadata = super::inference::InferenceDatabaseInsertMetadata {
+                                    function_name: "openai_compatible".to_string(),
+                                    variant_name: model_name.to_string(),
+                                    episode_id,
+                                    tool_config: None,
+                                    processing_time: Some(std::time::Duration::from_millis(0)),
+                                    tags: HashMap::new(),
+                                    extra_body: UnfilteredInferenceExtraBody::default(),
+                                    extra_headers: UnfilteredInferenceExtraHeaders::default(),
+                                };
+
+                                // Write inference and guardrail records
+                                super::inference::write_inference(
+                                    &clickhouse,
+                                    &kafka,
+                                    &config_clone,
+                                    resolved_input,
+                                    blocked_result,
+                                    metadata,
+                                    obs_metadata,
+                                    gateway_request, // Pass the actual gateway_request
+                                    Some(gateway_response_str), // Pass the actual gateway_response
+                                    model_pricing,
+                                    Some(records),
+                                )
+                                .await;
+                            });
+
+                            if !async_writes {
+                                write_future.await.map_err(|e| {
+                                    Error::new(ErrorDetails::InternalError {
+                                        message: format!(
+                                            "Failed to join blocked inference write task: {e}"
+                                        ),
+                                    })
+                                })?;
+                            }
+                        }
+                        // Return OpenAI-compatible error response
+                        let (status_code, error_response) = create_guardrail_error_response(
+                            "Input content violates content policy",
+                            true,
+                        );
+
+                        return Ok(Response::builder()
+                            .status(status_code)
+                            .header("Content-Type", "application/json")
+                            .body(Body::from(error_response.to_string()))
+                            .unwrap());
+                    }
                 }
             }
         }
@@ -719,25 +729,28 @@ pub async fn inference_handler(
                                 crate::guardrail_table::GuardType::Output,
                                 &clients,
                                 None,
+                                false,
                             )
                             .await?;
                             let output_scan_duration = output_scan_start.elapsed();
 
-                            // Create guardrail inference record with placeholder ID (will be updated later)
-                            let placeholder_id = uuid::Uuid::nil();
-                            let scan_record =
-                                crate::guardrail::GuardrailInferenceDatabaseInsert::from_result(
-                                    placeholder_id,
-                                    guardrail_profile.to_string(),
-                                    crate::guardrail_table::GuardType::Output,
-                                    "l1".to_string(),
-                                    crate::guardrail::ScanMode::Single,
-                                    &guardrail_result,
-                                    Some(output_scan_duration),
-                                    &output_texts.join(" "),
-                                    None,
-                                );
-                            guardrail_context.add_scan_record(scan_record);
+                            if !guardrail_result.provider_results.is_empty() {
+                                // Create guardrail inference record with placeholder ID (will be updated later)
+                                let placeholder_id = uuid::Uuid::nil();
+                                let scan_record =
+                                    crate::guardrail::GuardrailInferenceDatabaseInsert::from_result(
+                                        placeholder_id,
+                                        guardrail_profile.to_string(),
+                                        crate::guardrail_table::GuardType::Output,
+                                        "l1".to_string(),
+                                        crate::guardrail::ScanMode::Single,
+                                        &guardrail_result,
+                                        Some(output_scan_duration),
+                                        &output_texts.join(" "),
+                                        None,
+                                    );
+                                guardrail_context.add_scan_record(scan_record);
+                            }
 
                             // If output is flagged, return an error
                             if guardrail_result.flagged {
@@ -1009,9 +1022,7 @@ pub async fn inference_handler(
             Ok(http_response)
         }
         InferenceOutput::Streaming(mut stream) => {
-            // TODO: Implement output guardrails for streaming responses
-            // This would require buffering the entire response which defeats the purpose of streaming
-            // For now, streaming responses with guardrails will only check input
+            let guardrail_context = Arc::new(tokio::sync::Mutex::new(guardrail_context));
 
             // Capture usage limiter and headers for usage tracking after stream completion
             let usage_limiter_for_tracking = usage_limiter.clone();
@@ -1041,10 +1052,36 @@ pub async fn inference_handler(
                 }
             };
 
+            // Attach streaming guardrail processing if configured
+            let mut processed_stream: InferenceStream = Box::pin(combined_stream);
+
+            if let Some(guardrail_profile) = &guardrail_profile_id {
+                let guardrails_read = guardrails.read().await;
+                if let Some(guardrail_config) = guardrails_read.get(guardrail_profile.as_ref()) {
+                    if guardrail_config
+                        .guard_types
+                        .contains(&crate::guardrail_table::GuardType::Output)
+                    {
+                        let streaming_guardrail_state = StreamingGuardrailState {
+                            guardrail_profile: guardrail_profile.to_string(),
+                            guardrail_config: guardrail_config.clone(),
+                            http_client: http_client.clone(),
+                            model_credential_store: model_credential_store.clone(),
+                            clickhouse_connection_info: clickhouse_connection_info.clone(),
+                            guardrail_context: guardrail_context.clone(),
+                        };
+                        processed_stream = attach_streaming_output_guardrail(
+                            processed_stream,
+                            streaming_guardrail_state,
+                        );
+                    }
+                }
+            }
+
             // Create the stream with usage tracking
             let openai_compatible_stream =
                 prepare_serialized_openai_compatible_events_with_usage_tracking(
-                    Box::pin(combined_stream),
+                    processed_stream,
                     original_model_name.clone(),
                     stream_options,
                     usage_limiter_for_tracking,
@@ -2170,6 +2207,201 @@ fn process_chat_content_chunk(
     (content_str, tool_calls, reasoning_content)
 }
 
+fn stream_guardrail_window_char_limit() -> usize {
+    static WINDOW_LIMIT: OnceLock<usize> = OnceLock::new();
+    *WINDOW_LIMIT.get_or_init(|| {
+        std::env::var("STREAM_GUARDRAIL_WINDOW_CHAR_LIMIT")
+            .ok()
+            .and_then(|raw| raw.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(50)
+    })
+}
+const STREAM_GUARDRAIL_BLOCKED_MESSAGE: &str = "Output content violates content policy";
+
+struct StreamingGuardrailState {
+    guardrail_profile: String,
+    guardrail_config: Arc<crate::guardrail_table::GuardrailConfig>,
+    http_client: reqwest::Client,
+    model_credential_store: Arc<std::sync::RwLock<HashMap<String, SecretString>>>,
+    clickhouse_connection_info: crate::clickhouse::ClickHouseConnectionInfo,
+    guardrail_context: Arc<tokio::sync::Mutex<crate::guardrail::GuardrailExecutionContext>>,
+}
+
+impl StreamingGuardrailState {
+    async fn scan_window(
+        &self,
+        window_text: &str,
+        inference_id: Uuid,
+        window_index: usize,
+    ) -> Result<crate::guardrail_table::GuardrailResult, Error> {
+        let credentials = merge_credentials_from_store(&self.model_credential_store);
+        let cache_options = crate::cache::CacheOptions {
+            enabled: crate::cache::CacheEnabledMode::Off,
+            max_age_s: None,
+        };
+        let clients = super::inference::InferenceClients {
+            http_client: &self.http_client,
+            credentials: &credentials,
+            clickhouse_connection_info: &self.clickhouse_connection_info,
+            cache_options: &cache_options,
+        };
+
+        let scan_start = tokio::time::Instant::now();
+        let guardrail_result = crate::guardrail::execute_guardrail(
+            self.guardrail_config.as_ref(),
+            crate::moderation::ModerationInput::Single(window_text.to_string()),
+            crate::guardrail_table::GuardType::Output,
+            &clients,
+            None,
+            false,
+        )
+        .await?;
+        let scan_duration = Some(scan_start.elapsed());
+
+        if !guardrail_result.provider_results.is_empty() {
+            let scan_record = crate::guardrail::GuardrailInferenceDatabaseInsert::from_result(
+                inference_id,
+                self.guardrail_profile.clone(),
+                crate::guardrail_table::GuardType::Output,
+                format!("stream_window_{window_index}"),
+                crate::guardrail::ScanMode::GatewayManagedMulti,
+                &guardrail_result,
+                scan_duration,
+                window_text,
+                None,
+            );
+
+            {
+                let mut context = self.guardrail_context.lock().await;
+                context.add_scan_record(scan_record);
+                if guardrail_result.flagged {
+                    context.response_terminated = true;
+                }
+            }
+        }
+
+        Ok(guardrail_result)
+    }
+}
+
+fn extract_guardrail_text_from_chunk(chunk: &InferenceResponseChunk) -> String {
+    match chunk {
+        InferenceResponseChunk::Chat(chat_chunk) => {
+            let mut aggregated = String::new();
+            for block in &chat_chunk.content {
+                if let ContentBlockChunk::Text(text_chunk) = block {
+                    aggregated.push_str(text_chunk.text.as_str());
+                }
+            }
+            aggregated
+        }
+        InferenceResponseChunk::Json(json_chunk) => json_chunk.raw.clone(),
+    }
+}
+
+fn chunk_has_finish_reason(chunk: &InferenceResponseChunk) -> bool {
+    match chunk {
+        InferenceResponseChunk::Chat(chat_chunk) => chat_chunk.finish_reason.is_some(),
+        InferenceResponseChunk::Json(json_chunk) => json_chunk.finish_reason.is_some(),
+    }
+}
+
+fn attach_streaming_output_guardrail(
+    stream: InferenceStream,
+    guardrail_state: StreamingGuardrailState,
+) -> InferenceStream {
+    Box::pin(async_stream::stream! {
+        let mut upstream_stream = stream;
+        let mut buffered_chunks: Vec<InferenceResponseChunk> = Vec::new();
+        let mut buffered_text = String::new();
+        let mut window_index: usize = 0;
+        let window_limit = stream_guardrail_window_char_limit();
+
+        while let Some(chunk_result) = FuturesStreamExt::next(&mut upstream_stream).await {
+            match chunk_result {
+                Ok(chunk) => {
+                    let inference_id = chunk.inference_id();
+                    let chunk_finish = chunk_has_finish_reason(&chunk);
+                    let chunk_text = extract_guardrail_text_from_chunk(&chunk);
+
+                    if !chunk_text.is_empty() {
+                        buffered_text.push_str(&chunk_text);
+                    }
+
+                    buffered_chunks.push(chunk);
+
+                    let should_scan = buffered_text.len() >= window_limit || chunk_finish;
+                    if should_scan {
+                        if !buffered_text.is_empty() {
+                            window_index += 1;
+                            match guardrail_state
+                                .scan_window(&buffered_text, inference_id, window_index)
+                                .await
+                            {
+                                Ok(result) => {
+                                    if result.flagged {
+                                        yield Err(Error::new(
+                                            ErrorDetails::GuardrailOutputViolation {
+                                                message: STREAM_GUARDRAIL_BLOCKED_MESSAGE
+                                                    .to_string(),
+                                            },
+                                        ));
+                                        return;
+                                    }
+                                }
+                                Err(e) => {
+                                    yield Err(e);
+                                    return;
+                                }
+                            }
+                        }
+
+                        for chunk_to_send in buffered_chunks.drain(..) {
+                            yield Ok(chunk_to_send);
+                        }
+                        buffered_text.clear();
+                    }
+                }
+                Err(e) => {
+                    yield Err(e);
+                    return;
+                }
+            }
+        }
+
+        if !buffered_chunks.is_empty() {
+            if !buffered_text.is_empty() {
+                window_index += 1;
+                match guardrail_state
+                    .scan_window(&buffered_text, buffered_chunks[0].inference_id(), window_index)
+                    .await
+                {
+                    Ok(result) => {
+                        if result.flagged {
+                            yield Err(Error::new(
+                                ErrorDetails::GuardrailOutputViolation {
+                                    message: STREAM_GUARDRAIL_BLOCKED_MESSAGE
+                                        .to_string(),
+                                },
+                            ));
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+
+            for chunk_to_send in buffered_chunks.drain(..) {
+                yield Ok(chunk_to_send);
+            }
+        }
+    })
+}
+
 /// Shared stream processor for OpenAI-compatible events with optional usage tracking
 struct OpenAICompatibleStreamProcessor {
     stream: InferenceStream,
@@ -2234,49 +2466,65 @@ impl OpenAICompatibleStreamProcessor {
             let mut inference_id = None;
             let mut _episode_id = None;
 
-            // Process all chunks and accumulate usage
-            while let Some(chunk) = tokio_stream::StreamExt::next(&mut self.stream).await {
-                let Ok(chunk) = chunk else {
-                    continue;
-                };
-                inference_id = Some(chunk.inference_id());
-                _episode_id = Some(chunk.episode_id());
-                let chunk_usage = match &chunk {
-                    InferenceResponseChunk::Chat(c) => &c.usage,
-                    InferenceResponseChunk::Json(c) => &c.usage,
-                };
-                if let Some(chunk_usage) = chunk_usage {
-                    total_usage.prompt_tokens += chunk_usage.input_tokens;
-                    total_usage.completion_tokens += chunk_usage.output_tokens;
-                    total_usage.total_tokens += chunk_usage.input_tokens + chunk_usage.output_tokens;
-                }
-                let openai_compatible_chunks = convert_inference_response_chunk_to_openai_compatible(
-                    chunk,
-                    &mut tool_id_to_index,
-                    &self.model_name,
-                );
-                for chunk in openai_compatible_chunks {
-                    let mut chunk_json = serde_json::to_value(chunk).map_err(|e| {
-                        Error::new(ErrorDetails::Inference {
-                            message: format!("Failed to convert chunk to JSON: {e}"),
-                        })
-                    })?;
-                    if is_first_chunk {
-                        chunk_json["choices"][0]["delta"]["role"] = Value::String("assistant".to_string());
-                        is_first_chunk = false;
-                    }
+            let mut stream_terminated_early = false;
 
-                    yield Ok(Event::default().json_data(chunk_json).map_err(|e| {
-                        Error::new(ErrorDetails::Inference {
-                            message: format!("Failed to convert Value to Event: {e}"),
-                        })
-                    })?);
+            // Process all chunks and accumulate usage
+            while let Some(chunk_result) = tokio_stream::StreamExt::next(&mut self.stream).await {
+                match chunk_result {
+                    Ok(chunk) => {
+                        inference_id = Some(chunk.inference_id());
+                        _episode_id = Some(chunk.episode_id());
+                        let chunk_usage = match &chunk {
+                            InferenceResponseChunk::Chat(c) => &c.usage,
+                            InferenceResponseChunk::Json(c) => &c.usage,
+                        };
+                        if let Some(chunk_usage) = chunk_usage {
+                            total_usage.prompt_tokens += chunk_usage.input_tokens;
+                            total_usage.completion_tokens += chunk_usage.output_tokens;
+                            total_usage.total_tokens +=
+                                chunk_usage.input_tokens + chunk_usage.output_tokens;
+                        }
+                        let openai_compatible_chunks =
+                            convert_inference_response_chunk_to_openai_compatible(
+                                chunk,
+                                &mut tool_id_to_index,
+                                &self.model_name,
+                            );
+                        for chunk in openai_compatible_chunks {
+                            let mut chunk_json = serde_json::to_value(chunk).map_err(|e| {
+                                Error::new(ErrorDetails::Inference {
+                                    message: format!("Failed to convert chunk to JSON: {e}"),
+                                })
+                            })?;
+                            if is_first_chunk {
+                                chunk_json["choices"][0]["delta"]["role"] =
+                                    Value::String("assistant".to_string());
+                                is_first_chunk = false;
+                            }
+
+                            yield Ok(Event::default().json_data(chunk_json).map_err(|e| {
+                                Error::new(ErrorDetails::Inference {
+                                    message: format!("Failed to convert Value to Event: {e}"),
+                                })
+                            })?);
+                        }
+                    }
+                    Err(e) => {
+                        stream_terminated_early = true;
+                        let error_message = serde_json::json!({ "error": e.to_string() });
+                        yield Ok(Event::default().json_data(error_message).map_err(|err| {
+                            Error::new(ErrorDetails::Inference {
+                                message: format!("Failed to convert error Value to Event: {err}"),
+                            })
+                        })?);
+                        break;
+                    }
                 }
             }
 
             // Handle final usage message if stream_options.include_usage is true
             if let Some(ref options) = self.stream_options {
-                if options.include_usage {
+                if options.include_usage && !stream_terminated_early {
                     let final_usage_message = serde_json::json!({
                         "id": format!("chatcmpl-{}", inference_id.unwrap_or(Uuid::new_v4())),
                         "choices": [],
@@ -3354,6 +3602,7 @@ pub async fn moderation_handler(
             crate::guardrail_table::GuardType::Input,
             &clients,
             moderation_request.provider_params.clone(),
+            true,
         )
         .await?;
         let latency = start_time.elapsed();
@@ -3466,6 +3715,26 @@ pub async fn moderation_handler(
                     let provider_request = moderation_request.clone();
                     // Use the Azure Content Safety provider's moderation capability
                     match azure_cs_provider
+                        .moderate(&provider_request, clients.http_client, &credentials)
+                        .await
+                    {
+                        Ok(provider_response) => {
+                            response = Some(crate::moderation::ModerationResponse::new(
+                                provider_response,
+                                provider_name.clone(),
+                            ));
+                            break;
+                        }
+                        Err(e) => {
+                            provider_errors.insert(provider_name.to_string(), e);
+                            continue;
+                        }
+                    }
+                }
+                crate::model::ProviderConfig::BudSentinel(bud_sentinel_provider) => {
+                    tracing::info!("Found Bud Sentinel provider for moderation");
+                    let provider_request = moderation_request.clone();
+                    match bud_sentinel_provider
                         .moderate(&provider_request, clients.http_client, &credentials)
                         .await
                     {
@@ -3602,6 +3871,8 @@ pub async fn moderation_handler(
                         categories_map.insert("insult".to_string(), r.categories.insult);
                         categories_map.insert("toxicity".to_string(), r.categories.toxicity);
                         categories_map.insert("malicious".to_string(), r.categories.malicious);
+                        categories_map.insert("pii".to_string(), r.categories.pii);
+                        categories_map.insert("secrets".to_string(), r.categories.secrets);
                         categories_map
                             .insert("ip-violation".to_string(), r.categories.ip_violation);
 
@@ -3642,6 +3913,9 @@ pub async fn moderation_handler(
                         scores_map.insert("profanity".to_string(), r.category_scores.profanity);
                         scores_map.insert("insult".to_string(), r.category_scores.insult);
                         scores_map.insert("toxicity".to_string(), r.category_scores.toxicity);
+                        scores_map.insert("malicious".to_string(), r.category_scores.malicious);
+                        scores_map.insert("pii".to_string(), r.category_scores.pii);
+                        scores_map.insert("secrets".to_string(), r.category_scores.secrets);
 
                         crate::inference::types::ModerationResult {
                             flagged: r.flagged,
