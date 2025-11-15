@@ -16,18 +16,19 @@
 
 """Validation module for dynamic model validation using natural language prompts."""
 
-import logging
 from typing import Type
 
+from budmicroframe.commons import logging
 from pydantic import BaseModel, model_validator
 from pydantic_ai import Agent
 from pydantic_ai.settings import ModelSettings
 
-from budprompt.commons.config import app_settings
 from budprompt.shared.providers import BudServeProvider
 
+from ..commons.constants import VALIDATION_MODEL_NAME
 
-logger = logging.getLogger(__name__)
+
+logger = logging.get_logger(__name__)
 
 
 def format_schema_for_llm(model_class: Type[BaseModel]) -> str:
@@ -131,7 +132,8 @@ async def generate_model_validator_code_async(validation_prompt: str, model_clas
 
     # Create provider and model using default model from config
     provider = BudServeProvider()
-    model = provider.get_model(model_name=app_settings.bud_default_model_name, settings=ModelSettings(temperature=0.1))
+    # model = provider.get_model(model_name=app_settings.bud_default_model_name, settings=ModelSettings(temperature=0.1))
+    model = provider.get_model(model_name=VALIDATION_MODEL_NAME, settings=ModelSettings(temperature=0.1))
 
     # Create a code generation agent
     code_gen_agent = Agent(
@@ -188,7 +190,8 @@ async def enhance_validator_error_messages_async(
     schema_info = format_schema_for_llm(model_class)
 
     provider = BudServeProvider()
-    model = provider.get_model(model_name=app_settings.bud_default_model_name, settings=ModelSettings(temperature=0.1))
+    # model = provider.get_model(model_name=app_settings.bud_default_model_name, settings=ModelSettings(temperature=0.1))
+    model = provider.get_model(model_name=VALIDATION_MODEL_NAME, settings=ModelSettings(temperature=0.1))
 
     enhancement_agent = Agent(
         model=model,

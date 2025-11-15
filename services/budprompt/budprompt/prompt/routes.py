@@ -16,10 +16,10 @@
 
 """API routes for the prompt module."""
 
-import logging
 import uuid
 from typing import Optional, Union
 
+from budmicroframe.commons import logging
 from budmicroframe.commons.api_utils import pubsub_api_endpoint
 from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse
 from fastapi import APIRouter, Query, Request, Response, status
@@ -43,7 +43,7 @@ from .services import PromptCleanupService, PromptConfigurationService, PromptEx
 from .workflows import PromptCleanupWorkflow, PromptSchemaWorkflow
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 # Create a global service instance
 prompt_service = PromptExecutorService()

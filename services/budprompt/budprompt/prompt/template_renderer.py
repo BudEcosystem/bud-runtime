@@ -16,15 +16,15 @@
 
 """Jinja2 template renderer for prompts and messages."""
 
-import logging
 from typing import Any, Dict, Optional
 
+from budmicroframe.commons import logging
 from jinja2 import Environment, TemplateSyntaxError, UndefinedError, meta
 
 from budprompt.commons.exceptions import TemplateRenderingException
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class TemplateRenderer:

@@ -16,9 +16,9 @@
 
 """API routes for responses module - OpenAI-compatible API."""
 
-import logging
 from typing import Any, Dict, Union
 
+from budmicroframe.commons import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -29,7 +29,7 @@ from .schemas import OpenAIError, OpenAIResponse, OpenAIResponsesError, Response
 from .services import ResponsesService
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 # NOTE: Optional Bearer token security (auto_error=False makes it optional)
 security = HTTPBearer()
