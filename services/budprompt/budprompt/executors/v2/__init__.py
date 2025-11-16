@@ -14,4 +14,9 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""Simple Prompt Executor Module."""
+"""Simple Prompt Executor Module - Version 2."""
+
+from .executor import SimplePromptExecutor
+
+
+__all__ = ["SimplePromptExecutor"]
