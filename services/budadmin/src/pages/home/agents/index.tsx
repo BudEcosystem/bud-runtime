@@ -15,7 +15,7 @@ import {
   Text_12_400_B3B3B3,
   Text_12_300_EEEEEE,
   Text_12_600_EEEEEE,
-} from "./../../../components/ui/text";
+} from "../../../components/ui/text";
 import { useLoader } from "src/context/appContext";
 import PageHeader from "@/components/ui/pageHeader";
 import NoAccess from "@/components/ui/noAccess";
