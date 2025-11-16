@@ -11,6 +11,7 @@ import DeployModelSpecification from "src/flows/DeployModelSpecification";
 import DeployModelTemplate from "src/flows/DeployModelTemplate";
 import DeployModelConfiguration from "src/flows/DeployModelConfiguration";
 import DeployModelCredentialSelect from "src/flows/DeployModel/DeployModelCredentialSelect";
+import DeployModelHardwareMode from "src/flows/DeployModel/DeployModelHardwareMode";
 import InviteMembers from "src/flows/InviteMembers";
 import NewProject from "src/flows/NewProject";
 import ModelSource from "src/flows/AddModel/ModelSource";
@@ -154,6 +155,7 @@ export const StepComponents = {
   "invite-success": CreateProjectSuccess,
   "deploy-model": DeployModel,
   "deploy-model-credential-select": DeployModelCredentialSelect,
+  "deploy-model-hardware-mode": DeployModelHardwareMode,
   "deploy-model-template": DeployModelTemplate,
   "deploy-model-configuration": DeployModelConfiguration,
   "deploy-model-specification": DeployModelSpecification,

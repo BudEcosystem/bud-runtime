@@ -185,6 +185,8 @@ export const useDeployModel = create<{
   selectedProvider: Provider | null;
   providerTypeList: ProviderType[];
   modalityTypeList: ModalityType[];
+  hardwareMode: "dedicated" | "shared" | null;
+  setHardwareMode: (mode: "dedicated" | "shared" | null) => void;
   deploymentSpecifcation: {
     deployment_name: string;
     concurrent_requests: number;
@@ -241,6 +243,7 @@ export const useDeployModel = create<{
   reset: () => void;
   createWorkflow: (projectId: string) => void;
   updateModel: () => void;
+  updateHardwareMode: () => Promise<any>;
   updateTemplate: () => void;
   getWorkflow: (id?: string) => Promise<any>;
   updateDeploymentConfiguration: (payload?: { enable_tool_calling?: boolean; enable_reasoning?: boolean }) => Promise<any>;
@@ -426,6 +429,10 @@ export const useDeployModel = create<{
   },
   providerTypeList: providerTypeList,
   modalityTypeList: modalityTypeList,
+  hardwareMode: null,
+  setHardwareMode: (mode: "dedicated" | "shared" | null) => {
+    set({ hardwareMode: mode });
+  },
   requestCount: 0,
   startRequest: () => {
     const newCount = get().requestCount + 1;
@@ -445,6 +452,7 @@ export const useDeployModel = create<{
       currentWorkflow: null,
       selectedModel: null,
       selectedTemplate: null,
+      hardwareMode: null,
       deploymentSpecifcation: {
         deployment_name: "",
         concurrent_requests: 0,
@@ -752,6 +760,7 @@ export const useDeployModel = create<{
   // },
   createWorkflow: async (projectId: string) => {
     const modelId = get().selectedModel?.id;
+    const hardwareMode = get().hardwareMode;
     if (!modelId) {
       errorToast("Please select a model");
       return;
@@ -766,6 +775,7 @@ export const useDeployModel = create<{
           trigger_workflow: false,
           project_id: projectId,
           model_id: modelId,
+          hardware_mode: hardwareMode,
         },
         {
           headers: {
@@ -787,6 +797,7 @@ export const useDeployModel = create<{
   updateModel: async () => {
     const workflowId = get().currentWorkflow?.workflow_id;
     const modelId = get().selectedModel?.id;
+    const hardwareMode = get().hardwareMode;
     const projectId = useProjects.getState().selectedProject?.id;
     if (!workflowId) {
       errorToast("Please create a workflow");
@@ -802,6 +813,7 @@ export const useDeployModel = create<{
           workflow_id: workflowId,
           model_id: modelId,
           project_id: projectId,
+          hardware_mode: hardwareMode,
         },
         {
           headers: {
@@ -847,6 +859,40 @@ export const useDeployModel = create<{
       get().getWorkflowCloud();
     } catch (error) {
       console.error("Error creating model:", error);
+    } finally {
+      get().endRequest();
+    }
+  },
+
+  updateHardwareMode: async () => {
+    const workflowId = get().currentWorkflow?.workflow_id;
+    const hardwareMode = get().hardwareMode;
+    const projectId = useProjects.getState().selectedProject?.id;
+    if (!workflowId) {
+      errorToast("Please create a workflow");
+      return;
+    }
+    get().startRequest();
+    try {
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/models/deploy-workflow`,
+        {
+          step_number: 2,
+          trigger_workflow: false,
+          workflow_id: workflowId,
+          hardware_mode: hardwareMode,
+        },
+        {
+          headers: {
+            "x-resource-type": "project",
+            "x-entity-id": projectId,
+          },
+        },
+      );
+      get().getWorkflowCloud();
+      return response;
+    } catch (error) {
+      console.error("Error updating hardware mode:", error);
     } finally {
       get().endRequest();
     }

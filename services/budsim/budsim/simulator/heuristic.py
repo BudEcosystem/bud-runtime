@@ -206,6 +206,7 @@ class HeuristicCalculator:
             seq_length=seq_length,
             precision=self._get_precision_bits(model_params),
             tensor_parallel=tp_size,  # Pass TP to get per-device memory
+            respect_weight_tying=False,
         )
 
         # Memory per device - already calculated correctly by calculate_memory with TP
@@ -300,6 +301,7 @@ class HeuristicCalculator:
                     seq_length=seq_length,
                     precision=self._get_precision_bits(model_params),
                     tensor_parallel=tp_size,  # Pass TP to get per-device memory
+                    respect_weight_tying=False,
                 )
                 # Cache the result
                 self._memory_cache[cache_key] = memory_report

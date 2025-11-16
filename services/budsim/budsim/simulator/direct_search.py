@@ -68,6 +68,7 @@ class DirectSearchOptimizer:
         concurrency_step: int = 5,  # Step size for concurrency reduction
         max_evaluations: int = 200,  # Safety limit
         supports_pipeline_parallelism: bool = False,
+        hardware_mode: str = "dedicated",  # Hardware utilization mode
     ):
         """Initialize DirectSearchOptimizer."""
         self.model = model
@@ -86,6 +87,7 @@ class DirectSearchOptimizer:
         self.concurrency_step = concurrency_step
         self.max_evaluations = max_evaluations
         self.supports_pipeline_parallelism = supports_pipeline_parallelism
+        self.hardware_mode = hardware_mode
 
         self.engine_config = get_engine_properties(self.engine_name, {"model": self.model})
 
@@ -160,6 +162,13 @@ class DirectSearchOptimizer:
                 tp *= 2
         # Valid PP sizes
         self.valid_pp_sizes = list(range(1, self.max_pp + 1))
+
+        # Override for shared hardware mode: force TP=1, PP=1
+        if self.hardware_mode == "shared":
+            logger.debug("Shared hardware mode: constraining to TP=1, PP=1 (no tensor/pipeline parallelism)")
+            self.valid_tp_sizes = [1]
+            self.valid_pp_sizes = [1]
+            self.min_tp = 1
 
         logger.debug(
             f"Search space: TP sizes {self.valid_tp_sizes} (min required: {self.min_tp}), PP sizes {self.valid_pp_sizes}, max_concurrency={self.max_concurrency}"
@@ -266,6 +275,9 @@ class DirectSearchOptimizer:
             # Validate memory requirements
             validation_result = self._heuristic_calc.validate_memory_requirements(model_params)
 
+            # Store validation result for later use (e.g., in shared mode to get memory value)
+            self._last_validation_result = validation_result
+
             fits = validation_result["valid"]
             logger.debug(
                 f"Memory check TP={tp_size}, PP={pp_size}, concurrency={concurrency}: "
@@ -304,6 +316,44 @@ class DirectSearchOptimizer:
             return None
 
         try:
+            # Shared hardware mode: Skip performance prediction, only validate memory
+            if self.hardware_mode == "shared":
+                logger.info(
+                    f"Shared mode: Memory validated for TP={tp_size}, PP={pp_size}, concurrency={concurrency}. "
+                    "Skipping performance prediction."
+                )
+
+                # Get calculated memory from validation result
+                kv_cache_memory = 0
+                if hasattr(self, "_last_validation_result") and self._last_validation_result:
+                    kv_cache_memory = self._last_validation_result.get("total_memory_gb", 0)
+                    breakdown = self._last_validation_result.get("breakdown", {})
+                    logger.debug(
+                        f"Shared mode: total_memory_gb from validation={kv_cache_memory:.4f}GB, breakdown={breakdown}"
+                    )
+
+                # Return minimal result - memory already validated in _validate_config
+                result = SearchResult(
+                    config=config,
+                    kv_cache_memory=kv_cache_memory,
+                    ttft=0,  # Not predicted in shared mode
+                    e2e_latency=0,  # Not predicted in shared mode
+                    throughput_per_user=0,  # Not predicted in shared mode
+                    concurrency=concurrency,
+                    cost_per_million_tokens=0,  # Cost model differs for shared mode
+                    performance_penalty=0,  # No performance requirements in shared mode
+                    meets_targets=True,  # Memory fit is the only requirement
+                    search_step=len(self.evaluated_configs),
+                    error_rate=0,
+                )
+
+                # Cache and store result
+                self._evaluation_cache[cache_key] = result
+                self.evaluated_configs.append(result)
+
+                return result
+
+            # Dedicated hardware mode: Full performance prediction
             # Prepare data for prediction
             data = self._prepare_predictor_data(config)
 
