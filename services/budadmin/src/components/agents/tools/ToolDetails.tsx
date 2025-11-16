@@ -71,12 +71,10 @@ export const ToolDetails: React.FC<ToolDetailsProps> = ({
   };
 
   const formatParamName = (paramName: string) => {
-    // Replace underscores, hyphens, and other special characters with spaces
-    // Also add space before capital letters for camelCase
+    // Replace special characters with spaces and add space before capital letters for camelCase
     return paramName
-      .replace(/[_-]/g, ' ') // Replace underscores and hyphens with spaces
       .replace(/([a-z])([A-Z])/g, '$1 $2') // Add space before capital letters in camelCase
-      .replace(/[^a-zA-Z0-9\s]/g, ' ') // Replace any other special characters with spaces
+      .replace(/[^a-zA-Z0-9\s]/g, ' ') // Replace any special characters (including _ and -) with spaces
       .replace(/\s+/g, ' ') // Replace multiple spaces with single space
       .trim(); // Remove leading/trailing spaces
   };

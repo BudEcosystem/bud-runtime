@@ -99,7 +99,6 @@ const AgentDrawer: React.FC = () => {
 
     if (isOAuthCallback) {
       // OAuth callback - session should already exist, don't create new one
-      console.log('OAuth callback detected, using existing session');
       return;
     }
 
@@ -185,9 +184,6 @@ const AgentDrawer: React.FC = () => {
         '',
         newUrl
       );
-
-      console.log('Updated URL with prompt IDs:', promptIds);
-      console.log('Preserved agent param:', urlSearchParams.get('agent'));
     }
   }, [activeSessions, isAgentDrawerOpen, router]);
 

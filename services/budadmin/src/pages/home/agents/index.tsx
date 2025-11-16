@@ -56,8 +56,6 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
       key={index}
       onClick={async () => {
         // Handle click - will need to implement drawer flow or navigation
-        // For now, just log the action
-        console.log("View prompt/agent:", item.name);
       }}
     >
       <div className="pr-[1.5em] pl-[1.5em] pt-[1.6em] pb-[.6rem] h-full flex flex-col">
@@ -249,7 +247,6 @@ export default function PromptsAgents() {
   // handling useEffect below will recreate sessions from the URL and open the drawer.
   // This ensures sessions are created before the drawer opens.
   const handleOAuthCallback = useCallback((oauthState: any) => {
-    console.log('OAuth callback handler triggered', oauthState);
     // The ConnectorDetails component will handle the actual OAuth completion
   }, []);
 
@@ -376,8 +373,6 @@ export default function PromptsAgents() {
         agentId = parts[0];
         promptParam = parts[1];
         console.warn('Malformed URL detected. Use & instead of ? to separate query parameters.');
-        console.log('Parsed agent ID:', agentId);
-        console.log('Parsed prompt param:', promptParam);
       }
 
       // Check if this is an OAuth callback
@@ -387,7 +382,6 @@ export default function PromptsAgents() {
       if (agentId && typeof agentId === 'string') {
         try {
           showLoader();
-          console.log('Opening add agent workflow with ID:', agentId);
 
           // Fetch workflow details
           const workflowResponse = await AppRequest.Get(
@@ -395,7 +389,6 @@ export default function PromptsAgents() {
           );
 
           if (workflowResponse?.data) {
-            console.log('Workflow details fetched:', workflowResponse.data);
 
             // Open the add agent drawer
             openDrawer("add-agent");
@@ -404,51 +397,23 @@ export default function PromptsAgents() {
             if (promptParam && typeof promptParam === 'string') {
               // Parse comma-separated prompt IDs
               const promptIds = promptParam.split(',').map(id => id.trim());
-              console.log('Opening AgentDrawer with prompt IDs:', promptIds);
-
-              const createdSessionIds: string[] = [];
 
               // Create sessions for each prompt ID (don't fetch from API)
               for (const promptId of promptIds) {
                 // Create agent session for each prompt
                 const sessionId = createSession();
-                console.log(`Created session ${sessionId} for prompt ${promptId}`);
-
-                // Check store state immediately after creation
-                const storeAfterCreate = useAgentStore.getState();
-                console.log(`  Store after createSession: activeSessionIds = [${storeAfterCreate.activeSessionIds.join(', ')}]`);
-                console.log(`  Total sessions: ${storeAfterCreate.sessions.length}`);
 
                 if (sessionId) {
-                  createdSessionIds.push(sessionId);
-
                   // Update session with prompt ID from URL
                   updateSession(sessionId, {
                     promptId: promptId,
                     name: `Agent ${promptIds.indexOf(promptId) + 1}`,
                   });
-                  console.log(`Updated session ${sessionId} with prompt ID: ${promptId}`);
-
-                  // Check store state after update
-                  const storeAfterUpdate = useAgentStore.getState();
-                  console.log(`  Store after updateSession: activeSessionIds = [${storeAfterUpdate.activeSessionIds.join(', ')}]`);
                 }
               }
 
-              // Open AgentDrawer AFTER sessions are created
-              console.log(`Total sessions created: ${createdSessionIds.length}`);
-              console.log('Created session IDs:', createdSessionIds);
-
-              // Log the store state before opening drawer
-              const { sessions: currentSessions, activeSessionIds: currentActiveIds } = useAgentStore.getState();
-              console.log('Store state before opening drawer:');
-              console.log('  Total sessions in store:', currentSessions.length);
-              console.log('  Active session IDs:', currentActiveIds);
-              console.log('  Sessions:', currentSessions.map(s => ({ id: s.id, name: s.name, promptId: s.promptId })));
-
               // Use requestAnimationFrame to ensure React has rendered the state updates
               requestAnimationFrame(() => {
-                console.log('Opening AgentDrawer after session creation');
                 openAgentDrawer();
               });
             }
@@ -470,51 +435,23 @@ export default function PromptsAgents() {
 
           // Parse comma-separated prompt IDs
           const promptIds = promptParam.split(',').map(id => id.trim());
-          console.log('Opening AgentDrawer with prompt IDs (no agent workflow):', promptIds);
-
-          const createdSessionIds: string[] = [];
 
           // Create sessions for each prompt ID (don't fetch from API)
           for (const promptId of promptIds) {
             // Create agent session for each prompt
             const sessionId = createSession();
-            console.log(`Created session ${sessionId} for prompt ${promptId}`);
-
-            // Check store state immediately after creation
-            const storeAfterCreate = useAgentStore.getState();
-            console.log(`  Store after createSession: activeSessionIds = [${storeAfterCreate.activeSessionIds.join(', ')}]`);
-            console.log(`  Total sessions: ${storeAfterCreate.sessions.length}`);
 
             if (sessionId) {
-              createdSessionIds.push(sessionId);
-
               // Update session with prompt ID from URL
               updateSession(sessionId, {
                 promptId: promptId,
                 name: `Agent ${promptIds.indexOf(promptId) + 1}`,
               });
-              console.log(`Updated session ${sessionId} with prompt ID: ${promptId}`);
-
-              // Check store state after update
-              const storeAfterUpdate = useAgentStore.getState();
-              console.log(`  Store after updateSession: activeSessionIds = [${storeAfterUpdate.activeSessionIds.join(', ')}]`);
             }
           }
 
-          // Open AgentDrawer AFTER sessions are created
-          console.log(`Total sessions created: ${createdSessionIds.length}`);
-          console.log('Created session IDs:', createdSessionIds);
-
-          // Log the store state before opening drawer
-          const { sessions: currentSessions, activeSessionIds: currentActiveIds } = useAgentStore.getState();
-          console.log('Store state before opening drawer (no agent workflow):');
-          console.log('  Total sessions in store:', currentSessions.length);
-          console.log('  Active session IDs:', currentActiveIds);
-          console.log('  Sessions:', currentSessions.map(s => ({ id: s.id, name: s.name, promptId: s.promptId })));
-
           // Use requestAnimationFrame to ensure React has rendered the state updates
           requestAnimationFrame(() => {
-            console.log('Opening AgentDrawer after session creation (no agent workflow)');
             openAgentDrawer();
           });
 
