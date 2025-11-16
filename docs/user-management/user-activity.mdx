@@ -1,0 +1,550 @@
+---
+title: "User Activity"
+description: "Monitor team usage and track user actions"
+---
+
+# User Activity
+
+Track and monitor user actions across your organization with comprehensive audit logs and activity tracking. This guide covers how to view user activity, understand audit trails, and monitor team usage.
+
+## Overview
+
+Bud Stack automatically tracks all significant user actions to provide:
+- **Audit trails** for compliance and security
+- **Activity monitoring** for team oversight
+- **Troubleshooting** support for debugging issues
+- **Usage analytics** for understanding platform adoption
+
+<Note>
+Only Admin users with USER_VIEW or USER_MANAGE permissions can access user activity logs.
+</Note>
+
+## What's Tracked
+
+### User Actions
+
+All major user actions are logged:
+
+<CardGroup cols={2}>
+  <Card title="Account Actions" icon="user-circle">
+    - User creation (CREATE)
+    - Profile updates (UPDATE)
+    - Account deletion (DELETE)
+    - Login attempts (LOGIN)
+    - Failed logins (LOGIN_FAILED)
+    - Password resets
+  </Card>
+
+  <Card title="Resource Actions" icon="cube">
+    - Project creation/deletion
+    - Model deployments
+    - Endpoint configuration
+    - Cluster registration
+    - Benchmark runs
+    - Settings changes
+  </Card>
+</CardGroup>
+
+### Captured Information
+
+For each action, the system records:
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| **Action** | Type of action performed | CREATE, UPDATE, DELETE, LOGIN |
+| **Resource Type** | What was affected | USER, PROJECT, MODEL, ENDPOINT, CLUSTER |
+| **Resource ID** | Specific resource identifier | `project-abc-123` |
+| **User ID** | Who performed the action | User's UUID |
+| **User Email** | User's email address | `john@company.com` |
+| **Timestamp** | When it happened | `2025-01-15T14:30:00Z` |
+| **IP Address** | Where it came from | `192.168.1.100` |
+| **User Agent** | Browser/client info | `Mozilla/5.0...` |
+| **Details** | Additional context | JSON object with specifics |
+| **Status** | Success or failure | SUCCESS, FAILED |
+
+## Viewing User Activity
+
+### Access Activity Logs
+
+<Steps>
+  <Step title="Navigate to User Management">
+    From the dashboard sidebar, click on **User Management**.
+  </Step>
+
+  <Step title="Select a User">
+    Click on any user in the list to view their profile.
+  </Step>
+
+  <Step title="View Activity Tab">
+    Click the **Activity** or **Audit Log** tab to see their action history.
+  </Step>
+
+  <Step title="Filter and Search">
+    Use filters to narrow down by date range, action type, or resource.
+  </Step>
+</Steps>
+
+### Activity Dashboard
+
+The activity dashboard shows:
+- **Recent Actions**: Latest 50 actions
+- **Action Timeline**: Visual timeline of user activity
+- **Action Summary**: Count by action type
+- **Resource Breakdown**: Which resources users interact with most
+
+## Action Types Explained
+
+### CREATE Actions
+
+Logged when users create new resources:
+
+```json
+{
+  "action": "CREATE",
+  "resource_type": "PROJECT",
+  "resource_id": "project-abc-123",
+  "user_id": "user-def-456",
+  "user_email": "alice@company.com",
+  "timestamp": "2025-01-15T14:30:00Z",
+  "ip_address": "192.168.1.100",
+  "details": {
+    "project_name": "My AI Project",
+    "description": "New ML deployment project"
+  }
+}
+```
+
+**Common CREATE Actions:**
+- New project creation
+- User invitation
+- Model deployment
+- Endpoint setup
+- Cluster registration
+
+### UPDATE Actions
+
+Logged when users modify existing resources:
+
+```json
+{
+  "action": "UPDATE",
+  "resource_type": "USER",
+  "resource_id": "user-def-456",
+  "user_id": "admin-789",
+  "user_email": "admin@company.com",
+  "timestamp": "2025-01-15T15:00:00Z",
+  "details": {
+    "changed_fields": ["role"],
+    "old_value": "DEVELOPER",
+    "new_value": "ADMIN"
+  }
+}
+```
+
+**Common UPDATE Actions:**
+- User profile changes
+- Role/permission updates
+- Project configuration changes
+- Endpoint modifications
+- Settings updates
+
+### DELETE Actions
+
+Logged when users delete resources:
+
+```json
+{
+  "action": "DELETE",
+  "resource_type": "ENDPOINT",
+  "resource_id": "endpoint-xyz-789",
+  "user_id": "user-def-456",
+  "user_email": "bob@company.com",
+  "timestamp": "2025-01-15T16:00:00Z",
+  "details": {
+    "endpoint_name": "production-api",
+    "reason": "No longer needed"
+  }
+}
+```
+
+**Common DELETE Actions:**
+- Project deletion
+- User account removal
+- Endpoint deletion
+- Model undeployment
+- Cluster deregistration
+
+### LOGIN Actions
+
+Logged for successful authentication:
+
+```json
+{
+  "action": "LOGIN",
+  "resource_type": "USER",
+  "resource_id": "user-def-456",
+  "user_id": "user-def-456",
+  "user_email": "charlie@company.com",
+  "timestamp": "2025-01-15T09:00:00Z",
+  "ip_address": "203.0.113.42",
+  "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...",
+  "details": {
+    "login_method": "email_password",
+    "tenant_name": "Acme Corp"
+  }
+}
+```
+
+### LOGIN_FAILED Actions
+
+Logged for failed authentication attempts:
+
+```json
+{
+  "action": "LOGIN_FAILED",
+  "resource_type": "USER",
+  "user_email": "attacker@evil.com",
+  "timestamp": "2025-01-15T09:05:00Z",
+  "ip_address": "198.51.100.42",
+  "details": {
+    "reason": "Invalid credentials",
+    "attempted_email": "admin@company.com"
+  }
+}
+```
+
+<Warning>
+Multiple failed login attempts from the same IP may indicate a security threat. Monitor these closely.
+</Warning>
+
+## Filtering Activity Logs
+
+### Filter by Date Range
+
+View activity within specific time periods:
+- **Last 24 hours**: Recent activity
+- **Last 7 days**: Weekly overview
+- **Last 30 days**: Monthly trends
+- **Custom range**: Specify exact dates
+
+### Filter by Action Type
+
+Focus on specific actions:
+- CREATE
+- UPDATE
+- DELETE
+- LOGIN
+- LOGIN_FAILED
+
+### Filter by Resource Type
+
+See activity for specific resources:
+- USER
+- PROJECT
+- MODEL
+- ENDPOINT
+- CLUSTER
+- BENCHMARK
+
+### Filter by User
+
+View activity for specific team members:
+- Select from user dropdown
+- Search by name or email
+- View all actions by that user
+
+## Team Usage Analytics
+
+### Activity Metrics
+
+Track overall team engagement:
+
+<CardGroup cols={3}>
+  <Card title="Active Users" icon="users">
+    Number of users who logged in during the period
+  </Card>
+  <Card title="Total Actions" icon="bolt">
+    All actions performed across the organization
+  </Card>
+  <Card title="Resource Changes" icon="pen-to-square">
+    CREATE, UPDATE, DELETE operations
+  </Card>
+</CardGroup>
+
+### Usage Patterns
+
+Identify:
+- **Peak Usage Times**: When your team is most active
+- **Popular Features**: Which features are used most
+- **Inactive Users**: Users who haven't logged in recently
+- **Power Users**: Most active team members
+
+### Resource Activity
+
+See which resources are most actively managed:
+- Projects with most changes
+- Frequently accessed models
+- Heavily used endpoints
+- Active clusters
+
+## Security Monitoring
+
+### Suspicious Activity Detection
+
+Watch for potential security issues:
+
+<Accordion title="Multiple Failed Login Attempts">
+  Several failed logins from same IP address may indicate brute force attack. Review IP and consider blocking if necessary.
+</Accordion>
+
+<Accordion title="Unusual Login Locations">
+  User logging in from unexpected geographic location. Verify with user or investigate potential account compromise.
+</Accordion>
+
+<Accordion title="After-Hours Activity">
+  Activity outside normal working hours. Could be legitimate or indicate unauthorized access.
+</Accordion>
+
+<Accordion title="Bulk Deletions">
+  Large number of resources deleted quickly. May indicate malicious activity or accidental bulk action.
+</Accordion>
+
+<Accordion title="Permission Escalations">
+  User role changed to higher privilege level. Verify this was intentional and authorized.
+</Accordion>
+
+### Security Best Practices
+
+1. **Regular Reviews**: Check audit logs weekly
+2. **Alert Setup**: Configure notifications for suspicious activities
+3. **Failed Login Monitoring**: Investigate repeated failures
+4. **IP Whitelisting**: Restrict access to known IPs when possible
+5. **Two-Factor Authentication**: Enable for sensitive accounts
+
+## Exporting Activity Logs
+
+### Export Options
+
+<Tabs>
+  <Tab title="CSV Export">
+    Download activity logs as CSV for analysis in spreadsheet tools:
+
+    1. Apply desired filters
+    2. Click **Export** button
+    3. Select **CSV format**
+    4. Open in Excel, Google Sheets, etc.
+  </Tab>
+
+  <Tab title="JSON Export">
+    Export in JSON format for programmatic processing:
+
+    1. Apply desired filters
+    2. Click **Export** button
+    3. Select **JSON format**
+    4. Process with custom scripts
+  </Tab>
+
+  <Tab title="API Access">
+    Access logs programmatically via API:
+
+    ```python
+    import requests
+
+    response = requests.get(
+        "https://api.bud.studio/audit-logs/",
+        headers={"Authorization": f"Bearer {api_key}"},
+        params={
+            "start_date": "2025-01-01",
+            "end_date": "2025-01-31",
+            "action": "LOGIN",
+            "limit": 1000
+        }
+    )
+
+    logs = response.json()
+    ```
+  </Tab>
+</Tabs>
+
+### Compliance Reporting
+
+For compliance requirements:
+- Export logs for specific audit periods
+- Filter by specific users or actions
+- Include all required fields for auditors
+- Maintain logs for required retention period
+
+<Note>
+Activity logs are retained for 90 days by default. Contact support for extended retention options.
+</Note>
+
+## Real-Time Activity Monitoring
+
+### Live Activity Feed
+
+View real-time user actions as they happen:
+- Live updates without page refresh
+- Color-coded by action type
+- Instant notifications for critical actions
+- Stream view of all organizational activity
+
+### Activity Notifications
+
+Set up alerts for specific events:
+
+<Steps>
+  <Step title="Navigate to Settings">
+    Go to **Organization Settings** > **Notifications**.
+  </Step>
+
+  <Step title="Configure Activity Alerts">
+    Enable alerts for events you want to monitor.
+  </Step>
+
+  <Step title="Choose Delivery Method">
+    Select email, Slack, or in-app notifications.
+  </Step>
+
+  <Step title="Set Alert Criteria">
+    Define conditions that trigger alerts (e.g., failed logins > 5).
+  </Step>
+</Steps>
+
+## Use Cases
+
+### Compliance Auditing
+
+**Scenario**: Annual security audit requires proof of access controls
+
+**Solution**:
+1. Export all USER actions for the audit period
+2. Filter by CREATE and UPDATE to show user management
+3. Demonstrate proper role assignments and changes
+4. Show audit trail of who made what changes
+
+### Troubleshooting
+
+**Scenario**: User reports they can't access a project
+
+**Solution**:
+1. View user's recent activity
+2. Check for any DELETE actions on projects
+3. Review permission UPDATE actions
+4. Identify when access changed and by whom
+
+### Security Investigation
+
+**Scenario**: Suspicious activity detected on account
+
+**Solution**:
+1. Filter LOGIN and LOGIN_FAILED for the user
+2. Check IP addresses and locations
+3. Review recent actions for unauthorized changes
+4. Identify timeline of suspicious activity
+
+### Team Performance
+
+**Scenario**: Understanding team productivity and engagement
+
+**Solution**:
+1. View activity metrics for all users
+2. Identify most/least active team members
+3. See which features are used most
+4. Plan training based on usage patterns
+
+## Troubleshooting Activity Logs
+
+### Missing Activity Data
+
+If expected actions aren't showing:
+
+1. Check date range filter
+2. Verify you have USER_VIEW permission
+3. Ensure user exists and has taken actions
+4. Contact support if issue persists
+
+### Incomplete Action Details
+
+Some actions may have limited details:
+- Actions from API vs UI may have different details
+- System actions may lack user context
+- Deleted resources may show ID only
+
+### Export Not Working
+
+If export fails:
+1. Try smaller date range
+2. Reduce number of filters
+3. Check browser console for errors
+4. Try different format (CSV vs JSON)
+
+## API Reference
+
+### List Activity Logs
+
+```python
+import requests
+
+# Get recent activity
+response = requests.get(
+    "https://api.bud.studio/audit-logs/",
+    headers={"Authorization": f"Bearer {api_key}"},
+    params={
+        "limit": 100,
+        "offset": 0,
+        "action": "LOGIN",
+        "start_date": "2025-01-01T00:00:00Z",
+        "end_date": "2025-01-31T23:59:59Z"
+    }
+)
+
+logs = response.json()
+for log in logs['items']:
+    print(f"{log['timestamp']}: {log['user_email']} - {log['action']}")
+```
+
+### Get User-Specific Activity
+
+```python
+user_id = "user-abc-123"
+response = requests.get(
+    f"https://api.bud.studio/users/{user_id}/activity",
+    headers={"Authorization": f"Bearer {api_key}"},
+    params={"limit": 50}
+)
+
+user_activity = response.json()
+```
+
+### Filter by Resource
+
+```python
+response = requests.get(
+    "https://api.bud.studio/audit-logs/",
+    headers={"Authorization": f"Bearer {api_key}"},
+    params={
+        "resource_type": "PROJECT",
+        "resource_id": "project-xyz-789"
+    }
+)
+
+project_activity = response.json()
+```
+
+## Related Pages
+
+- [Inviting Users](/user-management/inviting-users) - Add team members to track
+- [Roles & Permissions](/user-management/roles-permissions) - Understand permission changes
+- [Security Best Practices](/api-keys/security-best-practices) - Secure your organization
+- [Organization Settings](/settings/organization-settings) - Configure activity alerts
+
+## Summary
+
+User activity tracking provides:
+- **Complete Audit Trail**: All actions logged with full context
+- **Security Monitoring**: Detect and investigate suspicious activity
+- **Compliance Support**: Export logs for regulatory requirements
+- **Troubleshooting**: Debug issues by reviewing action history
+- **Team Insights**: Understand platform usage and engagement
+
+Monitor your team's activity regularly to maintain security, ensure compliance, and optimize platform usage.

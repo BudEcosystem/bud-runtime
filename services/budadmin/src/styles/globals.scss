@@ -3924,6 +3924,14 @@ html {
   padding-top: .65rem !important;
 }
 
+.agentSelect.ant-select {
+  .ant-select-selector {
+    background: transparent;
+    border: .5px solid #757575 !important;
+    padding: 0 .5rem !important;
+  }
+}
+
 // responsive styles
 @media only screen and (min-width: 1440px) {
 

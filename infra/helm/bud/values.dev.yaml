@@ -31,8 +31,6 @@ microservices:
         image: budstudio/budapp:nightly
     budcluster:
         image: budstudio/budcluster:nightly
-        env:
-            VOLUME_TYPE: nfs
     budmetrics:
         image: budstudio/budmetrics:nightly
     budmodel:
@@ -47,6 +45,8 @@ microservices:
         image: budstudio/budnotify:nightly
     budprompt:
         image: budstudio/budprompt:nightly
+        env:
+            LOG_LEVEL: DEBUG
 
 imagePullPolicy: "Always"
 deploymentAnnotations:

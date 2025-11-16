@@ -185,8 +185,39 @@ pub async fn require_api_key(
     let is_batch_or_file_endpoint =
         path.starts_with("/v1/batches") || path.starts_with("/v1/files");
     let is_responses_endpoint = path.starts_with("/v1/responses");
+    let is_models_list_endpoint = path == "/v1/models";
 
     let mut request = Request::from_parts(parts, Body::from(bytes.clone()));
+
+    // Special handling for /v1/models endpoint - it lists all available models
+    if is_models_list_endpoint {
+        // We already checked that api_config is Ok in the if statement above
+        #[expect(clippy::unwrap_used)]
+        let api_config = api_config.as_ref().unwrap();
+
+        // Get all model names (keys) available to this API key
+        let model_names: Vec<String> = api_config
+            .keys()
+            .filter(|k| !k.starts_with("prompt:")) // Exclude prompt-based keys
+            .map(|k| k.to_string())
+            .collect();
+
+        // Pass the available models as a comma-separated header
+        let models_header = model_names.join(",");
+        if let Ok(header_value) = models_header.parse() {
+            request
+                .headers_mut()
+                .insert("x-tensorzero-available-models", header_value);
+        }
+
+        // Mark as authenticated - use from_static for known static string
+        request.headers_mut().insert(
+            "x-tensorzero-endpoint-id",
+            axum::http::HeaderValue::from_static("models_list"),
+        );
+
+        return Ok(next.run(request).await);
+    }
 
     if !is_batch_or_file_endpoint {
         // Parse the JSON body to validate and extract model name or prompt.id
@@ -201,26 +232,30 @@ pub async fn require_api_key(
         };
 
         // Determine lookup key: either model OR prompt.id with prompt: prefix
-        let (lookup_key, is_prompt_based, _original_prompt_id) = if let Some(model) = val.get("model").and_then(|v| v.as_str()) {
-            // Traditional model-based request
-            (model.to_string(), false, None)
-        } else if let Some(prompt_id) = val.get("prompt")
-            .and_then(|p| p.get("id"))
-            .and_then(|id| id.as_str()) {
-            // Add prompt: prefix for authorization lookup
-            (format!("prompt:{}", prompt_id), true, Some(prompt_id.to_string()))
-        } else {
-            // Provide endpoint-specific error message
-            let error_message = if is_responses_endpoint {
-                "Model name or prompt.id required in request body"
+        let (lookup_key, is_prompt_based, _original_prompt_id) =
+            if let Some(model) = val.get("model").and_then(|v| v.as_str()) {
+                // Traditional model-based request
+                (model.to_string(), false, None)
+            } else if let Some(prompt_id) = val
+                .get("prompt")
+                .and_then(|p| p.get("id"))
+                .and_then(|id| id.as_str())
+            {
+                // Add prompt: prefix for authorization lookup
+                (
+                    format!("prompt:{}", prompt_id),
+                    true,
+                    Some(prompt_id.to_string()),
+                )
             } else {
-                "Missing model name in request body"
+                // Provide endpoint-specific error message
+                let error_message = if is_responses_endpoint {
+                    "Model name or prompt.id required in request body"
+                } else {
+                    "Missing model name in request body"
+                };
+                return Err(auth_error_response(StatusCode::BAD_REQUEST, error_message));
             };
-            return Err(auth_error_response(
-                StatusCode::BAD_REQUEST,
-                error_message,
-            ));
-        };
 
         // We already checked that api_config is Ok in the if statement above
         #[expect(clippy::unwrap_used)]
@@ -235,10 +270,7 @@ pub async fn require_api_key(
                 } else {
                     format!("Model not found: {}", lookup_key)
                 };
-                return Err(auth_error_response(
-                    StatusCode::NOT_FOUND,
-                    &error_message,
-                ))
+                return Err(auth_error_response(StatusCode::NOT_FOUND, &error_message));
             }
         };
 

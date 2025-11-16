@@ -183,13 +183,8 @@ export default function AdaptersTable() {
           return;
         }
         setConfirmLoading(true);
-        const result = await deleteAdapter(record?.id, projectId);
-        if (result?.["data"]) {
-          await load();
-          successToast("Deployment deleted successfully");
-        } else {
-          errorToast("Failed to delete deployment");
-        }
+        await deleteAdapter(record?.id, projectId);
+        // deleteAdapter already shows appropriate toast message
         await load();
         setConfirmLoading(false);
         setConfirmVisible(false);

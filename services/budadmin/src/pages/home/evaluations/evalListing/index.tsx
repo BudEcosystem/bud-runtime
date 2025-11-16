@@ -16,6 +16,7 @@ import {
   GetEvaluationsPayload,
   Evaluation,
 } from "src/hooks/useEvaluations";
+import { useLoader } from "src/context/appContext";
 
 const EvaluationList = () => {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
@@ -27,12 +28,14 @@ const EvaluationList = () => {
     getTraits,
     traitsList,
   } = useEvaluations();
+  const { isLoading, showLoader, hideLoader } = useLoader();
   const router = useRouter();
   const [searchValue, setSearchValue] = useState("");
   const descriptionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const handleEvaluationClick = useCallback((evaluation: Evaluation) => {
     // Store the selected evaluation data in sessionStorage to pass to the detail page
+    showLoader();
     sessionStorage.setItem('selectedEvaluation', JSON.stringify(evaluation));
     router.push(`/evaluations/${evaluation.id}`);
   }, [router]);

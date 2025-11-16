@@ -16,21 +16,20 @@
 
 """API routes for responses module - OpenAI-compatible API."""
 
-import logging
 from typing import Any, Dict, Union
 
+from budmicroframe.commons import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from budprompt.commons.exceptions import OpenAIResponseException
 
-from ..prompt.openai_response_formatter import OpenAIResponseSchema
-from .schemas import OpenAIError, OpenAIResponsesError, ResponseCreateRequest
+from .schemas import OpenAIError, OpenAIResponse, OpenAIResponsesError, ResponseCreateRequest
 from .services import ResponsesService
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 # NOTE: Optional Bearer token security (auto_error=False makes it optional)
 security = HTTPBearer()
@@ -44,7 +43,7 @@ responses_router = APIRouter(
 
 @responses_router.post(
     "/",
-    response_model=Union[OpenAIResponseSchema, OpenAIResponsesError, Dict[str, Any]],
+    response_model=Union[OpenAIResponse, OpenAIResponsesError, Dict[str, Any]],
     summary="Create response using prompt template",
     description="Execute a prompt template with variables (OpenAI-compatible)",
     responses={
@@ -59,7 +58,7 @@ responses_router = APIRouter(
 async def create_response(
     request: ResponseCreateRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security),  # noqa: B008
-) -> Union[OpenAIResponseSchema, OpenAIResponsesError, Dict[str, Any]]:
+) -> Union[OpenAIResponse, OpenAIResponsesError, Dict[str, Any]]:
     """Create a response using a prompt template.
 
     This endpoint is compatible with OpenAI's responses API format.
@@ -71,7 +70,7 @@ async def create_response(
         credentials: Optional bearer token credentials for API authentication
 
     Returns:
-        OpenAIResponseSchema on success or JSONResponse with error status code and
+        OpenAIResponse on success or JSONResponse with error status code and
         OpenAI-compatible error format on failure
     """
     logger.info(f"Received response creation request for prompt: {request.prompt.id}")

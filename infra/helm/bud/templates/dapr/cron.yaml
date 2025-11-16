@@ -51,3 +51,22 @@ spec:
     value: "/clusters/recommended-scheduler"
 scopes:
   - budapp
+
+---
+
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: prompt-cleanup-scheduler
+spec:
+  type: bindings.cron
+  version: v1
+  metadata:
+  - name: schedule
+    value: "@every 12h" # Every 12 hours
+  - name: direction
+    value: "input"
+  - name: route
+    value: "/v1/prompt/prompt-cleanup-cron"
+scopes:
+  - budprompt

@@ -594,6 +594,10 @@ class ExpDataset(BaseModel):
         None,
         description="Advantages and disadvantages with structure {'advantages': ['str1'], 'disadvantages': ['str2']}.",
     )
+    eval_types: Optional[dict] = Field(
+        None,
+        description="Evaluation type configurations like {'gen': 'gsm8k_gen', 'agent': 'gsm8k_agent'}.",
+    )
     traits: List[Trait] = Field([], description="Traits associated with this dataset.")
 
     class Config:
@@ -625,6 +629,10 @@ class DatasetFilter(BaseModel):
     language: Optional[List[str]] = Field(None, description="Filter by languages.")
     domains: Optional[List[str]] = Field(None, description="Filter by domains.")
     trait_ids: Optional[List[UUID4]] = Field(None, description="Filter by trait UUIDs.")
+    has_gen_eval_type: Optional[bool] = Field(
+        None,
+        description="Filter datasets that have 'gen' key in eval_types. True to include only datasets with 'gen' key.",
+    )
 
 
 class CreateDatasetRequest(BaseModel):
@@ -860,20 +868,28 @@ class ExperimentEvaluationsResponse(SuccessResponse):
 # ------------------------ Evaluation Listing Schemas ------------------------
 
 
-class EvaluationListItem(BaseModel):
-    """A single evaluation item in the completed evaluations list."""
+class RunDatasetScore(BaseModel):
+    """Individual run with dataset and score."""
 
-    evaluation_name: str = Field(..., description="Name of the evaluation")
+    run_id: UUID4 = Field(..., description="UUID of the run")
+    dataset_name: str = Field(..., description="Name of the dataset")
+    score: Optional[float] = Field(None, description="Score for this run")
+
+
+class EvaluationListItem(BaseModel):
+    """A single evaluation with its runs."""
+
     evaluation_id: UUID4 = Field(..., description="UUID of the evaluation")
+    evaluation_name: str = Field(..., description="Name of the evaluation")
     model_name: str = Field(..., description="Name of the model used")
-    started_date: datetime = Field(..., description="Date when the evaluation was started")
-    duration_minutes: int = Field(..., description="Duration of the evaluation in minutes")
-    trait_name: str = Field(..., description="Name of the trait")
-    trait_score: float = Field(..., description="Score for this trait")
+    deployment_name: Optional[str] = Field(None, description="Deployment/endpoint name")
+    started_date: datetime = Field(..., description="When evaluation started")
+    duration_minutes: int = Field(..., description="Duration in minutes")
     status: str = Field(
         ...,
-        description="Status of the evaluation (pending/running/completed/failed)",
+        description="Status (pending/running/completed/failed)",
     )
+    runs: List[RunDatasetScore] = Field(default_factory=list, description="Runs with dataset scores")
 
 
 class ListEvaluationsResponse(SuccessResponse):

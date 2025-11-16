@@ -115,9 +115,9 @@ export default function ViewModel() {
       );
     }
 
-    // Hide Performance and Adapters tabs when dev mode is disabled
+    // Hide Performance tab when dev mode is disabled
     if (!enableDevMode) {
-      filtered = filtered.filter((item) => item.key !== "3" && item.key !== "5");
+      filtered = filtered.filter((item) => item.key !== "3");
     }
 
     setFilteredItems(filtered);

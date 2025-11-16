@@ -537,6 +537,7 @@ impl Client {
                         gateway.state.kafka_connection_info.clone(),
                         gateway.state.model_credential_store.clone(),
                         params.try_into().map_err(err_to_http)?,
+                        None, // No analytics available for Rust client
                     )
                     .await
                     .map_err(err_to_http)

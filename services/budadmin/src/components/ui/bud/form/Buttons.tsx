@@ -35,7 +35,7 @@ export function PrimaryButton({
           <div className="relative inline-block">
             <Button
               {...props}
-              className={`pointer-events-none opacity-60 flex justify-center items-center !border-[.5px] !border-[#965CDE] font-normal !bg-[#1E0C34] ${classNames}`}
+              className={`pointer-events-none opacity-60 flex justify-center items-center !border-[.5px] font-normal ${classNames}`}
               disabled={true} // keep enabled so events can bubble
               style={{
                 minWidth: "4rem",
@@ -44,6 +44,8 @@ export function PrimaryButton({
                 cursor: "not-allowed",
                 borderRadius: "0.3rem",
                 height: "1.75rem",
+                borderColor: "#965CDE",
+                background: "#1E0C34 !important",
               }}
             >
               {Children}
@@ -70,7 +72,7 @@ export function PrimaryButton({
       ) : (
         <Button
           {...props}
-          className={`flex justify-center items-center !border-[.5px] !border-[#965CDE] font-normal !bg-[#1E0C34] hover:bg-[#965CDE] ${classNames}
+          className={`flex justify-center items-center !border-[.5px] font-normal hover:bg-[#965CDE] ${classNames}
       ${disabled ? "!bg-[#1E0C34] hover:!bg-[#1E0C34] border-[#965CDE] text-[#888888] cursor-not-allowed" : "!bg-[#1E0C34] hover:!bg-[#965CDE]"} `}
           disabled={disabled} // Ensures that the button is actually disabled
           style={{
@@ -79,6 +81,8 @@ export function PrimaryButton({
             paddingRight: ".7rem",
             borderRadius: "0.3rem",
             height: "1.75rem",
+            borderColor: "#965CDE",
+            background: "#1E0C34",
           }}
         >
           {!permission ? (
@@ -92,12 +96,12 @@ export function PrimaryButton({
                 <div
                   className={`${textClass} ${props.children == "Next" || props.text == "Next" ? "ml-[.4rem] mr-[0]" : ""}`}
                   style={{
-                  fontSize: "0.75rem",
-                  color: "#EEEEEE",
-                  fontWeight: 600,
-                  lineHeight: "100%",
-                  background: "transparent",
-                }}
+                    fontSize: "0.75rem",
+                    color: "#EEEEEE",
+                    fontWeight: 600,
+                    lineHeight: "100%",
+                    background: "transparent",
+                  }}
                 >
                   {props.children || props.text || "Next"}
                 </div>
@@ -140,12 +144,23 @@ export function SecondaryButton({ classNames = "", ...props }: any) {
   return (
     <Button
       {...props}
-      className={`text-[0.75rem] h-[1.75rem] border-[.5px] border-[#757575] min-w-[4rem] font-normal bg-[#1F1F1F]
+      className={`text-[0.75rem]
     hover:bg-[#1F1F1F] hover:border-[#B3B3B3] ${classNames}
     ${props.text == "Skip" && "hover:bg-[#38260B] hover:border-[#896814]"}
     ${props.text == "Close" && "hover:bg-[#290E0E] hover:border-[#6F0E0E]"}
     ${props.disabled ? "bg-[#1F1F1F]  text-[#757575]! cursor-not-allowed" : "bg-[#1F1F1F] "}
     `}
+    style={{
+      height: '1.75rem',
+      border: '0.5px solid',
+      borderColor: '#757575',
+      borderRadius: '0.3rem',
+      minWidth: '4rem',
+      paddingLeft: '0.7rem',
+      paddingRight: '0.7rem',
+      background: '#1F1F1F',
+      transform: 'none'
+    }}
     >
       <Text_12_400_EEEEEE
         className={`${props.disabled ? "!text-[#757575] font-600" : "text-[#EEEEEE]"}`}

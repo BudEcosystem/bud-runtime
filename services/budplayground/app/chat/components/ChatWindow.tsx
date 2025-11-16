@@ -29,6 +29,15 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
   const [showPromptForm, setShowPromptForm] = useState<boolean>(false);
+  const [promptFormSubmitted, setPromptFormSubmitted] = useState<boolean>(false);
+
+  // State to control PromptForm visibility based on postMessage from parent window
+  // Initially true if promptIds are present in URL
+  const [enablePromptForm, setEnablePromptForm] = useState<boolean>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const promptIdsParam = params.get('promptIds');
+    return !!(promptIdsParam && promptIdsParam.trim().length > 0);
+  });
 
   const promptRef = useRef("");
   const lastMessageRef = useRef<string>("");
@@ -101,6 +110,39 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     }
   }, []);
 
+  // Listen for postMessage events from parent window to control PromptForm visibility
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Optional: Verify the origin for security
+      // if (event.origin !== 'http://localhost:3000') return;
+
+      // Check if this is the message we're expecting
+      if (event.data && event.data.type === 'SET_TYPE_FORM') {
+        const typeFormValue = event.data.typeForm;
+
+        console.log('Received typeForm signal:', typeFormValue);
+
+        // Update state to show/hide PromptForm based on parent message
+        setEnablePromptForm(typeFormValue);
+
+        // Also update showPromptForm to reopen the form if typeForm is true
+        if (typeFormValue && getPromptIds().length > 0) {
+          setShowPromptForm(true);
+        } else {
+          setShowPromptForm(false);
+        }
+      }
+    };
+
+    // Listen for messages from parent
+    window.addEventListener('message', handleMessage);
+
+    // Cleanup listener on unmount
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [getPromptIds]);
+
 
 
   const createNewChat = () => {
@@ -160,6 +202,19 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     addMessage(chat.id, promptMessage);
     addMessage(chat.id, responseMessage);
 
+    // After the first prompt message completes, update promptData to only include prompt ID context
+    // This ensures subsequent messages don't re-send the variables
+    if (promptData && promptData.prompt?.variables) {
+      setPromptData({
+        prompt: {
+          id: promptData.prompt?.id,
+          version: promptData.prompt?.version,
+        },
+        promptId: promptData.promptId,
+        model: promptData.model,
+      });
+    }
+
     // Use smooth scrolling with scrollTo
     setTimeout(() => {
       if (contentRef.current) {
@@ -187,23 +242,35 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const handlePromptFormSubmit = (data: any) => {
     console.log('Prompt form submitted with data:', data);
 
-    // Set the prompt data for the chat body
+    // Set the prompt data for the chat body (includes full data with variables for first message)
     setPromptData(data);
 
+    // Mark that the prompt form has been submitted (enables textarea for subsequent messages)
+    setPromptFormSubmitted(true);
+
     // Create a user message with the prompt input
-    const userMessage =
-      data.input ||
-      (data.prompt?.variables
-        ? Object.entries(data.prompt.variables)
-            .map(([k, v]) => `${k}: ${v}`)
-            .join('\n')
-        : '');
+    let userMessage = '';
+
+    if (data.input) {
+      // Unstructured input
+      userMessage = data.input;
+    } else if (data.prompt?.variables) {
+      // Structured input - need to unwrap 'content' if it exists
+      const variables = data.prompt.variables.content || data.prompt.variables;
+
+      userMessage = Object.entries(variables)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n');
+    }
 
     // Append the message to trigger the chat with prompt context
     append({
       role: 'user',
       content: userMessage,
     });
+
+    // Note: promptData will be updated in handleFinish after the first message completes
+    // to only include prompt ID context for subsequent messages
 
     // Close the form
     setShowPromptForm(false);
@@ -313,55 +380,94 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             {(status === "submitted" || status === "streaming") && (
               <MessageLoading />
             )}
-            {error && (
-              <div className="mt-4">
-                <div
-                  className="text-[#FF0000] text-[.75rem] font-[400]
+            {error && (() => {
+              // Parse error message if it's a JSON string
+              let errorMessage = error.message || 'An unexpected error occurred';
+              let errorDetails = null;
 
-                "
-                >
-                  {error.message}
+              try {
+                const parsed = JSON.parse(errorMessage);
+                if (parsed.error) {
+                  errorMessage = parsed.error;
+                  errorDetails = parsed.details;
+                }
+              } catch (e) {
+                // Not a JSON string, use as is
+              }
+
+              return (
+                <div className="mt-4 pb-4 border border-[#FF000040] bg-[#FF000010] rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="10" cy="10" r="9" stroke="#FF0000" strokeWidth="1.5"/>
+                        <path d="M10 6V11" stroke="#FF0000" strokeWidth="1.5" strokeLinecap="round"/>
+                        <circle cx="10" cy="14" r="0.75" fill="#FF0000"/>
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-[#FF4444] text-[.875rem] font-[500] mb-2">
+                        Error Processing Request
+                      </div>
+                      <div className="text-[#FFAAAA] text-[.75rem] font-[400] leading-relaxed">
+                        {errorMessage}
+                        {errorDetails && (
+                          <span className="block mt-1 text-[#FF8888]">
+                            details: "{errorDetails}"
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="px-[.75rem] py-[.5rem] mt-4 text-[#fff] border border-[#965cde] rounded-md bg-[#965cde] text-[.75rem] font-[500] hover:bg-[#8a4dcc] hover:border-[#8a4dcc] transition-colors focus:outline-none focus:ring-2 focus:ring-[#965cde] focus:ring-offset-2 focus:ring-offset-[#101010] cursor-pointer"
+                    onClick={() => reload()}
+                  >
+                    Try Again
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="px-[.5rem] p-[.25rem] mt-4 text-[#fff] border border-[#757575] rounded-sm bg-[#965cde] text-[.75rem] font-[400] hover:bg-[#965cde] hover:text-[
-                  #fff] focus:outline-none cursor-pointer"
-                  onClick={() => reload()}
-                >
-                  Retry
-                </button>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </Content>
         <Footer className="sticky bottom-0 !px-[2.6875rem]">
-          <NormalEditor
-            isLoading={status === "submitted" || status === "streaming"}
-            error={error}
-            disabled={!chat?.selectedDeployment?.name}
-            stop={stop}
-            handleInputChange={handleChange}
-            handleSubmit={(e) => {
-              // setSubmitInput(e);
-              handleSubmit(e);
+          {promptIds.length === 0 && (
+            <NormalEditor
+              isLoading={status === "submitted" || status === "streaming"}
+              error={error}
+              disabled={
+                promptIds.length > 0
+                  ? !promptFormSubmitted
+                  : !chat?.selectedDeployment?.name
+              }
+              isPromptMode={promptIds.length > 0}
+              stop={stop}
+              handleInputChange={handleChange}
+              handleSubmit={(e) => {
+                // setSubmitInput(e);
+                handleSubmit(e);
 
-              // Use smooth scrolling with scrollTo
-              setTimeout(() => {
-                if (contentRef.current) {
-                  contentRef.current.scrollTo({
-                    top: contentRef.current.scrollHeight,
-                    behavior: 'smooth'
-                  });
-                }
-              }, 100);
-            }}
-            input={input}
-          />
+                // Use smooth scrolling with scrollTo
+                setTimeout(() => {
+                  if (contentRef.current) {
+                    contentRef.current.scrollTo({
+                      top: contentRef.current.scrollHeight,
+                      behavior: 'smooth'
+                    });
+                  }
+                }, 100);
+              }}
+              input={input}
+            />
+          )}
         </Footer>
+
         {/* Prompt Form - Absolutely positioned at bottom */}
-        {showPromptForm && getPromptIds().length > 0 && (
+        {enablePromptForm && showPromptForm && getPromptIds().length > 0 && (
           <PromptForm
             promptIds={getPromptIds()}
+            chatId={chat.id}
             onSubmit={handlePromptFormSubmit}
             onClose={() => setShowPromptForm(false)}
           />

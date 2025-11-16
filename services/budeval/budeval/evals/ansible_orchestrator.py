@@ -263,14 +263,36 @@ class AnsibleOrchestrator:
                                     "args": ["-c", bash_script],
                                     "env": [
                                         {"name": "ENGINE_ARGS", "value": ""},
-                                        {"name": "OPENCOMPASS_CONFIG_PATH", "value": "/workspace/configs"},
-                                        {"name": "HF_HOME", "value": "/workspace/cache"},
-                                        {"name": "TRANSFORMERS_CACHE", "value": "/workspace/cache"},
-                                        {"name": "TORCH_HOME", "value": "/workspace/cache"},
+                                        {
+                                            "name": "OPENCOMPASS_CONFIG_PATH",
+                                            "value": "/workspace/configs",
+                                        },
+                                        {
+                                            "name": "HF_HOME",
+                                            "value": "/workspace/cache",
+                                        },
+                                        {
+                                            "name": "TRANSFORMERS_CACHE",
+                                            "value": "/workspace/cache",
+                                        },
+                                        {
+                                            "name": "TORCH_HOME",
+                                            "value": "/workspace/cache",
+                                        },
+                                        {
+                                            "name": "COMPASS_DATA_CACHE",
+                                            "value": "/workspace/shared",
+                                        },
                                     ],
                                     "volumeMounts": [
-                                        {"name": "eval-datasets-shared", "mountPath": "/workspace/shared"},
-                                        {"name": "cache-volume", "mountPath": "/workspace/cache"},
+                                        {
+                                            "name": "eval-datasets-shared",
+                                            "mountPath": "/workspace/shared",
+                                        },
+                                        {
+                                            "name": "cache-volume",
+                                            "mountPath": "/workspace/cache",
+                                        },
                                     ],
                                     "workingDir": "/workspace",
                                 }
@@ -312,19 +334,28 @@ class AnsibleOrchestrator:
 
         return jobs
 
-    def extract_job_results(self, eval_id: str, run_ids: list[str], kubeconfig: Optional[str] = None) -> dict:
+    def extract_job_results(
+        self,
+        eval_id: str,
+        run_ids: list[str],
+        kubeconfig: Optional[str] = None,
+        job_timing_map: Optional[dict[str, dict]] = None,
+    ) -> dict:
         """Extract results from completed evaluation jobs using Kubernetes extraction job.
 
         This method:
         1. Deploys a Kubernetes Job that mounts the eval-datasets PVC
         2. Runs a Python script to parse OpenCompass CSV results
         3. Retrieves the parsed results via kubectl logs
-        4. Returns structured results with run_id
+        4. Merges timing information from job monitoring
+        5. Returns structured results with run_id and timing data
 
         Args:
             eval_id: Evaluation request ID
             run_ids: List of run IDs (job names) to extract results for
             kubeconfig: Optional kubeconfig JSON
+            job_timing_map: Optional timing data from job monitoring
+                {job_id: {startTime, completionTime, status, ...}}
 
         Returns:
             {
@@ -334,6 +365,9 @@ class AnsibleOrchestrator:
                         "run_id": "...",
                         "eval_id": "...",
                         "status": "success|error",
+                        "startTime": "2025-11-11T10:00:00Z",
+                        "completionTime": "2025-11-11T10:15:30Z",
+                        "duration_seconds": 930.0,
                         "scores": [
                             {
                                 "dataset": "demo_gsm8k",
@@ -372,11 +406,39 @@ class AnsibleOrchestrator:
                     extraction_results = json.load(f)
                 results_file.unlink()  # Clean up
 
+                # Merge timing information if available
+                if extraction_results.get("success") and job_timing_map:
+                    for result in extraction_results.get("results", []):
+                        run_id = result.get("run_id")
+                        if run_id and run_id in job_timing_map:
+                            timing_info = job_timing_map[run_id]
+                            result["startTime"] = timing_info.get("startTime", "")
+                            result["completionTime"] = timing_info.get("completionTime", "")
+
+                            # Calculate duration if both timestamps exist
+                            start_time = timing_info.get("startTime")
+                            completion_time = timing_info.get("completionTime")
+                            if start_time and completion_time:
+                                try:
+                                    from datetime import datetime
+
+                                    start = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+                                    end = datetime.fromisoformat(completion_time.replace("Z", "+00:00"))
+                                    duration_seconds = (end - start).total_seconds()
+                                    result["duration_seconds"] = duration_seconds
+                                    logger.info(f"Job {run_id} duration: {duration_seconds}s")
+                                except Exception as e:
+                                    logger.warning(f"Failed to calculate duration for {run_id}: {e}")
+
                 logger.info(f"Successfully extracted results for {len(run_ids)} runs")
                 return extraction_results
             else:
                 logger.error("Extraction results file not found")
-                return {"success": False, "results": [], "error": "Results file not created"}
+                return {
+                    "success": False,
+                    "results": [],
+                    "error": "Results file not created",
+                }
 
         except Exception as e:
             logger.error(f"Failed to extract results: {e}", exc_info=True)

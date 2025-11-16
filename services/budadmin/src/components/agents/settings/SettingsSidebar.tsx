@@ -1,172 +1,103 @@
-'use client';
-
-import React from 'react';
-import { InputSettings } from './InputSettings';
-import { SystemPromptSettings } from './SystemPromptSettings';
-import { PromptMessageSettings } from './PromptMessageSettings';
-import { OutputSettings } from './OutputSettings';
-import { AgentSession, AgentVariable } from "@/stores/useAgentStore";
-
-export enum SettingsType {
-  INPUT = 'input',
-  SYSTEM_PROMPT = 'system_prompt',
-  PROMPT_MESSAGE = 'prompt_message',
-  OUTPUT = 'output'
-}
+import React, { useState } from "react";
+import Settings from "./Settings";
+import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
+import { useAgentStore, AgentSession, AgentSettings } from "@/stores/useAgentStore";
+import { AppRequest } from "src/pages/api/requests";
+import { errorToast } from "@/components/toast";
 
 interface SettingsSidebarProps {
-  session: AgentSession;
   isOpen: boolean;
-  activeSettings: SettingsType;
-  onClose?: () => void;
-  // Input settings props
-  onAddInputVariable: () => void;
-  onAddOutputVariable: () => void;
-  onVariableChange: (variableId: string, field: keyof AgentVariable, value: string) => void;
-  onDeleteVariable: (variableId: string) => void;
-  onStructuredInputEnabledChange?: (enabled: boolean) => void;
-  onStructuredOutputEnabledChange?: (enabled: boolean) => void;
-  // System prompt and messages props
-  onSystemPromptChange: (value: string) => void;
-  onPromptMessagesChange: (value: string) => void;
-  localSystemPrompt: string;
-  localPromptMessages: string;
-  // Save props
-  onSavePromptSchema?: () => void;
-  isSaving?: boolean;
-  onSaveSystemPrompt?: () => void;
-  isSavingSystemPrompt?: boolean;
-  onSavePromptMessages?: () => void;
-  isSavingPromptMessages?: boolean;
-  onSaveOutputSchema?: () => void;
-  isSavingOutput?: boolean;
+  onClose: () => void;
+  session?: AgentSession;
 }
 
-export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
-  session,
-  isOpen,
-  activeSettings,
-  onClose,
-  onAddInputVariable,
-  onAddOutputVariable,
-  onVariableChange,
-  onDeleteVariable,
-  onStructuredInputEnabledChange,
-  onStructuredOutputEnabledChange,
-  onSystemPromptChange,
-  onPromptMessagesChange,
-  localSystemPrompt,
-  localPromptMessages,
-  onSavePromptSchema,
-  isSaving,
-  onSaveSystemPrompt,
-  isSavingSystemPrompt,
-  onSavePromptMessages,
-  isSavingPromptMessages,
-  onSaveOutputSchema,
-  isSavingOutput
-}) => {
-  const renderSettings = () => {
-    switch (activeSettings) {
-      case SettingsType.INPUT:
-        return (
-          <InputSettings
-            sessionId={session.id}
-            inputVariables={session.inputVariables || []}
-            onAddVariable={onAddInputVariable}
-            onVariableChange={onVariableChange}
-            onDeleteVariable={onDeleteVariable}
-            onSavePromptSchema={onSavePromptSchema}
-            isSaving={isSaving}
-            onStructuredInputEnabledChange={onStructuredInputEnabledChange}
-          />
-        );
-      case SettingsType.SYSTEM_PROMPT:
-        return (
-          <SystemPromptSettings
-            sessionId={session.id}
-            systemPrompt={localSystemPrompt}
-            onSystemPromptChange={onSystemPromptChange}
-            onSaveSystemPrompt={onSaveSystemPrompt}
-            isSavingSystemPrompt={isSavingSystemPrompt}
-          />
-        );
-      case SettingsType.PROMPT_MESSAGE:
-        return (
-          <PromptMessageSettings
-            sessionId={session.id}
-            promptMessages={localPromptMessages}
-            onPromptMessagesChange={onPromptMessagesChange}
-            onSavePromptMessages={onSavePromptMessages}
-            isSavingPromptMessages={isSavingPromptMessages}
-          />
-        );
-      case SettingsType.OUTPUT:
-        return (
-          <OutputSettings
-            sessionId={session.id}
-            outputVariables={session.outputVariables || []}
-            onAddVariable={onAddOutputVariable}
-            onVariableChange={onVariableChange}
-            onDeleteVariable={onDeleteVariable}
-            onSaveOutputSchema={onSaveOutputSchema}
-            isSavingOutput={isSavingOutput}
-            onStructuredOutputEnabledChange={onStructuredOutputEnabledChange}
-          />
-        );
-      default:
-        // Show all settings as default
-        return (
-          <>
-            <InputSettings
-              sessionId={session.id}
-              inputVariables={session.inputVariables || []}
-              onAddVariable={onAddInputVariable}
-              onVariableChange={onVariableChange}
-              onDeleteVariable={onDeleteVariable}
-              onSavePromptSchema={onSavePromptSchema}
-              isSaving={isSaving}
-              onStructuredInputEnabledChange={onStructuredInputEnabledChange}
-            />
-            <SystemPromptSettings
-              sessionId={session.id}
-              systemPrompt={localSystemPrompt}
-              onSystemPromptChange={onSystemPromptChange}
-              onSaveSystemPrompt={onSaveSystemPrompt}
-              isSavingSystemPrompt={isSavingSystemPrompt}
-            />
-            <PromptMessageSettings
-              sessionId={session.id}
-              promptMessages={localPromptMessages}
-              onPromptMessagesChange={onPromptMessagesChange}
-              onSavePromptMessages={onSavePromptMessages}
-              isSavingPromptMessages={isSavingPromptMessages}
-            />
-            <OutputSettings
-              sessionId={session.id}
-              outputVariables={session.outputVariables || []}
-              onAddVariable={onAddOutputVariable}
-              onVariableChange={onVariableChange}
-              onDeleteVariable={onDeleteVariable}
-              onSaveOutputSchema={onSaveOutputSchema}
-              isSavingOutput={isSavingOutput}
-              onStructuredOutputEnabledChange={onStructuredOutputEnabledChange}
-            />
-          </>
-        );
+export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarProps) {
+  const { currentSettingPreset } = useAgentStore();
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleUpdate = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!session?.promptId) {
+      errorToast("No prompt ID found for this session");
+      return;
+    }
+
+    if (!currentSettingPreset) {
+      errorToast("No settings found to update");
+      return;
+    }
+
+    setIsUpdating(true);
+
+    try {
+      // Build model_settings with only temperature (always) and modified fields
+      const modelSettings: Partial<AgentSettings> = {
+        temperature: currentSettingPreset.temperature, // Always include temperature
+      };
+
+      // Get modified fields from the preset
+      const modifiedFields = currentSettingPreset.modifiedFields || new Set<string>();
+
+      // Add only the fields that have been modified by the user
+      modifiedFields.forEach((field) => {
+        if (field !== 'temperature' && field in currentSettingPreset) {
+          const key = field as keyof AgentSettings;
+          (modelSettings as any)[key] = currentSettingPreset[key];
+        }
+      });
+
+      const payload = {
+        prompt_id: session.promptId,
+        model_settings: modelSettings,
+      };
+
+      await AppRequest.Post("/prompts/prompt-config", payload);
+      // successToast("Model settings updated successfully"); // Removed: No toast needed
+    } catch (error) {
+      console.error("Failed to update model settings:", error);
+      errorToast("Failed to update model settings");
+    } finally {
+      setIsUpdating(false);
     }
   };
 
   return (
     <div
-      className={`z-[100] settings-box absolute p-3 right-0 top-0 h-full transition-all duration-300 ease-in-out ${
-        isOpen ? 'translate-x-0' : 'translate-x-full'
-      }`}
-      onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside settings
+      className="z-[100] tools-box absolute p-3 right-0 top-0 h-full transition-all duration-300 ease-in-out translate-x-0"
+      onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex flex-col h-full w-[15rem] prompt-settings border border-[#1F1F1F] bg-[#0A0A0A] overflow-y-auto rounded-[12px]">
-        {renderSettings()}
+      <div
+        className="flex flex-col h-full w-[16rem] prompt-settings overflow-y-auto rounded-[12px]"
+        style={{
+          backgroundImage: 'url(/agents/settingsBg.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        <Settings onClose={onClose} />
+        <div style={{
+        marginTop: '18px',
+        paddingTop: '18px',
+        paddingBottom: '18px',
+        borderRadius: '0 0 11px 11px',
+        borderTop: '0.5px solid #1F1F1F',
+        background: 'rgba(255, 255, 255, 0.03)',
+        backdropFilter: 'blur(5px)'
+      }} className='flex justify-end items-center px-[1rem]'>
+        <PrimaryButton
+          onClick={handleUpdate}
+          disabled={isUpdating}
+          classNames="h-[1.375rem] rounded-[0.375rem]"
+          textClass="!text-[0.625rem] !font-[400]"
+        >
+          {isUpdating ? 'Updating...' : 'Update'}
+        </PrimaryButton>
+      </div>
       </div>
     </div>
   );
-};
+}

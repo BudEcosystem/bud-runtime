@@ -29,6 +29,7 @@ import LeaderboardTable from "./leaderboardTable";
 import LeaderboardDetails from "./details";
 import { AppRequest } from "src/pages/api/requests";
 import { capitalize } from "@/lib/utils";
+import { useLoader } from "src/context/appContext";
 
 interface EvaluationCard {
   id: string;
@@ -47,7 +48,7 @@ const defaultTags = [
 
 const EvalDetailed = () => {
   const [isMounted, setIsMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState("3");
+  const [activeTab, setActiveTab] = useState("1");
   const [showAllTags, setShowAllTags] = useState(false);
   const [datasets, setDatasets] = useState<any>(null);
   const [datasetDetails, setDatasetDetails] = useState<any>(null);
@@ -55,7 +56,9 @@ const EvalDetailed = () => {
   const router = useRouter();
   const evaluationId = router.query.evaluationId;
   const id = Array.isArray(evaluationId) ? evaluationId[0] : evaluationId;
+  const { isLoading, showLoader, hideLoader } = useLoader();
 
+  // back functionality
   const goBack = () => {
     router.back();
   };
@@ -132,10 +135,9 @@ const EvalDetailed = () => {
     const fetchDatasets = async () => {
       if (id) {
         try {
-          const response = await AppRequest.Get(`/experiments/datasets?trait_ids=${id}`);
+          const response = await AppRequest.Get(`/experiments/datasets/${id}`);
           console.log("Datasets API Response:", response.data);
-          setDatasets(response.data);
-
+          setDatasets(response.data.dataset);
           // If we have datasets, fetch the first dataset's details as an example
           if (response.data && response.data.datasets && response.data.datasets.length > 0) {
             const firstDatasetId = response.data.datasets[0].dataset_id;
@@ -143,6 +145,9 @@ const EvalDetailed = () => {
           }
         } catch (error) {
           console.error("Error fetching datasets:", error);
+        }
+        finally {
+          hideLoader();
         }
       }
     };
@@ -237,7 +242,7 @@ const EvalDetailed = () => {
                     </div>
                   ),
                   key: "1",
-                  children: <LeaderboardDetails />,
+                  children: <LeaderboardDetails datasets={datasets}/>,
                   // children: <></>,
                 },
                 {

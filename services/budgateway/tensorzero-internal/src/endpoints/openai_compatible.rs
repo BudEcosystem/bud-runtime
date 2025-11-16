@@ -14,7 +14,7 @@ use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::debug_handler;
-use axum::extract::{Multipart, Path, Query, State};
+use axum::extract::{Extension, Multipart, Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, Sse};
 use axum::response::{IntoResponse, Response};
@@ -25,6 +25,7 @@ use serde_json::{json, Map, Value};
 use url::Url;
 use uuid::Uuid;
 
+use crate::analytics::RequestAnalytics;
 use crate::cache::CacheParamsOptions;
 use crate::endpoints::inference::{
     inference, write_inference, ChatCompletionInferenceParams, InferenceClients,
@@ -93,10 +94,7 @@ fn merge_credentials_from_store(
 }
 
 /// Helper function to merge credentials from headers (for dynamic authorization)
-fn merge_credentials_from_headers(
-    headers: &HeaderMap,
-    credentials: &mut InferenceCredentials,
-) {
+fn merge_credentials_from_headers(headers: &HeaderMap, credentials: &mut InferenceCredentials) {
     // Extract authorization header if present
     if let Some(auth_header) = headers.get("authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
@@ -196,6 +194,7 @@ pub async fn inference_handler(
         guardrails,
         ..
     }): AppState,
+    analytics: Option<Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>>,
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleParams>,
 ) -> Result<Response<Body>, Error> {
@@ -620,6 +619,7 @@ pub async fn inference_handler(
         kafka_connection_info.clone(),
         model_credential_store.clone(),
         params,
+        analytics.as_ref().map(|ext| ext.0.clone()),
     )
     .await?;
 
@@ -1338,8 +1338,10 @@ struct OpenAICompatibleResponse {
     choices: Vec<OpenAICompatibleChoice>,
     created: u32,
     model: String,
-    system_fingerprint: String,
-    service_tier: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    system_fingerprint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    service_tier: Option<String>,
     object: String,
     usage: OpenAICompatibleUsage,
 }
@@ -1920,8 +1922,8 @@ impl From<(InferenceResponse, String)> for OpenAICompatibleResponse {
                     }],
                     created: current_timestamp() as u32,
                     model: model_name.clone(),
-                    service_tier: "".to_string(),
-                    system_fingerprint: "".to_string(),
+                    service_tier: None,
+                    system_fingerprint: None,
                     object: "chat.completion".to_string(),
                     usage: response.usage.into(),
                     episode_id: response.episode_id.to_string(),
@@ -1943,8 +1945,8 @@ impl From<(InferenceResponse, String)> for OpenAICompatibleResponse {
                 }],
                 created: current_timestamp() as u32,
                 model: model_name,
-                system_fingerprint: "".to_string(),
-                service_tier: "".to_string(),
+                system_fingerprint: None,
+                service_tier: None,
                 object: "chat.completion".to_string(),
                 usage: OpenAICompatibleUsage {
                     prompt_tokens: response.usage.input_tokens,
@@ -2031,8 +2033,10 @@ struct OpenAICompatibleResponseChunk {
     choices: Vec<OpenAICompatibleChoiceChunk>,
     created: u32,
     model: String,
-    system_fingerprint: String,
-    service_tier: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    system_fingerprint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    service_tier: Option<String>,
     object: String,
     usage: Option<OpenAICompatibleUsage>,
 }
@@ -2083,9 +2087,9 @@ fn convert_inference_response_chunk_to_openai_compatible(
                     },
                 }],
                 created: current_timestamp() as u32,
-                service_tier: "".to_string(),
+                service_tier: None,
                 model: model_name.to_string(),
-                system_fingerprint: "".to_string(),
+                system_fingerprint: None,
                 object: "chat.completion.chunk".to_string(),
                 // We emit a single chunk containing 'usage' at the end of the stream
                 usage: None,
@@ -2105,9 +2109,9 @@ fn convert_inference_response_chunk_to_openai_compatible(
                 },
             }],
             created: current_timestamp() as u32,
-            service_tier: "".to_string(),
+            service_tier: None,
             model: model_name.to_string(),
-            system_fingerprint: "".to_string(),
+            system_fingerprint: None,
             object: "chat.completion.chunk".to_string(),
             // We emit a single chunk containing 'usage' at the end of the stream
             usage: None,
@@ -2143,7 +2147,11 @@ fn process_chat_content_chunk(
                     index: *index,
                     r#type: "function".to_string(),
                     function: OpenAICompatibleFunctionCall {
-                        name: if is_new { Some(tool_call.raw_name) } else { None },
+                        name: if is_new {
+                            Some(tool_call.raw_name)
+                        } else {
+                            None
+                        },
                         arguments: tool_call.raw_arguments,
                     },
                 });
@@ -2277,7 +2285,6 @@ impl OpenAICompatibleStreamProcessor {
                             .unwrap()
                             .as_secs(),
                         "model": self.model_name,
-                        "system_fingerprint": serde_json::Value::Null,
                         "object": "chat.completion.chunk",
                         "usage": total_usage
                     });
@@ -2603,11 +2610,7 @@ pub async fn completion_handler(
     StructuredJson(params): StructuredJson<OpenAICompatibleCompletionParams>,
 ) -> Result<Response<Body>, Error> {
     // Log unknown fields
-    let unknown_fields: Vec<&str> = params
-        .unknown_fields
-        .keys()
-        .map(|k| k.as_str())
-        .collect();
+    let unknown_fields: Vec<&str> = params.unknown_fields.keys().map(|k| k.as_str()).collect();
 
     if !unknown_fields.is_empty() {
         tracing::warn!(
@@ -2710,16 +2713,17 @@ pub async fn completion_handler(
         }
 
         // Create a combined stream that re-injects the first chunk, then yields the rest
-        let combined_stream: crate::completions::CompletionStream = Box::pin(async_stream::stream! {
-            // Yield the first chunk if we have one
-            if let Some(chunk) = first_chunk {
-                yield chunk;
-            }
-            // Then yield the rest of the stream
-            while let Some(chunk) = completion_stream.next().await {
-                yield chunk;
-            }
-        });
+        let combined_stream: crate::completions::CompletionStream =
+            Box::pin(async_stream::stream! {
+                // Yield the first chunk if we have one
+                if let Some(chunk) = first_chunk {
+                    yield chunk;
+                }
+                // Then yield the rest of the stream
+                while let Some(chunk) = completion_stream.next().await {
+                    yield chunk;
+                }
+            });
 
         // Convert completion stream to SSE events
         let sse_stream = prepare_serialized_completion_events(
@@ -2749,12 +2753,14 @@ pub async fn completion_handler(
                 .map(|choice| OpenAICompatibleCompletionChoice {
                     text: choice.text,
                     index: choice.index,
-                    logprobs: choice.logprobs.map(|lp| OpenAICompatibleCompletionLogProbs {
-                        tokens: lp.tokens,
-                        token_logprobs: lp.token_logprobs,
-                        top_logprobs: lp.top_logprobs,
-                        text_offset: lp.text_offset,
-                    }),
+                    logprobs: choice
+                        .logprobs
+                        .map(|lp| OpenAICompatibleCompletionLogProbs {
+                            tokens: lp.tokens,
+                            token_logprobs: lp.token_logprobs,
+                            top_logprobs: lp.top_logprobs,
+                            text_offset: lp.text_offset,
+                        }),
                     finish_reason: choice.finish_reason,
                 })
                 .collect(),
@@ -2807,6 +2813,81 @@ struct OpenAICompatibleEmbeddingResponse {
     data: Vec<OpenAICompatibleEmbeddingData>,
     model: String,
     usage: OpenAICompatibleEmbeddingUsage,
+}
+
+/// Response for a single model in the list
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ModelObject {
+    pub id: String,
+    pub created: u64,
+    pub object: &'static str,
+    pub owned_by: &'static str,
+}
+
+/// Response for the /v1/models endpoint
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ListModelsResponse {
+    pub object: &'static str,
+    pub data: Vec<ModelObject>,
+}
+
+/// A handler for the OpenAI-compatible list models endpoint
+#[debug_handler(state = AppStateData)]
+pub async fn list_models(
+    State(AppStateData { config, .. }): AppState,
+    headers: HeaderMap,
+) -> Result<Json<ListModelsResponse>, Error> {
+    // Check if the request is authenticated by looking for the auth metadata header
+    let is_authenticated = headers.contains_key("x-tensorzero-endpoint-id");
+
+    // Get all models
+    let models = config.models.read().await;
+
+    // Filter models based on authentication
+    let model_list: Vec<ModelObject> = if is_authenticated {
+        // Authenticated: return all models available to this API key
+        // The auth middleware provides these as a comma-separated list
+        headers
+            .get("x-tensorzero-available-models")
+            .and_then(|header| header.to_str().ok())
+            .map(|models_str| {
+                models_str
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|model_name| ModelObject {
+                        id: model_name.to_string(),
+                        created: 0,
+                        object: "model",
+                        owned_by: "bud",
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|| {
+                // No available models header or failed to parse
+                tracing::warn!(
+                    "Authenticated /v1/models request missing x-tensorzero-available-models header"
+                );
+                vec![]
+            })
+    } else {
+        // Unauthenticated (when auth is disabled): return all models
+        models
+            .iter_static_models()
+            .map(|(model_id, _model_config)| ModelObject {
+                id: model_id.to_string(),
+                created: 0,
+                object: "model",
+                owned_by: "bud",
+            })
+            .collect()
+    };
+
+    let response = ListModelsResponse {
+        object: "list",
+        data: model_list,
+    };
+
+    Ok(Json(response))
 }
 
 /// A handler for the OpenAI-compatible embedding endpoint
@@ -3163,7 +3244,8 @@ pub async fn moderation_handler(
         .unwrap_or_else(|| "omni-moderation-latest".to_string());
 
     // Resolve the model name based on authentication state
-    let model_resolution = model_resolution::resolve_model_name(Some(&model_name), &headers, false)?;
+    let model_resolution =
+        model_resolution::resolve_model_name(Some(&model_name), &headers, false)?;
 
     let resolved_model_name = model_resolution
         .model_name
@@ -5689,9 +5771,10 @@ pub async fn response_create_handler(
         })?;
 
         // Check if any provider is BudPrompt
-        let has_budprompt = model_info.providers.values().any(|p| {
-            matches!(p.config, crate::model::ProviderConfig::BudPrompt(_))
-        });
+        let has_budprompt = model_info
+            .providers
+            .values()
+            .any(|p| matches!(p.config, crate::model::ProviderConfig::BudPrompt(_)));
 
         has_budprompt && params.prompt.is_some()
     };
@@ -5701,23 +5784,25 @@ pub async fn response_create_handler(
         use crate::responses::ResponseResult;
 
         let result = model
-            .execute_response_with_detection(&params, &model_resolution.original_model_name, &clients)
+            .execute_response_with_detection(
+                &params,
+                &model_resolution.original_model_name,
+                &clients,
+            )
             .await?;
 
         match result {
             ResponseResult::Streaming(stream) => {
                 // Convert to SSE stream
                 let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
-                    Ok(event) => {
-                        Event::default()
-                            .event(event.event)
-                            .json_data(event.data)
-                            .map_err(|e| {
-                                Error::new(ErrorDetails::Inference {
-                                    message: format!("Failed to serialize SSE event: {e}"),
-                                })
+                    Ok(event) => Event::default()
+                        .event(event.event)
+                        .json_data(event.data)
+                        .map_err(|e| {
+                            Error::new(ErrorDetails::Inference {
+                                message: format!("Failed to serialize SSE event: {e}"),
                             })
-                    },
+                        }),
                     Err(e) => Err(e),
                 });
 
@@ -5752,7 +5837,7 @@ pub async fn response_create_handler(
                                 message: format!("Failed to serialize SSE event: {e}"),
                             })
                         })
-                },
+                }
                 Err(e) => Err(e),
             });
 
@@ -8002,6 +8087,7 @@ struct AnthropicMetadata {
 #[debug_handler(state = AppStateData)]
 pub async fn anthropic_messages_handler(
     State(app_state): AppState,
+    analytics: Option<Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>>,
     headers: HeaderMap,
     StructuredJson(anthropic_params): StructuredJson<AnthropicMessagesParams>,
 ) -> Result<Response<Body>, Error> {
@@ -8016,8 +8102,13 @@ pub async fn anthropic_messages_handler(
     let openai_params = convert_anthropic_to_openai(anthropic_params)?;
 
     // Call the existing inference handler with converted parameters
-    let response =
-        inference_handler(State(app_state), headers, StructuredJson(openai_params)).await?;
+    let response = inference_handler(
+        State(app_state),
+        analytics,
+        headers,
+        StructuredJson(openai_params),
+    )
+    .await?;
 
     // Convert the response from OpenAI format to Anthropic format
     convert_openai_response_to_anthropic(response).await

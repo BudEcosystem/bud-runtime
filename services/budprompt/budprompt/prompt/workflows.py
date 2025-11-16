@@ -27,8 +27,8 @@ from budmicroframe.commons.constants import WorkflowStatus
 from budmicroframe.commons.schemas import NotificationContent, NotificationRequest, WorkflowStep
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
-from .schemas import PromptSchemaRequest, PromptSchemaResponse
-from .services import PromptConfigurationService
+from .schemas import PromptCleanupRequest, PromptCleanupResponse, PromptSchemaRequest, PromptSchemaResponse
+from .services import PromptCleanupService, PromptConfigurationService
 
 
 logger = logging.get_logger(__name__)
@@ -188,6 +188,120 @@ class PromptSchemaWorkflow:
                     id="save_prompt_configuration",
                     title="Saving the prompt configuration to the Redis",
                     description="Save the prompt configuration to the Redis",
+                ),
+            ],
+            eta=None,
+            target_topic_name=request.source_topic,
+            target_name=request.source,
+        )
+
+        return response
+
+
+class PromptCleanupWorkflow:
+    """Workflow for MCP resource cleanup."""
+
+    def __init__(self) -> None:
+        """Initialize the PromptCleanupWorkflow class."""
+        self.dapr_workflow = DaprWorkflow()
+
+    @dapr_workflow.register_activity
+    @staticmethod
+    def get_cleanup_targets(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Determine which prompts need cleanup."""
+        notification_request = NotificationRequest(**kwargs.pop("notification_request"))
+        return PromptCleanupService.get_cleanup_targets(**kwargs, notification_request=notification_request)
+
+    @dapr_workflow.register_activity
+    @staticmethod
+    def cleanup_resources(ctx: wf.WorkflowActivityContext, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Cleanup MCP resources for target prompts."""
+        notification_request = NotificationRequest(**kwargs.pop("notification_request"))
+        return PromptCleanupService.cleanup_resources(**kwargs, notification_request=notification_request)
+
+    @dapr_workflow.register_workflow
+    @staticmethod
+    def run_prompt_cleanup(ctx: wf.DaprWorkflowContext, payload: Dict[str, Any]):
+        """Run the prompt cleanup workflow."""
+        logger.info("Is workflow replaying: %s", ctx.is_replaying)
+
+        workflow_name = "perform_prompt_cleanup"
+        workflow_id = ctx.instance_id
+        request = PromptCleanupRequest(**payload)
+
+        notification_request = NotificationRequest.from_cloud_event(
+            cloud_event=request,
+            name=workflow_name,
+            workflow_id=workflow_id,
+        )
+        notification_request_dict = notification_request.model_dump(mode="json")
+
+        # Determine cleanup targets
+        cleanup_targets_result = yield ctx.call_activity(
+            PromptCleanupWorkflow.get_cleanup_targets,
+            input={
+                "workflow_id": workflow_id,
+                "notification_request": notification_request_dict,
+                "prompts": [p.model_dump() for p in request.prompts] if request.prompts else None,
+                "target_topic_name": request.source_topic,
+                "target_name": request.source,
+            },
+            retry_policy=retry_policy,
+        )
+
+        # Cleanup the resources
+        cleanup_result = yield ctx.call_activity(
+            PromptCleanupWorkflow.cleanup_resources,
+            input={
+                "workflow_id": workflow_id,
+                "notification_request": notification_request_dict,
+                "cleanup_targets": cleanup_targets_result,
+                "target_topic_name": request.source_topic,
+                "target_name": request.source,
+            },
+            retry_policy=retry_policy,
+        )
+
+        response = PromptCleanupResponse(
+            workflow_id=workflow_id,
+            cleaned=cleanup_result["success"],
+            failed=cleanup_result["failed"],
+        )
+
+        notification_request.payload.event = "results"
+        notification_request.payload.content = NotificationContent(
+            title="Prompt Cleanup Results",
+            message="The prompt cleanup results are ready",
+            result=response.model_dump(mode="json"),
+            status=WorkflowStatus.COMPLETED,
+        )
+        dapr_workflow.publish_notification(
+            workflow_id=workflow_id,
+            notification=notification_request,
+            target_topic_name=request.source_topic,
+            target_name=request.source,
+        )
+
+        return response.model_dump(mode="json")
+
+    def __call__(self, request: PromptCleanupRequest, workflow_id: Optional[str] = None):
+        """Schedule the prompt cleanup workflow."""
+        selected_workflow_id = str(workflow_id or uuid.uuid4())
+
+        response = dapr_workflow.schedule_workflow(
+            workflow_name="run_prompt_cleanup",
+            workflow_input=request.model_dump(),
+            workflow_id=selected_workflow_id,
+            workflow_steps=[
+                WorkflowStep(
+                    id="identify_targets",
+                    title="Identifying cleanup targets",
+                    description="Determine which prompts need MCP resource cleanup",
+                ),
+                WorkflowStep(
+                    id="cleanup_resources",
+                    title="Cleaning up MCP resources",
+                    description="Delete gateways, virtual servers, and update cleanup registry",
                 ),
             ],
             eta=None,

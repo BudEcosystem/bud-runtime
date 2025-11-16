@@ -17,6 +17,7 @@
 """Manages application and secret configurations, utilizing environment variables and Dapr's configuration store for syncing."""
 
 from pathlib import Path
+from typing import Optional
 
 from budmicroframe.commons.config import (
     BaseAppConfig,
@@ -39,13 +40,23 @@ class AppConfig(BaseAppConfig):
 
     # BudServe Gateway Configuration
     bud_gateway_base_url: str = Field(..., alias="BUD_GATEWAY_BASE_URL")
-    bud_default_model_name: str = Field(..., alias="BUD_DEFAULT_MODEL_NAME")
+
+    # MCP Foundry Configuration
+    mcp_foundry_base_url: str = Field(..., alias="MCP_FOUNDRY_BASE_URL", description="Base URL for MCP Foundry API")
+    mcp_foundry_api_key: str = Field(..., alias="MCP_FOUNDRY_API_KEY")
 
     # Redis Configuration
     redis_host: str = Field(..., alias="REDIS_HOST")
     redis_port: int = Field(default=6379, alias="REDIS_PORT")
     redis_db_index: int = Field(default=0, alias="REDIS_DB_INDEX")
     redis_password: str = Field(default="", alias="REDIS_PASSWORD")
+
+    # TensorZero Redis Configuration (for API key bypass storage)
+    tensorzero_redis_url: Optional[str] = Field(
+        default=None,
+        alias="TENSORZERO_REDIS_URL",
+        description="Complete Redis URL for TensorZero (format: redis://[:password@]host:port/db)",
+    )
 
     # Redis TTL Configuration
     prompt_config_redis_ttl: int = Field(default=86400, alias="PROMPT_CONFIG_REDIS_TTL")
@@ -68,7 +79,6 @@ class SecretsConfig(BaseSecretsConfig):
     version: str = __version__.split("@")[-1]
 
     # Add any other secrets here that are not Redis-related
-    # For now, this class can remain empty or contain other secrets
 
 
 app_settings = AppConfig()

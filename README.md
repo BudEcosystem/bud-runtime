@@ -1,14 +1,15 @@
-# Bud Stack
+[![ Bud Ecosystem](https://github.com/BudEcosystem/.github/blob/main/assets/bud-runtime-banner.png)]()
+
+# Bud AI Foundry
 
 [![License](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
-[![Python 3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js](https://img.shields.io/badge/Next.js-14+-black.svg)](https://nextjs.org/)
 [![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org/)
 [![Kubernetes](https://img.shields.io/badge/kubernetes-1.25+-blue.svg)](https://kubernetes.io/)
 
-A comprehensive AI/ML infrastructure platform for intelligent model deployment, optimization, and scaling. Bud Stack provides enterprise-grade automation, ML-driven performance optimization, and seamless deployment across multi-cloud and multi-hardware environments.
+Bud AI Foundry is a control panel for your GenAI deployments, designed to maximize infrastructure performance and give you full control over every aspect, from deployment administration to compliance and security management—All in one place
 
-**[Quick Start](#-quick-start)** • **[Documentation](#-documentation)** • **[Services](#-services)** • **[Contributing](#-contributing)**
+**[Quick Start](#-quick-start)** • **[Documentation](#-documentation)** • **[Contributing](#-contributing)**
 
 ## 🚀 Features
 
