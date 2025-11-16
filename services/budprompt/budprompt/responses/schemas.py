@@ -18,7 +18,6 @@
 
 from typing import Any, Dict, Literal, Optional, Union
 
-from budmicroframe.commons.schemas import SuccessResponse
 from openai.types.responses import Response
 from pydantic import BaseModel, Field, field_serializer
 
@@ -74,12 +73,6 @@ class ResponseCreateRequest(BaseModel):
 
     prompt: ResponsePromptParam = Field(..., description="Prompt parameters including id, variables, and version")
     input: Optional[str] = Field(None, description="Optional input text for the prompt")
-
-
-class ResponsePromptResponse(SuccessResponse):
-    """Response model for prompt execution via responses API."""
-
-    data: Optional[Dict[str, Any]] = Field(None, description="Response data from prompt execution")
 
 
 class OpenAIError(BaseModel):

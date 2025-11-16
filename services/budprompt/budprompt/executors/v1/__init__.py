@@ -14,4 +14,4 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""Prompt module for Managing Prompts."""
+"""Simple Prompt Executor Module."""
