@@ -245,12 +245,13 @@ export default function PromptsAgents() {
   const { openAgentDrawer, createSession, updateSession } = useAgentStore();
 
   // Handle OAuth callback
+  // Note: We don't open the drawer here anymore. Instead, the URL parameter
+  // handling useEffect below will recreate sessions from the URL and open the drawer.
+  // This ensures sessions are created before the drawer opens.
   const handleOAuthCallback = useCallback((oauthState: any) => {
-    console.log('OAuth callback handler triggered, opening drawer...', oauthState);
-    // Open the agent drawer when OAuth callback is detected
-    openAgentDrawer();
+    console.log('OAuth callback handler triggered', oauthState);
     // The ConnectorDetails component will handle the actual OAuth completion
-  }, [openAgentDrawer]);
+  }, []);
 
   useOAuthCallback(handleOAuthCallback);
 
@@ -379,6 +380,9 @@ export default function PromptsAgents() {
         console.log('Parsed prompt param:', promptParam);
       }
 
+      // Check if this is an OAuth callback
+      const isOAuthCallback = localStorage.getItem('oauth_should_open_drawer') === 'true';
+
       // If agent parameter exists, open add agent workflow and fetch workflow details
       if (agentId && typeof agentId === 'string') {
         try {
@@ -463,6 +467,8 @@ export default function PromptsAgents() {
       else if (promptParam && typeof promptParam === 'string') {
         try {
           showLoader();
+
+          // Parse comma-separated prompt IDs
           const promptIds = promptParam.split(',').map(id => id.trim());
           console.log('Opening AgentDrawer with prompt IDs (no agent workflow):', promptIds);
 
