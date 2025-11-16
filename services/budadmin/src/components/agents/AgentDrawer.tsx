@@ -92,7 +92,19 @@ const AgentDrawer: React.FC = () => {
 
   // Create initial session when drawer opens if none exist
   useEffect(() => {
-    if (isAgentDrawerOpen && activeSessions.length === 0) {
+    if (!isAgentDrawerOpen) return;
+
+    // Check if this is an OAuth callback - don't create new session
+    const isOAuthCallback = localStorage.getItem('oauth_should_open_drawer') === 'true';
+
+    if (isOAuthCallback) {
+      // OAuth callback - session should already exist, don't create new one
+      console.log('OAuth callback detected, using existing session');
+      return;
+    }
+
+    // Only create session if none exist AND not OAuth callback
+    if (activeSessions.length === 0) {
       createSession();
     }
   }, [isAgentDrawerOpen, activeSessions.length, createSession]);
@@ -194,6 +206,7 @@ const AgentDrawer: React.FC = () => {
           wrapper: {
             backgroundColor: "transparent",
             boxShadow: "none",
+            zIndex: 1050, // Higher than AddAgent drawer to ensure proper stacking
           },
           mask: {
             backgroundColor: "#101010",

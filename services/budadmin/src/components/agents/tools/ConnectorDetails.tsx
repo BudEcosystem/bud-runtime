@@ -246,8 +246,16 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
           state
         );
 
-        // Clean up URL params
-        const cleanUrl = window.location.pathname;
+        // Clean up OAuth-specific URL params only (preserve agent and prompt params)
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.delete('code');
+        urlParams.delete('state');
+        urlParams.delete('connector');
+
+        const cleanUrl = urlParams.toString()
+          ? `${window.location.pathname}?${urlParams.toString()}`
+          : window.location.pathname;
+
         window.history.replaceState({}, document.title, cleanUrl);
 
         // Clear saved state
@@ -263,8 +271,16 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       } catch (error: any) {
         errorToast(error?.response?.data?.message || 'Failed to complete OAuth authorization');
 
-        // Clean up URL params even on error
-        const cleanUrl = window.location.pathname;
+        // Clean up OAuth-specific URL params even on error (preserve agent and prompt params)
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.delete('code');
+        urlParams.delete('state');
+        urlParams.delete('connector');
+
+        const cleanUrl = urlParams.toString()
+          ? `${window.location.pathname}?${urlParams.toString()}`
+          : window.location.pathname;
+
         window.history.replaceState({}, document.title, cleanUrl);
 
         clearOAuthState();
