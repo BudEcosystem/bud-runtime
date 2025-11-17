@@ -74,31 +74,32 @@ export default function AgentSuccess() {
 
   // Remove 'agent' and 'prompt' query parameters from URL
   useEffect(() => {
-    if (!router.isReady) return;
-
-    const { agent, prompt } = router.query;
-
-    // Only attempt removal if parameters exist
-    if (agent || prompt) {
+    // Use a slight delay to ensure router is fully ready
+    const timer = setTimeout(() => {
       const currentPath = window.location.pathname;
       const urlSearchParams = new URLSearchParams(window.location.search);
 
-      // Remove agent and prompt parameters
-      urlSearchParams.delete('agent');
-      urlSearchParams.delete('prompt');
+      const hasAgentParam = urlSearchParams.has('agent');
+      const hasPromptParam = urlSearchParams.has('prompt');
 
-      const newUrl = urlSearchParams.toString()
-        ? `${currentPath}?${urlSearchParams.toString()}`
-        : currentPath;
+      // Only attempt removal if parameters exist
+      if (hasAgentParam || hasPromptParam) {
+        // Remove agent and prompt parameters
+        urlSearchParams.delete('agent');
+        urlSearchParams.delete('prompt');
 
-      // Use window.history.replaceState to avoid triggering router events
-      window.history.replaceState(
-        { ...window.history.state },
-        '',
-        newUrl
-      );
-    }
-  }, [router.isReady, router.query.agent, router.query.prompt]);
+        const newUrl = urlSearchParams.toString()
+          ? `${currentPath}?${urlSearchParams.toString()}`
+          : currentPath;
+
+        // Use router.replace to properly update Next.js router
+        router.replace(newUrl, undefined, { shallow: true });
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - run only once on mount
 
   useEffect(() => {
     // Clean up the store when component unmounts (drawer closes)
@@ -123,9 +124,9 @@ export default function AgentSuccess() {
   const endpointConfigs = useMemo<EndpointConfig[]>(() => {
     return [
       {
-        key: "/v1/chat/completions",
-        label: "Chat Completions",
-        path: "/v1/chat/completions",
+        key: "/v1/responses",
+        label: "Responses",
+        path: "/v1/responses",
         payload: {
           prompt: {
             name: promptName,
@@ -139,9 +140,9 @@ export default function AgentSuccess() {
         },
       },
       {
-        key: "/v1/completions",
-        label: "Completions",
-        path: "/v1/completions",
+        key: "/v1/responses",
+        label: "Responses",
+        path: "/v1/responses",
         payload: {
           prompt: {
             name: promptName,

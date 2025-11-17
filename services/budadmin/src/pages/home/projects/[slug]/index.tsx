@@ -180,7 +180,7 @@ const ProjectDetailsPage = () => {
                 ),
                 key: "2",
                 children: <AgentsPromptsListTable />,
-                hide: !enableDevMode,
+                // hide: !enableDevMode,
               },
               {
                 label: (

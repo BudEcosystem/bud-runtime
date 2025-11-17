@@ -31,7 +31,6 @@ import NoDataFount from "@/components/ui/noDataFount";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import { PlusOutlined } from "@ant-design/icons";
 import { useAgentStore } from "@/stores/useAgentStore";
-import AgentDrawer from "@/components/agents/AgentDrawer";
 import { usePromptsAgents, type PromptAgent } from "@/stores/usePromptsAgents";
 import { IconOnlyRender } from "src/flows/components/BudIconRender";
 import PromptAgentTags from "src/flows/components/PromptAgentTags";
@@ -851,8 +850,7 @@ export default function PromptsAgents() {
         )}
       </div>
 
-      {/* Agent Drawer - Independent from existing drawer */}
-      <AgentDrawer />
+      {/* Agent Drawer moved to global layout (layout.tsx) for availability across all pages */}
     </DashBoardLayout>
   );
 }
