@@ -25,11 +25,6 @@ type EndpointConfig = {
   payload: Record<string, unknown>;
 };
 
-const ensureLeadingSlash = (path: string) => {
-  if (!path) return "";
-  return path.startsWith("/") ? path : `/${path}`;
-};
-
 const stripLeadingSlash = (path: string) =>
   path.startsWith("/") ? path.slice(1) : path;
 
