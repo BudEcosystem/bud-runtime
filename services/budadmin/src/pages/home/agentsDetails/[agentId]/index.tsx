@@ -204,7 +204,7 @@ const AgentDetailsPage = () => {
   return (
     <DashBoardLayout>
       <div className="temp-bg h-full w-full">
-        <div className="evalTab h-full">
+        <div className="evalTab agentTab h-full">
           <Tabs
             defaultActiveKey="1"
             activeKey={activeTab}

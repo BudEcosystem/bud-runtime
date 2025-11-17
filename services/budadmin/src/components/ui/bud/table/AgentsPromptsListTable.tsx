@@ -275,9 +275,12 @@ function AgentsPromptsListTable() {
                     bordered={false}
                     footer={null}
                     virtual
-                    onRow={() => {
+                    onRow={(record) => {
                         return {
-                            className: 'group',
+                            className: 'group cursor-pointer',
+                            onClick: () => {
+                                router.push(`/home/agentsDetails/${record.id}`);
+                            },
                         };
                     }}
                     onChange={(_pagination, _filters, sorter: any) => {

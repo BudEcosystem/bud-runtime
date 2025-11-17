@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, Row, Col, Statistic, Select, Tag } from "antd";
+import { Card, Row, Col, Statistic, Segmented } from "antd";
 import {
   Text_14_600_EEEEEE,
   Text_12_400_B3B3B3,
@@ -20,12 +20,25 @@ import {
 } from "recharts";
 import Tags from "src/flows/components/DrawerTags";
 
+const segmentOptions = ["LAST 24 HRS", "LAST 7 DAYS", "LAST 30 DAYS"];
+
 interface OverviewTabProps {
   agentData: any;
 }
 
 const OverviewTab: React.FC<OverviewTabProps> = ({ agentData }) => {
-  const [timeRange, setTimeRange] = React.useState("daily");
+  const [timeRange, setTimeRange] = React.useState("weekly");
+
+  const handleChartFilter = (val: string) => {
+    if (val === "LAST 24 HRS") return "daily";
+    if (val === "LAST 7 DAYS") return "weekly";
+    if (val === "LAST 30 DAYS") return "monthly";
+    return "weekly"; // Default fallback
+  };
+
+  const handleTimeRangeChange = (value: string) => {
+    setTimeRange(handleChartFilter(value));
+  };
 
   // Mock data for charts
   const callsData = [
@@ -92,32 +105,32 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ agentData }) => {
   ];
 
   const TimeRangeSelector = () => (
-    <Select
-      value={timeRange}
-      onChange={setTimeRange}
-      className="w-[120px]"
-      options={[
-        { label: "Daily", value: "daily" },
-        { label: "Weekly", value: "weekly" },
-        { label: "Monthly", value: "monthly" },
-      ]}
+    <Segmented
+      options={segmentOptions}
+      value={segmentOptions.find(
+        (opt) => handleChartFilter(opt) === timeRange,
+      )}
+      onChange={(value) => {
+        handleTimeRangeChange(value);
+      }}
+      className="antSegmented rounded-md text-[#EEEEEE] font-[400] bg-[transparent] border border-[#4D4D4D] border-[.53px] p-[0]"
     />
   );
 
   return (
-    <div className="px-[3.5rem] pb-8">
+    <div className="pb-8">
       {/* Agent Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-3 mb-2 pt-[.5rem]">
           <Text_26_600_FFFFFF className="text-[#EEE]">
-            {agentData?.name}
+            {agentData?.name || 'Agent Name'}
           </Text_26_600_FFFFFF>
-          <Tag color="green" className="text-xs">
-            {agentData?.status}
-          </Tag>
+          <Tags color="green" name={agentData?.status || 'Active'}
+
+          />
         </div>
         <Text_12_400_B3B3B3 className="max-w-[850px] mb-3">
-          {agentData?.description}
+          {agentData?.description || 'LiveMathBench can capture LLM capabilities in complex reasoning tasks, including challenging latest question sets from various mathematical competitions.'}
         </Text_12_400_B3B3B3>
         <div className="flex items-center gap-2 flex-wrap">
           {agentData?.tags?.map((tag: any, index: number) => (
