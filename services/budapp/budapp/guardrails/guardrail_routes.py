@@ -648,6 +648,51 @@ async def get_profile_probe_rules(
     ).to_http_response()
 
 
+@router.get(
+    "/profile/{profile_id}/deployments",
+    response_model=GuardrailDeploymentPaginatedResponse,
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def list_all_profile_deployments(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    profile_id: UUID,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=0),
+    order_by: Optional[list[str]] = Depends(parse_ordering_fields),
+    search: bool = False,
+) -> Union[GuardrailDeploymentPaginatedResponse, ErrorResponse]:
+    """List all guardrail deployments with pagination."""
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Construct filters
+    filters_dict = {}
+    filters_dict["profile_id"] = profile_id
+
+    try:
+        db_deployments, count = await GuardrailProfileDeploymentService(session).list_deployments(
+            offset, limit, filters_dict, order_by, search
+        )
+    except ClientException as e:
+        logger.exception(f"Failed to get all deployments: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get all deployments: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all deployments"
+        ).to_http_response()
+
+    return GuardrailDeploymentPaginatedResponse(
+        deployments=db_deployments,
+        total_record=count,
+        page=page,
+        limit=limit,
+        code=status.HTTP_200_OK,
+        message="Successfully list all deployments",
+    ).to_http_response()
+
+
 @router.put(
     "/profile/{profile_id}",
     response_model=GuardrailProfileDetailResponse,
@@ -757,56 +802,6 @@ async def add_guardrail_deployment_workflow(
 
 
 # Deployment endpoints
-@router.get(
-    "/deployments",
-    response_model=GuardrailDeploymentPaginatedResponse,
-)
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
-async def list_all_deployments(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=0),
-    order_by: Optional[list[str]] = Depends(parse_ordering_fields),
-    search: bool = False,
-    project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
-    profile_id: Optional[UUID] = Query(None, description="Filter by profile ID"),
-    endpoint_id: Optional[UUID] = Query(None, description="Filter by endpoint ID"),
-) -> Union[GuardrailDeploymentPaginatedResponse, ErrorResponse]:
-    """List all guardrail deployments with pagination."""
-    # Calculate offset
-    offset = (page - 1) * limit
-
-    # Construct filters
-    filters_dict = {}
-    if project_id:
-        filters_dict["project_id"] = project_id
-    if profile_id:
-        filters_dict["profile_id"] = profile_id
-    if endpoint_id:
-        filters_dict["endpoint_id"] = endpoint_id
-
-    try:
-        db_deployments, count = await GuardrailProfileDeploymentService(session).list_deployments(
-            offset, limit, filters_dict, order_by, search
-        )
-    except ClientException as e:
-        logger.exception(f"Failed to get all deployments: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to get all deployments: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get all deployments"
-        ).to_http_response()
-
-    return GuardrailDeploymentPaginatedResponse(
-        deployments=db_deployments,
-        total_record=count,
-        page=page,
-        limit=limit,
-        code=status.HTTP_200_OK,
-        message="Successfully list all deployments",
-    ).to_http_response()
 
 
 @router.get(
