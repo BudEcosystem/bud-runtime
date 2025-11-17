@@ -172,9 +172,9 @@ const ProjectDetailsPage = () => {
                       />
                     </svg>
                     {activeTab === "2" ? (
-                      <Text_14_600_EEEEEE>Agents & Prompts</Text_14_600_EEEEEE>
+                      <Text_14_600_EEEEEE>Agents</Text_14_600_EEEEEE>
                     ) : (
-                      <Text_14_600_B3B3B3>Agents & Prompts</Text_14_600_B3B3B3>
+                      <Text_14_600_B3B3B3>Agents</Text_14_600_B3B3B3>
                     )}
                   </div>
                 ),

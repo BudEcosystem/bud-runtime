@@ -244,7 +244,7 @@ function AgentsPromptsListTable() {
                                             permission={hasPermission(PermissionEnum.ModelManage)}
                                             onClick={(event: React.MouseEvent) => {
                                                 event.stopPropagation();
-                                                openDrawer("use-model", { endpoint: record });
+                                                openDrawer("use-agent", { endpoint: record });
                                             }}
                                         >
                                             Use this agent
@@ -299,7 +299,7 @@ function AgentsPromptsListTable() {
                     title={() => (
                         <div className='flex justify-between items-center px-[0.75rem] py-[1rem]'>
                             <Text_16_600_FFFFFF className='text-[#EEEEEE]'>
-                                Prompt List
+                                Agent List
                             </Text_16_600_FFFFFF>
                             <div className='flex items-center justify-between gap-x-[.8rem]'>
                                 <SearchHeaderInput

@@ -1,22 +1,21 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Image, Tag } from "antd";
-import { useRouter } from "next/router";
-import { useDrawer } from "src/hooks/useDrawer";
+import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import { Text_12_400_B3B3B3, Text_16_600_FFFFFF, Text_14_400_EEEEEE, Text_12_400_757575, Text_20_400_FFFFFF, Text_12_600_EEEEEE, Text_12_400_EEEEEE } from "@/components/ui/text";
-import { getChromeColor } from "@/components/ui/bud/dataEntry/TagsInputData";
-import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import DrawerCard from "@/components/ui/bud/card/DrawerCard";
-import { ModelFlowInfoCard } from "@/components/ui/bud/deploymentDrawer/DeployModelSpecificationInfo";
-import { useAddAgent } from "@/stores/useAddAgent";
-import { usePromptsAgents } from "@/stores/usePromptsAgents";
+import {
+  Text_12_400_757575,
+  Text_12_400_EEEEEE,
+  Text_12_600_EEEEEE,
+  Text_20_400_FFFFFF,
+} from "@/components/ui/text";
+import { Image } from "antd";
+import React, { useEffect, useMemo, useState } from "react";
 import CustomDropDown from "../components/CustomDropDown";
-import CustomPopover from "../components/customPopover";
 import { ChevronDown } from "lucide-react";
+import CustomPopover from "../components/customPopover";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { useDrawer } from "src/hooks/useDrawer";
 import { copyToClipboard } from "@/utils/clipboard";
 
 type EndpointConfig = {
@@ -60,144 +59,45 @@ const generateJavaScriptCode = (apiUrl: string, config?: EndpointConfig) => {
   return `const data = ${JSON.stringify(config.payload, null, 2)};\n\nfetch('${apiUrl}', {\n  method: 'POST',\n  headers: {\n    'Authorization': 'Bearer {API_KEY_HERE}',\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify(data)\n})\n.then(response => response.json())\n.then(data => console.log(data))\n.catch(error => console.error('Error:', error));`;
 };
 
-export default function AgentSuccess() {
-  const router = useRouter();
-  const { closeDrawer } = useDrawer();
-  const { fetchPrompts } = usePromptsAgents();
+export default function UseAgent() {
+  const { drawerProps } = useDrawer();
 
-  // Get data from the Add Agent store
-  const {
-    currentWorkflow,
-    deploymentConfiguration,
-    reset
-  } = useAddAgent();
+  // Get prompt name from the endpoint record passed via drawer props
+  const promptName = drawerProps?.endpoint?.name || "PROMPT_NAME";
 
-  // Remove 'agent' and 'prompt' query parameters from URL
-  useEffect(() => {
-    if (!router.isReady) return;
-
-    const { agent, prompt } = router.query;
-
-    // Only attempt removal if parameters exist
-    if (agent || prompt) {
-      const currentPath = window.location.pathname;
-      const urlSearchParams = new URLSearchParams(window.location.search);
-
-      // Remove agent and prompt parameters
-      urlSearchParams.delete('agent');
-      urlSearchParams.delete('prompt');
-
-      const newUrl = urlSearchParams.toString()
-        ? `${currentPath}?${urlSearchParams.toString()}`
-        : currentPath;
-
-      // Use window.history.replaceState to avoid triggering router events
-      window.history.replaceState(
-        { ...window.history.state },
-        '',
-        newUrl
-      );
-    }
-  }, [router.isReady, router.query.agent, router.query.prompt]);
-
-  useEffect(() => {
-    // Clean up the store when component unmounts (drawer closes)
-    return () => {
-      reset();
-    };
-  }, [reset]);
-
-  // Get model from workflow steps
-  const model = currentWorkflow?.workflow_steps?.model;
-
-  const handleClose = () => {
-    // Refresh the prompts list
-    fetchPrompts();
-    // Close the drawer
-    closeDrawer();
-  };
-
-  // Code snippet functionality
-  const promptName = deploymentConfiguration?.deploymentName || "PROMPT_NAME";
-
-  const endpointConfigs = useMemo<EndpointConfig[]>(() => {
-    return [
-      {
-        key: "/v1/chat/completions",
-        label: "Chat Completions",
-        path: "/v1/chat/completions",
-        payload: {
-          prompt: {
-            name: promptName,
-            version: "1",
-            variables: {
-              variable_1: "Value 1",
-              variable_2: "Value 2"
-            }
-          },
-          input: "Unstructured input text related to the prompt."
+  // Use a single endpoint configuration for agents/prompts
+  const endpointConfig = useMemo<EndpointConfig>(() => {
+    return {
+      key: "/v1/chat/completions",
+      label: "Chat Completions",
+      path: "/v1/chat/completions",
+      payload: {
+        prompt: {
+          name: promptName,
+          version: "1",
+          variables: {
+            variable_1: "Value 1",
+            variable_2: "Value 2"
+          }
         },
+        input: "Unstructured input text related to the prompt."
       },
-      {
-        key: "/v1/completions",
-        label: "Completions",
-        path: "/v1/completions",
-        payload: {
-          prompt: {
-            name: promptName,
-            version: "1",
-            variables: {
-              variable_1: "Value 1",
-              variable_2: "Value 2"
-            }
-          },
-          input: "Unstructured input text related to the prompt."
-        },
-      }
-    ];
+    };
   }, [promptName]);
-
-  const [selectedEndpointKey, setSelectedEndpointKey] = useState<string>(
-    endpointConfigs[0]?.key || ""
-  );
-
-  useEffect(() => {
-    if (!endpointConfigs.length) {
-      setSelectedEndpointKey("");
-      return;
-    }
-
-    const hasCurrent = endpointConfigs.some(
-      (config) => config.key === selectedEndpointKey
-    );
-
-    if (!hasCurrent) {
-      setSelectedEndpointKey(endpointConfigs[0].key);
-    }
-  }, [endpointConfigs, selectedEndpointKey]);
-
-  const selectedEndpoint = useMemo(
-    () =>
-      endpointConfigs.find((config) => config.key === selectedEndpointKey) ||
-      endpointConfigs[0],
-    [endpointConfigs, selectedEndpointKey]
-  );
 
   const baseUrl =
     process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL ||
     process.env.NEXT_PUBLIC_BASE_URL ||
     "";
-  const apiUrl = selectedEndpoint
-    ? joinBaseWithPath(baseUrl, selectedEndpoint.path)
-    : baseUrl;
+  const apiUrl = joinBaseWithPath(baseUrl, endpointConfig.path);
 
   const codeSnippets = useMemo(
     () => ({
-      curl: generateCurlCommand(apiUrl, selectedEndpoint),
-      python: generatePythonCode(apiUrl, selectedEndpoint),
-      javascript: generateJavaScriptCode(apiUrl, selectedEndpoint),
+      curl: generateCurlCommand(apiUrl, endpointConfig),
+      python: generatePythonCode(apiUrl, endpointConfig),
+      javascript: generateJavaScriptCode(apiUrl, endpointConfig),
     }),
-    [apiUrl, selectedEndpoint]
+    [apiUrl, endpointConfig]
   );
 
   const [selectedCode, setSelectedCode] = useState("curl");
@@ -230,42 +130,9 @@ export default function AgentSuccess() {
     return () => clearTimeout(timeout);
   }, [copyText]);
 
-  const endpointDropdownItems = endpointConfigs.map((config) => ({
-    key: config.key,
-    label: (
-      <div className="flex flex-col">
-        <Text_12_400_EEEEEE>{config.path}</Text_12_400_EEEEEE>
-      </div>
-    ),
-    onClick: () => setSelectedEndpointKey(config.key),
-  }));
-
-  const selectedEndpointPathDisplay = selectedEndpoint?.path || "/v1/chat/completions";
-
   return (
-    <BudForm
-      data={{}}
-      backText="Close"
-      onBack={handleClose}
-    >
-      <BudWraperBox >
-        <BudDrawerLayout>
-          <DrawerTitleCard
-              title={"Prompt Deployed"}
-              description={`${deploymentConfiguration?.deploymentName} prompt has been deployed`}
-            />
-            <ModelFlowInfoCard
-              selectedModel={model}
-              informationSpecs={[
-                {
-                  name: "URI",
-                  value: model?.uri,
-                  full: true,
-                  icon: "/images/drawer/tag.png",
-                },
-              ]}
-            />
-        </BudDrawerLayout>
+    <BudForm data={{}}>
+      <BudWraperBox>
         <BudDrawerLayout>
           <DrawerCard>
             <div className="pt-[.9rem]">
@@ -273,15 +140,15 @@ export default function AgentSuccess() {
                 Code Snippet
               </Text_20_400_FFFFFF>
               <Text_12_400_757575 className="tracking-[.004rem] mt-[1rem]">
-                Copy the code below and use it for deployment
+                Copy the code below and use it to call your agent
               </Text_12_400_757575>
             </div>
-            <div className="pt-[1.4rem] flex flex-row gap-[1rem] items-start">
+            <div className="pt-[1.4rem] flex flex-row gap-[1rem] items-start justify-start">
               <div className="flex-shrink-0">
                 <CustomDropDown
                   Placement="bottomLeft"
                   buttonContent={
-                    <div className="border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[1.25rem] flex items-center justify-center px-[.75rem] pt-[.1rem] pb-[0rem]">
+                    <div className="border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[1.25rem] flex items-center justify-center px-[.75rem] py-[.1rem] pb-[0]">
                       <Text_12_600_EEEEEE className="flex items-center justify-center">
                         {selectedCode.charAt(0).toUpperCase() +
                           selectedCode.slice(1)}
