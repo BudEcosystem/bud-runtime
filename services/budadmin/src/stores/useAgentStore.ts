@@ -64,6 +64,7 @@ export interface AgentSession {
   createdAt: Date;
   updatedAt: Date;
   position?: number;
+  llm_retry_limit?: number;
   settings?: {
     temperature?: number;
     maxTokens?: number;
@@ -169,6 +170,7 @@ const createDefaultSession = (): AgentSession => ({
   createdAt: new Date(),
   updatedAt: new Date(),
   position: 0,
+  llm_retry_limit: 3,
   settings: {
     temperature: 0.7,
     maxTokens: 2000,

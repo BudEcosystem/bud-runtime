@@ -203,6 +203,10 @@ function AgentBoxInner({
     if (session) updateSession(session.id, { promptMessages: value });
   };
 
+  const handleLlmRetryLimitChange = (value: number) => {
+    if (session) updateSession(session.id, { llm_retry_limit: value });
+  };
+
   const handleStreamToggle = (checked: boolean) => {
     setStreamEnabled(checked);
     if (session) {
@@ -488,7 +492,7 @@ function AgentBoxInner({
             content: session.systemPrompt
           }
         ],
-        llm_retry_limit: 0,
+        llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: true,
         system_prompt_role: "system"
@@ -598,7 +602,7 @@ function AgentBoxInner({
           role: msg.role,
           content: msg.content
         })),
-        llm_retry_limit: 0,
+        llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: true,
         system_prompt_role: "system"
@@ -904,6 +908,7 @@ function AgentBoxInner({
             onPromptMessagesChange={handlePromptMessagesChange}
             localSystemPrompt={localSystemPrompt}
             localPromptMessages={localPromptMessages}
+            onLlmRetryLimitChange={handleLlmRetryLimitChange}
             onSavePromptSchema={handleSavePromptSchema}
             isSaving={isSaving}
             onSaveSystemPrompt={handleSaveSystemPrompt}
