@@ -281,7 +281,7 @@ export default function AgentSuccess() {
                 <CustomDropDown
                   Placement="bottomLeft"
                   buttonContent={
-                    <div className="border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[1.25rem] flex items-center justify-center px-[.75rem] pt-[.1rem] pb-[0rem]">
+                    <div className="border border-[.5px] border-[#965CDE] rounded-[6px] bg-[#1E0C34] min-w-[4rem] min-h-[1.25rem] flex items-center justify-center px-[.75rem] py-[.1rem]">
                       <Text_12_600_EEEEEE className="flex items-center justify-center">
                         {selectedCode.charAt(0).toUpperCase() +
                           selectedCode.slice(1)}
