@@ -441,7 +441,7 @@ class PromptVersionResponse(BaseModel):
     version: int
     endpoint: EndpointResponse
     model: ModelResponse
-    cluster: ClusterResponse
+    cluster: ClusterResponse | None = None
     created_at: datetime
     modified_at: datetime
 
