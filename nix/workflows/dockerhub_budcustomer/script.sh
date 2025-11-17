@@ -56,7 +56,7 @@ docker login \
 package="packages.x86_64-linux.container_budcustomer"
 note "Building $package..."
 nix build ".#$package" -L
-image_tag="$(docker image load -i result | cut -d' ' -f3 | head -n1)"
+image_tag="$(docker image load -i result | awk '{print $3}' | head -n1)"
 image="${image_tag%%:*}"
 
 note "Built image: $image_tag"
