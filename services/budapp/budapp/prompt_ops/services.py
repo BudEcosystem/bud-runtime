@@ -364,6 +364,28 @@ class PromptService(SessionMixin):
 
         return prompt_response
 
+    async def get_prompt(self, prompt_id: UUID) -> PromptResponse:
+        """Retrieve a single prompt by ID.
+
+        Args:
+            prompt_id: UUID of the prompt to retrieve
+
+        Returns:
+            PromptResponse: Prompt details with full relationships
+
+        Raises:
+            ClientException: If prompt not found (404) or inactive
+        """
+        # Retrieve prompt by ID (active only)
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel, fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE}, missing_ok=True
+        )
+
+        if not db_prompt:
+            raise ClientException(message="Prompt not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        return PromptResponse.model_validate(db_prompt)
+
     async def search_prompt_tags(self, search_term: str, offset: int = 0, limit: int = 10) -> Tuple[List[Dict], int]:
         """Search prompt tags by name."""
         db_tags, count = await PromptDataManager(self.session).search_tags_by_name(search_term, offset, limit)
