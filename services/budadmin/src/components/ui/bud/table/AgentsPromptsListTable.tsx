@@ -17,7 +17,6 @@ import { SortIcon } from './SortIcon';
 import { useConfirmAction } from 'src/hooks/useConfirmAction';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { IconOnlyRender } from 'src/flows/components/BudIconRender';
-import { useEndPoints } from 'src/hooks/useEndPoint';
 
 const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
@@ -56,7 +55,6 @@ function AgentsPromptsListTable() {
     const [order, setOrder] = useState<'-' | ''>('-');
     const [orderBy, setOrderBy] = useState<string>('created_at');
     const { hasProjectPermission, hasPermission } = useUser();
-    const { getEndpointClusterDetails } = useEndPoints();
     useLoaderOnLoding(loading);
     const { contextHolder, openConfirm } = useConfirmAction();
     const [confirmVisible, setConfirmVisible] = useState(false);
@@ -244,12 +242,8 @@ function AgentsPromptsListTable() {
                                     <div className='flex flex-row items-center justify-end'>
                                         <BorderlessButton
                                             permission={hasPermission(PermissionEnum.ModelManage)}
-                                            onClick={async (event: React.MouseEvent) => {
+                                            onClick={(event: React.MouseEvent) => {
                                                 event.stopPropagation();
-                                                await getEndpointClusterDetails(
-                                                    record.id!,
-                                                    projectId as string,
-                                                );
                                                 openDrawer("use-model", { endpoint: record });
                                             }}
                                         >
