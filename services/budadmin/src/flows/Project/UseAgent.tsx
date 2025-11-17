@@ -191,8 +191,8 @@ export default function UseAgent() {
               </CustomPopover>
               <div className="markdown-body">
                 {" "}
-                <SyntaxHighlighter language="bash" style={oneDark} showLineNumbers>
-                  {selectedText.replace(/^```[\w]*\n/, "").replace(/```$/, "")}
+                <SyntaxHighlighter language={selectedCode === 'curl' ? 'bash' : selectedCode} style={oneDark} showLineNumbers>
+                  {selectedText}
                 </SyntaxHighlighter>
               </div>
             </div>
