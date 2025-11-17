@@ -250,6 +250,51 @@ async def list_prompts(
 
 
 @router.get(
+    "/{prompt_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SinglePromptResponse,
+            "description": "Successfully retrieved prompt",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Retrieve a single prompt by its ID",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_prompt(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: UUID,
+) -> Union[SinglePromptResponse, ErrorResponse]:
+    """Retrieve a single prompt by its ID."""
+    try:
+        # Get the prompt from service
+        prompt_response = await PromptService(session).get_prompt(prompt_id=prompt_id)
+
+        return SinglePromptResponse(
+            prompt=prompt_response,
+            message="Prompt retrieved successfully",
+            code=status.HTTP_200_OK,
+            object="prompt.get",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to retrieve prompt: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve prompt: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve prompt"
+        ).to_http_response()
+
+
+@router.get(
     "/{prompt_id}/versions",
     responses={
         status.HTTP_200_OK: {
