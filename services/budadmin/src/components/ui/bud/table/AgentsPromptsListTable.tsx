@@ -307,7 +307,7 @@ function AgentsPromptsListTable() {
                                     searchValue={searchValue}
                                     setSearchValue={setSearchValue}
                                 />
-                                {(hasPermission(PermissionEnum.ProjectManage) || hasProjectPermission(projectId as string, PermissionEnum.ProjectManage)) && (
+                                {/* {(hasPermission(PermissionEnum.ProjectManage) || hasProjectPermission(projectId as string, PermissionEnum.ProjectManage)) && (
                                     <PrimaryButton
                                         onClick={() => {
                                             // openDrawer("create-prompt");
@@ -321,7 +321,7 @@ function AgentsPromptsListTable() {
                                             Create New
                                         </div>
                                     </PrimaryButton>
-                                )}
+                                )} */}
                             </div>
                         </div>
                     )}

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Image, Tag } from "antd";
+import { useRouter } from "next/router";
 import { useDrawer } from "src/hooks/useDrawer";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
@@ -60,6 +61,7 @@ const generateJavaScriptCode = (apiUrl: string, config?: EndpointConfig) => {
 };
 
 export default function AgentSuccess() {
+  const router = useRouter();
   const { closeDrawer } = useDrawer();
   const { fetchPrompts } = usePromptsAgents();
 
@@ -69,6 +71,34 @@ export default function AgentSuccess() {
     deploymentConfiguration,
     reset
   } = useAddAgent();
+
+  // Remove 'agent' and 'prompt' query parameters from URL
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const { agent, prompt } = router.query;
+
+    // Only attempt removal if parameters exist
+    if (agent || prompt) {
+      const currentPath = window.location.pathname;
+      const urlSearchParams = new URLSearchParams(window.location.search);
+
+      // Remove agent and prompt parameters
+      urlSearchParams.delete('agent');
+      urlSearchParams.delete('prompt');
+
+      const newUrl = urlSearchParams.toString()
+        ? `${currentPath}?${urlSearchParams.toString()}`
+        : currentPath;
+
+      // Use window.history.replaceState to avoid triggering router events
+      window.history.replaceState(
+        { ...window.history.state },
+        '',
+        newUrl
+      );
+    }
+  }, [router.isReady, router.query.agent, router.query.prompt]);
 
   useEffect(() => {
     // Clean up the store when component unmounts (drawer closes)
