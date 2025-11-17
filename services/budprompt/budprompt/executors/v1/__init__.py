@@ -14,4 +14,9 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""Prompt module for Managing Prompts."""
+"""Simple Prompt Executor Module - Version 1 (Deprecated)."""
+
+from .executor import SimplePromptExecutorDeprecated
+
+
+__all__ = ["SimplePromptExecutorDeprecated"]

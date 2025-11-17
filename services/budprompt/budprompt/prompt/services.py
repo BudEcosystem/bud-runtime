@@ -43,10 +43,10 @@ from ..commons.exceptions import (
 )
 from ..commons.helpers import run_async
 from ..commons.security import HashManager
+from ..executors import PromptExecutorFactory
 from ..shared.mcp_foundry_service import mcp_foundry_service
 from ..shared.redis_service import RedisService, TensorZeroRedisService
 from .crud import PromptCRUD, PromptVersionCRUD
-from .executors import SimplePromptExecutor_V1
 from .revised_code.field_validation import generate_validation_function
 from .schema_builder import ModelGeneratorFactory
 from .schemas import (
@@ -82,7 +82,7 @@ class PromptExecutorService:
 
     def __init__(self):
         """Initialize the PromptExecutorService."""
-        self.executor = SimplePromptExecutor_V1()
+        self.executor = PromptExecutorFactory.get_executor(version=3)
 
     async def execute_prompt_deprecated(
         self, request: PromptExecuteRequest
