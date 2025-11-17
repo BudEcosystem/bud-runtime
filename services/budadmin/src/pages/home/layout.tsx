@@ -38,6 +38,7 @@ import BudIsland from "@/components/island/BudIsland";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import pkg from '@novu/notification-center/package.json';
 import { enableDevMode } from "@/components/environment";
+import AgentDrawer from "@/components/agents/AgentDrawer";
 
 interface LayoutProps {
   children: ReactNode;
@@ -581,6 +582,9 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           </div>
         </div>
         {/* Add footer or other common components here */}
+
+        {/* Global Agent Drawer - Available on all pages */}
+        <AgentDrawer />
       </Theme>
     </div>
   );
