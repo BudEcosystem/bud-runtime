@@ -55,11 +55,13 @@ docker login \
 # Push with specified tag
 image_push x86_64-linux "$TAG"
 
-# For release tags (not nightly), also push as latest
-if [ "$TAG" != "nightly" ]; then
+# For release tags, also push as latest
+case "$TAG" in
+  v* | [0-9]*)
 	note "Also pushing as latest tag"
 	image_push x86_64-linux latest
-fi
+	;;
+esac
 
 # Uncomment for multi-arch support in the future
 # image_push x86_64-linux "x86_64-linux-$TAG"
