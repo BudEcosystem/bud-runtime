@@ -40,6 +40,7 @@ import EditProject from "src/flows/Project/EditProject";
 import AddMembers from "src/flows/Project/AddMembers";
 import WorkerDetails from "src/flows/Worker/WorkerDetails";
 import UseModel from "src/flows/Project/UseModel";
+import UseAgent from "src/flows/Project/UseAgent";
 import DeleteCluster from "src/flows/Cluster/DeleteCluster";
 import DeployModelSuccess from "src/flows/DeployModel/DeployModelSuccess";
 import ClusterDeleteStatus from "./Cluster/ClusterDeleteStatus";
@@ -201,6 +202,7 @@ export const StepComponents = {
   "add-members": AddMembers,
   "worker-details": WorkerDetails,
   "use-model": UseModel,
+  "use-agent": UseAgent,
   "publish": Publish,
   "publish-endpoint": PublishEndpoint,
   "delete-cluster": DeleteCluster,

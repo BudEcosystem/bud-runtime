@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Table, notification } from 'antd';
 import ProjectTags from 'src/flows/components/ProjectTags';
-import { PrimaryButton } from '../form/Buttons';
+import { BorderlessButton, PrimaryButton } from '../form/Buttons';
 import { useRouter } from "next/router";
-// import { useDrawer } from 'src/hooks/useDrawer'; // Commented out - uncomment when drawer is needed
+import { useDrawer } from 'src/hooks/useDrawer';
 import { Text_12_300_EEEEEE, Text_12_400_EEEEEE, Text_16_600_FFFFFF } from '../../text';
 import SearchHeaderInput from 'src/flows/components/SearchHeaderInput';
 import { usePrompts } from "src/hooks/usePrompts";
@@ -47,7 +47,7 @@ interface DataType {
 function AgentsPromptsListTable() {
     const [isMounted, setIsMounted] = useState(false);
     const [confirmLoading, setConfirmLoading] = useState(false);
-    // const { openDrawer } = useDrawer(); // Commented out - uncomment when drawer is needed
+    const { openDrawer } = useDrawer();
     const [searchValue, setSearchValue] = useState('');
     const router = useRouter();
     const { projectId } = router.query;
@@ -220,7 +220,7 @@ function AgentsPromptsListTable() {
                             render: (modalities: string[]) => {
                                 if (!modalities || modalities.length === 0) return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
                                 const formattedModalities = modalities.map(m => formatPromptType(m)).join(', ');
-                                return <Text_12_400_EEEEEE className='whitespace-nowrap'>{formattedModalities}</Text_12_400_EEEEEE>;
+                                return <Text_12_400_EEEEEE className='whitespace-nowrap max-w-[150px] truncate'>{formattedModalities}</Text_12_400_EEEEEE>;
                             },
                             sortIcon: SortIcon,
                         },
@@ -238,18 +238,29 @@ function AgentsPromptsListTable() {
                             dataIndex: 'actions',
                             key: 'actions',
                             render: (_text, record) => (
-                                <div className='min-w-[80px]'>
+                                <div className='min-w-[100px]'>
                                     <div className='flex flex-row items-center justify-end'>
-                                        <PrimaryButton
-                                            classNames='rounded-[0.375rem]'
-                                            permission={hasPermission(PermissionEnum.ProjectManage)}
+                                        <BorderlessButton
+                                            permission={hasPermission(PermissionEnum.ModelManage)}
                                             onClick={(event: React.MouseEvent) => {
                                                 event.stopPropagation();
-                                                // openDrawer('view-prompt', { prompt: record });
+                                                openDrawer("use-agent", { endpoint: record });
                                             }}
                                         >
-                                            View
-                                        </PrimaryButton>
+                                            Use this agent
+                                        </BorderlessButton>
+                                        {/* <div className='ml-[.3rem]'>
+                                            <PrimaryButton
+                                                classNames='rounded-[0.375rem]'
+                                                permission={hasPermission(PermissionEnum.ProjectManage)}
+                                                onClick={(event: React.MouseEvent) => {
+                                                    event.stopPropagation();
+                                                    // openDrawer('view-prompt', { prompt: record });
+                                                }}
+                                            >
+                                                View
+                                            </PrimaryButton>
+                                        </div> */}
                                         <div className='ml-[.3rem] w-[1rem] h-auto block'>
                                             <Button
                                                 className='bg-transparent border-none p-0 opacity-0 group-hover:opacity-100'
@@ -288,7 +299,7 @@ function AgentsPromptsListTable() {
                     title={() => (
                         <div className='flex justify-between items-center px-[0.75rem] py-[1rem]'>
                             <Text_16_600_FFFFFF className='text-[#EEEEEE]'>
-                                Prompt List
+                                Agent List
                             </Text_16_600_FFFFFF>
                             <div className='flex items-center justify-between gap-x-[.8rem]'>
                                 <SearchHeaderInput
@@ -296,7 +307,7 @@ function AgentsPromptsListTable() {
                                     searchValue={searchValue}
                                     setSearchValue={setSearchValue}
                                 />
-                                {(hasPermission(PermissionEnum.ProjectManage) || hasProjectPermission(projectId as string, PermissionEnum.ProjectManage)) && (
+                                {/* {(hasPermission(PermissionEnum.ProjectManage) || hasProjectPermission(projectId as string, PermissionEnum.ProjectManage)) && (
                                     <PrimaryButton
                                         onClick={() => {
                                             // openDrawer("create-prompt");
@@ -310,7 +321,7 @@ function AgentsPromptsListTable() {
                                             Create New
                                         </div>
                                     </PrimaryButton>
-                                )}
+                                )} */}
                             </div>
                         </div>
                     )}

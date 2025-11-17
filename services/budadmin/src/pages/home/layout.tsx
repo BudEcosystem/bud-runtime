@@ -158,7 +158,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       // iconSvg: true,
       cmd: "7",
       customSvg: "prompts",
-      hide: !enableDevMode,
+      // hide: !enableDevMode,
     },
     {
       label: "Observability",

@@ -39,47 +39,45 @@ export const usePromptSchemaWorkflow = ({
   const timeoutRef = useRef<number | null>(null);
 
   // Fetch workflow data when workflowId changes
-  const getWorkflow = useCallback(async () => {
+  useEffect(() => {
     if (!workflowId || loading) return;
 
-    setSteps([]);
-    setLoading(true);
+    const getWorkflow = async () => {
+      setSteps([]);
+      setLoading(true);
 
-    try {
-      console.log(`[usePromptSchemaWorkflow] Fetching workflow: ${workflowId}`);
-      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/workflows/${workflowId}`);
-      const data = response?.data;
+      try {
+        console.log(`[usePromptSchemaWorkflow] Fetching workflow: ${workflowId}`);
+        const response: any = await AppRequest.Get(`${tempApiBaseUrl}/workflows/${workflowId}`);
+        const data = response?.data;
 
-      if (data?.workflow_steps?.prompt_schema_events) {
-        const workflowSteps = data.workflow_steps.prompt_schema_events.steps || [];
-        console.log(`[usePromptSchemaWorkflow] Loaded ${workflowSteps.length} steps:`, workflowSteps);
-        setSteps(workflowSteps);
+        if (data?.workflow_steps?.prompt_schema_events) {
+          const workflowSteps = data.workflow_steps.prompt_schema_events.steps || [];
+          console.log(`[usePromptSchemaWorkflow] Loaded ${workflowSteps.length} steps:`, workflowSteps);
+          setSteps(workflowSteps);
 
-        // Check if workflow is already completed/failed
-        const workflowStatus = data.workflow_steps.prompt_schema_events.status;
-        if (workflowStatus === 'COMPLETED') {
-          console.log(`[usePromptSchemaWorkflow] Workflow already completed`);
-          setStatus('success');
-        } else if (workflowStatus === 'FAILED') {
-          console.log(`[usePromptSchemaWorkflow] Workflow already failed`);
-          setStatus('failed');
+          // Check if workflow is already completed/failed
+          const workflowStatus = data.workflow_steps.prompt_schema_events.status;
+          if (workflowStatus === 'COMPLETED') {
+            console.log(`[usePromptSchemaWorkflow] Workflow already completed`);
+            setStatus('success');
+          } else if (workflowStatus === 'FAILED') {
+            console.log(`[usePromptSchemaWorkflow] Workflow already failed`);
+            setStatus('failed');
+          }
+        } else {
+          console.warn(`[usePromptSchemaWorkflow] No prompt_schema_events found in workflow response`);
         }
-      } else {
-        console.warn(`[usePromptSchemaWorkflow] No prompt_schema_events found in workflow response`);
+      } catch (error) {
+        console.error('[usePromptSchemaWorkflow] Error fetching workflow:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('[usePromptSchemaWorkflow] Error fetching workflow:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [workflowId, loading]);
+    };
 
-  // Fetch workflow data when workflowId is set
-  useEffect(() => {
-    if (workflowId) {
-      getWorkflow();
-    }
-  }, [workflowId, getWorkflow]);
+    getWorkflow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflowId]);
 
   const handleNotification = useCallback(async (data: any) => {
     try {
