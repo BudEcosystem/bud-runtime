@@ -70,6 +70,15 @@ export const ToolDetails: React.FC<ToolDetailsProps> = ({
     return name.charAt(0).toUpperCase();
   };
 
+  const formatParamName = (paramName: string) => {
+    // Replace special characters with spaces and add space before capital letters for camelCase
+    return paramName
+      .replace(/([a-z])([A-Z])/g, '$1 $2') // Add space before capital letters in camelCase
+      .replace(/[^a-zA-Z0-9\s]/g, ' ') // Replace any special characters (including _ and -) with spaces
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .trim(); // Remove leading/trailing spaces
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full text-white items-center justify-center">
@@ -79,7 +88,7 @@ export const ToolDetails: React.FC<ToolDetailsProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full text-white">
+    <div className="flex flex-col h-full text-white pb-[.5rem]">
       {/* Header */}
       <div className="px-[1.125rem] py-[1.875rem] relative">
         <button
@@ -117,7 +126,7 @@ export const ToolDetails: React.FC<ToolDetailsProps> = ({
         {toolData?.description && (
           <div className="mb-6">
             <Text_12_400_EEEEEE className="mb-1">Description</Text_12_400_EEEEEE>
-            <Text_10_400_B3B3B3>{toolData.description}</Text_10_400_B3B3B3>
+            <Text_10_400_B3B3B3 className='leading-[140%]'>{toolData.description}</Text_10_400_B3B3B3>
           </div>
         )}
 
@@ -134,13 +143,13 @@ export const ToolDetails: React.FC<ToolDetailsProps> = ({
                     className="bg-[#ffffff08] border border-[#1F1F1F] rounded-lg p-[.54rem]"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="w-[30%]">
-                        <Text_12_400_EEEEEE>{paramName}</Text_12_400_EEEEEE>
+                      <div className="w-[40%]">
+                        <Text_12_400_EEEEEE>{formatParamName(paramName)}</Text_12_400_EEEEEE>
                       </div>
-                      <div className="w-[30%]">
+                      <div className="w-[25%]">
                         <Text_10_400_757575>{paramDetails.type}</Text_10_400_757575>
                       </div>
-                      <div className="w-[30%]">
+                      <div className="w-[35%]">
                         {isRequired ? (
                           <ProjectTags
                             name='Required'

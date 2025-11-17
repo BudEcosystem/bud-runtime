@@ -23,6 +23,7 @@ class OpencompassTransformer:
             script = f"""# Setup data symlink for datasets (if data directory exists in PVC)
 echo "Setting up data access..."
 if [ -d /workspace/shared/data ]; then
+    rm -rf /workspace/data
     ln -sf /workspace/shared/data /workspace/data
     echo "Created symlink: /workspace/data -> /workspace/shared/data"
 else

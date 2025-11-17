@@ -153,8 +153,8 @@ export default {
       },
 
       {
-        source: '/prompts&agents',
-        destination: '/home/prompts&agents',
+        source: '/agents',
+        destination: '/home/agents',
       },
     ];
   },
