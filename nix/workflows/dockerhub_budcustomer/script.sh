@@ -52,14 +52,26 @@ docker login \
 	--username "$(secret_get username)" \
 	--password "$(secret_get password)"
 
-# Push with specified tag
-image_push x86_64-linux "$TAG"
+# Build the image once
+package="packages.x86_64-linux.container_budcustomer"
+note "Building $package..."
+nix build ".#$package" -L
+image_tag="$(docker image load -i result | awk '{print $3}' | head -n1)"
+image="${image_tag%:*}"
 
-# For release tags, also push as latest
+note "Built image: $image_tag"
+
+# Tag and push with specified tag
+note "Tagging and pushing $image:$TAG"
+docker image tag "$image_tag" "$image:$TAG"
+docker push "$image:$TAG"
+
+# For release tags, also tag and push as latest
 case "$TAG" in
   v* | [0-9]*)
-	note "Also pushing as latest tag"
-	image_push x86_64-linux latest
+	note "Also tagging and pushing $image:latest"
+	docker image tag "$image_tag" "$image:latest"
+	docker push "$image:latest"
 	;;
 esac
 
