@@ -51,12 +51,12 @@ from budprompt.shared.providers import BudServeProvider
 
 from ...prompt.schemas import MCPToolConfig, Message, ModelSettings
 from .field_validation import ModelValidationEnhancer
-from .openai_response_formatter_v1 import OpenAIResponseFormatter_V1
-from .openai_streaming_formatter_v1 import OpenAIStreamingFormatter_V1
+from .openai_response_formatter import OpenAIResponseFormatter_V1
+from .openai_streaming_formatter import OpenAIStreamingFormatter_V1
 from .schema_builder import CustomModelGenerator
 from .template_renderer import render_template
 from .tool_loaders import ToolRegistry
-from .utils import PydanticResultSerializer, contains_pydantic_model, validate_input_data_type
+from .utils import contains_pydantic_model, validate_input_data_type
 
 
 logger = logging.get_logger(__name__)
@@ -189,12 +189,6 @@ class SimplePromptExecutor_V1:
                     message_history,
                     output_schema,
                 )
-
-                # Serialize to debug file using custom serializer (for debugging)
-                serializer = PydanticResultSerializer()
-                serialized_result = serializer.serialize(result)
-                with open("latest_pydantic.json", "w") as fp:
-                    fp.write(serialized_result.model_dump_json(indent=4))
 
                 # Format to official OpenAI Response
                 openai_response = await self.response_formatter.format_response(
