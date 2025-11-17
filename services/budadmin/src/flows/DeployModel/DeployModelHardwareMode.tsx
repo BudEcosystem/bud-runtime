@@ -8,6 +8,12 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
 import { Checkbox, Image } from "antd";
 
+// Badge color configurations for hardware mode cards
+const BADGE_STYLES: Record<string, { backgroundColor: string; color: string }> = {
+  blue: { backgroundColor: "#1F3A5F", color: "#5B9FFF" },
+  green: { backgroundColor: "#1F3F1F", color: "#52c41a" },
+};
+
 interface HardwareModeCardProps {
   mode: "dedicated" | "shared";
   title: string;
@@ -57,13 +63,10 @@ function HardwareModeCard({
             <Text_14_400_EEEEEE className="leading-[150%]">
               {title}
             </Text_14_400_EEEEEE>
-            {badge && (
+            {badge && badgeColor && (
               <span
                 className="px-2 py-0.5 rounded text-[10px] font-medium"
-                style={{
-                  backgroundColor: badgeColor === "blue" ? "#1F3A5F" : "#1F3F1F",
-                  color: badgeColor === "blue" ? "#5B9FFF" : "#52c41a",
-                }}
+                style={BADGE_STYLES[badgeColor] || BADGE_STYLES.blue}
               >
                 {badge}
               </span>

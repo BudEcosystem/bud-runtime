@@ -483,9 +483,6 @@ class SimulationService:
                 top_k_configs = optimizer.search()
                 # Convert SearchResult dataclasses to dicts for JSON serialization in workflow mode
                 top_k_configs = [asdict(result) for result in top_k_configs]
-                # Add hardware_mode to each config for downstream processing
-                for config in top_k_configs:
-                    config["hardware_mode"] = hardware_mode
             else:
                 # Use Evolution for regressor mode
                 logger.info("Using Evolution for regressor mode")
@@ -509,9 +506,10 @@ class SimulationService:
                 top_k_configs = evolution.evolve()
                 # Convert EvaluationResult dataclasses to dicts for JSON serialization in workflow mode
                 top_k_configs = [asdict(result) for result in top_k_configs]
-                # Add hardware_mode to each config for downstream processing
-                for config in top_k_configs:
-                    config["hardware_mode"] = hardware_mode
+
+            # Add hardware_mode to each config for downstream processing (common to both paths)
+            for config in top_k_configs:
+                config["hardware_mode"] = hardware_mode
 
             # Handle case where no valid configurations were found
             if not top_k_configs:

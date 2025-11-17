@@ -88,6 +88,7 @@ class DirectSearchOptimizer:
         self.max_evaluations = max_evaluations
         self.supports_pipeline_parallelism = supports_pipeline_parallelism
         self.hardware_mode = hardware_mode
+        self._last_validation_result = None  # Initialize validation result cache
 
         self.engine_config = get_engine_properties(self.engine_name, {"model": self.model})
 
