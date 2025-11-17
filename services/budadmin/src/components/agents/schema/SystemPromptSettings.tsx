@@ -4,6 +4,7 @@ import React from 'react';
 import { Checkbox } from "antd";
 import { PrimaryButton } from "../../ui/bud/form/Buttons";
 import { Text_16_400_EEEEEE, Text_10_400_757575, Text_12_400_EEEEEE } from "../../ui/text";
+import { TextInput } from "../../ui/input";
 
 interface SystemPromptSettingsProps {
   sessionId: string;
@@ -11,6 +12,8 @@ interface SystemPromptSettingsProps {
   onSystemPromptChange: (value: string) => void;
   onSaveSystemPrompt?: () => void;
   isSavingSystemPrompt?: boolean;
+  llmRetryLimit?: number;
+  onLlmRetryLimitChange?: (value: number) => void;
 }
 
 export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
@@ -18,9 +21,40 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
   systemPrompt,
   onSystemPromptChange,
   onSaveSystemPrompt,
-  isSavingSystemPrompt
+  isSavingSystemPrompt,
+  llmRetryLimit = 3,
+  onLlmRetryLimitChange
 }) => {
   const [allowMultipleCalls, setAllowMultipleCalls] = React.useState(false);
+  const [localRetryLimit, setLocalRetryLimit] = React.useState<number | string>(llmRetryLimit);
+
+  React.useEffect(() => {
+    setLocalRetryLimit(llmRetryLimit);
+  }, [llmRetryLimit]);
+
+  const handleRetryLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Allow only digits or empty string
+    if (value === '' || /^\d*$/.test(value)) {
+      setLocalRetryLimit(value);
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    let numValue = parseInt(value, 10);
+
+    if (isNaN(numValue)) {
+      numValue = 3; // Default to 3 if empty or invalid
+    }
+
+    // Enforce min/max limits
+    const clampedValue = Math.min(Math.max(numValue, 3), 10);
+
+    // Update both local and parent state
+    setLocalRetryLimit(clampedValue);
+    onLlmRetryLimitChange?.(clampedValue);
+  };
 
   return (
     <div className="flex flex-col justify-between h-full w-full">
@@ -37,7 +71,7 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
         {/* Text Area */}
         <div className="mb-4 mt-[1rem] px-[.5rem] border-b border-[#1F1F1F] pb-[1rem]">
           <textarea
-            className="w-full max-w-full min-h-[7.5rem] text-[#EEEEEE] text-sm bg-[#0F0F0F] border border-[#2A2A2A] hover:border-[#965CDE] focus:border-[#965CDE] rounded-lg p-3 outline-none resize-y placeholder:text-[#757575] placeholder:opacity-100 placeholder:text-[.75rem]"
+            className="w-full max-w-full min-h-[5rem] text-[#EEEEEE] text-sm bg-[#0F0F0F] border border-[#2A2A2A] hover:border-[#965CDE] focus:border-[#965CDE] rounded-lg p-3 outline-none resize-y placeholder:text-[#757575] placeholder:opacity-100 placeholder:text-[.75rem]"
             value={systemPrompt}
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
               onSystemPromptChange(e.target.value);
@@ -47,6 +81,26 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
               color: '#EEEEEE',
             }}
           />
+        </div>
+
+        {/* LLM Retry Limit Section */}
+        <div className="space-y-2 px-[.5rem] mb-4">
+          <div className='bg-[#FFFFFF08] px-[.725rem] py-[1rem] rounded-[.5rem]'>
+            <div className="flex flex-col gap-[.5rem]">
+              <Text_12_400_EEEEEE className="text-[#EEEEEE] text-sm">LLM Retry Limit</Text_12_400_EEEEEE>
+              <TextInput
+                type="text"
+                name="limit"
+                className="!w-full !max-w-full !h-[1.9375rem] placeholder-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] text-[#EEEEEE] text-[.75rem] indent-[.625rem] px-[0] bg-[#FFFFFF08]"
+                value={localRetryLimit}
+                onChange={handleRetryLimitChange}
+                onBlur={handleBlur}
+              />
+              <Text_10_400_757575 className='leading-[140%]'>
+                The number of retry attempts for LLM calls. Value must be between 3 and 10.
+              </Text_10_400_757575>
+            </div>
+          </div>
         </div>
 
         {/* Checkbox Section */}
@@ -68,7 +122,7 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
         </div>
       </div>
       <div style={{
-        marginTop: '18px',
+        marginTop: '0px',
         paddingTop: '18px',
         paddingBottom: '18px',
         borderRadius: '0 0 11px 11px',
