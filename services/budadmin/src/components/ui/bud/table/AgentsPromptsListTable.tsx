@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Table, notification } from 'antd';
 import ProjectTags from 'src/flows/components/ProjectTags';
-import { PrimaryButton } from '../form/Buttons';
+import { BorderlessButton, PrimaryButton } from '../form/Buttons';
 import { useRouter } from "next/router";
 import { useDrawer } from 'src/hooks/useDrawer';
 import { Text_12_300_EEEEEE, Text_12_400_EEEEEE, Text_16_600_FFFFFF } from '../../text';
@@ -242,7 +242,7 @@ function AgentsPromptsListTable() {
                             render: (_text, record) => (
                                 <div className='min-w-[100px]'>
                                     <div className='flex flex-row items-center justify-end'>
-                                        <PrimaryButton
+                                        <BorderlessButton
                                             permission={hasPermission(PermissionEnum.ModelManage)}
                                             onClick={async (event: React.MouseEvent) => {
                                                 event.stopPropagation();
@@ -253,8 +253,8 @@ function AgentsPromptsListTable() {
                                                 openDrawer("use-model", { endpoint: record });
                                             }}
                                         >
-                                            Use this model
-                                        </PrimaryButton>
+                                            Use this agent
+                                        </BorderlessButton>
                                         {/* <div className='ml-[.3rem]'>
                                             <PrimaryButton
                                                 classNames='rounded-[0.375rem]'
