@@ -34,40 +34,24 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
 
   const handleRetryLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-
-    // Allow empty string (for clearing the field)
-    if (value === '') {
-      setLocalRetryLimit('');
-      return;
-    }
-
-    // Allow only numbers
-    if (/^\d+$/.test(value)) {
-      const numValue = parseInt(value, 10);
-
-      // Prevent values greater than 10
-      if (numValue > 10) {
-        return;
-      }
-
-      // Update local display value to show what user is typing
-      setLocalRetryLimit(numValue);
-
-      // Only notify parent if value is within valid range (3-10)
-      if (numValue >= 3 && numValue <= 10) {
-        onLlmRetryLimitChange?.(numValue);
-      }
+    // Allow only digits or empty string
+    if (value === '' || /^\d*$/.test(value)) {
+      setLocalRetryLimit(value);
     }
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const numValue = value === '' ? 3 : parseInt(value, 10);
+    let numValue = parseInt(value, 10);
 
-    // Enforce min/max limits on blur
+    if (isNaN(numValue)) {
+      numValue = 3; // Default to 3 if empty or invalid
+    }
+
+    // Enforce min/max limits
     const clampedValue = Math.min(Math.max(numValue, 3), 10);
 
-    // Update both local and parent with clamped value
+    // Update both local and parent state
     setLocalRetryLimit(clampedValue);
     onLlmRetryLimitChange?.(clampedValue);
   };

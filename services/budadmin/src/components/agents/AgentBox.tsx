@@ -602,7 +602,7 @@ function AgentBoxInner({
           role: msg.role,
           content: msg.content
         })),
-        llm_retry_limit: 0,
+        llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: true,
         system_prompt_role: "system"
