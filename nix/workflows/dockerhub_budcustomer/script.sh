@@ -43,11 +43,27 @@ multiarch_image_push() {
 # MAIN #
 ########
 
+# Get tag from environment variable or default to "nightly"
+TAG="${IMAGE_TAG:-nightly}"
+
+note "Building and pushing version: $TAG"
+
 docker login \
 	--username "$(secret_get username)" \
 	--password "$(secret_get password)"
 
-image_push x86_64-linux nightly
-# image_push x86_64-linux x86_64-linux-nightly
-# image_push aarch64-linux aarch64-linux-nightly
-# multiarch_image_push nightly x86_64-linux-nightly x86_64-linux-nightly
+# Push with specified tag
+image_push x86_64-linux "$TAG"
+
+# For release tags, also push as latest
+case "$TAG" in
+  v* | [0-9]*)
+	note "Also pushing as latest tag"
+	image_push x86_64-linux latest
+	;;
+esac
+
+# Uncomment for multi-arch support in the future
+# image_push x86_64-linux "x86_64-linux-$TAG"
+# image_push aarch64-linux "aarch64-linux-$TAG"
+# multiarch_image_push "$TAG" "x86_64-linux-$TAG" "aarch64-linux-$TAG"
