@@ -3,7 +3,7 @@ import { Button, Table, notification } from 'antd';
 import ProjectTags from 'src/flows/components/ProjectTags';
 import { PrimaryButton } from '../form/Buttons';
 import { useRouter } from "next/router";
-// import { useDrawer } from 'src/hooks/useDrawer'; // Commented out - uncomment when drawer is needed
+import { useDrawer } from 'src/hooks/useDrawer';
 import { Text_12_300_EEEEEE, Text_12_400_EEEEEE, Text_16_600_FFFFFF } from '../../text';
 import SearchHeaderInput from 'src/flows/components/SearchHeaderInput';
 import { usePrompts } from "src/hooks/usePrompts";
@@ -17,6 +17,7 @@ import { SortIcon } from './SortIcon';
 import { useConfirmAction } from 'src/hooks/useConfirmAction';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { IconOnlyRender } from 'src/flows/components/BudIconRender';
+import { useEndPoints } from 'src/hooks/useEndPoint';
 
 const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
@@ -47,7 +48,7 @@ interface DataType {
 function AgentsPromptsListTable() {
     const [isMounted, setIsMounted] = useState(false);
     const [confirmLoading, setConfirmLoading] = useState(false);
-    // const { openDrawer } = useDrawer(); // Commented out - uncomment when drawer is needed
+    const { openDrawer } = useDrawer();
     const [searchValue, setSearchValue] = useState('');
     const router = useRouter();
     const { projectId } = router.query;
@@ -55,6 +56,7 @@ function AgentsPromptsListTable() {
     const [order, setOrder] = useState<'-' | ''>('-');
     const [orderBy, setOrderBy] = useState<string>('created_at');
     const { hasProjectPermission, hasPermission } = useUser();
+    const { getEndpointClusterDetails } = useEndPoints();
     useLoaderOnLoding(loading);
     const { contextHolder, openConfirm } = useConfirmAction();
     const [confirmVisible, setConfirmVisible] = useState(false);
@@ -220,7 +222,7 @@ function AgentsPromptsListTable() {
                             render: (modalities: string[]) => {
                                 if (!modalities || modalities.length === 0) return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
                                 const formattedModalities = modalities.map(m => formatPromptType(m)).join(', ');
-                                return <Text_12_400_EEEEEE className='whitespace-nowrap'>{formattedModalities}</Text_12_400_EEEEEE>;
+                                return <Text_12_400_EEEEEE className='whitespace-nowrap max-w-[150px] truncate'>{formattedModalities}</Text_12_400_EEEEEE>;
                             },
                             sortIcon: SortIcon,
                         },
@@ -238,18 +240,33 @@ function AgentsPromptsListTable() {
                             dataIndex: 'actions',
                             key: 'actions',
                             render: (_text, record) => (
-                                <div className='min-w-[80px]'>
+                                <div className='min-w-[100px]'>
                                     <div className='flex flex-row items-center justify-end'>
                                         <PrimaryButton
-                                            classNames='rounded-[0.375rem]'
-                                            permission={hasPermission(PermissionEnum.ProjectManage)}
-                                            onClick={(event: React.MouseEvent) => {
+                                            permission={hasPermission(PermissionEnum.ModelManage)}
+                                            onClick={async (event: React.MouseEvent) => {
                                                 event.stopPropagation();
-                                                // openDrawer('view-prompt', { prompt: record });
+                                                await getEndpointClusterDetails(
+                                                    record.id!,
+                                                    projectId as string,
+                                                );
+                                                openDrawer("use-model", { endpoint: record });
                                             }}
                                         >
-                                            View
+                                            Use this model
                                         </PrimaryButton>
+                                        {/* <div className='ml-[.3rem]'>
+                                            <PrimaryButton
+                                                classNames='rounded-[0.375rem]'
+                                                permission={hasPermission(PermissionEnum.ProjectManage)}
+                                                onClick={(event: React.MouseEvent) => {
+                                                    event.stopPropagation();
+                                                    // openDrawer('view-prompt', { prompt: record });
+                                                }}
+                                            >
+                                                View
+                                            </PrimaryButton>
+                                        </div> */}
                                         <div className='ml-[.3rem] w-[1rem] h-auto block'>
                                             <Button
                                                 className='bg-transparent border-none p-0 opacity-0 group-hover:opacity-100'

@@ -73,7 +73,6 @@ export const usePrompts = create<{
       const listData = response.data;
       set({ prompts: listData.prompts || listData.items || [] });
       set({ totalRecords: listData.total_record || listData.total || 0 });
-      successToast(response.message || "Prompts fetched successfully");
     } catch (error) {
       console.error("Error fetching prompts:", error);
       set({ prompts: [] });
