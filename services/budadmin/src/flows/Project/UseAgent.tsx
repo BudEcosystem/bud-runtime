@@ -63,9 +63,9 @@ export default function UseAgent() {
   // Use a single endpoint configuration for agents/prompts
   const endpointConfig = useMemo<EndpointConfig>(() => {
     return {
-      key: "/v1/chat/completions",
-      label: "Chat Completions",
-      path: "/v1/chat/completions",
+      key: "/v1/responses",
+      label: "Responses",
+      path: "/v1/responses",
       payload: {
         prompt: {
           name: promptName,

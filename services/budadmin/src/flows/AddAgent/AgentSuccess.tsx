@@ -123,9 +123,9 @@ export default function AgentSuccess() {
   const endpointConfigs = useMemo<EndpointConfig[]>(() => {
     return [
       {
-        key: "/v1/chat/completions",
-        label: "Chat Completions",
-        path: "/v1/chat/completions",
+        key: "/v1/responses",
+        label: "Responses",
+        path: "/v1/responses",
         payload: {
           prompt: {
             name: promptName,
@@ -139,9 +139,9 @@ export default function AgentSuccess() {
         },
       },
       {
-        key: "/v1/completions",
-        label: "Completions",
-        path: "/v1/completions",
+        key: "/v1/responses",
+        label: "Responses",
+        path: "/v1/responses",
         payload: {
           prompt: {
             name: promptName,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Button, Table, notification } from 'antd';
 import ProjectTags from 'src/flows/components/ProjectTags';
 import { BorderlessButton, PrimaryButton } from '../form/Buttons';
@@ -58,6 +58,7 @@ function AgentsPromptsListTable() {
     useLoaderOnLoding(loading);
     const { contextHolder, openConfirm } = useConfirmAction();
     const [confirmVisible, setConfirmVisible] = useState(false);
+    const isInitialMount = useRef(true);
 
     const page = 1;
     const limit = 1000;
@@ -85,6 +86,12 @@ function AgentsPromptsListTable() {
 
     useEffect(() => {
         if (!projectId) return;
+
+        // Skip API call on initial mount - first useEffect handles that
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
 
         const timer = setTimeout(() => {
             getPrompts({
@@ -310,7 +317,7 @@ function AgentsPromptsListTable() {
                                 {/* {(hasPermission(PermissionEnum.ProjectManage) || hasProjectPermission(projectId as string, PermissionEnum.ProjectManage)) && (
                                     <PrimaryButton
                                         onClick={() => {
-                                            // openDrawer("create-prompt");
+                                            openDrawer("add-agent");
                                         }}
                                     >
                                         <div className='flex items-center justify-center'>
