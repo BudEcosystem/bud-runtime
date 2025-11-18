@@ -3082,6 +3082,7 @@ class ModelService(SessionMixin):
         trigger_workflow: bool = False,
         credential_id: Optional[UUID] = None,
         scaling_specification: Optional[ScalingSpecification] = None,
+        hardware_mode: Optional[str] = None,
         enable_tool_calling: Optional[bool] = None,
         enable_reasoning: Optional[bool] = None,
         tool_calling_parser_type: Optional[str] = None,
@@ -3178,6 +3179,7 @@ class ModelService(SessionMixin):
             template_id=template_id,
             credential_id=credential_id,
             scaling_specification=scaling_specification,
+            hardware_mode=hardware_mode,
             enable_tool_calling=enable_tool_calling,
             enable_reasoning=enable_reasoning,
             tool_calling_parser_type=tool_calling_parser_type,
@@ -3233,10 +3235,11 @@ class ModelService(SessionMixin):
         if db_current_workflow_step:
             logger.debug(f"Workflow {db_workflow.id} step {current_step_number} already exists")
 
-            # Update workflow step data in db
+            # Merge new data with existing data (preserve previous step data)
+            merged_data = {**db_current_workflow_step.data, **workflow_step_data}
             db_workflow_step = await WorkflowStepDataManager(self.session).update_by_fields(
                 db_current_workflow_step,
-                {"data": workflow_step_data},
+                {"data": merged_data},
             )
             logger.info(f"Workflow {db_workflow.id} step {current_step_number} updated")
         else:
@@ -3268,11 +3271,14 @@ class ModelService(SessionMixin):
                 {"workflow_id": db_workflow.id}
             )
 
-            # Get latest model_id from workflow steps
+            # Get latest model_id and hardware_mode from workflow steps
             model_id = None
+            workflow_hardware_mode = "dedicated"  # Default value
             for db_workflow_step in db_workflow_steps:
                 if "model_id" in db_workflow_step.data:
                     model_id = db_workflow_step.data["model_id"]
+                if "hardware_mode" in db_workflow_step.data:
+                    workflow_hardware_mode = db_workflow_step.data["hardware_mode"]
 
             if not model_id:
                 raise ClientException("Model ID is not provided")
@@ -3295,6 +3301,7 @@ class ModelService(SessionMixin):
                     db_model.uri,
                     db_model.provider_type,
                     db_model.local_path,
+                    workflow_hardware_mode,
                 )
                 simulator_id = bud_simulator_events.pop("workflow_id")
                 recommended_cluster_events = {
@@ -3496,6 +3503,7 @@ class ModelService(SessionMixin):
         model_uri: str,
         provider_type: ModelProviderTypeEnum,
         local_path: Optional[str] = None,
+        hardware_mode: Optional[str] = "dedicated",
     ) -> Dict[str, Any]:
         """Get recommended cluster events."""
         logger.info("Getting recommended cluster events")
@@ -3518,6 +3526,7 @@ class ModelService(SessionMixin):
                 notification_metadata=notification_metadata,
                 source_topic=app_settings.source_topic,
                 is_proprietary_model=True,
+                hardware_mode=hardware_mode,
             )
         else:
             # Only applicable for local model deployment
@@ -3540,6 +3549,7 @@ class ModelService(SessionMixin):
                 notification_metadata=notification_metadata,
                 source_topic=app_settings.source_topic,
                 is_proprietary_model=False,
+                hardware_mode=hardware_mode,
             )
 
         # Get recommended cluster info from Bud Simulator
