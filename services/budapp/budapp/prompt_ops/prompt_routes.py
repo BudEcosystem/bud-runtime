@@ -250,51 +250,6 @@ async def list_prompts(
 
 
 @router.get(
-    "/{prompt_id}",
-    responses={
-        status.HTTP_200_OK: {
-            "model": SinglePromptResponse,
-            "description": "Successfully retrieved prompt",
-        },
-        status.HTTP_404_NOT_FOUND: {
-            "model": ErrorResponse,
-            "description": "Prompt not found",
-        },
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Server error",
-        },
-    },
-    description="Retrieve a single prompt by its ID",
-)
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
-async def get_prompt(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    prompt_id: UUID,
-) -> Union[SinglePromptResponse, ErrorResponse]:
-    """Retrieve a single prompt by its ID."""
-    try:
-        # Get the prompt from service
-        prompt_response = await PromptService(session).get_prompt(prompt_id=prompt_id)
-
-        return SinglePromptResponse(
-            prompt=prompt_response,
-            message="Prompt retrieved successfully",
-            code=status.HTTP_200_OK,
-            object="prompt.get",
-        ).to_http_response()
-    except ClientException as e:
-        logger.error(f"Failed to retrieve prompt: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to retrieve prompt: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve prompt"
-        ).to_http_response()
-
-
-@router.get(
     "/{prompt_id}/versions",
     responses={
         status.HTTP_200_OK: {
@@ -559,103 +514,6 @@ async def delete_prompt_version(
         logger.exception(f"Failed to delete prompt version: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete prompt version"
-        ).to_http_response()
-
-
-@router.delete(
-    "/{prompt_id}",
-    responses={
-        status.HTTP_200_OK: {
-            "model": SuccessResponse,
-            "description": "Successfully deleted prompt",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Invalid request data",
-        },
-        status.HTTP_404_NOT_FOUND: {
-            "model": ErrorResponse,
-            "description": "Prompt not found",
-        },
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Server error",
-        },
-    },
-    description="Delete a prompt by its ID",
-)
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
-async def delete_prompt(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    prompt_id: UUID,
-) -> Union[SuccessResponse, ErrorResponse]:
-    """Delete a prompt by its ID."""
-    try:
-        _ = await PromptService(session).delete_active_prompt(prompt_id)
-        logger.debug(f"Prompt deleted: {prompt_id}")
-
-        return SuccessResponse(
-            message="Prompt deleted successfully", code=status.HTTP_200_OK, object="prompt.delete"
-        ).to_http_response()
-    except ClientException as e:
-        logger.error(f"Failed to delete prompt: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to delete prompt: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete prompt"
-        ).to_http_response()
-
-
-@router.patch(
-    "/{prompt_id}",
-    responses={
-        status.HTTP_200_OK: {
-            "model": SinglePromptResponse,
-            "description": "Successfully updated prompt",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Invalid request data",
-        },
-        status.HTTP_404_NOT_FOUND: {
-            "model": ErrorResponse,
-            "description": "Prompt not found",
-        },
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Server error",
-        },
-    },
-    description="Update a prompt by its ID",
-)
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
-async def edit_prompt(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[Session, Depends(get_session)],
-    prompt_id: UUID,
-    edit_prompt: EditPromptRequest,
-) -> Union[SinglePromptResponse, ErrorResponse]:
-    """Edit prompt fields."""
-    try:
-        prompt_response = await PromptService(session).edit_prompt(
-            prompt_id=prompt_id, data=edit_prompt.model_dump(exclude_unset=True, exclude_none=True)
-        )
-
-        return SinglePromptResponse(
-            prompt=prompt_response,
-            message="Prompt updated successfully",
-            code=status.HTTP_200_OK,
-            object="prompt.edit",
-        ).to_http_response()
-    except ClientException as e:
-        logger.error(f"Failed to edit prompt: {e}")
-        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
-    except Exception as e:
-        logger.exception(f"Failed to edit prompt: {e}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit prompt"
         ).to_http_response()
 
 
@@ -1675,4 +1533,146 @@ async def oauth_callback(
         logger.exception(f"Failed to handle OAuth callback: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to handle OAuth callback"
+        ).to_http_response()
+
+
+@router.delete(
+    "/{prompt_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully deleted prompt",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Delete a prompt by its ID",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def delete_prompt(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a prompt by its ID."""
+    try:
+        _ = await PromptService(session).delete_active_prompt(prompt_id)
+        logger.debug(f"Prompt deleted: {prompt_id}")
+
+        return SuccessResponse(
+            message="Prompt deleted successfully", code=status.HTTP_200_OK, object="prompt.delete"
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to delete prompt: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete prompt: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete prompt"
+        ).to_http_response()
+
+
+@router.patch(
+    "/{prompt_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SinglePromptResponse,
+            "description": "Successfully updated prompt",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request data",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Update a prompt by its ID",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def edit_prompt(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: UUID,
+    edit_prompt: EditPromptRequest,
+) -> Union[SinglePromptResponse, ErrorResponse]:
+    """Edit prompt fields."""
+    try:
+        prompt_response = await PromptService(session).edit_prompt(
+            prompt_id=prompt_id, data=edit_prompt.model_dump(exclude_unset=True, exclude_none=True)
+        )
+
+        return SinglePromptResponse(
+            prompt=prompt_response,
+            message="Prompt updated successfully",
+            code=status.HTTP_200_OK,
+            object="prompt.edit",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to edit prompt: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to edit prompt: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to edit prompt"
+        ).to_http_response()
+
+
+@router.get(
+    "/{prompt_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SinglePromptResponse,
+            "description": "Successfully retrieved prompt",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Retrieve a single prompt by its ID",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_prompt(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    prompt_id: UUID,
+) -> Union[SinglePromptResponse, ErrorResponse]:
+    """Retrieve a single prompt by its ID."""
+    try:
+        # Get the prompt from service
+        prompt_response = await PromptService(session).get_prompt(prompt_id=prompt_id)
+
+        return SinglePromptResponse(
+            prompt=prompt_response,
+            message="Prompt retrieved successfully",
+            code=status.HTTP_200_OK,
+            object="prompt.get",
+        ).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to retrieve prompt: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to retrieve prompt: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve prompt"
         ).to_http_response()
