@@ -58,7 +58,7 @@ spec:
   version: v1
   metadata:
   - name: schedule
-    value: "@every 3m" # DEBUG: 1 minute
+    value: "@every 12h" # Every 12 hours
   - name: direction
     value: "input"
   - name: route
