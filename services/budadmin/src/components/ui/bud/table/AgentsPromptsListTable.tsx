@@ -17,6 +17,7 @@ import { SortIcon } from './SortIcon';
 import { useConfirmAction } from 'src/hooks/useConfirmAction';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { IconOnlyRender } from 'src/flows/components/BudIconRender';
+import { useAddAgent } from '@/stores/useAddAgent';
 
 const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
@@ -47,7 +48,7 @@ interface DataType {
 function AgentsPromptsListTable() {
     const [isMounted, setIsMounted] = useState(false);
     const [confirmLoading, setConfirmLoading] = useState(false);
-    const { openDrawer } = useDrawer();
+    const { openDrawer, openDrawerWithStep } = useDrawer();
     const [searchValue, setSearchValue] = useState('');
     const router = useRouter();
     const { projectId } = router.query;
@@ -138,6 +139,73 @@ function AgentsPromptsListTable() {
             okText: 'Delete',
             type: 'warining'
         });
+    };
+
+    const handleCreateAgent = async () => {
+        if (!projectId) {
+            errorToast("Project not found");
+            return;
+        }
+
+        // Get current project data from the prompts hook
+        // Since we're on the agents list page, we need to fetch project data
+        const { createWorkflow, setSelectedProject } = useAddAgent.getState();
+
+        try {
+            // For now, we'll create a minimal project object with the ID
+            // The actual project details will be fetched by the workflow if needed
+            const projectData = {
+                id: projectId as string,
+                name: '', // Will be populated by workflow if needed
+                description: '',
+                icon: '📁'
+            };
+
+            // Store the selected project
+            setSelectedProject(projectData as any);
+
+            // Create the workflow (calls step 1 API)
+            const response = await createWorkflow(projectId as string);
+
+            if (!response || !response.data) {
+                errorToast("Failed to create agent workflow");
+                return;
+            }
+
+            // Extract workflow_id
+            const workflowId = response.data.workflow_id || response.data.id;
+
+            // Update URL with workflow ID
+            if (workflowId) {
+                const currentPath = window.location.pathname;
+                const queryParts: string[] = [];
+
+                Object.entries(router.query).forEach(([key, value]) => {
+                    if (key !== 'agent' && value) {
+                        queryParts.push(`${key}=${encodeURIComponent(String(value))}`);
+                    }
+                });
+
+                queryParts.push(`agent=${workflowId}`);
+
+                const newUrl = queryParts.length > 0
+                    ? `${currentPath}?${queryParts.join('&')}`
+                    : currentPath;
+
+                window.history.replaceState(
+                    { ...window.history.state },
+                    '',
+                    newUrl
+                );
+            }
+
+            // Open drawer at step 2 (skip Select Project)
+            openDrawerWithStep("add-agent-select-type");
+
+        } catch (error) {
+            console.error("Failed to create agent:", error);
+            errorToast("Failed to create agent workflow");
+        }
     };
 
     useEffect(() => {
@@ -317,7 +385,7 @@ function AgentsPromptsListTable() {
                                 {(hasPermission(PermissionEnum.ProjectManage) || hasProjectPermission(projectId as string, PermissionEnum.ProjectManage)) && (
                                     <PrimaryButton
                                         onClick={() => {
-                                            openDrawer("add-agent");
+                                            handleCreateAgent();
                                         }}
                                     >
                                         <div className='flex items-center justify-center'>
