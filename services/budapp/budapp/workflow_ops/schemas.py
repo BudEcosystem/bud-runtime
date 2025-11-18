@@ -114,6 +114,8 @@ class RetrieveWorkflowStepData(BaseModel):
     bud_prompt_version: int | str | None = None
     discarded_prompt_ids: list[dict] | None = None
     prompt_schema_events: dict | None = None
+    # Hardware resource mode (dedicated vs shared/time-slicing)
+    hardware_mode: str | None = None
     # Parser metadata from cluster/simulator
     tool_calling_parser_type: str | None = None
     reasoning_parser_type: str | None = None

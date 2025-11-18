@@ -27,7 +27,13 @@ export default function DeployModelTemplate() {
         }
       }}
       onBack={() => {
-        openDrawer("deploy-model");
+        // Check if it's a cloud model or local model to navigate to the correct previous step
+        if (currentWorkflow?.workflow_steps?.model?.provider_type === "cloud_model") {
+          openDrawerWithStep("deploy-model-credential-select");
+        } else {
+          // For local models, go back to hardware mode selection
+          openDrawerWithStep("deploy-model-hardware-mode");
+        }
       }}
       backText="Back"
       nextText="Next"

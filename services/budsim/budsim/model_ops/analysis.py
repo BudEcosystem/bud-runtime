@@ -246,6 +246,7 @@ class ModelAnalysis:
                 seq_length=seq_length,
                 precision=precision,
                 tensor_parallel=self.tp_size,  # Pass TP for correct per-device calculations
+                respect_weight_tying=False,
             )
 
             # Extract model weight and KV cache from memory report
@@ -354,6 +355,7 @@ class ModelAnalysis:
                 seq_length=seq_length,
                 precision=precision,
                 tensor_parallel=self.tp_size,  # Pass TP for correct per-device calculations
+                respect_weight_tying=False,
             )
 
             # Return total memory in GB

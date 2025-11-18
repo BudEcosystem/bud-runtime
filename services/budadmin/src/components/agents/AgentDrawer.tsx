@@ -25,7 +25,7 @@ const AgentDrawer: React.FC = () => {
     workflowContext,
   } = useAgentStore();
 
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, step, currentFlow } = useDrawer();
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [drawerWidth, setDrawerWidth] = useState<string>('100%');
@@ -136,6 +136,12 @@ const AgentDrawer: React.FC = () => {
   useEffect(() => {
     if (!isAgentDrawerOpen) return;
 
+    // Don't update URL if we're on the add-agent success step
+    // This allows AgentSuccess component to clear the URL parameters
+    if (currentFlow === 'add-agent' && step?.id === 'add-agent-success') {
+      return;
+    }
+
     // Get all prompt IDs from active sessions
     const promptIds = activeSessions
       .map(session => session.promptId)
@@ -185,7 +191,7 @@ const AgentDrawer: React.FC = () => {
         newUrl
       );
     }
-  }, [activeSessions, isAgentDrawerOpen, router]);
+  }, [activeSessions, isAgentDrawerOpen, router, currentFlow, step]);
 
 
 

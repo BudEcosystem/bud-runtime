@@ -73,7 +73,8 @@ export default function DeployModel() {
           return openDrawerWithStep("deploy-model-credential-select");
         }
 
-        openDrawerWithStep("deploy-model-template");
+        // For local models, go to hardware mode selection
+        openDrawerWithStep("deploy-model-hardware-mode");
       }}
       nextText="Next"
     >

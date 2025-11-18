@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Button, Table, notification } from 'antd';
 import ProjectTags from 'src/flows/components/ProjectTags';
-import { PrimaryButton } from '../form/Buttons';
+import { BorderlessButton, PrimaryButton } from '../form/Buttons';
 import { useRouter } from "next/router";
-// import { useDrawer } from 'src/hooks/useDrawer'; // Commented out - uncomment when drawer is needed
+import { useDrawer } from 'src/hooks/useDrawer';
 import { Text_12_300_EEEEEE, Text_12_400_EEEEEE, Text_16_600_FFFFFF } from '../../text';
 import SearchHeaderInput from 'src/flows/components/SearchHeaderInput';
 import { usePrompts } from "src/hooks/usePrompts";
@@ -17,6 +17,8 @@ import { SortIcon } from './SortIcon';
 import { useConfirmAction } from 'src/hooks/useConfirmAction';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { IconOnlyRender } from 'src/flows/components/BudIconRender';
+import { useAddAgent } from '@/stores/useAddAgent';
+import { updateQueryParams } from '@/utils/urlUtils';
 
 const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
@@ -47,7 +49,7 @@ interface DataType {
 function AgentsPromptsListTable() {
     const [isMounted, setIsMounted] = useState(false);
     const [confirmLoading, setConfirmLoading] = useState(false);
-    // const { openDrawer } = useDrawer(); // Commented out - uncomment when drawer is needed
+    const { openDrawer, openDrawerWithStep } = useDrawer();
     const [searchValue, setSearchValue] = useState('');
     const router = useRouter();
     const { projectId } = router.query;
@@ -58,6 +60,7 @@ function AgentsPromptsListTable() {
     useLoaderOnLoding(loading);
     const { contextHolder, openConfirm } = useConfirmAction();
     const [confirmVisible, setConfirmVisible] = useState(false);
+    const isInitialMount = useRef(true);
 
     const page = 1;
     const limit = 1000;
@@ -85,6 +88,12 @@ function AgentsPromptsListTable() {
 
     useEffect(() => {
         if (!projectId) return;
+
+        // Skip API call on initial mount - first useEffect handles that
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
 
         const timer = setTimeout(() => {
             getPrompts({
@@ -131,6 +140,57 @@ function AgentsPromptsListTable() {
             okText: 'Delete',
             type: 'warining'
         });
+    };
+
+    const handleCreateAgent = async () => {
+        if (!projectId) {
+            errorToast("Project not found");
+            return;
+        }
+
+        // Get current project data from the prompts hook
+        // Since we're on the agents list page, we need to fetch project data
+        const { createWorkflow, setSelectedProject } = useAddAgent.getState();
+
+        try {
+            // For now, we'll create a minimal project object with the ID
+            // The actual project details will be fetched by the workflow if needed
+            const projectData = {
+                id: projectId as string,
+                name: '', // Will be populated by workflow if needed
+                description: '',
+                icon: '📁'
+            };
+
+            // Store the selected project
+            setSelectedProject(projectData);
+
+            // Create the workflow (calls step 1 API)
+            const response = await createWorkflow(projectId as string);
+
+            if (!response || !response.data) {
+                errorToast("Failed to create agent workflow");
+                return;
+            }
+
+            // Extract workflow_id
+            const workflowId = response.data.workflow_id || response.data.id;
+
+            // Update URL with workflow ID
+            if (workflowId) {
+                updateQueryParams(
+                    { agent: workflowId },
+                    { replaceHistory: true }
+                );
+            }
+
+            // Open drawer at step 2 (skip Select Project)
+            openDrawerWithStep("add-agent-select-type");
+
+        } catch (error) {
+            console.error("Failed to create agent:", error);
+            errorToast("Failed to create agent workflow");
+        }
     };
 
     useEffect(() => {
@@ -220,7 +280,7 @@ function AgentsPromptsListTable() {
                             render: (modalities: string[]) => {
                                 if (!modalities || modalities.length === 0) return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
                                 const formattedModalities = modalities.map(m => formatPromptType(m)).join(', ');
-                                return <Text_12_400_EEEEEE className='whitespace-nowrap'>{formattedModalities}</Text_12_400_EEEEEE>;
+                                return <Text_12_400_EEEEEE className='whitespace-nowrap max-w-[150px] truncate'>{formattedModalities}</Text_12_400_EEEEEE>;
                             },
                             sortIcon: SortIcon,
                         },
@@ -238,18 +298,29 @@ function AgentsPromptsListTable() {
                             dataIndex: 'actions',
                             key: 'actions',
                             render: (_text, record) => (
-                                <div className='min-w-[80px]'>
+                                <div className='min-w-[100px]'>
                                     <div className='flex flex-row items-center justify-end'>
-                                        <PrimaryButton
-                                            classNames='rounded-[0.375rem]'
-                                            permission={hasPermission(PermissionEnum.ProjectManage)}
+                                        <BorderlessButton
+                                            permission={hasPermission(PermissionEnum.ModelManage)}
                                             onClick={(event: React.MouseEvent) => {
                                                 event.stopPropagation();
-                                                // openDrawer('view-prompt', { prompt: record });
+                                                openDrawer("use-agent", { endpoint: record });
                                             }}
                                         >
-                                            View
-                                        </PrimaryButton>
+                                            Use this agent
+                                        </BorderlessButton>
+                                        {/* <div className='ml-[.3rem]'>
+                                            <PrimaryButton
+                                                classNames='rounded-[0.375rem]'
+                                                permission={hasPermission(PermissionEnum.ProjectManage)}
+                                                onClick={(event: React.MouseEvent) => {
+                                                    event.stopPropagation();
+                                                    // openDrawer('view-prompt', { prompt: record });
+                                                }}
+                                            >
+                                                View
+                                            </PrimaryButton>
+                                        </div> */}
                                         <div className='ml-[.3rem] w-[1rem] h-auto block'>
                                             <Button
                                                 className='bg-transparent border-none p-0 opacity-0 group-hover:opacity-100'
@@ -288,7 +359,7 @@ function AgentsPromptsListTable() {
                     title={() => (
                         <div className='flex justify-between items-center px-[0.75rem] py-[1rem]'>
                             <Text_16_600_FFFFFF className='text-[#EEEEEE]'>
-                                Prompt List
+                                Agent List
                             </Text_16_600_FFFFFF>
                             <div className='flex items-center justify-between gap-x-[.8rem]'>
                                 <SearchHeaderInput
@@ -299,7 +370,7 @@ function AgentsPromptsListTable() {
                                 {(hasPermission(PermissionEnum.ProjectManage) || hasProjectPermission(projectId as string, PermissionEnum.ProjectManage)) && (
                                     <PrimaryButton
                                         onClick={() => {
-                                            // openDrawer("create-prompt");
+                                            handleCreateAgent();
                                         }}
                                     >
                                         <div className='flex items-center justify-center'>

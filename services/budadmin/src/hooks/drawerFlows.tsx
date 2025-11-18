@@ -315,6 +315,59 @@ const deployModel: DrawerFlowType = {
         `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
         "Deploy Model",
       ],
+      id: "deploy-model-hardware-mode",
+      component: StepComponents["deploy-model-hardware-mode"],
+      confirmClose: true,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Deploy Model",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Hardware Mode",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: " Select Deployment Templates",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment Specification",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Finding Clusters",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Auto Scaling",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Status",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      step: 2,
+    },
+    {
+      navigation: () => [
+        "Projects",
+        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        "Deploy Model",
+      ],
       id: "deploy-model-template",
       confirmClose: true,
       step: 3,
@@ -2060,6 +2113,27 @@ const useModel: DrawerFlowType = {
         {
           status: FormProgressStatus.inProgress,
           title: "Use Model",
+        },
+      ],
+    },
+  ],
+};
+
+const useAgent: DrawerFlowType = {
+  title: "Use Agent",
+  description: "Use an agent/prompt",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Agents", "Use Agent"],
+      id: "use-agent",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["use-agent"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Use Agent",
         },
       ],
     },
@@ -4687,6 +4761,7 @@ const flows = {
   "add-worker": addWorker,
   "worker-details": workerDetails,
   "use-model": useModel,
+  "use-agent": useAgent,
   "publish": publish,
   "publish-endpoint": publishEndpoint,
   "delete-cluster": deleteCluster,

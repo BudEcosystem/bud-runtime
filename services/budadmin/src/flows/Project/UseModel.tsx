@@ -496,7 +496,7 @@ export default function UseModel() {
               </div>
               <div className="flex items-center justify-start gap-[.5rem] mt-[.3rem] flex-wrap">
                 {tags.map((item, index) => (
-                  <Tags key={index} name={item.name} color={item.color} />
+                  item.name ? <Tags key={index} name={item.name} color={item.color} /> : null
                 ))}
               </div>
             </div>
