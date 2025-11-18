@@ -85,8 +85,8 @@ class DatasetMetadata(BaseModel):
     estimated_output_tokens: Optional[int] = None
 
     # Enriched evaluation fields
-    why_run_this_eval: Optional[str] = None
-    what_to_expect: Optional[str] = None
+    why_run_this_eval: Optional[List[str]] = None
+    what_to_expect: Optional[List[str]] = None
     evaluation_description: Optional[str] = None
     top_5_task_types: Optional[List[str]] = None
     top_5_domains: Optional[List[str]] = None

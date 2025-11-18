@@ -74,43 +74,145 @@
         "version": "1.0.0",
         "checksum": "sha256:913a03cac67794ef",
         "url": "traits/traits_v1.json",
-        "count": 6,
+        "count": 23,
         "definitions": [
             {
-                "name": "Agent Topic",
-                "description": "Evaluating the capability of large language models as intelligent agents when invoking tools.",
-                "slogan": "🐮 Large language models do more than talk – they wield tools",
-                "icon": "https://opencompass.oss-cn-shanghai.aliyuncs.com/image/compass-hub/agent.png"
+                "name": "Strong Reasoning",
+                "description": "Evaluation trait: Strong Reasoning",
+                "slogan": "",
+                "icon": "icons/traits/strong_reasoning.png"
             },
             {
-                "name": "Math Topic",
-                "description": "An integrated evaluation of the model's proficiency in addressing problems across the spectrum of mathematical disciplines, from elementary to advanced levels.",
-                "slogan": "Does your large language model serve as the mathematics representative in its class?",
-                "icon": "https://opencompass.oss-cn-shanghai.aliyuncs.com/image/compass-hub/evaluate.png"
+                "name": "Multimodal",
+                "description": "Evaluation trait: Multimodal",
+                "slogan": "",
+                "icon": "icons/traits/multimodal.png"
             },
             {
-                "name": "Code Topic",
-                "description": "Assessing the model's ability to understand, interpret, generate, optimize code, and understand coding problems.",
-                "slogan": "🥹 Oh no! I've been replaced by a large language model",
-                "icon": "https://opencompass.oss-cn-shanghai.aliyuncs.com/image/compass-hub/code.png"
+                "name": "Science",
+                "description": "Evaluation trait: Science",
+                "slogan": "",
+                "icon": "icons/traits/science.png"
             },
             {
-                "name": "Safety Topic",
-                "description": "The ability to avoid generating harmful, misleading, biased, or inappropriate content.",
-                "slogan": "🫢 In Chinese language contexts, ensuring legal, compliant, and value-aligned content generation by large models is crucial",
-                "icon": "https://opencompass.oss-cn-shanghai.aliyuncs.com/image/compass-hub/security.png"
+                "name": "Reasoning",
+                "description": "Evaluation trait: Reasoning",
+                "slogan": "",
+                "icon": "icons/traits/reasoning.png"
             },
             {
-                "name": "Creation Topic",
-                "description": "An assessment of the model's adeptness in elaborating, extending, and revising written works across a diverse range of subjects.",
-                "slogan": "Who is the Champion Writer? ✒️",
-                "icon": "https://opencompass.oss-cn-shanghai.aliyuncs.com/image/compass-hub/security.png"
+                "name": "Agent",
+                "description": "Evaluation trait: Agent",
+                "slogan": "",
+                "icon": "icons/traits/agent.png"
             },
             {
-                "name": "Long-Context Topic",
-                "description": "Evaluating the model's accuracy in understanding and generating exceptionally long texts.",
-                "slogan": "😅 The model can’t afford to lose track in long conversations",
-                "icon": "https://opencompass.oss-cn-shanghai.aliyuncs.com/image/compass-hub/long-text.png"
+                "name": "Code",
+                "description": "Evaluation trait: Code",
+                "slogan": "",
+                "icon": "icons/traits/code.png"
+            },
+            {
+                "name": "Math",
+                "description": "Evaluation trait: Math",
+                "slogan": "",
+                "icon": "icons/traits/math.png"
+            },
+            {
+                "name": "Instruct",
+                "description": "Evaluation trait: Instruct",
+                "slogan": "",
+                "icon": "icons/traits/instruct.png"
+            },
+            {
+                "name": "Examination",
+                "description": "Evaluation trait: Examination",
+                "slogan": "",
+                "icon": "icons/traits/examination.png"
+            },
+            {
+                "name": "Knowledge",
+                "description": "Evaluation trait: Knowledge",
+                "slogan": "",
+                "icon": "icons/traits/knowledge.png"
+            },
+            {
+                "name": "Medical",
+                "description": "Evaluation trait: Medical",
+                "slogan": "",
+                "icon": "icons/traits/medical.png"
+            },
+            {
+                "name": "Understanding",
+                "description": "Evaluation trait: Understanding",
+                "slogan": "",
+                "icon": "icons/traits/understanding.png"
+            },
+            {
+                "name": "Language",
+                "description": "Evaluation trait: Language",
+                "slogan": "",
+                "icon": "icons/traits/language.png"
+            },
+            {
+                "name": "Safety",
+                "description": "Evaluation trait: Safety",
+                "slogan": "",
+                "icon": "icons/traits/safety.png"
+            },
+            {
+                "name": "Long-Context",
+                "description": "Evaluation trait: Long-Context",
+                "slogan": "",
+                "icon": "icons/traits/long_context.png"
+            },
+            {
+                "name": "Creation",
+                "description": "Evaluation trait: Creation",
+                "slogan": "",
+                "icon": "icons/traits/creation.png"
+            },
+            {
+                "name": "Hallucination",
+                "description": "Evaluation trait: Hallucination",
+                "slogan": "",
+                "icon": "icons/traits/hallucination.png"
+            },
+            {
+                "name": "Alignment",
+                "description": "Evaluation trait: Alignment",
+                "slogan": "",
+                "icon": "icons/traits/alignment.png"
+            },
+            {
+                "name": "Visual-Qa",
+                "description": "Evaluation trait: Visual-Qa",
+                "slogan": "",
+                "icon": "icons/traits/visual_qa.png"
+            },
+            {
+                "name": "Visual-Localization",
+                "description": "Evaluation trait: Visual-Localization",
+                "slogan": "",
+                "icon": "icons/traits/visual_localization.png"
+            },
+            {
+                "name": "Spatial-Understanding",
+                "description": "Evaluation trait: Spatial-Understanding",
+                "slogan": "",
+                "icon": "icons/traits/spatial_understanding.png"
+            },
+            {
+                "name": "Video-Understanding",
+                "description": "Evaluation trait: Video-Understanding",
+                "slogan": "",
+                "icon": "icons/traits/video_understanding.png"
+            },
+            {
+                "name": "Other",
+                "description": "Evaluation trait: Other",
+                "slogan": "",
+                "icon": "icons/traits/other.png"
             }
         ]
     },
@@ -1464,8 +1566,15 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "Run this evaluation when you want to benchmark a model’s mathematical problem‑solving skills, assess its ability to carry out multi‑step algebraic reasoning, test its arithmetic precision, and gauge its performance on number‑theoretic and combinatorial questions. It is particularly useful for models intended for educational or tutoring applications, or for any system that must handle math‑related queries.",
-                        "what_to_expect": "When a language model is evaluated on MATH, the resulting score indicates how well it can parse mathematical sentences, apply algebraic rules, perform symbolic calculations, and reason about number theory or trigonometric identities. A high score shows the model can reliably understand problem contexts, carry out multi‑step reasoning, and produce correct solutions. A low score suggests weaknesses in mathematical reasoning or symbolic manipulation.",
+                        "why_run_this_eval": [
+                            "Run this evaluation when you want to benchmark a model’s mathematical problem‑solving skills, assess its ability to carry out multi‑step algebraic reasoning, test its arithmetic precision, and gauge its performance on number‑theoretic and combinatorial questions.",
+                            "It is particularly useful for models intended for educational or tutoring applications, or for any system that must handle math‑related queries."
+                        ],
+                        "what_to_expect": [
+                            "When a language model is evaluated on MATH, the resulting score indicates how well it can parse mathematical sentences, apply algebraic rules, perform symbolic calculations, and reason about number theory or trigonometric identities.",
+                            "A high score shows the model can reliably understand problem contexts, carry out multi‑step reasoning, and produce correct solutions.",
+                            "A low score suggests weaknesses in mathematical reasoning or symbolic manipulation."
+                        ],
                         "evaluation_description": "The MATH dataset contains 5,000 handwritten and digitally typed math problems that span typical middle‑school to early college topics. Each row includes a problem statement, sometimes a difficulty label, the domain it belongs to, and a solution or partial solution. The problems cover Algebra, Combinatorics, Number Theory, Trigonometry, Precalculus, as well as discrete mathematics concepts. Most items are at the Beginner or Intermediate level, designed to test algebraic manipulation, arithmetic reasoning, critical thinking, and pattern recognition.",
                         "top_5_task_types": [
                             "algebra",
@@ -1774,8 +1883,14 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "Run this evaluation to assess a model’s:\n- Basic arithmetic capability (addition, subtraction, multiplication, division).\n- Handling of fractions, percentages, and simple algebraic expressions.\n- Ability to read and interpret plain‑text word problems.\n- Consistency in applying rules of calculation across varying contexts.\nThese skills are essential for educational applications, tutoring assistants, or any task requiring quick numeric reasoning.",
-                        "what_to_expect": "When a large language model is scored on GSM8K, the percentage of correctly solved problems indicates its proficiency in basic numeric reasoning, arithmetic manipulation, and word‑problem interpretation. A high score (e.g., >70%) suggests that the model can reliably parse and solve straightforward mathematical questions and perform simple calculations, while a low score points to weaknesses in number sense, arithmetic accuracy, or understanding of the problem context.",
+                        "why_run_this_eval": [
+                            "Run this evaluation to assess a model’s:\n- Basic arithmetic capability (addition, subtraction, multiplication, division).\n- Handling of fractions, percentages, and simple algebraic expressions.\n- Ability to read and interpret plain‑text word problems.\n- Consistency in applying rules of calculation across varying contexts.",
+                            "These skills are essential for educational applications, tutoring assistants, or any task requiring quick numeric reasoning."
+                        ],
+                        "what_to_expect": [
+                            "When a large language model is scored on GSM8K, the percentage of correctly solved problems indicates its proficiency in basic numeric reasoning, arithmetic manipulation, and word‑problem interpretation.",
+                            "A high score (e.g., >70%) suggests that the model can reliably parse and solve straightforward mathematical questions and perform simple calculations, while a low score points to weaknesses in number sense, arithmetic accuracy, or understanding of the problem context."
+                        ],
                         "evaluation_description": "GSM8K is an open‑source collection of 1,319 arithmetic word problems written in English. Each row contains a single question that tests basic mathematical skills such as addition, subtraction, multiplication, division, fractions, percentages, and simple algebraic reasoning. The problems are designed for a beginner difficulty level, making the dataset suitable for early‑stage model evaluation or educational tools aimed at young learners. The dataset focuses exclusively on the Mathematics domain and covers a broad range of arithmetic and number‑reasoning skills, including reading comprehension of word problems and logical reasoning about quantities.",
                         "top_5_task_types": [
                             "qa",
@@ -2235,8 +2350,15 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "The dataset is a benchmark for general language model competency and generalized reasoning. Running an evaluation helps developers gauge model readiness for real‑world knowledge transfer, identify capability gaps, guide targeted training or fine‑tuning, and provide interpretable metrics that stakeholders can trust for educational or professional applications.",
-                        "what_to_expect": "Evaluating MMLU will reveal how well a model performs across a wide spectrum of academic and professional knowledge areas, difficulty levels, and question types. Analysts will see which domains and skill categories (e.g., logical reasoning, domain-specific facts, procedural knowledge) the model excels or struggles with, detect patterns of over- or under‑representation in the age distribution, and assess how the dataset tests reasoning and factual recall rather than rote memorization. The exercise offers insights into model strengths on advanced, intermediate, and beginner content and yields a granular breakdown of performance by domain, skill, and task type.",
+                        "why_run_this_eval": [
+                            "The dataset is a benchmark for general language model competency and generalized reasoning.",
+                            "Running an evaluation helps developers gauge model readiness for real‑world knowledge transfer, identify capability gaps, guide targeted training or fine‑tuning, and provide interpretable metrics that stakeholders can trust for educational or professional applications."
+                        ],
+                        "what_to_expect": [
+                            "Evaluating MMLU will reveal how well a model performs across a wide spectrum of academic and professional knowledge areas, difficulty levels, and question types.",
+                            "Analysts will see which domains and skill categories (e.g., logical reasoning, domain-specific facts, procedural knowledge) the model excels or struggles with, detect patterns of over- or under‑representation in the age distribution, and assess how the dataset tests reasoning and factual recall rather than rote memorization.",
+                            "The exercise offers insights into model strengths on advanced, intermediate, and beginner content and yields a granular breakdown of performance by domain, skill, and task type."
+                        ],
                         "top_5_task_types": [
                             "qa",
                             "multiple_choice",
@@ -2700,8 +2822,12 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "Run this evaluation to evaluate algorithmic thinking, conditional_statement_usage, Type handling capabilities, to assess domain knowledge in Information Security, Computer Science, to test hashing, unit_test performance.",
-                        "what_to_expect": "Expect questions at Beginner, Intermediate levels, diverse tasks including hashing, unit_test, requiring Information Security, Computer Science knowledge, suitable for computer_science, high_school_graduation level.",
+                        "why_run_this_eval": [
+                            "Run this evaluation to evaluate algorithmic thinking, conditional_statement_usage, Type handling capabilities, to assess domain knowledge in Information Security, Computer Science, to test hashing, unit_test performance."
+                        ],
+                        "what_to_expect": [
+                            "Expect questions at Beginner, Intermediate levels, diverse tasks including hashing, unit_test, requiring Information Security, Computer Science knowledge, suitable for computer_science, high_school_graduation level."
+                        ],
                         "top_5_task_types": [
                             "coding",
                             "algorithm",
@@ -3004,8 +3130,15 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "Running CMMLU is useful if you want to benchmark or monitor:\n1. **Domain coverage** – does the model know enough about biology, law, physics, etc.?\n2. **Critical thinking & reasoning** – can it choose the correct answer when reasoning patterns differ across subjects? \n3. **Language proficiency** – the dataset includes both English and Chinese contexts, so it tests multilingual understanding.\n4. **Benchmarking against peer models** – many research papers use CMMLU, enabling direct comparison.\n5. **Assessing knowledge updating** – when a model is fine‑tuned or updated, CMMLU can quickly show if factual knowledge has improved or degraded.",
-                        "what_to_expect": "When an LLM is evaluated on CMMLU, the system calculates the **accuracy** – the percentage of questions correctly answered.  A high accuracy means the model can reliably retrieve factual information, reason through problem‑solving steps, and understand context within the given domains.  Conversely, lower scores reveal gaps in knowledge or reasoning abilities in specific subjects or formats.  Because the dataset uses only multiple‑choice questions, the score specifically reflects the model’s ability to identify the best answer given the options, rather than free‑form generation quality.",
+                        "why_run_this_eval": [
+                            "Running CMMLU is useful if you want to benchmark or monitor:\n1. **Domain coverage** – does the model know enough about biology, law, physics, etc.?\n2. **Critical thinking & reasoning** – can it choose the correct answer when reasoning patterns differ across subjects? \n3. **Language proficiency** – the dataset includes both English and Chinese contexts, so it tests multilingual understanding.\n4. **Benchmarking against peer models** – many research papers use CMMLU, enabling direct comparison.\n5. **Assessing knowledge updating** – when a model is fine‑tuned or updated, CMMLU can quickly show if factual knowledge has improved or degraded."
+                        ],
+                        "what_to_expect": [
+                            "When an LLM is evaluated on CMMLU, the system calculates the **accuracy** – the percentage of questions correctly answered.",
+                            "A high accuracy means the model can reliably retrieve factual information, reason through problem‑solving steps, and understand context within the given domains.",
+                            "Conversely, lower scores reveal gaps in knowledge or reasoning abilities in specific subjects or formats.",
+                            "Because the dataset uses only multiple‑choice questions, the score specifically reflects the model’s ability to identify the best answer given the options, rather than free‑form generation quality."
+                        ],
                         "evaluation_description": "CMMLU (Comprehensive Multi‑Domain Language Understanding) is a benchmark dataset designed to test general knowledge and reasoning in multiple academic and professional domains.  It contains **11,649 multiple‑choice questions** that cover 16 distinct domains such as Biology, Civil Engineering, Chinese Classics, History, Law, Physics, Sociology, and Virology.  The questions were collected from real exams, quizzes, and knowledge checks and are categorized as beginner or intermediate difficulty.  Each entry includes a question stem, up to four answer choices, and the correct answer label (e.g., \"A\", \"B\", \"C\", or \"D\").  The dataset is broadly suitable for evaluating an LLM’s factual recall, reasoning, domain expertise, and language comprehension across a spectrum of topics.",
                         "top_5_task_types": [
                             "multiple_choice",
@@ -3311,8 +3444,18 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "Run this evaluation if you want to gauge:\n1. Commonsense reasoning across a wide range of domains.\n2. The model’s ability to pick the most plausible everyday continuation.\n3. Its performance on both simple (routine) and more challenging (context‑rich) examples.\n4. How well the model handles varying age perspectives and communication styles.",
-                        "what_to_expect": "When an LLM is evaluated on HellaSwag, the main metric is the accuracy (%) of correctly chosen continuations.  A high score means the model can understand context, reason about everyday events, and choose the most believable outcome – a key trait for natural‑language reasoning.  A low score would suggest gaps in commonsense knowledge and contextual understanding.",
+                        "why_run_this_eval": [
+                            "Run this evaluation if you want to gauge:\n1.",
+                            "Commonsense reasoning across a wide range of domains.\n2.",
+                            "The model’s ability to pick the most plausible everyday continuation.\n3.",
+                            "Its performance on both simple (routine) and more challenging (context‑rich) examples.\n4.",
+                            "How well the model handles varying age perspectives and communication styles."
+                        ],
+                        "what_to_expect": [
+                            "When an LLM is evaluated on HellaSwag, the main metric is the accuracy (%) of correctly chosen continuations.",
+                            "A high score means the model can understand context, reason about everyday events, and choose the most believable outcome – a key trait for natural‑language reasoning.",
+                            "A low score would suggest gaps in commonsense knowledge and contextual understanding."
+                        ],
                         "evaluation_description": "HellaSwag is a crowdsourced evaluation benchmark that contains 10,042 examples.  Each example is a short paragraph followed by four possible continuations.  The model is expected to pick the most plausible one.  The stories cover everyday situations such as personal care, home improvement, parenting, sports coaching, and more.  The dataset was annotated by respondents aged 10–34, providing a range of perspectives.  Tasks include answering, advice, instruction delivery, creative writing, summarization, and question answering.  The difficulty level is split between ‘Beginner’ and ‘Intermediate’ examples.",
                         "top_5_task_types": [
                             "advice",
@@ -3645,8 +3788,15 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "Run this evaluation if you want to:\n\n- Measure how well a model can translate problem statements into working code.\n- Check the model’s proficiency in core programming concepts such as conditionals, loops, and function design.\n- Assess debugging and error‑handling abilities via the hidden test cases.\n- Benchmark different models or prompt‑engineering strategies on a standard, widely‑used coding dataset.",
-                        "what_to_expect": "When an LLM is evaluated on MBPP, the model generates code for each prompt and the resulting code is run against the hidden test cases. The evaluation score reflects the percentage of functions that compile and satisfy all tests. A higher score demonstrates stronger skills in algorithmic thinking, debugging, and producing syntactically correct, logically sound Python code. An assessment that fails many tests highlights weaknesses in understanding program logic, edge‑case handling, or proper use of data types.",
+                        "why_run_this_eval": [
+                            "Run this evaluation if you want to:\n\n- Measure how well a model can translate problem statements into working code.\n- Check the model’s proficiency in core programming concepts such as conditionals, loops, and function design.\n- Assess debugging and error‑handling abilities via the hidden test cases.\n- Benchmark different models or prompt‑engineering strategies on a standard, widely‑used coding dataset."
+                        ],
+                        "what_to_expect": [
+                            "When an LLM is evaluated on MBPP, the model generates code for each prompt and the resulting code is run against the hidden test cases.",
+                            "The evaluation score reflects the percentage of functions that compile and satisfy all tests.",
+                            "A higher score demonstrates stronger skills in algorithmic thinking, debugging, and producing syntactically correct, logically sound Python code.",
+                            "An assessment that fails many tests highlights weaknesses in understanding program logic, edge‑case handling, or proper use of data types."
+                        ],
                         "evaluation_description": "MBPP (Mini-Benchmarks for Programming Problems) is a collection of **974** programming challenges written in Python. The problems cover the basics of computer science, mathematics, and programming, ranging from very simple (Beginner) to moderately complex (Intermediate). Users will find tasks centred on functions, list manipulation, basic algorithms, debugging, and logic. Each problem is paired with test cases that automatically verify the correctness of a submitted function.",
                         "top_5_task_types": [
                             "coding",
@@ -4722,8 +4872,17 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "Benches a model’s core conversational skills:\n- **Reading comprehension** – can the model extract the truth from the text?\n- **Fact‑based reasoning** – does it correctly differentiate between true and false statements?\n- **Domain adaptability** – does the model handle a range of topics (history, sports, engineering, regulations)?\n- **Binary decision making** – is the model capable of choosing a clear yes/no answer with minimal ambiguity?\nRunning BoolQ helps stakeholders quickly gauge these capabilities in a realistic, lightweight setup.",
-                        "what_to_expect": "Running a model on BoolQ provides a single **accuracy score** – the proportion of questions the model answers correctly.  An accuracy close to 1 indicates the model can read the passage, understand the question, and retrieve or infer the correct binary answer.  Lower scores signal gaps in reading comprehension or knowledge recall.  Because each question tests a simple yes/no decision, the score directly reflects the model’s ability to perform quick, factual inference from a small context.\n\nRelevance: A high accuracy suggests strong grounding in general knowledge and good paragraph comprehension, while a low score can highlight weaknesses in understanding nuanced policy language or domain‑specific terminology.",
+                        "why_run_this_eval": [
+                            "Benches a model’s core conversational skills:\n- **Reading comprehension** – can the model extract the truth from the text?\n- **Fact‑based reasoning** – does it correctly differentiate between true and false statements?\n- **Domain adaptability** – does the model handle a range of topics (history, sports, engineering, regulations)?\n- **Binary decision making** – is the model capable of choosing a clear yes/no answer with minimal ambiguity?",
+                            "Running BoolQ helps stakeholders quickly gauge these capabilities in a realistic, lightweight setup."
+                        ],
+                        "what_to_expect": [
+                            "Running a model on BoolQ provides a single **accuracy score** – the proportion of questions the model answers correctly.",
+                            "An accuracy close to 1 indicates the model can read the passage, understand the question, and retrieve or infer the correct binary answer.",
+                            "Lower scores signal gaps in reading comprehension or knowledge recall.",
+                            "Because each question tests a simple yes/no decision, the score directly reflects the model’s ability to perform quick, factual inference from a small context.",
+                            "Relevance: A high accuracy suggests strong grounding in general knowledge and good paragraph comprehension, while a low score can highlight weaknesses in understanding nuanced policy language or domain‑specific terminology."
+                        ],
                         "evaluation_description": "BoolQ is a question‑answering dataset that contains 3,270 short natural‑language questions. Each question is paired with a short passage (≈50 tokens) and a binary answer (yes/no). The questions cover a variety of topics such as U.S. history, sports, engineering, and everyday policy. The dataset is organized into two difficulty levels – Beginner and Intermediate – and reflects a wide range of skills including reading comprehension, information recall, basic reasoning, and domain knowledge.\n\nKey facts:\n- Number of rows: 3,270\n- Question‑type: Yes/No (binary) answers\n- Difficulty: Beginner & Intermediate\n- Domains: History, Sports, Engineering, Policy/Regulations, etc.\n- Each row includes a short context passage and a question about that passage.\n\nThe data has been compiled from the Stanford Natural Language Inference (SNLI) repository and reused for practical evaluation of LLMs on binary QA tasks.",
                         "top_5_task_types": [
                             "question_answering",
@@ -6956,8 +7115,15 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "Running the LAMBADA evaluation lets you probe key generative competencies: *contextual understanding*, *long‑term memory*, *coherence, and narrative fluency*. It is particularly useful when you want to",
-                        "what_to_expect": "When a language model is evaluated on LAMBADA, its performance is reported as a *accuracy* metric: the proportion of samples where the model’s top‑1 prediction matches the human‑written last word. High accuracy indicates that the model can derive meaning from large stretches of text, infer narrative intent, and produce context‑appropriate completions. A low score typically signals that the model struggles with long‑range dependencies or fails to capture subtle plot or character cues, which may translate into generative errors in larger‑scale storytelling tasks.",
+                        "why_run_this_eval": [
+                            "Running the LAMBADA evaluation lets you probe key generative competencies: *contextual understanding*, *long‑term memory*, *coherence, and narrative fluency*.",
+                            "It is particularly useful when you want to."
+                        ],
+                        "what_to_expect": [
+                            "When a language model is evaluated on LAMBADA, its performance is reported as a *accuracy* metric: the proportion of samples where the model’s top‑1 prediction matches the human‑written last word.",
+                            "High accuracy indicates that the model can derive meaning from large stretches of text, infer narrative intent, and produce context‑appropriate completions.",
+                            "A low score typically signals that the model struggles with long‑range dependencies or fails to capture subtle plot or character cues, which may translate into generative errors in larger‑scale storytelling tasks."
+                        ],
                         "evaluation_description": "LAMBADA is a large story‑completion evaluation set with 5,153 samples. Each row contains a short narrative context (a few sentences) and the last word that must be predicted. The stories come from varied creative‑writing and literary domains such as Fantasy Literature, English Literature, and general Reading Comprehension, making the data ideal for testing a model’s ability to weave together plot, character, and setting. The dataset is labeled as Intermediate difficulty – it challenges models to keep track of long contextual cues rather than simple surface patterns.",
                         "top_5_task_types": [
                             "creative_writing",
@@ -9227,8 +9393,14 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "Running CMB evaluation helps assess the following model traits:\n- Medical domain expertise (clinical, pharmacological, laboratory, ethical)\n- Clinical reasoning and differential diagnosis capabilities\n- Ability to interpret Chinese medical terminology and context\n- Decision‑making under uncertainty\n- Knowledge retrieval and synthesis across multiple disciplines",
-                        "what_to_expect": "When an LLM is evaluated against CMB, the resulting score reflects its ability to comprehend Chinese medical text, retrieve domain‑specific facts, perform clinical reasoning, and provide accurate, context‑appropriate responses. A high score indicates that the model can navigate complex decision‑making scenarios, interpret lab data, and articulate ethical positions. Conversely, a low score signals gaps in clinical knowledge, poor reasoning, or language‑specific misunderstandings.",
+                        "why_run_this_eval": [
+                            "Running CMB evaluation helps assess the following model traits:\n- Medical domain expertise (clinical, pharmacological, laboratory, ethical)\n- Clinical reasoning and differential diagnosis capabilities\n- Ability to interpret Chinese medical terminology and context\n- Decision‑making under uncertainty\n- Knowledge retrieval and synthesis across multiple disciplines."
+                        ],
+                        "what_to_expect": [
+                            "When an LLM is evaluated against CMB, the resulting score reflects its ability to comprehend Chinese medical text, retrieve domain‑specific facts, perform clinical reasoning, and provide accurate, context‑appropriate responses.",
+                            "A high score indicates that the model can navigate complex decision‑making scenarios, interpret lab data, and articulate ethical positions.",
+                            "Conversely, a low score signals gaps in clinical knowledge, poor reasoning, or language‑specific misunderstandings."
+                        ],
                         "evaluation_description": "The CMB dataset is a curated collection of 11,200 Chinese-language medical‑question pairs. Each row contains a clinical scenario and a multi‑choice or short‑answer prompt. The dataset spans 30 distinct domains (e.g., Internal Medicine, Pharmacology, Obstetrics, Microbiology, Ethics, Sociology, etc.) and incorporates 32 core skill categories (clinical reasoning, pharmacology, lab interpretation, ethics, communication, critical thinking, knowledge retrieval, etc.). Questions are split into two difficulty tiers – Beginner and Intermediate – designed to test both foundational knowledge and intermediate clinical decision‑making. The age distribution of the respondents (ages 16‑38) and diverse skill tags illustrate that the scenarios target a broad audience of medical students, residents, and practicing clinicians.",
                         "top_5_task_types": [
                             "question_answering",
@@ -12688,8 +12860,15 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "WinoGrande is valuable for testing a model’s ability to perform pronoun resolution, a fundamental skill for many downstream tasks such as question answering, summarization, and dialogue systems. Running this evaluation signals that the model can handle basic syntactic parsing and contextual inference, which are essential for clear and coherent language generation.",
-                        "what_to_expect": "When a language model is evaluated on WinoGrande, the resulting score reflects how well the model can resolve ambiguous pronouns by using contextual and inferential cues. A higher accuracy indicates that the model is proficient at linking pronouns to the correct referent, which is a key component of reading comprehension and natural language understanding. Conversely, a low score suggests weaknesses in reasoning about context, inference, and syntactic structures.",
+                        "why_run_this_eval": [
+                            "WinoGrande is valuable for testing a model’s ability to perform pronoun resolution, a fundamental skill for many downstream tasks such as question answering, summarization, and dialogue systems.",
+                            "Running this evaluation signals that the model can handle basic syntactic parsing and contextual inference, which are essential for clear and coherent language generation."
+                        ],
+                        "what_to_expect": [
+                            "When a language model is evaluated on WinoGrande, the resulting score reflects how well the model can resolve ambiguous pronouns by using contextual and inferential cues.",
+                            "A higher accuracy indicates that the model is proficient at linking pronouns to the correct referent, which is a key component of reading comprehension and natural language understanding.",
+                            "Conversely, a low score suggests weaknesses in reasoning about context, inference, and syntactic structures."
+                        ],
                         "evaluation_description": "WinoGrande is a pronoun resolution benchmark consisting of 1,767 English sentences. Each instance presents a sentence with a missing pronoun and two candidate antecedents. The dataset focuses on beginner‑level reading comprehension and grammar skills, covering domains such as English Language and Grammar. The age distribution of the example sentences is skewed toward older teens and young adults (ages 10, 12, and 14). The labeled skills include basic grammar knowledge, inference, contextual inference, logical inference, and natural language understanding.",
                         "top_5_task_types": [
                             "reading_comprehension",
@@ -16581,8 +16760,14 @@
                                 "60"
                             ]
                         },
-                        "why_run_this_eval": "Run this evaluation when you want to gauge the following model traits:\n- **Basic Arithmetic Proficiency** – can the model add, subtract, multiply, and divide correctly?\n- **Reading‑to‑Equation Mapping** – does the model understand the narrative and translate it into the proper mathematical expression?\n- **Numeracy / Number Sense** – does the model apply numbers in a realistic context?\n- **Early‑Stage Problem‑Solving** – is the model able to solve simple word problems as a baseline before tackling more advanced reasoning tasks?",
-                        "what_to_expect": "When an LLM is evaluated on SVAMP, the model’s accuracy indicates how reliably it can parse a short story, extract the relevant numbers, carry out the required arithmetic, and produce the correct numeric answer. A higher score demonstrates stronger numeric reasoning, the ability to interpret simple textual constraints, and precise calculation capabilities. Conversely, a low score reveals gaps in the model’s handling of basic math or its ability to translate language into equations.",
+                        "why_run_this_eval": [
+                            "Run this evaluation when you want to gauge the following model traits:\n- **Basic Arithmetic Proficiency** – can the model add, subtract, multiply, and divide correctly?\n- **Reading‑to‑Equation Mapping** – does the model understand the narrative and translate it into the proper mathematical expression?\n- **Numeracy / Number Sense** – does the model apply numbers in a realistic context?\n- **Early‑Stage Problem‑Solving** – is the model able to solve simple word problems as a baseline before tackling more advanced reasoning tasks?"
+                        ],
+                        "what_to_expect": [
+                            "When an LLM is evaluated on SVAMP, the model’s accuracy indicates how reliably it can parse a short story, extract the relevant numbers, carry out the required arithmetic, and produce the correct numeric answer.",
+                            "A higher score demonstrates stronger numeric reasoning, the ability to interpret simple textual constraints, and precise calculation capabilities.",
+                            "Conversely, a low score reveals gaps in the model’s handling of basic math or its ability to translate language into equations."
+                        ],
                         "evaluation_description": "SVAMP is a lightweight benchmark for elementary mathematics. It contains 1,000 question‑answer pairs that mix arithmetic operations (addition, subtraction, multiplication, division) with simple word problems. Each example provides a short text (the problem body), a question, the correct numerical answer, and an equation in a human‑readable form. The dataset is purposely beginner‑level, targeting basic numeracy and reading comprehension skills suitable for students in late primary school.",
                         "top_5_task_types": [
                             "arithmetic",

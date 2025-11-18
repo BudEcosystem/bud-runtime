@@ -598,13 +598,13 @@ class ExpDataset(BaseModel):
         None,
         description="Evaluation type configurations like {'gen': 'gsm8k_gen', 'agent': 'gsm8k_agent'}.",
     )
-    why_run_this_eval: Optional[str] = Field(
+    why_run_this_eval: Optional[List[str]] = Field(
         None,
-        description="Explanation of why running this evaluation is valuable and what insights it provides.",
+        description="List of reasons why running this evaluation is valuable and what insights it provides.",
     )
-    what_to_expect: Optional[str] = Field(
+    what_to_expect: Optional[List[str]] = Field(
         None,
-        description="Description of what to expect when evaluating this dataset, including patterns, trends, and characteristics.",
+        description="List of expectations when evaluating this dataset, including patterns, trends, and characteristics.",
     )
     additional_info: Optional[dict] = Field(
         None,

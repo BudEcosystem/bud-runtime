@@ -215,9 +215,9 @@ class ExpDataset(Base, TimestampMixin):
         JSONB, nullable=True
     )  # Stores evaluation type configurations like {"gen": "demo_gsm8k_chat_gen", "ppl": "config_name"}
 
-    # New fields for enriched dataset information
-    why_run_this_eval: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Why run this evaluation
-    what_to_expect: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # What to expect from evaluation
+    # New fields for enriched dataset information (stored as JSONB for list support)
+    why_run_this_eval: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)  # List of reasons to run eval
+    what_to_expect: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)  # List of expectations from eval
     additional_info: Mapped[Optional[dict]] = mapped_column(
         JSONB, nullable=True
     )  # Flexible JSON field for top_5 lists, age_distribution, and future metadata

@@ -25,13 +25,13 @@ def upgrade() -> None:
     # Add why_run_this_eval field
     op.add_column(
         "exp_datasets",
-        sa.Column("why_run_this_eval", sa.Text(), nullable=True),
+        sa.Column("why_run_this_eval", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     )
 
     # Add what_to_expect field
     op.add_column(
         "exp_datasets",
-        sa.Column("what_to_expect", sa.Text(), nullable=True),
+        sa.Column("what_to_expect", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     )
 
     # Add additional_info JSONB field for flexible metadata storage
