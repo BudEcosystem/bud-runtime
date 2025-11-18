@@ -178,7 +178,9 @@ class AppConfig(BaseAppConfig):
     # Minio store
     minio_endpoint: str = Field("bud-store.bud.studio", alias="MINIO_ENDPOINT")
     minio_secure: bool = Field(True, alias="MINIO_SECURE")
+    # Stores actual model files (weights, configs, tokenizers)
     minio_bucket: str = Field("models-registry", alias="MINIO_BUCKET")
+    # Stores model metadata and license files only (NOT model files)
     minio_model_bucket: str = Field("model-info", alias="MINIO_MODEL_BUCKET")
 
     # model download directory

@@ -1171,6 +1171,7 @@ class ModelDeploymentRequest(BaseModel):
     hf_token: str | None = None
     model: str
     model_size: Optional[int] = None
+    storage_size_gb: Optional[float] = None
     target_ttft: Optional[int] = None
     target_e2e_latency: Optional[int] = None
     target_throughput_per_user: Optional[int] = None

@@ -256,6 +256,7 @@ class CreateDeploymentWorkflow:
                 namespace=existing_deployment_namespace,
                 default_storage_class=transfer_model_request_json.default_storage_class,
                 default_access_mode=transfer_model_request_json.default_access_mode,
+                storage_size_gb=transfer_model_request_json.storage_size_gb,
             )
             if status is not None:
                 workflow_status = check_workflow_status_in_statestore(workflow_id)
@@ -791,6 +792,7 @@ class CreateDeploymentWorkflow:
             existing_deployment_namespace=deployment_request_json.existing_deployment_namespace,
             default_storage_class=getattr(deployment_request_json, "default_storage_class", None),
             default_access_mode=getattr(deployment_request_json, "default_access_mode", None),
+            storage_size_gb=getattr(deployment_request_json, "storage_size_gb", None),
         )
         transfer_model_result = yield ctx.call_activity(
             CreateDeploymentWorkflow.transfer_model, input=transfer_model_request.model_dump_json()

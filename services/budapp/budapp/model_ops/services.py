@@ -556,6 +556,17 @@ class CloudModelWorkflowService(SessionMixin):
         if extracted_metadata.get("website_url"):
             update_fields["website_url"] = extracted_metadata["website_url"]
 
+        # Calculate and update storage size from MinIO if local_path is available
+        if model.local_path:
+            try:
+                model_store = ModelStore()
+                storage_size_gb = model_store.get_folder_size(app_settings.minio_bucket, model.local_path)
+                update_fields["storage_size_gb"] = storage_size_gb
+                logger.info(f"Calculated storage size for model {model.id}: {storage_size_gb:.2f} GB")
+            except Exception as e:
+                logger.warning(f"Failed to calculate storage size for model {model.id}: {e}")
+                # Don't fail the update if storage size calculation fails
+
         # Update model with extracted metadata
         if update_fields:
             model = await ModelDataManager(self.session).update_by_fields(model, update_fields)
@@ -1262,6 +1273,17 @@ class LocalModelWorkflowService(SessionMixin):
         if extracted_license:
             await self._create_model_licenses_from_model_info(extracted_license, db_model.id, local_path)
             logger.debug(f"Model licenses created for model {db_model.id}")
+
+        # Calculate and update storage size from MinIO
+        if local_path:
+            try:
+                model_store = ModelStore()
+                storage_size_gb = model_store.get_folder_size(app_settings.minio_bucket, local_path)
+                await ModelDataManager(self.session).update_by_fields(db_model, {"storage_size_gb": storage_size_gb})
+                logger.info(f"Calculated and updated storage size for model {db_model.id}: {storage_size_gb:.2f} GB")
+            except Exception as e:
+                logger.warning(f"Failed to calculate storage size for model {db_model.id}: {e}")
+                # Don't fail the model creation if storage size calculation fails
 
         # Update to workflow step
         workflow_update_data = {
@@ -3680,6 +3702,7 @@ class ModelService(SessionMixin):
             endpoint_name=endpoint_name,
             model=deploy_model_uri,
             model_size=db_model.model_size,
+            storage_size_gb=db_model.storage_size_gb,
             target_ttft=ttft_min,
             target_e2e_latency=e2e_latency_min,
             target_throughput_per_user=target_throughput_per_user_max,

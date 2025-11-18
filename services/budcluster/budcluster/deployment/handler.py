@@ -96,36 +96,52 @@ class DeploymentHandler:
         return urlparse(url).netloc
 
     def _get_memory_size(self, node_list: List[dict]) -> int:
-        """Get memory size from node list, supporting both legacy and new formats.
+        """Get maximum memory size from node list for PVC sizing fallback.
+
+        This method calculates the maximum memory across all nodes as a fallback
+        for PVC sizing when actual storage size is not available. For shared
+        deployments, all replicas share the same PVC, so we use the maximum
+        memory requirement.
 
         Args:
             node_list: List of node configurations
 
         Returns:
-            Memory size in GB
+            Maximum memory size in GB across all nodes
         """
-        memory_size = 0
+        max_memory_bytes = 0
+        nodes_with_memory = 0
+
         for node in node_list:
+            node_memory = 0
             if "memory" in node:
                 # New node group format: memory directly on node
-                memory_size = node["memory"]
-                logger.info(f"Using memory from node group format: {memory_size} bytes")
-                break
+                node_memory = node["memory"]
+                logger.debug(f"Node {node.get('name', 'unknown')}: {node_memory} bytes")
             elif "devices" in node and node["devices"]:
                 # Legacy format: memory in devices array
                 for device in node["devices"]:
-                    memory_size = device["memory"]
-                    logger.warning("Using memory from legacy devices format - consider migrating to node groups")
-                    break
-                break
-            else:
-                logger.warning(f"Node {node.get('name', 'unknown')} has no memory information")
+                    if "memory" in device:
+                        node_memory = device["memory"]
+                        logger.warning(
+                            f"Node {node.get('name', 'unknown')} using legacy devices format - "
+                            "consider migrating to node groups"
+                        )
+                        break
 
-        if memory_size == 0:
-            logger.warning("No memory size found in node list, using default")
-            memory_size = 1024**3  # 1GB default
+            if node_memory > 0:
+                nodes_with_memory += 1
+                max_memory_bytes = max(max_memory_bytes, node_memory)
 
-        return memory_size / (1024**3)
+        if max_memory_bytes == 0:
+            logger.warning("No memory size found in node list, using default of 10GB")
+            max_memory_bytes = 10 * (1024**3)  # 10GB default (more reasonable for models)
+        else:
+            logger.info(
+                f"Calculated maximum memory from {nodes_with_memory} nodes: {max_memory_bytes / (1024**3):.2f} GB"
+            )
+
+        return max_memory_bytes / (1024**3)
 
     def deploy(
         self,
@@ -644,6 +660,7 @@ api_key_location = "env::API_KEY"
         namespace: str = None,
         default_storage_class: Optional[str] = None,
         default_access_mode: Optional[str] = None,
+        storage_size_gb: Optional[float] = None,
     ):
         """Transfer model to the pod.
 
@@ -654,6 +671,8 @@ api_key_location = "env::API_KEY"
             platform: Optional cluster platform
             namespace: Optional Kubernetes namespace
             default_storage_class: Optional storage class for PVC creation
+            default_access_mode: Optional access mode for PVC
+            storage_size_gb: Actual model storage size in GB from MinIO
         """
         model_uri = [part for part in model_uri.split("/") if part]
         model_uri = model_uri[-1]
@@ -661,6 +680,31 @@ api_key_location = "env::API_KEY"
         access_mode = default_access_mode or "ReadWriteOnce"
         if default_access_mode:
             logger.info(f"Model transfer using provided access mode: {default_access_mode}")
+
+        # Calculate PVC size with validation
+        if storage_size_gb and storage_size_gb > 0:
+            # Use actual storage size from MinIO with 20% buffer for safety
+            pvc_size_gb = math.ceil(storage_size_gb * 1.2)
+            logger.info(
+                f"Using actual model storage size: {storage_size_gb:.2f} GB, "
+                f"PVC size with 20% buffer: {pvc_size_gb} GB"
+            )
+        else:
+            # Fallback to memory-based calculation
+            pvc_size_gb = math.ceil(self._get_memory_size(node_list) * 1.1)
+            logger.warning(f"Model storage size not available, using fallback calculation: {pvc_size_gb} GB")
+
+        # Validation: warn if too small, fail if critically small
+        if pvc_size_gb < 1:
+            raise ValueError(
+                f"Calculated PVC size ({pvc_size_gb} GB) is too small. Minimum size is 1 GB. Check model storage size."
+            )
+        elif pvc_size_gb < 5:
+            logger.warning(
+                f"PVC size ({pvc_size_gb} GB) is below recommended minimum of 5 GB. "
+                "This may cause issues with model transfer."
+            )
+
         values = {
             "source_model_path": model_uri,
             "namespace": namespace,
@@ -669,7 +713,7 @@ api_key_location = "env::API_KEY"
             "minio_access_key": secrets_settings.minio_access_key,
             "minio_secret_key": secrets_settings.minio_secret_key,
             "minio_bucket": app_settings.minio_bucket,
-            "model_size": math.ceil(self._get_memory_size(node_list) * 1.1),
+            "model_size": pvc_size_gb,
             "nodes": node_list,
             "volume_type": app_settings.volume_type,
         }
