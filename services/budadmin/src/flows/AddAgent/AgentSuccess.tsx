@@ -119,7 +119,7 @@ export default function AgentSuccess() {
   };
 
   // Code snippet functionality
-  const promptName = deploymentConfiguration?.deploymentName || "PROMPT_NAME";
+  const prompt_Id = currentWorkflow?.workflow_steps?.bud_prompt_id || "PROMPT_ID";
 
   const endpointConfigs = useMemo<EndpointConfig[]>(() => {
     return [
@@ -129,7 +129,7 @@ export default function AgentSuccess() {
         path: "/v1/responses",
         payload: {
           prompt: {
-            name: promptName,
+            id: prompt_Id,
             version: "1",
             variables: {
               variable_1: "Value 1",
@@ -145,7 +145,7 @@ export default function AgentSuccess() {
         path: "/v1/responses",
         payload: {
           prompt: {
-            name: promptName,
+            id: prompt_Id,
             version: "1",
             variables: {
               variable_1: "Value 1",
@@ -156,7 +156,7 @@ export default function AgentSuccess() {
         },
       }
     ];
-  }, [promptName]);
+  }, [prompt_Id]);
 
   const [selectedEndpointKey, setSelectedEndpointKey] = useState<string>(
     endpointConfigs[0]?.key || ""
