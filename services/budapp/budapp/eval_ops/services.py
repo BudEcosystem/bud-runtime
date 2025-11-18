@@ -1669,6 +1669,10 @@ class ExperimentService:
                 modalities=dataset.modalities,
                 sample_questions_answers=dataset.sample_questions_answers,
                 advantages_disadvantages=dataset.advantages_disadvantages,
+                eval_types=dataset.eval_types,
+                why_run_this_eval=dataset.why_run_this_eval,
+                what_to_expect=dataset.what_to_expect,
+                additional_info=dataset.additional_info,
                 traits=traits,
             )
 
@@ -1780,6 +1784,9 @@ class ExperimentService:
                     sample_questions_answers=dataset.sample_questions_answers,
                     advantages_disadvantages=dataset.advantages_disadvantages,
                     eval_types=dataset.eval_types,
+                    why_run_this_eval=dataset.why_run_this_eval,
+                    what_to_expect=dataset.what_to_expect,
+                    additional_info=dataset.additional_info,
                     traits=traits,
                 )
                 dataset_schemas.append(dataset_schema)
