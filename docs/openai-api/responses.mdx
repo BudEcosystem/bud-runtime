@@ -6,6 +6,10 @@ description: "Advanced conversational AI interface with multi-turn support, para
 ## Overview
 
 The Responses API provides a next-generation interface for complex AI interactions, supporting:
+- Prompt-based execution: Execute versioned prompt templates with variable substitution
+- MCP tool integration: Access Model Context Protocol tools for extended functionality
+- Structured outputs: JSON schema-validated responses for reliable data extraction
+- Array-based outputs: Multiple output types (messages, tool calls, reasoning, MCP tool lists)
 - Multi-turn conversations with context preservation
 - Parallel tool/function calling
 - Multimodal inputs (text, image, audio)
@@ -47,6 +51,14 @@ Generate AI responses with advanced conversational features.
   "model": "gpt-4o",
   "input": "Explain quantum computing",
   "previous_response_id": "resp_abc123",
+  "prompt": {
+    "id": "prompt_quantum_explanation",
+    "variables": {
+      "topic": "quantum computing",
+      "difficulty": "beginner"
+    },
+    "version": "1"
+  }
   "instructions": "You are a helpful physics tutor",
   "modalities": ["text"],
   "reasoning": true,
@@ -82,8 +94,9 @@ Generate AI responses with advanced conversational features.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `model` | string | Yes | Model identifier |
-| `input` | string/array | Yes | Text or multimodal content |
+| `model` | string | No | Model identifier |
+| `prompt` | object | No | Prompt template parameters |
+| `input` | string/array | No | Text or multimodal content |
 | `previous_response_id` | string | No | ID for conversation continuity |
 | `instructions` | string | No | System instructions |
 | `modalities` | array | No | Output types: `["text"]`, `["text", "audio"]` |
@@ -94,6 +107,22 @@ Generate AI responses with advanced conversational features.
 | `max_tokens` | integer | No | Maximum output tokens |
 | `stream` | boolean | No | Enable streaming response |
 | `metadata` | object | No | Custom metadata |
+
+### Prompt Input Format
+
+```json
+{
+  "prompt": {
+    "name": "prompt_name",
+    "version": "1",
+    "variables": {
+      "variable_1": "Value 1",
+      "variable_2": "Value 2"
+    }
+  },
+  "input": "Unstructured input text related to the prompt."
+}
+```
 
 ### Multimodal Input Format
 
@@ -115,6 +144,7 @@ Generate AI responses with advanced conversational features.
 ```
 
 ### Response Format
+The response contains an array-based `output` field with multiple item types:
 
 ```json
 {
@@ -123,40 +153,323 @@ Generate AI responses with advanced conversational features.
   "created": 1699123456,
   "model": "gpt-4o",
   "status": "completed",
-  "output": {
-    "type": "message",
-    "role": "assistant",
-    "content": "Quantum computing uses quantum mechanical phenomena...",
-    "tool_calls": []
-  },
-  "reasoning_content": "To explain quantum computing, I should start with...",
+  "output": [
+    {
+      "id": "msg_xyz",
+      "type": "message",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Quantum computing uses quantum mechanical phenomena...",
+          "annotations": []
+        }
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "type": "message",
+      "role": "system",
+      "status": "completed",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "You are a helpful physics tutor"
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "status": "completed",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Explain quantum computing"
+        }
+      ]
+    }
+  ],
   "usage": {
-    "prompt_tokens": 25,
-    "completion_tokens": 150,
-    "total_tokens": 175
+    "input_tokens": 25,
+    "output_tokens": 150,
+    "total_tokens": 175,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    }
   },
-  "metadata": {
-    "user_id": "user123",
-    "session": "quantum_tutorial"
+  "parallel_tool_calls": true,
+  "tool_choice": "auto",
+  "tools": [],
+  "temperature": 0.7,
+  "top_p": 0.9,
+  "max_output_tokens": 1500,
+  "background": false,
+  "reasoning": {},
+  "text": {
+    "format": {
+      "type": "text"
+    }
   }
+}
+```
+
+### Output Item Types
+
+The `output` array can contain multiple types of items:
+
+#### Text Messages
+```json
+{
+  "id": "msg_abc",
+  "type": "message",
+  "status": "completed",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "output_text",
+      "text": "Response content...",
+      "annotations": [],
+      "logprobs": []
+    }
+  ]
+}
+```
+
+#### MCP Tool Lists
+```json
+{
+  "id": "mcpl_def",
+  "type": "mcp_list_tools",
+  "server_label": "filesystem",
+  "tools": [
+    {
+      "name": "read_file",
+      "description": "Read file contents",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string"}
+        }
+      }
+    }
+  ],
+  "error": null
+}
+```
+
+#### MCP Tool Calls
+```json
+{
+  "id": "call_123",
+  "type": "mcp_call",
+  "status": "completed",
+  "name": "read_file",
+  "server_label": "filesystem",
+  "arguments": "{\"path\":\"/data/file.txt\"}",
+  "output": "File contents here...",
+  "error": null
+}
+```
+
+#### Function Tool Calls
+```json
+{
+  "type": "function_call",
+  "call_id": "call_456",
+  "name": "get_weather",
+  "arguments": "{\"location\":\"Paris\"}",
+  "id": "fc_789"
+}
+```
+
+#### Reasoning Items
+```json
+{
+  "id": "rs_abc",
+  "type": "reasoning",
+  "status": "completed",
+  "summary": [
+    {
+      "type": "summary_text",
+      "text": "Let me think through this step by step..."
+    }
+  ]
 }
 ```
 
 ### Streaming Response Format
 
-When `stream: true`, returns Server-Sent Events:
+When streaming is enabled, responses are returned as Server-Sent Events (SSE) with the following format:
 
 ```
-data: {"id":"resp_abc123","object":"response.chunk","delta":{"content":"Quantum"}}
+event: {event_type}
+data: {json_payload}
 
-data: {"id":"resp_abc123","object":"response.chunk","delta":{"content":" computing"}}
-
-data: {"id":"resp_abc123","object":"response.chunk","delta":{"tool_calls":[{"id":"call_123","function":{"name":"calculate_quantum_state","arguments":"{\"qub"}}]}}
-
-data: {"id":"resp_abc123","object":"response.done","usage":{"prompt_tokens":25,"completion_tokens":150,"total_tokens":175}}
-
-data: [DONE]
 ```
+
+#### Event Lifecycle
+
+**1. Initial Events**
+```
+event: response.created
+data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_abc","status":"in_progress","created_at":1699123456}}
+
+event: response.in_progress
+data: {"type":"response.in_progress","sequence_number":1,"response":{"id":"resp_abc","status":"in_progress"}}
+```
+
+**2. MCP Tool List Events** (if MCP tools are configured)
+```
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":2,"output_index":0,"item":{"id":"mcpl_xyz","type":"mcp_list_tools","server_label":"filesystem","tools":[]}}
+
+event: response.mcp_list_tools.in_progress
+data: {"type":"response.mcp_list_tools.in_progress","sequence_number":3,"output_index":0,"item_id":"mcpl_xyz"}
+
+event: response.mcp_list_tools.completed
+data: {"type":"response.mcp_list_tools.completed","sequence_number":4,"output_index":0,"item_id":"mcpl_xyz"}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":5,"output_index":0,"item":{"id":"mcpl_xyz","type":"mcp_list_tools","server_label":"filesystem","tools":[{"name":"read_file","description":"Read file"}]}}
+```
+
+**3. Text Output Events**
+```
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":6,"output_index":1,"item":{"id":"msg_abc","type":"message","status":"in_progress","role":"assistant","content":[]}}
+
+event: response.content_part.added
+data: {"type":"response.content_part.added","sequence_number":7,"item_id":"msg_abc","output_index":1,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":8,"item_id":"msg_abc","output_index":1,"content_index":0,"delta":"Quantum","logprobs":[]}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":9,"item_id":"msg_abc","output_index":1,"content_index":0,"delta":" computing","logprobs":[]}
+
+event: response.output_text.done
+data: {"type":"response.output_text.done","sequence_number":10,"item_id":"msg_abc","output_index":1,"content_index":0,"text":"Quantum computing uses...","logprobs":[]}
+
+event: response.content_part.done
+data: {"type":"response.content_part.done","sequence_number":11,"item_id":"msg_abc","output_index":1,"content_index":0,"part":{"type":"output_text","text":"Quantum computing uses...","annotations":[]}}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":12,"output_index":1,"item":{"id":"msg_abc","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Quantum computing uses..."}]}}
+```
+
+**4. Reasoning Events** (for thinking/reasoning models)
+```
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":13,"output_index":0,"item":{"id":"rs_xyz","type":"reasoning","status":"in_progress","summary":[]}}
+
+event: response.reasoning_summary_part.added
+data: {"type":"response.reasoning_summary_part.added","sequence_number":14,"item_id":"rs_xyz","output_index":0,"summary_index":0,"part":{"type":"summary_text","text":""}}
+
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","sequence_number":15,"item_id":"rs_xyz","output_index":0,"summary_index":0,"delta":"Let me think..."}
+
+event: response.reasoning_summary_text.done
+data: {"type":"response.reasoning_summary_text.done","sequence_number":16,"item_id":"rs_xyz","output_index":0,"summary_index":0,"text":"Let me think through this..."}
+
+event: response.reasoning_summary_part.done
+data: {"type":"response.reasoning_summary_part.done","sequence_number":17,"item_id":"rs_xyz","output_index":0,"summary_index":0,"part":{"type":"summary_text","text":"Let me think through this..."}}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":18,"output_index":0,"item":{"id":"rs_xyz","type":"reasoning","status":"completed","summary":[{"type":"summary_text","text":"Let me think through this..."}]}}
+```
+
+**5. MCP Tool Call Events**
+```
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":19,"output_index":2,"item":{"id":"call_123","type":"mcp_call","status":"in_progress","name":"read_file","server_label":"filesystem","arguments":""}}
+
+event: response.mcp_call.in_progress
+data: {"type":"response.mcp_call.in_progress","sequence_number":20,"output_index":2,"item_id":"call_123"}
+
+event: response.mcp_call_arguments.delta
+data: {"type":"response.mcp_call_arguments.delta","sequence_number":21,"output_index":2,"item_id":"call_123","delta":"{\"path\"}"}
+
+event: response.mcp_call_arguments.done
+data: {"type":"response.mcp_call_arguments.done","sequence_number":22,"output_index":2,"item_id":"call_123","arguments":"{\"path\":\"/file.txt\"}"}
+
+event: response.mcp_call.completed
+data: {"type":"response.mcp_call.completed","sequence_number":23,"output_index":2,"item_id":"call_123"}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":24,"output_index":2,"item":{"id":"call_123","type":"mcp_call","status":"completed","name":"read_file","server_label":"filesystem","arguments":"{\"path\":\"/file.txt\"}","output":"file contents..."}}
+```
+
+**6. Function Tool Call Events**
+```
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":25,"output_index":3,"item":{"type":"function_call","call_id":"call_456","name":"get_weather","arguments":"","id":"fc_789"}}
+
+event: response.function_call_arguments.done
+data: {"type":"response.function_call_arguments.done","sequence_number":26,"output_index":3,"item_id":"call_456","name":"get_weather","arguments":"{\"location\":\"Paris\"}"}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":27,"output_index":3,"item":{"type":"function_call","call_id":"call_456","name":"get_weather","arguments":"{\"location\":\"Paris\"}","id":"fc_789"}}
+```
+
+**7. Completion Event**
+```
+event: response.completed
+data: {"type":"response.completed","sequence_number":28,"response":{"id":"resp_abc","object":"response","created_at":1699123456,"model":"gpt-4","status":"completed","output":[...],"instructions":[...],"usage":{"input_tokens":25,"output_tokens":150,"total_tokens":175}}}
+```
+
+**8. Error Event** (on failure)
+```
+event: response.failed
+data: {"type":"response.failed","sequence_number":5,"response":{"id":"resp_abc","status":"failed","error":{"message":"Error description","type":"server_error","code":"execution_failed"}}}
+```
+
+#### Key Event Fields
+
+- **`sequence_number`**: Monotonically increasing counter for event ordering
+- **`output_index`**: Position in the output array (0-indexed)
+- **`item_id`**: Unique identifier for the specific item being streamed
+- **`content_index`**: Position within the content array (for messages)
+- **`summary_index`**: Position within the summary array (for reasoning)
+
+
+### Prompt-Based Execution
+
+Execute pre-configured prompt templates using the `prompt` parameter:
+
+**Request Example:**
+```json
+{
+  "prompt": {
+    "id": "prompt_template_id",
+    "variables": {"topic": "quantum computing"},
+    "version": "v1"
+  },
+  "input": "Unstructured user input"
+}
+```
+
+**Fields:**
+- `prompt.id` (required) - Template identifier
+- `prompt.variables` (optional) - Variable substitutions
+- `prompt.version` (optional) - Template version (defaults to default version)
+- `input` (optional) - Unstructured user input
+
+**Prompt Configuration (via UI or API):**
+
+Users can pre-configure prompts with:
+- Model deployment and settings (temperature, max_tokens, top_p, etc.)
+- System prompt with Jinja2 template support
+- Conversation messages and context with Jinja2 template support
+- MCP tools (filesystem, web access, custom tools)
+- Input/output schemas for structured data
+- Validation rules and retry limits
+- Streaming configuration
 
 ## Retrieve Response
 
@@ -243,6 +556,22 @@ curl -X POST http://localhost:3000/v1/responses \
   -d '{
     "model": "gpt-4o",
     "input": "What is machine learning?"
+  }'
+```
+
+### Prompt Execution
+
+```bash
+curl -X POST http://localhost:3000/v1/responses \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": {
+      "id": "prompt_neural_networks",
+      "variables": {
+        "question": "Explain neural networks"
+      }
+    }
   }'
 ```
 
@@ -647,6 +976,9 @@ Maintain context across multiple interactions:
 - **Metadata**: Use metadata to track conversations and user sessions
 - **Context Window**: Be mindful of token limits when building long conversations
 - **Parallel Tools**: Leverage parallel tool calling for independent operations
+- **Prompt Templates**: Design reusable prompt templates with clear variable names for maintainability
+- **Variable Management**: Use descriptive variable names and provide defaults where appropriate
+- **Version Control**: Use prompt versioning to iterate on prompts without breaking existing integrations
 
 ## Limitations
 
@@ -654,6 +986,8 @@ Maintain context across multiple interactions:
 - Response management endpoints have limited functionality
 - Conversation history is maintained only through `previous_response_id` chaining
 - Maximum context window depends on the model used
+- Prompt templates must be pre-configured before use
+- Maximum context window depends on the underlying model configured in the prompt template
 
 ## Supported providers
 
