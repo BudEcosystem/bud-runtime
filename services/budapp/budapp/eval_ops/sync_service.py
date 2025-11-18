@@ -148,21 +148,20 @@ class EvalDataSyncService:
                     dataset_fields[key] = value
 
             # Extract sample_questions_answers from original_data
-            if original_data.get("sample_questions_answers"):
-                sqa_data = original_data["sample_questions_answers"]
+            if sqa_data := original_data.get("sample_questions_answers"):
                 # Initialize with sample_count if not already set
                 if not dataset_fields["sample_questions_answers"]:
                     dataset_fields["sample_questions_answers"] = {}
-                if dataset.sample_count:
-                    dataset_fields["sample_questions_answers"]["sample_count"] = dataset.sample_count
+                    if dataset.sample_count:
+                        dataset_fields["sample_questions_answers"]["sample_count"] = dataset.sample_count
 
                 # Add examples if present
-                if sqa_data.get("examples"):
-                    dataset_fields["sample_questions_answers"]["examples"] = sqa_data["examples"]
+                if examples := sqa_data.get("examples"):
+                    dataset_fields["sample_questions_answers"]["examples"] = examples
 
                 # Add total_questions if present
-                if sqa_data.get("total_questions"):
-                    dataset_fields["sample_questions_answers"]["total_count"] = sqa_data["total_questions"]
+                if total_questions := sqa_data.get("total_questions"):
+                    dataset_fields["sample_questions_answers"]["total_count"] = total_questions
 
             # Build additional_info JSON field from various metadata in original_data
             additional_info_keys = [
