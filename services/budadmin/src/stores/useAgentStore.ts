@@ -91,6 +91,10 @@ interface AgentStore {
     nextStep: string | null;
   };
 
+  // Edit Mode
+  isEditMode: boolean;
+  editingPromptId: string | null;
+
   // Deleted prompts tracking
   deletedPromptIds: Array<{sessionId: string; promptId: string}>;
 
@@ -117,6 +121,11 @@ interface AgentStore {
   setSelectedSession: (id: string | null) => void;
   openModelSelector: () => void;
   closeModelSelector: () => void;
+
+  // Edit Mode Actions
+  setEditMode: (promptId: string) => void;
+  clearEditMode: () => void;
+  loadPromptForEdit: (promptId: string, sessionData: Partial<AgentSession>) => void;
 
   // Bulk Actions
   clearAllSessions: () => void;
@@ -191,6 +200,8 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         isInWorkflow: false,
         nextStep: null,
       },
+      isEditMode: false,
+      editingPromptId: null,
       deletedPromptIds: [],
 
       // Session Management
@@ -413,13 +424,15 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         const { workflowContext } = get();
         const nextStep = workflowContext.nextStep;
 
-        // Close the drawer first
+        // Close the drawer first and clear edit mode
         set({
           isAgentDrawerOpen: false,
           workflowContext: {
             isInWorkflow: false,
             nextStep: null,
-          }
+          },
+          isEditMode: false,
+          editingPromptId: null
         });
 
         // If we're in a workflow and have a next step, trigger it after closing
@@ -445,6 +458,40 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
       closeModelSelector: () => {
         set({ isModelSelectorOpen: false });
+      },
+
+      // Edit Mode Actions
+      setEditMode: (promptId: string) => {
+        set({
+          isEditMode: true,
+          editingPromptId: promptId
+        });
+      },
+
+      clearEditMode: () => {
+        set({
+          isEditMode: false,
+          editingPromptId: null
+        });
+      },
+
+      loadPromptForEdit: (promptId: string, sessionData: Partial<AgentSession>) => {
+        // Clear existing sessions and create a new one with the prompt data
+        const newSession: AgentSession = {
+          ...createDefaultSession(),
+          ...sessionData,
+          id: generateId(), // Generate new session ID
+          promptId: promptId, // Ensure promptId is set
+          updatedAt: new Date(),
+        };
+
+        set({
+          sessions: [newSession],
+          activeSessionIds: [newSession.id],
+          selectedSessionId: newSession.id,
+          isEditMode: true,
+          editingPromptId: promptId
+        });
       },
 
       // Bulk Actions

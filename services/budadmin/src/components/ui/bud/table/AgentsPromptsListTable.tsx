@@ -19,6 +19,8 @@ import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { IconOnlyRender } from 'src/flows/components/BudIconRender';
 import { useAddAgent } from '@/stores/useAddAgent';
 import { updateQueryParams } from '@/utils/urlUtils';
+import { useAgentStore } from '@/stores/useAgentStore';
+import { loadPromptForEditing } from '@/utils/promptHelpers';
 
 const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
@@ -323,7 +325,40 @@ function AgentsPromptsListTable() {
                                         </div> */}
                                         <div className='ml-[.3rem] w-[1rem] h-auto block'>
                                             <Button
-                                                className='bg-transparent border-none p-0 opacity-0 group-hover:opacity-100'
+                                                className='bg-transparent px-[.2rem] border-none p-0 opacity-0 group-hover:opacity-100 hover:[&_svg_path]:fill-white transition-all'
+                                                onClick={async (event: React.MouseEvent) => {
+                                                    event.stopPropagation();
+                                                    if (!hasPermission(PermissionEnum.ProjectManage)) return;
+
+                                                    try {
+                                                        // Load prompt data for editing
+                                                        const sessionData = await loadPromptForEditing(
+                                                            record.id,
+                                                            projectId as string
+                                                        );
+
+                                                        // Get agent store methods
+                                                        const { loadPromptForEdit, openAgentDrawer } = useAgentStore.getState();
+
+                                                        // Load the prompt into a session
+                                                        loadPromptForEdit(record.id, sessionData);
+
+                                                        // Open the drawer
+                                                        openAgentDrawer();
+                                                    } catch (error) {
+                                                        console.error('Failed to load prompt for editing:', error);
+                                                        errorToast('Failed to load prompt for editing');
+                                                    }
+                                                }}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 14" fill="none">
+                                                    <path d="M11.0871 1.04488C10.9933 0.951116 10.8661 0.898438 10.7335 0.898438C10.6009 0.898438 10.4737 0.951116 10.38 1.04488L3.44805 7.9768C3.35809 8.06675 3.28612 8.17305 3.23601 8.28998L1.87394 11.4681C1.7934 11.6561 1.83539 11.8741 1.97996 12.0187C2.12453 12.1632 2.34255 12.2052 2.53047 12.1247L5.70863 10.7626C5.82556 10.7125 5.93186 10.6405 6.02182 10.5506L12.9537 3.61866C13.149 3.4234 13.149 3.10681 12.9537 2.91155L11.0871 1.04488ZM4.15515 8.6839L10.7335 2.10554L11.8931 3.2651L5.31471 9.84346L3.91273 10.4443L3.5543 10.0859L4.15515 8.6839Z" fill="#B3B3B3" className="transition-all" />
+                                                </svg>
+                                            </Button>
+                                        </div>
+                                        <div className='ml-[.3rem] w-[1rem] h-auto block'>
+                                            <Button
+                                                className='bg-transparent px-[.2rem] border-none p-0 opacity-0 group-hover:opacity-100 [&_svg_path]:fill-[#B3B3B3] hover:[&_svg_path]:!fill-white [&_svg_path]:transition-all'
                                                 onClick={(event: React.MouseEvent) => {
                                                     event.stopPropagation();
                                                     if (!hasPermission(PermissionEnum.ProjectManage)) return;
@@ -331,7 +366,7 @@ function AgentsPromptsListTable() {
                                                 }}
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 15" fill="none">
-                                                    <path fillRule="evenodd" clipRule="evenodd" d="M5.13327 1.28906C4.85713 1.28906 4.63327 1.51292 4.63327 1.78906C4.63327 2.0652 4.85713 2.28906 5.13327 2.28906H8.8666C9.14274 2.28906 9.3666 2.0652 9.3666 1.78906C9.3666 1.51292 9.14274 1.28906 8.8666 1.28906H5.13327ZM2.7666 3.65573C2.7666 3.37959 2.99046 3.15573 3.2666 3.15573H10.7333C11.0094 3.15573 11.2333 3.37959 11.2333 3.65573C11.2333 3.93187 11.0094 4.15573 10.7333 4.15573H10.2661C10.2664 4.1668 10.2666 4.17791 10.2666 4.18906V11.5224C10.2666 12.0747 9.81889 12.5224 9.2666 12.5224H4.73327C4.18098 12.5224 3.73327 12.0747 3.73327 11.5224V4.18906C3.73327 4.17791 3.73345 4.1668 3.73381 4.15573H3.2666C2.99046 4.15573 2.7666 3.93187 2.7666 3.65573ZM9.2666 4.18906L4.73327 4.18906V11.5224L9.2666 11.5224V4.18906Z" fill="#B3B3B3" />
+                                                    <path fillRule="evenodd" clipRule="evenodd" d="M5.13327 1.28906C4.85713 1.28906 4.63327 1.51292 4.63327 1.78906C4.63327 2.0652 4.85713 2.28906 5.13327 2.28906H8.8666C9.14274 2.28906 9.3666 2.0652 9.3666 1.78906C9.3666 1.51292 9.14274 1.28906 8.8666 1.28906H5.13327ZM2.7666 3.65573C2.7666 3.37959 2.99046 3.15573 3.2666 3.15573H10.7333C11.0094 3.15573 11.2333 3.37959 11.2333 3.65573C11.2333 3.93187 11.0094 4.15573 10.7333 4.15573H10.2661C10.2664 4.1668 10.2666 4.17791 10.2666 4.18906V11.5224C10.2666 12.0747 9.81889 12.5224 9.2666 12.5224H4.73327C4.18098 12.5224 3.73327 12.0747 3.73327 11.5224V4.18906C3.73327 4.17791 3.73345 4.1668 3.73381 4.15573H3.2666C2.99046 4.15573 2.7666 3.93187 2.7666 3.65573ZM9.2666 4.18906L4.73327 4.18906V11.5224L9.2666 11.5224V4.18906Z" />
                                                 </svg>
                                             </Button>
                                         </div>
