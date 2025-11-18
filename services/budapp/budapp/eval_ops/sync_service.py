@@ -143,38 +143,24 @@ class EvalDataSyncService:
                 dataset_fields["meta_links"]["update_date"] = original_data["updateDate"]
 
             # Extract enriched evaluation fields from original_data
-            if original_data.get("why_run_this_eval"):
-                dataset_fields["why_run_this_eval"] = original_data["why_run_this_eval"]
+            for key in ["why_run_this_eval", "what_to_expect"]:
+                if (value := original_data.get(key)) is not None:
+                    dataset_fields[key] = value
 
-            if original_data.get("what_to_expect"):
-                dataset_fields["what_to_expect"] = original_data["what_to_expect"]
-
-            # Build additional_info JSON field from top_5 lists and age_distribution in original_data
-            additional_info = {}
-
-            if original_data.get("top_5_task_types"):
-                additional_info["top_5_task_types"] = original_data["top_5_task_types"]
-
-            if original_data.get("top_5_domains"):
-                additional_info["top_5_domains"] = original_data["top_5_domains"]
-
-            if original_data.get("top_5_skills"):
-                additional_info["top_5_skills"] = original_data["top_5_skills"]
-
-            if original_data.get("top_5_concepts"):
-                additional_info["top_5_concepts"] = original_data["top_5_concepts"]
-
-            if original_data.get("top_5_qualifications"):
-                additional_info["top_5_qualifications"] = original_data["top_5_qualifications"]
-
-            if original_data.get("top_5_languages"):
-                additional_info["top_5_languages"] = original_data["top_5_languages"]
-
-            if original_data.get("age_distribution"):
-                additional_info["age_distribution"] = original_data["age_distribution"]
-
-            if original_data.get("evaluation_description"):
-                additional_info["evaluation_description"] = original_data["evaluation_description"]
+            # Build additional_info JSON field from various metadata in original_data
+            additional_info_keys = [
+                "top_5_task_types",
+                "top_5_domains",
+                "top_5_skills",
+                "top_5_concepts",
+                "top_5_qualifications",
+                "top_5_languages",
+                "age_distribution",
+                "evaluation_description",
+            ]
+            additional_info = {
+                key: value for key in additional_info_keys if (value := original_data.get(key)) is not None
+            }
 
             # Only set additional_info if we have data
             if additional_info:
