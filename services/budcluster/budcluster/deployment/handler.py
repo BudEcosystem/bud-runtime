@@ -288,6 +288,19 @@ class DeploymentHandler:
 
             node["args"]["gpu-memory-utilization"] = 0.95
 
+            # For shared hardware mode, calculate GPU memory limit in MB
+            hardware_mode = node.get("hardware_mode", "dedicated")
+            if hardware_mode == "shared":
+                # Convert GB to MB for nvidia.com/gpumem resource limit
+                gpu_memory_mb = int(allocation_memory_gb * 1024)
+                node["gpu_memory_mb"] = gpu_memory_mb
+                logger.debug(
+                    f"Shared mode: Setting GPU memory limit to {gpu_memory_mb}MB ({allocation_memory_gb:.2f}GB)"
+                )
+
+                node["args"]["max-num-seqs"] = node_concurrency
+                node["args"]["gpu-memory-utilization"] = round(node["memory"] / allocation_memory_gb, 2)
+
             # Enable LoRA configuration if engine supports it
             supports_lora = node.get("supports_lora", False)
             if supports_lora:
@@ -335,19 +348,6 @@ class DeploymentHandler:
             if supports_lora:
                 node["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
                 logger.info("Enabled runtime LoRA updating")
-
-            # For shared hardware mode, calculate GPU memory limit in MB
-            hardware_mode = node.get("hardware_mode", "dedicated")
-            if hardware_mode == "shared":
-                # Convert GB to MB for nvidia.com/gpumem resource limit
-                gpu_memory_mb = int(allocation_memory_gb * 1024)
-                node["gpu_memory_mb"] = gpu_memory_mb
-                logger.debug(
-                    f"Shared mode: Setting GPU memory limit to {gpu_memory_mb}MB ({allocation_memory_gb:.2f}GB)"
-                )
-
-                node["args"]["max-num-seqs"] = node_concurrency
-                node["args"]["gpu-memory-utilization"] = round(node["memory"] / allocation_memory_gb, 2)
 
             node["name"] = self._to_k8s_label(node["name"])
 
