@@ -187,7 +187,8 @@ class MCPFoundryService(metaclass=SingletonMeta):
 
             except httpx.ConnectError as e:
                 last_exception = e
-                logger.warning("Connection error to MCP Foundry on attempt %d/%d: %s", attempt + 1, self.max_retries, e)
+                error_msg = f"Connection error to MCP Foundry: {str(e)}"
+                logger.warning("%s: attempt=%d, max_retries=%d", error_msg, attempt + 1, self.max_retries)
 
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay * (attempt + 1))
