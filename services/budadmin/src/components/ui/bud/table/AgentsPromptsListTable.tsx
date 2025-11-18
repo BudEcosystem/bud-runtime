@@ -18,6 +18,7 @@ import { useConfirmAction } from 'src/hooks/useConfirmAction';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { IconOnlyRender } from 'src/flows/components/BudIconRender';
 import { useAddAgent } from '@/stores/useAddAgent';
+import { updateQueryParams } from '@/utils/urlUtils';
 
 const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
@@ -162,7 +163,7 @@ function AgentsPromptsListTable() {
             };
 
             // Store the selected project
-            setSelectedProject(projectData as any);
+            setSelectedProject(projectData);
 
             // Create the workflow (calls step 1 API)
             const response = await createWorkflow(projectId as string);
@@ -177,25 +178,9 @@ function AgentsPromptsListTable() {
 
             // Update URL with workflow ID
             if (workflowId) {
-                const currentPath = window.location.pathname;
-                const queryParts: string[] = [];
-
-                Object.entries(router.query).forEach(([key, value]) => {
-                    if (key !== 'agent' && value) {
-                        queryParts.push(`${key}=${encodeURIComponent(String(value))}`);
-                    }
-                });
-
-                queryParts.push(`agent=${workflowId}`);
-
-                const newUrl = queryParts.length > 0
-                    ? `${currentPath}?${queryParts.join('&')}`
-                    : currentPath;
-
-                window.history.replaceState(
-                    { ...window.history.state },
-                    '',
-                    newUrl
+                updateQueryParams(
+                    { agent: workflowId },
+                    { replaceHistory: true }
                 );
             }
 

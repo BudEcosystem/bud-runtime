@@ -58,7 +58,7 @@ export default function UseAgent() {
   const { drawerProps } = useDrawer();
 
   // Get prompt ID from the endpoint record passed via drawer props
-  const prompt_Id = drawerProps?.endpoint?.id || "PROMPT_ID";
+  const promptId = drawerProps?.endpoint?.id || "PROMPT_ID";
 
   // Use a single endpoint configuration for agents/prompts
   const endpointConfig = useMemo<EndpointConfig>(() => {
@@ -68,7 +68,7 @@ export default function UseAgent() {
       path: "/v1/responses",
       payload: {
         prompt: {
-          id: prompt_Id,
+          id: promptId,
           version: "1",
           variables: {
             variable_1: "Value 1",
@@ -78,7 +78,7 @@ export default function UseAgent() {
         input: "Unstructured input text related to the prompt."
       },
     };
-  }, [prompt_Id]);
+  }, [promptId]);
 
   const baseUrl =
     process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL ||

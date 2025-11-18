@@ -88,8 +88,7 @@ export default function SelectAgentType() {
     if (currentWorkflow?.workflow_id && !currentWorkflow?.workflow_steps) {
       getWorkflow(currentWorkflow.workflow_id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+  }, [currentWorkflow, getWorkflow]);
 
   const handleNext = async () => {
     if (!selectedType) {
