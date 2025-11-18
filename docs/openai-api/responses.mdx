@@ -58,7 +58,7 @@ Generate AI responses with advanced conversational features.
       "difficulty": "beginner"
     },
     "version": "1"
-  }
+  },
   "instructions": "You are a helpful physics tutor",
   "modalities": ["text"],
   "reasoning": true,
@@ -448,7 +448,7 @@ Execute pre-configured prompt templates using the `prompt` parameter:
   "prompt": {
     "id": "prompt_template_id",
     "variables": {"topic": "quantum computing"},
-    "version": "v1"
+    "version": "1"
   },
   "input": "Unstructured user input"
 }
@@ -987,7 +987,7 @@ Maintain context across multiple interactions:
 - Conversation history is maintained only through `previous_response_id` chaining
 - Maximum context window depends on the model used
 - Prompt templates must be pre-configured before use
-- Maximum context window depends on the underlying model configured in the prompt template
+- Maximum context window depends on the model used, including when configured in a prompt template.
 
 ## Supported providers
 
