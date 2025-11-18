@@ -1806,7 +1806,7 @@ class PromptCleanupService:
                 if mcp_resources.get("gateways"):
                     for _connector_id, gateway_id in mcp_resources["gateways"].items():
                         try:
-                            run_async(mcp_foundry_service.delete_gateway(gateway_id))
+                            mcp_foundry_service.delete_gateway_sync(gateway_id)
                             logger.debug(f"Deleted gateway {gateway_id} for {prompt_key}")
                         except Exception as e:
                             logger.error(f"Failed to delete gateway {gateway_id}: {e}")
@@ -1815,7 +1815,7 @@ class PromptCleanupService:
                 # Delete virtual server
                 if mcp_resources.get("virtual_server_id"):
                     try:
-                        run_async(mcp_foundry_service.delete_virtual_server(mcp_resources["virtual_server_id"]))
+                        mcp_foundry_service.delete_virtual_server_sync(mcp_resources["virtual_server_id"])
                         logger.debug(f"Deleted virtual server {mcp_resources['virtual_server_id']}")
                     except Exception as e:
                         logger.error(f"Failed to delete virtual server: {e}")

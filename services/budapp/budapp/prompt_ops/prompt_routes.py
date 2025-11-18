@@ -681,7 +681,7 @@ async def get_prompt_config(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     prompt_id: str,
-    version: Optional[int] = Query(None, description="Version of the configuration to retrieve", ge=1),
+    version: int = Query(1, description="Version of the configuration to retrieve", ge=1),
 ) -> Union[PromptConfigGetResponse, ErrorResponse]:
     """Get prompt configuration by ID.
 
