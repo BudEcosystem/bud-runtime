@@ -1,5 +1,5 @@
 {
-    "manifest_version": "1.0.8",
+    "manifest_version": "1.0.9",
     "last_updated": "2025-10-24T11:44:12Z",
     "schema_version": "1.0",
     "repository": {
@@ -12,7 +12,7 @@
         "bundle_size_mb": null
     },
     "version_info": {
-        "current_version": "1.0.8",
+        "current_version": "1.0.9",
         "previous_versions": [
             {
                 "version": "1.0.0",
@@ -61,6 +61,12 @@
                 "deprecated": false,
                 "migration_required": false,
                 "updated_at": "2025-10-24T11:12:11Z"
+            },
+            {
+                "version": "1.0.8",
+                "deprecated": false,
+                "migration_required": false,
+                "updated_at": "2025-11-14T09:01:01Z"
             }
         ]
     },
@@ -114,7 +120,7 @@
             "license": "Various - See individual dataset licenses",
             "source": "OpenCompass Evaluation Platform",
             "checksum": "sha256:placeholder_opencompass_v2",
-            "count": 446,
+            "count": 445,
             "datasets": [
                 {
                     "id": "opencompass_2152",
@@ -1363,42 +1369,147 @@
                         "sample_questions_answers": {
                             "examples": [
                                 {
-                                    "question": "{\"problem\": \"Simplify\\n\\\\[\\\\frac{\\\\sec x}{\\\\sin x} - \\\\frac{\\\\sin x}{\\\\cos x}.\\\\]\", \"solution\": \"We can write\\n\\\\begin{align*}\\n\\\\frac{\\\\sec x}{\\\\sin x} - \\\\frac{\\\\sin x}{\\\\cos x} &= \\\\frac{1}{\\\\cos x",
+                                    "question": "{\"problem\": \"What fraction of the form $\\\\frac{A}{x + 3}$ can be added to $\\\\frac{6x}{x^2 + 2x - 3}$ so that the result reduces to a fraction of the form $\\\\frac{B}{x - 1}$?  Here $A$ and $B$ are real",
                                     "difficulty": "moderate",
-                                    "task_type": "Mathematical simplification, Trigonometric identity application"
+                                    "task_type": "algebra, equation_solving"
                                 },
                                 {
-                                    "question": "{\"problem\": \"Compute $\\\\sin 120^\\\\circ$.\", \"solution\": \"Let $P$ be the point on the unit circle that is $120^\\\\circ$ counterclockwise from $(1,0)$, and let $D$ be the foot of the altitude from $P$ to ",
-                                    "difficulty": "moderate",
-                                    "task_type": "Mathematical Calculation, Conceptual Application"
+                                    "question": "{\"problem\": \"Evaluate $|\\\\sqrt5+2i|$.\", \"level\": \"Level 1\", \"type\": \"Intermediate Algebra\", \"solution\": \"We have $|\\\\sqrt5+2i| = \\\\sqrt{(\\\\sqrt5)^2 + 2^2} = \\\\sqrt{5+4} = \\\\sqrt9 = \\\\boxed{3}$.\", \"_so",
+                                    "difficulty": "easy",
+                                    "task_type": "math"
                                 },
                                 {
-                                    "question": "{\"problem\": \"Find the units digit of $13^{19} \\\\cdot 19^{13}$\", \"solution\": \"Since the tens digits don't matter to us, the problem is the same as finding the units digit of $3^{19} \\\\cdot 9^{13} = 3^{",
+                                    "question": "{\"problem\": \"Simplify $\\\\cos 10^\\\\circ \\\\cos 30^\\\\circ \\\\cos 50^\\\\circ \\\\cos 70^\\\\circ.$\", \"level\": \"Level 3\", \"type\": \"Precalculus\", \"solution\": \"From the product-to-sum formula, $\\\\cos 50^\\\\circ \\\\c",
                                     "difficulty": "moderate",
-                                    "task_type": "Problem Solving, Mathematical Reasoning"
+                                    "task_type": "qa"
                                 }
                             ],
                             "total_questions": 5000,
-                            "question_format": "Conceptual Application, Math problem solving, Mathematical Calculation, Mathematical Reasoning, Mathematical simplification, Problem Solving, Trigonometric identity application",
+                            "question_format": "Algebra, Algebra Problem Solving, Algebra problem solving, Algebraic manipulation, Algebraic_Problem, Arithmetical_reasoning, Combinatorics, Computation, Counting, Counting & Probability, Enumeration, Equation Solving, Equation solving, Geometry, Inequality Problem, Math Calculation, Math Problem, Math problem solving, Math_Problem, Mathematical problem solving, Number Theory, Number_Theory, Optimization, Prealgebra, Precalculus, Probability, Problem_Solving, Product calculation, QuestionAnswer, Question_and_Answer, Sequence Analysis, Simplification, algebra, algebra_problem, algebraic manipulation, algebraic_equation_solving, algebraic_manipulation, algebraic_reasoning, analysis, area_calculation, arithmetic, arithmetical_sum, arithmetics, basic_algebra, basic_calculation, calculation, calculations, classification, combinatorics, complex-number-problem, conceptual_reasoning, conic sections, coordinate geometry, coordinate_conversion, coordinate_geometry, counting, counting_and_probability, divisibility, enumeration, equation_solving, factoring, function_analysis, functional equation analysis, geometric_problem, geometry, geometry_problem_solving, inequality, intermediate_algebra, math, math problem solving, math_algebra, math_comprehension, math_evaluation, math_problem, math_problem_solving, math_reasoning, mathematical problem solving, mathematical_reasoning, mathematics, mathematics problem solving, mathematics_problem_solving, matrix_problem, number theory, number_theory, numerical_reasoning, optimization, polynomial, prealgebra, precalculus, probability, probability_problem, problem solving, problem_solving, qa, question_answer, question_answering, ratio_problem, reasoning, sequence_analysis, simple math, simplification, summation, trigonometry, unit_conversion",
                             "difficulty_levels": [
+                                "Advanced",
+                                "Beginner",
                                 "Intermediate"
                             ]
                         },
                         "advantages_disadvantages": {
                             "advantages": [
-                                "Tests domain-specific knowledge in Mathematical Analysis, Mathematics, Geometry",
-                                "Evaluates Spatial Reasoning, Critical Thinking, Algebraic manipulation skills",
-                                "Diverse task types: Math problem solving, Conceptual Application, Problem Solving"
+                                "Large, diverse set of 5,000 problems covering a wide range of math topics.",
+                                "Includes both conceptual and calculation‑heavy questions, testing multiple skills.",
+                                "Clear difficulty labels (Beginner, Intermediate) allow fine‑grained analysis.",
+                                "Rich feature set (domains, skills) aids in diagnosing specific strengths/weaknesses."
                             ],
                             "disadvantages": [
-                                "Requires knowledge across multiple specialized domains"
+                                "No items beyond the Intermediate difficulty level, limiting assessment of advanced problem solving.",
+                                "Problems are mostly textbook‑style; lacks real‑world applied math contexts.",
+                                "Solution formats vary; inconsistencies may introduce noise for evaluation scripts.",
+                                "High reliance on symbolic manipulation may expose ceiling effects for many existing LLMs."
                             ]
-                        }
+                        },
+                        "age_distribution": {
+                            "data": [
+                                13,
+                                40,
+                                50,
+                                79,
+                                17,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "Run this evaluation when you want to benchmark a model’s mathematical problem‑solving skills, assess its ability to carry out multi‑step algebraic reasoning, test its arithmetic precision, and gauge its performance on number‑theoretic and combinatorial questions. It is particularly useful for models intended for educational or tutoring applications, or for any system that must handle math‑related queries.",
+                        "what_to_expect": "When a language model is evaluated on MATH, the resulting score indicates how well it can parse mathematical sentences, apply algebraic rules, perform symbolic calculations, and reason about number theory or trigonometric identities. A high score shows the model can reliably understand problem contexts, carry out multi‑step reasoning, and produce correct solutions. A low score suggests weaknesses in mathematical reasoning or symbolic manipulation.",
+                        "evaluation_description": "The MATH dataset contains 5,000 handwritten and digitally typed math problems that span typical middle‑school to early college topics. Each row includes a problem statement, sometimes a difficulty label, the domain it belongs to, and a solution or partial solution. The problems cover Algebra, Combinatorics, Number Theory, Trigonometry, Precalculus, as well as discrete mathematics concepts. Most items are at the Beginner or Intermediate level, designed to test algebraic manipulation, arithmetic reasoning, critical thinking, and pattern recognition.",
+                        "top_5_task_types": [
+                            "algebra",
+                            "math_problem",
+                            "question_answering",
+                            "math_problem_solving",
+                            "qa"
+                        ],
+                        "top_5_domains": [
+                            "Mathematics",
+                            "Algebra",
+                            "Geometry",
+                            "Number Theory",
+                            "Trigonometry"
+                        ],
+                        "top_5_skills": [
+                            "problem_solving",
+                            "critical_thinking",
+                            "arithmetic",
+                            "algebraic manipulation",
+                            "critical thinking"
+                        ],
+                        "top_5_concepts": [
+                            "multiplication",
+                            "Pythagorean theorem",
+                            "division",
+                            "fractions",
+                            "linear equations"
+                        ],
+                        "top_5_qualifications": [
+                            "high_school",
+                            "middle_school",
+                            "undergraduate",
+                            "High School Diploma",
+                            "High School"
+                        ],
+                        "top_5_languages": [
+                            "English"
+                        ]
                     },
                     "analysis_file": "analysis/opencompass_534_analysis.json",
                     "analysis_summary": {
-                        "total_analyzed": 5,
-                        "successful": 5,
+                        "total_analyzed": 200,
+                        "successful": 200,
                         "failed": 0
                     }
                 },
@@ -1569,21 +1680,21 @@
                                 {
                                     "question": "Jared is trying to increase his typing speed. He starts with 47 words per minute (WPM). After some lessons the next time he tests his typing speed it has increased to 52 WPM. If he continues to increa",
                                     "difficulty": "easy",
-                                    "task_type": "math_problem"
+                                    "task_type": "math, arithmetics"
                                 },
                                 {
                                     "question": "Jordan has 2 children who wear diapers.  Each child requires 5 diaper changes per day.  Jordan's wife changes half of the diapers.  How many diapers does Jordan change per day?",
                                     "difficulty": "easy",
-                                    "task_type": "arithmetic, word_problem"
+                                    "task_type": "math, qa, problem_solving"
                                 },
                                 {
                                     "question": "A wooden bridge can carry no more than 5000 pounds. A delivery truck filled with identical boxes, each weighing 15 pounds, will pass over the bridge. The combined weight of the driver and the empty tr",
-                                    "difficulty": "moderate",
-                                    "task_type": "Problem Solving"
+                                    "difficulty": "easy",
+                                    "task_type": "arithmetic, math"
                                 }
                             ],
                             "total_questions": 1319,
-                            "question_format": "Mathematical Problem Solving, Problem Solving, Quantitative reasoning, arithmetic, math_problem, word_problem",
+                            "question_format": "Algebra, Basic_Math_Problem, Calculations, Math problem solving, Mathematical Reasoning, QA, Word problem, addition, algebra, arithmetic, arithmetical reasoning, arithmetics, basic_algebra, basic_arithmetic, basic_calculation, basic_computation, basic_math, basic_math_problem, basic_problem_solving, calculation, calculational, calculations, computation, counting, financial_calculation, financial_math, math, math problem solving, math word problem, math_basic, math_calculation, math_problem, math_problem_solving, math_problems, math_question, math_riddle, math_word_problem, mathematics, problem solving, problem_solving, puzzle, qa, question_answer, question_answering, reading_comprehension, reasoning, riddle, simple_arithmetic, simple_calculation, simple_computation, simple_math, word_problem",
                             "difficulty_levels": [
                                 "Beginner",
                                 "Intermediate"
@@ -1591,18 +1702,120 @@
                         },
                         "advantages_disadvantages": {
                             "advantages": [
-                                "Tests domain-specific knowledge in Mathematics",
-                                "Evaluates arithmetic, Basic arithmetic, problem_solving skills",
-                                "Covers multiple difficulty levels: Beginner, Intermediate",
-                                "Diverse task types: arithmetic, math_problem, word_problem"
+                                "Large sample size (1319 questions) provides robust statistical evidence.",
+                                "Problems are beginner‑level, so even early‑stage models can achieve meaningful scores, enabling quick iterative testing.",
+                                "Dataset is domain‑specific to Mathematics, reducing noise from unrelated content.",
+                                "Explicit representation of skill types (arithmetic, logical reasoning, etc.) allows targeted analysis of model strengths and weaknesses.",
+                                "Publicly available and widely used, facilitating comparison with other studies."
                             ],
-                            "disadvantages": []
-                        }
+                            "disadvantages": [
+                                "Only covers beginner-level problems; does not challenge models with advanced algebra, calculus, or domain‑specific math contexts.",
+                                "All questions are in English, limiting evaluation of multilingual numeric reasoning capabilities.",
+                                "Potential for bias toward certain arithmetic patterns (e.g., many problems involve subtraction of small numbers).",
+                                "Because the dataset is smallish compared to generative‑QA benchmarks, statistical power for niche skills may be limited.",
+                                "Does not test the model’s ability to handle ambiguous or multi‑step reasoning beyond the beginner scope."
+                            ]
+                        },
+                        "age_distribution": {
+                            "data": [
+                                116,
+                                65,
+                                11,
+                                3,
+                                0,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                4,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "Run this evaluation to assess a model’s:\n- Basic arithmetic capability (addition, subtraction, multiplication, division).\n- Handling of fractions, percentages, and simple algebraic expressions.\n- Ability to read and interpret plain‑text word problems.\n- Consistency in applying rules of calculation across varying contexts.\nThese skills are essential for educational applications, tutoring assistants, or any task requiring quick numeric reasoning.",
+                        "what_to_expect": "When a large language model is scored on GSM8K, the percentage of correctly solved problems indicates its proficiency in basic numeric reasoning, arithmetic manipulation, and word‑problem interpretation. A high score (e.g., >70%) suggests that the model can reliably parse and solve straightforward mathematical questions and perform simple calculations, while a low score points to weaknesses in number sense, arithmetic accuracy, or understanding of the problem context.",
+                        "evaluation_description": "GSM8K is an open‑source collection of 1,319 arithmetic word problems written in English. Each row contains a single question that tests basic mathematical skills such as addition, subtraction, multiplication, division, fractions, percentages, and simple algebraic reasoning. The problems are designed for a beginner difficulty level, making the dataset suitable for early‑stage model evaluation or educational tools aimed at young learners. The dataset focuses exclusively on the Mathematics domain and covers a broad range of arithmetic and number‑reasoning skills, including reading comprehension of word problems and logical reasoning about quantities.",
+                        "top_5_task_types": [
+                            "qa",
+                            "math_problem",
+                            "math",
+                            "question_answering",
+                            "calculations"
+                        ],
+                        "top_5_domains": [
+                            "Mathematics"
+                        ],
+                        "top_5_skills": [
+                            "problem_solving",
+                            "basic_arithmetic",
+                            "basic arithmetic",
+                            "reading_comprehension",
+                            "problem solving"
+                        ],
+                        "top_5_concepts": [
+                            "addition",
+                            "multiplication",
+                            "subtraction",
+                            "basic_arithmetic",
+                            "fraction"
+                        ],
+                        "top_5_qualifications": [
+                            "5th grade",
+                            "1st grade",
+                            "Middle school",
+                            "High school",
+                            "primary_school"
+                        ],
+                        "top_5_languages": [
+                            "English"
+                        ]
                     },
                     "analysis_file": "analysis/opencompass_535_analysis.json",
                     "analysis_summary": {
-                        "total_analyzed": 5,
-                        "successful": 5,
+                        "total_analyzed": 200,
+                        "successful": 200,
                         "failed": 0
                     }
                 },
@@ -1924,43 +2137,150 @@
                         "sample_questions_answers": {
                             "examples": [
                                 {
-                                    "question": "A manufacturer of appliances put a washing machine of a new and advanced design on the market. Two years of experimental use prior to commercial marketing had demonstrated that the machine laundered c",
+                                    "question": "The market for denim jeans is in equilibrium, and the price of polyester pants, a substitute good, rises. In the jean market\n\nOptions:\nA) supply falls, increasing the price and decreasing the quantity",
                                     "difficulty": "moderate",
-                                    "task_type": "QA, Legal Analysis"
+                                    "task_type": "reasoning, economics"
                                 },
                                 {
-                                    "question": "A man was in an accident while driving his car on July 3. The other driver sent him a notice of injuries and demanded damages. The man notified his insurance carrier but was told that his policy had l",
-                                    "difficulty": "moderate",
-                                    "task_type": "Legal Analysis, Contract Interpretation"
+                                    "question": "The code fragment below is intended to display \"odd\" if the positive number num is odd.\n IF (<MISSING CONDITION>)\n DISPLAY “odd”\n\n Which of the following can be used to replace <MISSING CONDITION> so ",
+                                    "difficulty": "easy",
+                                    "task_type": "qa"
                                 },
                                 {
-                                    "question": "Airmail Express charges for shipping small packages by integer values of weight. The charges for a weight w in pounds are as follows:\n 0 < w ≤ 2 $4.00\n 2 < w ≤ 5 $8.00\n 5 < w ≤ 20 $15.00\n The company ",
-                                    "difficulty": "moderate",
-                                    "task_type": "qa, problem_solving"
+                                    "question": "Experimenter A uses a very small test charge qo, and experimenter B uses a test charge 2qo to measure an electric field produced by two parallel plates. A finds a field that is\n\nOptions:\nA) greater th",
+                                    "difficulty": "easy",
+                                    "task_type": "question_answering, knowledge_based"
                                 }
                             ],
                             "total_questions": 14042,
-                            "question_format": "Contract Interpretation, Legal Analysis, QA, problem_solving, qa",
+                            "question_format": "Classification, Legal Analysis, Legal Reasoning, Logic, Moral_Judgment, Multiple Choice, Multiple Choice Question, Multiple Choice Question Analysis, Multiple Choice Reasoning, QA, Question Answering, QuestionAnswering, Reader Comprehension, ReadingComprehension, algebra, analysis, arithmetic, basic_math, calculation, case_analysis, chemistry_facts, classification, conceptual_understanding, contract_analysis, critical_thinking, decision_making, economics, ethical_judgment, fact recall, knowledge_assessment, knowledge_based, knowledge_based_question, knowledge_check, knowledge_extraction, knowledge_question, knowledge_recall, knowledge_recognition, knowledge_verification, law problem solving, legal analysis, legal reasoning, legal_analysis, legal_reasoning, logic_symbolization, logic_translation, logical_reasoning, math, math_problem, math_problem_solving, medical reasoning, medical_ethical_reasoning, ml_test, moral reasoning, moral_judgement, moral_judgment, moral_reasoning, moral_sentiment_analysis, multiple-choice, multiple_choice, multiple_choice_answer, multiple_choice_qa, multiple_choice_question, multiple_choice_question_answering, multiple_choice_quiz, negotiated_qa, polynomial_root_finding, problem_solving, professional_consultation, q_a, qa, qc, question answering, question_answer, question_answering, quiz, quiz_answering, reading_comprehension, reasoning, regulatory_advisory, statistics, trivia",
                             "difficulty_levels": [
+                                "Advanced",
+                                "Beginner",
+                                "Expert",
                                 "Intermediate"
                             ]
                         },
                         "advantages_disadvantages": {
                             "advantages": [
-                                "Tests domain-specific knowledge in Legal Studies, Product Liability, Physics",
-                                "Evaluates Legal Reasoning, abstract_reasoning, Organizational understanding skills",
-                                "Diverse task types: QA, problem_solving, qa"
+                                "Extremely large (14,042 questions) covering vast subject matter.",
+                                "Rich diversity in domain, task type, and difficulty level.",
+                                "Supports multi‑choice and reasoning‑heavy scenarios.",
+                                "Facilitates weak‑spot detection by skill and domain.",
+                                "Open‑source and widely adopted in the research community."
                             ],
                             "disadvantages": [
-                                "Requires knowledge across multiple specialized domains"
+                                "Highly uneven domain and skill frequency, leading to bias toward over‑represented topics.",
+                                "Redundant and inconsistent skill labels (e.g., multiple variants of “critical thinking”), making fine‑grained analysis difficult.",
+                                "Age distribution limited to a narrow range, lacking broader demographic granularity.",
+                                "No contextual metadata for questions (e.g., image, code snippets), restricting analysis of multimodal capabilities.",
+                                "Potential platform bias where the dataset was originally curated for English‑speaking academic contexts."
                             ]
-                        }
+                        },
+                        "age_distribution": {
+                            "data": [
+                                6,
+                                13,
+                                27,
+                                51,
+                                13,
+                                28,
+                                16,
+                                18,
+                                1,
+                                2,
+                                12,
+                                1,
+                                10,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "The dataset is a benchmark for general language model competency and generalized reasoning. Running an evaluation helps developers gauge model readiness for real‑world knowledge transfer, identify capability gaps, guide targeted training or fine‑tuning, and provide interpretable metrics that stakeholders can trust for educational or professional applications.",
+                        "what_to_expect": "Evaluating MMLU will reveal how well a model performs across a wide spectrum of academic and professional knowledge areas, difficulty levels, and question types. Analysts will see which domains and skill categories (e.g., logical reasoning, domain-specific facts, procedural knowledge) the model excels or struggles with, detect patterns of over- or under‑representation in the age distribution, and assess how the dataset tests reasoning and factual recall rather than rote memorization. The exercise offers insights into model strengths on advanced, intermediate, and beginner content and yields a granular breakdown of performance by domain, skill, and task type.",
+                        "top_5_task_types": [
+                            "qa",
+                            "multiple_choice",
+                            "question_answering",
+                            "programming_knowledge",
+                            "Legal Analysis"
+                        ],
+                        "top_5_domains": [
+                            "Economics",
+                            "Computer Science",
+                            "Programming",
+                            "Physics",
+                            "Contract Law"
+                        ],
+                        "top_5_skills": [
+                            "critical_thinking",
+                            "reading_comprehension",
+                            "basic_economic_analysis",
+                            "reasoning",
+                            "Logical reasoning"
+                        ],
+                        "top_5_concepts": [
+                            "supply and demand",
+                            "equilibrium",
+                            "substitute goods",
+                            "cross-price elasticity",
+                            "Modulus operator"
+                        ],
+                        "top_5_qualifications": [
+                            "high_school_graduate",
+                            "high_school",
+                            "High School",
+                            "Middle School (Grade 8+)",
+                            "high school physics"
+                        ],
+                        "top_5_languages": [
+                            "English"
+                        ]
                     },
                     "analysis_file": "analysis/opencompass_498_analysis.json",
                     "analysis_summary": {
-                        "total_analyzed": 5,
-                        "successful": 5,
-                        "failed": 0
+                        "total_analyzed": 200,
+                        "successful": 199,
+                        "failed": 1
                     }
                 },
                 {
@@ -2305,24 +2625,127 @@
                                 }
                             ],
                             "total_questions": 164,
-                            "question_format": "coding, function_calling, problem_solving",
+                            "question_format": "Coding, Function_creation, Programming, algorithm, algorithm_design, algorithm_implementation, algorithmic, algorithmic problem solving, algorithmic_problem, algorithmic_problem_solving, best_practices, coding, docstring, function implementation, function writing, function_creation, function_definition, function_development, function_implementation, hashing, implementation, list_manipulation, math, plat, problem_solving, programming, programming_logic, sorting, string_manipulation, string_parsing, string_processing, unit_test, unit_testing",
                             "difficulty_levels": [
+                                "Beginner",
                                 "Intermediate"
                             ]
                         },
                         "advantages_disadvantages": {
                             "advantages": [
-                                "Tests domain-specific knowledge in Mathematics, Algorithms, Computer Science",
-                                "Evaluates problem_solving, basic_programming, attention_to_detail skills",
-                                "Diverse task types: problem_solving, function_calling, coding"
+                                "Tests domain-specific knowledge in Information Security, Computer Science, Mathematics",
+                                "Evaluates algorithmic thinking, conditional_statement_usage, Type handling skills",
+                                "Covers multiple difficulty levels: Beginner, Intermediate",
+                                "Diverse task types: hashing, unit_test, docstring"
                             ],
-                            "disadvantages": []
-                        }
+                            "disadvantages": [
+                                "Requires knowledge across multiple specialized domains"
+                            ]
+                        },
+                        "age_distribution": {
+                            "data": [
+                                1,
+                                4,
+                                32,
+                                63,
+                                24,
+                                25,
+                                9,
+                                5,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "Run this evaluation to evaluate algorithmic thinking, conditional_statement_usage, Type handling capabilities, to assess domain knowledge in Information Security, Computer Science, to test hashing, unit_test performance.",
+                        "what_to_expect": "Expect questions at Beginner, Intermediate levels, diverse tasks including hashing, unit_test, requiring Information Security, Computer Science knowledge, suitable for computer_science, high_school_graduation level.",
+                        "top_5_task_types": [
+                            "coding",
+                            "algorithm",
+                            "function_definition",
+                            "function_implementation",
+                            "algorithm_design"
+                        ],
+                        "top_5_domains": [
+                            "Computer Science",
+                            "Programming",
+                            "Mathematics",
+                            "Algorithms",
+                            "Software Engineering"
+                        ],
+                        "top_5_skills": [
+                            "problem_solving",
+                            "programming",
+                            "algorithmic thinking",
+                            "debugging",
+                            "basic_programming"
+                        ],
+                        "top_5_concepts": [
+                            "iteration",
+                            "string manipulation",
+                            "function definition",
+                            "conditional logic",
+                            "String manipulation"
+                        ],
+                        "top_5_qualifications": [
+                            "high_school",
+                            "undergraduate",
+                            "High School",
+                            "Undergraduate",
+                            "High School Diploma"
+                        ],
+                        "top_5_languages": [
+                            "English",
+                            "Python"
+                        ]
                     },
                     "analysis_file": "analysis/opencompass_537_analysis.json",
                     "analysis_summary": {
-                        "total_analyzed": 5,
-                        "successful": 5,
+                        "total_analyzed": 164,
+                        "successful": 164,
                         "failed": 0
                     }
                 },
@@ -2483,42 +2906,151 @@
                         "sample_questions_answers": {
                             "examples": [
                                 {
-                                    "question": "{\"0\": \"62\", \"1\": \"在统计语言模型中，通常以概率的形式描述任意语句的可能性，利用最大相似度估计进行度量，对于一些低频词，无论如何扩大训练数据，出现的频度仍然很低，下列哪种方法能解决这一问题\", \"2\": \"数据平滑\", \"3\": \"N元文法\", \"4\": \"一元文法\", \"5\": \"一元切分\", \"6\": \"A\"}",
-                                    "difficulty": "moderate",
+                                    "question": "{\"0\": \"205\", \"1\": \"中华民族在五千多年的发展中形成的伟大民族精神的核心是\", \"2\": \"国际主义\", \"3\": \"爱国主义\", \"4\": \"团结统一\", \"5\": \"爱好和平\", \"6\": \"B\"}",
+                                    "difficulty": "easy",
                                     "task_type": "qa"
                                 },
                                 {
-                                    "question": "{\"0\": \"63\", \"1\": \"1994年到l997年4年时间，财政收入占GDP的比重仅l0%多一点，到2011年接近22%，如果考虑到土地出让和其他政府基金性收入，有专家估计政府收入占GDP的比l重超过30%。而同期，企业或者是资本收入占比也大幅度提高。一个佐证是，2002年底，企业存款为64298．47亿元，低于当时的个人存款，而到2011年底，企业存款(央哥新的统计科旧为“单位存款”，口",
+                                    "question": "{\"0\": \"1\", \"1\": \"下列现象中，属于⽤热传递的⽅式改变物体内能的是\", \"2\": \"两⼿互相摩擦时⼿发热\", \"3\": \"在炉⼦上烧开⽔\", \"4\": \"菜⼑在砂轮上磨得发烫\", \"5\": \"⽤打⽓筒打⽓时筒壁发热\", \"6\": \"B\"}",
                                     "difficulty": "moderate",
-                                    "task_type": "question_answering, critical_thinking"
+                                    "task_type": "question_answering, multiple_choice"
                                 },
                                 {
-                                    "question": "{\"0\": \"119\", \"1\": \"天元性构造的两性生理学差异性构架决定了男女身心发展存在着客观的\", \"2\": \"差异性\", \"3\": \"同异性\", \"4\": \"同一性\", \"5\": \"统一性\", \"6\": \"A\"}",
+                                    "question": "{\"0\": \"26\", \"1\": \"编制施工组织总设计时，编制资源需求量计划前必须完成的工作是\", \"2\": \"计算技术经济指标\", \"3\": \"绘制施工总平面图\", \"4\": \"编制施工总进度计划\", \"5\": \"编制施工准备工作计划\", \"6\": \"C\"}",
                                     "difficulty": "moderate",
-                                    "task_type": "multiple_choice_question"
+                                    "task_type": "question_answering, multiple_choice_quiz"
                                 }
                             ],
                             "total_questions": 11649,
-                            "question_format": "QA, critical_thinking, multiple_choice_question, qa, question_answering",
+                            "question_format": "Multiple Choice, MultipleChoice, Multiple_Choice, Multiple_Choice_QA, QA, Question_Answering, algebra, analysis, biology, choice_of_law_examination, conceptual summarisation, conceptual_question, content_analysis, content_creation, data_entry, domain_specific_knowledge, equation solving, essay_writing, knowledge_assessment, knowledge_check, knowledge_question, knowledge_recall, language_lookup, language_understanding, legal_analysis, lexicographic_lookup, math, math problem, math_computation, math_problem, medical_question_answering, multichoice, multiple_choice, multiple_choice_QA, multiple_choice_answering, multiple_choice_classification, multiple_choice_comprehension, multiple_choice_question, multiple_choice_question_answering, multiple_choice_quiz, probability_theory, programming, qa, question answering, question_answer, question_answering, quiz, quiz_answering, quiz_solution, reading comprehension, reading_comprehension, rule_explanation, short_answer_selection, statistical_analysis",
                             "difficulty_levels": [
+                                "Advanced",
+                                "Beginner",
+                                "Expert",
                                 "Intermediate"
                             ]
                         },
                         "advantages_disadvantages": {
                             "advantages": [
-                                "Tests domain-specific knowledge in Gender Studies, Statistics, Criminal Law",
-                                "Evaluates Legal analysis, domain_knowledge, Political theory comprehension skills",
-                                "Diverse task types: question_answering, QA, multiple_choice_question"
+                                "Large, realistic question set (11.6k items) with proven exam‑style difficulty.",
+                                "Broad domain spectrum – useful for multi‑disciplinary skill assessment.",
+                                "Clear, quantitative metric (accuracy) easy to interpret.",
+                                "Supports both English and Chinese contexts, giving a multilingual perspective.",
+                                "Free‐to‐use and openly available for research and industry testing."
                             ],
                             "disadvantages": [
-                                "Requires knowledge across multiple specialized domains"
+                                "Only multiple‑choice format; no assessment of free‑text generation quality.",
+                                "Questions are domain‑monitored, so they may bias toward certain curricula or cultural viewpoints (e.g., many Chinese‑history and Chinese‑classics items).",
+                                "Difficulty is marked only as Beginner/Intermediate; there is no fine‑grained difficulty ladder or adaptive testing.",
+                                "The dataset doesn’t test reasoning steps – only the final answer, so subtle understanding or reasoning quality might be missed.",
+                                "If a model relies on heavy pre‑training data overlap, CMMLU results may reflect memorization rather than true generalization."
                             ]
-                        }
+                        },
+                        "age_distribution": {
+                            "data": [
+                                3,
+                                8,
+                                22,
+                                73,
+                                23,
+                                14,
+                                18,
+                                20,
+                                1,
+                                8,
+                                5,
+                                0,
+                                4,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "Running CMMLU is useful if you want to benchmark or monitor:\n1. **Domain coverage** – does the model know enough about biology, law, physics, etc.?\n2. **Critical thinking & reasoning** – can it choose the correct answer when reasoning patterns differ across subjects? \n3. **Language proficiency** – the dataset includes both English and Chinese contexts, so it tests multilingual understanding.\n4. **Benchmarking against peer models** – many research papers use CMMLU, enabling direct comparison.\n5. **Assessing knowledge updating** – when a model is fine‑tuned or updated, CMMLU can quickly show if factual knowledge has improved or degraded.",
+                        "what_to_expect": "When an LLM is evaluated on CMMLU, the system calculates the **accuracy** – the percentage of questions correctly answered.  A high accuracy means the model can reliably retrieve factual information, reason through problem‑solving steps, and understand context within the given domains.  Conversely, lower scores reveal gaps in knowledge or reasoning abilities in specific subjects or formats.  Because the dataset uses only multiple‑choice questions, the score specifically reflects the model’s ability to identify the best answer given the options, rather than free‑form generation quality.",
+                        "evaluation_description": "CMMLU (Comprehensive Multi‑Domain Language Understanding) is a benchmark dataset designed to test general knowledge and reasoning in multiple academic and professional domains.  It contains **11,649 multiple‑choice questions** that cover 16 distinct domains such as Biology, Civil Engineering, Chinese Classics, History, Law, Physics, Sociology, and Virology.  The questions were collected from real exams, quizzes, and knowledge checks and are categorized as beginner or intermediate difficulty.  Each entry includes a question stem, up to four answer choices, and the correct answer label (e.g., \"A\", \"B\", \"C\", or \"D\").  The dataset is broadly suitable for evaluating an LLM’s factual recall, reasoning, domain expertise, and language comprehension across a spectrum of topics.",
+                        "top_5_task_types": [
+                            "multiple_choice",
+                            "qa",
+                            "question_answering",
+                            "multiple_choice_question",
+                            "multiple_choice_quiz"
+                        ],
+                        "top_5_domains": [
+                            "Chinese History",
+                            "Chinese Culture",
+                            "Nationalism Studies",
+                            "Physics",
+                            "Construction Engineering"
+                        ],
+                        "top_5_skills": [
+                            "reading_comprehension",
+                            "critical_thinking",
+                            "reading comprehension",
+                            "critical thinking",
+                            "natural_language_understanding"
+                        ],
+                        "top_5_concepts": [
+                            "National Spirit",
+                            "爱国主义",
+                            "中华民族",
+                            "文化认同",
+                            "Heat transfer"
+                        ],
+                        "top_5_qualifications": [
+                            "High School Diploma",
+                            "high_school",
+                            "Middle School Graduation",
+                            "High School Graduation",
+                            "Undergraduate Degree (optional)"
+                        ],
+                        "top_5_languages": [
+                            "Chinese",
+                            "Mandarin Chinese"
+                        ]
                     },
                     "analysis_file": "analysis/opencompass_499_analysis.json",
                     "analysis_summary": {
-                        "total_analyzed": 5,
-                        "successful": 5,
+                        "total_analyzed": 200,
+                        "successful": 200,
                         "failed": 0
                     }
                 },
@@ -2684,43 +3216,148 @@
                                 {
                                     "question": "Personal Care and Style: How to increase breast size with a bra. Check your bra size. Wearing a bra that is too big will not make your breasts look larger. That is why it is important to wear the righ",
                                     "difficulty": "easy",
-                                    "task_type": "QA, Instructional Guidance"
+                                    "task_type": "qa, information_retrieval, content_generation"
                                 },
                                 {
                                     "question": "Washing face: A girl stands in front of a bathroom mirror and vigorously rubs her face. The girl turns on the faucet. The girl",
                                     "difficulty": "easy",
-                                    "task_type": "procedural_instruction, comprehension"
+                                    "task_type": "creative_writing, narrative, description"
                                 },
                                 {
                                     "question": "Home and Garden: How to paint basement stairs. Remove any carpet or overlaid material from your basement stairs. Remove staples left from the carpet installation with pliers. Look over all areas of th",
                                     "difficulty": "moderate",
-                                    "task_type": "Procedural Guidance, DIY Tutorial"
+                                    "task_type": "instruction, how_to_guide, content_generation"
                                 }
                             ],
                             "total_questions": 10042,
-                            "question_format": "Advisory, Behavioral analysis, DIY Tutorial, Instructional Guidance, Problem-solving, Procedural Guidance, QA, comprehension, procedural_instruction, qa, summarisation",
+                            "question_format": "Advice, Advice_Generation, Basic_electrical_instructions, ColorMixing, DIY, DIY_assembly, Information_Response, Informational, Instruction, Instruction following, Instruction_Following, Instructional, Manual_Task, MaterialApproximation, Measurement, Music_Performance, Organization, Physical Performance Description, Planning, Problem_solving, Q&A, Self‑care, Skill_based, StyleRecommendation, Summarization, action_description, advice, advice_and_instructions, advisory, advisory_content, analysis, audio_connection, beauty_tutorial, behavioral_assessment, business_strategy, caption_generation, captioning, caregiving, classification, cleaning, coaching, communication, completion, comprehension, consulting, content creation, content_creation, content_generation, contextual_understanding, conversation, cooking, copywriting, counseling, crafting, creative, creative_writing, decision_making, description, description_generation, design, discussion, documentation, domestic_chores, education, educational, emotional support, emotional_support, explanation, fact-checking, faq, fashion_advice, fill_in_the_blank, gardening, generation, guidance, handcrafting, hardware_setup, health_advice, how-to, how-to guide, how_to, how_to_guidance, how_to_guide, hr_strategy, information, information retrieval, information_discovery, information_extraction, information_gathering, information_generation, information_retrieval, informational, instruction, instruction_following, instruction_generation, instructional, instructional guidance, instructional_description, interpersonal skill development, job guidance, knowledge_based_explanation, knowledge_based_qa, knowledge_sharing, language_comprehension, learning_strategies, lesson_plan, manual_guide, manual_labor, manual_task, marketing, marketing_strategy, media_commentary, narration, narrative, narrative creation, narrative_generation, observation_description, organization, outdoor_sport_description, performance, performance_description, personal_care, pet_care, physical_activity, physical_exercise, physical_task, physical_work, planning, policy_drafting, practical, problem_solving, public_health_policy, public_speaking, qa, question_answer, question_answering, reading comprehension, reading_comprehension, recipe_execution, recipe_following, recipe_instruction, recommendation, recruitment, relationship counseling, relationship guidance, research, rewriting, routine, scene_description, script_writing, scriptwriting, self_service, shopping_advice, simple_user_guide, skill_development, skill_instruction, sports, story_continuation, story_generation, storytelling, style_advice, style_guidance, summarisation, summarization, summary, support, surveying, teaching_material_creation, technical_writing, text_completion, text_comprehension, text_generation, video_editing, video_production, visual observation, visual_description, writing",
                             "difficulty_levels": [
+                                "Advanced",
                                 "Beginner",
                                 "Intermediate"
                             ]
                         },
                         "advantages_disadvantages": {
                             "advantages": [
-                                "Tests domain-specific knowledge in Home Improvement, Developmental Psychology, Education",
-                                "Evaluates fine_motor_skills, Behavioral intervention strategies, Observational skills skills",
-                                "Covers multiple difficulty levels: Beginner, Intermediate",
-                                "Diverse task types: Instructional Guidance, comprehension, QA"
+                                "Large number of examples (10k+) covers many real‑world topics.",
+                                "Clear, single‑choice format makes scoring straightforward.",
+                                "Balanced difficulty (Beginner & Intermediate) lets you see progress at different stages.",
+                                "Domain diversity (from personal care to sports, law, and education) tests contextual flexibility.",
+                                "Crowd‑annotated, so the correct choice reflects common human intuition."
                             ],
                             "disadvantages": [
-                                "Requires knowledge across multiple specialized domains"
+                                "Only four candidate sentences – no open‑ended generation to test creativity.",
+                                "Potential bias from the age distribution (mostly younger participants).",
+                                "Sensitive or awkward topics (e.g., body image, legal advice) may not be suitable for all audiences.",
+                                "Evaluation is strictly accuracy; it does not capture partial reasoning or explanations.",
+                                "The dataset is not rich in multimodal content (images, audio)."
                             ]
-                        }
+                        },
+                        "age_distribution": {
+                            "data": [
+                                10,
+                                22,
+                                21,
+                                18,
+                                8,
+                                11,
+                                2,
+                                29,
+                                6,
+                                10,
+                                25,
+                                2,
+                                34,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "Run this evaluation if you want to gauge:\n1. Commonsense reasoning across a wide range of domains.\n2. The model’s ability to pick the most plausible everyday continuation.\n3. Its performance on both simple (routine) and more challenging (context‑rich) examples.\n4. How well the model handles varying age perspectives and communication styles.",
+                        "what_to_expect": "When an LLM is evaluated on HellaSwag, the main metric is the accuracy (%) of correctly chosen continuations.  A high score means the model can understand context, reason about everyday events, and choose the most believable outcome – a key trait for natural‑language reasoning.  A low score would suggest gaps in commonsense knowledge and contextual understanding.",
+                        "evaluation_description": "HellaSwag is a crowdsourced evaluation benchmark that contains 10,042 examples.  Each example is a short paragraph followed by four possible continuations.  The model is expected to pick the most plausible one.  The stories cover everyday situations such as personal care, home improvement, parenting, sports coaching, and more.  The dataset was annotated by respondents aged 10–34, providing a range of perspectives.  Tasks include answering, advice, instruction delivery, creative writing, summarization, and question answering.  The difficulty level is split between ‘Beginner’ and ‘Intermediate’ examples.",
+                        "top_5_task_types": [
+                            "advice",
+                            "reading_comprehension",
+                            "description",
+                            "summarization",
+                            "informational content"
+                        ],
+                        "top_5_domains": [
+                            "Fashion & Apparel",
+                            "Body Image Studies",
+                            "Health & Wellness",
+                            "Home Improvement",
+                            "Parenting"
+                        ],
+                        "top_5_skills": [
+                            "communication",
+                            "empathy",
+                            "basic_reading",
+                            "body measurement",
+                            "critical thinking"
+                        ],
+                        "top_5_concepts": [
+                            "Bra fitting",
+                            "Band and cup sizing",
+                            "Push‑up technology",
+                            "Underwire support",
+                            "Padding"
+                        ],
+                        "top_5_qualifications": [
+                            "High school graduate",
+                            "Certified Lingerie Specialist",
+                            "Fashion design student",
+                            "Health and Wellness Coach",
+                            "No formal educational requirement"
+                        ],
+                        "top_5_languages": [
+                            "English"
+                        ]
                     },
                     "analysis_file": "analysis/opencompass_531_analysis.json",
                     "analysis_summary": {
-                        "total_analyzed": 5,
-                        "successful": 5,
-                        "failed": 0
+                        "total_analyzed": 200,
+                        "successful": 199,
+                        "failed": 1
                     }
                 },
                 {
@@ -2915,12 +3552,12 @@
                             "examples": [
                                 {
                                     "question": "Write a function to check if the triangle is valid or not.",
-                                    "difficulty": "moderate",
-                                    "task_type": "coding"
+                                    "difficulty": "easy",
+                                    "task_type": "coding, function_definition"
                                 },
                                 {
                                     "question": "Write a function to sort the given array by using counting sort.",
-                                    "difficulty": "moderate",
+                                    "difficulty": "easy",
                                     "task_type": "coding"
                                 },
                                 {
@@ -2930,7 +3567,7 @@
                                 }
                             ],
                             "total_questions": 974,
-                            "question_format": "coding",
+                            "question_format": "Coding, Function Definition, Function_Creation, Programming, algorithm, algorithm_design, algorithm_implementation, algorithmic_problem, algorithmic_problem_solving, coding, function, function implementation, function-writing, function_creation, function_defining, function_definition, function_design, function_development, function_generation, function_implementation, lambda_function, lambda_usage, map_function, math_problem_solving, programming, python, recursion, regex, regex_application, string_processing, string_search",
                             "difficulty_levels": [
                                 "Beginner",
                                 "Intermediate"
@@ -2938,20 +3575,118 @@
                         },
                         "advantages_disadvantages": {
                             "advantages": [
-                                "Tests domain-specific knowledge in Computer Science, Data Structures, Programming",
-                                "Evaluates abstract_reasoning, problem_solving, programming skills",
-                                "Covers multiple difficulty levels: Beginner, Intermediate",
-                                "Diverse task types: coding"
+                                "Large, well‑curated set of problems guarantees diverse coverage of programming fundamentals.",
+                                "Automated, objective scoring via hidden test cases eliminates human bias.",
+                                "Python is the most common language for LLM evaluation, making results comparable across studies.",
+                                "Tasks are labelled by difficulty, so you can test models at both beginner and intermediate levels."
                             ],
                             "disadvantages": [
-                                "Requires knowledge across multiple specialized domains"
+                                "The dataset focuses on *simple* and *intermediate* problems only; it contains no advanced topics like concurrent programming or machine‑learning pipelines.",
+                                "All tests are in Python – models trained on other languages may not be reflected accurately.",
+                                "Evaluations rely solely on functional correctness; code quality, readability, security, and documentation are not assessed.",
+                                "Some prompts exhibit duplicate or very similar wording, which can bias a few models that remember training examples."
                             ]
-                        }
+                        },
+                        "age_distribution": {
+                            "data": [
+                                0,
+                                5,
+                                36,
+                                69,
+                                28,
+                                31,
+                                18,
+                                11,
+                                0,
+                                1,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "Run this evaluation if you want to:\n\n- Measure how well a model can translate problem statements into working code.\n- Check the model’s proficiency in core programming concepts such as conditionals, loops, and function design.\n- Assess debugging and error‑handling abilities via the hidden test cases.\n- Benchmark different models or prompt‑engineering strategies on a standard, widely‑used coding dataset.",
+                        "what_to_expect": "When an LLM is evaluated on MBPP, the model generates code for each prompt and the resulting code is run against the hidden test cases. The evaluation score reflects the percentage of functions that compile and satisfy all tests. A higher score demonstrates stronger skills in algorithmic thinking, debugging, and producing syntactically correct, logically sound Python code. An assessment that fails many tests highlights weaknesses in understanding program logic, edge‑case handling, or proper use of data types.",
+                        "evaluation_description": "MBPP (Mini-Benchmarks for Programming Problems) is a collection of **974** programming challenges written in Python. The problems cover the basics of computer science, mathematics, and programming, ranging from very simple (Beginner) to moderately complex (Intermediate). Users will find tasks centred on functions, list manipulation, basic algorithms, debugging, and logic. Each problem is paired with test cases that automatically verify the correctness of a submitted function.",
+                        "top_5_task_types": [
+                            "coding",
+                            "function_definition"
+                        ],
+                        "top_5_domains": [
+                            "Computer Science",
+                            "Mathematics",
+                            "Programming"
+                        ],
+                        "top_5_skills": [
+                            "problem_solving",
+                            "basic programming",
+                            "algorithm_design",
+                            "Programming",
+                            "basic_algorithm_design"
+                        ],
+                        "top_5_concepts": [
+                            "function definition",
+                            "iteration",
+                            "triangle inequality",
+                            "basic algorithm",
+                            "input validation"
+                        ],
+                        "top_5_qualifications": [
+                            "high_school",
+                            "undergraduate",
+                            "High School Graduate",
+                            "High School Diploma",
+                            "Basic programming knowledge"
+                        ],
+                        "top_5_languages": [
+                            "English",
+                            "Python"
+                        ]
                     },
                     "analysis_file": "analysis/opencompass_538_analysis.json",
                     "analysis_summary": {
-                        "total_analyzed": 5,
-                        "successful": 5,
+                        "total_analyzed": 200,
+                        "successful": 200,
                         "failed": 0
                     }
                 },
@@ -3892,42 +4627,144 @@
                                 {
                                     "question": "is ncis new orleans over for the season",
                                     "difficulty": "easy",
-                                    "task_type": "qa"
+                                    "task_type": "question_answering"
                                 },
                                 {
                                     "question": "can i have a beard in the military",
-                                    "difficulty": "moderate",
-                                    "task_type": "QA, RAG"
+                                    "difficulty": "easy",
+                                    "task_type": "qa"
                                 },
                                 {
                                     "question": "can you contest a scrum in rugby league",
                                     "difficulty": "moderate",
-                                    "task_type": "QA, Procedural knowledge"
+                                    "task_type": "qa, explanation"
                                 }
                             ],
                             "total_questions": 3270,
-                            "question_format": "Procedural knowledge, QA, RAG, qa, question_answering",
+                            "question_format": "Legal_information, QA, Question Answering, Question-answering, QuestionAnswering, Question_answering, conceptual_reasoning, explanation, fact_checking, fact_verification, factual_question, general_knowledge, information retrieval, information_retrieval, knowledge_explanation, knowledge_lookup, knowledge_question, knowledge_retrieval, legal_reasoning, legal_research, medical_information, medical_surgery, qa, question_answer, question_answering",
                             "difficulty_levels": [
                                 "Beginner",
+                                "Expert",
                                 "Intermediate"
                             ]
                         },
                         "advantages_disadvantages": {
                             "advantages": [
-                                "Tests domain-specific knowledge in Grooming Standards, Military Policy, Geometry",
-                                "Evaluates abstract_reasoning, Strategic thinking, Teamwork skills",
-                                "Covers multiple difficulty levels: Beginner, Intermediate",
-                                "Diverse task types: question_answering, QA, qa"
+                                "Easy to interpret binary metric (accuracy).",
+                                "Compact dataset: only ~3,300 examples—fast to evaluate.",
+                                "Variety of real‑world topics ensures broad coverage of everyday knowledge.",
+                                "Clear task structure (passage + yes/no question) reduces experimental noise.",
+                                "Widely used benchmark – facilitates comparison across systems."
                             ],
                             "disadvantages": [
-                                "Requires knowledge across multiple specialized domains"
+                                "Small dataset size may not fully test edge‑case reasoning.",
+                                "Binary answers do not capture nuanced or ambiguous situations.",
+                                "Lacks multi‑turn dialogue or long‑form answering, limiting evaluation of conversational depth.",
+                                "Possible topic skew: certain domains may dominate and bias results.",
+                                "Answers are pre‑generated, so the model cannot demonstrate open‑ended generation or elaboration."
                             ]
-                        }
+                        },
+                        "age_distribution": {
+                            "data": [
+                                11,
+                                30,
+                                29,
+                                37,
+                                23,
+                                7,
+                                4,
+                                29,
+                                1,
+                                6,
+                                10,
+                                1,
+                                11,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "Benches a model’s core conversational skills:\n- **Reading comprehension** – can the model extract the truth from the text?\n- **Fact‑based reasoning** – does it correctly differentiate between true and false statements?\n- **Domain adaptability** – does the model handle a range of topics (history, sports, engineering, regulations)?\n- **Binary decision making** – is the model capable of choosing a clear yes/no answer with minimal ambiguity?\nRunning BoolQ helps stakeholders quickly gauge these capabilities in a realistic, lightweight setup.",
+                        "what_to_expect": "Running a model on BoolQ provides a single **accuracy score** – the proportion of questions the model answers correctly.  An accuracy close to 1 indicates the model can read the passage, understand the question, and retrieve or infer the correct binary answer.  Lower scores signal gaps in reading comprehension or knowledge recall.  Because each question tests a simple yes/no decision, the score directly reflects the model’s ability to perform quick, factual inference from a small context.\n\nRelevance: A high accuracy suggests strong grounding in general knowledge and good paragraph comprehension, while a low score can highlight weaknesses in understanding nuanced policy language or domain‑specific terminology.",
+                        "evaluation_description": "BoolQ is a question‑answering dataset that contains 3,270 short natural‑language questions. Each question is paired with a short passage (≈50 tokens) and a binary answer (yes/no). The questions cover a variety of topics such as U.S. history, sports, engineering, and everyday policy. The dataset is organized into two difficulty levels – Beginner and Intermediate – and reflects a wide range of skills including reading comprehension, information recall, basic reasoning, and domain knowledge.\n\nKey facts:\n- Number of rows: 3,270\n- Question‑type: Yes/No (binary) answers\n- Difficulty: Beginner & Intermediate\n- Domains: History, Sports, Engineering, Policy/Regulations, etc.\n- Each row includes a short context passage and a question about that passage.\n\nThe data has been compiled from the Stanford Natural Language Inference (SNLI) repository and reused for practical evaluation of LLMs on binary QA tasks.",
+                        "top_5_task_types": [
+                            "question_answering",
+                            "qa"
+                        ],
+                        "top_5_domains": [
+                            "Mathematics",
+                            "Geometry",
+                            "Military Studies",
+                            "Rugby League",
+                            "Automotive Engineering"
+                        ],
+                        "top_5_skills": [
+                            "knowledge_recall",
+                            "information recall",
+                            "basic research",
+                            "Regulatory knowledge",
+                            "Policy interpretation"
+                        ],
+                        "top_5_concepts": [
+                            "TV series",
+                            "season",
+                            "cancellation",
+                            "Grooming regulations",
+                            "Facial hair policies"
+                        ],
+                        "top_5_qualifications": [
+                            "None",
+                            "Active Duty Military",
+                            "Military Recruiter",
+                            "Enlisted Personnel",
+                            "high_school"
+                        ],
+                        "top_5_languages": [
+                            "English"
+                        ]
                     },
                     "analysis_file": "analysis/opencompass_510_analysis.json",
                     "analysis_summary": {
-                        "total_analyzed": 5,
-                        "successful": 5,
+                        "total_analyzed": 200,
+                        "successful": 200,
                         "failed": 0
                     }
                 },
@@ -5964,7 +6801,7 @@
                     "url": "opencompass/opencompass_523.jsonl",
                     "size_mb": 1.0,
                     "checksum": "sha256:placeholder_opencompass_523",
-                    "sample_count": 1000,
+                    "sample_count": 5153,
                     "traits": [
                         "Understanding"
                     ],
@@ -5977,8 +6814,8 @@
                         "domain": "General",
                         "difficulty": "medium",
                         "requires_auth": false,
-                        "estimated_input_tokens": 1000,
-                        "estimated_output_tokens": 500
+                        "estimated_input_tokens": 74,
+                        "estimated_output_tokens": 1
                     },
                     "original_data": {
                         "id": "523",
@@ -6021,23 +6858,151 @@
                             "text"
                         ],
                         "sample_questions_answers": {
-                            "examples": [],
-                            "total_questions": 1000,
-                            "question_format": "Various formats",
+                            "examples": [
+                                {
+                                    "question": "“Carlos Rafael Wilson.”\nThe man smiled at him. Carlos didn’t have a clue what was going on. He looked to his manager.\n“Tom here’s just moved into the house at the bottom of the hill.”\n“Oh right.”\n“Abo",
+                                    "difficulty": "moderate",
+                                    "task_type": "reading_comprehension, summarization"
+                                },
+                                {
+                                    "question": "“You wouldn’t dare,” Elijah growled. I squeaked as he was all of a sudden an inch or two behind the rogue. “Tell me, rogue, where is Delilah?” The rogue stiffened. “On behalf of the Vampiric Council,”",
+                                    "difficulty": "moderate",
+                                    "task_type": "creative text generation, story continuation"
+                                },
+                                {
+                                    "question": "Bob was pensive for the rest of the evening, talking openly and realistically about his work on the railroad to the four students who appeared enthused over the prospect of high speed rail in their li",
+                                    "difficulty": "moderate",
+                                    "task_type": "reading_comprehension, creative_writing"
+                                }
+                            ],
+                            "total_questions": 5153,
+                            "question_format": "Creative Writing, CreativeWriting, Creative_Writing, Dialogue Generation, Inference, Narrative Completion, NarrativeGeneration, Narrative_Analysis, Narrative_Composition, Narrative_Synthesis, Question_answering, Reading Comprehension, Reading_Comprehension, Reasoning, RolePlaying, Story Continuation, StoryCompletion, Story_Continuation, Summarisation, Textual Analysis, analysis, argumentation, comprehension, content_generation, conversation, counseling, creative text generation, creative writing, creative-writing, creative_narration, creative_prose, creative_story_completion, creative_story_prompt, creative_text_generation, creative_write, creative_writing, critical_thinking, deduction, dialogue, dialogue generation, dialogue_analysis, dialogue_completion, dialogue_continuation, dialogue_generation, empathetic_response, explanatory_conversation, fiction, fictional_narrative, forensic report writing, generative_text, inference, inferential_analysis, interpretation, investigation, language_understanding, literary_analysis, literary_inference, narrative_analysis, narrative_completion, narrative_extension, narrative_generation, narrative_response, natural language understanding, natural_language_generation, plot_development, problem solving, problem_solving, prompt_completion, prompt_response, puzzle_solving, qa, qualitative analysis, question answering, question_answering, reading comprehension, reading_comprehension, research, response_generation, role_play, self-reflection, self‑assessment, social_interaction, story continuation, story_completion, story_continuation, story_generation, storytelling, strategic_planning, summarisation, summarization, summary, text_analysis, text_continuation, text_generation, text_interpretation, textual analysis, textual_analysis, therapy, translation, troubleshooting, writing, writing_prompt",
                             "difficulty_levels": [
+                                "Advanced",
                                 "Beginner",
-                                "Intermediate",
-                                "Advanced"
+                                "Expert",
+                                "Intermediate"
                             ]
                         },
                         "advantages_disadvantages": {
-                            "advantages": [],
-                            "disadvantages": []
-                        }
+                            "advantages": [
+                                "Measures a model’s capacity to use extended context, a critical skill for realistic story generation.",
+                                "Provides a clear, objective accuracy metric that can be easily compared across models.",
+                                "Includes a diverse set of genres (fantasy, literary, reportage), training models to generalize beyond narrow domains.",
+                                "The size (5k+ samples) is large enough to give statistically robust scores while still being quick to run."
+                            ],
+                            "disadvantages": [
+                                "The evaluation focuses narrowly on the last‑word prediction task, which may not reflect all aspects of creative writing (e.g., dialogue style, pacing).",
+                                "Success depends heavily on the model’s tokenization; different vocabularies can affect accuracy unfairly.",
+                                "Because only narratives are included, models that excel at dialogue or expository writing may appear weaker.",
+                                "Some stories contain ambiguous or multi‑word endings that can inflate error rates if the target word is tokenized differently."
+                            ]
+                        },
+                        "age_distribution": {
+                            "data": [
+                                2,
+                                11,
+                                35,
+                                50,
+                                47,
+                                8,
+                                4,
+                                24,
+                                1,
+                                3,
+                                5,
+                                2,
+                                4,
+                                0,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "Running the LAMBADA evaluation lets you probe key generative competencies: *contextual understanding*, *long‑term memory*, *coherence, and narrative fluency*. It is particularly useful when you want to",
+                        "what_to_expect": "When a language model is evaluated on LAMBADA, its performance is reported as a *accuracy* metric: the proportion of samples where the model’s top‑1 prediction matches the human‑written last word. High accuracy indicates that the model can derive meaning from large stretches of text, infer narrative intent, and produce context‑appropriate completions. A low score typically signals that the model struggles with long‑range dependencies or fails to capture subtle plot or character cues, which may translate into generative errors in larger‑scale storytelling tasks.",
+                        "evaluation_description": "LAMBADA is a large story‑completion evaluation set with 5,153 samples. Each row contains a short narrative context (a few sentences) and the last word that must be predicted. The stories come from varied creative‑writing and literary domains such as Fantasy Literature, English Literature, and general Reading Comprehension, making the data ideal for testing a model’s ability to weave together plot, character, and setting. The dataset is labeled as Intermediate difficulty – it challenges models to keep track of long contextual cues rather than simple surface patterns.",
+                        "top_5_task_types": [
+                            "creative_writing",
+                            "story_continuation",
+                            "reading_comprehension",
+                            "qa",
+                            "Creative Writing"
+                        ],
+                        "top_5_domains": [
+                            "Creative Writing",
+                            "Fantasy Literature",
+                            "Literature",
+                            "English Literature",
+                            "Reading Comprehension"
+                        ],
+                        "top_5_skills": [
+                            "reading_comprehension",
+                            "critical_thinking",
+                            "inference",
+                            "creative_writing",
+                            "imagination"
+                        ],
+                        "top_5_concepts": [
+                            "dialogue",
+                            "narrative structure",
+                            "character_development",
+                            "character motivation",
+                            "dialogue continuity"
+                        ],
+                        "top_5_qualifications": [
+                            "high_school",
+                            "High School Diploma",
+                            "high_school_graduate",
+                            "undergraduate",
+                            "College-Level Creative Writing"
+                        ],
+                        "top_5_languages": [
+                            "English"
+                        ]
                     },
-                    "analysis_file": null,
+                    "analysis_file": "analysis/opencompass_523_analysis.json",
                     "analysis_summary": {
-                        "error": "No valid url for ./data/lambada/test.jsonl!\nPlease make sure  `./data/lambada/test.jsonl` is correct"
+                        "total_analyzed": 200,
+                        "successful": 197,
+                        "failed": 3
                     }
                 },
                 {
@@ -8100,7 +9065,7 @@
                     "url": "opencompass/opencompass_1137.jsonl",
                     "size_mb": 1.0,
                     "checksum": "sha256:placeholder_opencompass_1137",
-                    "sample_count": 1000,
+                    "sample_count": 11200,
                     "traits": [
                         "Other"
                     ],
@@ -8113,8 +9078,8 @@
                         "domain": "General",
                         "difficulty": "medium",
                         "requires_auth": false,
-                        "estimated_input_tokens": 1000,
-                        "estimated_output_tokens": 500
+                        "estimated_input_tokens": 36,
+                        "estimated_output_tokens": 50
                     },
                     "original_data": {
                         "id": "1137",
@@ -8162,23 +9127,155 @@
                             "text"
                         ],
                         "sample_questions_answers": {
-                            "examples": [],
-                            "total_questions": 1000,
-                            "question_format": "Various formats",
+                            "examples": [
+                                {
+                                    "question": "30岁男性，反复双眼睑浮肿伴夜尿增多2年，血压160/100mmHg，尿蛋白（+)，红细胞5～10个/HP，颗粒管型1～2/HP，血肌酐145μmol/L，血红蛋白85g/L，血清白蛋白32g/L。下列哪种药物本例不宜应用",
+                                    "difficulty": "moderate",
+                                    "task_type": "Medical_MCQ_Answering"
+                                },
+                                {
+                                    "question": "尊重病人自主性意味着在病人坚持己见对自己的健康有害时,可能要求医生",
+                                    "difficulty": "moderate",
+                                    "task_type": "question_answering, explanation, analysis"
+                                },
+                                {
+                                    "question": "初产妇，孕41+5周，规律宫缩14小时，宫口开全1小时，先露下降停滞，阴道检查：宫口开10cm，S+3，胎头有一小产瘤，胎头矢状缝在左斜径上，小囟门在5点处，请问此时胎方位是",
+                                    "difficulty": "easy",
+                                    "task_type": "qa"
+                                }
+                            ],
+                            "total_questions": 11200,
+                            "question_format": "Clinical Decision-Making, Clinical decision support, Clinical_QA, Ethical Analysis, Evidence‑Based Recommendation, Knowledge Retrieval, Medical Knowledge Retrieval, Medical advice interpretation, Medical_Advice, Medical_MCQ_Answering, Q&A, QA, Qualitative Reasoning, Question_Answering, Question_answering, Summarization, Technical Explanation, Text_Interpretation, analysis, application, assessment, calculations, case_analysis, classification, clinical reasoning, clinical_advice, clinical_decision, clinical_decision_support, clinical_diagnosis, clinical_guidance, clinical_guideline, clinical_reasoning, critical_reasoning, cultural knowledge, definition, diagnosis, diagnostic_reasoning, domain_knowledge, domain_specific_extraction, essay writing, examination_answering, explanation, fill_blank, information_explanation, information_retrieval, instruction, interpretation, knowledge, knowledge retrieval, knowledge_answering, knowledge_based, knowledge_question, knowledge_recall, knowledge_recognition, knowledge_retrieval, medical diagnosis, medical-qa, medical_QA, medical_advice, medical_diagnosis, medical_diagnosis_classification, medical_qa, medical_question, medical_question_answering, medical_recommendation, medical_research, medicine, multiple-choice question, multiple_choice, multiple_choice_question, pattern recognition, pharmacology, physics_problem, policy_evaluation, policy_knowledge, political_essay, prosthetic_planning, qa, question_answer, question_answering, quiz, radiation_shielding, reading_comprehension, recipe_interpretation, riddle, summarisation, summarization, therapeutic_decision, translation, treatment_planning",
                             "difficulty_levels": [
+                                "Advanced",
                                 "Beginner",
-                                "Intermediate",
-                                "Advanced"
+                                "Expert",
+                                "Intermediate"
                             ]
                         },
                         "advantages_disadvantages": {
-                            "advantages": [],
-                            "disadvantages": []
-                        }
+                            "advantages": [
+                                "Large size (11,200 questions) gives statistically robust results.",
+                                "Multi‑disciplinary coverage ensures comprehensive testing of domain knowledge.",
+                                "Real‑world clinical scenarios increase ecological validity.",
+                                "Balanced difficulty levels allow staged benchmarking and skill‑progression analysis.",
+                                "Chinese language focus makes it unique for evaluating models on non‑English medical data."
+                            ],
+                            "disadvantages": [
+                                "Primarily Chinese; insights may not transfer to English medical tasks without translation.",
+                                "No explicit annotation of correct answers listed in the prompt—requires separate key file.",
+                                "Skill tags overlap, potentially complicating attribution of errors to specific shortcomings.",
+                                "Intermediate difficulty only; lacks advanced‑level problem‑sets needed for specialist evaluation.",
+                                "Dataset does not include demographic or outcome data beyond age, limiting analysis of bias or real‑world impact."
+                            ]
+                        },
+                        "age_distribution": {
+                            "data": [
+                                0,
+                                2,
+                                9,
+                                10,
+                                6,
+                                7,
+                                13,
+                                28,
+                                10,
+                                11,
+                                38,
+                                4,
+                                53,
+                                0,
+                                0,
+                                7,
+                                0,
+                                2,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "Running CMB evaluation helps assess the following model traits:\n- Medical domain expertise (clinical, pharmacological, laboratory, ethical)\n- Clinical reasoning and differential diagnosis capabilities\n- Ability to interpret Chinese medical terminology and context\n- Decision‑making under uncertainty\n- Knowledge retrieval and synthesis across multiple disciplines",
+                        "what_to_expect": "When an LLM is evaluated against CMB, the resulting score reflects its ability to comprehend Chinese medical text, retrieve domain‑specific facts, perform clinical reasoning, and provide accurate, context‑appropriate responses. A high score indicates that the model can navigate complex decision‑making scenarios, interpret lab data, and articulate ethical positions. Conversely, a low score signals gaps in clinical knowledge, poor reasoning, or language‑specific misunderstandings.",
+                        "evaluation_description": "The CMB dataset is a curated collection of 11,200 Chinese-language medical‑question pairs. Each row contains a clinical scenario and a multi‑choice or short‑answer prompt. The dataset spans 30 distinct domains (e.g., Internal Medicine, Pharmacology, Obstetrics, Microbiology, Ethics, Sociology, etc.) and incorporates 32 core skill categories (clinical reasoning, pharmacology, lab interpretation, ethics, communication, critical thinking, knowledge retrieval, etc.). Questions are split into two difficulty tiers – Beginner and Intermediate – designed to test both foundational knowledge and intermediate clinical decision‑making. The age distribution of the respondents (ages 16‑38) and diverse skill tags illustrate that the scenarios target a broad audience of medical students, residents, and practicing clinicians.",
+                        "top_5_task_types": [
+                            "question_answering",
+                            "qa",
+                            "Question answering",
+                            "Medical decision making",
+                            "ethics_discussion"
+                        ],
+                        "top_5_domains": [
+                            "Medicine",
+                            "Internal Medicine",
+                            "Nephrology",
+                            "Medical Ethics",
+                            "Philosophy"
+                        ],
+                        "top_5_skills": [
+                            "critical thinking",
+                            "medical knowledge",
+                            "communication",
+                            "clinical reasoning",
+                            "reading comprehension"
+                        ],
+                        "top_5_concepts": [
+                            "Hypertension",
+                            "Proteinuria",
+                            "Hematuria",
+                            "Granular casts",
+                            "Renal impairment"
+                        ],
+                        "top_5_qualifications": [
+                            "Undergraduate medical degree (MD/MBBS)",
+                            "Residency in internal medicine or nephrology",
+                            "Board certification in internal medicine or nephrology (optional but beneficial)",
+                            "Undergraduate degree in health sciences",
+                            "Medical school"
+                        ],
+                        "top_5_languages": [
+                            "Chinese",
+                            "English",
+                            "Mandarin Chinese"
+                        ]
                     },
-                    "analysis_file": null,
+                    "analysis_file": "analysis/opencompass_1137_analysis.json",
                     "analysis_summary": {
-                        "error": "Could not load dataset 'opencompass/cmb'. Error: Path opencompass/cmb is neither a directory nor a file\nPlease ensure the dataset name is correct and the dataset exists."
+                        "total_analyzed": 200,
+                        "successful": 200,
+                        "failed": 0
                     }
                 },
                 {
@@ -11499,21 +12596,21 @@
                                 {
                                     "question": "{\"qID\": \"3087LXLJ6OUC8YHY6A67DCJQIOA0FY-1\", \"sentence\": \"Eric was disappointed to see that Ryan had formica countertops, because _ thought formica was tacky.\", \"option1\": \"Eric\", \"option2\": \"Ryan\"}",
                                     "difficulty": "easy",
-                                    "task_type": "qa, comprehension"
+                                    "task_type": "reading_comprehension, multiple_choice"
                                 },
                                 {
                                     "question": "{\"qID\": \"3TFJJUELSHNX771VAX8KWW3TOWSC24-2\", \"sentence\": \"Rachel was the victim of an assault by Elena. _ had was taken to the jail by the police.\", \"option1\": \"Rachel\", \"option2\": \"Elena\"}",
                                     "difficulty": "easy",
-                                    "task_type": "comprehension, reasoning"
+                                    "task_type": "multiple_choice, reading_comprehension"
                                 },
                                 {
                                     "question": "{\"qID\": \"3DQYSJDTYNPSZANDEBB848L0FTSXEF-1\", \"sentence\": \"The cute little dog was the one Craig gave Donald after _ found out he was allergic to dogs.\", \"option1\": \"Craig\", \"option2\": \"Donald\"}",
-                                    "difficulty": "moderate",
-                                    "task_type": "qa"
+                                    "difficulty": "easy",
+                                    "task_type": "qa, multiple_choice"
                                 }
                             ],
                             "total_questions": 1767,
-                            "question_format": "comprehension, contextual_comprehension, fill_in_the_blank, qa, reasoning",
+                            "question_format": "cloze, cloze_question, cloze_task, cloze_test, comprehension, fill_in_blank, fill_in_the_blank, gap_filling, grammar, inference, knowledge_check, language_comprehension, language_question, language_understanding, logic_inference, multiple_choice, multiple_choice_grading, multiple_choice_qa, multiple_choice_question, multiple_choice_selection, qa, question_answering, quiz, read_comprehension, reading_comprehension, reasoning, selecting_answer, single_choice, text_comprehension, word_choice, word_selection",
                             "difficulty_levels": [
                                 "Beginner",
                                 "Intermediate"
@@ -11521,17 +12618,119 @@
                         },
                         "advantages_disadvantages": {
                             "advantages": [
-                                "Evaluates critical thinking, comprehension, reading_comprehension skills",
-                                "Covers multiple difficulty levels: Beginner, Intermediate",
-                                "Diverse task types: comprehension, reasoning, fill_in_the_blank"
+                                "Large number of instances (1,767) provides a robust statistical assessment.",
+                                "Tasks are simple enough for quick benchmarking yet require genuine inference, avoiding trivial memorization.",
+                                "Clear, well‑structured format (sentence, two options) facilitates automated scoring.",
+                                "Targets a core language skill (pronoun resolution) that is critical for many applications."
                             ],
-                            "disadvantages": []
-                        }
+                            "disadvantages": [
+                                "All tasks are beginner‑level; top‑tier models may score near perfect, limiting differentiation.",
+                                "Dataset is limited to English and includes only a narrow age range, reducing cross‑linguistic or age‑diverse applicability.",
+                                "The focus on pronoun resolution means it does not test other aspects of language generation like creativity or stylistic nuance.",
+                                "Potential annotation bias: the dataset may over‑represent certain syntactic constructions, leading models to overfit to those patterns."
+                            ]
+                        },
+                        "age_distribution": {
+                            "data": [
+                                88,
+                                68,
+                                35,
+                                8,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "WinoGrande is valuable for testing a model’s ability to perform pronoun resolution, a fundamental skill for many downstream tasks such as question answering, summarization, and dialogue systems. Running this evaluation signals that the model can handle basic syntactic parsing and contextual inference, which are essential for clear and coherent language generation.",
+                        "what_to_expect": "When a language model is evaluated on WinoGrande, the resulting score reflects how well the model can resolve ambiguous pronouns by using contextual and inferential cues. A higher accuracy indicates that the model is proficient at linking pronouns to the correct referent, which is a key component of reading comprehension and natural language understanding. Conversely, a low score suggests weaknesses in reasoning about context, inference, and syntactic structures.",
+                        "evaluation_description": "WinoGrande is a pronoun resolution benchmark consisting of 1,767 English sentences. Each instance presents a sentence with a missing pronoun and two candidate antecedents. The dataset focuses on beginner‑level reading comprehension and grammar skills, covering domains such as English Language and Grammar. The age distribution of the example sentences is skewed toward older teens and young adults (ages 10, 12, and 14). The labeled skills include basic grammar knowledge, inference, contextual inference, logical inference, and natural language understanding.",
+                        "top_5_task_types": [
+                            "reading_comprehension",
+                            "question_answering",
+                            "qa",
+                            "fill_in_the_blank",
+                            "multiple_choice_fill_in_the_blank"
+                        ],
+                        "top_5_domains": [
+                            "English_Language",
+                            "Grammar"
+                        ],
+                        "top_5_skills": [
+                            "reading_comprehension",
+                            "inference",
+                            "grammar",
+                            "vocabulary",
+                            "language_understanding"
+                        ],
+                        "top_5_concepts": [
+                            "reading comprehension",
+                            "inference",
+                            "subject-verb agreement",
+                            "pronoun_reference",
+                            "cause_and_effect"
+                        ],
+                        "top_5_qualifications": [
+                            "middle_school",
+                            "middle_school_education",
+                            "9th grade student",
+                            "1st grade",
+                            "Kindergarten"
+                        ],
+                        "top_5_languages": [
+                            "English"
+                        ]
                     },
                     "analysis_file": "analysis/opencompass_1109_analysis.json",
                     "analysis_summary": {
-                        "total_analyzed": 5,
-                        "successful": 5,
+                        "total_analyzed": 200,
+                        "successful": 200,
                         "failed": 0
                     }
                 },
@@ -15240,8 +16439,8 @@
                         "domain": "General",
                         "difficulty": "medium",
                         "requires_auth": false,
-                        "estimated_input_tokens": 1000,
-                        "estimated_output_tokens": 500
+                        "estimated_input_tokens": 100,
+                        "estimated_output_tokens": 50
                     },
                     "original_data": {
                         "id": "1113",
@@ -15284,23 +16483,145 @@
                             "text"
                         ],
                         "sample_questions_answers": {
-                            "examples": [],
+                            "examples": [
+                                {
+                                    "question": "{\"Answer\": 337.0, \"Question\": \"How many boys are there in that school?\", \"Equation\": \"( 739.0 - 402.0 )\", \"Body\": \"In a school there are 402 more girls than boys. If there are 739 girls\", \"Type\": \"Sub",
+                                    "difficulty": "easy",
+                                    "task_type": "Arithmetic, Subtraction Problem"
+                                },
+                                {
+                                    "question": "{\"Answer\": 10.0, \"Question\": \"How many pots are there in all?\", \"Equation\": \"( 400.0 / 40.0 )\", \"Body\": \"Each pot has 40 flowers in it. There are 400 flowers in total.\", \"Type\": \"Common-Division\", \"ID",
+                                    "difficulty": "easy",
+                                    "task_type": "question_answering, math"
+                                },
+                                {
+                                    "question": "{\"Answer\": 75.0, \"Question\": \"How many cookies did Paco have left?\", \"Equation\": \"( ( 40.0 - 2.0 ) + 37.0 )\", \"Body\": \"Paco had 40 cookies. He ate 2 of them. Then he bought 37 more cookies\", \"Type\": \"",
+                                    "difficulty": "easy",
+                                    "task_type": "qa, addition"
+                                }
+                            ],
                             "total_questions": 1000,
-                            "question_format": "Various formats",
+                            "question_format": "Addition, Arithmetic, Math, Math Problem, Multiplication, QA, Subtraction Problem, addition, arithmetic, arithmetic_subtraction, arithmetics, basic arithmetic, basic_arithmetic, basic_calculation, basic_computation, basic_division, basic_math, basic_maths, basic_multiplication, calculation, calculations, division, math, math_basic, math_comprehension, math_problem, math_problem_solving, math_problems, math_question, math_quiz, math_understanding, math_word_problem, mathematical_computation, mathematics, multiplication, number_problem, problem_solving, q_and_a, qa, question answering, question_and_answer, question_answer, question_answering, question_response, reading_comprehension, reasoning, simple arithmetic, simple_math, simple_multiplication, subtraction, word problem, word_problem",
                             "difficulty_levels": [
                                 "Beginner",
-                                "Intermediate",
-                                "Advanced"
+                                "Intermediate"
                             ]
                         },
                         "advantages_disadvantages": {
-                            "advantages": [],
-                            "disadvantages": []
-                        }
+                            "advantages": [
+                                "Clarity & Simplicity – Beginner‑level questions make results easy to interpret.",
+                                "Comprehensive Operation Mix – covers all four primary arithmetic operations.",
+                                "Embedded Equations – each answer comes with a human‑readable equation, aiding debugging.",
+                                "Compact Size – 1,000 samples allow quick evaluation and reproducibility.",
+                                "Domain‑agnostic – questions are generic enough to test pure numeric reasoning without domain bias."
+                            ],
+                            "disadvantages": [
+                                "Limited Complexity – no advanced topics such as algebra, geometry, or multi‑step reasoning.",
+                                "Small Sample Size – may not capture full variability of real‑world math problems.",
+                                "Unspecified Domain Distribution – without known domains, it’s hard to assess domain‑specific performance.",
+                                "Water‑Blob Scoring – accuracy on such simple tasks may not correlate with performance on more complex benchmarks.",
+                                "No Language Variance – all problems are written in the same style, potentially over‑fitting language‑to‑math strategies."
+                            ]
+                        },
+                        "age_distribution": {
+                            "data": [
+                                192,
+                                7,
+                                1,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0
+                            ],
+                            "categories": [
+                                "10",
+                                "12",
+                                "14",
+                                "16",
+                                "18",
+                                "20",
+                                "22",
+                                "24",
+                                "26",
+                                "28",
+                                "30",
+                                "32",
+                                "34",
+                                "36",
+                                "38",
+                                "40",
+                                "42",
+                                "44",
+                                "46",
+                                "48",
+                                "50",
+                                "52",
+                                "54",
+                                "56",
+                                "58",
+                                "60"
+                            ]
+                        },
+                        "why_run_this_eval": "Run this evaluation when you want to gauge the following model traits:\n- **Basic Arithmetic Proficiency** – can the model add, subtract, multiply, and divide correctly?\n- **Reading‑to‑Equation Mapping** – does the model understand the narrative and translate it into the proper mathematical expression?\n- **Numeracy / Number Sense** – does the model apply numbers in a realistic context?\n- **Early‑Stage Problem‑Solving** – is the model able to solve simple word problems as a baseline before tackling more advanced reasoning tasks?",
+                        "what_to_expect": "When an LLM is evaluated on SVAMP, the model’s accuracy indicates how reliably it can parse a short story, extract the relevant numbers, carry out the required arithmetic, and produce the correct numeric answer. A higher score demonstrates stronger numeric reasoning, the ability to interpret simple textual constraints, and precise calculation capabilities. Conversely, a low score reveals gaps in the model’s handling of basic math or its ability to translate language into equations.",
+                        "evaluation_description": "SVAMP is a lightweight benchmark for elementary mathematics. It contains 1,000 question‑answer pairs that mix arithmetic operations (addition, subtraction, multiplication, division) with simple word problems. Each example provides a short text (the problem body), a question, the correct numerical answer, and an equation in a human‑readable form. The dataset is purposely beginner‑level, targeting basic numeracy and reading comprehension skills suitable for students in late primary school.",
+                        "top_5_task_types": [
+                            "arithmetic",
+                            "subtraction",
+                            "qa",
+                            "math",
+                            "question_answering"
+                        ],
+                        "top_5_domains": [],
+                        "top_5_skills": [
+                            "basic_arithmetic",
+                            "basic arithmetic",
+                            "reading_comprehension",
+                            "problem_solving",
+                            "number_sense"
+                        ],
+                        "top_5_concepts": [
+                            "basic arithmetic",
+                            "Subtraction",
+                            "addition",
+                            "subtraction",
+                            "division"
+                        ],
+                        "top_5_qualifications": [
+                            "elementary school",
+                            "4th grade",
+                            "primary_school",
+                            "Elementary school",
+                            "1st_primary"
+                        ],
+                        "top_5_languages": [
+                            "English"
+                        ]
                     },
-                    "analysis_file": null,
+                    "analysis_file": "analysis/opencompass_1113_analysis.json",
                     "analysis_summary": {
-                        "error": "Could not load dataset 'opencompass/svamp'. Error: Path opencompass/svamp is neither a directory nor a file\nPlease ensure the dataset name is correct and the dataset exists."
+                        "total_analyzed": 200,
+                        "successful": 200,
+                        "failed": 0
                     }
                 },
                 {

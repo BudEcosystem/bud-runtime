@@ -84,6 +84,18 @@ class DatasetMetadata(BaseModel):
     estimated_input_tokens: Optional[int] = None
     estimated_output_tokens: Optional[int] = None
 
+    # Enriched evaluation fields
+    why_run_this_eval: Optional[str] = None
+    what_to_expect: Optional[str] = None
+    evaluation_description: Optional[str] = None
+    top_5_task_types: Optional[List[str]] = None
+    top_5_domains: Optional[List[str]] = None
+    top_5_skills: Optional[List[str]] = None
+    top_5_concepts: Optional[List[str]] = None
+    top_5_qualifications: Optional[List[str]] = None
+    top_5_languages: Optional[List[str]] = None
+    age_distribution: Optional[Dict[str, Any]] = None
+
 
 class Dataset(BaseModel):
     """Individual dataset information."""
