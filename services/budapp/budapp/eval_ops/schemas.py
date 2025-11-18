@@ -598,6 +598,18 @@ class ExpDataset(BaseModel):
         None,
         description="Evaluation type configurations like {'gen': 'gsm8k_gen', 'agent': 'gsm8k_agent'}.",
     )
+    why_run_this_eval: Optional[List[str]] = Field(
+        None,
+        description="List of reasons why running this evaluation is valuable and what insights it provides.",
+    )
+    what_to_expect: Optional[List[str]] = Field(
+        None,
+        description="List of expectations when evaluating this dataset, including patterns, trends, and characteristics.",
+    )
+    additional_info: Optional[dict] = Field(
+        None,
+        description="Additional metadata including top_5_task_types, top_5_domains, top_5_skills, top_5_concepts, top_5_qualifications, top_5_languages, age_distribution, and evaluation_description.",
+    )
     traits: List[Trait] = Field([], description="Traits associated with this dataset.")
 
     class Config:
