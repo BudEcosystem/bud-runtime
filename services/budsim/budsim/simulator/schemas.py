@@ -37,6 +37,13 @@ class SimulationMethod(str, Enum):
     HEURISTIC = "heuristic"
 
 
+class HardwareMode(str, Enum):
+    """Enum for hardware utilization modes."""
+
+    DEDICATED = "dedicated"
+    SHARED = "shared"
+
+
 class Device(BaseModel):
     name: str
     type: str
@@ -89,6 +96,9 @@ class ClusterRecommendationRequest(CloudEventBase):
     quantization_method: Optional[str] = None
     quantization_type: Optional[str] = None
     simulation_method: Optional[SimulationMethod] = Field(None, description="Method to use for performance simulation")
+    hardware_mode: Optional[HardwareMode] = Field(
+        default=HardwareMode.DEDICATED, description="Hardware utilization mode: dedicated or shared"
+    )
 
     @model_validator(mode="before")
     def validate_pretrained_model_uri(cls, values):
@@ -231,6 +241,7 @@ class NodeGroupConfiguration(BaseModel):
     replicas: int = 1  # Number of replicas for this node group
     image: str
     memory: float
+    hardware_mode: Optional[str] = Field(default="dedicated", description="Hardware mode: dedicated or shared")
     # Performance metrics
     ttft: float
     throughput_per_user: float

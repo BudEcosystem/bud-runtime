@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import json
+import math
 import re
 import uuid
 from typing import Any, List, Optional
@@ -259,6 +260,16 @@ class DeploymentHandler:
         for _idx, node in enumerate(node_list):
             node["args"]["served-model-name"] = namespace
 
+            # Extract concurrency from labels (where budsim actually stores it)
+            node_concurrency = node.get("labels", {}).get("concurrency", "1")
+            node_concurrency = int(node_concurrency)  # Convert from string to int
+            node["concurrency"] = node_concurrency  # Also preserve at top level for Helm template
+
+            # Memory is already in GB from BudSim, no conversion needed
+            # Use tiered buffer: 1GB for ≤10GB, 2GB for >10GB
+            buffer_gb = 1 if node["memory"] <= 10 else 2
+            allocation_memory_gb = node["memory"] + buffer_gb
+
             node["args"]["gpu-memory-utilization"] = 0.95
 
             # Enable LoRA configuration if engine supports it
@@ -309,8 +320,19 @@ class DeploymentHandler:
                 node["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
                 logger.info("Enabled runtime LoRA updating")
 
-            # node["core_count"] = core_count if device["type"] == "cpu" else 1
-            node["memory"] = node["memory"] / (1024**3)
+            # For shared hardware mode, calculate GPU memory limit in MB
+            hardware_mode = node.get("hardware_mode", "dedicated")
+            if hardware_mode == "shared":
+                # Convert GB to MB for nvidia.com/gpumem resource limit
+                gpu_memory_mb = int(allocation_memory_gb * 1024)
+                node["gpu_memory_mb"] = gpu_memory_mb
+                logger.debug(
+                    f"Shared mode: Setting GPU memory limit to {gpu_memory_mb}MB ({allocation_memory_gb:.2f}GB)"
+                )
+
+                node["args"]["max-num-seqs"] = node_concurrency
+                node["args"]["gpu-memory-utilization"] = round(node["memory"] / allocation_memory_gb, 2)
+
             node["name"] = self._to_k8s_label(node["name"])
 
             # Add device mapping for node selector
@@ -647,7 +669,7 @@ api_key_location = "env::API_KEY"
             "minio_access_key": secrets_settings.minio_access_key,
             "minio_secret_key": secrets_settings.minio_secret_key,
             "minio_bucket": app_settings.minio_bucket,
-            "model_size": self._get_memory_size(node_list),
+            "model_size": math.ceil(self._get_memory_size(node_list) * 1.1),
             "nodes": node_list,
             "volume_type": app_settings.volume_type,
         }

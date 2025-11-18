@@ -364,8 +364,11 @@ class ModelDataManager(DataManagerUtils):
 
         if explicit_filters["exclude_adapters"]:
             # Exclude adapter-type models (used in deploy flow)
-            # Adapters should only be added via the separate "Add Adapter" flow
-            exclude_adapter_condition = Model.base_model_relation != BaseModelRelationEnum.ADAPTER
+            # Include models with NULL base_model_relation (newly added models without a relation type)
+            exclude_adapter_condition = or_(
+                Model.base_model_relation.is_(None),
+                Model.base_model_relation != BaseModelRelationEnum.ADAPTER,
+            )
             explicit_conditions.append(exclude_adapter_condition)
 
         # Generate statements according to search or filters

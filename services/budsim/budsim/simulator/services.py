@@ -439,6 +439,7 @@ class SimulationService:
         chat_template: Optional[str] = None,
         supports_lora: bool = False,
         supports_pipeline_parallelism: bool = False,
+        hardware_mode: str = "dedicated",
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K deployment configurations based on the provided parameters.
@@ -477,6 +478,7 @@ class SimulationService:
                     dtype=quantization_type,
                     use_heuristic=True,  # DirectSearchOptimizer uses heuristic calculations
                     supports_pipeline_parallelism=supports_pipeline_parallelism,
+                    hardware_mode=hardware_mode,
                 )
                 top_k_configs = optimizer.search()
                 # Convert SearchResult dataclasses to dicts for JSON serialization in workflow mode
@@ -504,6 +506,10 @@ class SimulationService:
                 top_k_configs = evolution.evolve()
                 # Convert EvaluationResult dataclasses to dicts for JSON serialization in workflow mode
                 top_k_configs = [asdict(result) for result in top_k_configs]
+
+            # Add hardware_mode to each config for downstream processing (common to both paths)
+            for config in top_k_configs:
+                config["hardware_mode"] = hardware_mode
 
             # Handle case where no valid configurations were found
             if not top_k_configs:
@@ -1735,9 +1741,21 @@ class SimulationService:
         tp_size = engine_config.get("tensor_parallel_size", 1)
         pp_size = engine_config.get("pipeline_parallel_size", 1)
 
-        # Skip validation - TP/PP values from top_k_configs are already validated during optimization
-        # The Evolution and DirectSearch optimizers validate these combinations before storing them
-        logger.info(f"Using pre-validated parallelism: TP={tp_size}, PP={pp_size} from optimization results")
+        # Override TP/PP to 1 for shared hardware mode (defensive check)
+        hardware_mode = top_k_configs.get("hardware_mode", "dedicated")
+        if hardware_mode == "shared":
+            if tp_size != 1 or pp_size != 1:
+                logger.warning(
+                    f"Shared hardware mode detected but TP={tp_size}, PP={pp_size}. "
+                    "Overriding to TP=1, PP=1 for time-slicing compatibility."
+                )
+            tp_size = 1
+            pp_size = 1
+            logger.info("Shared hardware mode: Using TP=1, PP=1 for time-slicing (no tensor/pipeline parallelism)")
+        else:
+            # Skip validation - TP/PP values from top_k_configs are already validated during optimization
+            # The Evolution and DirectSearch optimizers validate these combinations before storing them
+            logger.info(f"Dedicated hardware mode: Using pre-validated parallelism TP={tp_size}, PP={pp_size}")
 
         # Create labels for Kubernetes node selection
         labels = {"device_name": device_type, "concurrency": str(top_k_configs.get("concurrency", 1))}
@@ -1759,6 +1777,7 @@ class SimulationService:
             replicas=replica_count,
             image=template_result.engine_image,
             memory=top_k_configs.get("kv_cache_memory", 0),
+            hardware_mode=top_k_configs.get("hardware_mode", "dedicated"),
             ttft=float(top_k_configs.get("ttft", 0)),
             throughput_per_user=float(top_k_configs.get("throughput_per_user", 0)),
             e2e_latency=float(top_k_configs.get("e2e_latency", 0)),

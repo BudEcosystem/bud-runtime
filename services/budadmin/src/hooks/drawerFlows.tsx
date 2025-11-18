@@ -315,6 +315,59 @@ const deployModel: DrawerFlowType = {
         `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
         "Deploy Model",
       ],
+      id: "deploy-model-hardware-mode",
+      component: StepComponents["deploy-model-hardware-mode"],
+      confirmClose: true,
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Deploy Model",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Hardware Mode",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: " Select Deployment Templates",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment Specification",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Finding Clusters",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Choose Cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deployment Configuration",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Auto Scaling",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Status",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      step: 2,
+    },
+    {
+      navigation: () => [
+        "Projects",
+        `${useProjects.getState().selectedProject?.icon} ${useProjects.getState().selectedProject?.name}`,
+        "Deploy Model",
+      ],
       id: "deploy-model-template",
       confirmClose: true,
       step: 3,

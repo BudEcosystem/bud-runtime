@@ -1,0 +1,344 @@
+---
+title: "Authentication"
+description: "Authentication system configuration and management"
+---
+
+# Authentication
+
+Bud Stack uses a comprehensive authentication system built on Keycloak and JWT tokens. This guide covers how authentication works, password policies, session management, and how to configure authentication settings via Helm.
+
+## Authentication Overview
+
+### System Architecture
+
+Bud Stack's authentication system consists of:
+
+- **Keycloak**: Enterprise-grade identity and access management
+- **JWT Tokens**: Secure, stateless authentication tokens
+- **Redis/Valkey**: Token blacklist and session state
+- **budapp Service**: Authentication logic and token management
+
+### Authentication Flow
+
+1. User submits credentials (email + password)
+2. budapp validates credentials with Keycloak
+3. Keycloak returns access and refresh tokens
+4. Tokens are stored securely in browser
+5. Access token auto-refreshes every 5 minutes
+6. Session expires after 30 minutes of inactivity
+
+<Info>
+All authentication happens over HTTPS with industry-standard encryption. Passwords are never stored in plain text.
+</Info>
+
+## Login Requirements
+
+### Required Fields
+
+When logging in, users must provide:
+
+| Field | Description | Validation |
+|-------|-------------|------------|
+| **Email** | User's registered email address | Must be valid email format |
+| **Password** | User's password | Must meet password policy |
+| **User Type** | Account type (ADMIN or CLIENT) | Must match actual user type |
+
+
+### User Type Enforcement
+
+- **Security Feature**: User type must match the account's actual type
+- **Prevents Privilege Escalation**: Users cannot login as a different type
+- **Types**:
+  - `ADMIN`: Platform administrators
+  - `CLIENT`: Regular users
+
+<Warning>
+If the provided user_type doesn't match the account's actual type, login will fail. This prevents unauthorized access escalation.
+</Warning>
+
+### Email Validation
+
+Emails must:
+- Be in valid email format (user@domain.com)
+- Be registered in the system
+- Be associated with an active account
+
+
+## Password Policy
+
+### Password Requirements
+
+All passwords must meet the following criteria:
+
+- **Minimum Length**: 8 characters
+- **Uppercase**: At least 1 uppercase letter (A-Z)
+- **Lowercase**: At least 1 lowercase letter (a-z)
+- **Digit**: At least 1 number (0-9)
+- **Special Character**: At least 1 special character (!@#$%^&*)
+- **No Whitespace**: Cannot contain spaces or tabs
+
+### Password Security
+
+**Hashing & Storage:**
+- Passwords are **never stored in plain text**
+- Salted with `PASSWORD_SALT` environment variable
+- Hashed using industry-standard algorithms
+- Only the hash is stored in the database
+
+## First-Time Login & Password Reset
+
+### Forced Password Reset Flow
+
+When a user must reset their password (first login or admin-initiated reset):
+
+1. **Login Attempt**
+   - User logs in with temporary password
+   - Receives successful authentication
+
+2. **Reset Flag Detection**
+   - Response includes `"is_reset_password": true`
+   - Frontend detects this flag
+
+3. **Automatic Redirect**
+   - User is redirected to password reset page
+   - Cannot access platform until password is changed
+
+4. **Set New Password**
+   - User enters new password meeting all requirements
+   - Password is updated in both Keycloak and local database
+
+5. **Return to Login**
+   - User logs in with new password
+   - Full access granted
+
+### When Password Reset is Required
+
+Password reset is forced when:
+
+- **First Login**: Administrator creates account with temporary password
+- **Admin Action**: Administrator resets user password
+
+### Password Reset via Email
+
+Users can request password reset:
+
+1. Click "Forgot Password" on login page
+2. Enter registered email address
+3. Receive password reset link via email
+4. Link valid for limited time
+5. Set new password and return to login
+
+<Warning>
+Password reset links expire for security. If the link has expired, users must request a new one.
+</Warning>
+
+## Session Management
+
+### Session Duration
+
+Bud Stack uses a multi-tiered session system:
+
+| Component | Duration | Description |
+|-----------|----------|-------------|
+| **Access Token** | 5 minutes | Used for API authentication |
+| **Token Auto-Refresh** | Automatic | Seamless token renewal |
+| **Active Session** | 30 minutes | From last user activity |
+| **Refresh Token** | 7 days (default) | Maximum session lifespan |
+
+### How Sessions Work
+
+**1. Initial Login**
+- User logs in successfully
+- Receives access token (5-minute lifespan)
+- Receives refresh token (7-day lifespan)
+- Session timer starts at 30 minutes
+
+**2. Active Usage**
+- Access token auto-refreshes every 5 minutes
+- Each interaction extends session timeout
+- User stays logged in while active
+
+**3. Inactivity Timeout**
+- After 30 minutes of no activity
+- Session expires automatically
+- User must log in again
+
+**4. Maximum Session**
+- Even with continuous activity
+- Session ends after refresh token expires (7 days default)
+- User must log in again for new session
+
+<Info>
+Sessions are managed client-side with tokens stored in browser localStorage. Each device maintains independent sessions.
+</Info>
+
+### Session Expiration
+
+**Automatic Logout Triggers:**
+- 30 minutes of inactivity
+- Refresh token expiration (7 days)
+- Manual logout by user
+- Token invalidation by administrator
+
+**What Happens on Expiry:**
+- Access token becomes invalid
+- Refresh token cannot renew access
+- User redirected to login page
+- Must authenticate again
+
+
+### Token Blacklisting
+
+**On Logout:**
+- Access token added to Redis blacklist
+- Blacklist entry expires when token would naturally expire
+- Prevents token reuse after logout
+- Refresh token invalidated in Keycloak
+
+**Blacklist Implementation:**
+- Stored in Redis/Valkey (fast lookup)
+- TTL matches remaining token lifetime
+- Automatic expiration and cleanup
+- Checked on every authenticated request
+
+<Warning>
+Once a user logs out, their tokens are immediately invalidated. They cannot be reused even if they haven't naturally expired.
+</Warning>
+
+## Configuring Authentication in Helm
+
+### Token Lifetime Configuration
+
+Authentication settings are configured via Helm values. You can customize token lifetimes for different environments.
+
+#### Application Token Settings
+
+Configure budapp service token lifetimes:
+
+**File**: `values.yaml` or environment-specific file (e.g., `values.production.yaml`)
+
+```yaml
+microservices:
+  budapp:
+    env:
+      # Access token expiration (in minutes)
+      # Default: 30 minutes
+      # Recommendation: 30-60 minutes for production
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+
+      # Refresh token expiration (in minutes)
+      # Default: 10080 (7 days)
+      # Recommendation: 7-14 days for production
+      REFRESH_TOKEN_EXPIRE_MINUTES: "10080"
+
+      # JWT Secret Key - MUST be generated securely
+      # Generate with: tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 64
+      JWT_SECRET_KEY: "your-64-character-secret-key"
+
+      # Password salt for hashing
+      # Generate with: tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 64
+      PASSWORD_SALT: "your-64-character-password-salt"
+```
+
+<Warning>
+**NEVER commit secrets directly to Git!** Use encrypted secrets files (e.g., `values.enc.yaml` with SOPS) or secret management systems.
+</Warning>
+
+
+## Security Features
+
+### Rate Limiting
+
+Authentication endpoints have rate limits to prevent abuse:
+
+| Endpoint | Rate Limit | Window |
+|----------|------------|--------|
+| `/auth/login` | 10 requests | Per minute per IP |
+| `/auth/register` | 3 requests | Per 10 minutes per IP |
+| `/auth/refresh-token` | 20 requests | Per minute per user |
+
+**What Happens When Rate Limited:**
+- HTTP 429 (Too Many Requests) response
+- `Retry-After` header indicates wait time
+- Temporary block (1-10 minutes depending on endpoint)
+
+### Audit Logging
+
+All authentication events are logged:
+
+**Logged Events:**
+- Login attempts (successful and failed)
+- Password changes
+- Password reset requests
+- Token refreshes
+- Logout events
+- Account lockouts
+
+**Log Data Includes:**
+- Timestamp
+- User email
+- IP address
+- User agent
+- Success/failure status
+- Failure reason (if applicable)
+
+<Info>
+Audit logs are stored in the database and can be viewed in the User Activity section for compliance and security monitoring.
+</Info>
+
+### Token Blacklist
+
+**Implementation:**
+- Redis/Valkey for high-performance lookup
+- Blacklist checked on every authenticated request
+- Automatic expiration matching token lifetime
+- Prevents token replay attacks
+
+**What Gets Blacklisted:**
+- Access tokens on logout
+- Tokens from revoked sessions
+- Tokens from deleted users
+- Tokens from password changes
+
+## Troubleshooting
+
+### Common Issues
+
+**Session expires too quickly**
+- Check `ACCESS_TOKEN_EXPIRE_MINUTES` setting
+- Verify `REFRESH_TOKEN_EXPIRE_MINUTES` configuration
+- Review Keycloak session timeout settings
+
+**Token refresh fails**
+- Check Redis/Valkey is running and accessible
+- Verify `JWT_SECRET_KEY` is set correctly
+- Ensure refresh token hasn't exceeded max lifespan
+
+**Password reset doesn't work**
+- Verify email service is configured
+- Check Keycloak realm `resetPasswordAllowed` is true
+- Review email delivery logs
+
+**Users locked out after failed logins**
+- Check Keycloak brute force protection settings
+- Reduce `failureFactor` if too strict
+- Adjust `maxFailureWaitSeconds` for shorter lockouts
+
+## Related Documentation
+
+- [Inviting Users](/user-management/inviting-users)
+- [Roles & Permissions](/user-management/roles-permissions)
+- [User Activity](/user-management/user-activity)
+- [SSO Integration](/user-management/sso-integration)
+- [Account Settings](/settings/account-settings)
+
+## Additional Resources
+
+- [Keycloak Documentation](https://www.keycloak.org/documentation)
+- [JWT.io](https://jwt.io/) - JWT token decoder
+- [SOPS](https://github.com/mozilla/sops) - Secret encryption
+- [Helm Values Files](https://helm.sh/docs/chart_template_guide/values_files/)
+
+<Info>
+For security concerns or questions about authentication configuration, contact your system administrator or Bud Stack support at contact@bud.studio.
+</Info>

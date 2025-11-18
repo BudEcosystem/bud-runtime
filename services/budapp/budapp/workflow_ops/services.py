@@ -224,6 +224,9 @@ class WorkflowService(SessionMixin):
             enable_tool_calling = required_data.get("enable_tool_calling")
             enable_reasoning = required_data.get("enable_reasoning")
 
+            # Extract hardware mode
+            hardware_mode = required_data.get("hardware_mode")
+
             # Handle experiment_id extraction with UUID conversion
             experiment_id_str = required_data.get("experiment_id")
             experiment_id = None
@@ -423,6 +426,7 @@ class WorkflowService(SessionMixin):
                 chat_template=chat_template if chat_template else None,
                 enable_tool_calling=enable_tool_calling if enable_tool_calling else None,
                 enable_reasoning=enable_reasoning if enable_reasoning else None,
+                hardware_mode=hardware_mode if hardware_mode else None,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -551,6 +555,7 @@ class WorkflowService(SessionMixin):
                 "project_id",
                 "cluster_id",
                 "endpoint_name",
+                "hardware_mode",
                 "budserve_cluster_events",
                 "bud_simulator_events",
                 "deploy_config",

@@ -82,11 +82,13 @@ export default function SelectAgentType() {
   ];
 
   // Load workflow on component mount if it exists
+  // Note: createWorkflow() already fetches the complete workflow, so we only
+  // need to fetch here if we're returning to this page without workflow data
   useEffect(() => {
-    if (currentWorkflow?.workflow_id) {
+    if (currentWorkflow?.workflow_id && !currentWorkflow?.workflow_steps) {
       getWorkflow(currentWorkflow.workflow_id);
     }
-  }, [currentWorkflow?.workflow_id, getWorkflow]);
+  }, [currentWorkflow, getWorkflow]);
 
   const handleNext = async () => {
     if (!selectedType) {
