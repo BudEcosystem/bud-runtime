@@ -1,5 +1,6 @@
-import React from "react";
-import { Card, Row, Col, Statistic, Segmented } from "antd";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import { Card, Row, Col, Statistic, Segmented, Spin } from "antd";
 import {
   Text_14_600_EEEEEE,
   Text_12_400_B3B3B3,
@@ -19,15 +20,40 @@ import {
   Legend,
 } from "recharts";
 import Tags from "src/flows/components/DrawerTags";
+import { usePrompts } from "src/hooks/usePrompts";
+import ProjectTags from "src/flows/components/ProjectTags";
+import { endpointStatusMapping } from "@/lib/colorMapping";
 
 const segmentOptions = ["LAST 24 HRS", "LAST 7 DAYS", "LAST 30 DAYS"];
 
-interface OverviewTabProps {
-  agentData: any;
-}
+interface OverviewTabProps {}
+const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
-const OverviewTab: React.FC<OverviewTabProps> = ({ agentData }) => {
-  const [timeRange, setTimeRange] = React.useState("weekly");
+const OverviewTab: React.FC<OverviewTabProps> = () => {
+  const router = useRouter();
+  const { id, projectId } = router.query;
+  const [timeRange, setTimeRange] = useState("weekly");
+  const [agentData, setAgentData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const { getPromptById } = usePrompts();
+
+  useEffect(() => {
+    const fetchAgentDetails = async () => {
+      if (id && typeof id === "string") {
+        try {
+          setLoading(true);
+          const data = await getPromptById(id, projectId as string);
+          setAgentData(data);
+        } catch (error) {
+          console.error("Error fetching agent details:", error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchAgentDetails();
+  }, [id, projectId]);
 
   const handleChartFilter = (val: string) => {
     if (val === "LAST 24 HRS") return "daily";
@@ -117,17 +143,23 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ agentData }) => {
     />
   );
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <Spin size="large" />
+      </div>
+    );
+  }
+
   return (
     <div className="pb-8">
       {/* Agent Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2 pt-[.5rem]">
           <Text_26_600_FFFFFF className="text-[#EEE]">
-            {agentData?.name || 'Agent Name'}
+            {agentData?.name}
           </Text_26_600_FFFFFF>
-          <Tags color="green" name={agentData?.status || 'Active'}
-
-          />
+          <ProjectTags color={endpointStatusMapping[capitalize(agentData?.status)]} name={capitalize(agentData?.status)}/>
         </div>
         <Text_12_400_B3B3B3 className="max-w-[850px] mb-3">
           {agentData?.description || 'LiveMathBench can capture LLM capabilities in complex reasoning tasks, including challenging latest question sets from various mathematical competitions.'}

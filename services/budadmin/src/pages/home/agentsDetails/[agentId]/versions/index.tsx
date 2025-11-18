@@ -15,7 +15,7 @@ import Tags from "src/flows/components/DrawerTags";
 import { usePrompts, IPromptVersion } from "src/hooks/usePrompts";
 
 interface VersionsTabProps {
-  agentData: any;
+  agentData?: any;
 }
 
 const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {

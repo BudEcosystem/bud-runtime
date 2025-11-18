@@ -9,7 +9,7 @@ import {
 const { TextArea } = Input;
 
 interface SettingsTabProps {
-  agentData: any;
+  agentData?: any;
 }
 
 const SettingsTab: React.FC<SettingsTabProps> = ({ agentData }) => {

@@ -10,7 +10,7 @@ import { formatTimestampWithTZ } from "@/utils/formatDate";
 const { RangePicker } = DatePicker;
 
 interface LogsTracesTabProps {
-  agentData: any;
+  agentData?: any;
 }
 
 const LogsTracesTab: React.FC<LogsTracesTabProps> = ({ agentData }) => {

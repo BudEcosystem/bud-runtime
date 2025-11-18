@@ -1,13 +1,12 @@
 "use client";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import DashBoardLayout from "../../layout";
 import {
   Text_14_600_B3B3B3,
   Text_14_600_EEEEEE,
 } from "@/components/ui/text";
-import { Tabs, Spin } from "antd";
-import { usePrompts } from "src/hooks/usePrompts";
+import { Tabs } from "antd";
 import OverviewTab from "./overview";
 import VersionsTab from "./versions";
 import CacheTab from "./cache";
@@ -17,44 +16,7 @@ import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 
 const AgentDetailsPage = () => {
   const router = useRouter();
-  const { agentId } = router.query;
   const [activeTab, setActiveTab] = useState("1");
-  const [agentData, setAgentData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (agentId && typeof agentId === "string") {
-      fetchAgentDetails(agentId);
-    }
-  }, [agentId]);
-
-  const { getPromptById } = usePrompts();
-
-  const fetchAgentDetails = async (id: string) => {
-    try {
-      setLoading(true);
-      const data = await getPromptById(id);
-      setAgentData(data);
-    } catch (error) {
-      console.error("Error fetching agent details:", error);
-      // Set fallback data on error
-      setAgentData({
-        id: id,
-        name: "Agent Name",
-        description: "LiveMathBench can capture LLM capabilities in complex reasoning tasks, including challenging latest question sets from various mathematical competitions.",
-        tags: [
-          { name: "tag 1", color: "#965CDE" },
-          { name: "tag 2", color: "#5CADFF" },
-          { name: "tag 3", color: "#22C55E" },
-        ],
-        status: "Active",
-        created_at: new Date().toISOString(),
-        modified_at: new Date().toISOString(),
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const operations = (
     <PrimaryButton
@@ -96,7 +58,7 @@ const AgentDetailsPage = () => {
         </div>
       ),
       key: "1",
-      children: <OverviewTab agentData={agentData} />,
+      children: <OverviewTab />,
     },
     {
       label: (
@@ -109,7 +71,7 @@ const AgentDetailsPage = () => {
         </div>
       ),
       key: "2",
-      children: <VersionsTab agentData={agentData} />,
+      children: <VersionsTab />,
     },
     {
       label: (
@@ -122,7 +84,7 @@ const AgentDetailsPage = () => {
         </div>
       ),
       key: "3",
-      children: <CacheTab agentData={agentData} />,
+      children: <CacheTab />,
     },
     {
       label: (
@@ -135,7 +97,7 @@ const AgentDetailsPage = () => {
         </div>
       ),
       key: "4",
-      children: <LogsTracesTab agentData={agentData} />,
+      children: <LogsTracesTab />,
     },
     {
       label: (
@@ -187,19 +149,9 @@ const AgentDetailsPage = () => {
         </div>
       ),
       key: "8",
-      children: <SettingsTab agentData={agentData} />,
+      children: <SettingsTab />,
     },
   ];
-
-  if (loading) {
-    return (
-      <DashBoardLayout>
-        <div className="flex justify-center items-center h-96">
-          <Spin size="large" />
-        </div>
-      </DashBoardLayout>
-    );
-  }
 
   return (
     <DashBoardLayout>

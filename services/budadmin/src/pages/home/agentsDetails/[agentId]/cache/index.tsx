@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/text";
 
 interface CacheTabProps {
-  agentData: any;
+  agentData?: any;
 }
 
 const CacheTab: React.FC<CacheTabProps> = ({ agentData }) => {

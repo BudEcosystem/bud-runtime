@@ -111,8 +111,7 @@ export const usePrompts = create<{
       }
 
       const response: any = await AppRequest.Get(url, { headers });
-      successToast(response.message || "Prompt details fetched successfully");
-      return response.data;
+      return response.data?.prompt;
     } catch (error) {
       console.error("Error fetching prompt by ID:", error);
       throw error;
