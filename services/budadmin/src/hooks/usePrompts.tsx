@@ -20,6 +20,15 @@ export interface IPrompt {
   model?: Model;
 }
 
+export interface IPromptVersion {
+  id: string;
+  endpoint_name: string;
+  version: number;
+  created_at: string;
+  modified_at: string;
+  is_default_version: boolean;
+}
+
 export type GetPromptsParams = {
   page: number;
   limit: number;
@@ -32,8 +41,13 @@ export const usePrompts = create<{
   prompts: IPrompt[];
   totalRecords: number;
   loading: boolean;
+  versions: IPromptVersion[];
+  currentVersion: IPromptVersion | null;
+  previousVersions: IPromptVersion[];
+  versionsLoading: boolean;
   getPrompts: (params: GetPromptsParams, projectId?: string) => void;
   getPromptById: (promptId: string, projectId?: string) => Promise<any>;
+  getPromptVersions: (promptId: string, projectId?: string) => Promise<void>;
   createPrompt: (data: any, projectId?: string) => Promise<any>;
   deletePrompt: (promptId: string, projectId?: string) => Promise<any>;
   updatePrompt: (promptId: string, data: any, projectId?: string) => Promise<any>;
@@ -41,6 +55,10 @@ export const usePrompts = create<{
   prompts: [],
   totalRecords: 0,
   loading: true,
+  versions: [],
+  currentVersion: null,
+  previousVersions: [],
+  versionsLoading: false,
 
   getPrompts: async (params: GetPromptsParams, projectId?) => {
     const url = `${tempApiBaseUrl}/prompts`;
@@ -98,6 +116,48 @@ export const usePrompts = create<{
     } catch (error) {
       console.error("Error fetching prompt by ID:", error);
       throw error;
+    }
+  },
+
+  getPromptVersions: async (promptId: string, projectId?): Promise<void> => {
+    set({ versionsLoading: true });
+    try {
+      const url = `${tempApiBaseUrl}/prompts/${promptId}/versions`;
+      const headers: any = {};
+      if (projectId) {
+        headers["x-resource-type"] = "project";
+        headers["x-entity-id"] = projectId;
+      }
+
+      const response: any = await AppRequest.Get(url, {
+        params: {
+          page: 1,
+          limit: 100,
+        },
+        headers,
+      });
+
+      const data = response.data;
+      const allVersions = data.versions || [];
+
+      // Separate versions based on is_default_version
+      const current = allVersions.find((v: IPromptVersion) => v.is_default_version);
+      const previous = allVersions.filter((v: IPromptVersion) => !v.is_default_version);
+
+      set({
+        versions: allVersions,
+        currentVersion: current || null,
+        previousVersions: previous,
+      });
+    } catch (error) {
+      console.error("Error fetching prompt versions:", error);
+      set({
+        versions: [],
+        currentVersion: null,
+        previousVersions: [],
+      });
+    } finally {
+      set({ versionsLoading: false });
     }
   },
 

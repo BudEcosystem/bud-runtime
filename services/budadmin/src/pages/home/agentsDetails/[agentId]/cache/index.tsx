@@ -15,7 +15,7 @@ const CacheTab: React.FC<CacheTabProps> = ({ agentData }) => {
   const [cacheTTL, setCacheTTL] = React.useState(3600);
 
   return (
-    <div className="px-[3.5rem] pb-8">
+    <div className="mt-[1rem] pb-8">
       <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
         <Text_14_600_EEEEEE className="mb-6 block">Cache Configuration</Text_14_600_EEEEEE>
 

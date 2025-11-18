@@ -209,7 +209,7 @@ const AgentDetailsPage = () => {
             defaultActiveKey="1"
             activeKey={activeTab}
             onChange={(key) => setActiveTab(key)}
-            tabBarExtraContent={operations}
+            // tabBarExtraContent={operations}
             className="h-full"
             items={agentTabs}
           />

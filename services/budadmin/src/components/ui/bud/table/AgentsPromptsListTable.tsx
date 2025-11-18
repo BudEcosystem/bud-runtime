@@ -297,7 +297,9 @@ function AgentsPromptsListTable() {
                         return {
                             className: 'group cursor-pointer',
                             onClick: () => {
-                                router.push(`/home/agentsDetails/${record.id}`);
+                                router.push(`/projects/${projectId}/agentsDetails/${record.id}`);
+                                // console.log('Row clicked', record);
+                                // console.log(`/projects/${projectId}/agentsDetails/${record.id}`);
                             },
                         };
                     }}
