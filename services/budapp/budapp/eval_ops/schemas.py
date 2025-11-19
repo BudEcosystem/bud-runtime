@@ -29,6 +29,15 @@ class TraitSummary(BaseModel):
     icon: Optional[str] = Field(None, description="The icon for the trait.")
 
 
+class ExperimentModelListItem(BaseModel):
+    """Model item for filtering experiments."""
+
+    id: UUID4 = Field(..., description="The UUID of the model.")
+    name: str = Field(..., description="The name of the model.")
+    deployment_name: Optional[str] = Field(None, description="The deployment name/namespace if deployed.")
+    experiment_count: int = Field(..., description="Number of experiments using this model.")
+
+
 # ------------------------ New Experiment Detail Schemas ------------------------
 
 
@@ -304,6 +313,13 @@ class DeleteExperimentResponse(SuccessResponse):
     """Response schema for deleting an experiment."""
 
     pass
+
+
+class ListExperimentModelsResponse(SuccessResponse):
+    """Response for listing models used in experiments."""
+
+    models: List[ExperimentModelListItem] = Field(..., description="List of models used in experiments.")
+    total_count: int = Field(..., description="Total number of unique models.")
 
 
 # ------------------------ Run Schemas ------------------------
