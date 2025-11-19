@@ -355,19 +355,22 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
                 <Text_12_400_757575> No Data Available </Text_12_400_757575>
               }
             </div>
-            <div className="hR mt-[1.5rem]"></div>
           </div>) : null}
 
-          <div className="pt-[1.3rem]">
+          {datasets && datasets.additional_info.age_distribution && 
+          <>
+            <div className="hR mt-[1.5rem]"></div>
+            <div className="pt-[1.3rem]">
             <Text_14_400_EEEEEE>Age Distribution</Text_14_400_EEEEEE>
             <Text_12_400_757575 className="pt-[.33rem]">
               Following are some of the concepts of this evaluation
             </Text_12_400_757575>
             
-            {datasets && <div className="h-[232px]">
+            <div className="h-[232px]">
               <CompositeChart data={datasets.additional_info.age_distribution}/>
-            </div>}
+            </div>
           </div>
+          </>}
         </div>
       </div>
     </div>
