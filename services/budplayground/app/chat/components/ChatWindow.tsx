@@ -134,8 +134,6 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       if (event.data && event.data.type === 'SET_TYPE_FORM') {
         const typeFormValue = event.data.typeForm;
 
-        console.log('Received typeForm signal:', typeFormValue);
-
         // Update state to show/hide PromptForm based on parent message
         setEnablePromptForm(typeFormValue);
 
@@ -161,22 +159,14 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   useEffect(() => {
     const fetchPromptConfiguration = async () => {
       const promptIds = getPromptIds();
-      console.log('[ChatWindow] fetchPromptConfiguration effect running', {
-        promptIdsLength: promptIds.length,
-        hasAuth: !!(apiKey || accessKey),
-        promptConfig: !!promptConfig
-      });
 
       if (promptIds.length > 0 && (apiKey || accessKey) && !promptConfig) {
-        console.log('[ChatWindow] Fetching prompt configuration for:', promptIds[0]);
         setPromptConfigLoading(true);
 
         try {
           const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
-          console.log('[ChatWindow] Prompt config fetched:', config);
 
           if (config && config.data) {
-            console.log('[ChatWindow] Setting promptConfig:', config.data);
             setPromptConfig(config.data);
 
             // Determine if structured or unstructured
@@ -196,19 +186,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
                              typeof schemaToCheck === 'object' &&
                              Object.keys(schemaToCheck).length > 0;
 
-            console.log('[ChatWindow] Schema analysis:', {
-              input_schema: config.data.input_schema,
-              schemaToCheck,
-              hasSchema
-            });
-
             setIsStructuredPrompt(hasSchema);
-
-            console.log(`[ChatWindow] Prompt type: ${hasSchema ? 'structured' : 'unstructured'}`);
-            console.log('[ChatWindow] State after setting:', {
-              isStructuredPrompt: hasSchema,
-              promptConfig: config.data
-            });
 
             // If unstructured, prepare prompt data for chat body
             if (!hasSchema) {
@@ -228,25 +206,15 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
                 promptPayload.model = config.data.deployment_name;
               }
 
-              console.log('[ChatWindow] Setting promptData for unstructured:', promptPayload);
               setPromptData(promptPayload);
             }
-          } else {
-            console.log('[ChatWindow] No config.data found in response');
           }
         } catch (error) {
           console.error('[ChatWindow] Error fetching prompt config:', error);
           setIsStructuredPrompt(false); // Default to unstructured on error
         } finally {
-          console.log('[ChatWindow] Fetch complete, setting promptConfigLoading to false');
           setPromptConfigLoading(false);
         }
-      } else {
-        console.log('[ChatWindow] Skipping fetch:', {
-          reason: !promptIds.length ? 'no promptIds' :
-                  !(apiKey || accessKey) ? 'no auth' :
-                  'promptConfig already set'
-        });
       }
     };
 
@@ -277,7 +245,6 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         if (matchingEndpoint) {
           setDeployment(chat.id, matchingEndpoint);
           setDeploymentLock(chat.id, true);
-          console.log(`Auto-selected and locked deployment for unstructured prompt: ${matchingEndpoint.name}`);
         } else {
           console.warn(`Deployment '${deploymentName}' not found in available endpoints`);
         }
@@ -369,7 +336,6 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   };
 
   const handleEdit = (content: string, message: Message) => {
-    console.log('handleEdit - setting prompt to:', message);
     message.content = content;
 
     promptRef.current = content;
@@ -382,8 +348,6 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   }
 
   const handlePromptFormSubmit = (data: any) => {
-    console.log('Prompt form submitted with data:', data);
-
     // Set the prompt data for the chat body (includes full data with variables for first message)
     setPromptData(data);
 
@@ -419,17 +383,11 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   };
 
   const handleUnstructuredPromptSubmit = (data: any) => {
-    console.log('Unstructured prompt submitted with data:', data);
-
     // Only set promptData with input for the first message
     // For subsequent messages, promptData already has prompt ID context (set by handleFinish)
     if (messages.length === 0) {
       // First message - include full prompt data with input field
       setPromptData(data);
-      console.log('First message: Setting promptData with input field');
-    } else {
-      // Subsequent messages - don't update promptData to avoid re-sending input field
-      console.log('Follow-up message: Using existing promptData without input field');
     }
 
     // Create user message from the input
@@ -610,21 +568,8 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
           </div>
         </Content>
         <Footer className="sticky bottom-0 !px-[2.6875rem]">
-          {(() => {
-            console.log('[ChatWindow] Render Footer - State:', {
-              promptIdsLength: promptIds.length,
-              isStructuredPrompt,
-              promptConfig: !!promptConfig,
-              status,
-              hasDeployment: !!chat?.selectedDeployment?.name
-            });
-            return null;
-          })()}
-
           {/* Regular chat - no promptIds */}
-          {promptIds.length === 0 && (() => {
-            console.log('[ChatWindow] Rendering: Regular NormalEditor (no promptIds)');
-            return (
+          {promptIds.length === 0 && (
               <NormalEditor
                 isLoading={status === "submitted" || status === "streaming"}
                 error={error}
@@ -645,34 +590,25 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
                 }}
                 input={input}
               />
-            );
-          })()}
+          )}
 
           {/* Unstructured prompt - show UnstructuredPromptInput */}
           {/* Show for unstructured prompts OR while loading (when not confirmed as structured) */}
-          {promptIds.length > 0 && isStructuredPrompt !== true && (() => {
-            console.log('[ChatWindow] Rendering: UnstructuredPromptInput', {
-              promptId: promptIds[0],
-              status,
-              disabled: !chat?.selectedDeployment?.name,
-              isLoading: isStructuredPrompt === null
-            });
-            return (
-              <UnstructuredPromptInput
-                promptId={promptIds[0]}
-                promptVersion={promptConfig?.version}
-                deploymentName={promptConfig?.deployment_name}
-                chatId={chat.id}
-                onSubmit={handleUnstructuredPromptSubmit}
-                status={status}
-                stop={stop}
-                input={input}
-                handleInputChange={handleChange}
-                error={error}
-                disabled={!chat?.selectedDeployment?.name}
-              />
-            );
-          })()}
+          {promptIds.length > 0 && isStructuredPrompt !== true && (
+            <UnstructuredPromptInput
+              promptId={promptIds[0]}
+              promptVersion={promptConfig?.version}
+              deploymentName={promptConfig?.deployment_name}
+              chatId={chat.id}
+              onSubmit={handleUnstructuredPromptSubmit}
+              status={status}
+              stop={stop}
+              input={input}
+              handleInputChange={handleChange}
+              error={error}
+              disabled={!chat?.selectedDeployment?.name}
+            />
+          )}
         </Footer>
 
         {/* Loading state while determining prompt schema type */}
