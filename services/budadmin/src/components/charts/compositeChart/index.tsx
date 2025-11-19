@@ -3,7 +3,7 @@ import * as echarts from "echarts";
 
 interface ChartProps {
   data: {
-    data: string[];
+    data: number[];
     categories: string[];
   };
 }
@@ -66,7 +66,7 @@ const CompositeChart = ({data}: ChartProps) => {
             const isVisible = i < START_COUNT || i >= total - END_COUNT;
             return isVisible ? v : null;   // ⬅️ removes bar + spacing
           }),
-          barWidth:  yData.length > 10 ? yData.length % 10 : 7,
+          barWidth: 7,
           itemStyle: {
             borderRadius: [5, 5, 0, 0],
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [

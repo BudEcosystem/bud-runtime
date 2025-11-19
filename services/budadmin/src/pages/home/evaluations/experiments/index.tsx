@@ -22,7 +22,7 @@ import Tags from "src/flows/components/DrawerTags";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { capitalize } from "@/lib/utils";
 import { endpointStatusMapping } from "@/lib/colorMapping";
-import { useModels } from "@/hooks/useModels";
+import { Model, useModels } from "@/hooks/useModels";
 import dayjs from "dayjs";
 
 
@@ -606,7 +606,7 @@ const ExperimentsTable = () => {
                                   value={tempFilter.model_id}
                                   size="large"
                                   className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                  options={models.map((model: any) => ({
+                                  options={models.map((model: Model) => ({
                                     label: model?.name,
                                     value: model?.id,
                                   }))}
@@ -656,10 +656,10 @@ const ExperimentsTable = () => {
                                   setTempFilter({
                                     ...tempFilter,
                                     created_after: from
-                                      ? from.format("YYYY-MM-DDT00:00:00.000[Z]")
+                                      ? from.startOf('day').toISOString()
                                       : undefined,
                                     created_before: to
-                                      ? to.format("YYYY-MM-DDT00:00:00.000[Z]")
+                                      ? to.endOf('day').toISOString()
                                       : undefined,
                                   });
                                 }}
