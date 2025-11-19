@@ -1,3 +1,6 @@
+imagePullSecrets:
+    - name: harbor-bud
+
 ingress:
     https: internal
     hosts:
@@ -43,6 +46,8 @@ microservices:
         image: budstudio/buddoc:nightly
     budnotify:
         image: budstudio/budnotify:nightly
+    budsentinel:
+        enabled: true
     budprompt:
         image: budstudio/budprompt:nightly
         env:

@@ -17,9 +17,11 @@
 """Service class for interacting with MCP Foundry API."""
 
 import asyncio
+import time
 from typing import Any, Dict, Optional
 
 import aiohttp
+import httpx
 from budmicroframe.commons import logging
 
 from ..commons.config import app_settings
@@ -45,8 +47,11 @@ class MCPFoundryService(metaclass=SingletonMeta):
         self.max_retries = 3
         self.retry_delay = 1  # seconds
 
-        # Initialize session as None, will be created on demand
+        # Initialize async session as None, will be created on demand
         self._session: Optional[aiohttp.ClientSession] = None
+
+        # Initialize sync client as None, will be created on demand
+        self._sync_client: Optional[httpx.Client] = None
 
         logger.debug(f"MCP Foundry service initialized: base_url={self.base_url}, has_api_key={bool(self.api_key)}")
 
@@ -67,6 +72,146 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 connector=connector,
             )
         return self._session
+
+    def _get_sync_client(self) -> httpx.Client:
+        """Get or create the httpx sync client.
+
+        Returns:
+            httpx.Client: The HTTP client for making synchronous requests.
+        """
+        if self._sync_client is None or self._sync_client.is_closed:
+            # Determine if we need to verify SSL based on URL
+            verify_ssl = not self.base_url.startswith("http://")
+
+            self._sync_client = httpx.Client(
+                timeout=httpx.Timeout(30.0),  # Match aiohttp timeout
+                verify=verify_ssl,
+            )
+        return self._sync_client
+
+    def _make_sync_request(
+        self,
+        method: str,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        json_data: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        """Make a synchronous HTTP request to MCP Foundry API with retry logic.
+
+        Args:
+            method: HTTP method (GET, POST, DELETE, etc.)
+            endpoint: API endpoint path
+            params: Query parameters
+            json_data: JSON body data
+            headers: Additional headers
+
+        Returns:
+            Dict[str, Any]: Response data
+
+        Raises:
+            MCPFoundryException: If the request fails after retries
+        """
+        url = f"{self.base_url}{endpoint}"
+
+        # Prepare headers
+        request_headers = headers or {}
+        if self.api_key:
+            request_headers["Authorization"] = f"Bearer {self.api_key}"
+
+        last_exception = None
+
+        for attempt in range(self.max_retries):
+            try:
+                client = self._get_sync_client()
+
+                logger.debug(
+                    "Making MCP Foundry sync request: method=%s, url=%s, attempt=%d, params=%s",
+                    method,
+                    url,
+                    attempt + 1,
+                    params,
+                )
+
+                response = client.request(
+                    method=method,
+                    url=url,
+                    params=params,
+                    json=json_data,
+                    headers=request_headers,
+                )
+
+                # Check status code and raise exception if needed
+                if response.status_code == 401 or response.status_code == 403:
+                    error_msg = f"Authentication failed for MCP Foundry: {response.status_code}"
+                    logger.error(error_msg)
+                    raise MCPFoundryException(error_msg, status_code=response.status_code)
+
+                elif response.status_code == 404:
+                    error_msg = f"Resource not found in MCP Foundry: {endpoint}"
+                    logger.error(error_msg)
+                    raise MCPFoundryException(error_msg, status_code=404)
+
+                elif response.status_code >= 500:
+                    error_msg = f"MCP Foundry server error: {response.status_code}"
+                    logger.error(error_msg)
+                    raise MCPFoundryException(error_msg, status_code=response.status_code)
+
+                elif response.status_code >= 400:
+                    error_text = response.text
+                    error_msg = f"MCP Foundry request failed: {response.status_code} - {error_text}"
+                    logger.error(error_msg)
+                    raise MCPFoundryException(error_msg, status_code=response.status_code)
+
+                # Success - parse response
+                # Handle empty responses (204 No Content, etc.)
+                if response.status_code == 204 or not response.text:
+                    logger.debug(
+                        "MCP Foundry sync request successful: method=%s, url=%s, status=%d (empty response)",
+                        method,
+                        url,
+                        response.status_code,
+                    )
+                    return {}
+
+                data = response.json()
+
+                logger.debug(
+                    "MCP Foundry sync request successful: method=%s, url=%s, status=%d",
+                    method,
+                    url,
+                    response.status_code,
+                )
+
+                return data
+
+            except httpx.ConnectError as e:
+                last_exception = e
+                error_msg = f"Connection error to MCP Foundry: {str(e)}"
+                logger.warning("%s: attempt=%d, max_retries=%d", error_msg, attempt + 1, self.max_retries)
+
+                if attempt < self.max_retries - 1:
+                    time.sleep(self.retry_delay * (attempt + 1))
+                    continue
+
+            except httpx.HTTPError as e:
+                last_exception = e
+                error_msg = f"HTTP error with MCP Foundry: {str(e)}"
+                logger.error(error_msg)
+                raise MCPFoundryException(error_msg, status_code=500) from e
+
+            except Exception as e:
+                if isinstance(e, MCPFoundryException):
+                    raise
+                last_exception = e
+                error_msg = f"Unexpected error with MCP Foundry: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                raise MCPFoundryException(error_msg, status_code=500) from e
+
+        # All retries exhausted
+        error_msg = f"Failed to connect to MCP Foundry after {self.max_retries} attempts: {str(last_exception)}"
+        logger.error(error_msg)
+        raise MCPFoundryException(error_msg, status_code=503)
 
     async def _make_request(
         self,
@@ -239,12 +384,84 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 return {}
             raise
 
+    def delete_gateway_sync(
+        self,
+        gateway_id: str,
+    ) -> Dict[str, Any]:
+        """Delete a gateway from MCP Foundry (synchronous version for workflows).
+
+        When a gateway is deleted, MCP Foundry automatically removes
+        all tools associated with this gateway from the virtual server.
+
+        Args:
+            gateway_id: The gateway ID to delete
+
+        Returns:
+            Response from MCP Foundry (may be empty dict on success)
+
+        Raises:
+            MCPFoundryException: If deletion fails (except 404 or 400 with "Gateway not found")
+        """
+        try:
+            response = self._make_sync_request(
+                method="DELETE",
+                endpoint=f"/gateways/{gateway_id}",
+            )
+            logger.debug("Successfully deleted gateway %s (sync)", gateway_id)
+            return response
+
+        except MCPFoundryException as e:
+            # Handle both 404 and 400 with "Gateway not found" message
+            if e.status_code == 404 or (e.status_code == 400 and "Gateway not found" in e.message):
+                # Gateway already deleted or doesn't exist - this is okay
+                logger.warning("Gateway %s not found (already deleted): %s", gateway_id, e.message)
+                return {}
+            raise
+
+    def delete_virtual_server_sync(
+        self,
+        server_id: str,
+    ) -> Dict[str, Any]:
+        """Delete a virtual server from MCP Foundry (synchronous version for workflows).
+
+        Args:
+            server_id: The virtual server ID to delete
+
+        Returns:
+            Response from MCP Foundry (may be empty dict on success)
+
+        Raises:
+            MCPFoundryException: If deletion fails (except 404)
+        """
+        try:
+            response = self._make_sync_request(
+                method="DELETE",
+                endpoint=f"/servers/{server_id}",
+            )
+            logger.debug("Successfully deleted virtual server %s (sync)", server_id)
+            return response
+
+        except MCPFoundryException as e:
+            # Handle both 404 and 400 with "Server not found" message
+            if e.status_code == 404 or (e.status_code == 400 and "Server not found" in e.message):
+                # Server already deleted or doesn't exist - this is okay
+                logger.warning("Server %s not found (already deleted): %s", server_id, e.message)
+                return {}
+            raise
+
     async def close(self):
-        """Close the HTTP session."""
+        """Close both async and sync HTTP clients."""
+        # Close async session
         if self._session and not self._session.closed:
             await self._session.close()
             self._session = None
-            logger.debug("MCP Foundry service session closed")
+            logger.debug("MCP Foundry async session closed")
+
+        # Close sync client
+        if self._sync_client and not self._sync_client.is_closed:
+            self._sync_client.close()
+            self._sync_client = None
+            logger.debug("MCP Foundry sync client closed")
 
     async def __aenter__(self):
         """Async context manager entry."""
