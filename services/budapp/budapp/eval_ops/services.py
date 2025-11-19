@@ -2067,6 +2067,61 @@ class ExperimentService:
             page_size=page_size,
         )
 
+    def get_experiment_summary(self, experiment_id: uuid.UUID, user_id: uuid.UUID):
+        """Get summary statistics for an experiment.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+            user_id (uuid.UUID): ID of the user.
+
+        Returns:
+            ExperimentSummary: Summary statistics including run counts and total duration.
+
+        Raises:
+            HTTPException(status_code=404): If experiment not found or access denied.
+        """
+        from budapp.eval_ops.schemas import ExperimentSummary
+
+        # Verify experiment exists and user has access
+        experiment = self.session.get(ExperimentModel, experiment_id)
+        if not experiment or experiment.status == ExperimentStatusEnum.DELETED.value:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
+            )
+
+        # Get all runs for the experiment (excluding deleted runs)
+        runs = (
+            self.session.query(RunModel)
+            .filter(
+                RunModel.experiment_id == experiment_id,
+                RunModel.status != RunStatusEnum.DELETED.value,
+            )
+            .all()
+        )
+
+        # Count runs by status
+        total_runs = len(runs)
+        completed_runs = sum(1 for run in runs if run.status == RunStatusEnum.COMPLETED.value)
+        failed_runs = sum(1 for run in runs if run.status == RunStatusEnum.FAILED.value)
+        pending_runs = sum(1 for run in runs if run.status == RunStatusEnum.PENDING.value)
+        running_runs = sum(1 for run in runs if run.status == RunStatusEnum.RUNNING.value)
+
+        # Get all evaluations for the experiment to sum up duration
+        evaluations = self.session.query(EvaluationModel).filter(EvaluationModel.experiment_id == experiment_id).all()
+
+        # Sum up total duration from all evaluations
+        total_duration_seconds = sum(evaluation.duration_in_seconds or 0 for evaluation in evaluations)
+
+        return ExperimentSummary(
+            total_runs=total_runs,
+            total_duration_seconds=total_duration_seconds,
+            completed_runs=completed_runs,
+            failed_runs=failed_runs,
+            pending_runs=pending_runs,
+            running_runs=running_runs,
+        )
+
     # ------------------------ Experiment Evaluations Methods ------------------------
 
     async def get_experiment_evaluations(self, experiment_id: uuid.UUID, user_id: uuid.UUID) -> dict:
