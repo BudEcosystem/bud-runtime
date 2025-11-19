@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 import aiohttp
 from budmicroframe.commons.schemas import WorkflowMetadataResponse
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -2198,36 +2198,36 @@ class ExperimentService:
                 detail="Experiment not found or access denied",
             )
 
-        # Get all runs for the experiment (excluding deleted runs)
-        runs = (
-            self.session.query(RunModel)
+        # Efficiently count runs by status in a single query using database-level aggregation
+        run_stats = (
+            self.session.query(
+                func.count(RunModel.id).label("total"),
+                func.sum(case((RunModel.status == RunStatusEnum.COMPLETED.value, 1), else_=0)).label("completed"),
+                func.sum(case((RunModel.status == RunStatusEnum.FAILED.value, 1), else_=0)).label("failed"),
+                func.sum(case((RunModel.status == RunStatusEnum.PENDING.value, 1), else_=0)).label("pending"),
+                func.sum(case((RunModel.status == RunStatusEnum.RUNNING.value, 1), else_=0)).label("running"),
+            )
             .filter(
                 RunModel.experiment_id == experiment_id,
                 RunModel.status != RunStatusEnum.DELETED.value,
             )
-            .all()
+            .one()
         )
 
-        # Count runs by status
-        total_runs = len(runs)
-        completed_runs = sum(1 for run in runs if run.status == RunStatusEnum.COMPLETED.value)
-        failed_runs = sum(1 for run in runs if run.status == RunStatusEnum.FAILED.value)
-        pending_runs = sum(1 for run in runs if run.status == RunStatusEnum.PENDING.value)
-        running_runs = sum(1 for run in runs if run.status == RunStatusEnum.RUNNING.value)
-
-        # Get all evaluations for the experiment to sum up duration
-        evaluations = self.session.query(EvaluationModel).filter(EvaluationModel.experiment_id == experiment_id).all()
-
-        # Sum up total duration from all evaluations
-        total_duration_seconds = sum(evaluation.duration_in_seconds or 0 for evaluation in evaluations)
+        # Efficiently sum up total duration from all evaluations in a single query
+        total_duration_seconds = (
+            self.session.query(func.coalesce(func.sum(EvaluationModel.duration_in_seconds), 0))
+            .filter(EvaluationModel.experiment_id == experiment_id)
+            .scalar()
+        )
 
         return ExperimentSummary(
-            total_runs=total_runs,
-            total_duration_seconds=total_duration_seconds,
-            completed_runs=completed_runs,
-            failed_runs=failed_runs,
-            pending_runs=pending_runs,
-            running_runs=running_runs,
+            total_runs=run_stats.total or 0,
+            total_duration_seconds=int(total_duration_seconds),
+            completed_runs=run_stats.completed or 0,
+            failed_runs=run_stats.failed or 0,
+            pending_runs=run_stats.pending or 0,
+            running_runs=run_stats.running or 0,
         )
 
     # ------------------------ Experiment Evaluations Methods ------------------------
