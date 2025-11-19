@@ -18,6 +18,15 @@ export interface IPrompt {
   created_at: string;
   modified_at?: string;
   model?: Model;
+  system_prompt?: string;
+  prompt_messages?: string;
+  settings?: {
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    stream?: boolean;
+  };
+  llm_retry_limit?: number;
 }
 
 export interface IPromptVersion {
@@ -46,7 +55,7 @@ export const usePrompts = create<{
   previousVersions: IPromptVersion[];
   versionsLoading: boolean;
   getPrompts: (params: GetPromptsParams, projectId?: string) => void;
-  getPromptById: (promptId: string, projectId?: string) => Promise<any>;
+  getPromptById: (promptId: string, projectId?: string) => Promise<IPrompt>;
   getPromptVersions: (promptId: string, projectId?: string) => Promise<void>;
   createPrompt: (data: any, projectId?: string) => Promise<any>;
   deletePrompt: (promptId: string, projectId?: string) => Promise<any>;
@@ -101,7 +110,7 @@ export const usePrompts = create<{
     }
   },
 
-  getPromptById: async (promptId: string, projectId?): Promise<any> => {
+  getPromptById: async (promptId: string, projectId?): Promise<IPrompt> => {
     try {
       const url = `${tempApiBaseUrl}/prompts/${promptId}`;
       const headers: any = {};
