@@ -19,7 +19,8 @@ interface LoadModelProps {
 export default function LoadModel(props: LoadModelProps) {
     const { endpoints, getEndPoints, isReady } = useEndPoints();
     const chat = useChatStore.getState().getChat(props.chatId);
-    const { setDeployment } = useChatStore();
+    const { setDeployment, isDeploymentLocked } = useChatStore();
+    const isLocked = isDeploymentLocked(props.chatId);
 
     const [sortBy, setSortBy] = React.useState("recency");
     const [sortOrder, setSortOrder] = React.useState("desc");
@@ -61,7 +62,7 @@ export default function LoadModel(props: LoadModelProps) {
             <BlurModal
                 width="520px"
                 height="400px"
-                open={props.open}
+                open={props.open && !isLocked}
                 onClose={() => props.setOpen(false)}
                 ref={containerRef}
             >
@@ -167,8 +168,14 @@ export default function LoadModel(props: LoadModelProps) {
             {chat?.selectedDeployment ? (
                 <Button
                     type="default"
-                    className="w-[12.25rem] 2rem border-[1px] border-[#1F1F1F]"
-                    onClick={() => props.setOpen(!props.open)}
+                    className={`w-[12.25rem] 2rem border-[1px] border-[#1F1F1F] ${isLocked ? 'cursor-not-allowed opacity-75' : ''}`}
+                    onClick={() => {
+                        if (!isLocked) {
+                            props.setOpen(!props.open);
+                        }
+                    }}
+                    disabled={isLocked}
+                    title={isLocked ? 'Model selection locked by prompt configuration' : 'Change model'}
                 >
                     <Image
                         src={typeof chat.selectedDeployment.model === 'string'
@@ -182,7 +189,9 @@ export default function LoadModel(props: LoadModelProps) {
                             height: ".875rem",
                         }}
                     />
-                    <Text_12_400_EEEEEE className="Open-Sans">{chat.selectedDeployment.name}</Text_12_400_EEEEEE>
+                    <Text_12_400_EEEEEE className="Open-Sans">
+                        {chat.selectedDeployment.name}
+                    </Text_12_400_EEEEEE>
                 </Button>
             ) : (
                 <Button
