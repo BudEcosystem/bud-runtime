@@ -599,7 +599,6 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
               promptId={promptIds[0]}
               promptVersion={promptConfig?.version}
               deploymentName={promptConfig?.deployment_name}
-              chatId={chat.id}
               onSubmit={handleUnstructuredPromptSubmit}
               status={status}
               stop={stop}

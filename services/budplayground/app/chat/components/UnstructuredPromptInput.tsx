@@ -6,7 +6,6 @@ interface UnstructuredPromptInputProps {
   promptId: string;
   promptVersion?: string;
   deploymentName?: string;
-  chatId: string;
   onSubmit: (data: any) => void;
   status: string;
   stop: () => void;
@@ -51,8 +50,6 @@ export default function UnstructuredPromptInput({
     if (deploymentName && typeof deploymentName === 'string') {
       payload.model = deploymentName;
     }
-
-    console.log('Unstructured prompt payload:', payload);
 
     // Call parent submit handler
     onSubmit(payload);
