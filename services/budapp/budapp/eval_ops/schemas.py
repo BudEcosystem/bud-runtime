@@ -970,3 +970,20 @@ class RunHistoryResponse(SuccessResponse):
     """Response for run history endpoint."""
 
     runs_history: RunHistoryData = Field(..., description="Run history data")
+
+
+class ExperimentSummary(BaseModel):
+    """Summary statistics for an experiment."""
+
+    total_runs: int = Field(..., description="Total number of runs in the experiment")
+    total_duration_seconds: int = Field(..., description="Total duration of all evaluations in seconds")
+    completed_runs: int = Field(..., description="Number of completed runs")
+    failed_runs: int = Field(..., description="Number of failed runs")
+    pending_runs: int = Field(..., description="Number of pending runs")
+    running_runs: int = Field(..., description="Number of currently running runs")
+
+
+class ExperimentSummaryResponse(SuccessResponse):
+    """Response for experiment summary endpoint."""
+
+    summary: ExperimentSummary = Field(..., description="Experiment summary data")
