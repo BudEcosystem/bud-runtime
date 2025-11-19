@@ -251,6 +251,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     };
 
     fetchPromptConfiguration();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getPromptIds, apiKey, accessKey]);
 
   // Fetch endpoints when prompt config has deployment_name (for unstructured prompts)
