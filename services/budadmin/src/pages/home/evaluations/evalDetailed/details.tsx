@@ -348,7 +348,10 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
             <div className="flex flex-wrap gap-2 mt-3">
               {datasets.additional_info?.[item?.keyName] ?
                 (datasets.additional_info?.[item?.keyName] || []).map((tag) => <Tags
-                  name={tag}
+                  name={tag
+                    .split("_")
+                    .join(" ")
+                  }
                   color="#D1B854"
                   classNames="text-center justify-center items-center capitalize"
                 />) :
