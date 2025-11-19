@@ -95,6 +95,18 @@ interface AgentStore {
   isEditMode: boolean;
   editingPromptId: string | null;
 
+  // Add Version Mode
+  isAddVersionMode: boolean;
+  addVersionPromptId: string | null;
+
+  // Edit Version Mode
+  isEditVersionMode: boolean;
+  editVersionData: {
+    versionId: string;
+    versionNumber: number;
+    isDefault: boolean;
+  } | null;
+
   // Deleted prompts tracking
   deletedPromptIds: Array<{sessionId: string; promptId: string}>;
 
@@ -126,6 +138,16 @@ interface AgentStore {
   setEditMode: (promptId: string) => void;
   clearEditMode: () => void;
   loadPromptForEdit: (promptId: string, sessionData: Partial<AgentSession>) => void;
+
+  // Add Version Mode Actions
+  setAddVersionMode: (promptId: string) => void;
+  clearAddVersionMode: () => void;
+  loadPromptForAddVersion: (promptId: string, sessionData: Partial<AgentSession>) => void;
+
+  // Edit Version Mode Actions
+  setEditVersionMode: (versionData: { versionId: string; versionNumber: number; isDefault: boolean }) => void;
+  clearEditVersionMode: () => void;
+  loadPromptForEditVersion: (promptId: string, versionData: { versionId: string; versionNumber: number; isDefault: boolean }, sessionData: Partial<AgentSession>) => void;
 
   // Bulk Actions
   clearAllSessions: () => void;
@@ -202,6 +224,10 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       },
       isEditMode: false,
       editingPromptId: null,
+      isAddVersionMode: false,
+      addVersionPromptId: null,
+      isEditVersionMode: false,
+      editVersionData: null,
       deletedPromptIds: [],
 
       // Session Management
@@ -424,7 +450,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         const { workflowContext } = get();
         const nextStep = workflowContext.nextStep;
 
-        // Close the drawer first and clear edit mode
+        // Close the drawer first and clear edit mode, add version mode, and edit version mode
         set({
           isAgentDrawerOpen: false,
           workflowContext: {
@@ -432,7 +458,11 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
             nextStep: null,
           },
           isEditMode: false,
-          editingPromptId: null
+          editingPromptId: null,
+          isAddVersionMode: false,
+          addVersionPromptId: null,
+          isEditVersionMode: false,
+          editVersionData: null
         });
 
         // If we're in a workflow and have a next step, trigger it after closing
@@ -512,6 +542,74 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       addDeletedPromptId: (sessionId, promptId) => {
         set({
           deletedPromptIds: [...get().deletedPromptIds, { sessionId, promptId }]
+        });
+      },
+
+      // Add Version Mode Actions
+      setAddVersionMode: (promptId: string) => {
+        set({
+          isAddVersionMode: true,
+          addVersionPromptId: promptId
+        });
+      },
+
+      clearAddVersionMode: () => {
+        set({
+          isAddVersionMode: false,
+          addVersionPromptId: null
+        });
+      },
+
+      loadPromptForAddVersion: (promptId: string, sessionData: Partial<AgentSession>) => {
+        // Clear existing sessions and create a new one with the prompt data
+        const newSession: AgentSession = {
+          ...createDefaultSession(),
+          ...sessionData,
+          id: generateId(), // Generate new session ID
+          promptId: promptId, // Use the provided promptId for version creation
+          updatedAt: new Date(),
+        };
+
+        set({
+          sessions: [newSession],
+          activeSessionIds: [newSession.id],
+          selectedSessionId: newSession.id,
+          isAddVersionMode: true,
+          addVersionPromptId: promptId
+        });
+      },
+
+      // Edit Version Mode Actions
+      setEditVersionMode: (versionData: { versionId: string; versionNumber: number; isDefault: boolean }) => {
+        set({
+          isEditVersionMode: true,
+          editVersionData: versionData
+        });
+      },
+
+      clearEditVersionMode: () => {
+        set({
+          isEditVersionMode: false,
+          editVersionData: null
+        });
+      },
+
+      loadPromptForEditVersion: (promptId: string, versionData: { versionId: string; versionNumber: number; isDefault: boolean }, sessionData: Partial<AgentSession>) => {
+        // Clear existing sessions and create a new one with the prompt data for editing
+        const newSession: AgentSession = {
+          ...createDefaultSession(),
+          ...sessionData,
+          id: generateId(), // Generate new session ID
+          promptId: promptId, // Use the provided promptId
+          updatedAt: new Date(),
+        };
+
+        set({
+          sessions: [newSession],
+          activeSessionIds: [newSession.id],
+          selectedSessionId: newSession.id,
+          isEditVersionMode: true,
+          editVersionData: versionData
         });
       }
     }));

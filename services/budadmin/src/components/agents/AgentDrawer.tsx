@@ -26,6 +26,10 @@ const AgentDrawer: React.FC = () => {
     isEditMode,
     editingPromptId,
     clearEditMode,
+    isAddVersionMode,
+    addVersionPromptId,
+    isEditVersionMode,
+    editVersionData,
   } = useAgentStore();
 
   const { openDrawerWithStep, step, currentFlow } = useDrawer();
@@ -106,16 +110,16 @@ const AgentDrawer: React.FC = () => {
       return;
     }
 
-    // Don't create a new session if in edit mode (session already loaded)
-    if (isEditMode) {
+    // Don't create a new session if in edit mode, add version mode, or edit version mode (session already loaded)
+    if (isEditMode || isAddVersionMode || isEditVersionMode) {
       return;
     }
 
-    // Only create session if none exist AND not OAuth callback AND not in edit mode
+    // Only create session if none exist AND not OAuth callback AND not in any special mode
     if (activeSessions.length === 0) {
       createSession();
     }
-  }, [isAgentDrawerOpen, activeSessions.length, createSession, isEditMode]);
+  }, [isAgentDrawerOpen, activeSessions.length, createSession, isEditMode, isAddVersionMode, isEditVersionMode]);
 
   // Set first session as active by default
   useEffect(() => {
@@ -344,6 +348,9 @@ const AgentDrawer: React.FC = () => {
                               totalSessions={numBoxes}
                               isActive={activeBoxId === session.id}
                               onActivate={() => setActiveBoxId(session.id)}
+                              isAddVersionMode={isAddVersionMode}
+                              isEditVersionMode={isEditVersionMode}
+                              editVersionData={editVersionData}
                             />
                           </div>
                         );

@@ -13,6 +13,10 @@ import { formatDate } from "src/utils/formatDate";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import Tags from "src/flows/components/DrawerTags";
 import { usePrompts, IPromptVersion } from "src/hooks/usePrompts";
+import { useAgentStore } from "@/stores/useAgentStore";
+import { AppRequest } from "src/pages/api/requests";
+import { tempApiBaseUrl } from "@/components/environment";
+import { errorToast } from "@/components/toast";
 
 interface VersionsTabProps {
   agentData?: any;
@@ -28,7 +32,15 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
     previousVersions,
     versionsLoading,
     getPromptVersions,
+    getPromptById,
   } = usePrompts();
+
+  // Use agent store for opening drawer in add version mode and edit version mode
+  const {
+    openAgentDrawer,
+    loadPromptForAddVersion,
+    loadPromptForEditVersion,
+  } = useAgentStore();
 
   // Fetch data when component mounts or agentId changes
   useEffect(() => {
@@ -37,12 +49,142 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
     }
   }, [id, projectId]);
 
+  // Listen for version created event to refresh the list
+  useEffect(() => {
+    const handleVersionCreated = () => {
+      if (id && typeof id === "string") {
+        getPromptVersions(id, projectId as string);
+      }
+    };
+
+    window.addEventListener('versionCreated', handleVersionCreated);
+
+    return () => {
+      window.removeEventListener('versionCreated', handleVersionCreated);
+    };
+  }, [id, projectId, getPromptVersions]);
+
+  // Handle Add Version button click
+  const handleAddVersion = async () => {
+    if (!id || typeof id !== "string") {
+      errorToast("Invalid prompt ID");
+      return;
+    }
+
+    try {
+      // Fetch the prompt data
+      const promptData = await getPromptById(id, projectId as string);
+
+      if (!promptData) {
+        errorToast("Failed to load prompt data");
+        return;
+      }
+
+      // Prepare session data from prompt
+      const sessionData = {
+        name: promptData.name || promptData.prompt_name || "New Version",
+        systemPrompt: "", // Will be configured in the drawer
+        promptMessages: "",
+        // Additional fields can be populated if available in promptData
+      };
+
+      // Load prompt data into agent store for add version mode
+      loadPromptForAddVersion(id, sessionData);
+
+      // Open the agent drawer
+      openAgentDrawer();
+    } catch (error) {
+      console.error("Error loading prompt for add version:", error);
+      errorToast("Failed to load prompt for adding version");
+    }
+  };
+
+  // Handle Edit Version button click
+  const handleEditVersion = async (versionData: IPromptVersion) => {
+    if (!id || typeof id !== "string") {
+      errorToast("Invalid prompt ID");
+      return;
+    }
+
+    try {
+      // Fetch the prompt data
+      const promptData = await getPromptById(id, projectId as string);
+
+      if (!promptData) {
+        errorToast("Failed to load prompt data");
+        return;
+      }
+
+      // Fetch endpoint/deployment details based on endpoint_name
+      let selectedDeployment = null;
+      if (versionData.endpoint_name) {
+        try {
+          const endpointResponse: any = await AppRequest.Get(
+            `${tempApiBaseUrl}/playground/deployments`,
+            {
+              params: {
+                name: versionData.endpoint_name,
+                project_id: projectId,
+                page: 1,
+                limit: 1,
+                search: true
+              }
+            }
+          );
+
+          if (endpointResponse?.data?.endpoints && endpointResponse.data.endpoints.length > 0) {
+            const endpoint = endpointResponse.data.endpoints[0];
+            selectedDeployment = {
+              id: endpoint.id,
+              name: endpoint.model.name,
+              model: {
+                icon: endpoint.model.icon || endpoint.model.uri,
+                provider: endpoint.model.provider
+              }
+            };
+            console.log("Pre-selected deployment for edit version:", selectedDeployment);
+          }
+        } catch (endpointError) {
+          console.warn("Failed to fetch endpoint details, user will need to select manually:", endpointError);
+          // Don't show error - graceful degradation, user can select manually
+        }
+      }
+
+      // Prepare session data from prompt
+      const sessionData: any = {
+        name: promptData.name || promptData.prompt_name || `Edit Version ${versionData.version}`,
+        systemPrompt: "", // Will be loaded from version data if available
+        promptMessages: "",
+        // Additional fields can be populated if available in promptData
+      };
+
+      // Add selected deployment if found
+      if (selectedDeployment) {
+        sessionData.selectedDeployment = selectedDeployment;
+      }
+
+      // Prepare version metadata
+      const versionMetadata = {
+        versionId: versionData.id,
+        versionNumber: versionData.version,
+        isDefault: versionData.is_default_version
+      };
+
+      // Load prompt data into agent store for edit version mode
+      loadPromptForEditVersion(id, versionMetadata, sessionData);
+
+      // Open the agent drawer
+      openAgentDrawer();
+    } catch (error) {
+      console.error("Error loading prompt for edit version:", error);
+      errorToast("Failed to load prompt for editing version");
+    }
+  };
+
   const VersionCard = ({
-    versionData,
-    showDeploy = false
+    versionData
   }: {
     versionData: IPromptVersion;
-    showDeploy?: boolean;
   }) => (
     <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-[.9rem] flex items-center justify-between mb-4">
       <div className="flex items-center gap-6">
@@ -80,7 +222,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
       <div className="flex items-center gap-2">
         <PrimaryButton
           className="px-[.1rem]"
-          onClick={() => { }}
+          onClick={() => handleEditVersion(versionData)}
         >
           <div className="flex justify-center items-center gap-1">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -89,7 +231,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
             Edit
           </div>
         </PrimaryButton>
-        {showDeploy && (
+        {/* {showDeploy && (
           <PrimaryButton
             className="px-[.1rem]"
             onClick={() => { }}
@@ -101,7 +243,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
               Deploy
             </div>
           </PrimaryButton>
-        )}
+        )} */}
       </div>
     </div>
   );
@@ -123,9 +265,9 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
           <Text_24_600_FFFFFF>Current Version</Text_24_600_FFFFFF>
           <PrimaryButton
             className=" px-6"
-            onClick={() => { }}
+            onClick={handleAddVersion}
           >
-            Add Version
+            + Version
           </PrimaryButton>
         </div>
         {currentVersion ? (
@@ -142,7 +284,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
         <Text_24_600_FFFFFF className="block mb-6">Previous Version</Text_24_600_FFFFFF>
         {previousVersions.length > 0 ? (
           previousVersions.map((version) => (
-            <VersionCard key={version.id} versionData={version} showDeploy={true} />
+            <VersionCard key={version.id} versionData={version} />
           ))
         ) : (
           <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 text-center">

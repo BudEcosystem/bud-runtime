@@ -47,110 +47,110 @@ const AgentDetailsPage = () => {
   );
 
   const agentTabs = [
+    // {
+    //   label: (
+    //     <div className="flex items-center gap-[0.375rem]">
+    //       {activeTab === "1" ? (
+    //         <Text_14_600_EEEEEE>Prompt Home</Text_14_600_EEEEEE>
+    //       ) : (
+    //         <Text_14_600_B3B3B3>Prompt Home</Text_14_600_B3B3B3>
+    //       )}
+    //     </div>
+    //   ),
+    //   key: "1",
+    //   children: <OverviewTab />,
+    // },
     {
       label: (
         <div className="flex items-center gap-[0.375rem]">
           {activeTab === "1" ? (
-            <Text_14_600_EEEEEE>Prompt Home</Text_14_600_EEEEEE>
-          ) : (
-            <Text_14_600_B3B3B3>Prompt Home</Text_14_600_B3B3B3>
-          )}
-        </div>
-      ),
-      key: "1",
-      children: <OverviewTab />,
-    },
-    {
-      label: (
-        <div className="flex items-center gap-[0.375rem]">
-          {activeTab === "2" ? (
             <Text_14_600_EEEEEE>Versions</Text_14_600_EEEEEE>
           ) : (
             <Text_14_600_B3B3B3>Versions</Text_14_600_B3B3B3>
           )}
         </div>
       ),
-      key: "2",
+      key: "1",
       children: <VersionsTab />,
     },
-    {
-      label: (
-        <div className="flex items-center gap-[0.375rem]">
-          {activeTab === "3" ? (
-            <Text_14_600_EEEEEE>Cache</Text_14_600_EEEEEE>
-          ) : (
-            <Text_14_600_B3B3B3>Cache</Text_14_600_B3B3B3>
-          )}
-        </div>
-      ),
-      key: "3",
-      children: <CacheTab />,
-    },
-    {
-      label: (
-        <div className="flex items-center gap-[0.375rem]">
-          {activeTab === "4" ? (
-            <Text_14_600_EEEEEE>Logs & Traces</Text_14_600_EEEEEE>
-          ) : (
-            <Text_14_600_B3B3B3>Logs & Traces</Text_14_600_B3B3B3>
-          )}
-        </div>
-      ),
-      key: "4",
-      children: <LogsTracesTab />,
-    },
-    {
-      label: (
-        <div className="flex items-center gap-[0.375rem]">
-          {activeTab === "5" ? (
-            <Text_14_600_EEEEEE>Bud Sentinel</Text_14_600_EEEEEE>
-          ) : (
-            <Text_14_600_B3B3B3>Bud Sentinel</Text_14_600_B3B3B3>
-          )}
-        </div>
-      ),
-      key: "5",
-      children: <div className="p-6 text-center text-gray-400">Bud Sentinel - Coming Soon</div>,
-    },
-    {
-      label: (
-        <div className="flex items-center gap-[0.375rem]">
-          {activeTab === "6" ? (
-            <Text_14_600_EEEEEE>FinOps</Text_14_600_EEEEEE>
-          ) : (
-            <Text_14_600_B3B3B3>FinOps</Text_14_600_B3B3B3>
-          )}
-        </div>
-      ),
-      key: "6",
-      children: <div className="p-6 text-center text-gray-400">FinOps - Coming Soon</div>,
-    },
-    {
-      label: (
-        <div className="flex items-center gap-[0.375rem]">
-          {activeTab === "7" ? (
-            <Text_14_600_EEEEEE>Users</Text_14_600_EEEEEE>
-          ) : (
-            <Text_14_600_B3B3B3>Users</Text_14_600_B3B3B3>
-          )}
-        </div>
-      ),
-      key: "7",
-      children: <div className="p-6 text-center text-gray-400">Users - Coming Soon</div>,
-    },
-    {
-      label: (
-        <div className="flex items-center gap-[0.375rem]">
-          {activeTab === "8" ? (
-            <Text_14_600_EEEEEE>Settings</Text_14_600_EEEEEE>
-          ) : (
-            <Text_14_600_B3B3B3>Settings</Text_14_600_B3B3B3>
-          )}
-        </div>
-      ),
-      key: "8",
-      children: <SettingsTab />,
-    },
+    // {
+    //   label: (
+    //     <div className="flex items-center gap-[0.375rem]">
+    //       {activeTab === "3" ? (
+    //         <Text_14_600_EEEEEE>Cache</Text_14_600_EEEEEE>
+    //       ) : (
+    //         <Text_14_600_B3B3B3>Cache</Text_14_600_B3B3B3>
+    //       )}
+    //     </div>
+    //   ),
+    //   key: "3",
+    //   children: <CacheTab />,
+    // },
+    // {
+    //   label: (
+    //     <div className="flex items-center gap-[0.375rem]">
+    //       {activeTab === "4" ? (
+    //         <Text_14_600_EEEEEE>Logs & Traces</Text_14_600_EEEEEE>
+    //       ) : (
+    //         <Text_14_600_B3B3B3>Logs & Traces</Text_14_600_B3B3B3>
+    //       )}
+    //     </div>
+    //   ),
+    //   key: "4",
+    //   children: <LogsTracesTab />,
+    // },
+    // {
+    //   label: (
+    //     <div className="flex items-center gap-[0.375rem]">
+    //       {activeTab === "5" ? (
+    //         <Text_14_600_EEEEEE>Bud Sentinel</Text_14_600_EEEEEE>
+    //       ) : (
+    //         <Text_14_600_B3B3B3>Bud Sentinel</Text_14_600_B3B3B3>
+    //       )}
+    //     </div>
+    //   ),
+    //   key: "5",
+    //   children: <div className="p-6 text-center text-gray-400">Bud Sentinel - Coming Soon</div>,
+    // },
+    // {
+    //   label: (
+    //     <div className="flex items-center gap-[0.375rem]">
+    //       {activeTab === "6" ? (
+    //         <Text_14_600_EEEEEE>FinOps</Text_14_600_EEEEEE>
+    //       ) : (
+    //         <Text_14_600_B3B3B3>FinOps</Text_14_600_B3B3B3>
+    //       )}
+    //     </div>
+    //   ),
+    //   key: "6",
+    //   children: <div className="p-6 text-center text-gray-400">FinOps - Coming Soon</div>,
+    // },
+    // {
+    //   label: (
+    //     <div className="flex items-center gap-[0.375rem]">
+    //       {activeTab === "7" ? (
+    //         <Text_14_600_EEEEEE>Users</Text_14_600_EEEEEE>
+    //       ) : (
+    //         <Text_14_600_B3B3B3>Users</Text_14_600_B3B3B3>
+    //       )}
+    //     </div>
+    //   ),
+    //   key: "7",
+    //   children: <div className="p-6 text-center text-gray-400">Users - Coming Soon</div>,
+    // },
+    // {
+    //   label: (
+    //     <div className="flex items-center gap-[0.375rem]">
+    //       {activeTab === "8" ? (
+    //         <Text_14_600_EEEEEE>Settings</Text_14_600_EEEEEE>
+    //       ) : (
+    //         <Text_14_600_B3B3B3>Settings</Text_14_600_B3B3B3>
+    //       )}
+    //     </div>
+    //   ),
+    //   key: "8",
+    //   children: <SettingsTab />,
+    // },
   ];
 
   return (
