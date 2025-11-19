@@ -113,7 +113,7 @@ def list_experiments(
     search: Annotated[
         Optional[str], Query(min_length=1, max_length=100, description="Search experiments by name (case-insensitive)")
     ] = None,
-    status: Annotated[
+    experiment_status: Annotated[
         Optional[str],
         Query(description="Filter by status: running, completed, no_runs"),
     ] = None,
@@ -134,7 +134,7 @@ def list_experiments(
     - **search**: Optional search query to filter by experiment name (case-insensitive substring match).
     - **project_id**: Optional filter by project ID.
     - **id**: Optional filter by experiment ID.
-    - **status**: Optional filter by computed status (running/completed/no_runs).
+    - **experiment_status**: Optional filter by computed status (running/completed/no_runs).
     - **model_id**: Optional filter by model ID used in experiment runs.
     - **created_after**: Optional filter for experiments created after this date (ISO 8601 format).
     - **created_before**: Optional filter for experiments created before this date (ISO 8601 format).
@@ -155,7 +155,7 @@ def list_experiments(
             project_id=project_id,
             experiment_id=id,
             search_query=search,
-            status=status,
+            status=experiment_status,
             model_id=model_id,
             created_after=created_after,
             created_before=created_before,
