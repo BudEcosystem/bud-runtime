@@ -271,7 +271,7 @@ def list_datasets(
     current_user: Annotated[User, Depends(get_current_active_user)],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
-    name: Annotated[Optional[str], Query(description="Filter by dataset name")] = None,
+    name: Annotated[Optional[str], Query(description="Search in dataset name and description")] = None,
     modalities: Annotated[
         Optional[str],
         Query(description="Filter by modalities (comma-separated)"),

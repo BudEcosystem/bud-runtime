@@ -652,7 +652,9 @@ class ListDatasetsResponse(SuccessResponse):
 class DatasetFilter(BaseModel):
     """Filter parameters for dataset listing."""
 
-    name: Optional[str] = Field(None, description="Filter by dataset name (case-insensitive substring).")
+    name: Optional[str] = Field(
+        None, description="Search in dataset name and description (case-insensitive substring)."
+    )
     modalities: Optional[List[str]] = Field(None, description="Filter by modalities.")
     language: Optional[List[str]] = Field(None, description="Filter by languages.")
     domains: Optional[List[str]] = Field(None, description="Filter by domains.")

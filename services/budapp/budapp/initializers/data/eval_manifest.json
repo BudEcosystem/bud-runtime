@@ -1,5 +1,5 @@
 {
-    "manifest_version": "1.0.9",
+    "manifest_version": "1.0.10",
     "last_updated": "2025-10-24T11:44:12Z",
     "schema_version": "1.0",
     "repository": {
@@ -12,7 +12,7 @@
         "bundle_size_mb": null
     },
     "version_info": {
-        "current_version": "1.0.9",
+        "current_version": "1.0.10",
         "previous_versions": [
             {
                 "version": "1.0.0",
@@ -67,6 +67,12 @@
                 "deprecated": false,
                 "migration_required": false,
                 "updated_at": "2025-11-14T09:01:01Z"
+            },
+            {
+                "version": "1.0.9",
+                "deprecated": false,
+                "migration_required": false,
+                "updated_at": "2025-11-17T12:08:21Z"
             }
         ]
     },

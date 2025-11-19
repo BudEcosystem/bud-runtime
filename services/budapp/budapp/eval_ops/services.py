@@ -1819,7 +1819,13 @@ class ExperimentService:
             # Apply filters
             if filters:
                 if filters.name:
-                    q = q.filter(DatasetModel.name.ilike(f"%{filters.name}%"))
+                    # Search in both name and description fields
+                    q = q.filter(
+                        or_(
+                            DatasetModel.name.ilike(f"%{filters.name}%"),
+                            DatasetModel.description.ilike(f"%{filters.name}%"),
+                        )
+                    )
                 if filters.modalities:
                     # Filter by modalities (JSONB contains any of the specified modalities)
                     for modality in filters.modalities:
