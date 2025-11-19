@@ -1,9 +1,11 @@
+from keycloak.exceptions import KeycloakPostError
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import UserColorEnum, UserRoleEnum, UserStatusEnum, UserTypeEnum
 from budapp.commons.database import engine
+from budapp.commons.exceptions import DatabaseException
 from budapp.commons.keycloak import KeycloakManager
 from budapp.initializers.base_seeder import BaseSeeder
 from budapp.user_ops.crud import UserDataManager
@@ -161,33 +163,77 @@ class BaseKeycloakSeeder(BaseSeeder):
             missing_ok=True,
         )
 
-        # Create client in Keycloak if realm was just created
-        if not keycloak_realm_exists:
-            new_client_id, client_secret = await keycloak_manager.create_client(default_client_id, default_realm_name)
-
-            if not tenant_client:
-                # Create new client record in DB with encrypted secret
-                tenant_client = TenantClient(
-                    tenant_id=tenant.id,
-                    client_named_id=default_client_id,
-                    client_id=new_client_id,
+        # Check if TenantClient needs to be created
+        if not tenant_client:
+            # Client doesn't exist in DB - need to create it
+            if not keycloak_realm_exists:
+                # Realm was just created - create client in Keycloak
+                logger.debug(f"::KEYCLOAK::Creating client {default_client_id} in newly created realm")
+                new_client_id, client_secret = await keycloak_manager.create_client(
+                    default_client_id, default_realm_name
                 )
-                # Encrypt the client secret before storage
-                await tenant_client.set_client_secret(client_secret)
-                await UserDataManager(session).insert_one(tenant_client)
-                logger.info(f"::KEYCLOAK::Client created in DB with ID {tenant_client.id} and encrypted secret")
             else:
-                # Update existing client record with new Keycloak credentials
+                # Realm already exists - try to create client in Keycloak
+                logger.info(
+                    "::KEYCLOAK::Realm exists but no client record in DB. Attempting to create client in Keycloak..."
+                )
+
+                try:
+                    # Try to create the client - this will fail if client already exists
+                    new_client_id, client_secret = await keycloak_manager.create_client(
+                        default_client_id, default_realm_name
+                    )
+                    logger.info(f"::KEYCLOAK::Client {default_client_id} created in existing realm")
+                except KeycloakPostError as e:
+                    # Check if error is due to client already existing
+                    error_message = str(e)
+                    if (
+                        "409" in error_message
+                        or "Conflict" in error_message
+                        or "already exists" in error_message.lower()
+                    ):
+                        # Client already exists in Keycloak but not in DB - inconsistent state
+                        logger.error(
+                            f"::KEYCLOAK::Client {default_client_id} already exists in Keycloak but not in database. "
+                            "This is an inconsistent state. Cannot retrieve existing client secret from Keycloak."
+                        )
+                        raise DatabaseException(
+                            f"Client '{default_client_id}' exists in Keycloak but not in database. "
+                            "Please delete the client in Keycloak admin console and restart the application, "
+                            "or manually sync the client credentials to the database."
+                        )
+                    else:
+                        # Some other error - re-raise it
+                        logger.error(f"::KEYCLOAK::Failed to create client in Keycloak: {e}")
+                        raise
+
+            # Create TenantClient record in DB with encrypted secret
+            tenant_client = TenantClient(
+                tenant_id=tenant.id,
+                client_named_id=default_client_id,
+                client_id=new_client_id,
+            )
+            # Encrypt the client secret before storage
+            await tenant_client.set_client_secret(client_secret)
+            await UserDataManager(session).insert_one(tenant_client)
+            logger.info(f"::KEYCLOAK::Client created in DB with ID {tenant_client.id} and encrypted secret")
+        else:
+            # TenantClient already exists in DB
+            logger.info(f"::KEYCLOAK::Client already exists in DB with ID {tenant_client.id}")
+
+            # If realm was just created but client exists in DB, update with new Keycloak credentials
+            if not keycloak_realm_exists:
+                logger.warning(
+                    "::KEYCLOAK::Client record exists in DB but realm was just created. "
+                    "Creating client in Keycloak and updating DB record..."
+                )
+                new_client_id, client_secret = await keycloak_manager.create_client(
+                    default_client_id, default_realm_name
+                )
                 tenant_client.client_id = new_client_id
-                # Encrypt the client secret before storage
                 await tenant_client.set_client_secret(client_secret)
                 UserDataManager(session).update_one(tenant_client)
                 logger.info(f"::KEYCLOAK::Client updated in DB with ID {tenant_client.id} and encrypted secret")
-        else:
-            # If we get here, realm exists but user doesn't, we need to fetch client info
-            if not tenant_client:
-                logger.error("::KEYCLOAK::Inconsistent state: Realm exists but no client record in DB")
-                return
 
         # If realm was just created or user doesn't exist, create user in Keycloak
         if not keycloak_realm_exists or not db_user:
