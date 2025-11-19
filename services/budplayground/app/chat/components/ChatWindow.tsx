@@ -268,11 +268,8 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     if (promptConfig?.deployment_name && endpoints && endpoints.length > 0 && isStructuredPrompt !== true) {
       const deploymentName = promptConfig.deployment_name;
 
-      // Get current chat state to check deployment
-      const currentChat = useChatStore.getState().getChat(chat.id);
-
       // Only auto-select if no deployment is set yet
-      if (!currentChat?.selectedDeployment) {
+      if (!chat.selectedDeployment) {
         const matchingEndpoint = endpoints.find(
           (ep) => ep.name === deploymentName || ep.id === deploymentName
         );
@@ -286,7 +283,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         }
       }
     }
-  }, [promptConfig, endpoints, isStructuredPrompt, chat.id, setDeployment, setDeploymentLock]);
+  }, [promptConfig, endpoints, isStructuredPrompt, chat, setDeployment, setDeploymentLock]);
 
 
 
