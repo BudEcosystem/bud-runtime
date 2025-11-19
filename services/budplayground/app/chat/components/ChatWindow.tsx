@@ -15,7 +15,10 @@ import NormalEditor from '@/app/components/bud/components/input/NormalEditor';
 import { useChatStore } from '@/app/store/chat';
 import SettingsList from './Settings';
 import PromptForm from './PromptForm';
+import UnstructuredPromptInput from './UnstructuredPromptInput';
 import { resolveChatBaseUrl } from '@/app/lib/gateway';
+import { getPromptConfig } from '@/app/lib/api';
+import { useEndPoints } from '@/app/components/bud/hooks/useEndPoint';
 
 
 
@@ -23,13 +26,19 @@ const { Header, Footer, Sider, Content } = Layout;
 
 export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSingleChat: boolean }) {
 
-  const { addMessage, getMessages, updateChat, createChat, disableChat, currentSettingPreset, deleteMessageAfter, getPromptIds } = useChatStore();
+  const { addMessage, getMessages, updateChat, createChat, disableChat, currentSettingPreset, deleteMessageAfter, getPromptIds, setDeployment, setDeploymentLock } = useChatStore();
   const { apiKey, accessKey } = useAuth();
+  const { endpoints, getEndPoints, isReady } = useEndPoints();
 
   const [toggleLeft, setToggleLeft] = useState<boolean>(false);
   const [toggleRight, setToggleRight] = useState<boolean>(false);
   const [showPromptForm, setShowPromptForm] = useState<boolean>(false);
   const [promptFormSubmitted, setPromptFormSubmitted] = useState<boolean>(false);
+
+  // Prompt configuration state
+  const [promptConfig, setPromptConfig] = useState<any>(null);
+  const [isStructuredPrompt, setIsStructuredPrompt] = useState<boolean | null>(null);
+  const [promptConfigLoading, setPromptConfigLoading] = useState<boolean>(false);
 
   // State to control PromptForm visibility based on postMessage from parent window
   // Initially true if promptIds are present in URL
@@ -73,9 +82,14 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     return baseBody;
   }, [chat, currentSettingPreset, promptData]);
 
+  // Determine API endpoint based on whether we have promptIds
+  const apiEndpoint = useMemo(() => {
+    return promptIds.length > 0 ? '/api/prompt-chat' : '/api/chat';
+  }, [promptIds]);
+
   const { messages, input, handleInputChange, handleSubmit, reload, error, stop, status, setMessages, append } = useChat({
     id: chat.id,
-    api: promptIds.length > 0 ? '/api/prompt-chat' : '/api/chat',
+    api: apiEndpoint,
     headers: {
       Authorization: `Bearer ${apiKey ? apiKey : accessKey}`,
     },
@@ -143,6 +157,136 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     };
   }, [getPromptIds]);
 
+  // Fetch prompt configuration to determine if structured or unstructured
+  useEffect(() => {
+    const fetchPromptConfiguration = async () => {
+      const promptIds = getPromptIds();
+      console.log('[ChatWindow] fetchPromptConfiguration effect running', {
+        promptIdsLength: promptIds.length,
+        hasAuth: !!(apiKey || accessKey),
+        promptConfig: !!promptConfig
+      });
+
+      if (promptIds.length > 0 && (apiKey || accessKey) && !promptConfig) {
+        console.log('[ChatWindow] Fetching prompt configuration for:', promptIds[0]);
+        setPromptConfigLoading(true);
+
+        try {
+          const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
+          console.log('[ChatWindow] Prompt config fetched:', config);
+
+          if (config && config.data) {
+            console.log('[ChatWindow] Setting promptConfig:', config.data);
+            setPromptConfig(config.data);
+
+            // Determine if structured or unstructured
+            let schemaToCheck = config.data.input_schema;
+
+            // Check for $defs structure (JSON schema format)
+            if (schemaToCheck && schemaToCheck.$defs) {
+              if (schemaToCheck.$defs.Input) {
+                schemaToCheck = schemaToCheck.$defs.Input.properties || {};
+              } else if (schemaToCheck.$defs.InputSchema) {
+                schemaToCheck = schemaToCheck.$defs.InputSchema.properties || {};
+              }
+            }
+
+            // Is structured if schema has properties
+            const hasSchema = schemaToCheck &&
+                             typeof schemaToCheck === 'object' &&
+                             Object.keys(schemaToCheck).length > 0;
+
+            console.log('[ChatWindow] Schema analysis:', {
+              input_schema: config.data.input_schema,
+              schemaToCheck,
+              hasSchema
+            });
+
+            setIsStructuredPrompt(hasSchema);
+
+            console.log(`[ChatWindow] Prompt type: ${hasSchema ? 'structured' : 'unstructured'}`);
+            console.log('[ChatWindow] State after setting:', {
+              isStructuredPrompt: hasSchema,
+              promptConfig: config.data
+            });
+
+            // If unstructured, prepare prompt data for chat body
+            if (!hasSchema) {
+              const version = config.data?.version ?? config.data?.prompt?.version ?? undefined;
+              const promptPayload: any = {
+                prompt: {
+                  id: promptIds[0],
+                },
+                promptId: promptIds[0],
+              };
+
+              if (version !== undefined && version !== null) {
+                promptPayload.prompt.version = String(version);
+              }
+
+              if (config.data.deployment_name && typeof config.data.deployment_name === 'string') {
+                promptPayload.model = config.data.deployment_name;
+              }
+
+              console.log('[ChatWindow] Setting promptData for unstructured:', promptPayload);
+              setPromptData(promptPayload);
+            }
+          } else {
+            console.log('[ChatWindow] No config.data found in response');
+          }
+        } catch (error) {
+          console.error('[ChatWindow] Error fetching prompt config:', error);
+          setIsStructuredPrompt(false); // Default to unstructured on error
+        } finally {
+          console.log('[ChatWindow] Fetch complete, setting promptConfigLoading to false');
+          setPromptConfigLoading(false);
+        }
+      } else {
+        console.log('[ChatWindow] Skipping fetch:', {
+          reason: !promptIds.length ? 'no promptIds' :
+                  !(apiKey || accessKey) ? 'no auth' :
+                  'promptConfig already set'
+        });
+      }
+    };
+
+    fetchPromptConfiguration();
+  }, [getPromptIds, apiKey, accessKey]);
+
+  // Fetch endpoints when prompt config has deployment_name (for unstructured prompts)
+  // Note: Structured prompts handle this in PromptForm
+  useEffect(() => {
+    if (isReady && promptConfig?.deployment_name && isStructuredPrompt !== true) {
+      getEndPoints({ page: 1, limit: 100 });
+    }
+  }, [isReady, promptConfig, isStructuredPrompt, getEndPoints]);
+
+  // Auto-select deployment for unstructured prompts
+  // Note: Structured prompts handle this in PromptForm
+  useEffect(() => {
+    if (promptConfig?.deployment_name && endpoints && endpoints.length > 0 && isStructuredPrompt !== true) {
+      const deploymentName = promptConfig.deployment_name;
+
+      // Get current chat state to check deployment
+      const currentChat = useChatStore.getState().getChat(chat.id);
+
+      // Only auto-select if no deployment is set yet
+      if (!currentChat?.selectedDeployment) {
+        const matchingEndpoint = endpoints.find(
+          (ep) => ep.name === deploymentName || ep.id === deploymentName
+        );
+
+        if (matchingEndpoint) {
+          setDeployment(chat.id, matchingEndpoint);
+          setDeploymentLock(chat.id, true);
+          console.log(`Auto-selected and locked deployment for unstructured prompt: ${matchingEndpoint.name}`);
+        } else {
+          console.warn(`Deployment '${deploymentName}' not found in available endpoints`);
+        }
+      }
+    }
+  }, [promptConfig, endpoints, isStructuredPrompt, chat.id, setDeployment, setDeploymentLock]);
+
 
 
   const createNewChat = () => {
@@ -203,8 +347,8 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     addMessage(chat.id, responseMessage);
 
     // After the first prompt message completes, update promptData to only include prompt ID context
-    // This ensures subsequent messages don't re-send the variables
-    if (promptData && promptData.prompt?.variables) {
+    // This ensures subsequent messages don't re-send the variables (for structured) or input (for unstructured)
+    if (promptData && (promptData.prompt?.variables || promptData.input)) {
       setPromptData({
         prompt: {
           id: promptData.prompt?.id,
@@ -274,6 +418,40 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
 
     // Close the form
     setShowPromptForm(false);
+  };
+
+  const handleUnstructuredPromptSubmit = (data: any) => {
+    console.log('Unstructured prompt submitted with data:', data);
+
+    // Only set promptData with input for the first message
+    // For subsequent messages, promptData already has prompt ID context (set by handleFinish)
+    if (messages.length === 0) {
+      // First message - include full prompt data with input field
+      setPromptData(data);
+      console.log('First message: Setting promptData with input field');
+    } else {
+      // Subsequent messages - don't update promptData to avoid re-sending input field
+      console.log('Follow-up message: Using existing promptData without input field');
+    }
+
+    // Create user message from the input
+    const userMessage = data.input || '';
+
+    // Append the message to trigger the chat with prompt context
+    append({
+      role: 'user',
+      content: userMessage,
+    });
+
+    // Scroll to bottom
+    setTimeout(() => {
+      if (contentRef.current) {
+        contentRef.current.scrollTo({
+          top: contentRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
   };
 
   return (
@@ -371,9 +549,11 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
                       className="relative z-9 mt-[-8.5rem]"
                     />
 
-                    <div className="relative z-10 Open-Sans text-[1.575rem] mt-[-18.5rem]">
-                      Select a model to get started
-                    </div>
+                    {promptIds.length === 0 && (
+                      <div className="relative z-10 Open-Sans text-[1.575rem] mt-[-18.5rem]">
+                        Select a model to get started
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -432,39 +612,86 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
           </div>
         </Content>
         <Footer className="sticky bottom-0 !px-[2.6875rem]">
-          {promptIds.length === 0 && (
-            <NormalEditor
-              isLoading={status === "submitted" || status === "streaming"}
-              error={error}
-              disabled={
-                promptIds.length > 0
-                  ? !promptFormSubmitted
-                  : !chat?.selectedDeployment?.name
-              }
-              isPromptMode={promptIds.length > 0}
-              stop={stop}
-              handleInputChange={handleChange}
-              handleSubmit={(e) => {
-                // setSubmitInput(e);
-                handleSubmit(e);
+          {(() => {
+            console.log('[ChatWindow] Render Footer - State:', {
+              promptIdsLength: promptIds.length,
+              isStructuredPrompt,
+              promptConfig: !!promptConfig,
+              status,
+              hasDeployment: !!chat?.selectedDeployment?.name
+            });
+            return null;
+          })()}
 
-                // Use smooth scrolling with scrollTo
-                setTimeout(() => {
-                  if (contentRef.current) {
-                    contentRef.current.scrollTo({
-                      top: contentRef.current.scrollHeight,
-                      behavior: 'smooth'
-                    });
-                  }
-                }, 100);
-              }}
-              input={input}
-            />
-          )}
+          {/* Regular chat - no promptIds */}
+          {promptIds.length === 0 && (() => {
+            console.log('[ChatWindow] Rendering: Regular NormalEditor (no promptIds)');
+            return (
+              <NormalEditor
+                isLoading={status === "submitted" || status === "streaming"}
+                error={error}
+                disabled={!chat?.selectedDeployment?.name}
+                isPromptMode={false}
+                stop={stop}
+                handleInputChange={handleChange}
+                handleSubmit={(e) => {
+                  handleSubmit(e);
+                  setTimeout(() => {
+                    if (contentRef.current) {
+                      contentRef.current.scrollTo({
+                        top: contentRef.current.scrollHeight,
+                        behavior: 'smooth'
+                      });
+                    }
+                  }, 100);
+                }}
+                input={input}
+              />
+            );
+          })()}
+
+          {/* Unstructured prompt - show UnstructuredPromptInput */}
+          {/* Show for unstructured prompts OR while loading (when not confirmed as structured) */}
+          {promptIds.length > 0 && isStructuredPrompt !== true && (() => {
+            console.log('[ChatWindow] Rendering: UnstructuredPromptInput', {
+              promptId: promptIds[0],
+              status,
+              disabled: false,
+              isLoading: isStructuredPrompt === null
+            });
+            return (
+              <UnstructuredPromptInput
+                promptId={promptIds[0]}
+                promptVersion={promptConfig?.version}
+                deploymentName={promptConfig?.deployment_name}
+                chatId={chat.id}
+                onSubmit={handleUnstructuredPromptSubmit}
+                status={status}
+                stop={stop}
+                input={input}
+                handleInputChange={handleChange}
+                error={error}
+                disabled={false}
+              />
+            );
+          })()}
         </Footer>
 
+        {/* Loading state while determining prompt schema type */}
+        {promptIds.length > 0 && promptConfigLoading && (
+          <div className="absolute bottom-0 left-0 right-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-[#0c0c0d] rounded-lg border border-[#1F1F1F] p-4 shadow-2xl">
+              <span className="text-white text-sm">Loading prompt configuration...</span>
+            </div>
+          </div>
+        )}
+
         {/* Prompt Form - Absolutely positioned at bottom */}
-        {enablePromptForm && showPromptForm && getPromptIds().length > 0 && (
+        {/* Show PromptForm only for structured prompts */}
+        {enablePromptForm &&
+         showPromptForm &&
+         getPromptIds().length > 0 &&
+         isStructuredPrompt === true && (
           <PromptForm
             promptIds={getPromptIds()}
             chatId={chat.id}
