@@ -157,6 +157,12 @@ microservices:
     env: {}
     nodeSelector: {}
     affinity: {}
+  budsentinel:
+    enabled: false # closed source, avoid enabling by default
+    image: harbor.bud.studio/sentinel/sentinel:nightly
+    env: {}
+    nodeSelector: {}
+    affinity: {}
   askbud:
     enabled: true
     image: budstudio/askbud:0.4.3
