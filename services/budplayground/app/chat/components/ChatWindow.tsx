@@ -654,7 +654,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             console.log('[ChatWindow] Rendering: UnstructuredPromptInput', {
               promptId: promptIds[0],
               status,
-              disabled: false,
+              disabled: !chat?.selectedDeployment?.name,
               isLoading: isStructuredPrompt === null
             });
             return (
@@ -669,7 +669,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
                 input={input}
                 handleInputChange={handleChange}
                 error={error}
-                disabled={false}
+                disabled={!chat?.selectedDeployment?.name}
               />
             );
           })()}
