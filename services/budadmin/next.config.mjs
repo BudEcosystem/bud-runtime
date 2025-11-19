@@ -45,9 +45,9 @@ export default {
         destination: '/home/deployments/[deploymentId]',
       },
       {
-        source: '/projects/:projectId/agentsDetails/:id',
+        source: '/projects/:projectId/agentDetails/:id',
         // destination: '/home/projectId/deployments/[deploymentId]',
-        destination: '/home/agentsDetails/[id]',
+        destination: '/home/agentDetails/[id]',
       },
       {
         source: '/projects/:projectId',
