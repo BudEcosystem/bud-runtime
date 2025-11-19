@@ -19,10 +19,13 @@ export interface GetExperimentsPayload {
   page?: number;
   limit?: number;
   search?: string;
-  status?: string[];
+  experiment_status?: string;
   tags?: string[];
   order?: string;
   orderBy?: string;
+  model_id?: string;
+  created_before?: string;
+  created_after?: string;
 }
 
 export interface ExperimentData {
@@ -261,18 +264,30 @@ export const useEvaluations = create<{
       if (payload?.page) params.append('page', payload.page.toString());
       if (payload?.limit) params.append('limit', payload.limit.toString());
       if (payload?.search) params.append('search', payload.search);
-      if (payload?.status && payload.status.length > 0) {
-        payload.status.forEach(status => params.append('status', status));
+      if (payload?.experiment_status) {
+        params.append('search', payload.experiment_status);
+        // payload.experiment_status.forEach(status => params.append('status', status));
       }
       if (payload?.tags && payload.tags.length > 0) {
         payload.tags.forEach(tag => params.append('tags', tag));
       }
+      if (payload?.model_id) {
+        params.append('model_id', payload.model_id);
+      }
+      if(payload?.created_after) {
+        params.append('created_after', payload.created_after);
+      }
+      if(payload?.created_before) {
+        params.append('created_after', payload.created_before);
+      }
       if (payload?.order) params.append('order', payload.order);
       if (payload?.orderBy) params.append('orderBy', payload.orderBy);
-
+      console.log(payload)
       const url = `${tempApiBaseUrl}/experiments/`;
 
-      const response: any = await AppRequest.Get(url);
+      const response: any = await AppRequest.Get(url, {
+        params: payload,
+      });
       // Ensure experimentsList is always an array
       const experiments = response.data?.experiments || response.data || [];
       const experimentsArray = Array.isArray(experiments) ? experiments : [];
