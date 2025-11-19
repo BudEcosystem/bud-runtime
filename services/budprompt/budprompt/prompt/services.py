@@ -1449,25 +1449,25 @@ class PromptService:
             # If source is temporary, remove MCP resources from cleanup registry
             # This preserves shared MCP resources while allowing prompt config cleanup
             if source_registry_entry_json:
-                source_registry_entry = json.loads(
-                    source_registry_entry_json.decode("utf-8")
-                    if isinstance(source_registry_entry_json, bytes)
-                    else source_registry_entry_json
+                # Decode bytes if needed
+                if isinstance(source_registry_entry_json, bytes):
+                    source_registry_entry_json = source_registry_entry_json.decode("utf-8")
+
+                # Load and validate using Pydantic model
+                source_registry_entry = MCPCleanupRegistryEntry.model_validate_json(source_registry_entry_json)
+
+                # Clear mcp_resources to prevent cleanup from deleting shared resources
+                source_registry_entry.mcp_resources = {"virtual_server_id": None, "gateways": {}}
+
+                # Serialize using Pydantic and update registry
+                updated_entry_json = source_registry_entry.model_dump_json()
+                await self.redis_service.hset(CLEANUP_REGISTRY_KEY, source_key, updated_entry_json)
+
+                logger.debug(
+                    "Cleared mcp_resources from cleanup registry for %s - resources now shared with target %s",
+                    source_key,
+                    target_key,
                 )
-
-                # Remove mcp_resources key to prevent cleanup from deleting shared resources
-                if "mcp_resources" in source_registry_entry:
-                    source_registry_entry["mcp_resources"] = {"virtual_server_id": None, "gateways": {}}
-
-                    # Update registry entry with cleared MCP resources
-                    updated_entry_json = json.dumps(source_registry_entry)
-                    await self.redis_service.hset(CLEANUP_REGISTRY_KEY, source_key, updated_entry_json)
-
-                    logger.debug(
-                        "Cleared mcp_resources from cleanup registry for %s - resources now shared with target %s",
-                        source_key,
-                        target_key,
-                    )
 
             # Parse final_data as PromptConfigurationData for response
             final_config_data = PromptConfigurationData.model_validate(final_data)
