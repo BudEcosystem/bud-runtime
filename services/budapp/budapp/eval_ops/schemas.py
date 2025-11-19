@@ -231,7 +231,7 @@ class Experiment(BaseModel):
     tag_objects: Optional[List["EvalTag"]] = Field(None, description="Complete tag objects with details.")
     status: Optional[str] = Field(
         None,
-        description="Computed status based on runs (running/failed/completed/pending/no_runs).",
+        description="Computed status based on runs (running/completed/no_runs).",
     )
     models: Optional[List[ModelSummary]] = Field(default_factory=list, description="Models used in the experiment.")
     traits: Optional[List[TraitSummary]] = Field(

@@ -1265,11 +1265,16 @@ class ExperimentService:
     def compute_experiment_status(self, experiment_id: uuid.UUID) -> str:
         """Compute experiment status based on all runs' statuses.
 
+        Simplified logic:
+        - If any run is RUNNING → experiment is "running"
+        - If no runs exist → "no_runs"
+        - Otherwise → "completed" (regardless of failures, pending, cancelled, etc.)
+
         Parameters:
             experiment_id (uuid.UUID): ID of the experiment.
 
         Returns:
-            str: Computed status string (running/failed/completed/pending/cancelled/skipped/no_runs).
+            str: Computed status string (running/completed/no_runs).
         """
         try:
             # Query all non-deleted runs for the experiment
@@ -1287,28 +1292,23 @@ class ExperimentService:
 
             statuses = [run.status for run in runs]
 
-            # Priority order for status determination
+            # Simplified status determination
             if RunStatusEnum.RUNNING.value in statuses:
                 return "running"
-            if RunStatusEnum.FAILED.value in statuses:
-                return "failed"
-            if RunStatusEnum.CANCELLED.value in statuses:
-                return "cancelled"
-            if RunStatusEnum.PENDING.value in statuses:
-                return "pending"
-            if all(s == RunStatusEnum.COMPLETED.value for s in statuses):
+            else:
+                # Everything else (completed, failed, pending, cancelled, skipped) → "completed"
                 return "completed"
-            if all(s == RunStatusEnum.SKIPPED.value for s in statuses):
-                return "skipped"
-
-            # Fallback for mixed completed/skipped states
-            return "completed"
         except Exception as e:
             logger.error(f"Failed to compute status for experiment {experiment_id}: {e}")
             return "unknown"
 
     def get_experiment_statuses_batch(self, experiment_ids: List[uuid.UUID]) -> dict[uuid.UUID, str]:
         """Get statuses for multiple experiments in one query for optimization.
+
+        Simplified logic:
+        - If any run is RUNNING → experiment is "running"
+        - If no runs exist → "no_runs"
+        - Otherwise → "completed" (regardless of failures, pending, cancelled, etc.)
 
         Parameters:
             experiment_ids (List[uuid.UUID]): List of experiment IDs.
@@ -1342,21 +1342,12 @@ class ExperimentService:
                 else:
                     statuses = runs_by_experiment[exp_id]
 
-                    # Apply the same priority logic
+                    # Simplified status determination
                     if RunStatusEnum.RUNNING.value in statuses:
                         result[exp_id] = "running"
-                    elif RunStatusEnum.FAILED.value in statuses:
-                        result[exp_id] = "failed"
-                    elif RunStatusEnum.CANCELLED.value in statuses:
-                        result[exp_id] = "cancelled"
-                    elif RunStatusEnum.PENDING.value in statuses:
-                        result[exp_id] = "pending"
-                    elif all(s == RunStatusEnum.COMPLETED.value for s in statuses):
-                        result[exp_id] = "completed"
-                    elif all(s == RunStatusEnum.SKIPPED.value for s in statuses):
-                        result[exp_id] = "skipped"
                     else:
-                        result[exp_id] = "completed"  # Fallback for mixed completed/skipped
+                        # Everything else (completed, failed, pending, cancelled, skipped) → "completed"
+                        result[exp_id] = "completed"
 
             return result
         except Exception as e:

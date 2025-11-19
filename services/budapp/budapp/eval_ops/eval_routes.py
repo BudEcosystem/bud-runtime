@@ -115,7 +115,7 @@ def list_experiments(
     ] = None,
     status: Annotated[
         Optional[str],
-        Query(description="Filter by status: running, completed, failed, pending, cancelled, no_runs"),
+        Query(description="Filter by status: running, completed, no_runs"),
     ] = None,
     model_id: Annotated[Optional[uuid.UUID], Query(description="Filter by model ID")] = None,
     created_after: Annotated[
@@ -134,7 +134,7 @@ def list_experiments(
     - **search**: Optional search query to filter by experiment name (case-insensitive substring match).
     - **project_id**: Optional filter by project ID.
     - **id**: Optional filter by experiment ID.
-    - **status**: Optional filter by computed status (running/completed/failed/pending/cancelled/no_runs).
+    - **status**: Optional filter by computed status (running/completed/no_runs).
     - **model_id**: Optional filter by model ID used in experiment runs.
     - **created_after**: Optional filter for experiments created after this date (ISO 8601 format).
     - **created_before**: Optional filter for experiments created before this date (ISO 8601 format).
@@ -142,6 +142,11 @@ def list_experiments(
     - **limit**: Items per page (default: 10, max: 100).
 
     Returns a `ListExperimentsResponse` containing a paginated list of experiments.
+
+    **Status Logic:**
+    - "running": At least one run is currently running
+    - "completed": All runs are finished (includes successful, failed, pending, cancelled, skipped)
+    - "no_runs": Experiment has no runs configured
     """
     try:
         offset = (page - 1) * limit
