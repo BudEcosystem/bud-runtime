@@ -14,12 +14,12 @@ const CompositeChart = ({data}: ChartProps) => {
   useEffect(() => {
     const chart = echarts.init(chartRef.current);
 
-    const xData = data.categories;
+    const xData = data?.categories;
 
-    const yData = data.data;
+    const yData = data?.data;
     const START_COUNT = 10; 
     const END_COUNT = 10;
-    const total = yData.length;
+    const total = yData?.length;
 
     const option = {
       grid: {
@@ -62,7 +62,7 @@ const CompositeChart = ({data}: ChartProps) => {
         {
           name: "Bar",
           type: "bar",
-          data: yData.map((v, i) => {
+          data: yData?.map((v, i) => {
             const isVisible = i < START_COUNT || i >= total - END_COUNT;
             return isVisible ? v : null;   // ⬅️ removes bar + spacing
           }),
