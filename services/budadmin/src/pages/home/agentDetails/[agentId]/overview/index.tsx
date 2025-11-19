@@ -4,6 +4,7 @@ import { Card, Row, Col, Statistic, Segmented, Spin } from "antd";
 import {
   Text_14_600_EEEEEE,
   Text_12_400_B3B3B3,
+  Text_12_600_EEEEEE,
   Text_20_400_FFFFFF,
   Text_26_600_FFFFFF,
 } from "@/components/ui/text";
@@ -35,24 +36,53 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
   const [timeRange, setTimeRange] = useState("weekly");
   const [agentData, setAgentData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { getPromptById } = usePrompts();
 
-  useEffect(() => {
-    const fetchAgentDetails = async () => {
-      if (id && typeof id === "string") {
-        try {
-          setLoading(true);
-          const data = await getPromptById(id, projectId as string);
-          setAgentData(data);
-        } catch (error) {
-          console.error("Error fetching agent details:", error);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
+  // Check if we're in development mode
+  const isDevelopmentMode = process.env.NEXT_PUBLIC_VERCEL_ENV === "development" ||
+                           process.env.NODE_ENV === "development";
 
+  const fetchAgentDetails = async () => {
+    if (id && typeof id === "string") {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getPromptById(id, projectId as string);
+        setAgentData(data);
+      } catch (error: any) {
+        console.error("Error fetching agent details:", error);
+        const errorMessage = error?.response?.data?.detail ||
+                            error?.message ||
+                            "Failed to load agent details. Please try again.";
+        setError(errorMessage);
+
+        // Only set fallback data in development mode
+        if (isDevelopmentMode) {
+          console.warn("Development mode: Using fallback data");
+          setAgentData({
+            id: id,
+            name: "Agent Name (Dev Fallback)",
+            description: "LiveMathBench can capture LLM capabilities in complex reasoning tasks, including challenging latest question sets from various mathematical competitions.",
+            tags: [
+              { name: "tag 1", color: "#965CDE" },
+              { name: "tag 2", color: "#5CADFF" },
+              { name: "tag 3", color: "#22C55E" },
+            ],
+            status: "Active",
+            created_at: new Date().toISOString(),
+            modified_at: new Date().toISOString(),
+          });
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
     fetchAgentDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, projectId]);
 
   const handleChartFilter = (val: string) => {
@@ -151,8 +181,54 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
     );
   }
 
+  // Error state display with retry functionality
+  if (error && !agentData) {
+    return (
+      <div className="flex flex-col justify-center items-center h-96 gap-4">
+        <div className="text-center max-w-md">
+          <div className="text-[#EF4444] text-5xl mb-4">⚠️</div>
+          <Text_14_600_EEEEEE className="block mb-2">
+            Unable to Load Agent Details
+          </Text_14_600_EEEEEE>
+          <Text_12_400_B3B3B3 className="block mb-4">
+            {error}
+          </Text_12_400_B3B3B3>
+          <button
+            onClick={fetchAgentDetails}
+            className="px-6 py-2 bg-[#965CDE] hover:bg-[#7B4AB8] text-white rounded-md transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show warning banner if using fallback data in development
+  const showDevWarning = isDevelopmentMode && error && agentData;
+
   return (
     <div className="pb-8">
+      {/* Development Mode Warning Banner */}
+      {showDevWarning && (
+        <div className="mb-4 p-4 bg-[#FFA500] bg-opacity-10 border border-[#FFA500] rounded-lg flex items-start gap-3">
+          <div className="text-[#FFA500] text-xl">⚠️</div>
+          <div className="flex-1">
+            <Text_12_600_EEEEEE className="block mb-1 text-[#FFA500]">
+              Development Mode - Using Fallback Data
+            </Text_12_600_EEEEEE>
+            <Text_12_400_B3B3B3 className="block">
+              {error}
+            </Text_12_400_B3B3B3>
+          </div>
+          <button
+            onClick={fetchAgentDetails}
+            className="px-4 py-1 bg-[#FFA500] hover:bg-[#FF8C00] text-white rounded text-xs transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       {/* Agent Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2 pt-[.5rem]">

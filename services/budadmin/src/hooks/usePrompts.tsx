@@ -1,4 +1,3 @@
-import { successToast } from "../components/toast";
 import { AppRequest } from "../pages/api/requests";
 import { create } from "zustand";
 import { tempApiBaseUrl } from "@/components/environment";
@@ -179,7 +178,6 @@ export const usePrompts = create<{
       }
 
       const response: any = await AppRequest.Post(url, data, { headers });
-      successToast(response.message || "Prompt created successfully");
       return response.data;
     } catch (error) {
       console.error("Error creating prompt:", error);
@@ -214,7 +212,6 @@ export const usePrompts = create<{
       }
 
       const response: any = await AppRequest.Patch(url, data);
-      successToast(response.message || "Prompt updated successfully");
       return response.data;
     } catch (error) {
       console.error("Error updating prompt:", error);

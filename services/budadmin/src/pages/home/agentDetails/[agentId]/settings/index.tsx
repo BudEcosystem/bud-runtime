@@ -8,26 +8,127 @@ import {
 
 const { TextArea } = Input;
 
-interface SettingsTabProps {
-  agentData?: any;
+interface AgentSettingsData {
+  name?: string;
+  description?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  enableStreaming?: boolean;
+  enableLogging?: boolean;
 }
 
-const SettingsTab: React.FC<SettingsTabProps> = ({ agentData }) => {
-  const [formData, setFormData] = React.useState({
+interface SettingsFormData {
+  name: string;
+  description: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
+  enableStreaming: boolean;
+  enableLogging: boolean;
+}
+
+interface SettingsTabProps {
+  agentData?: AgentSettingsData;
+  onSave?: (settings: SettingsFormData) => void | Promise<void>;
+  onCancel?: () => void;
+}
+
+const defaultFormData: SettingsFormData = {
+  name: "",
+  description: "",
+  model: "gpt-4",
+  temperature: 0.7,
+  maxTokens: 2048,
+  topP: 1.0,
+  frequencyPenalty: 0,
+  presencePenalty: 0,
+  enableStreaming: true,
+  enableLogging: true,
+};
+
+const SettingsTab: React.FC<SettingsTabProps> = ({ agentData, onSave, onCancel }) => {
+  const [formData, setFormData] = React.useState<SettingsFormData>({
+    ...defaultFormData,
     name: agentData?.name || "",
     description: agentData?.description || "",
-    model: "gpt-4",
-    temperature: 0.7,
-    maxTokens: 2048,
-    topP: 1.0,
-    frequencyPenalty: 0,
-    presencePenalty: 0,
-    enableStreaming: true,
-    enableLogging: true,
   });
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [isDirty, setIsDirty] = React.useState(false);
 
-  const handleChange = (field: string, value: any) => {
+  // Sync formData with agentData when it changes
+  React.useEffect(() => {
+    if (agentData) {
+      setFormData((prev) => ({
+        ...prev,
+        name: agentData.name || defaultFormData.name,
+        description: agentData.description || defaultFormData.description,
+        model: agentData.model || defaultFormData.model,
+        temperature: agentData.temperature ?? defaultFormData.temperature,
+        maxTokens: agentData.maxTokens ?? defaultFormData.maxTokens,
+        topP: agentData.topP ?? defaultFormData.topP,
+        frequencyPenalty: agentData.frequencyPenalty ?? defaultFormData.frequencyPenalty,
+        presencePenalty: agentData.presencePenalty ?? defaultFormData.presencePenalty,
+        enableStreaming: agentData.enableStreaming ?? defaultFormData.enableStreaming,
+        enableLogging: agentData.enableLogging ?? defaultFormData.enableLogging,
+      }));
+      setIsDirty(false);
+    }
+  }, [agentData]);
+
+  const handleChange = (field: keyof SettingsFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    setIsDirty(true);
+  };
+
+  const handleSave = async () => {
+    if (!onSave) {
+      console.warn("No onSave handler provided to SettingsTab");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await onSave(formData);
+      setIsDirty(false);
+    } catch (error) {
+      console.error("Error saving settings:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    // Reset form to original agentData values
+    if (agentData) {
+      setFormData({
+        ...defaultFormData,
+        name: agentData.name || "",
+        description: agentData.description || "",
+        model: agentData.model || defaultFormData.model,
+        temperature: agentData.temperature ?? defaultFormData.temperature,
+        maxTokens: agentData.maxTokens ?? defaultFormData.maxTokens,
+        topP: agentData.topP ?? defaultFormData.topP,
+        frequencyPenalty: agentData.frequencyPenalty ?? defaultFormData.frequencyPenalty,
+        presencePenalty: agentData.presencePenalty ?? defaultFormData.presencePenalty,
+        enableStreaming: agentData.enableStreaming ?? defaultFormData.enableStreaming,
+        enableLogging: agentData.enableLogging ?? defaultFormData.enableLogging,
+      });
+    } else {
+      setFormData(defaultFormData);
+    }
+    setIsDirty(false);
+
+    // Call onCancel callback if provided
+    if (onCancel) {
+      onCancel();
+    }
   };
 
   return (
@@ -186,8 +287,20 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ agentData }) => {
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-6 border-t border-[#1F1F1F]">
-            <Button>Cancel</Button>
-            <Button type="primary">Save Changes</Button>
+            <Button
+              onClick={handleCancel}
+              disabled={isSaving || !isDirty}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleSave}
+              loading={isSaving}
+              disabled={!isDirty || !onSave}
+            >
+              Save Changes
+            </Button>
           </div>
         </div>
       </div>
@@ -196,3 +309,4 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ agentData }) => {
 };
 
 export default SettingsTab;
+export type { AgentSettingsData, SettingsFormData, SettingsTabProps };
