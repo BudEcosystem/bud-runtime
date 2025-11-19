@@ -153,7 +153,7 @@ body {
 }
 
 .temp-bg {
-  // background-image: url(./../../public/images/evaluations/ui/bg.png);
+  background-image: url(./../../public/images/evaluations/ui/bg.png);
   background-size: cover;
   background-repeat: no-repeat;
 }
@@ -3931,7 +3931,9 @@ html {
     padding: 0 .5rem !important;
   }
 }
+.agentTab {
 
+}
 // responsive styles
 @media only screen and (min-width: 1440px) {
 

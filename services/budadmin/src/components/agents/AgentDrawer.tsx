@@ -23,6 +23,13 @@ const AgentDrawer: React.FC = () => {
     activeSessionIds,
     createSession,
     workflowContext,
+    isEditMode,
+    editingPromptId,
+    clearEditMode,
+    isAddVersionMode,
+    addVersionPromptId,
+    isEditVersionMode,
+    editVersionData,
   } = useAgentStore();
 
   const { openDrawerWithStep, step, currentFlow } = useDrawer();
@@ -56,6 +63,7 @@ const AgentDrawer: React.FC = () => {
     // Reset views when drawer closes
     setShowPlayground(false);
     setShowChatHistory(false);
+    // Clear edit mode is handled in closeAgentDrawer in the store
   };
 
   // Handle Play button click
@@ -102,11 +110,16 @@ const AgentDrawer: React.FC = () => {
       return;
     }
 
-    // Only create session if none exist AND not OAuth callback
+    // Don't create a new session if in edit mode, add version mode, or edit version mode (session already loaded)
+    if (isEditMode || isAddVersionMode || isEditVersionMode) {
+      return;
+    }
+
+    // Only create session if none exist AND not OAuth callback AND not in any special mode
     if (activeSessions.length === 0) {
       createSession();
     }
-  }, [isAgentDrawerOpen, activeSessions.length, createSession]);
+  }, [isAgentDrawerOpen, activeSessions.length, createSession, isEditMode, isAddVersionMode, isEditVersionMode]);
 
   // Set first session as active by default
   useEffect(() => {
@@ -335,6 +348,9 @@ const AgentDrawer: React.FC = () => {
                               totalSessions={numBoxes}
                               isActive={activeBoxId === session.id}
                               onActivate={() => setActiveBoxId(session.id)}
+                              isAddVersionMode={isAddVersionMode}
+                              isEditVersionMode={isEditVersionMode}
+                              editVersionData={editVersionData}
                             />
                           </div>
                         );
