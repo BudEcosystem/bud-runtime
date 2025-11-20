@@ -262,6 +262,8 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   // Auto-select deployment for unstructured prompts
   // Note: Structured prompts handle this in PromptForm
   useEffect(() => {
+    const promptIds = getPromptIds();
+
     if (promptConfig?.deployment_name && endpoints && endpoints.length > 0 && isStructuredPrompt !== true) {
       const deploymentName = promptConfig.deployment_name;
       const currentDeploymentName = chat.selectedDeployment?.name;
@@ -298,7 +300,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       // No prompt IDs, no deployment needed, ready to show
       setIsDeploymentReady(true);
     }
-  }, [promptConfig, endpoints, isStructuredPrompt, chat, setDeployment, setDeploymentLock, promptIds]);
+  }, [promptConfig, endpoints, isStructuredPrompt, chat, setDeployment, setDeploymentLock, getPromptIds]);
 
 
 
