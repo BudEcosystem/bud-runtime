@@ -1262,7 +1262,7 @@ class ClusterOpsService:
 
         # Configuration
         BATCH_SIZE = 2  # Process max 2 clusters concurrently (reduced from 5 to prevent OOM)
-        STALE_THRESHOLD_MINUTES = 10  # Consider sync stale after 10 minutes
+        STALE_THRESHOLD_MINUTES = 20  # Consider sync stale after 20 minutes
         STATE_STORE_KEY = "cluster_node_sync_state"
 
         try:

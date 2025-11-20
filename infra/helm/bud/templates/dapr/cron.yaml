@@ -7,7 +7,7 @@ spec:
   version: v1
   metadata:
   - name: schedule
-    value: "@every 3m" # Every 3 minutes
+    value: "@every 10m" # Every 10 minutes
   - name: direction
     value: "input"
   - name: route
