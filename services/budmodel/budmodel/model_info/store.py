@@ -11,10 +11,9 @@ from minio.error import S3Error
 from ..commons.config import app_settings, secrets_settings
 from ..commons.constants import LOCAL_MIN_SIZE_GB
 from ..commons.helpers import safe_delete
+from ..shared.io_monitor import get_io_monitor
 from .schemas import UploadFile
 
-
-from ..shared.io_monitor import get_io_monitor
 
 logger = logging.get_logger(__name__)
 
@@ -33,7 +32,7 @@ class ModelStore:
             secret_key=secrets_settings.minio_secret_key,
             secure=app_settings.minio_secure,
         )
-        
+
         # Initialize I/O monitor if enabled
         self.io_monitor = None
         if app_settings.enable_io_monitoring:
