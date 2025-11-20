@@ -17,7 +17,7 @@ const CompositeChart = ({data}: ChartProps) => {
     const xData = data?.categories;
 
     const yData = data?.data;
-    const START_COUNT = 10; 
+    const START_COUNT = 10;
     const END_COUNT = 10;
     const total = yData?.length;
 
