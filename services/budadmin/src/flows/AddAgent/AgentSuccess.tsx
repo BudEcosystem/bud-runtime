@@ -72,20 +72,18 @@ export default function AgentSuccess() {
     reset
   } = useAddAgent();
 
-  // Remove 'agent' and 'prompt' query parameters from URL
+  // Remove only 'prompt' query parameter from URL (preserve 'agent' parameter)
   useEffect(() => {
     // Use a slight delay to ensure router is fully ready
     const timer = setTimeout(() => {
       const currentPath = window.location.pathname;
       const urlSearchParams = new URLSearchParams(window.location.search);
 
-      const hasAgentParam = urlSearchParams.has('agent');
       const hasPromptParam = urlSearchParams.has('prompt');
 
-      // Only attempt removal if parameters exist
-      if (hasAgentParam || hasPromptParam) {
-        // Remove agent and prompt parameters
-        urlSearchParams.delete('agent');
+      // Only attempt removal if prompt parameter exists
+      if (hasPromptParam) {
+        // Remove only prompt parameter, preserve agent parameter
         urlSearchParams.delete('prompt');
 
         const newUrl = urlSearchParams.toString()

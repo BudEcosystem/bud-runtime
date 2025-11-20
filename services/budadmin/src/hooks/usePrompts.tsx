@@ -19,6 +19,8 @@ export interface IPrompt {
   model?: Model;
   system_prompt?: string;
   prompt_messages?: string;
+  input_variables?: any[];
+  output_variables?: any[];
   settings?: {
     temperature?: number;
     max_tokens?: number;
