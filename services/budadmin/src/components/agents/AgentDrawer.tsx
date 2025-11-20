@@ -187,7 +187,6 @@ const AgentDrawer: React.FC = () => {
 
       // CRITICAL: Explicitly capture agent parameter FIRST before any operations
       const agentParam = urlSearchParams.get('agent');
-      console.log('📌 Agent parameter captured:', agentParam);
 
       // Add all existing query params except 'prompt'
       urlSearchParams.forEach((value, key) => {
@@ -203,7 +202,6 @@ const AgentDrawer: React.FC = () => {
 
       // TRIPLE-CHECK: If agent parameter was in URL but somehow not added, force add it
       if (agentParam && !queryParts.some(part => part.startsWith('agent='))) {
-        console.log('⚠️ Agent parameter was missing, force adding it!');
         queryParts.unshift(`agent=${agentParam}`);
       }
 
