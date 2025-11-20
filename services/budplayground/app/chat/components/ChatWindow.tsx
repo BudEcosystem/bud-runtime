@@ -141,7 +141,6 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
 
         // Trigger refresh of prompt config when switching to playground
         setRefreshTrigger(prev => prev + 1);
-        console.log('[ChatWindow] Received SET_TYPE_FORM postMessage, triggering refresh');
 
         // Also update showPromptForm to reopen the form if typeForm is true
         if (typeFormValue && getPromptIds().length > 0) {
@@ -156,7 +155,6 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     const handleVisibilityChange = () => {
       if (!document.hidden && getPromptIds().length > 0) {
         setRefreshTrigger(prev => prev + 1);
-        console.log('[ChatWindow] Window became visible, triggering refresh');
       }
     };
 
@@ -164,7 +162,6 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     const handleFocus = () => {
       if (getPromptIds().length > 0) {
         setRefreshTrigger(prev => prev + 1);
-        console.log('[ChatWindow] Window focused, triggering refresh');
       }
     };
 
@@ -191,11 +188,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         setIsDeploymentReady(false); // Start loading
 
         try {
-          console.log('[ChatWindow] Fetching prompt config for:', promptIds[0]);
           const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
 
           if (config && config.data) {
-            console.log('[ChatWindow] API returned deployment_name:', config.data.deployment_name);
             setPromptConfig(config.data);
 
             // Determine if structured or unstructured
@@ -268,29 +263,20 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       const deploymentName = promptConfig.deployment_name;
       const currentDeploymentName = chat.selectedDeployment?.name;
 
-      console.log('[ChatWindow Auto-select] Current deployment:', currentDeploymentName);
-      console.log('[ChatWindow Auto-select] Target deployment:', deploymentName);
-
       const matchingEndpoint = endpoints.find(
         (ep) => ep.name === deploymentName || ep.id === deploymentName
       );
 
       if (matchingEndpoint) {
-        console.log('[ChatWindow Auto-select] Found matching endpoint:', matchingEndpoint.name);
-
         // Update deployment if it's different from current selection
         if (currentDeploymentName !== matchingEndpoint.name) {
-          console.log('[ChatWindow Auto-select] Updating deployment from', currentDeploymentName, 'to', matchingEndpoint.name);
           setDeployment(chat.id, matchingEndpoint);
           setDeploymentLock(chat.id, true);
           setIsDeploymentReady(true); // Deployment updated, ready to show
         } else {
-          console.log('[ChatWindow Auto-select] Deployment already set, no update needed');
           setIsDeploymentReady(true); // No update needed, ready to show
         }
       } else {
-        console.warn('[ChatWindow Auto-select] Deployment not found in endpoints:', deploymentName);
-        console.warn('[ChatWindow Auto-select] Available endpoints:', endpoints.map(ep => ep.name));
         setIsDeploymentReady(true); // Even if not found, stop loading to avoid infinite spinner
       }
     } else if (promptConfig && isStructuredPrompt === true) {

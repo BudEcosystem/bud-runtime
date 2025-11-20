@@ -34,7 +34,6 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
     const handleMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'SET_TYPE_FORM') {
         setRefreshTrigger(prev => prev + 1);
-        console.log('[PromptForm] Received SET_TYPE_FORM postMessage, triggering refresh');
       }
     };
 
@@ -42,7 +41,6 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
     const handleVisibilityChange = () => {
       if (!document.hidden && promptIds.length > 0) {
         setRefreshTrigger(prev => prev + 1);
-        console.log('[PromptForm] Window became visible, triggering refresh');
       }
     };
 
@@ -50,7 +48,6 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
     const handleFocus = () => {
       if (promptIds.length > 0) {
         setRefreshTrigger(prev => prev + 1);
-        console.log('[PromptForm] Window focused, triggering refresh');
       }
     };
 
@@ -76,7 +73,6 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
       }
 
       try {
-        console.log('[PromptForm] Fetching prompt config for:', promptIds[0]);
         const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
 
         if (config && config.data) {
@@ -89,8 +85,6 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
           const newDeploymentName = typeof config.data?.deployment_name === 'string'
             ? config.data.deployment_name
             : undefined;
-
-          console.log('[PromptForm] API returned deployment_name:', newDeploymentName);
 
           // Always update deployment name when API returns a value
           setPromptDeployment(newDeploymentName);
@@ -157,18 +151,9 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
 
   // Auto-select deployment when endpoints are loaded or deployment name changes
   useEffect(() => {
-    console.log('[PromptForm Auto-select] Triggered with:', {
-      promptDeployment,
-      endpointsCount: endpoints?.length,
-      chatId
-    });
-
     if (promptDeployment && endpoints && endpoints.length > 0 && chatId) {
       const chat = getChat(chatId);
       const currentDeploymentName = chat?.selectedDeployment?.name;
-
-      console.log('[PromptForm Auto-select] Current deployment:', currentDeploymentName);
-      console.log('[PromptForm Auto-select] Target deployment:', promptDeployment);
 
       // Find matching endpoint by name or ID
       const matchingEndpoint = endpoints.find(
@@ -176,19 +161,11 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
       );
 
       if (matchingEndpoint) {
-        console.log('[PromptForm Auto-select] Found matching endpoint:', matchingEndpoint.name);
-
         // Update deployment if it's different from current selection
         if (currentDeploymentName !== matchingEndpoint.name) {
-          console.log('[PromptForm Auto-select] Updating deployment from', currentDeploymentName, 'to', matchingEndpoint.name);
           setDeployment(chatId, matchingEndpoint);
           setDeploymentLock(chatId, true);
-        } else {
-          console.log('[PromptForm Auto-select] Deployment already set, no update needed');
         }
-      } else {
-        console.warn('[PromptForm Auto-select] Deployment not found in endpoints:', promptDeployment);
-        console.warn('[PromptForm Auto-select] Available endpoints:', endpoints.map(ep => ep.name));
       }
     }
   }, [promptDeployment, endpoints, chatId, setDeployment, setDeploymentLock, getChat]);
