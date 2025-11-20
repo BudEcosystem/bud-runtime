@@ -40,6 +40,32 @@ const EvaluationList = () => {
     router.push(`/evaluations/${evaluation.id}`);
   }, [router]);
 
+  useEffect(() => {
+    const observers: ResizeObserver[] = [];
+
+    descriptionRefs.current.forEach((el, id) => {
+      const lineHeight = 16.8;
+      const maxLines = 3;
+      const maxHeight = lineHeight * maxLines;
+
+      const observer = new ResizeObserver(() => {
+        const isOverflowing = el.scrollHeight > maxHeight;
+
+        setDescriptionOverflows(prev => {
+          const map = new Map(prev);
+          if (map.get(id) === isOverflowing) return prev; // No changes
+          map.set(id, isOverflowing);
+          return map;
+        });
+      });
+
+      observer.observe(el);
+      observers.push(observer);
+    });
+
+    return () => observers.forEach(o => o.disconnect());
+  }, [evaluationsList]);   // depends on list
+
   const handleFilterToggle = useCallback((filterName: string) => {
     setSelectedFilters((prev) => {
       if (prev.includes(filterName)) {
@@ -194,18 +220,19 @@ const EvaluationList = () => {
               <div className="mb-[2.15rem] relative">
                 <div
                   ref={(el: HTMLDivElement | null) => {
-                    if (el) {
-                      descriptionRefs.current.set(evaluation.id, el);
-                      // Check if text overflows after rendering
-                      setTimeout(() => {
-                        const lineHeight = 16.8; // 140% of 12px
-                        const maxLines = 3;
-                        const maxHeight = lineHeight * maxLines;
-                        if (el.scrollHeight > maxHeight) {
-                          setDescriptionOverflows(prev => new Map(prev).set(evaluation.id, true));
-                        }
-                      }, 10);
-                    }
+                    // if (el) {
+                    //   descriptionRefs.current.set(evaluation.id, el);
+                    //   // Check if text overflows after rendering
+                    //   setTimeout(() => {
+                    //     const lineHeight = 16.8; // 140% of 12px
+                    //     const maxLines = 3;
+                    //     const maxHeight = lineHeight * maxLines;
+                    //     if (el.scrollHeight > maxHeight) {
+                    //       setDescriptionOverflows(prev => new Map(prev).set(evaluation.id, true));
+                    //     }
+                    //   }, 10);
+                    // }
+                    if (el) descriptionRefs.current.set(evaluation.id, el);
                   }}
                   className="text-xs font-normal text-[#EEEEEE] line-clamp-3 leading-[140%]"
                   style={{
