@@ -23,9 +23,16 @@ const AgentDrawer: React.FC = () => {
     activeSessionIds,
     createSession,
     workflowContext,
+    isEditMode,
+    editingPromptId,
+    clearEditMode,
+    isAddVersionMode,
+    addVersionPromptId,
+    isEditVersionMode,
+    editVersionData,
   } = useAgentStore();
 
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, step, currentFlow } = useDrawer();
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [drawerWidth, setDrawerWidth] = useState<string>('100%');
@@ -56,6 +63,7 @@ const AgentDrawer: React.FC = () => {
     // Reset views when drawer closes
     setShowPlayground(false);
     setShowChatHistory(false);
+    // Clear edit mode is handled in closeAgentDrawer in the store
   };
 
   // Handle Play button click
@@ -92,10 +100,26 @@ const AgentDrawer: React.FC = () => {
 
   // Create initial session when drawer opens if none exist
   useEffect(() => {
-    if (isAgentDrawerOpen && activeSessions.length === 0) {
+    if (!isAgentDrawerOpen) return;
+
+    // Check if this is an OAuth callback - don't create new session
+    const isOAuthCallback = localStorage.getItem('oauth_should_open_drawer') === 'true';
+
+    if (isOAuthCallback) {
+      // OAuth callback - session should already exist, don't create new one
+      return;
+    }
+
+    // Don't create a new session if in edit mode, add version mode, or edit version mode (session already loaded)
+    if (isEditMode || isAddVersionMode || isEditVersionMode) {
+      return;
+    }
+
+    // Only create session if none exist AND not OAuth callback AND not in any special mode
+    if (activeSessions.length === 0) {
       createSession();
     }
-  }, [isAgentDrawerOpen, activeSessions.length, createSession]);
+  }, [isAgentDrawerOpen, activeSessions.length, createSession, isEditMode, isAddVersionMode, isEditVersionMode]);
 
   // Set first session as active by default
   useEffect(() => {
@@ -124,6 +148,12 @@ const AgentDrawer: React.FC = () => {
   // Update URL with prompt IDs when active sessions change
   useEffect(() => {
     if (!isAgentDrawerOpen) return;
+
+    // Don't update URL if we're on the add-agent success step
+    // This allows AgentSuccess component to clear the URL parameters
+    if (currentFlow === 'add-agent' && step?.id === 'add-agent-success') {
+      return;
+    }
 
     // Get all prompt IDs from active sessions
     const promptIds = activeSessions
@@ -173,11 +203,8 @@ const AgentDrawer: React.FC = () => {
         '',
         newUrl
       );
-
-      console.log('Updated URL with prompt IDs:', promptIds);
-      console.log('Preserved agent param:', urlSearchParams.get('agent'));
     }
-  }, [activeSessions, isAgentDrawerOpen, router]);
+  }, [activeSessions, isAgentDrawerOpen, router, currentFlow, step]);
 
 
 
@@ -194,6 +221,7 @@ const AgentDrawer: React.FC = () => {
           wrapper: {
             backgroundColor: "transparent",
             boxShadow: "none",
+            zIndex: 1050, // Higher than AddAgent drawer to ensure proper stacking
           },
           mask: {
             backgroundColor: "#101010",
@@ -320,6 +348,9 @@ const AgentDrawer: React.FC = () => {
                               totalSessions={numBoxes}
                               isActive={activeBoxId === session.id}
                               onActivate={() => setActiveBoxId(session.id)}
+                              isAddVersionMode={isAddVersionMode}
+                              isEditVersionMode={isEditVersionMode}
+                              editVersionData={editVersionData}
                             />
                           </div>
                         );

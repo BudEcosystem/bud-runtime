@@ -6,6 +6,10 @@ on:
         description: "Workflow Name"
         required: true
         type: string
+      image_tag:
+        description: "Image tag (e.g., nightly, 0.25.0)"
+        required: false
+        type: string
     secrets:
       SOPS_AGE_KEY:
         required: false
@@ -14,6 +18,10 @@ on:
       workflow:
         description: "Workflow Name"
         required: true
+        type: string
+      image_tag:
+        description: "Image tag (e.g., nightly, 0.25.0)"
+        required: false
         type: string
 
 jobs:
@@ -29,4 +37,5 @@ jobs:
     - name: Run Nix Workflow
       env:
         SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        IMAGE_TAG: ${{ github.event.inputs.image_tag || inputs.image_tag }}
       run: nix run ".#workflow_${{ github.event.inputs.workflow || inputs.workflow }}"

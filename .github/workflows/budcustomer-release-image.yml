@@ -1,0 +1,19 @@
+name: "BudCustomer: Build and Push Docker Image on Release"
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release version (e.g., 0.25.0)'
+        required: true
+        type: string
+
+jobs:
+  build-and-push:
+    name: Build and Push Release
+    uses: ./.github/workflows/nix-workflow.yaml
+    with:
+      workflow: dockerhub_budcustomer
+      image_tag: ${{ inputs.release_tag }}
+    secrets:
+      SOPS_AGE_KEY: "${{ secrets.SOPS_AGE_KEY }}"

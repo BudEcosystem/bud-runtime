@@ -28,11 +28,11 @@ This formatter handles:
 """
 
 import json
-import logging
 import time
 import uuid
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Union
 
+from budmicroframe.commons import logging
 from openai.types.responses import (
     ResponseContentPartAddedEvent,
     ResponseContentPartDoneEvent,
@@ -89,7 +89,7 @@ from ..responses.schemas import OpenAIResponse
 from .schemas import MCPToolConfig, Message, ModelSettings
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class PartState(BaseModel):

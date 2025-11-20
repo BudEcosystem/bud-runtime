@@ -173,6 +173,7 @@
             "group": "User Management",
             "icon": "users",
             "pages": [
+              "user-management/authentication",
               "user-management/inviting-users",
               "user-management/roles-permissions",
               "user-management/user-activity",

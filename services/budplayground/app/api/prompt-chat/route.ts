@@ -8,7 +8,7 @@ interface PromptBody {
   prompt?: {
     id?: string;
     version?: string | null;
-    variables?: Record<string, string>;
+    variables?: Record<string, any> | { content?: Record<string, any> };
   } | null;
   metadata?: {
     project_id?: string;
@@ -55,14 +55,38 @@ const resolveGatewayBase = (preferred?: string | null) => {
   return baseUrl;
 };
 
+// Helper function to unwrap variables from the nested content structure
+const unwrapVariables = (variables: any): Record<string, any> | null => {
+  if (!variables || typeof variables !== 'object') {
+    return null;
+  }
+
+  // Check if this is the wrapped format: { content: { "Variable Name": "value" } }
+  if (variables.content && typeof variables.content === 'object') {
+    return variables.content;
+  }
+
+  // Otherwise, return as-is (already unwrapped)
+  return variables;
+};
+
 const buildPromptInput = (body: PromptBody) => {
   if (body.input && body.input.trim().length > 0) {
     return body.input;
   }
 
   if (body.prompt?.variables) {
-    return Object.entries(body.prompt.variables)
-      .map(([key, value]) => `${key}: ${value}`)
+    const vars = unwrapVariables(body.prompt.variables);
+    if (!vars) return '';
+
+    return Object.entries(vars)
+      .map(([key, value]) => {
+        // Handle nested objects by stringifying them
+        if (typeof value === 'object' && value !== null) {
+          return `${key}: ${JSON.stringify(value)}`;
+        }
+        return `${key}: ${value}`;
+      })
       .join('\n');
   }
 
@@ -98,10 +122,16 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  // Check if this is a follow-up message in a conversation
-  const isFollowUpMessage = body.messages && body.messages.length > 1;
-
   const promptInput = buildPromptInput(body);
+
+  // Check if this is a prompt form submission (has variables or input)
+  const hasPromptVariables = body.prompt?.variables && Object.keys(body.prompt.variables).length > 0;
+  const hasPromptInput = body.input && body.input.trim().length > 0;
+  const isPromptFormSubmission = hasPromptVariables || hasPromptInput;
+
+  // Check if this is a follow-up message in a conversation
+  // Only treat as follow-up if we have messages AND it's NOT a prompt form submission
+  const isFollowUpMessage = !isPromptFormSubmission && body.messages && body.messages.length > 1;
 
   // For initial prompt submission, we need prompt input
   // For follow-up messages, we rely on the messages array
@@ -120,7 +150,8 @@ export async function POST(req: Request) {
 
   try {
     // Check if this is a structured prompt (has variables)
-    const hasStructuredInput = body.prompt?.variables && Object.keys(body.prompt.variables).length > 0;
+    const actualVariables = unwrapVariables(body.prompt?.variables);
+    const hasStructuredInput = actualVariables !== null && Object.keys(actualVariables).length > 0;
 
     // Build request body for gateway
     const requestBody: any = {
@@ -140,28 +171,32 @@ export async function POST(req: Request) {
         };
       }
     } else {
-      // For initial prompt submission, use the original approach
-      // Only include input field for unstructured prompts
-      if (!hasStructuredInput && promptInput) {
-        requestBody.input = promptInput;
-      }
-
-      // Add prompt object with variables if provided
+      // For initial prompt submission
       if (body.prompt?.id) {
-        // Transform variable keys: replace spaces with underscores
-        const transformedVariables: Record<string, string> = {};
-        if (body.prompt.variables) {
-          Object.entries(body.prompt.variables).forEach(([key, value]) => {
-            const transformedKey = key.replace(/\s+/g, '_');
-            transformedVariables[transformedKey] = String(value);
-          });
-        }
+        // Unwrap variables from content wrapper
+        const sourceVariables = unwrapVariables(body.prompt.variables);
 
-        requestBody.prompt = {
-          id: body.prompt.id,
-          version: body.prompt.version || '1',
-          variables: transformedVariables,
-        };
+        if (hasStructuredInput && sourceVariables) {
+          // STRUCTURED INPUT: Send ONLY prompt.variables (no input field)
+          requestBody.prompt = {
+            id: body.prompt.id,
+            version: body.prompt.version || '1',
+            variables: sourceVariables,
+          };
+        } else {
+          // UNSTRUCTURED INPUT: Send prompt.id + input field
+          requestBody.prompt = {
+            id: body.prompt.id,
+            version: body.prompt.version || '1',
+          };
+
+          if (promptInput) {
+            requestBody.input = promptInput;
+          }
+        }
+      } else if (promptInput) {
+        // No prompt ID, just send input
+        requestBody.input = promptInput;
       }
     }
 

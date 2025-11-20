@@ -16,10 +16,10 @@
 
 """Tool loaders for loading and managing different types of tools (MCP, custom, etc.)."""
 
-import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
+from budmicroframe.commons import logging
 from pydantic_ai.mcp import MCPServerStreamableHTTP
 
 from budprompt.commons.config import app_settings
@@ -27,7 +27,7 @@ from budprompt.commons.config import app_settings
 from .schemas import MCPToolConfig
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class ToolLoader(ABC):

@@ -100,6 +100,10 @@ spec:
             value: "false"
           - name: MCP_FOUNDRY_API_KEY
             value: {{ .Values.microservices.keys.mcpFoundryApi }}
+{{- if (default .Values.microservices.budsentinel.enabled false) }}
+          - name: BUD_SENTINEL_BASE_URL
+            value: {{ .Release.Name }}-budsentinel:50051
+{{ end }}
         {{- $root := . }}
         {{- range $key, $value := .Values.microservices.budapp.env }}
           - name: {{ $key }}
