@@ -25,9 +25,15 @@ interface NavBarProps {
 
 export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSidebar, isLeftSidebarOpen, isRightSidebarOpen, isSingleChat}: NavBarProps){
 
-    const { disableChat, createChat, deleteChat, activeChatList } = useChatStore();
+    const { disableChat, createChat, deleteChat, activeChatList, getPromptIds } = useChatStore();
     const [openDropdown, setOpenDropdown] = React.useState(false);
     const [open, setOpen] = React.useState(false);
+
+    // Check if promptIds exist in URL
+    const hasPromptIds = React.useMemo(() => {
+      const promptIds = getPromptIds();
+      return promptIds && promptIds.length > 0;
+    }, [getPromptIds]);
 
     const createNewChat = () => {
       const newChatPayload = {
@@ -114,7 +120,7 @@ export default function NavBar({chatId, onToggleLeftSidebar, onToggleRightSideba
                 </Tooltip>
               </div>
             </button>}
-            {!isSingleChat && <button
+            {!isSingleChat && !hasPromptIds && <button
               onClick={createNewChat}
               className="w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer"
             >
