@@ -49,10 +49,36 @@ class SchemaGenerationException(BaseException):
     pass
 
 
-class PromptExecutionException(BaseException):
-    """Exception raised when prompt execution fails."""
+class PromptExecutionException(Exception):
+    """Exception raised when prompt execution fails.
 
-    pass
+    This exception encapsulates prompt execution errors with HTTP status codes
+    and OpenAI-compatible error information for proper API responses.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        status_code: int = 500,
+        err_type: Optional[str] = None,
+        param: Optional[str] = None,
+        code: Optional[str] = None,
+    ):
+        """Initialize the PromptExecutionException.
+
+        Args:
+            message: Human-readable error message
+            status_code: HTTP status code (default: 500 for server errors)
+            type: Optional OpenAI error type
+            param: Optional parameter path that caused the error
+            code: Optional specific error code (e.g., "invalid_schema", "execution_failed")
+        """
+        self.message = message
+        self.status_code = status_code
+        self.type = err_type
+        self.param = param
+        self.code = code
+        super().__init__(self.message)
 
 
 class TemplateRenderingException(BaseException):
