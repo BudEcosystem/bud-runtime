@@ -48,6 +48,9 @@ const AgentDrawer: React.FC = () => {
 
   // Handle close button click
   const handleCloseDrawer = () => {
+    // Remove prompt parameter from URL
+    removePromptFromUrl();
+
     // Check if we're in a workflow
     if (workflowContext.isInWorkflow) {
       // Close the agent drawer
@@ -64,6 +67,42 @@ const AgentDrawer: React.FC = () => {
     setShowPlayground(false);
     setShowChatHistory(false);
     // Clear edit mode is handled in closeAgentDrawer in the store
+  };
+
+  // Helper function to remove prompt parameter from URL
+  const removePromptFromUrl = () => {
+    if (typeof window === 'undefined') return;
+
+    const currentPath = window.location.pathname;
+    const urlSearchParams = new URLSearchParams(window.location.search);
+
+    // Remove the prompt parameter
+    urlSearchParams.delete('prompt');
+
+    // Build query parts for remaining parameters
+    const queryParts: string[] = [];
+    urlSearchParams.forEach((value, key) => {
+      if (value) {
+        // Don't encode agent parameter
+        if (key === 'agent') {
+          queryParts.push(`${key}=${value}`);
+        } else {
+          queryParts.push(`${key}=${encodeURIComponent(value)}`);
+        }
+      }
+    });
+
+    // Build the final URL
+    const newUrl = queryParts.length > 0
+      ? `${currentPath}?${queryParts.join('&')}`
+      : currentPath;
+
+    // Use window.history.replaceState to update URL
+    window.history.replaceState(
+      { ...window.history.state },
+      '',
+      newUrl
+    );
   };
 
   // Handle Play button click
@@ -166,6 +205,12 @@ const AgentDrawer: React.FC = () => {
 
     // Only update if the URL param is different from what we want to set
     if (currentPromptParam !== newPromptParam) {
+      console.log('🔄 AgentDrawer updating URL:', {
+        currentPrompt: currentPromptParam,
+        newPrompt: newPromptParam,
+        willAddPrompt: !!newPromptParam
+      });
+
       // Build URL manually to avoid encoding commas
       // Use window.location to get the actual browser URL
       const currentPath = window.location.pathname;
@@ -174,6 +219,10 @@ const AgentDrawer: React.FC = () => {
       // Parse existing query params from actual browser URL (not router.query)
       // This ensures we capture params added via window.history.replaceState
       const urlSearchParams = new URLSearchParams(window.location.search);
+
+      // CRITICAL: Explicitly capture agent parameter FIRST before any operations
+      const agentParam = urlSearchParams.get('agent');
+      console.log('📌 Agent parameter captured:', agentParam);
 
       // Add all existing query params except 'prompt'
       urlSearchParams.forEach((value, key) => {
@@ -187,15 +236,26 @@ const AgentDrawer: React.FC = () => {
         }
       });
 
+      // TRIPLE-CHECK: If agent parameter was in URL but somehow not added, force add it
+      if (agentParam && !queryParts.some(part => part.startsWith('agent='))) {
+        console.log('⚠️ Agent parameter was missing, force adding it!');
+        queryParts.unshift(`agent=${agentParam}`);
+      }
+
       // Add new prompt param if exists (without encoding commas)
       if (newPromptParam) {
         queryParts.push(`prompt=${newPromptParam}`);
+        console.log('✓ Adding prompt parameter:', newPromptParam);
       }
+
+      console.log('🔧 Final query parts:', queryParts);
 
       // Build the final URL
       const newUrl = queryParts.length > 0
         ? `${currentPath}?${queryParts.join('&')}`
         : currentPath;
+
+      console.log('✓ New URL:', newUrl);
 
       // Use window.history.replaceState to update URL
       window.history.replaceState(

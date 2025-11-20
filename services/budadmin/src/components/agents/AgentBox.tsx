@@ -1148,6 +1148,9 @@ function AgentBoxInner({
 
         successToast("Version created successfully");
 
+        // Remove prompt parameter from URL before closing
+        removePromptFromUrl();
+
         // Close the drawer
         closeAgentDrawer();
 
@@ -1166,8 +1169,47 @@ function AgentBoxInner({
     }
   };
 
+  // Helper function to remove prompt parameter from URL
+  const removePromptFromUrl = () => {
+    if (typeof window === 'undefined') return;
+
+    const currentPath = window.location.pathname;
+    const urlSearchParams = new URLSearchParams(window.location.search);
+
+    // Remove the prompt parameter
+    urlSearchParams.delete('prompt');
+
+    // Build query parts for remaining parameters
+    const queryParts: string[] = [];
+    urlSearchParams.forEach((value, key) => {
+      if (value) {
+        // Don't encode agent parameter
+        if (key === 'agent') {
+          queryParts.push(`${key}=${value}`);
+        } else {
+          queryParts.push(`${key}=${encodeURIComponent(value)}`);
+        }
+      }
+    });
+
+    // Build the final URL
+    const newUrl = queryParts.length > 0
+      ? `${currentPath}?${queryParts.join('&')}`
+      : currentPath;
+
+    // Use window.history.replaceState to update URL
+    window.history.replaceState(
+      { ...window.history.state },
+      '',
+      newUrl
+    );
+  };
+
   // Handle Save button click - different behavior based on mode
   const handleSaveClick = () => {
+    // Remove prompt parameter from URL before closing
+    removePromptFromUrl();
+
     if (isAddVersionMode) {
       handleCreateVersion();
     } else if (isEditVersionMode) {
