@@ -31,7 +31,7 @@ const CurrentMetricsTable: React.FC<CurrentMetricsTableProps> = ({ data }) => {
             dataIndex: "evaluation",
             key: "evaluation",
             render: (text: string) => (
-                <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
+                <Text_12_400_EEEEEE className={'capitalize'}>{text}</Text_12_400_EEEEEE>
             ),
         },
         {

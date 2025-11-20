@@ -337,8 +337,8 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
               </div>
             </div>
           </div>
-          <div className="hR mt-[1.5rem]"></div>
-          {datasets ? displaySections.map((item, sectionIndex) => <div key={item.keyName || sectionIndex}>
+          {datasets ? displaySections.map((item, sectionIndex) => datasets.additional_info?.[item?.keyName] && <div key={item.keyName || sectionIndex}>
+            <div className="hR mt-[1.5rem]"></div>
             <div className="pt-[1.3rem]">
               <Text_14_400_EEEEEE>{item.header}</Text_14_400_EEEEEE>
               <Text_12_400_757575 className="pt-[.33rem]">
