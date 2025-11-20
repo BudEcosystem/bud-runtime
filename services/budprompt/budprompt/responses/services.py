@@ -64,7 +64,7 @@ class ResponsesService:
             OpenAIResponseException: OpenAI-compatible exception with status code and error details
         """
         try:
-            if prompt_params.variables and input:
+            if prompt_params.get("variables") and input:
                 logger.error("Please provide either variables or input.")
                 raise OpenAIResponseException(
                     status_code=400,
@@ -73,8 +73,8 @@ class ResponsesService:
                 )
 
             # Extract parameters
-            prompt_id = prompt_params.id
-            version = prompt_params.version
+            prompt_id = prompt_params["id"]
+            version = prompt_params.get("version")
 
             # Determine Redis key based on version
             if version:
@@ -119,7 +119,7 @@ class ResponsesService:
             prompt_execute_data = PromptExecuteData.model_validate(config_data)
             logger.debug("Config data for prompt: %s: %s", prompt_id, prompt_execute_data)
 
-            input_data = prompt_params.variables if prompt_params.variables else input
+            input_data = prompt_params.get("variables") if prompt_params.get("variables") else input
 
             result = await PromptExecutorService().execute_prompt(
                 prompt_execute_data,
@@ -148,7 +148,7 @@ class ResponsesService:
                     update={
                         "prompt": ResponsePrompt(
                             id=prompt_id,
-                            variables=prompt_params.variables,
+                            variables=prompt_params.get("variables"),
                             version=version,
                         )
                     }
