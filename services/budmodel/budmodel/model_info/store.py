@@ -14,6 +14,8 @@ from ..commons.helpers import safe_delete
 from .schemas import UploadFile
 
 
+from ..shared.io_monitor import get_io_monitor
+
 logger = logging.get_logger(__name__)
 
 
@@ -31,6 +33,23 @@ class ModelStore:
             secret_key=secrets_settings.minio_secret_key,
             secure=app_settings.minio_secure,
         )
+        
+        # Initialize I/O monitor if enabled
+        self.io_monitor = None
+        if app_settings.enable_io_monitoring:
+            self.io_monitor = get_io_monitor()
+
+    def _wait_for_io_clearance(self) -> None:
+        """Wait for I/O stress to clear before proceeding."""
+        if not self.io_monitor:
+            return
+
+        # Check if we should pause due to high stress
+        # We use the model download directory as the reference path since that's where we're reading from
+        if self.io_monitor.should_pause_downloads(disk_path=self.model_download_dir):
+            logger.warning("High I/O stress detected. Pausing upload temporarily...")
+            self.io_monitor.wait_for_io_recovery()
+            logger.info("I/O stress recovered. Resuming upload.")
 
     def upload_file(self, file_path: str, object_name: str, bucket_name: str = app_settings.minio_bucket) -> bool:
         """Upload a file to the MinIO store.
@@ -42,6 +61,9 @@ class ModelStore:
         Returns:
             bool: True if the upload was successful, False otherwise
         """
+        # Check for I/O clearance before starting upload
+        self._wait_for_io_clearance()
+
         try:
             # Upload the file
             self.client.fput_object(
