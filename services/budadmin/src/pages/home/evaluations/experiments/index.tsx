@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import React from "react";
-import { Table, Tag, Popover, ConfigProvider, Select } from "antd";
+import { Table, Tag, Popover, ConfigProvider, Select, DatePicker } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { useRouter } from "next/router";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
@@ -11,6 +11,7 @@ import {
   Text_16_600_FFFFFF,
   Text_12_300_EEEEEE,
   Text_12_400_B3B3B3,
+  Text_12_400_FFFFFF,
 } from "@/components/ui/text";
 import { PrimaryButton, SecondaryButton } from "@/components/ui/bud/form/Buttons";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
@@ -21,18 +22,26 @@ import Tags from "src/flows/components/DrawerTags";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { capitalize } from "@/lib/utils";
 import { endpointStatusMapping } from "@/lib/colorMapping";
+import { Model, useModels } from "@/hooks/useModels";
+import dayjs from "dayjs";
 
 
 // Remove the local interface since we're importing it from the hook
 
 interface ExperimentFilters {
-  status?: string[];
+  status?: string;
   tags?: string[];
+  model_id?: string
+  created_after?: string
+  created_before?: string
 }
 
 const defaultFilter: ExperimentFilters = {
-  status: [],
+  status: '',
   tags: [],
+  model_id: '',
+  created_after: '',
+  created_before: ''
 };
 
 const ExperimentsTable = () => {
@@ -47,6 +56,7 @@ const ExperimentsTable = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const { RangePicker } = DatePicker;
   // Sample data for testing when API returns no data
   const sampleExperiments: ExperimentData[] = [
     // {
@@ -65,7 +75,9 @@ const ExperimentsTable = () => {
     experimentsList,
     experimentsListTotal,
     loading,
-    getExperiments
+    getExperiments,
+    experimentModels,
+    getExperimentModels
   } = useEvaluations();
 
   // Fetch experiments data from API
@@ -75,10 +87,13 @@ const ExperimentsTable = () => {
         page: currentPage,
         limit: pageSize,
         search: searchValue || undefined,
-        status: filter.status?.length > 0 ? filter.status : undefined,
+        experiment_status: filter.status?.length > 0 ? filter.status : undefined,
         tags: filter.tags?.length > 0 ? filter.tags : undefined,
         order: order || undefined,
         orderBy: orderBy || undefined,
+        model_id: filter.model_id || undefined,
+        created_after: filter.created_after || undefined,
+        created_before: filter.created_before || undefined,
       };
 
       await getExperiments(payload);
@@ -412,6 +427,10 @@ const ExperimentsTable = () => {
     return Array.from(tags);
   }, [experimentsList]);
 
+  useEffect(() => {
+    getExperimentModels();
+  }, [getExperimentModels])
+
   return (
     <div className="h-full w-full relative pt-[2.5rem]">
       {/* Selected Filters */}
@@ -467,7 +486,7 @@ const ExperimentsTable = () => {
           title={() => (
             <div className="flex justify-between items-center px-[0.75rem] py-[1rem]">
               <Text_16_600_FFFFFF>Experiments</Text_16_600_FFFFFF>
-              <div className="flex items-center gap-3 hidden">
+              <div className="flex items-center gap-3">
                 <SearchHeaderInput
                   searchValue={searchValue}
                   setSearchValue={setSearchValue}
@@ -530,11 +549,10 @@ const ExperimentsTable = () => {
                                   size="large"
                                   className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
                                   options={[
-                                    { label: "Running", value: "Running" },
-                                    { label: "Completed", value: "Completed" },
-                                    { label: "Failed", value: "Failed" },
+                                    { label: "Running", value: "running" },
+                                    { label: "Completed", value: "completed" },
+                                    { label: "No Runs", value: "no_runs" },
                                   ]}
-                                  mode="multiple"
                                   onChange={(value) => {
                                     setTempFilter({
                                       ...tempFilter,
@@ -556,11 +574,11 @@ const ExperimentsTable = () => {
                             </div>
                           </div>
 
-                          {/* Tags Filter */}
+                          {/* Models Filter */}
                           <div className="rounded-[6px] relative !bg-[transparent] !w-[100%]">
                             <div className="w-full">
                               <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] px-1 tracking-[.035rem] z-10">
-                                Tags
+                                Models
                               </Text_12_300_EEEEEE>
                             </div>
                             <div className="custom-select-two w-full rounded-[6px] relative">
@@ -572,25 +590,29 @@ const ExperimentsTable = () => {
                                 }}
                               >
                                 <Select
-                                  placeholder="Select Tags"
+                                  showSearch
+                                  placeholder="Search and select models"
+                                  filterOption={(input, option) =>
+                                    (option?.label?.toString() ?? '').toLowerCase().includes(input.toLowerCase())
+                                  }
+                                  optionFilterProp="label"
                                   style={{
                                     backgroundColor: "transparent",
                                     color: "#EEEEEE",
                                     border: "0.5px solid #757575",
                                     width: "100%",
                                   }}
-                                  value={tempFilter.tags}
+                                  value={tempFilter.model_id}
                                   size="large"
                                   className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                  options={availableTags.map((tag) => ({
-                                    label: tag,
-                                    value: tag,
+                                  options={experimentModels.map((model: Model) => ({
+                                    label: model?.name,
+                                    value: model?.id,
                                   }))}
-                                  mode="multiple"
                                   onChange={(value) => {
                                     setTempFilter({
                                       ...tempFilter,
-                                      tags: value,
+                                      model_id: value,
                                     });
                                   }}
                                   tagRender={(props) => {
@@ -605,6 +627,42 @@ const ExperimentsTable = () => {
                                   }}
                                 />
                               </ConfigProvider>
+                            </div>
+                            <div className="mt-4">
+                              <Text_12_400_FFFFFF className="mb-1">Created Date</Text_12_400_FFFFFF>
+                              <RangePicker
+                                showTime={false}
+                                style={{ width: "100%" }}
+                                format="YYYY-MM-DD"
+                                placeholder={["Start Date", "End Date"]}
+                                className="bg-[#1A1A1A] border-[#1F1F1F] hover:border-[#3F3F3F]"
+                                value={[
+                                  tempFilter.created_after ? dayjs(tempFilter.created_after) : null,
+                                  tempFilter.created_before ? dayjs(tempFilter.created_before) : null
+                                ]}
+                                onChange={(dates) => {
+                                  if (!dates) {
+                                    setTempFilter({
+                                      ...tempFilter,
+                                      created_after: undefined,
+                                      created_before: undefined
+                                    });
+                                    return;
+                                  }
+
+                                  const [from, to] = dates;
+
+                                  setTempFilter({
+                                    ...tempFilter,
+                                    created_after: from
+                                      ? from.startOf('day').toISOString()
+                                      : undefined,
+                                    created_before: to
+                                      ? to.endOf('day').toISOString()
+                                      : undefined,
+                                  });
+                                }}
+                              />
                             </div>
                           </div>
 
