@@ -150,7 +150,7 @@ const EvaluationList = () => {
           <SearchHeaderInput
             searchValue={searchValue}
             setSearchValue={setSearchValue}
-            placeholder="Type in anything you would like to evaluate: finance, healthcare, hindi, problem solving et"
+            placeholder="Type in anything you would like to evaluate: finance, problem solving etc"
             expanded={true}
             classNames="flex-1 border-[.5px] border-[#757575]"
           />

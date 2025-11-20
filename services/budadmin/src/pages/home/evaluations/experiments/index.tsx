@@ -135,7 +135,7 @@ const ExperimentsTable = () => {
       title: "Experiment name",
       dataIndex: "name",
       key: "name",
-      render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
+      render: (text) => <Text_12_400_EEEEEE className="capitalize">{text}</Text_12_400_EEEEEE>,
       sorter: true,
       sortOrder:
         orderBy === "name"
@@ -490,7 +490,7 @@ const ExperimentsTable = () => {
                 <SearchHeaderInput
                   searchValue={searchValue}
                   setSearchValue={setSearchValue}
-                  placeholder="Search experiments..."
+                  placeholder="Search by name"
                 />
                 <ConfigProvider
                   theme={{
