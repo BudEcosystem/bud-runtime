@@ -23,6 +23,8 @@ import { errorToast, successToast } from "@/components/toast";
 import { tempApiBaseUrl } from "@/components/environment";
 import { AppRequest } from "src/pages/api/requests";
 import { usePromptSchemaWorkflow } from "@/hooks/usePromptSchemaWorkflow";
+import { usePrompts } from "@/hooks/usePrompts";
+import { loadPromptForEditing } from "@/utils/promptHelpers";
 
 interface AgentBoxProps {
   session: AgentSession;
@@ -64,6 +66,46 @@ function AgentBoxInner({
     addDeletedPromptId,
   } = useAgentStore();
 
+  // Get prompts store for refreshing data
+  const { getPromptById } = usePrompts();
+
+  // Helper function to refresh session data from backend
+  const refreshSessionData = React.useCallback(async () => {
+    if (!session?.promptId) {
+      console.log("No promptId to refresh from");
+      return;
+    }
+
+    try {
+      console.log("=== Refreshing session data from backend ===");
+      console.log("Fetching prompt:", session.promptId);
+
+      // Fetch latest prompt data from backend
+      const promptData = await getPromptById(session.promptId);
+
+      // Transform the data using our helper
+      const transformedData = await loadPromptForEditing(session.promptId);
+
+      console.log("Fetched prompt data:", promptData);
+      console.log("Transformed input variables:", transformedData.inputVariables);
+      console.log("Transformed output variables:", transformedData.outputVariables);
+
+      // Update session with refreshed data
+      // This will automatically persist to localStorage via Zustand persist middleware
+      updateSession(session.id, {
+        inputVariables: transformedData.inputVariables || session.inputVariables,
+        outputVariables: transformedData.outputVariables || session.outputVariables,
+        systemPrompt: transformedData.systemPrompt || session.systemPrompt,
+        promptMessages: transformedData.promptMessages || session.promptMessages,
+      });
+
+      console.log("=== Session data refreshed and persisted to localStorage ===");
+    } catch (error) {
+      console.error("Error refreshing session data:", error);
+      // Don't show error toast as this is a background operation
+    }
+  }, [session, getPromptById, updateSession]);
+
   // Ensure session has a promptId (migration for old sessions)
   React.useEffect(() => {
     if (session && !session.promptId) {
@@ -90,6 +132,77 @@ function AgentBoxInner({
   const [structuredOutputEnabled, setStructuredOutputEnabled] = useState(false);
   const [streamEnabled, setStreamEnabled] = useState(session?.settings?.stream ?? false);
   const [setAsDefault, setSetAsDefault] = useState(editVersionData?.isDefault ?? false);
+
+  // Initialize structured mode based on existing variables
+  // Run on session change or when variable arrays change (but not on individual field edits)
+  React.useEffect(() => {
+    if (session) {
+      console.log("=== AgentBox Structured Mode Detection ===");
+      console.log("Session ID:", session.id);
+      console.log("Input variables COUNT:", session.inputVariables?.length);
+      console.log("Input variables NAMES:", session.inputVariables?.map(v => v.name));
+      console.log("Input variables FULL:", session.inputVariables);
+      console.log("Output variables COUNT:", session.outputVariables?.length);
+      console.log("Output variables NAMES:", session.outputVariables?.map(v => v.name));
+      console.log("Output variables FULL:", session.outputVariables);
+
+      // Enable structured input if we have meaningful variables (not just default)
+      // Less strict: just check if any variable has a custom name
+      const inputVarsCheck = session.inputVariables?.map(v => ({
+        name: v.name,
+        trimmed: v.name?.trim(),
+        isEmpty: v.name?.trim() === '',
+        isDefault: v.name?.trim() === 'Input Variable 1',
+        passes: v.name && v.name.trim() !== '' && v.name.trim() !== 'Input Variable 1' && v.name.trim().length > 0
+      }));
+      console.log("Input variables check details:", inputVarsCheck);
+
+      const hasInputVars = session.inputVariables &&
+        session.inputVariables.length > 0 &&
+        session.inputVariables.some(v =>
+          v.name &&
+          v.name.trim() !== '' &&
+          v.name.trim() !== 'Input Variable 1' &&
+          v.name.trim().length > 0
+        );
+
+      // Enable structured output if we have meaningful variables (not just default)
+      // Less strict: just check if any variable has a custom name
+      const outputVarsCheck = session.outputVariables?.map(v => ({
+        name: v.name,
+        trimmed: v.name?.trim(),
+        isEmpty: v.name?.trim() === '',
+        isDefault: v.name?.trim() === 'Output Variable 1',
+        passes: v.name && v.name.trim() !== '' && v.name.trim() !== 'Output Variable 1' && v.name.trim().length > 0
+      }));
+      console.log("Output variables check details:", outputVarsCheck);
+
+      const hasOutputVars = session.outputVariables &&
+        session.outputVariables.length > 0 &&
+        session.outputVariables.some(v =>
+          v.name &&
+          v.name.trim() !== '' &&
+          v.name.trim() !== 'Output Variable 1' &&
+          v.name.trim().length > 0
+        );
+
+      console.log("✓ Has input vars (should enable structured input):", hasInputVars);
+      console.log("✓ Has output vars (should enable structured output):", hasOutputVars);
+      console.log("Setting structured input enabled to:", hasInputVars);
+      console.log("Setting structured output enabled to:", hasOutputVars);
+      console.log("=== End Structured Mode Detection ===");
+
+      setStructuredInputEnabled(hasInputVars);
+      setStructuredOutputEnabled(hasOutputVars);
+    }
+  }, [
+    session?.id,
+    session?.inputVariables?.length,
+    session?.outputVariables?.length,
+    // Also depend on variable names to detect when loaded variables have custom names
+    session?.inputVariables?.map(v => v.name).join(','),
+    session?.outputVariables?.map(v => v.name).join(',')
+  ]);
 
   // Custom hook to create workflow handlers with consistent behavior
   const useWorkflowHandler = (name: string, workflowId?: string) => {
@@ -185,6 +298,17 @@ function AgentBoxInner({
       setSetAsDefault(editVersionData.isDefault);
     }
   }, [isEditVersionMode, editVersionData]);
+
+  // Refresh session data from backend when settings sidebar is opened
+  // This ensures prepopulation of data after navigating back from playground
+  React.useEffect(() => {
+    if (isSettingsOpen && session?.promptId) {
+      console.log("=== Settings opened, refreshing data from backend ===");
+      console.log("Session ID:", session.id);
+      console.log("Prompt ID:", session.promptId);
+      refreshSessionData();
+    }
+  }, [isSettingsOpen, session?.id, session?.promptId, refreshSessionData]);
 
   // Handle case where session is null early
   if (!session) {
@@ -393,14 +517,44 @@ function AgentBoxInner({
       // This function is for saving input schema, so type should always be "input"
       const type = "input";
 
-      // Build the payload using the utility function with required parameters
-      const payload: any = buildPromptSchemaFromSession(
-        session,
-        type,
-        1,     // step_number
-        0,     // workflow_total_steps (0 for single step save)
-        true   // trigger_workflow
-      );
+      let payload: any;
+
+      // Check if structured input is disabled - if so, send null schema
+      if (!structuredInputEnabled) {
+        payload = {
+          prompt_id: session.promptId,
+          version: 1,
+          set_default: false,
+          permanent: false,
+          schema: {
+            schema: null,
+            validations: null
+          },
+          type: "input",
+          deployment_name: session.selectedDeployment?.name,
+          endpoint_id: null,
+          model_id: null,
+          project_id: null,
+          user_id: null,
+          api_key_project_id: null,
+          access_token: null,
+          source_topic: null,
+          debug: false,
+          notification_metadata: null,
+          step_number: 1,
+          workflow_total_steps: 0,
+          trigger_workflow: true
+        };
+      } else {
+        // Build the payload using the utility function with required parameters
+        payload = buildPromptSchemaFromSession(
+          session,
+          type,
+          1,     // step_number
+          0,     // workflow_total_steps (0 for single step save)
+          true   // trigger_workflow
+        );
+      }
 
       // Add version and permanent parameters if in edit version mode
       if (isEditVersionMode && editVersionData) {
@@ -436,6 +590,9 @@ function AgentBoxInner({
           updateSession(session.id, { inputWorkflowId: workflowId });
           console.log("Stored inputWorkflowId in session");
         }
+
+        // Refresh session data from backend to ensure we have the latest saved variables
+        await refreshSessionData();
 
         // successToast("Input schema saved successfully"); // Removed: No toast needed
 
@@ -475,14 +632,44 @@ function AgentBoxInner({
     setIsSavingOutput(true);
 
     try {
-      // Build the payload with output type
-      const payload: any = buildPromptSchemaFromSession(
-        session,
-        "output",  // Explicitly use output type
-        1,         // step_number
-        0,         // workflow_total_steps (0 for single step save)
-        true       // trigger_workflow
-      );
+      let payload: any;
+
+      // Check if structured output is disabled - if so, send null schema
+      if (!structuredOutputEnabled) {
+        payload = {
+          prompt_id: session.promptId,
+          version: 1,
+          set_default: false,
+          permanent: false,
+          schema: {
+            schema: null,
+            validations: null
+          },
+          type: "output",
+          deployment_name: session.selectedDeployment?.name,
+          endpoint_id: null,
+          model_id: null,
+          project_id: null,
+          user_id: null,
+          api_key_project_id: null,
+          access_token: null,
+          source_topic: null,
+          debug: false,
+          notification_metadata: null,
+          step_number: 1,
+          workflow_total_steps: 0,
+          trigger_workflow: true
+        };
+      } else {
+        // Build the payload with output type
+        payload = buildPromptSchemaFromSession(
+          session,
+          "output",  // Explicitly use output type
+          1,         // step_number
+          0,         // workflow_total_steps (0 for single step save)
+          true       // trigger_workflow
+        );
+      }
 
       // Add version and permanent parameters if in edit version mode
       if (isEditVersionMode && editVersionData) {
@@ -514,6 +701,9 @@ function AgentBoxInner({
           console.log("Stored outputWorkflowId in session");
         }
 
+        // Refresh session data from backend to ensure we have the latest saved variables
+        await refreshSessionData();
+
         // successToast("Output schema saved successfully"); // Removed: No toast needed
 
         // promptId is already set when session was created, no need to extract from response
@@ -531,6 +721,156 @@ function AgentBoxInner({
       } else {
         errorToast(error?.response?.data?.detail || "Failed to save output schema");
       }
+    } finally {
+      setIsSavingOutput(false);
+    }
+  };
+
+  const handleClearInputSchema = async () => {
+    if (!session) {
+      errorToast("No session data available");
+      return;
+    }
+
+    if (!session.selectedDeployment?.name) {
+      errorToast("Please select a deployment model first");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      // Build payload with null schema to clear/delete the saved schema
+      const payload: any = {
+        prompt_id: session.promptId,
+        version: 1,
+        set_default: false,
+        permanent: false,
+        schema: {
+          schema: null,
+          validations: null
+        },
+        type: "input",
+        deployment_name: session.selectedDeployment?.name,
+        endpoint_id: null,
+        model_id: null,
+        project_id: null,
+        user_id: null,
+        api_key_project_id: null,
+        access_token: null,
+        source_topic: null,
+        debug: false,
+        notification_metadata: null,
+        step_number: 1,
+        workflow_total_steps: 0,
+        trigger_workflow: false
+      };
+
+      console.log("=== Clearing Input Schema ===");
+      console.log("Sending null schema payload:", payload);
+
+      // Make the API call
+      const response = await AppRequest.Post(
+        `${tempApiBaseUrl}/prompts/prompt-schema`,
+        payload
+      );
+
+      if (response && response.data) {
+        console.log("Input schema cleared successfully");
+        // Reset session input variables to default
+        updateSession(session.id, {
+          inputVariables: [
+            {
+              id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+              name: "Input Variable 1",
+              value: "",
+              type: "input",
+              description: "",
+              dataType: "string",
+              defaultValue: ""
+            }
+          ]
+        });
+        successToast("Input schema cleared");
+      }
+    } catch (error: any) {
+      console.error("Error clearing input schema:", error);
+      errorToast(error?.response?.data?.detail || "Failed to clear input schema");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleClearOutputSchema = async () => {
+    if (!session) {
+      errorToast("No session data available");
+      return;
+    }
+
+    if (!session.selectedDeployment?.name) {
+      errorToast("Please select a deployment model first");
+      return;
+    }
+
+    setIsSavingOutput(true);
+
+    try {
+      // Build payload with null schema to clear/delete the saved schema
+      const payload: any = {
+        prompt_id: session.promptId,
+        version: 1,
+        set_default: false,
+        permanent: false,
+        schema: {
+          schema: null,
+          validations: null
+        },
+        type: "output",
+        deployment_name: session.selectedDeployment?.name,
+        endpoint_id: null,
+        model_id: null,
+        project_id: null,
+        user_id: null,
+        api_key_project_id: null,
+        access_token: null,
+        source_topic: null,
+        debug: false,
+        notification_metadata: null,
+        step_number: 1,
+        workflow_total_steps: 0,
+        trigger_workflow: false
+      };
+
+      console.log("=== Clearing Output Schema ===");
+      console.log("Sending null schema payload:", payload);
+
+      // Make the API call
+      const response = await AppRequest.Post(
+        `${tempApiBaseUrl}/prompts/prompt-schema`,
+        payload
+      );
+
+      if (response && response.data) {
+        console.log("Output schema cleared successfully");
+        // Reset session output variables to default
+        updateSession(session.id, {
+          outputVariables: [
+            {
+              id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+              name: "Output Variable 1",
+              value: "",
+              type: "output",
+              description: "",
+              dataType: "string",
+              defaultValue: ""
+            }
+          ]
+        });
+        successToast("Output schema cleared");
+      }
+    } catch (error: any) {
+      console.error("Error clearing output schema:", error);
+      errorToast(error?.response?.data?.detail || "Failed to clear output schema");
     } finally {
       setIsSavingOutput(false);
     }
@@ -1097,6 +1437,8 @@ function AgentBoxInner({
             onDeleteVariable={handleDeleteVariable}
             onStructuredInputEnabledChange={setStructuredInputEnabled}
             onStructuredOutputEnabledChange={setStructuredOutputEnabled}
+            structuredInputEnabled={structuredInputEnabled}
+            structuredOutputEnabled={structuredOutputEnabled}
             onSystemPromptChange={handleSystemPromptChange}
             onPromptMessagesChange={handlePromptMessagesChange}
             localSystemPrompt={localSystemPrompt}
@@ -1110,6 +1452,8 @@ function AgentBoxInner({
             isSavingPromptMessages={isSavingPromptMessages}
             onSaveOutputSchema={handleSaveOutputSchema}
             isSavingOutput={isSavingOutput}
+            onClearInputSchema={handleClearInputSchema}
+            onClearOutputSchema={handleClearOutputSchema}
           />
 
           {/* Tools Sidebar */}

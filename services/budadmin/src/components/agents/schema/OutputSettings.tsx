@@ -17,6 +17,8 @@ interface OutputSettingsProps {
   onSaveOutputSchema?: () => void;
   isSavingOutput?: boolean;
   onStructuredOutputEnabledChange?: (enabled: boolean) => void;
+  initialStructuredOutputEnabled?: boolean;
+  onClearOutputSchema?: () => void;
 }
 
 export const OutputSettings: React.FC<OutputSettingsProps> = ({
@@ -27,10 +29,12 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
   onDeleteVariable,
   onSaveOutputSchema,
   isSavingOutput,
-  onStructuredOutputEnabledChange
+  onStructuredOutputEnabledChange,
+  initialStructuredOutputEnabled = false,
+  onClearOutputSchema
 }) => {
   const [isOpen, setIsOpen] = React.useState(true);
-  const [structuredOutputEnabled, setStructuredOutputEnabled] = React.useState(false);
+  const [structuredOutputEnabled, setStructuredOutputEnabled] = React.useState(initialStructuredOutputEnabled);
   const [variableOpenStates, setVariableOpenStates] = React.useState<Record<string, boolean>>({});
   const [validationEnabled, setValidationEnabled] = React.useState<Record<string, boolean>>({});
 
@@ -43,6 +47,32 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
       }
     });
     setValidationEnabled(prev => ({ ...prev, ...newValidationEnabled }));
+  }, [outputVariables]);
+
+  // Sync with parent's structured output enabled state
+  React.useEffect(() => {
+    console.log("=== OutputSettings: Syncing with parent state ===");
+    console.log("Initial structured output enabled from parent:", initialStructuredOutputEnabled);
+    setStructuredOutputEnabled(initialStructuredOutputEnabled);
+  }, [initialStructuredOutputEnabled]);
+
+  // Auto-enable structured output if we have configured variables
+  React.useEffect(() => {
+    const hasConfiguredVars = outputVariables &&
+      outputVariables.length > 0 &&
+      outputVariables.some(v =>
+        v.name &&
+        v.name.trim() !== '' &&
+        v.name.trim() !== 'Output Variable 1'
+      );
+
+    console.log("=== OutputSettings: Auto-enable check ===");
+    console.log("Has configured vars:", hasConfiguredVars);
+    console.log("Output variables:", outputVariables);
+
+    if (hasConfiguredVars) {
+      setStructuredOutputEnabled(true);
+    }
   }, [outputVariables]);
 
   // Notify parent when structuredOutputEnabled changes
@@ -79,15 +109,23 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
             )}
           </div>
           <div
-            className="flex flex-row items-center gap-[1rem] justify-start cursor-pointer"
-            onClick={() => setStructuredOutputEnabled(!structuredOutputEnabled)}
+            className="flex flex-row items-center gap-[1rem] justify-start"
           >
             <div className="flex flex-row items-center gap-[.4rem] py-[.5rem]">
               <Text_12_400_B3B3B3>Structured output</Text_12_400_B3B3B3>
             </div>
             <Switch
               checked={structuredOutputEnabled}
-              onChange={(checked) => setStructuredOutputEnabled(checked)}
+              onChange={(checked) => {
+                console.log("=== OutputSettings: Switch onChange ===");
+                console.log("New checked value:", checked);
+                setStructuredOutputEnabled(checked);
+                // If turning OFF, clear the saved schema
+                if (!checked && onClearOutputSchema) {
+                  console.log("Calling onClearOutputSchema");
+                  onClearOutputSchema();
+                }
+              }}
             />
           </div>
         </div>
@@ -244,9 +282,9 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
             onSaveOutputSchema?.();
           }}
           loading={isSavingOutput}
-          disabled={isSavingOutput || !structuredOutputEnabled}
+          disabled={isSavingOutput}
           style={{
-            cursor: (isSavingOutput || !structuredOutputEnabled) ? 'not-allowed' : 'pointer',
+            cursor: isSavingOutput ? 'not-allowed' : 'pointer',
           }}
           classNames="h-[1.375rem] rounded-[0.375rem]"
           textClass="!text-[0.625rem] !font-[400]"

@@ -17,6 +17,8 @@ interface InputSettingsProps {
   onSavePromptSchema?: () => void;
   isSaving?: boolean;
   onStructuredInputEnabledChange?: (enabled: boolean) => void;
+  initialStructuredInputEnabled?: boolean;
+  onClearInputSchema?: () => void;
 }
 
 export const InputSettings: React.FC<InputSettingsProps> = ({
@@ -27,10 +29,12 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
   onDeleteVariable,
   onSavePromptSchema,
   isSaving,
-  onStructuredInputEnabledChange
+  onStructuredInputEnabledChange,
+  initialStructuredInputEnabled = false,
+  onClearInputSchema
 }) => {
   const [isOpen, setIsOpen] = React.useState(true);
-  const [structuredInputEnabled, setStructuredInputEnabled] = React.useState(false);
+  const [structuredInputEnabled, setStructuredInputEnabled] = React.useState(initialStructuredInputEnabled);
   const [variableOpenStates, setVariableOpenStates] = React.useState<Record<string, boolean>>({});
   const [validationEnabled, setValidationEnabled] = React.useState<Record<string, boolean>>({});
 
@@ -43,6 +47,32 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
       }
     });
     setValidationEnabled(prev => ({ ...prev, ...newValidationEnabled }));
+  }, [inputVariables]);
+
+  // Sync with parent's structured input enabled state
+  React.useEffect(() => {
+    console.log("=== InputSettings: Syncing with parent state ===");
+    console.log("Initial structured input enabled from parent:", initialStructuredInputEnabled);
+    setStructuredInputEnabled(initialStructuredInputEnabled);
+  }, [initialStructuredInputEnabled]);
+
+  // Auto-enable structured input if we have configured variables
+  React.useEffect(() => {
+    const hasConfiguredVars = inputVariables &&
+      inputVariables.length > 0 &&
+      inputVariables.some(v =>
+        v.name &&
+        v.name.trim() !== '' &&
+        v.name.trim() !== 'Input Variable 1'
+      );
+
+    console.log("=== InputSettings: Auto-enable check ===");
+    console.log("Has configured vars:", hasConfiguredVars);
+    console.log("Input variables:", inputVariables);
+
+    if (hasConfiguredVars) {
+      setStructuredInputEnabled(true);
+    }
   }, [inputVariables]);
 
   // Notify parent when structuredInputEnabled changes
@@ -79,15 +109,23 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
             )}
           </div>
           <div
-            className="flex flex-row items-center gap-[1rem] justify-start cursor-pointer"
-            onClick={() => setStructuredInputEnabled(!structuredInputEnabled)}
+            className="flex flex-row items-center gap-[1rem] justify-start"
           >
             <div className="flex flex-row items-center gap-[.4rem] py-[.5rem]">
               <Text_12_400_B3B3B3>Structured input</Text_12_400_B3B3B3>
             </div>
             <Switch
               checked={structuredInputEnabled}
-              onChange={(checked) => setStructuredInputEnabled(checked)}
+              onChange={(checked) => {
+                console.log("=== InputSettings: Switch onChange ===");
+                console.log("New checked value:", checked);
+                setStructuredInputEnabled(checked);
+                // If turning OFF, clear the saved schema
+                if (!checked && onClearInputSchema) {
+                  console.log("Calling onClearInputSchema");
+                  onClearInputSchema();
+                }
+              }}
             />
           </div>
         </div>
@@ -251,9 +289,9 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
             onSavePromptSchema?.();
           }}
           loading={isSaving}
-          disabled={isSaving || !structuredInputEnabled}
+          disabled={isSaving}
           style={{
-            cursor: (isSaving || !structuredInputEnabled) ? 'not-allowed' : 'pointer',
+            cursor: isSaving ? 'not-allowed' : 'pointer',
           }}
           classNames="h-[1.375rem] rounded-[0.375rem]"
           textClass="!text-[0.625rem] !font-[400]"
