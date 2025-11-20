@@ -6,6 +6,8 @@ import {
 import { StepComponentsType } from "src/flows";
 import { create } from "zustand";
 import drawerFlows, { Flow } from "./drawerFlows";
+import { useAgentStore } from "@/stores/useAgentStore";
+import { updateQueryParams } from "@/utils/urlUtils";
 
 export type DrawerStepParsedType = {
   id: string;
@@ -181,57 +183,36 @@ export const useDrawer = create<{
     const currentFlow = get().currentFlow;
 
     if (typeof window !== 'undefined' && currentFlow === 'add-agent') {
-      // Add a small delay to allow AgentDrawer to open and set prompt parameter first
-      // This prevents race condition where agent is removed before prompt is added
-      setTimeout(() => {
-        const urlSearchParams = new URLSearchParams(window.location.search);
-        const hasPromptParam = urlSearchParams.has('prompt');
+      const urlSearchParams = new URLSearchParams(window.location.search);
+      const hasPromptParam = urlSearchParams.has('prompt');
 
-        // Import useAgentStore to check if AgentDrawer is open
-        import('../stores/useAgentStore').then(({ useAgentStore }) => {
-          const isAgentDrawerOpen = useAgentStore.getState().isAgentDrawerOpen;
+      // Get AgentDrawer state synchronously - no setTimeout or dynamic import needed!
+      const agentStoreState = useAgentStore.getState();
+      const isAgentDrawerOpen = agentStoreState.isAgentDrawerOpen;
+      const isTransitioning = agentStoreState.isTransitioningToAgentDrawer;
 
-          // SAFETY CHECKS: Only remove agent parameter if ALL conditions are met:
-          // 1. No prompt parameter in URL (not transitioning to AgentDrawer)
-          // 2. AgentDrawer is not open (not in AgentDrawer)
-          // 3. Currently in add-agent flow
-          if (!hasPromptParam && !isAgentDrawerOpen) {
-            console.log('✓ Safe to remove agent parameter - no prompt and AgentDrawer not open');
+      // SAFETY CHECKS: Only remove agent parameter if ALL conditions are met:
+      // 1. No prompt parameter in URL (not transitioning to AgentDrawer)
+      // 2. AgentDrawer is not open (not in AgentDrawer)
+      // 3. Not currently transitioning to AgentDrawer (deterministic check)
+      // 4. Currently in add-agent flow
+      if (!hasPromptParam && !isAgentDrawerOpen && !isTransitioning) {
+        console.log('✓ Safe to remove agent parameter - no prompt and AgentDrawer not open/transitioning');
 
-            const currentPath = window.location.pathname;
-            const freshUrlSearchParams = new URLSearchParams(window.location.search);
-
-            // Remove the agent parameter
-            freshUrlSearchParams.delete('agent');
-
-            // Build query parts for remaining parameters
-            const queryParts: string[] = [];
-            freshUrlSearchParams.forEach((value, key) => {
-              if (value) {
-                queryParts.push(`${key}=${encodeURIComponent(value)}`);
-              }
-            });
-
-            // Build the final URL
-            const newUrl = queryParts.length > 0
-              ? `${currentPath}?${queryParts.join('&')}`
-              : currentPath;
-
-            // Use window.history.replaceState to update URL
-            window.history.replaceState(
-              { ...window.history.state },
-              '',
-              newUrl
-            );
-          } else {
-            console.log('⚠️ Preserving agent parameter:', {
-              hasPromptParam,
-              isAgentDrawerOpen,
-              reason: hasPromptParam ? 'prompt parameter exists' : 'AgentDrawer is open'
-            });
-          }
+        // Use shared utility function for URL manipulation
+        updateQueryParams({ agent: null }, { replaceHistory: true });
+      } else {
+        console.log('⚠️ Preserving agent parameter:', {
+          hasPromptParam,
+          isAgentDrawerOpen,
+          isTransitioning,
+          reason: hasPromptParam
+            ? 'prompt parameter exists'
+            : isTransitioning
+              ? 'transitioning to AgentDrawer'
+              : 'AgentDrawer is open'
         });
-      }, 100); // 100ms delay to allow AgentDrawer to initialize
+      }
     }
 
     set({

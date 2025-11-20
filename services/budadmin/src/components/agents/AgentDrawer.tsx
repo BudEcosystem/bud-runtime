@@ -11,6 +11,7 @@ import AgentBoxWrapper from "./AgentBoxWrapper";
 import AgentSelector from "./AgentSelector";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
+import { removePromptFromUrl } from "@/utils/urlUtils";
 
 const AgentIframe = dynamic(() => import("./AgentIframe"), { ssr: false });
 
@@ -67,42 +68,6 @@ const AgentDrawer: React.FC = () => {
     setShowPlayground(false);
     setShowChatHistory(false);
     // Clear edit mode is handled in closeAgentDrawer in the store
-  };
-
-  // Helper function to remove prompt parameter from URL
-  const removePromptFromUrl = () => {
-    if (typeof window === 'undefined') return;
-
-    const currentPath = window.location.pathname;
-    const urlSearchParams = new URLSearchParams(window.location.search);
-
-    // Remove the prompt parameter
-    urlSearchParams.delete('prompt');
-
-    // Build query parts for remaining parameters
-    const queryParts: string[] = [];
-    urlSearchParams.forEach((value, key) => {
-      if (value) {
-        // Don't encode agent parameter
-        if (key === 'agent') {
-          queryParts.push(`${key}=${value}`);
-        } else {
-          queryParts.push(`${key}=${encodeURIComponent(value)}`);
-        }
-      }
-    });
-
-    // Build the final URL
-    const newUrl = queryParts.length > 0
-      ? `${currentPath}?${queryParts.join('&')}`
-      : currentPath;
-
-    // Use window.history.replaceState to update URL
-    window.history.replaceState(
-      { ...window.history.state },
-      '',
-      newUrl
-    );
   };
 
   // Handle Play button click

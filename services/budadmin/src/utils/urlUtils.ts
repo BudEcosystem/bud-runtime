@@ -44,3 +44,42 @@ export function updateQueryParams(
 
   return newUrl;
 }
+
+/**
+ * Removes the 'prompt' parameter from the current URL
+ * Used when closing agent/prompt editors to clean up the URL
+ */
+export function removePromptFromUrl(): void {
+  if (typeof window === 'undefined') return;
+
+  const currentPath = window.location.pathname;
+  const urlSearchParams = new URLSearchParams(window.location.search);
+
+  // Remove the prompt parameter
+  urlSearchParams.delete('prompt');
+
+  // Build query parts for remaining parameters
+  const queryParts: string[] = [];
+  urlSearchParams.forEach((value, key) => {
+    if (value) {
+      // Don't encode agent parameter
+      if (key === 'agent') {
+        queryParts.push(`${key}=${value}`);
+      } else {
+        queryParts.push(`${key}=${encodeURIComponent(value)}`);
+      }
+    }
+  });
+
+  // Build the final URL
+  const newUrl = queryParts.length > 0
+    ? `${currentPath}?${queryParts.join('&')}`
+    : currentPath;
+
+  // Use window.history.replaceState to update URL
+  window.history.replaceState(
+    { ...window.history.state },
+    '',
+    newUrl
+  );
+}
