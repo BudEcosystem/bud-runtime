@@ -9,7 +9,7 @@ from budmicroframe.commons.schemas import NotificationContent, NotificationReque
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 from .schemas import ClusterMetrics, ClusterRecommendationRequest, ClusterRecommendationResponse
-from .services import SimulationService
+from .services import SimulationService, calculate_available_gpu_memory
 
 
 logger = logging.get_logger(__name__)
@@ -234,13 +234,9 @@ class SimulationWorkflows:
 
                             if user_hardware_mode == "shared":
                                 # For shared mode, use unutilized memory (100% of available, no safety margin)
-                                total_memory_gb = (
-                                    cluster_device_config.get("mem_per_GPU_in_GB")
-                                    or cluster_device_config.get("memory_gb")
-                                    or 0.0
+                                total_memory_gb, memory_allocated_gb, available_memory_gb = (
+                                    calculate_available_gpu_memory(cluster_device_config)
                                 )
-                                memory_allocated_gb = cluster_device_config.get("memory_allocated_gb") or 0.0
-                                available_memory_gb = total_memory_gb - memory_allocated_gb
 
                                 logger.info(
                                     f"Shared mode GPU memory calculation for {device_type}: "

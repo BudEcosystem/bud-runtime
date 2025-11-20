@@ -66,6 +66,31 @@ from .schemas import (
 logger = logging.get_logger(__name__)
 
 
+def calculate_available_gpu_memory(device: Dict[str, Any]) -> Tuple[float, float, float]:
+    """Calculate available GPU memory for shared hardware mode.
+
+    This helper function calculates the available GPU memory by subtracting
+    allocated memory from total memory. It's used consistently across workflow
+    and service logic for GPU time-slicing scenarios.
+
+    Args:
+        device: Device dictionary containing memory information with keys:
+            - mem_per_GPU_in_GB or memory_gb: Total GPU memory
+            - memory_allocated_gb: Currently allocated memory
+
+    Returns:
+        Tuple of (total_memory_gb, memory_allocated_gb, available_memory_gb)
+
+    Note:
+        For shared mode, 100% of available memory is used with no safety margin,
+        as users typically add their own buffer in the total required memory.
+    """
+    total_memory_gb = device.get("mem_per_GPU_in_GB") or device.get("memory_gb") or 0.0
+    memory_allocated_gb = device.get("memory_allocated_gb") or 0.0
+    available_memory_gb = total_memory_gb - memory_allocated_gb
+    return total_memory_gb, memory_allocated_gb, available_memory_gb
+
+
 def ensure_json_serializable(obj):
     """Recursively ensure all values in the object are JSON serializable."""
     if isinstance(obj, dict):
@@ -186,9 +211,8 @@ class SimulationService:
 
                         # For shared mode, we'll use 100% of available memory (no threshold)
                         # Memory calculation will be done later in get_topk_engine_configs_per_cluster
-                        total_memory_gb = device.get("mem_per_GPU_in_GB") or device.get("memory_gb") or 0.0
+                        total_memory_gb, _, available_memory_gb = calculate_available_gpu_memory(device)
                         memory_allocated_gb = memory_allocated_value  # Already validated as not None
-                        available_memory_gb = total_memory_gb - memory_allocated_gb
 
                         if available_memory_gb <= 0:
                             logger.debug(
@@ -1250,13 +1274,9 @@ class SimulationService:
 
                             if user_hardware_mode == "shared":
                                 # For shared mode, use unutilized memory (100% of available, no safety margin)
-                                total_memory_gb = (
-                                    representative_device.get("mem_per_GPU_in_GB")
-                                    or representative_device.get("memory_gb")
-                                    or 0.0
+                                total_memory_gb, memory_allocated_gb, available_memory_gb = (
+                                    calculate_available_gpu_memory(representative_device)
                                 )
-                                memory_allocated_gb = representative_device.get("memory_allocated_gb") or 0.0
-                                available_memory_gb = total_memory_gb - memory_allocated_gb
 
                                 # Use 100% of available memory (user adds buffer in total required)
                                 logger.info(

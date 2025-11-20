@@ -208,22 +208,7 @@ class ClusterOpsService:
                         }
 
                         # Add HAMI fields if present (for time-slicing GPU sharing)
-                        if "core_utilization_percent" in gpu:
-                            formatted_device["core_utilization_percent"] = gpu["core_utilization_percent"]
-                        if "memory_utilization_percent" in gpu:
-                            formatted_device["memory_utilization_percent"] = gpu["memory_utilization_percent"]
-                        if "memory_allocated_gb" in gpu:
-                            formatted_device["memory_allocated_gb"] = gpu["memory_allocated_gb"]
-                        if "cores_allocated_percent" in gpu:
-                            formatted_device["cores_allocated_percent"] = gpu["cores_allocated_percent"]
-                        if "shared_containers_count" in gpu:
-                            formatted_device["shared_containers_count"] = gpu["shared_containers_count"]
-                        if "hardware_mode" in gpu:
-                            formatted_device["hardware_mode"] = gpu["hardware_mode"]
-                        if "device_uuid" in gpu:
-                            formatted_device["device_uuid"] = gpu["device_uuid"]
-                        if "last_metrics_update" in gpu:
-                            formatted_device["last_metrics_update"] = gpu["last_metrics_update"]
+                        _add_hami_fields_to_device(gpu, formatted_device)
 
                         formatted_devices.append(formatted_device)
                         device_type = gpu_type
@@ -428,22 +413,7 @@ class ClusterOpsService:
                 }
 
                 # Add HAMI fields if present (for time-slicing GPU sharing)
-                if "core_utilization_percent" in each_info:
-                    device["core_utilization_percent"] = each_info["core_utilization_percent"]
-                if "memory_utilization_percent" in each_info:
-                    device["memory_utilization_percent"] = each_info["memory_utilization_percent"]
-                if "memory_allocated_gb" in each_info:
-                    device["memory_allocated_gb"] = each_info["memory_allocated_gb"]
-                if "cores_allocated_percent" in each_info:
-                    device["cores_allocated_percent"] = each_info["cores_allocated_percent"]
-                if "shared_containers_count" in each_info:
-                    device["shared_containers_count"] = each_info["shared_containers_count"]
-                if "hardware_mode" in each_info:
-                    device["hardware_mode"] = each_info["hardware_mode"]
-                if "device_uuid" in each_info:
-                    device["device_uuid"] = each_info["device_uuid"]
-                if "last_metrics_update" in each_info:
-                    device["last_metrics_update"] = each_info["last_metrics_update"]
+                _add_hami_fields_to_device(each_info, device)
 
                 devices.append(device)
             result.append(
@@ -481,22 +451,7 @@ class ClusterOpsService:
                 }
 
                 # Add HAMI fields if present (for time-slicing GPU sharing)
-                if "core_utilization_percent" in each_info:
-                    enhanced_device["core_utilization_percent"] = each_info["core_utilization_percent"]
-                if "memory_utilization_percent" in each_info:
-                    enhanced_device["memory_utilization_percent"] = each_info["memory_utilization_percent"]
-                if "memory_allocated_gb" in each_info:
-                    enhanced_device["memory_allocated_gb"] = each_info["memory_allocated_gb"]
-                if "cores_allocated_percent" in each_info:
-                    enhanced_device["cores_allocated_percent"] = each_info["cores_allocated_percent"]
-                if "shared_containers_count" in each_info:
-                    enhanced_device["shared_containers_count"] = each_info["shared_containers_count"]
-                if "hardware_mode" in each_info:
-                    enhanced_device["hardware_mode"] = each_info["hardware_mode"]
-                if "device_uuid" in each_info:
-                    enhanced_device["device_uuid"] = each_info["device_uuid"]
-                if "last_metrics_update" in each_info:
-                    enhanced_device["last_metrics_update"] = each_info["last_metrics_update"]
+                _add_hami_fields_to_device(each_info, enhanced_device)
 
                 devices.append(enhanced_device)
 
@@ -988,22 +943,7 @@ class ClusterOpsService:
                         }
 
                         # Add HAMI fields if present (for time-slicing GPU sharing)
-                        if "core_utilization_percent" in gpu:
-                            formatted_device["core_utilization_percent"] = gpu["core_utilization_percent"]
-                        if "memory_utilization_percent" in gpu:
-                            formatted_device["memory_utilization_percent"] = gpu["memory_utilization_percent"]
-                        if "memory_allocated_gb" in gpu:
-                            formatted_device["memory_allocated_gb"] = gpu["memory_allocated_gb"]
-                        if "cores_allocated_percent" in gpu:
-                            formatted_device["cores_allocated_percent"] = gpu["cores_allocated_percent"]
-                        if "shared_containers_count" in gpu:
-                            formatted_device["shared_containers_count"] = gpu["shared_containers_count"]
-                        if "hardware_mode" in gpu:
-                            formatted_device["hardware_mode"] = gpu["hardware_mode"]
-                        if "device_uuid" in gpu:
-                            formatted_device["device_uuid"] = gpu["device_uuid"]
-                        if "last_metrics_update" in gpu:
-                            formatted_device["last_metrics_update"] = gpu["last_metrics_update"]
+                        _add_hami_fields_to_device(gpu, formatted_device)
 
                         formatted_devices.append(formatted_device)
                         device_type = gpu_type
@@ -1498,6 +1438,41 @@ class ClusterOpsService:
         except Exception as e:
             logger.error(f"Failed to trigger update for cluster {cluster_id_str}: {e}")
             raise
+
+
+def _add_hami_fields_to_device(source: Dict[str, Any], target: Dict[str, Any]) -> None:
+    """Add HAMI-specific fields from source dict to target dict if present.
+
+    This helper function centralizes the logic for adding GPU time-slicing
+    metrics from HAMI to device dictionaries. It copies the following fields
+    if they exist in the source:
+    - core_utilization_percent: GPU compute allocated (%)
+    - memory_utilization_percent: GPU memory allocated (%)
+    - memory_allocated_gb: Allocated GPU memory in GB
+    - cores_allocated_percent: Allocated GPU cores (%)
+    - shared_containers_count: Number of containers sharing the GPU
+    - hardware_mode: GPU hardware mode (dedicated/shared)
+    - device_uuid: Unique GPU device identifier
+    - last_metrics_update: Timestamp of last metrics update
+
+    Args:
+        source: Source dictionary containing HAMI fields
+        target: Target dictionary to add HAMI fields to (modified in-place)
+    """
+    hami_fields = [
+        "core_utilization_percent",
+        "memory_utilization_percent",
+        "memory_allocated_gb",
+        "cores_allocated_percent",
+        "shared_containers_count",
+        "hardware_mode",
+        "device_uuid",
+        "last_metrics_update",
+    ]
+
+    for field in hami_fields:
+        if field in source:
+            target[field] = source[field]
 
 
 class ClusterService(SessionMixin):
