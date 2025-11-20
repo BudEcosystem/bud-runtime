@@ -25,6 +25,7 @@ from budapp.eval_ops.schemas import (
     EvaluationWorkflowStepRequest,
     ExperimentEvaluationsResponse,
     ExperimentModelListItem,
+    ExperimentSummaryResponse,
     ExperimentWorkflowStepRequest,
     GetDatasetResponse,
     GetExperimentResponse,
@@ -271,7 +272,7 @@ def list_datasets(
     current_user: Annotated[User, Depends(get_current_active_user)],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
-    name: Annotated[Optional[str], Query(description="Filter by dataset name")] = None,
+    name: Annotated[Optional[str], Query(description="Search in dataset name and description")] = None,
     modalities: Annotated[
         Optional[str],
         Query(description="Filter by modalities (comma-separated)"),
@@ -771,6 +772,45 @@ def get_runs_history(
         object="runs.history",
         message="Successfully retrieved run history",
         runs_history=runs_history,
+    )
+
+
+@router.get(
+    "/{experiment_id}/summary",
+    response_model=ExperimentSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+def get_experiment_summary(
+    experiment_id: Annotated[uuid.UUID, Path(..., description="Experiment ID")],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Get summary statistics for an experiment.
+
+    Returns summary information including:
+    - Total number of runs
+    - Total duration of all evaluations in seconds
+    - Count of runs by status (completed, failed, pending, running)
+
+    - **experiment_id**: UUID of the experiment.
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user.
+
+    Returns an `ExperimentSummaryResponse` with experiment statistics.
+    """
+    try:
+        summary = ExperimentService(session).get_experiment_summary(experiment_id, current_user.id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to get experiment summary") from e
+
+    return ExperimentSummaryResponse(
+        code=status.HTTP_200_OK,
+        object="experiment.summary",
+        message="Successfully retrieved experiment summary",
+        summary=summary,
     )
 
 

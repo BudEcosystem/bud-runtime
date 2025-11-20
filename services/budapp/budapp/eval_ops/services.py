@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 import aiohttp
 from budmicroframe.commons.schemas import WorkflowMetadataResponse
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -1819,7 +1819,13 @@ class ExperimentService:
             # Apply filters
             if filters:
                 if filters.name:
-                    q = q.filter(DatasetModel.name.ilike(f"%{filters.name}%"))
+                    # Search in both name and description fields
+                    q = q.filter(
+                        or_(
+                            DatasetModel.name.ilike(f"%{filters.name}%"),
+                            DatasetModel.description.ilike(f"%{filters.name}%"),
+                        )
+                    )
                 if filters.modalities:
                     # Filter by modalities (JSONB contains any of the specified modalities)
                     for modality in filters.modalities:
@@ -2167,6 +2173,61 @@ class ExperimentService:
             sort=SortInfo(field=sort_field, direction=sort_direction),
             page=page,
             page_size=page_size,
+        )
+
+    def get_experiment_summary(self, experiment_id: uuid.UUID, user_id: uuid.UUID):
+        """Get summary statistics for an experiment.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+            user_id (uuid.UUID): ID of the user.
+
+        Returns:
+            ExperimentSummary: Summary statistics including run counts and total duration.
+
+        Raises:
+            HTTPException(status_code=404): If experiment not found or access denied.
+        """
+        from budapp.eval_ops.schemas import ExperimentSummary
+
+        # Verify experiment exists and user has access
+        experiment = self.session.get(ExperimentModel, experiment_id)
+        if not experiment or experiment.status == ExperimentStatusEnum.DELETED.value:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
+            )
+
+        # Efficiently count runs by status in a single query using database-level aggregation
+        run_stats = (
+            self.session.query(
+                func.count(RunModel.id).label("total"),
+                func.sum(case((RunModel.status == RunStatusEnum.COMPLETED.value, 1), else_=0)).label("completed"),
+                func.sum(case((RunModel.status == RunStatusEnum.FAILED.value, 1), else_=0)).label("failed"),
+                func.sum(case((RunModel.status == RunStatusEnum.PENDING.value, 1), else_=0)).label("pending"),
+                func.sum(case((RunModel.status == RunStatusEnum.RUNNING.value, 1), else_=0)).label("running"),
+            )
+            .filter(
+                RunModel.experiment_id == experiment_id,
+                RunModel.status != RunStatusEnum.DELETED.value,
+            )
+            .one()
+        )
+
+        # Efficiently sum up total duration from all evaluations in a single query
+        total_duration_seconds = (
+            self.session.query(func.coalesce(func.sum(EvaluationModel.duration_in_seconds), 0))
+            .filter(EvaluationModel.experiment_id == experiment_id)
+            .scalar()
+        )
+
+        return ExperimentSummary(
+            total_runs=run_stats.total or 0,
+            total_duration_seconds=int(total_duration_seconds),
+            completed_runs=run_stats.completed or 0,
+            failed_runs=run_stats.failed or 0,
+            pending_runs=run_stats.pending or 0,
+            running_runs=run_stats.running or 0,
         )
 
     # ------------------------ Experiment Evaluations Methods ------------------------
