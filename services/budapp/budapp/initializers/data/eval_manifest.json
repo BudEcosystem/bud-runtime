@@ -6620,8 +6620,8 @@
                         "Reasoning"
                     ],
                     "eval_type": {
-                        "gen": "COPA_gen",
-                        "ppl": "COPA_ppl"
+                        "gen": "SuperGLUE_COPA_gen",
+                        "ppl": "XCOPA_ppl"
                     },
                     "metadata": {
                         "format": "jsonl",
@@ -6792,8 +6792,8 @@
                         "Understanding"
                     ],
                     "eval_type": {
-                        "gen": "openbookqa_gen",
-                        "ppl": "openbookqa_ppl"
+                        "_gen": "openbookqa_gen",
+                        "_ppl": "openbookqa_ppl"
                     },
                     "metadata": {
                         "format": "jsonl",
@@ -24344,7 +24344,7 @@
                         "Knowledge"
                     ],
                     "eval_type": {
-                        "gen": "MedXpertQA_gen"
+                        "_gen": "MedXpertQAgen"
                     },
                     "metadata": {
                         "format": "jsonl",

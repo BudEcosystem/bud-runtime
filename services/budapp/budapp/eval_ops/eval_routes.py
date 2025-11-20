@@ -789,9 +789,9 @@ def get_experiment_summary(
     """Get summary statistics for an experiment.
 
     Returns summary information including:
-    - Total number of runs
+    - Total number of evaluations
     - Total duration of all evaluations in seconds
-    - Count of runs by status (completed, failed, pending, running)
+    - Count of evaluations by status (completed, failed, pending, running)
 
     - **experiment_id**: UUID of the experiment.
     - **session**: Database session dependency.
