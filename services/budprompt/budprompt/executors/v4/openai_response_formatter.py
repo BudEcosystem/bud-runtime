@@ -76,12 +76,12 @@ from ...responses.schemas import OpenAIResponse
 logger = logging.get_logger(__name__)
 
 __all__ = [
-    "OpenAIResponseFormatter_V1",
+    "OpenAIResponseFormatter_V4",
     "extract_validation_error_details",
 ]
 
 
-class OpenAIResponseFormatter_V1:
+class OpenAIResponseFormatter_V4:
     """Formatter for converting pydantic-ai responses to OpenAI format."""
 
     def __init__(self) -> None:

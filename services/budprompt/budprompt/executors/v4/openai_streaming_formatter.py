@@ -1372,10 +1372,10 @@ class OpenAIStreamingFormatter_V1:
         Returns:
             List of output items for final response.completed event
         """
-        from .openai_response_formatter import OpenAIResponseFormatter_V1
+        from .openai_response_formatter import OpenAIResponseFormatter_V4
 
         # Use the non-streaming formatter to build complete output items (includes structured output)
-        formatter = OpenAIResponseFormatter_V1()
+        formatter = OpenAIResponseFormatter_V4()
         all_messages = final_result.all_messages()
         output_items, _ = await formatter.build_complete_output_items(all_messages, final_result, tools)
 
@@ -1399,10 +1399,10 @@ class OpenAIStreamingFormatter_V1:
         Returns:
             List of instruction items (ResponseInputMessage) for final response
         """
-        from .openai_response_formatter import OpenAIResponseFormatter_V1
+        from .openai_response_formatter import OpenAIResponseFormatter_V4
 
         # Use the non-streaming formatter to extract instructions from all messages
-        formatter = OpenAIResponseFormatter_V1()
+        formatter = OpenAIResponseFormatter_V4()
         all_messages = final_result.all_messages()
 
         # First get output items to extract MCP tool call IDs

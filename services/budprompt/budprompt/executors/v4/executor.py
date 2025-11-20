@@ -51,7 +51,7 @@ from budprompt.shared.providers import BudServeProvider
 
 from ...prompt.schemas import MCPToolConfig, Message, ModelSettings
 from .field_validation import ModelValidationEnhancer
-from .openai_response_formatter import OpenAIResponseFormatter_V1
+from .openai_response_formatter import OpenAIResponseFormatter_V4
 from .openai_streaming_formatter import OpenAIStreamingFormatter_V1
 from .schema_builder import CustomModelGenerator
 from .template_renderer import render_template
@@ -72,7 +72,7 @@ class SimplePromptExecutor_V4:
     def __init__(self):
         """Initialize the SimplePromptExecutor."""
         self.model_generator = CustomModelGenerator()
-        self.response_formatter = OpenAIResponseFormatter_V1()
+        self.response_formatter = OpenAIResponseFormatter_V4()
 
     async def execute(
         self,
