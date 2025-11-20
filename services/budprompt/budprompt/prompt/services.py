@@ -82,7 +82,7 @@ class PromptExecutorService:
 
     def __init__(self):
         """Initialize the PromptExecutorService."""
-        self.executor = PromptExecutorFactory.get_executor(version=3)
+        self.executor = PromptExecutorFactory.get_executor()
 
     async def execute_prompt_deprecated(
         self, request: PromptExecuteRequest

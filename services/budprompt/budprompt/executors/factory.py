@@ -27,6 +27,7 @@ from budmicroframe.commons import logging
 from .v1 import SimplePromptExecutorDeprecated
 from .v2 import SimplePromptExecutor
 from .v3 import SimplePromptExecutor_V1
+from .v4 import SimplePromptExecutor_V4
 
 
 logger = logging.get_logger(__name__)
@@ -52,32 +53,18 @@ class PromptExecutorFactory:
 
     @staticmethod
     def get_executor(
-        version: int = 3,
+        version: int = 4,
     ) -> Union[SimplePromptExecutorDeprecated, SimplePromptExecutor, SimplePromptExecutor_V1]:
         """Get executor instance for the specified version.
 
         Args:
-            version: Executor version (1, 2, or 3). Default: 3
-                - 1: SimplePromptExecutorDeprecated
-                     Basic executor with simple validation and no tool support.
-                - 2: SimplePromptExecutor
-                     Improved executor with OpenAI formatters and enhanced validation.
-                - 3: SimplePromptExecutor_V1 (Recommended)
-                     Active version with MCP tools support, advanced streaming,
-                     and OpenAI v1 formatters.
+            version: Executor version (1, 2, or 3). Default: 4
 
         Returns:
             Executor instance of the requested version.
 
         Raises:
             ValueError: If version is not 1, 2, or 3.
-
-        Example:
-            >>> # Get the latest executor (version 3)
-            >>> executor = PromptExecutorFactory.get_executor()
-            >>>
-            >>> # Get a specific version
-            >>> executor_v2 = PromptExecutorFactory.get_executor(version=2)
         """
         if version == 1:
             logger.debug("Creating SimplePromptExecutorDeprecated (version 1)")
@@ -88,10 +75,9 @@ class PromptExecutorFactory:
         elif version == 3:
             logger.debug("Creating SimplePromptExecutor_V1 (version 3)")
             return SimplePromptExecutor_V1()
+        elif version == 4:
+            logger.debug("Creating SimplePromptExecutor_V4 (version 4)")
+            return SimplePromptExecutor_V4()
         else:
             logger.error("Invalid executor version requested: %s", version)
-            raise ValueError(
-                f"Invalid executor version: {version}. "
-                f"Supported versions are 1, 2, or 3. "
-                f"Use version 3 for the latest features."
-            )
+            raise ValueError("Invalid executor version: %s." % version)
