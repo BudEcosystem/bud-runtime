@@ -429,7 +429,7 @@ const ExperimentsTable = () => {
 
   useEffect(() => {
     getExperimentModels();
-  }, [])
+  }, [getExperimentModels])
 
   return (
     <div className="h-full w-full relative pt-[2.5rem]">
@@ -590,7 +590,12 @@ const ExperimentsTable = () => {
                                 }}
                               >
                                 <Select
-                                  placeholder="Select Models"
+                                  showSearch
+                                  placeholder="Search and select models"
+                                  filterOption={(input, option) =>
+                                    (option?.label?.toString() ?? '').toLowerCase().includes(input.toLowerCase())
+                                  }
+                                  optionFilterProp="label"
                                   style={{
                                     backgroundColor: "transparent",
                                     color: "#EEEEEE",
