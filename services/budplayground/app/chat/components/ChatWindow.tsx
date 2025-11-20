@@ -39,6 +39,8 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const [promptConfig, setPromptConfig] = useState<any>(null);
   const [isStructuredPrompt, setIsStructuredPrompt] = useState<boolean | null>(null);
   const [promptConfigLoading, setPromptConfigLoading] = useState<boolean>(false);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [isDeploymentReady, setIsDeploymentReady] = useState<boolean>(false);
 
   // State to control PromptForm visibility based on postMessage from parent window
   // Initially true if promptIds are present in URL
@@ -124,7 +126,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     }
   }, []);
 
-  // Listen for postMessage events from parent window to control PromptForm visibility
+  // Listen for multiple events to trigger refresh when returning to playground
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // Optional: Verify the origin for security
@@ -137,6 +139,10 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         // Update state to show/hide PromptForm based on parent message
         setEnablePromptForm(typeFormValue);
 
+        // Trigger refresh of prompt config when switching to playground
+        setRefreshTrigger(prev => prev + 1);
+        console.log('[ChatWindow] Received SET_TYPE_FORM postMessage, triggering refresh');
+
         // Also update showPromptForm to reopen the form if typeForm is true
         if (typeFormValue && getPromptIds().length > 0) {
           setShowPromptForm(true);
@@ -146,12 +152,32 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       }
     };
 
-    // Listen for messages from parent
+    // Handler for visibility change (tab switch)
+    const handleVisibilityChange = () => {
+      if (!document.hidden && getPromptIds().length > 0) {
+        setRefreshTrigger(prev => prev + 1);
+        console.log('[ChatWindow] Window became visible, triggering refresh');
+      }
+    };
+
+    // Handler for window focus
+    const handleFocus = () => {
+      if (getPromptIds().length > 0) {
+        setRefreshTrigger(prev => prev + 1);
+        console.log('[ChatWindow] Window focused, triggering refresh');
+      }
+    };
+
+    // Listen for all events
     window.addEventListener('message', handleMessage);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
 
     // Cleanup listener on unmount
     return () => {
       window.removeEventListener('message', handleMessage);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [getPromptIds]);
 
@@ -160,13 +186,16 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     const fetchPromptConfiguration = async () => {
       const promptIds = getPromptIds();
 
-      if (promptIds.length > 0 && (apiKey || accessKey) && !promptConfig) {
+      if (promptIds.length > 0 && (apiKey || accessKey)) {
         setPromptConfigLoading(true);
+        setIsDeploymentReady(false); // Start loading
 
         try {
+          console.log('[ChatWindow] Fetching prompt config for:', promptIds[0]);
           const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
 
           if (config && config.data) {
+            console.log('[ChatWindow] API returned deployment_name:', config.data.deployment_name);
             setPromptConfig(config.data);
 
             // Determine if structured or unstructured
@@ -220,7 +249,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
 
     fetchPromptConfiguration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getPromptIds, apiKey, accessKey]);
+  }, [getPromptIds, apiKey, accessKey, refreshTrigger]);
 
   // Fetch endpoints when prompt config has deployment_name (for unstructured prompts)
   // Note: Structured prompts handle this in PromptForm
@@ -235,22 +264,41 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   useEffect(() => {
     if (promptConfig?.deployment_name && endpoints && endpoints.length > 0 && isStructuredPrompt !== true) {
       const deploymentName = promptConfig.deployment_name;
+      const currentDeploymentName = chat.selectedDeployment?.name;
 
-      // Only auto-select if no deployment is set yet
-      if (!chat.selectedDeployment) {
-        const matchingEndpoint = endpoints.find(
-          (ep) => ep.name === deploymentName || ep.id === deploymentName
-        );
+      console.log('[ChatWindow Auto-select] Current deployment:', currentDeploymentName);
+      console.log('[ChatWindow Auto-select] Target deployment:', deploymentName);
 
-        if (matchingEndpoint) {
+      const matchingEndpoint = endpoints.find(
+        (ep) => ep.name === deploymentName || ep.id === deploymentName
+      );
+
+      if (matchingEndpoint) {
+        console.log('[ChatWindow Auto-select] Found matching endpoint:', matchingEndpoint.name);
+
+        // Update deployment if it's different from current selection
+        if (currentDeploymentName !== matchingEndpoint.name) {
+          console.log('[ChatWindow Auto-select] Updating deployment from', currentDeploymentName, 'to', matchingEndpoint.name);
           setDeployment(chat.id, matchingEndpoint);
           setDeploymentLock(chat.id, true);
+          setIsDeploymentReady(true); // Deployment updated, ready to show
         } else {
-          console.warn(`Deployment '${deploymentName}' not found in available endpoints`);
+          console.log('[ChatWindow Auto-select] Deployment already set, no update needed');
+          setIsDeploymentReady(true); // No update needed, ready to show
         }
+      } else {
+        console.warn('[ChatWindow Auto-select] Deployment not found in endpoints:', deploymentName);
+        console.warn('[ChatWindow Auto-select] Available endpoints:', endpoints.map(ep => ep.name));
+        setIsDeploymentReady(true); // Even if not found, stop loading to avoid infinite spinner
       }
+    } else if (promptConfig && isStructuredPrompt === true) {
+      // For structured prompts, PromptForm handles deployment, so we're ready
+      setIsDeploymentReady(true);
+    } else if (!promptConfig?.deployment_name && promptIds.length === 0) {
+      // No prompt IDs, no deployment needed, ready to show
+      setIsDeploymentReady(true);
     }
-  }, [promptConfig, endpoints, isStructuredPrompt, chat, setDeployment, setDeploymentLock]);
+  }, [promptConfig, endpoints, isStructuredPrompt, chat, setDeployment, setDeploymentLock, promptIds]);
 
 
 
@@ -469,14 +517,23 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
           } ${!toggleRight && "!rounded-r-[0.875rem] overflow-hidden"}`}
       >
         <Header>
-          <NavBar
-            chatId={chat.id}
-            isLeftSidebarOpen={toggleLeft}
-            isRightSidebarOpen={toggleRight}
-            onToggleLeftSidebar={() => setToggleLeft(!toggleLeft)}
-            onToggleRightSidebar={() => setToggleRight(!toggleRight)}
-            isSingleChat={isSingleChat}
-          />
+          {!isDeploymentReady && promptIds.length > 0 ? (
+            <div className="topBg text-[#FFF] p-[1rem] flex justify-center items-center h-[3.625rem] relative sticky top-0 z-10 bg-[#101010] border-b-[1px] border-b-[#1F1F1F]">
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span className="text-sm text-[#EEEEEE]">Loading deployment configuration...</span>
+              </div>
+            </div>
+          ) : (
+            <NavBar
+              chatId={chat.id}
+              isLeftSidebarOpen={toggleLeft}
+              isRightSidebarOpen={toggleRight}
+              onToggleLeftSidebar={() => setToggleLeft(!toggleLeft)}
+              onToggleRightSidebar={() => setToggleRight(!toggleRight)}
+              isSingleChat={isSingleChat}
+            />
+          )}
         </Header>
         <Content
           className="overflow-hidden overflow-y-auto hide-scrollbar"
