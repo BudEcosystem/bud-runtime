@@ -84,6 +84,7 @@ interface AgentStore {
 
   // UI State
   isAgentDrawerOpen: boolean;
+  isTransitioningToAgentDrawer: boolean; // Flag to prevent race conditions with useDrawer
   selectedSessionId: string | null;
   isModelSelectorOpen: boolean;
   workflowContext: {
@@ -216,6 +217,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       settingPresets: [],
       currentSettingPreset: null,
       isAgentDrawerOpen: false,
+      isTransitioningToAgentDrawer: false,
       selectedSessionId: null,
       isModelSelectorOpen: false,
       workflowContext: {
@@ -417,6 +419,9 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
       // UI Actions
       openAgentDrawer: (workflowId?: string, nextStep?: string) => {
+        // Set transition flag FIRST to prevent race conditions with useDrawer.closeDrawer
+        set({ isTransitioningToAgentDrawer: true });
+
         const sessions = get().sessions;
         if (sessions.length === 0) {
           const sessionId = get().createSession();
@@ -436,13 +441,17 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         if (nextStep) {
           set({
             isAgentDrawerOpen: true,
+            isTransitioningToAgentDrawer: false, // Clear transition flag
             workflowContext: {
               isInWorkflow: true,
               nextStep: nextStep,
             }
           });
         } else {
-          set({ isAgentDrawerOpen: true });
+          set({
+            isAgentDrawerOpen: true,
+            isTransitioningToAgentDrawer: false // Clear transition flag
+          });
         }
       },
 
@@ -453,6 +462,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         // Close the drawer first and clear edit mode, add version mode, and edit version mode
         set({
           isAgentDrawerOpen: false,
+          isTransitioningToAgentDrawer: false, // Clear transition flag
           workflowContext: {
             isInWorkflow: false,
             nextStep: null,
