@@ -17,5 +17,6 @@ jobs:
     uses: ./.github/workflows/nix-workflow.yaml
     with:
       workflow: dockerhub_budcustomer
+      image_tag: nightly
     secrets:
       SOPS_AGE_KEY: "${{ secrets.SOPS_AGE_KEY }}"

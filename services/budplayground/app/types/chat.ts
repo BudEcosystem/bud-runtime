@@ -12,6 +12,7 @@ export type Session = {
     chat_setting_id?: string;
     active?: boolean;
     selectedDeployment?: Endpoint;
+    deploymentLocked?: boolean;
 };
 
 export type Usage = {

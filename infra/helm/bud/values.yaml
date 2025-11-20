@@ -125,7 +125,7 @@ microservices:
   # frontend services
   budadmin:
     enabled: true
-    image: budstudio/budadmin:0.4.2
+    image: budstudio/budadmin:0.4.3
     # Branding configuration - customize logos per customer deployment
     # Leave empty to use default Bud logos
     env:
@@ -140,26 +140,32 @@ microservices:
     affinity: {}
   budcustomer:
     enabled: true
-    image: budstudio/budcustomer:0.4.2
+    image: budstudio/budcustomer:0.4.3
     env: {}
     nodeSelector: {}
     affinity: {}
   budplayground:
     enabled: true
-    image: budstudio/budplayground:0.4.2
+    image: budstudio/budplayground:0.4.3
     env: {}
     nodeSelector: {}
     affinity: {}
   # backend exposed services
   budgateway:
     enabled: true
-    image: budstudio/budgateway:0.4.2
+    image: budstudio/budgateway:0.4.3
+    env: {}
+    nodeSelector: {}
+    affinity: {}
+  budsentinel:
+    enabled: false # closed source, avoid enabling by default
+    image: harbor.bud.studio/sentinel/sentinel:nightly
     env: {}
     nodeSelector: {}
     affinity: {}
   askbud:
     enabled: true
-    image: budstudio/askbud:0.4.2
+    image: budstudio/askbud:0.4.3
     daprid: askbud
     model: bud-gpt-oss-20b-ada28b58
     env:
@@ -169,7 +175,7 @@ microservices:
     affinity: {}
   budapp:
     enabled: true
-    image: budstudio/budapp:0.4.2
+    image: budstudio/budapp:0.4.3
     daprid: budapp
     corsOrigins:
       - "http://localhost:3000"
@@ -192,7 +198,7 @@ microservices:
   # backend internal services
   budcluster:
     enabled: true
-    image: budstudio/budcluster:0.4.2
+    image: budstudio/budcluster:0.4.3
     daprid: budcluster
     env:
       LOG_LEVEL: INFO
@@ -225,7 +231,7 @@ microservices:
   budmetrics:
     enabled: true
     daprid: budmetrics
-    image: budstudio/budmetrics:0.4.2
+    image: budstudio/budmetrics:0.4.3
     env:
       #deadlink
       INFERENCE_URL: http://172.184.137.177:8502/classify
@@ -240,7 +246,7 @@ microservices:
     affinity: {}
   budmodel:
     enabled: true
-    image: budstudio/budmodel:0.4.2
+    image: budstudio/budmodel:0.4.3
     daprid: budmodel
     storageClassName: nfs-csi
     storageSize: "32Gi"
@@ -250,7 +256,7 @@ microservices:
     affinity: {}
   budeval:
     enabled: true
-    image: budstudio/budeval:0.4.2
+    image: budstudio/budeval:0.4.3
     daprid: budeval
     storageClassName: nfs-csi
     env: {}
@@ -258,7 +264,7 @@ microservices:
     affinity: {}
   budsim:
     enabled: true
-    image: budstudio/budsim:0.4.2
+    image: budstudio/budsim:0.4.3
     daprid: budsim
     env:
       LOG_LEVEL: INFO
@@ -266,7 +272,7 @@ microservices:
     affinity: {}
   buddoc:
     enabled: true
-    image: budstudio/buddoc:0.4.2
+    image: budstudio/buddoc:0.4.3
     daprid: buddoc
     env:
       LOG_LEVEL: INFO
@@ -278,7 +284,7 @@ microservices:
     affinity: {}
   budnotify:
     enabled: true
-    image: budstudio/budnotify:0.4.2
+    image: budstudio/budnotify:0.4.3
     daprid: budnotify
     pubsubTopic: notificationMessages
     nodeSelector: {}
@@ -286,11 +292,10 @@ microservices:
   budprompt:
     enabled: true
     daprid: budprompt
-    image: budstudio/budprompt:0.4.2
+    image: budstudio/budprompt:0.4.3
     env:
       LOG_LEVEL: INFO
       BUD_GATEWAY_BASE_URL: http://{{ .Release.Name }}-budgateway:3000/v1
-      BUD_DEFAULT_MODEL_NAME: qwen3-32b
       REDIS_HOST: "{{ .Release.Name }}-valkey-primary"
       REDIS_PORT: "6379"
       REDIS_DB_INDEX: "10"

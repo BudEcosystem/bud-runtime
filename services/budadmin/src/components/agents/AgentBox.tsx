@@ -19,7 +19,7 @@ import { SettingsSidebar as ModelSettingsSidebar } from "./settings/SettingsSide
 import { ModelSettingsProvider, useModelSettings } from "./contexts/ModelSettingsContext";
 import { PrimaryButton } from "../ui/bud/form/Buttons";
 import { buildPromptSchemaFromSession } from "@/utils/promptSchemaBuilder";
-import { errorToast } from "@/components/toast";
+import { errorToast, successToast } from "@/components/toast";
 import { tempApiBaseUrl } from "@/components/environment";
 import { AppRequest } from "src/pages/api/requests";
 import { usePromptSchemaWorkflow } from "@/hooks/usePromptSchemaWorkflow";
@@ -30,6 +30,13 @@ interface AgentBoxProps {
   totalSessions: number;
   isActive: boolean;
   onActivate: () => void;
+  isAddVersionMode?: boolean;
+  isEditVersionMode?: boolean;
+  editVersionData?: {
+    versionId: string;
+    versionNumber: number;
+    isDefault: boolean;
+  } | null;
 }
 
 function AgentBoxInner({
@@ -37,7 +44,10 @@ function AgentBoxInner({
   index,
   totalSessions,
   isActive,
-  onActivate
+  onActivate,
+  isAddVersionMode = false,
+  isEditVersionMode = false,
+  editVersionData = null
 }: AgentBoxProps) {
   // All hooks must be called before any conditional returns
   const {
@@ -79,6 +89,7 @@ function AgentBoxInner({
   const [structuredInputEnabled, setStructuredInputEnabled] = useState(false);
   const [structuredOutputEnabled, setStructuredOutputEnabled] = useState(false);
   const [streamEnabled, setStreamEnabled] = useState(session?.settings?.stream ?? false);
+  const [setAsDefault, setSetAsDefault] = useState(editVersionData?.isDefault ?? false);
 
   // Custom hook to create workflow handlers with consistent behavior
   const useWorkflowHandler = (name: string, workflowId?: string) => {
@@ -102,17 +113,17 @@ function AgentBoxInner({
     return workflow;
   };
 
-  // Initialize all workflow handlers
-  const inputWorkflow = useWorkflowHandler('Input', session?.workflowId);
-  const outputWorkflow = useWorkflowHandler('Output', session?.workflowId);
-  const systemPromptWorkflow = useWorkflowHandler('System prompt', session?.workflowId);
-  const promptMessagesWorkflow = useWorkflowHandler('Prompt messages', session?.workflowId);
+  // Initialize all workflow handlers with separate workflow IDs
+  const inputWorkflow = useWorkflowHandler('Input', session?.inputWorkflowId);
+  const outputWorkflow = useWorkflowHandler('Output', session?.outputWorkflowId);
+  const systemPromptWorkflow = useWorkflowHandler('System prompt', session?.systemPromptWorkflowId);
+  const promptMessagesWorkflow = useWorkflowHandler('Prompt messages', session?.promptMessagesWorkflowId);
 
   // Destructure for backward compatibility (resetStatus handled internally by useWorkflowHandler)
   const { status: workflowStatus, startWorkflow } = inputWorkflow;
   const { status: outputWorkflowStatus, startWorkflow: startOutputWorkflow } = outputWorkflow;
-  const { status: systemPromptWorkflowStatus, startWorkflow: startSystemPromptWorkflow } = systemPromptWorkflow;
-  const { status: promptMessagesWorkflowStatus, startWorkflow: startPromptMessagesWorkflow } = promptMessagesWorkflow;
+  const { status: systemPromptWorkflowStatus, startWorkflow: startSystemPromptWorkflow, setSuccess: setSystemPromptSuccess, setFailed: setSystemPromptFailed } = systemPromptWorkflow;
+  const { status: promptMessagesWorkflowStatus, startWorkflow: startPromptMessagesWorkflow, setSuccess: setPromptMessagesSuccess, setFailed: setPromptMessagesFailed } = promptMessagesWorkflow;
 
   // Use the settings context (schema settings)
   const { isOpen: isSettingsOpen, activeSettings, openSettings, closeSettings, toggleSettings: toggleSettingsOriginal } = useSettings();
@@ -135,7 +146,7 @@ function AgentBoxInner({
       closeModelSettings();
     }
     toggleSettingsOriginal();
-  }, [isToolsOpen, closeTools, toggleSettingsOriginal]);
+  }, [isToolsOpen, closeTools, isModelSettingsOpen, closeModelSettings, toggleSettingsOriginal]);
 
   const toggleTools = React.useCallback(() => {
     if (isSettingsOpen) {
@@ -145,7 +156,7 @@ function AgentBoxInner({
       closeModelSettings();
     }
     toggleToolsOriginal();
-  }, [isSettingsOpen, closeSettings, toggleToolsOriginal]);
+  }, [isSettingsOpen, closeSettings, isModelSettingsOpen, closeModelSettings, toggleToolsOriginal]);
 
   const toggleModelSettings = () => {
     if (isSettingsOpen) {
@@ -167,6 +178,13 @@ function AgentBoxInner({
     );
     setStreamEnabled(session?.settings?.stream ?? false);
   }, [session?.systemPrompt, session?.promptMessages, session?.settings?.stream]);
+
+  // Update setAsDefault when editVersionData changes
+  React.useEffect(() => {
+    if (isEditVersionMode && editVersionData) {
+      setSetAsDefault(editVersionData.isDefault);
+    }
+  }, [isEditVersionMode, editVersionData]);
 
   // Handle case where session is null early
   if (!session) {
@@ -203,6 +221,10 @@ function AgentBoxInner({
     if (session) updateSession(session.id, { promptMessages: value });
   };
 
+  const handleLlmRetryLimitChange = (value: number) => {
+    if (session) updateSession(session.id, { llm_retry_limit: value });
+  };
+
   const handleStreamToggle = (checked: boolean) => {
     setStreamEnabled(checked);
     if (session) {
@@ -212,6 +234,70 @@ function AgentBoxInner({
           stream: checked
         }
       });
+    }
+  };
+
+  // Handle Set as Default toggle change in edit version mode
+  const handleSetAsDefaultToggle = async (checked: boolean) => {
+    if (!isEditVersionMode || !editVersionData) {
+      return;
+    }
+
+    if (!session) {
+      errorToast("No session data available");
+      return;
+    }
+
+    // Check if deployment is selected
+    if (!session.selectedDeployment?.name) {
+      errorToast("Please select a deployment model first");
+      return;
+    }
+
+    // Check if prompt_id exists
+    if (!session.promptId) {
+      errorToast("Prompt ID is missing");
+      return;
+    }
+
+    try {
+      // Update local state first for immediate UI feedback
+      setSetAsDefault(checked);
+
+      // Build the payload for prompt-config endpoint
+      const payload = {
+        prompt_id: session.promptId,
+        deployment_name: session.selectedDeployment.name,
+        stream: streamEnabled,
+        version: editVersionData.versionNumber,
+        set_default: checked
+      };
+
+      console.log("=== Set as Default Toggle Payload ===");
+      console.log("Full payload:", payload);
+
+      // Make the API call
+      const response = await AppRequest.Post(
+        `${tempApiBaseUrl}/prompts/prompt-config`,
+        payload
+      );
+
+      if (response && response.data) {
+        console.log("Set as default updated successfully:", response.data);
+        // No toast message needed
+      }
+    } catch (error: any) {
+      console.error("Error updating set as default:", error);
+      // Revert the toggle on error
+      setSetAsDefault(!checked);
+
+      // Handle validation errors better
+      if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
+        const firstError = error.response.data.detail[0];
+        errorToast(firstError.msg || "Failed to update default status");
+      } else {
+        errorToast(error?.response?.data?.detail || "Failed to update default status");
+      }
     }
   };
 
@@ -308,13 +394,19 @@ function AgentBoxInner({
       const type = "input";
 
       // Build the payload using the utility function with required parameters
-      const payload = buildPromptSchemaFromSession(
+      const payload: any = buildPromptSchemaFromSession(
         session,
         type,
         1,     // step_number
         0,     // workflow_total_steps (0 for single step save)
         true   // trigger_workflow
       );
+
+      // Add version and permanent parameters if in edit version mode
+      if (isEditVersionMode && editVersionData) {
+        payload.version = editVersionData.versionNumber;
+        payload.permanent = true;
+      }
 
       console.log("=== Input Schema Save Debug ===");
       console.log("Session promptId:", session.promptId);
@@ -340,15 +432,9 @@ function AgentBoxInner({
         if (workflowId) {
           console.log("Got workflow_id from response:", workflowId);
 
-          // Make GET call to /workflows/{workflow_id}
-          try {
-            const workflowResponse = await AppRequest.Get(
-              `${tempApiBaseUrl}/workflows/${workflowId}`
-            );
-            console.log("Workflow status response:", workflowResponse.data);
-          } catch (workflowError) {
-            console.error("Error fetching workflow status:", workflowError);
-          }
+          // Store workflow_id in session for input schema status tracking
+          updateSession(session.id, { inputWorkflowId: workflowId });
+          console.log("Stored inputWorkflowId in session");
         }
 
         // successToast("Input schema saved successfully"); // Removed: No toast needed
@@ -390,13 +476,19 @@ function AgentBoxInner({
 
     try {
       // Build the payload with output type
-      const payload = buildPromptSchemaFromSession(
+      const payload: any = buildPromptSchemaFromSession(
         session,
         "output",  // Explicitly use output type
         1,         // step_number
         0,         // workflow_total_steps (0 for single step save)
         true       // trigger_workflow
       );
+
+      // Add version and permanent parameters if in edit version mode
+      if (isEditVersionMode && editVersionData) {
+        payload.version = editVersionData.versionNumber;
+        payload.permanent = true;
+      }
 
       // Start workflow status tracking for output
       startOutputWorkflow();
@@ -417,15 +509,9 @@ function AgentBoxInner({
         if (workflowId) {
           console.log("Got workflow_id from response:", workflowId);
 
-          // Make GET call to /workflows/{workflow_id}
-          try {
-            const workflowResponse = await AppRequest.Get(
-              `${tempApiBaseUrl}/workflows/${workflowId}`
-            );
-            console.log("Workflow status response:", workflowResponse.data);
-          } catch (workflowError) {
-            console.error("Error fetching workflow status:", workflowError);
-          }
+          // Store workflow_id in session for output schema status tracking
+          updateSession(session.id, { outputWorkflowId: workflowId });
+          console.log("Stored outputWorkflowId in session");
         }
 
         // successToast("Output schema saved successfully"); // Removed: No toast needed
@@ -487,10 +573,10 @@ function AgentBoxInner({
 
     try {
       // Build the payload for prompt-config endpoint
-      const payload = {
+      const payload: any = {
         prompt_id: session.promptId,
         version: 1,
-        set_default: false,
+        set_default: isEditVersionMode ? setAsDefault : false,
         deployment_name: session.selectedDeployment.model.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
@@ -500,11 +586,17 @@ function AgentBoxInner({
             content: session.systemPrompt
           }
         ],
-        llm_retry_limit: 0,
+        llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: true,
         system_prompt_role: "system"
       };
+
+      // Add version and permanent parameters if in edit version mode
+      if (isEditVersionMode && editVersionData) {
+        payload.version = editVersionData.versionNumber;
+        payload.permanent = true;
+      }
 
       console.log("=== System Prompt Save Payload ===");
       console.log("Stream enabled:", getStreamSetting());
@@ -522,22 +614,19 @@ function AgentBoxInner({
       if (response && response.data) {
         console.log("System prompt save response:", response.data);
 
-        // Extract workflow_id from response
+        // Extract workflow_id from response (optional for prompt-config)
         const workflowId = response.data.workflow_id;
 
         if (workflowId) {
           console.log("Got workflow_id from response:", workflowId);
 
-          // Make GET call to /workflows/{workflow_id}
-          try {
-            const workflowResponse = await AppRequest.Get(
-              `${tempApiBaseUrl}/workflows/${workflowId}`
-            );
-            console.log("Workflow status response:", workflowResponse.data);
-          } catch (workflowError) {
-            console.error("Error fetching workflow status:", workflowError);
-          }
+          // Store workflow_id in session for system prompt status tracking
+          updateSession(session.id, { systemPromptWorkflowId: workflowId });
+          console.log("Stored systemPromptWorkflowId in session");
         }
+
+        // Manually set success status (prompt-config doesn't have workflow events)
+        setSystemPromptSuccess();
 
         // successToast("System prompt saved successfully"); // Removed: No toast needed
 
@@ -546,6 +635,10 @@ function AgentBoxInner({
       }
     } catch (error: any) {
       console.error("Error saving system prompt:", error);
+
+      // Manually set failed status
+      setSystemPromptFailed();
+
       // Handle validation errors better
       if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
         const firstError = error.response.data.detail[0];
@@ -598,10 +691,10 @@ function AgentBoxInner({
 
     try {
       // Build the payload for prompt-config endpoint
-      const payload = {
+      const payload: any = {
         prompt_id: session.promptId,
         version: 1,
-        set_default: false,
+        set_default: isEditVersionMode ? setAsDefault : false,
         deployment_name: session.selectedDeployment.model.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
@@ -609,11 +702,17 @@ function AgentBoxInner({
           role: msg.role,
           content: msg.content
         })),
-        llm_retry_limit: 0,
+        llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: true,
         system_prompt_role: "system"
       };
+
+      // Add version and permanent parameters if in edit version mode
+      if (isEditVersionMode && editVersionData) {
+        payload.version = editVersionData.versionNumber;
+        payload.permanent = true;
+      }
 
       console.log("=== Prompt Messages Save Payload ===");
       console.log("Stream enabled:", getStreamSetting());
@@ -631,22 +730,19 @@ function AgentBoxInner({
       if (response && response.data) {
         console.log("Prompt messages save response:", response.data);
 
-        // Extract workflow_id from response
+        // Extract workflow_id from response (optional for prompt-config)
         const workflowId = response.data.workflow_id;
 
         if (workflowId) {
           console.log("Got workflow_id from response:", workflowId);
 
-          // Make GET call to /workflows/{workflow_id}
-          try {
-            const workflowResponse = await AppRequest.Get(
-              `${tempApiBaseUrl}/workflows/${workflowId}`
-            );
-            console.log("Workflow status response:", workflowResponse.data);
-          } catch (workflowError) {
-            console.error("Error fetching workflow status:", workflowError);
-          }
+          // Store workflow_id in session for prompt messages status tracking
+          updateSession(session.id, { promptMessagesWorkflowId: workflowId });
+          console.log("Stored promptMessagesWorkflowId in session");
         }
+
+        // Manually set success status (prompt-config doesn't have workflow events)
+        setPromptMessagesSuccess();
 
         // successToast("Prompt messages saved successfully"); // Removed: No toast needed
 
@@ -655,6 +751,10 @@ function AgentBoxInner({
       }
     } catch (error: any) {
       console.error("Error saving prompt messages:", error);
+
+      // Manually set failed status
+      setPromptMessagesFailed();
+
       // Handle validation errors better
       if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
         const firstError = error.response.data.detail[0];
@@ -664,6 +764,77 @@ function AgentBoxInner({
       }
     } finally {
       setIsSavingPromptMessages(false);
+    }
+  };
+
+  // Handle creating a new version
+  const handleCreateVersion = async () => {
+    if (!session) {
+      errorToast("No session data available");
+      return;
+    }
+
+    // Check if deployment is selected
+    if (!session.selectedDeployment?.id) {
+      errorToast("Please select a deployment model first");
+      return;
+    }
+
+    // Check if prompt_id exists
+    if (!session.promptId) {
+      errorToast("Prompt ID is missing");
+      return;
+    }
+
+    try {
+      // Build the payload for version creation
+      const payload = {
+        endpoint_id: session.selectedDeployment.id,
+        bud_prompt_id: session.promptId,
+        set_as_default: false
+      };
+
+      console.log("=== Create Version Payload ===");
+      console.log("Full payload:", payload);
+
+      // Make the API call
+      const response = await AppRequest.Post(
+        `${tempApiBaseUrl}/prompts/${session.promptId}/versions`,
+        payload
+      );
+
+      if (response && response.data) {
+        console.log("Version created successfully:", response.data);
+
+        successToast("Version created successfully");
+
+        // Close the drawer
+        closeAgentDrawer();
+
+        // Trigger a custom event to notify the versions tab to refresh
+        window.dispatchEvent(new CustomEvent('versionCreated'));
+      }
+    } catch (error: any) {
+      console.error("Error creating version:", error);
+      // Handle validation errors better
+      if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
+        const firstError = error.response.data.detail[0];
+        errorToast(firstError.msg || "Failed to create version");
+      } else {
+        errorToast(error?.response?.data?.detail || "Failed to create version");
+      }
+    }
+  };
+
+  // Handle Save button click - different behavior based on mode
+  const handleSaveClick = () => {
+    if (isAddVersionMode) {
+      handleCreateVersion();
+    } else if (isEditVersionMode) {
+      // Just close the drawer - API calls have already been made by individual save handlers
+      closeAgentDrawer();
+    } else {
+      closeAgentDrawer();
     }
   };
 
@@ -718,14 +889,16 @@ function AgentBoxInner({
         {/* Left Section - Session Info */}
         <div className="flex items-center gap-3 min-w-[100px]">
           <div className="h-[1.375rem] rounded-[0.375rem] min-w-[2rem] border-[1px] border-[#1F1F1F] flex justify-center items-center">
-            <span className="text-[#808080] text-xs font-medium">V{index + 1}</span>
+            <span className="text-[#808080] text-xs font-medium">
+              {isEditVersionMode && editVersionData ? `V${editVersionData.versionNumber}` : `V${index + 1}`}
+            </span>
           </div>
           {isHovering && (
-            <PrimaryButton onClick={closeAgentDrawer}
+            <PrimaryButton onClick={handleSaveClick}
               classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] hover:!bg-[#479d5f] hover:!border-[#965CDE] group"
               textClass="!text-[0.625rem] !font-[400] text-[#479d5f] group-hover:text-[#EEEEEE]"
             >
-              Save
+              {isAddVersionMode ? "Save Version" : isEditVersionMode ? "Save Changes" : "Save"}
             </PrimaryButton>
           )}
         </div>
@@ -739,6 +912,18 @@ function AgentBoxInner({
 
         {/* Right Section - Action Buttons */}
         <div className="flex items-center gap-1">
+          {/* Set as Default Toggle - Only visible in Edit Version Mode */}
+          {isEditVersionMode && (
+            <div className="flex items-center gap-2 mr-2 px-2 py-1 bg-[#1A1A1A] rounded-md border border-[#2F2F2F]">
+              <span className="text-[#B3B3B3] text-xs whitespace-nowrap">Set as Default</span>
+              <Switch
+                size="small"
+                checked={setAsDefault}
+                onChange={handleSetAsDefaultToggle}
+              />
+            </div>
+          )}
+
           {/* Model Settings Button - Works as toggle */}
           <button
             className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer transition-none ${isModelSettingsOpen ? 'bg-[#965CDE] bg-opacity-20' : ''
@@ -805,26 +990,28 @@ function AgentBoxInner({
             </div>
           </button>
 
-          {/* New Chat Window Button */}
-          <Tooltip title="New chat window" placement="bottom">
-            <button
-              onClick={createSession}
-              className="w-7 h-7 rounded-md flex justify-center items-center cursor-pointer hover:bg-[#1A1A1A] transition-colors"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                fill="none"
-                className="text-[#B3B3B3] hover:text-white"
+          {/* New Chat Window Button - Hidden in Add Version Mode and Edit Version Mode */}
+          {!isAddVersionMode && !isEditVersionMode && (
+            <Tooltip title="New chat window" placement="bottom">
+              <button
+                onClick={createSession}
+                className="w-7 h-7 rounded-md flex justify-center items-center cursor-pointer hover:bg-[#1A1A1A] transition-colors"
               >
-                <path
-                  fill="currentColor"
-                  d="M9 2a.757.757 0 0 0-.757.757v5.486H2.757a.757.757 0 0 0 0 1.514h5.486v5.486a.757.757 0 0 0 1.514 0V9.757h5.486a.757.757 0 0 0 0-1.514H9.757V2.757A.757.757 0 0 0 9 2Z"
-                />
-              </svg>
-            </button>
-          </Tooltip>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  className="text-[#B3B3B3] hover:text-white"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M9 2a.757.757 0 0 0-.757.757v5.486H2.757a.757.757 0 0 0 0 1.514h5.486v5.486a.757.757 0 0 0 1.514 0V9.757h5.486a.757.757 0 0 0 0-1.514H9.757V2.757A.757.757 0 0 0 9 2Z"
+                  />
+                </svg>
+              </button>
+            </Tooltip>
+          )}
 
           {/* More Options Dropdown */}
           <Dropdown menu={{ items: menuItems }} trigger={["click"]} placement="bottomRight">
@@ -914,6 +1101,7 @@ function AgentBoxInner({
             onPromptMessagesChange={handlePromptMessagesChange}
             localSystemPrompt={localSystemPrompt}
             localPromptMessages={localPromptMessages}
+            onLlmRetryLimitChange={handleLlmRetryLimitChange}
             onSavePromptSchema={handleSavePromptSchema}
             isSaving={isSaving}
             onSaveSystemPrompt={handleSaveSystemPrompt}

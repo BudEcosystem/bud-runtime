@@ -31,6 +31,8 @@ interface SettingsSidebarProps {
   onPromptMessagesChange: (value: string) => void;
   localSystemPrompt: string;
   localPromptMessages: string;
+  // LLM retry limit props
+  onLlmRetryLimitChange?: (value: number) => void;
   // Save props
   onSavePromptSchema?: () => void;
   isSaving?: boolean;
@@ -57,6 +59,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   onPromptMessagesChange,
   localSystemPrompt,
   localPromptMessages,
+  onLlmRetryLimitChange,
   onSavePromptSchema,
   isSaving,
   onSaveSystemPrompt,
@@ -89,6 +92,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             onSystemPromptChange={onSystemPromptChange}
             onSaveSystemPrompt={onSaveSystemPrompt}
             isSavingSystemPrompt={isSavingSystemPrompt}
+            llmRetryLimit={session.llm_retry_limit}
+            onLlmRetryLimitChange={onLlmRetryLimitChange}
           />
         );
       case SettingsType.PROMPT_MESSAGE:
@@ -134,6 +139,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               onSystemPromptChange={onSystemPromptChange}
               onSaveSystemPrompt={onSaveSystemPrompt}
               isSavingSystemPrompt={isSavingSystemPrompt}
+              llmRetryLimit={session.llm_retry_limit}
+              onLlmRetryLimitChange={onLlmRetryLimitChange}
             />
             <PromptMessageSettings
               sessionId={session.id}

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 import aiohttp
 from budmicroframe.commons.schemas import WorkflowMetadataResponse
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -486,6 +486,10 @@ class ExperimentService:
         project_id: Optional[uuid.UUID] = None,
         experiment_id: Optional[uuid.UUID] = None,
         search_query: Optional[str] = None,
+        status: Optional[str] = None,
+        model_id: Optional[uuid.UUID] = None,
+        created_after: Optional[datetime] = None,
+        created_before: Optional[datetime] = None,
         offset: int = 0,
         limit: int = 10,
     ) -> Tuple[List[ExperimentSchema], int]:
@@ -496,6 +500,10 @@ class ExperimentService:
             project_id (Optional[uuid.UUID]): Filter by project ID.
             experiment_id (Optional[uuid.UUID]): Filter by experiment ID.
             search_query (Optional[str]): Search query to filter by experiment name (case-insensitive).
+            status (Optional[str]): Filter by computed status (running/completed/failed/pending/cancelled/no_runs).
+            model_id (Optional[uuid.UUID]): Filter by model ID used in experiment runs.
+            created_after (Optional[datetime]): Filter experiments created after this date.
+            created_before (Optional[datetime]): Filter experiments created before this date.
             offset (int): Number of records to skip.
             limit (int): Maximum number of records to return.
 
@@ -521,12 +529,51 @@ class ExperimentService:
                 search_pattern = f"%{search_query.strip()}%"
                 q = q.filter(ExperimentModel.name.ilike(search_pattern))
 
-            # Get total count before pagination
-            total_count = q.count()
+            # Date range filters
+            if created_after is not None:
+                q = q.filter(ExperimentModel.created_at >= created_after)
 
-            # Apply pagination and ordering
-            q = q.order_by(ExperimentModel.created_at.desc()).offset(offset).limit(limit)
-            evs = q.all()
+            if created_before is not None:
+                q = q.filter(ExperimentModel.created_at <= created_before)
+
+            # Model filter: experiments that have runs with endpoints using this model
+            if model_id is not None:
+                model_subquery = (
+                    self.session.query(RunModel.experiment_id)
+                    .join(EndpointModel, RunModel.endpoint_id == EndpointModel.id)
+                    .filter(
+                        EndpointModel.model_id == model_id,
+                        RunModel.status != RunStatusEnum.DELETED.value,
+                    )
+                    .distinct()
+                    .subquery()
+                )
+                q = q.filter(ExperimentModel.id.in_(model_subquery))
+
+            # For status filter, we need to fetch more results initially
+            # Then filter by status and apply pagination
+            if status is not None:
+                # Get all matching experiments (without pagination initially)
+                q_for_status = q.order_by(ExperimentModel.created_at.desc())
+                all_evs = q_for_status.all()
+
+                # Compute statuses for all experiments
+                all_experiment_ids = [exp.id for exp in all_evs]
+                statuses = self.get_experiment_statuses_batch(all_experiment_ids)
+
+                # Filter by status
+                filtered_evs = [exp for exp in all_evs if statuses.get(exp.id, "unknown") == status]
+
+                # Apply pagination to filtered results
+                total_count = len(filtered_evs)
+                evs = filtered_evs[offset : offset + limit]
+            else:
+                # Get total count before pagination
+                total_count = q.count()
+
+                # Apply pagination and ordering
+                q = q.order_by(ExperimentModel.created_at.desc()).offset(offset).limit(limit)
+                evs = q.all()
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -534,8 +581,13 @@ class ExperimentService:
             ) from e
 
         # Get statuses for all experiments in one batch query
+        # If status filter was applied, statuses were already computed
         experiment_ids = [exp.id for exp in evs]
-        statuses = self.get_experiment_statuses_batch(experiment_ids)
+        if status is not None:
+            # Recompute statuses for the paginated subset
+            statuses = self.get_experiment_statuses_batch(experiment_ids)
+        else:
+            statuses = self.get_experiment_statuses_batch(experiment_ids)
 
         # Batch fetch tags for all experiments to avoid N+1 queries
         tag_service = EvalTagService(self.session)
@@ -1145,14 +1197,84 @@ class ExperimentService:
             logger.error(f"Failed to get traits for experiment {experiment_id}: {e}")
             return []
 
+    def list_experiment_models(
+        self, user_id: uuid.UUID, project_id: Optional[uuid.UUID] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Get unique models from user's experiments with experiment counts.
+
+        Parameters:
+            user_id (uuid.UUID): ID of the user whose experiments to query.
+            project_id (Optional[uuid.UUID]): Filter by project ID.
+
+        Returns:
+            Tuple[List[Dict], int]: List of model dicts with counts and total count.
+        """
+        try:
+            from sqlalchemy import distinct
+
+            # Base query for user's experiments
+            exp_query = self.session.query(ExperimentModel.id).filter(
+                ExperimentModel.created_by == user_id,
+                ExperimentModel.status != "deleted",
+            )
+
+            if project_id is not None:
+                exp_query = exp_query.filter(ExperimentModel.project_id == project_id)
+
+            experiment_ids_subquery = exp_query.subquery()
+
+            # Query to get models with experiment counts
+            # Join: Experiments -> Runs -> Endpoints -> Models
+            models_query = (
+                self.session.query(
+                    ModelTable.id,
+                    ModelTable.name,
+                    func.count(distinct(RunModel.experiment_id)).label("experiment_count"),
+                )
+                .join(EndpointModel, ModelTable.id == EndpointModel.model_id)
+                .join(RunModel, EndpointModel.id == RunModel.endpoint_id)
+                .filter(
+                    RunModel.experiment_id.in_(experiment_ids_subquery),
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .group_by(ModelTable.id, ModelTable.name)
+                .order_by(ModelTable.name)
+                .all()
+            )
+
+            # For each model, get a deployment name (any endpoint using this model)
+            result = []
+            for model_id, model_name, exp_count in models_query:
+                # Get any endpoint name for this model
+                endpoint = self.session.query(EndpointModel.name).filter(EndpointModel.model_id == model_id).first()
+
+                result.append(
+                    {
+                        "id": model_id,
+                        "name": model_name,
+                        "deployment_name": endpoint.name if endpoint else None,
+                        "experiment_count": exp_count,
+                    }
+                )
+
+            return result, len(result)
+        except Exception as e:
+            logger.error(f"Failed to list experiment models for user {user_id}: {e}", exc_info=True)
+            return [], 0
+
     def compute_experiment_status(self, experiment_id: uuid.UUID) -> str:
         """Compute experiment status based on all runs' statuses.
+
+        Simplified logic:
+        - If any run is RUNNING → experiment is "running"
+        - If no runs exist → "no_runs"
+        - Otherwise → "completed" (regardless of failures, pending, cancelled, etc.)
 
         Parameters:
             experiment_id (uuid.UUID): ID of the experiment.
 
         Returns:
-            str: Computed status string (running/failed/completed/pending/cancelled/skipped/no_runs).
+            str: Computed status string (running/completed/no_runs).
         """
         try:
             # Query all non-deleted runs for the experiment
@@ -1170,28 +1292,23 @@ class ExperimentService:
 
             statuses = [run.status for run in runs]
 
-            # Priority order for status determination
+            # Simplified status determination
             if RunStatusEnum.RUNNING.value in statuses:
                 return "running"
-            if RunStatusEnum.FAILED.value in statuses:
-                return "failed"
-            if RunStatusEnum.CANCELLED.value in statuses:
-                return "cancelled"
-            if RunStatusEnum.PENDING.value in statuses:
-                return "pending"
-            if all(s == RunStatusEnum.COMPLETED.value for s in statuses):
+            else:
+                # Everything else (completed, failed, pending, cancelled, skipped) → "completed"
                 return "completed"
-            if all(s == RunStatusEnum.SKIPPED.value for s in statuses):
-                return "skipped"
-
-            # Fallback for mixed completed/skipped states
-            return "completed"
         except Exception as e:
             logger.error(f"Failed to compute status for experiment {experiment_id}: {e}")
             return "unknown"
 
     def get_experiment_statuses_batch(self, experiment_ids: List[uuid.UUID]) -> dict[uuid.UUID, str]:
         """Get statuses for multiple experiments in one query for optimization.
+
+        Simplified logic:
+        - If any run is RUNNING → experiment is "running"
+        - If no runs exist → "no_runs"
+        - Otherwise → "completed" (regardless of failures, pending, cancelled, etc.)
 
         Parameters:
             experiment_ids (List[uuid.UUID]): List of experiment IDs.
@@ -1225,21 +1342,12 @@ class ExperimentService:
                 else:
                     statuses = runs_by_experiment[exp_id]
 
-                    # Apply the same priority logic
+                    # Simplified status determination
                     if RunStatusEnum.RUNNING.value in statuses:
                         result[exp_id] = "running"
-                    elif RunStatusEnum.FAILED.value in statuses:
-                        result[exp_id] = "failed"
-                    elif RunStatusEnum.CANCELLED.value in statuses:
-                        result[exp_id] = "cancelled"
-                    elif RunStatusEnum.PENDING.value in statuses:
-                        result[exp_id] = "pending"
-                    elif all(s == RunStatusEnum.COMPLETED.value for s in statuses):
-                        result[exp_id] = "completed"
-                    elif all(s == RunStatusEnum.SKIPPED.value for s in statuses):
-                        result[exp_id] = "skipped"
                     else:
-                        result[exp_id] = "completed"  # Fallback for mixed completed/skipped
+                        # Everything else (completed, failed, pending, cancelled, skipped) → "completed"
+                        result[exp_id] = "completed"
 
             return result
         except Exception as e:
@@ -1669,6 +1777,10 @@ class ExperimentService:
                 modalities=dataset.modalities,
                 sample_questions_answers=dataset.sample_questions_answers,
                 advantages_disadvantages=dataset.advantages_disadvantages,
+                eval_types=dataset.eval_types,
+                why_run_this_eval=dataset.why_run_this_eval,
+                what_to_expect=dataset.what_to_expect,
+                additional_info=dataset.additional_info,
                 traits=traits,
             )
 
@@ -1707,7 +1819,13 @@ class ExperimentService:
             # Apply filters
             if filters:
                 if filters.name:
-                    q = q.filter(DatasetModel.name.ilike(f"%{filters.name}%"))
+                    # Search in both name and description fields
+                    q = q.filter(
+                        or_(
+                            DatasetModel.name.ilike(f"%{filters.name}%"),
+                            DatasetModel.description.ilike(f"%{filters.name}%"),
+                        )
+                    )
                 if filters.modalities:
                     # Filter by modalities (JSONB contains any of the specified modalities)
                     for modality in filters.modalities:
@@ -1780,6 +1898,9 @@ class ExperimentService:
                     sample_questions_answers=dataset.sample_questions_answers,
                     advantages_disadvantages=dataset.advantages_disadvantages,
                     eval_types=dataset.eval_types,
+                    why_run_this_eval=dataset.why_run_this_eval,
+                    what_to_expect=dataset.what_to_expect,
+                    additional_info=dataset.additional_info,
                     traits=traits,
                 )
                 dataset_schemas.append(dataset_schema)
@@ -2052,6 +2173,61 @@ class ExperimentService:
             sort=SortInfo(field=sort_field, direction=sort_direction),
             page=page,
             page_size=page_size,
+        )
+
+    def get_experiment_summary(self, experiment_id: uuid.UUID, user_id: uuid.UUID):
+        """Get summary statistics for an experiment.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+            user_id (uuid.UUID): ID of the user.
+
+        Returns:
+            ExperimentSummary: Summary statistics including run counts and total duration.
+
+        Raises:
+            HTTPException(status_code=404): If experiment not found or access denied.
+        """
+        from budapp.eval_ops.schemas import ExperimentSummary
+
+        # Verify experiment exists and user has access
+        experiment = self.session.get(ExperimentModel, experiment_id)
+        if not experiment or experiment.status == ExperimentStatusEnum.DELETED.value:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
+            )
+
+        # Efficiently count runs by status in a single query using database-level aggregation
+        run_stats = (
+            self.session.query(
+                func.count(RunModel.id).label("total"),
+                func.sum(case((RunModel.status == RunStatusEnum.COMPLETED.value, 1), else_=0)).label("completed"),
+                func.sum(case((RunModel.status == RunStatusEnum.FAILED.value, 1), else_=0)).label("failed"),
+                func.sum(case((RunModel.status == RunStatusEnum.PENDING.value, 1), else_=0)).label("pending"),
+                func.sum(case((RunModel.status == RunStatusEnum.RUNNING.value, 1), else_=0)).label("running"),
+            )
+            .filter(
+                RunModel.experiment_id == experiment_id,
+                RunModel.status != RunStatusEnum.DELETED.value,
+            )
+            .one()
+        )
+
+        # Efficiently sum up total duration from all evaluations in a single query
+        total_duration_seconds = (
+            self.session.query(func.coalesce(func.sum(EvaluationModel.duration_in_seconds), 0))
+            .filter(EvaluationModel.experiment_id == experiment_id)
+            .scalar()
+        )
+
+        return ExperimentSummary(
+            total_runs=run_stats.total or 0,
+            total_duration_seconds=int(total_duration_seconds),
+            completed_runs=run_stats.completed or 0,
+            failed_runs=run_stats.failed or 0,
+            pending_runs=run_stats.pending or 0,
+            running_runs=run_stats.running or 0,
         )
 
     # ------------------------ Experiment Evaluations Methods ------------------------

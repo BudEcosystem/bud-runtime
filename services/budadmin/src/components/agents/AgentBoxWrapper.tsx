@@ -19,6 +19,13 @@ interface AgentBoxWrapperProps {
   totalSessions: number;
   isActive: boolean;
   onActivate: () => void;
+  isAddVersionMode?: boolean;
+  isEditVersionMode?: boolean;
+  editVersionData?: {
+    versionId: string;
+    versionNumber: number;
+    isDefault: boolean;
+  } | null;
 }
 
 const AgentBoxWrapper: React.FC<AgentBoxWrapperProps> = (props) => {

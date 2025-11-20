@@ -54,6 +54,7 @@ jobs:
           gh workflow run budadmin-release-image.yml -f release_tag=$VERSION
           gh workflow run budapp-release-image.yml -f release_tag=$VERSION
           gh workflow run budcluster-release-image.yml -f release_tag=$VERSION
+          gh workflow run budcustomer-release-image.yml -f release_tag=$VERSION
           gh workflow run buddoc-release-image.yml -f release_tag=$VERSION
           gh workflow run budeval-release-image.yml -f release_tag=$VERSION
           gh workflow run budgateway-release-image.yml -f release_tag=$VERSION
@@ -80,6 +81,7 @@ jobs:
             "budadmin-release-image.yml"
             "budapp-release-image.yml"
             "budcluster-release-image.yml"
+            "budcustomer-release-image.yml"
             "buddoc-release-image.yml"
             "budeval-release-image.yml"
             "budgateway-release-image.yml"

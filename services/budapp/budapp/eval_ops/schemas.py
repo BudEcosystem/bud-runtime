@@ -29,6 +29,15 @@ class TraitSummary(BaseModel):
     icon: Optional[str] = Field(None, description="The icon for the trait.")
 
 
+class ExperimentModelListItem(BaseModel):
+    """Model item for filtering experiments."""
+
+    id: UUID4 = Field(..., description="The UUID of the model.")
+    name: str = Field(..., description="The name of the model.")
+    deployment_name: Optional[str] = Field(None, description="The deployment name/namespace if deployed.")
+    experiment_count: int = Field(..., description="Number of experiments using this model.")
+
+
 # ------------------------ New Experiment Detail Schemas ------------------------
 
 
@@ -222,7 +231,7 @@ class Experiment(BaseModel):
     tag_objects: Optional[List["EvalTag"]] = Field(None, description="Complete tag objects with details.")
     status: Optional[str] = Field(
         None,
-        description="Computed status based on runs (running/failed/completed/pending/no_runs).",
+        description="Computed status based on runs (running/completed/no_runs).",
     )
     models: Optional[List[ModelSummary]] = Field(default_factory=list, description="Models used in the experiment.")
     traits: Optional[List[TraitSummary]] = Field(
@@ -304,6 +313,13 @@ class DeleteExperimentResponse(SuccessResponse):
     """Response schema for deleting an experiment."""
 
     pass
+
+
+class ListExperimentModelsResponse(SuccessResponse):
+    """Response for listing models used in experiments."""
+
+    models: List[ExperimentModelListItem] = Field(..., description="List of models used in experiments.")
+    total_count: int = Field(..., description="Total number of unique models.")
 
 
 # ------------------------ Run Schemas ------------------------
@@ -598,6 +614,18 @@ class ExpDataset(BaseModel):
         None,
         description="Evaluation type configurations like {'gen': 'gsm8k_gen', 'agent': 'gsm8k_agent'}.",
     )
+    why_run_this_eval: Optional[List[str]] = Field(
+        None,
+        description="List of reasons why running this evaluation is valuable and what insights it provides.",
+    )
+    what_to_expect: Optional[List[str]] = Field(
+        None,
+        description="List of expectations when evaluating this dataset, including patterns, trends, and characteristics.",
+    )
+    additional_info: Optional[dict] = Field(
+        None,
+        description="Additional metadata including top_5_task_types, top_5_domains, top_5_skills, top_5_concepts, top_5_qualifications, top_5_languages, age_distribution, and evaluation_description.",
+    )
     traits: List[Trait] = Field([], description="Traits associated with this dataset.")
 
     class Config:
@@ -624,7 +652,9 @@ class ListDatasetsResponse(SuccessResponse):
 class DatasetFilter(BaseModel):
     """Filter parameters for dataset listing."""
 
-    name: Optional[str] = Field(None, description="Filter by dataset name (case-insensitive substring).")
+    name: Optional[str] = Field(
+        None, description="Search in dataset name and description (case-insensitive substring)."
+    )
     modalities: Optional[List[str]] = Field(None, description="Filter by modalities.")
     language: Optional[List[str]] = Field(None, description="Filter by languages.")
     domains: Optional[List[str]] = Field(None, description="Filter by domains.")
@@ -940,3 +970,20 @@ class RunHistoryResponse(SuccessResponse):
     """Response for run history endpoint."""
 
     runs_history: RunHistoryData = Field(..., description="Run history data")
+
+
+class ExperimentSummary(BaseModel):
+    """Summary statistics for an experiment."""
+
+    total_runs: int = Field(..., description="Total number of runs in the experiment")
+    total_duration_seconds: int = Field(..., description="Total duration of all evaluations in seconds")
+    completed_runs: int = Field(..., description="Number of completed runs")
+    failed_runs: int = Field(..., description="Number of failed runs")
+    pending_runs: int = Field(..., description="Number of pending runs")
+    running_runs: int = Field(..., description="Number of currently running runs")
+
+
+class ExperimentSummaryResponse(SuccessResponse):
+    """Response for experiment summary endpoint."""
+
+    summary: ExperimentSummary = Field(..., description="Experiment summary data")

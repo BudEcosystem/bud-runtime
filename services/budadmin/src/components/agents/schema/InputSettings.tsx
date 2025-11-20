@@ -48,7 +48,8 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
   // Notify parent when structuredInputEnabled changes
   React.useEffect(() => {
     onStructuredInputEnabledChange?.(structuredInputEnabled);
-  }, [structuredInputEnabled, onStructuredInputEnabledChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structuredInputEnabled]);
 
   return (
     <div className="flex flex-col justify-between h-full w-full">

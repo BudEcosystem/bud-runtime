@@ -1,7 +1,7 @@
-import logging
 from typing import Optional, Union
 
 import redis.asyncio as aioredis
+from budmicroframe.commons import logging
 from redis.typing import AbsExpiryT, EncodableT, ExpiryT, KeyT, PatternT, ResponseT
 
 from ..commons.config import app_settings
@@ -9,7 +9,7 @@ from ..commons.exceptions import RedisException
 from .singleton import SingletonMeta
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class RedisSingleton(metaclass=SingletonMeta):
@@ -218,3 +218,40 @@ class RedisService:
             except Exception as e:
                 logger.exception(f"Error checking Redis hash field existence: {e}")
                 raise RedisException(f"Error checking hash field {key} in {name}") from e
+
+
+class TensorZeroRedisSingleton(metaclass=SingletonMeta):
+    """TensorZero Redis singleton class for API key bypass storage."""
+
+    _redis_client: Optional[aioredis.Redis] = None
+
+    def __init__(self):
+        """Initialize the TensorZero Redis singleton."""
+        if not self._redis_client:
+            # Use tensorzero_redis_url if configured, otherwise fallback to default redis_url
+            redis_url = app_settings.tensorzero_redis_url or app_settings.redis_url
+            pool = aioredis.ConnectionPool.from_url(redis_url)
+            self._redis_client = aioredis.Redis.from_pool(pool)
+            logger.debug(f"TensorZero Redis initialized with URL: {redis_url}")
+
+    async def __aenter__(self):
+        """Enter the context manager."""
+        return self._redis_client
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        """Exit the context manager."""
+        if self._redis_client:
+            await self._redis_client.aclose()
+
+
+class TensorZeroRedisService(RedisService):
+    """TensorZero Redis service for API key bypass storage.
+
+    Inherits all methods from RedisService but uses TensorZeroRedisSingleton
+    for connection, which points to the TensorZero Redis instance.
+    """
+
+    def __init__(self):
+        """Initialize the TensorZero Redis service."""
+        super().__init__()
+        self.redis_singleton = TensorZeroRedisSingleton()

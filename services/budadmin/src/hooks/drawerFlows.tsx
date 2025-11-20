@@ -2119,6 +2119,27 @@ const useModel: DrawerFlowType = {
   ],
 };
 
+const useAgent: DrawerFlowType = {
+  title: "Use Agent",
+  description: "Use an agent/prompt",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Agents", "Use Agent"],
+      id: "use-agent",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["use-agent"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Use Agent",
+        },
+      ],
+    },
+  ],
+};
+
 const publish: DrawerFlowType = {
   title: "Publish",
   description: "Publish deployment",
@@ -4740,6 +4761,7 @@ const flows = {
   "add-worker": addWorker,
   "worker-details": workerDetails,
   "use-model": useModel,
+  "use-agent": useAgent,
   "publish": publish,
   "publish-endpoint": publishEndpoint,
   "delete-cluster": deleteCluster,

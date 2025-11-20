@@ -18,12 +18,12 @@
 
 import asyncio
 import json
-import logging
 import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, Optional, Union
 
+from budmicroframe.commons import logging
 from budmicroframe.commons.constants import WorkflowStatus
 from budmicroframe.commons.schemas import (
     NotificationContent,
@@ -43,9 +43,10 @@ from ..commons.exceptions import (
 )
 from ..commons.helpers import run_async
 from ..commons.security import HashManager
+from ..executors import PromptExecutorFactory
 from ..shared.mcp_foundry_service import mcp_foundry_service
-from ..shared.redis_service import RedisService
-from .executors import SimplePromptExecutor_V1
+from ..shared.redis_service import RedisService, TensorZeroRedisService
+from .crud import PromptCRUD, PromptVersionCRUD
 from .revised_code.field_validation import generate_validation_function
 from .schema_builder import ModelGeneratorFactory
 from .schemas import (
@@ -67,7 +68,7 @@ from .schemas import (
 from .utils import clean_model_cache
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 dapr_workflow = DaprWorkflow()
 
@@ -81,7 +82,7 @@ class PromptExecutorService:
 
     def __init__(self):
         """Initialize the PromptExecutorService."""
-        self.executor = SimplePromptExecutor_V1()
+        self.executor = PromptExecutorFactory.get_executor(version=3)
 
     async def execute_prompt_deprecated(
         self, request: PromptExecuteRequest
@@ -406,7 +407,7 @@ class PromptConfigurationService:
             api_key_project_id: The API key project ID
             ttl: Time to live in seconds (default 3600 seconds = 1 hour)
         """
-        redis_service = RedisService()
+        redis_service = TensorZeroRedisService()
 
         # Build cache data structure matching budapp format
         cache_data = {
@@ -436,7 +437,7 @@ class PromptConfigurationService:
         Args:
             hashed_token: The hashed JWT token
         """
-        redis_service = RedisService()
+        redis_service = TensorZeroRedisService()
         redis_key = f"api_key:{hashed_token}"
 
         run_async(redis_service.delete(redis_key))
@@ -708,6 +709,40 @@ class PromptConfigurationService:
                 # Remove from cleanup registry if exists (permanent prompts don't need cleanup)
                 prompt_service = PromptService()
                 run_async(prompt_service._remove_from_cleanup_registry(redis_key))
+
+            # Persist to database for permanent prompts
+            if permanent:
+                try:
+                    # Use context managers for CRUD operations
+                    with PromptCRUD() as prompt_crud:
+                        prompt_record = prompt_crud.upsert_prompt(prompt_id=prompt_id, default_version_id=None)
+
+                    with PromptVersionCRUD() as version_crud:
+                        version_record = version_crud.upsert_prompt_version(
+                            prompt_db_id=prompt_record.id,
+                            version=version,
+                            version_data=config_data.model_dump(exclude_none=True, exclude_unset=True),
+                        )
+
+                    # Update default_version_id if requested
+                    if set_default:
+                        with PromptCRUD() as prompt_crud:
+                            prompt_record.default_version_id = version_record.id
+                            prompt_crud.update(data=prompt_record, conditions={"id": prompt_record.id})
+
+                        logger.debug(
+                            f"Database: Stored permanent prompt {prompt_id}:v{version} "
+                            f"and set as default (version_id: {version_record.id})"
+                        )
+                    else:
+                        logger.debug(f"Database: Stored permanent prompt {prompt_id}:v{version}")
+
+                except Exception as db_error:
+                    # Log warning but don't fail the request (eventual consistency)
+                    logger.warning(
+                        f"Failed to persist permanent prompt to database: {str(db_error)}. "
+                        f"Redis operation succeeded, but database sync failed for {prompt_id}:v{version}"
+                    )
 
             notification_req.payload.content = NotificationContent(
                 title="Successfully stored prompt configuration",
@@ -1137,6 +1172,40 @@ class PromptService:
                 # Remove from cleanup registry if exists (permanent prompts don't need cleanup)
                 await self._remove_from_cleanup_registry(redis_key)
 
+            # Persist to database for permanent prompts
+            if request.permanent:
+                try:
+                    # Use context manager for CRUD operations
+                    with PromptCRUD() as prompt_crud:
+                        prompt_record = prompt_crud.upsert_prompt(prompt_id=request.prompt_id, default_version_id=None)
+
+                    with PromptVersionCRUD() as version_crud:
+                        version_record = version_crud.upsert_prompt_version(
+                            prompt_db_id=prompt_record.id,
+                            version=version,
+                            version_data=config_data.model_dump(exclude_none=True, exclude_unset=True),
+                        )
+
+                    # Update default_version_id if requested
+                    if request.set_default:
+                        with PromptCRUD() as prompt_crud:
+                            prompt_record.default_version_id = version_record.id
+                            prompt_crud.update(data=prompt_record, conditions={"id": prompt_record.id})
+
+                        logger.debug(
+                            f"Database: Stored permanent prompt {request.prompt_id}:v{version} "
+                            f"and set as default (version_id: {version_record.id})"
+                        )
+                    else:
+                        logger.debug(f"Database: Stored permanent prompt {request.prompt_id}:v{version}")
+
+                except Exception as db_error:
+                    # Log warning but don't fail the request (eventual consistency)
+                    logger.warning(
+                        f"Failed to persist permanent prompt to database: {str(db_error)}. "
+                        f"Redis operation succeeded, but database sync failed for {request.prompt_id}:v{version}"
+                    )
+
             return PromptConfigResponse(
                 code=200,
                 message="Prompt configuration saved successfully",
@@ -1333,6 +1402,73 @@ class PromptService:
                 f"to {request.target_prompt_id}:v{request.target_version}"
             )
 
+            # Persist to database (copy operation always creates permanent storage)
+            try:
+                # Use context manager for CRUD operations
+                with PromptCRUD() as prompt_crud:
+                    prompt_record = prompt_crud.upsert_prompt(
+                        prompt_id=request.target_prompt_id, default_version_id=None
+                    )
+
+                with PromptVersionCRUD() as version_crud:
+                    version_record = version_crud.upsert_prompt_version(
+                        prompt_db_id=prompt_record.id,
+                        version=request.target_version,
+                        version_data=final_data,
+                    )
+
+                # Update default_version_id if requested
+                if request.set_as_default:
+                    with PromptCRUD() as prompt_crud:
+                        prompt_record.default_version_id = version_record.id
+                        prompt_crud.update(data=prompt_record, conditions={"id": prompt_record.id})
+
+                    logger.debug(
+                        f"Database: Stored copied prompt {request.target_prompt_id}:v{request.target_version} "
+                        f"and set as default (version_id: {version_record.id})"
+                    )
+                else:
+                    logger.debug(
+                        f"Database: Stored copied prompt {request.target_prompt_id}:v{request.target_version}"
+                    )
+
+            except Exception as db_error:
+                # Log warning but don't fail the request (eventual consistency)
+                logger.warning(
+                    f"Failed to persist copied prompt to database: {str(db_error)}. "
+                    f"Redis operation succeeded, but database sync failed for "
+                    f"{request.target_prompt_id}:v{request.target_version}"
+                )
+
+            # Remove target from cleanup registry if exists (permanent prompts don't need cleanup)
+            await self._remove_from_cleanup_registry(target_key)
+
+            # Check if source is in cleanup registry
+            source_registry_entry_json = await self.redis_service.hget(CLEANUP_REGISTRY_KEY, source_key)
+
+            # If source is temporary, remove MCP resources from cleanup registry
+            # This preserves shared MCP resources while allowing prompt config cleanup
+            if source_registry_entry_json:
+                # Decode bytes if needed
+                if isinstance(source_registry_entry_json, bytes):
+                    source_registry_entry_json = source_registry_entry_json.decode("utf-8")
+
+                # Load and validate using Pydantic model
+                source_registry_entry = MCPCleanupRegistryEntry.model_validate_json(source_registry_entry_json)
+
+                # Clear mcp_resources to prevent cleanup from deleting shared resources
+                source_registry_entry.mcp_resources = {"virtual_server_id": None, "gateways": {}}
+
+                # Serialize using Pydantic and update registry
+                updated_entry_json = source_registry_entry.model_dump_json()
+                await self.redis_service.hset(CLEANUP_REGISTRY_KEY, source_key, updated_entry_json)
+
+                logger.debug(
+                    "Cleared mcp_resources from cleanup registry for %s - resources now shared with target %s",
+                    source_key,
+                    target_key,
+                )
+
             # Parse final_data as PromptConfigurationData for response
             final_config_data = PromptConfigurationData.model_validate(final_data)
 
@@ -1382,6 +1518,46 @@ class PromptService:
             default_key = f"prompt:{prompt_id}:default_version"
             await self.redis_service.set(default_key, versioned_key)
             logger.debug(f"Set version key {versioned_key} as default for prompt_id: {prompt_id}")
+
+            # Update database if this is a permanent prompt (exists in database)
+            try:
+                with PromptCRUD() as prompt_crud:
+                    prompt_record = prompt_crud.fetch_one(conditions={"name": prompt_id})
+
+                if prompt_record:
+                    # This is a permanent prompt, validate version exists in database
+                    with PromptVersionCRUD() as version_crud:
+                        version_record = version_crud.fetch_one(
+                            conditions={"prompt_id": prompt_record.id, "version": version}
+                        )
+
+                    if version_record:
+                        # Update default_version_id in database
+                        with PromptCRUD() as prompt_crud:
+                            prompt_record.default_version_id = version_record.id
+                            prompt_crud.update(data=prompt_record, conditions={"id": prompt_record.id})
+
+                        logger.debug(
+                            f"Database: Updated default version for {prompt_id} to v{version} "
+                            f"(version_id: {version_record.id})"
+                        )
+                    else:
+                        logger.warning(
+                            f"Version {version} exists in Redis but not in database for {prompt_id}. "
+                            f"Skipping database update (inconsistent state)."
+                        )
+                else:
+                    # Temporary prompt (not in database), skip database update
+                    logger.debug(
+                        f"Prompt {prompt_id} not found in database, skipping database update (temporary prompt)"
+                    )
+
+            except Exception as db_error:
+                # Log warning but don't fail the request (eventual consistency)
+                logger.warning(
+                    f"Failed to update default version in database: {str(db_error)}. "
+                    f"Redis operation succeeded for {prompt_id}:v{version}"
+                )
 
             return SuccessResponse(message=f"Successfully set version {version} as default for prompt_id: {prompt_id}")
 
@@ -1437,6 +1613,34 @@ class PromptService:
                 await self.redis_service.delete(versioned_key)
                 logger.debug(f"Deleted version {version} for prompt_id: {prompt_id}")
 
+                # Delete from database if permanent prompt
+                try:
+                    with PromptCRUD() as prompt_crud:
+                        prompt_record = prompt_crud.fetch_one(conditions={"name": prompt_id})
+
+                    if prompt_record:
+                        with PromptVersionCRUD() as version_crud:
+                            version_crud.delete(conditions={"prompt_id": prompt_record.id, "version": version})
+
+                        logger.debug(f"Database: Deleted version {version} for prompt '{prompt_id}'")
+
+                        # Check if any versions remain for this prompt
+                        with PromptVersionCRUD() as version_crud:
+                            remaining_versions = version_crud.count_versions(prompt_record.id)
+
+                        if remaining_versions == 0:
+                            with PromptCRUD() as prompt_crud:
+                                prompt_crud.delete(conditions={"id": prompt_record.id})
+
+                            logger.info(f"Database: Auto-deleted prompt '{prompt_id}' as it had no remaining versions")
+                    else:
+                        logger.debug(f"Prompt '{prompt_id}' not found in database, skipping database deletion ")
+
+                except Exception as db_error:
+                    logger.warning(
+                        f"Failed to delete version {version} from database for prompt '{prompt_id}': {str(db_error)}. "
+                    )
+
                 return SuccessResponse(message=f"Successfully deleted version {version} for prompt_id: {prompt_id}")
 
             else:
@@ -1457,6 +1661,22 @@ class PromptService:
                     )
 
                 logger.debug(f"Deleted all {total_deleted} configurations for prompt_id: {prompt_id}")
+
+                # Delete from database if permanent prompt
+                try:
+                    with PromptCRUD() as prompt_crud:
+                        prompt_record = prompt_crud.fetch_one(conditions={"name": prompt_id})
+
+                    if prompt_record:
+                        with PromptCRUD() as prompt_crud:
+                            prompt_crud.delete(conditions={"id": prompt_record.id})
+
+                        logger.debug(f"Database: Deleted prompt '{prompt_id}' and all associated versions ")
+                    else:
+                        logger.debug(f"Prompt '{prompt_id}' not found in database, skipping database deletion ")
+
+                except Exception as db_error:
+                    logger.warning(f"Failed to delete prompt '{prompt_id}' from database: {str(db_error)}. ")
 
                 return SuccessResponse(message=f"Successfully deleted all configurations for prompt_id: {prompt_id}")
 
@@ -1612,7 +1832,7 @@ class PromptCleanupService:
                 if mcp_resources.get("gateways"):
                     for _connector_id, gateway_id in mcp_resources["gateways"].items():
                         try:
-                            run_async(mcp_foundry_service.delete_gateway(gateway_id))
+                            mcp_foundry_service.delete_gateway_sync(gateway_id)
                             logger.debug(f"Deleted gateway {gateway_id} for {prompt_key}")
                         except Exception as e:
                             logger.error(f"Failed to delete gateway {gateway_id}: {e}")
@@ -1621,7 +1841,7 @@ class PromptCleanupService:
                 # Delete virtual server
                 if mcp_resources.get("virtual_server_id"):
                     try:
-                        run_async(mcp_foundry_service.delete_virtual_server(mcp_resources["virtual_server_id"]))
+                        mcp_foundry_service.delete_virtual_server_sync(mcp_resources["virtual_server_id"])
                         logger.debug(f"Deleted virtual server {mcp_resources['virtual_server_id']}")
                     except Exception as e:
                         logger.error(f"Failed to delete virtual server: {e}")

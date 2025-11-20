@@ -5,6 +5,7 @@ import { Input, InputNumber, Checkbox, Image, message } from 'antd';
 import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
 import { useChatStore } from '@/app/store/chat';
+import { useEndPoints } from '@/app/components/bud/hooks/useEndPoint';
 
 interface PromptFormProps {
   promptIds?: string[];
@@ -16,6 +17,9 @@ interface PromptFormProps {
 export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: _onClose }: PromptFormProps) {
   const { apiKey, accessKey } = useAuth();
   const getChat = useChatStore((state) => state.getChat);
+  const setDeployment = useChatStore((state) => state.setDeployment);
+  const setDeploymentLock = useChatStore((state) => state.setDeploymentLock);
+  const { endpoints, getEndPoints, isReady } = useEndPoints();
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [inputSchema, setInputSchema] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -51,8 +55,13 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
           let schemaToUse: any = config.data.input_schema ?? null;
 
           // If it's a JSON schema with $defs, flatten it for the form
-          if (schemaToUse && schemaToUse.$defs && schemaToUse.$defs.InputSchema) {
-            schemaToUse = schemaToUse.$defs.InputSchema.properties || {};
+          // Check for both "Input" and "InputSchema" in $defs
+          if (schemaToUse && schemaToUse.$defs) {
+            if (schemaToUse.$defs.Input) {
+              schemaToUse = schemaToUse.$defs.Input.properties || {};
+            } else if (schemaToUse.$defs.InputSchema) {
+              schemaToUse = schemaToUse.$defs.InputSchema.properties || {};
+            }
           }
 
           if (
@@ -94,6 +103,38 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
 
     fetchPromptConfigs();
   }, [promptIds, apiKey, accessKey]);
+
+  // Fetch endpoints when ready and deployment name is available
+  useEffect(() => {
+    if (isReady && promptDeployment && chatId) {
+      getEndPoints({ page: 1, limit: 100 });
+    }
+  }, [isReady, promptDeployment, chatId, getEndPoints]);
+
+  // Auto-select deployment when endpoints are loaded
+  useEffect(() => {
+    if (promptDeployment && endpoints && endpoints.length > 0 && chatId) {
+      const chat = getChat(chatId);
+
+      // Only auto-select if no deployment is set yet OR if it's already locked
+      // This prevents overriding user's manual selection before config loads
+      if (!chat?.selectedDeployment || chat?.deploymentLocked) {
+        // Find matching endpoint by name or ID
+        const matchingEndpoint = endpoints.find(
+          (ep) => ep.name === promptDeployment || ep.id === promptDeployment
+        );
+
+        if (matchingEndpoint) {
+          // Set the deployment and lock it
+          setDeployment(chatId, matchingEndpoint);
+          setDeploymentLock(chatId, true);
+          console.log(`Auto-selected and locked deployment: ${matchingEndpoint.name}`);
+        } else {
+          console.warn(`Deployment '${promptDeployment}' not found in available endpoints`);
+        }
+      }
+    }
+  }, [promptDeployment, endpoints, chatId, setDeployment, setDeploymentLock, getChat]);
 
   const handleChange = (fieldName: string, value: any) => {
     setFormData(prev => ({
@@ -139,7 +180,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
 
     // Check if it's structured or unstructured input
     if (inputSchema && Object.keys(inputSchema).length > 0) {
-      // Structured input - send variables
+      // Structured input - send variables wrapped in content object
       const variables: Record<string, any> = {};
       Object.keys(formData).forEach(key => {
         if (formData[key] !== undefined && formData[key] !== '') {
@@ -148,8 +189,10 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
       });
 
       if (Object.keys(variables).length > 0) {
-        payload.prompt.variables = variables;
-        payload.variables = variables;
+        // Wrap variables in content object to match schema structure
+        const wrappedVariables = { content: variables };
+        payload.prompt.variables = wrappedVariables;
+        payload.variables = wrappedVariables;
       }
     } else {
       // Unstructured input - send input field
@@ -258,7 +301,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
             <>
               <div className="space-y-2">
                 <label className="text-white text-[0.875rem] font-[400] block">
-                  Unstructured Input
+                  Message
                 </label>
                 <Input
                   value={formData['unstructuredSchema'] || ''}

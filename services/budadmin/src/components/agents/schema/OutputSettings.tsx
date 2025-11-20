@@ -48,7 +48,8 @@ export const OutputSettings: React.FC<OutputSettingsProps> = ({
   // Notify parent when structuredOutputEnabled changes
   React.useEffect(() => {
     onStructuredOutputEnabledChange?.(structuredOutputEnabled);
-  }, [structuredOutputEnabled, onStructuredOutputEnabledChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structuredOutputEnabled]);
 
   return (
     <div className="flex flex-col justify-between h-full w-full">

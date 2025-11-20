@@ -118,6 +118,9 @@ class EvalDataSyncService:
             "sample_questions_answers": {"sample_count": dataset.sample_count} if dataset.sample_count else None,
             "advantages_disadvantages": None,
             "eval_types": dataset.eval_type if hasattr(dataset, "eval_type") and dataset.eval_type else None,
+            "why_run_this_eval": None,
+            "what_to_expect": None,
+            "additional_info": {},
         }
 
         # Extract creator info and links from original_data if available
@@ -138,6 +141,46 @@ class EvalDataSyncService:
                 dataset_fields["meta_links"]["create_date"] = original_data["createDate"]
             if original_data.get("updateDate"):
                 dataset_fields["meta_links"]["update_date"] = original_data["updateDate"]
+
+            # Extract enriched evaluation fields from original_data
+            for key in ["why_run_this_eval", "what_to_expect"]:
+                if (value := original_data.get(key)) is not None:
+                    dataset_fields[key] = value
+
+            # Extract sample_questions_answers from original_data
+            if sqa_data := original_data.get("sample_questions_answers"):
+                # Initialize with sample_count if not already set
+                if not dataset_fields["sample_questions_answers"]:
+                    dataset_fields["sample_questions_answers"] = {}
+                    if dataset.sample_count:
+                        dataset_fields["sample_questions_answers"]["sample_count"] = dataset.sample_count
+
+                # Add examples if present
+                if examples := sqa_data.get("examples"):
+                    dataset_fields["sample_questions_answers"]["examples"] = examples
+
+                # Add total_questions if present
+                if total_questions := sqa_data.get("total_questions"):
+                    dataset_fields["sample_questions_answers"]["total_count"] = total_questions
+
+            # Build additional_info JSON field from various metadata in original_data
+            additional_info_keys = [
+                "top_5_task_types",
+                "top_5_domains",
+                "top_5_skills",
+                "top_5_concepts",
+                "top_5_qualifications",
+                "top_5_languages",
+                "age_distribution",
+                "evaluation_description",
+            ]
+            additional_info = {
+                key: value for key in additional_info_keys if (value := original_data.get(key)) is not None
+            }
+
+            # Only set additional_info if we have data
+            if additional_info:
+                dataset_fields["additional_info"] = additional_info
         else:
             # If no original_data, still ensure empty strings for URL fields
             dataset_fields["meta_links"]["github"] = ""
