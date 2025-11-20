@@ -19,6 +19,8 @@ from pathlib import Path
 # Add parent directory to path to import budapp modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from sqlalchemy import and_
+
 from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.database import SessionLocal
@@ -50,8 +52,6 @@ async def backfill_storage_sizes(dry_run: bool = False, batch_size: int = 10) ->
         model_dm = ModelDataManager(session)
 
         # Query for models needing backfill
-        from sqlalchemy import and_
-
         models_to_process = (
             session.query(Model).filter(and_(Model.local_path.isnot(None), Model.storage_size_gb.is_(None))).all()
         )

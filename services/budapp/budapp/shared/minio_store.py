@@ -141,7 +141,7 @@ class ModelStore:
         return self.client.presigned_get_object(bucket_name, object_name)
 
     def get_folder_size(self, bucket_name: str, prefix: str) -> float:
-        """Get the total size of all objects under a prefix in GB.
+        """Get the total size of all objects under a prefix in GiB.
 
         This method calculates the total storage size of all objects (files)
         under a given prefix in a MinIO bucket. Useful for determining model
@@ -152,7 +152,7 @@ class ModelStore:
             prefix (str): The folder prefix (e.g., "models/llama-2-7b")
 
         Returns:
-            float: Total size in gigabytes (GB)
+            float: Total size in gibibytes (GiB)
 
         Raises:
             MinioException: If there's an error listing or accessing objects
@@ -166,15 +166,12 @@ class ModelStore:
                 total_size_bytes += obj.size
                 object_count += 1
 
-            total_size_gb = total_size_bytes / (1024**3)
+            total_size_gib = total_size_bytes / (1024**3)
             logger.info(
-                f"Calculated folder size for {bucket_name}/{prefix}: {total_size_gb:.2f} GB ({object_count} objects)"
+                f"Calculated folder size for {bucket_name}/{prefix}: {total_size_gib:.2f} GiB ({object_count} objects)"
             )
-            return total_size_gb
+            return total_size_gib
 
-        except S3Error as e:
-            logger.exception(f"Error calculating folder size for {bucket_name}/{prefix}: {e}")
-            raise MinioException(f"Error calculating folder size: {e}") from e
         except Exception as e:
             logger.exception(f"Error calculating folder size for {bucket_name}/{prefix}: {e}")
             raise MinioException(f"Error calculating folder size: {e}") from e

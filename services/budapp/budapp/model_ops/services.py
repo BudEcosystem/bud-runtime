@@ -558,14 +558,9 @@ class CloudModelWorkflowService(SessionMixin):
 
         # Calculate and update storage size from MinIO if local_path is available
         if model.local_path:
-            try:
-                model_store = ModelStore()
-                storage_size_gb = model_store.get_folder_size(app_settings.minio_bucket, model.local_path)
-                update_fields["storage_size_gb"] = storage_size_gb
-                logger.info(f"Calculated storage size for model {model.id}: {storage_size_gb:.2f} GB")
-            except Exception as e:
-                logger.warning(f"Failed to calculate storage size for model {model.id}: {e}")
-                # Don't fail the update if storage size calculation fails
+            storage_size_gib = await self._calculate_and_get_storage_size(model.id, model.local_path)
+            if storage_size_gib is not None:
+                update_fields["storage_size_gb"] = storage_size_gib
 
         # Update model with extracted metadata
         if update_fields:
@@ -577,6 +572,33 @@ class CloudModelWorkflowService(SessionMixin):
             await self._create_papers_from_extracted_metadata(extracted_metadata["papers"], model.id)
 
         return model
+
+    async def _calculate_and_get_storage_size(self, model_id: UUID, local_path: str) -> Optional[float]:
+        """Calculate storage size from MinIO for a model.
+
+        This helper method calculates the total storage size of model files
+        stored in MinIO under the given local_path prefix.
+
+        Args:
+            model_id (UUID): The model ID for logging purposes
+            local_path (str): The MinIO path prefix where model files are stored
+
+        Returns:
+            Optional[float]: Storage size in GiB, or None if calculation fails
+
+        Note:
+            This method does not update the database. Callers should handle
+            the returned value appropriately (e.g., add to update dict or
+            directly update the database).
+        """
+        try:
+            model_store = ModelStore()
+            storage_size_gib = model_store.get_folder_size(app_settings.minio_bucket, local_path)
+            logger.info(f"Calculated storage size for model {model_id}: {storage_size_gib:.2f} GiB")
+            return storage_size_gib
+        except Exception as e:
+            logger.warning(f"Failed to calculate storage size for model {model_id}: {e}")
+            return None
 
     async def _create_papers_from_extracted_metadata(self, papers_data: List[Dict], model_id: UUID) -> None:
         """Create paper records from extracted metadata."""
@@ -1276,14 +1298,9 @@ class LocalModelWorkflowService(SessionMixin):
 
         # Calculate and update storage size from MinIO
         if local_path:
-            try:
-                model_store = ModelStore()
-                storage_size_gb = model_store.get_folder_size(app_settings.minio_bucket, local_path)
-                await ModelDataManager(self.session).update_by_fields(db_model, {"storage_size_gb": storage_size_gb})
-                logger.info(f"Calculated and updated storage size for model {db_model.id}: {storage_size_gb:.2f} GB")
-            except Exception as e:
-                logger.warning(f"Failed to calculate storage size for model {db_model.id}: {e}")
-                # Don't fail the model creation if storage size calculation fails
+            storage_size_gib = await self._calculate_and_get_storage_size(db_model.id, local_path)
+            if storage_size_gib is not None:
+                await ModelDataManager(self.session).update_by_fields(db_model, {"storage_size_gb": storage_size_gib})
 
         # Update to workflow step
         workflow_update_data = {
