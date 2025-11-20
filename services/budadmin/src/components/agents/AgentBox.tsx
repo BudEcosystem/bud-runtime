@@ -249,7 +249,7 @@ function AgentBoxInner({
     }
 
     // Check if deployment is selected
-    if (!session.selectedDeployment?.name) {
+    if (!session.selectedDeployment?.id) {
       errorToast("Please select a deployment model first");
       return;
     }
@@ -260,25 +260,30 @@ function AgentBoxInner({
       return;
     }
 
+    // Check if version_id exists
+    if (!editVersionData.versionId) {
+      errorToast("Version ID is missing");
+      return;
+    }
+
     try {
       // Update local state first for immediate UI feedback
       setSetAsDefault(checked);
 
-      // Build the payload for prompt-config endpoint
+      // Build the payload for PATCH endpoint
       const payload = {
-        prompt_id: session.promptId,
-        deployment_name: session.selectedDeployment.name,
-        stream: streamEnabled,
-        version: editVersionData.versionNumber,
-        set_default: checked
+        endpoint_id: session.selectedDeployment.id,
+        set_as_default: checked
       };
 
       console.log("=== Set as Default Toggle Payload ===");
+      console.log("Prompt ID:", session.promptId);
+      console.log("Version ID:", editVersionData.versionId);
       console.log("Full payload:", payload);
 
-      // Make the API call
-      const response = await AppRequest.Post(
-        `${tempApiBaseUrl}/prompts/prompt-config`,
+      // Make the PATCH API call
+      const response = await AppRequest.Patch(
+        `${tempApiBaseUrl}/prompts/${session.promptId}/versions/${editVersionData.versionId}`,
         payload
       );
 
