@@ -691,18 +691,15 @@ api_key_location = "env::API_KEY"
             )
         else:
             # Fallback to memory-based calculation
-            pvc_size_gb = math.ceil(self._get_memory_size(node_list) * 1.1)
+            raw_size = self._get_memory_size(node_list) * 1.1
+            pvc_size_gb = math.ceil(raw_size)
             logger.warning(f"Model storage size not available, using fallback calculation: {pvc_size_gb} GB")
 
-        # Validation: warn if too small, fail if critically small
+        # Additional warning if below recommended minimum
         if pvc_size_gb < 1:
-            raise ValueError(
-                f"Calculated PVC size ({pvc_size_gb} GB) is too small. Minimum size is 1 GB. Check model storage size."
-            )
-        elif pvc_size_gb < 5:
+            pvc_size_gb = 1
             logger.warning(
-                f"PVC size ({pvc_size_gb} GB) is below recommended minimum of 5 GB. "
-                "This may cause issues with model transfer."
+                f"PVC size ({pvc_size_gb} GB) is below recommended minimum of 1 GB. Setting the value to 1 GB"
             )
 
         values = {

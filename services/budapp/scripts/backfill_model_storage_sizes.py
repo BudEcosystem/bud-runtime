@@ -51,26 +51,32 @@ async def backfill_storage_sizes(dry_run: bool = False, batch_size: int = 10) ->
         # Get all models that have a local_path but no storage_size_gb
         model_dm = ModelDataManager(session)
 
-        # Query for models needing backfill
-        models_to_process = (
-            session.query(Model).filter(and_(Model.local_path.isnot(None), Model.storage_size_gb.is_(None))).all()
+        # First, get the total count without loading all models
+        total_models = (
+            session.query(Model).filter(and_(Model.local_path.isnot(None), Model.storage_size_gb.is_(None))).count()
         )
 
-        total_models = len(models_to_process)
         logger.info(f"Found {total_models} models needing storage size calculation")
 
         if total_models == 0:
             logger.info("No models need backfilling. Exiting.")
             return
 
-        # Process models in batches
+        # Process models in batches using pagination
         successful = 0
         failed = 0
         skipped = 0
 
-        for i in range(0, total_models, batch_size):
-            batch = models_to_process[i : i + batch_size]
-            logger.info(f"\nProcessing batch {i // batch_size + 1} ({len(batch)} models)...")
+        for offset in range(0, total_models, batch_size):
+            # Fetch only one batch at a time using limit and offset
+            batch = (
+                session.query(Model)
+                .filter(and_(Model.local_path.isnot(None), Model.storage_size_gb.is_(None)))
+                .limit(batch_size)
+                .offset(offset)
+                .all()
+            )
+            logger.info(f"\nProcessing batch {offset // batch_size + 1} ({len(batch)} models)...")
 
             for model in batch:
                 try:

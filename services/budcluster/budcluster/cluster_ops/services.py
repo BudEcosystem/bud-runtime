@@ -183,30 +183,34 @@ class ClusterOpsService:
                             gpu_type = "cuda"
                             logger.warning(f"Unknown GPU vendor '{gpu_vendor}', defaulting to cuda")
 
-                        formatted_devices.append(
-                            {
-                                "device_config": {
-                                    "type": gpu_type,
-                                    "name": gpu.get("raw_name", "Unknown GPU"),
-                                    "vendor": gpu.get("vendor", ""),
-                                    "model": gpu.get("model", ""),
-                                    "memory_gb": gpu.get("memory_gb", 0),
-                                    "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
-                                    "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
-                                    "pci_vendor": gpu.get("pci_vendor_id"),
-                                    "pci_device": gpu.get("pci_device_id"),
-                                    "cuda_version": gpu.get("cuda_version"),
-                                    "count": gpu.get("count", 1),
-                                    "inter_node_bandwidth_in_GB_per_sec": 200,
-                                    "intra_node_bandwidth_in_GB_per_sec": 300,
-                                },
-                                # Store both total_count and available_count
-                                # available_count will be calculated separately if NFD is enabled
-                                "total_count": gpu.get("count", 1),
-                                "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                        # Build formatted device dict
+                        formatted_device = {
+                            "device_config": {
                                 "type": gpu_type,
-                            }
-                        )
+                                "name": gpu.get("raw_name", "Unknown GPU"),
+                                "vendor": gpu.get("vendor", ""),
+                                "model": gpu.get("model", ""),
+                                "memory_gb": gpu.get("memory_gb", 0),
+                                "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
+                                "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
+                                "pci_vendor": gpu.get("pci_vendor_id"),
+                                "pci_device": gpu.get("pci_device_id"),
+                                "cuda_version": gpu.get("cuda_version"),
+                                "count": gpu.get("count", 1),
+                                "inter_node_bandwidth_in_GB_per_sec": 200,
+                                "intra_node_bandwidth_in_GB_per_sec": 300,
+                            },
+                            # Store both total_count and available_count
+                            # available_count will be calculated separately if NFD is enabled
+                            "total_count": gpu.get("count", 1),
+                            "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                            "type": gpu_type,
+                        }
+
+                        # Add HAMI fields if present (for time-slicing GPU sharing)
+                        _add_hami_fields_to_device(gpu, formatted_device)
+
+                        formatted_devices.append(formatted_device)
                         device_type = gpu_type
 
                     # Process HPUs
@@ -401,13 +405,17 @@ class ClusterOpsService:
                 if not node.status:
                     available_count = 0
 
-                devices.append(
-                    {
-                        **device_config,
-                        "total_count": total_count,
-                        "available_count": available_count,
-                    }
-                )
+                # Build device dict with flattened device_config
+                device = {
+                    **device_config,
+                    "total_count": total_count,
+                    "available_count": available_count,
+                }
+
+                # Add HAMI fields if present (for time-slicing GPU sharing)
+                _add_hami_fields_to_device(each_info, device)
+
+                devices.append(device)
             result.append(
                 {
                     "name": node.name,
@@ -441,6 +449,10 @@ class ClusterOpsService:
                     "features": each_info.get("features", []),
                     "product_name": each_info.get("product_name", "Unknown"),
                 }
+
+                # Add HAMI fields if present (for time-slicing GPU sharing)
+                _add_hami_fields_to_device(each_info, enhanced_device)
+
                 devices.append(enhanced_device)
 
             node_result = {
@@ -906,30 +918,34 @@ class ClusterOpsService:
                             gpu_type = "cuda"
                             logger.warning(f"Unknown GPU vendor '{gpu_vendor}', defaulting to cuda")
 
-                        formatted_devices.append(
-                            {
-                                "device_config": {
-                                    "type": gpu_type,
-                                    "name": gpu.get("raw_name", "Unknown GPU"),
-                                    "vendor": gpu.get("vendor", ""),
-                                    "model": gpu.get("model", ""),
-                                    "memory_gb": gpu.get("memory_gb", 0),
-                                    "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
-                                    "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
-                                    "pci_vendor": gpu.get("pci_vendor_id"),
-                                    "pci_device": gpu.get("pci_device_id"),
-                                    "cuda_version": gpu.get("cuda_version"),
-                                    "count": gpu.get("count", 1),
-                                    "inter_node_bandwidth_in_GB_per_sec": 200,
-                                    "intra_node_bandwidth_in_GB_per_sec": 300,
-                                },
-                                # Store both total_count and available_count
-                                # The get_node_info in kubernetes.py already calculated real available_count
-                                "total_count": gpu.get("total_count", gpu.get("count", 1)),
-                                "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                        # Build formatted device dict
+                        formatted_device = {
+                            "device_config": {
                                 "type": gpu_type,
-                            }
-                        )
+                                "name": gpu.get("raw_name", "Unknown GPU"),
+                                "vendor": gpu.get("vendor", ""),
+                                "model": gpu.get("model", ""),
+                                "memory_gb": gpu.get("memory_gb", 0),
+                                "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
+                                "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
+                                "pci_vendor": gpu.get("pci_vendor_id"),
+                                "pci_device": gpu.get("pci_device_id"),
+                                "cuda_version": gpu.get("cuda_version"),
+                                "count": gpu.get("count", 1),
+                                "inter_node_bandwidth_in_GB_per_sec": 200,
+                                "intra_node_bandwidth_in_GB_per_sec": 300,
+                            },
+                            # Store both total_count and available_count
+                            # The get_node_info in kubernetes.py already calculated real available_count
+                            "total_count": gpu.get("total_count", gpu.get("count", 1)),
+                            "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                            "type": gpu_type,
+                        }
+
+                        # Add HAMI fields if present (for time-slicing GPU sharing)
+                        _add_hami_fields_to_device(gpu, formatted_device)
+
+                        formatted_devices.append(formatted_device)
                         device_type = gpu_type
 
                     # Process HPUs
@@ -1422,6 +1438,41 @@ class ClusterOpsService:
         except Exception as e:
             logger.error(f"Failed to trigger update for cluster {cluster_id_str}: {e}")
             raise
+
+
+def _add_hami_fields_to_device(source: Dict[str, Any], target: Dict[str, Any]) -> None:
+    """Add HAMI-specific fields from source dict to target dict if present.
+
+    This helper function centralizes the logic for adding GPU time-slicing
+    metrics from HAMI to device dictionaries. It copies the following fields
+    if they exist in the source:
+    - core_utilization_percent: GPU compute allocated (%)
+    - memory_utilization_percent: GPU memory allocated (%)
+    - memory_allocated_gb: Allocated GPU memory in GB
+    - cores_allocated_percent: Allocated GPU cores (%)
+    - shared_containers_count: Number of containers sharing the GPU
+    - hardware_mode: GPU hardware mode (dedicated/shared)
+    - device_uuid: Unique GPU device identifier
+    - last_metrics_update: Timestamp of last metrics update
+
+    Args:
+        source: Source dictionary containing HAMI fields
+        target: Target dictionary to add HAMI fields to (modified in-place)
+    """
+    hami_fields = [
+        "core_utilization_percent",
+        "memory_utilization_percent",
+        "memory_allocated_gb",
+        "cores_allocated_percent",
+        "shared_containers_count",
+        "hardware_mode",
+        "device_uuid",
+        "last_metrics_update",
+    ]
+
+    for field in hami_fields:
+        if field in source:
+            target[field] = source[field]
 
 
 class ClusterService(SessionMixin):
