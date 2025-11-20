@@ -208,6 +208,7 @@ class AdapterWorkflow:
             platform=platform,
             operation="download",
             existing_deployment_namespace=add_adapter_request_json.namespace,
+            storage_size_gb=getattr(add_adapter_request_json, "storage_size_gb", None),
         )
         transfer_model_result = yield ctx.call_activity(
             CreateDeploymentWorkflow.transfer_model, input=transfer_model_request.model_dump_json()

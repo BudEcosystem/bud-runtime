@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Uuid
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Uuid
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB
@@ -77,6 +77,7 @@ class Model(Base, TimestampMixin):
     model_type: Mapped[str] = mapped_column(String, nullable=True)
     family: Mapped[str] = mapped_column(String, nullable=True)
     model_weights_size: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    storage_size_gb: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     kv_cache_size: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     architecture_text_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
     architecture_vision_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
