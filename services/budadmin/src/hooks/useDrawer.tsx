@@ -191,23 +191,43 @@ export const useDrawer = create<{
       const isAgentDrawerOpen = agentStoreState.isAgentDrawerOpen;
       const isTransitioning = agentStoreState.isTransitioningToAgentDrawer;
 
-      // SAFETY CHECKS: Only remove agent parameter if ALL conditions are met:
-      // 1. No prompt parameter in URL (not transitioning to AgentDrawer)
+      // MULTI-LAYERED SAFETY CHECKS: Only remove agent parameter if ALL conditions are met:
+      // 1. No prompt parameter in URL (not transitioning to/from AgentDrawer)
       // 2. AgentDrawer is not open (not in AgentDrawer)
-      // 3. Not currently transitioning to AgentDrawer (deterministic check)
+      // 3. Not currently transitioning to AgentDrawer (flag set BEFORE closeDrawer)
       // 4. Currently in add-agent flow
+      //
+      // These checks ensure agent parameter is preserved when:
+      // - User is in AgentDrawer (hasPromptParam = true)
+      // - User is transitioning from AddAgent → AgentDrawer (isTransitioning = true)
+      // - AgentDrawer is already open (isAgentDrawerOpen = true)
       if (!hasPromptParam && !isAgentDrawerOpen && !isTransitioning) {
         console.log('✓ Safe to remove agent parameter - no prompt and AgentDrawer not open/transitioning');
 
-        // Use shared utility function for URL manipulation
-        updateQueryParams({ agent: null }, { replaceHistory: true });
+        // Add small delay to ensure any concurrent transitions have time to set their flags
+        // This provides defense-in-depth against race conditions
+        setTimeout(() => {
+          // Re-check conditions after delay to be extra safe
+          const currentUrlParams = new URLSearchParams(window.location.search);
+          const stillHasPromptParam = currentUrlParams.has('prompt');
+          const currentAgentState = useAgentStore.getState();
+
+          // Only remove if conditions are still valid after delay
+          if (!stillHasPromptParam && !currentAgentState.isAgentDrawerOpen && !currentAgentState.isTransitioningToAgentDrawer) {
+            // Use shared utility function for URL manipulation
+            updateQueryParams({ agent: null }, { replaceHistory: true });
+            console.log('✓ Agent parameter removed after safety delay');
+          } else {
+            console.log('⚠️ Agent parameter preserved after delay check - conditions changed');
+          }
+        }, 100);
       } else {
         console.log('⚠️ Preserving agent parameter:', {
           hasPromptParam,
           isAgentDrawerOpen,
           isTransitioning,
           reason: hasPromptParam
-            ? 'prompt parameter exists'
+            ? 'prompt parameter exists (in AgentDrawer)'
             : isTransitioning
               ? 'transitioning to AgentDrawer'
               : 'AgentDrawer is open'
