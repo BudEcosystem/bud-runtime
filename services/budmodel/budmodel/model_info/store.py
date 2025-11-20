@@ -86,15 +86,34 @@ class ModelStore:
         max_workers = min(len(upload_files), app_settings.max_thread_workers)
         failed_uploads = []
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        executor = ThreadPoolExecutor(max_workers=max_workers)
+        try:
             futures = [executor.submit(self.upload_file, file.file_path, file.object_name) for file in upload_files]
             for future in as_completed(futures):
                 try:
                     if not future.result():
                         failed_uploads.append(future)
+                        # On first failure, cancel all pending/running uploads
+                        logger.warning("Upload failed, cancelling remaining uploads")
+                        for f in futures:
+                            if not f.done():
+                                f.cancel()
+                        # Exit early - don't wait for other uploads
+                        break
                 except Exception as e:
                     logger.exception("Unexpected error uploading file: %s", e)
                     failed_uploads.append(future)
+                    # On exception, cancel all pending/running uploads
+                    logger.warning("Upload error, cancelling remaining uploads")
+                    for f in futures:
+                        if not f.done():
+                            f.cancel()
+                    # Exit early - don't wait for other uploads
+                    break
+        finally:
+            # Shutdown executor immediately without waiting for running tasks
+            # cancel_futures=True cancels all pending tasks (Python 3.9+)
+            executor.shutdown(wait=False, cancel_futures=True)
 
         if failed_uploads:
             logger.error("Failed to upload %d files", len(failed_uploads))
