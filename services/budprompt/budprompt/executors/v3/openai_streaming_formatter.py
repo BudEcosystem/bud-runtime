@@ -1372,7 +1372,7 @@ class OpenAIStreamingFormatter_V1:
         Returns:
             List of output items for final response.completed event
         """
-        from .openai_response_formatter_v1 import OpenAIResponseFormatter_V1
+        from .openai_response_formatter import OpenAIResponseFormatter_V1
 
         # Use the non-streaming formatter to build complete output items (includes structured output)
         formatter = OpenAIResponseFormatter_V1()
@@ -1399,7 +1399,7 @@ class OpenAIStreamingFormatter_V1:
         Returns:
             List of instruction items (ResponseInputMessage) for final response
         """
-        from .openai_response_formatter_v1 import OpenAIResponseFormatter_V1
+        from .openai_response_formatter import OpenAIResponseFormatter_V1
 
         # Use the non-streaming formatter to extract instructions from all messages
         formatter = OpenAIResponseFormatter_V1()

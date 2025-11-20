@@ -41,6 +41,8 @@ import { errorToast } from "@/components/toast";
 
 
 function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) {
+  const router = useRouter();
+
   const getTypeColor = (type?: string) => {
     return type === 'agent' ? '#965CDE' : '#5CADFF';
   };
@@ -48,14 +50,16 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
   // Check if description is long enough to need "See more" (approximately 2 lines worth)
   const needsSeeMore = item.description && item.description.length > 100;
 
+  const handleCardClick = () => {
+    // Navigate to agent detail page
+    router.push(`/home/agentDetails/${item.id}`);
+  };
 
   return (
     <div
       className="flex flex-col justify-start bg-[#101010] border border-[#1F1F1F] rounded-lg min-h-[250px] 1680px:min-h-[325px] 2048px:min-h-[400px] group cursor-pointer hover:shadow-[1px_1px_6px_-1px_#2e3036] overflow-hidden"
       key={index}
-      onClick={async () => {
-        // Handle click - will need to implement drawer flow or navigation
-      }}
+      onClick={handleCardClick}
     >
       <div className="pr-[1.5em] pl-[1.5em] pt-[1.6em] pb-[.6rem] h-full flex flex-col">
         <div className="min-h-[160px]">

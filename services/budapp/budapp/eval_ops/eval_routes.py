@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
@@ -23,12 +24,15 @@ from budapp.eval_ops.schemas import (
     EvaluationWorkflowResponse,
     EvaluationWorkflowStepRequest,
     ExperimentEvaluationsResponse,
+    ExperimentModelListItem,
+    ExperimentSummaryResponse,
     ExperimentWorkflowStepRequest,
     GetDatasetResponse,
     GetExperimentResponse,
     GetRunResponse,
     ListDatasetsResponse,
     ListEvaluationsResponse,
+    ListExperimentModelsResponse,
     ListExperimentsResponse,
     ListRunsResponse,
     ListTraitsResponse,
@@ -110,20 +114,40 @@ def list_experiments(
     search: Annotated[
         Optional[str], Query(min_length=1, max_length=100, description="Search experiments by name (case-insensitive)")
     ] = None,
+    experiment_status: Annotated[
+        Optional[str],
+        Query(description="Filter by status: running, completed, no_runs"),
+    ] = None,
+    model_id: Annotated[Optional[uuid.UUID], Query(description="Filter by model ID")] = None,
+    created_after: Annotated[
+        Optional[datetime], Query(description="Filter experiments created after this date (ISO 8601)")
+    ] = None,
+    created_before: Annotated[
+        Optional[datetime], Query(description="Filter experiments created before this date (ISO 8601)")
+    ] = None,
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
 ):
-    """List all experiments for the current user with pagination.
+    """List all experiments for the current user with pagination and advanced filtering.
 
     - **session**: Database session dependency.
     - **current_user**: The authenticated user whose experiments are listed.
     - **search**: Optional search query to filter by experiment name (case-insensitive substring match).
     - **project_id**: Optional filter by project ID.
     - **id**: Optional filter by experiment ID.
+    - **experiment_status**: Optional filter by computed status (running/completed/no_runs).
+    - **model_id**: Optional filter by model ID used in experiment runs.
+    - **created_after**: Optional filter for experiments created after this date (ISO 8601 format).
+    - **created_before**: Optional filter for experiments created before this date (ISO 8601 format).
     - **page**: Page number (default: 1).
     - **limit**: Items per page (default: 10, max: 100).
 
     Returns a `ListExperimentsResponse` containing a paginated list of experiments.
+
+    **Status Logic:**
+    - "running": At least one run is currently running
+    - "completed": All runs are finished (includes successful, failed, pending, cancelled, skipped)
+    - "no_runs": Experiment has no runs configured
     """
     try:
         offset = (page - 1) * limit
@@ -132,6 +156,10 @@ def list_experiments(
             project_id=project_id,
             experiment_id=id,
             search_query=search,
+            status=experiment_status,
+            model_id=model_id,
+            created_after=created_after,
+            created_before=created_before,
             offset=offset,
             limit=limit,
         )
@@ -148,6 +176,52 @@ def list_experiments(
         limit=limit,
         total_record=total_count,
     )
+
+
+@router.get(
+    "/models",
+    response_model=ListExperimentModelsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse}},
+)
+def list_experiment_models(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    project_id: Annotated[Optional[uuid.UUID], Query(description="Filter by project ID")] = None,
+):
+    """List all unique models used across user's experiments.
+
+    This endpoint returns all unique models that have been used in the current user's
+    experiments, along with the count of experiments using each model. This is useful
+    for populating filter dropdowns in the frontend.
+
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user whose experiments are queried.
+    - **project_id**: Optional filter by project ID to limit models to specific project.
+
+    Returns a `ListExperimentModelsResponse` containing:
+    - List of models with their IDs, names, deployment names, and experiment counts
+    - Total count of unique models
+    """
+    try:
+        models, total_count = ExperimentService(session).list_experiment_models(
+            user_id=current_user.id,
+            project_id=project_id,
+        )
+
+        # Convert dict results to Pydantic models
+        model_items = [ExperimentModelListItem(**model) for model in models]
+
+        return ListExperimentModelsResponse(
+            code=status.HTTP_200_OK,
+            object="experiment.models.list",
+            message="Successfully listed experiment models",
+            models=model_items,
+            total_count=total_count,
+        )
+    except Exception as e:
+        logger.debug(f"Failed to list experiment models: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list experiment models") from e
 
 
 @router.get(
@@ -198,7 +272,7 @@ def list_datasets(
     current_user: Annotated[User, Depends(get_current_active_user)],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
-    name: Annotated[Optional[str], Query(description="Filter by dataset name")] = None,
+    name: Annotated[Optional[str], Query(description="Search in dataset name and description")] = None,
     modalities: Annotated[
         Optional[str],
         Query(description="Filter by modalities (comma-separated)"),
@@ -698,6 +772,45 @@ def get_runs_history(
         object="runs.history",
         message="Successfully retrieved run history",
         runs_history=runs_history,
+    )
+
+
+@router.get(
+    "/{experiment_id}/summary",
+    response_model=ExperimentSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+def get_experiment_summary(
+    experiment_id: Annotated[uuid.UUID, Path(..., description="Experiment ID")],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Get summary statistics for an experiment.
+
+    Returns summary information including:
+    - Total number of runs
+    - Total duration of all evaluations in seconds
+    - Count of runs by status (completed, failed, pending, running)
+
+    - **experiment_id**: UUID of the experiment.
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user.
+
+    Returns an `ExperimentSummaryResponse` with experiment statistics.
+    """
+    try:
+        summary = ExperimentService(session).get_experiment_summary(experiment_id, current_user.id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to get experiment summary") from e
+
+    return ExperimentSummaryResponse(
+        code=status.HTTP_200_OK,
+        object="experiment.summary",
+        message="Successfully retrieved experiment summary",
+        summary=summary,
     )
 
 

@@ -120,8 +120,9 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
       let allTools: Tool[] = [];
 
-      // If auth_type exists (any value), call OAuth fetch-tools first, then regular tools
-      if (authType) {
+      // If auth_type is "Open" or empty/undefined, only call fetchTools
+      // If auth_type is "OAuth" or any other value, call fetchOAuthTools
+      if (authType && authType.toLowerCase() !== 'open') {
         try {
           const oauthResponse = await ConnectorService.fetchOAuthTools({
             prompt_id: promptId,
@@ -156,7 +157,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
           throw error;
         }
       } else {
-        // No auth_type, only call GET /prompts/tools
+        // auth_type is "Open" or not set, only call GET /prompts/tools
         const response = await ConnectorService.fetchTools({
           prompt_id: promptId,
           connector_id: connector.id,
