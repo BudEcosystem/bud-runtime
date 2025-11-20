@@ -1,7 +1,7 @@
 """Add storage_size_gb to model
 
 Revision ID: f5b76a5c7bda
-Revises: 8a9b463c9646
+Revises: a1b2c3d4e5f7
 Create Date: 2025-01-18 00:00:00.000000
 
 """
@@ -14,7 +14,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "f5b76a5c7bda"
-down_revision: Union[str, None] = "8a9b463c9646"
+down_revision: Union[str, None] = "a1b2c3d4e5f7"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
