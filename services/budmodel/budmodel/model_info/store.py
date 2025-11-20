@@ -39,17 +39,22 @@ class ModelStore:
         if app_settings.enable_io_monitoring:
             self.io_monitor = get_io_monitor()
 
-    def _wait_for_io_clearance(self) -> None:
-        """Wait for I/O stress to clear before proceeding."""
+    def _wait_for_io_clearance(self, disk_path: str) -> None:
+        """Wait for I/O stress to clear before proceeding.
+
+        Args:
+            disk_path: Path to the file/disk to monitor for I/O stress
+        """
         if not self.io_monitor:
             return
 
         # Check if we should pause due to high stress
-        # We use the model download directory as the reference path since that's where we're reading from
-        if self.io_monitor.should_pause_downloads(disk_path=self.model_download_dir):
+        if self.io_monitor.should_pause_downloads(disk_path=disk_path):
             logger.warning("High I/O stress detected. Pausing upload temporarily...")
-            self.io_monitor.wait_for_io_recovery()
-            logger.info("I/O stress recovered. Resuming upload.")
+            if self.io_monitor.wait_for_io_recovery():
+                logger.info("I/O stress recovered. Resuming upload.")
+            else:
+                logger.warning("I/O recovery timeout, proceeding with upload anyway")
 
     def upload_file(self, file_path: str, object_name: str, bucket_name: str = app_settings.minio_bucket) -> bool:
         """Upload a file to the MinIO store.
@@ -62,7 +67,7 @@ class ModelStore:
             bool: True if the upload was successful, False otherwise
         """
         # Check for I/O clearance before starting upload
-        self._wait_for_io_clearance()
+        self._wait_for_io_clearance(disk_path=file_path)
 
         try:
             # Upload the file
