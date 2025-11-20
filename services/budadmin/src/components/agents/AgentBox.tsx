@@ -359,9 +359,9 @@ function AgentBoxInner({
         set_as_default: checked
       };
 
-      // Make the API call
-      await AppRequest.Post(
-        `${tempApiBaseUrl}/prompts/prompt-config`,
+      // Make the API call using the correct PATCH endpoint
+      await AppRequest.Patch(
+        `${tempApiBaseUrl}/prompts/${session.promptId}/versions/${editVersionData.versionId}`,
         payload
       );
     } catch (error: any) {
@@ -1013,8 +1013,11 @@ function AgentBoxInner({
     if (isAddVersionMode) {
       handleCreateVersion();
     } else if (isEditVersionMode) {
-      // Just close the drawer - API calls have already been made by individual save handlers
+      // Close the drawer - API calls have already been made by individual save handlers
       closeAgentDrawer();
+
+      // Trigger a custom event to notify the versions tab to refresh
+      window.dispatchEvent(new CustomEvent('versionCreated'));
     } else {
       closeAgentDrawer();
     }
