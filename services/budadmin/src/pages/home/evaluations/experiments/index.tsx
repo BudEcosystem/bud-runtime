@@ -75,13 +75,10 @@ const ExperimentsTable = () => {
     experimentsList,
     experimentsListTotal,
     loading,
-    getExperiments
+    getExperiments,
+    experimentModels,
+    getExperimentModels
   } = useEvaluations();
-
-  const {
-    models,
-    getGlobalModels
-  } = useModels();
 
   // Fetch experiments data from API
   const fetchExperiments = useCallback(async () => {
@@ -431,10 +428,7 @@ const ExperimentsTable = () => {
   }, [experimentsList]);
 
   useEffect(() => {
-    getGlobalModels({
-        page: 1,
-        limit: 1000,
-    });
+    getExperimentModels();
   }, [])
 
   return (
@@ -606,7 +600,7 @@ const ExperimentsTable = () => {
                                   value={tempFilter.model_id}
                                   size="large"
                                   className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                  options={models.map((model: Model) => ({
+                                  options={experimentModels.map((model: Model) => ({
                                     label: model?.name,
                                     value: model?.id,
                                   }))}

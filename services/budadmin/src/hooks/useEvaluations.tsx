@@ -139,6 +139,7 @@ export const useEvaluations = create<{
   currentWorkflowId: string | null;
   workflowData: any;
   evaluationDetails: any;
+  experimentModels: any;
 
   setSelectedEvals: (evaluation: any) => void;
   getEvaluations: (payload?: GetEvaluationsPayload) => Promise<any>;
@@ -155,6 +156,7 @@ export const useEvaluations = create<{
   getCurrentWorkflow: () => WorkflowType | null;
   getWorkflowData: (experimentId: string, workflowId: string) => Promise<any>;
   deleteWorkflow: (id: string, suppressToast?: boolean) => Promise<any>;
+  getExperimentModels: () => Promise<any>;
 }>((set, get) => ({
   loading: false,
   selectedEvals: [],
@@ -172,6 +174,7 @@ export const useEvaluations = create<{
   currentWorkflowId: null,
   workflowData: null,
   evaluationDetails: null,
+  experimentModels: [],
 
   getEvaluations: async (payload) => {
     set({ loading: true });
@@ -461,5 +464,15 @@ export const useEvaluations = create<{
       throw error;
     }
   },
-
+  getExperimentModels: async () => {
+    try {
+      const response: any = await AppRequest.Get(
+        `${tempApiBaseUrl}/experiments/models`
+      );
+      set({ experimentModels: response.data.models });
+      return response.data.models;
+    } catch (error) {
+      throw error;
+    }
+  },
 }));
