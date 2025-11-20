@@ -256,6 +256,21 @@ class DirectSearchOptimizer:
                 self._heuristic_calc = HeuristicCalculator()
 
             # Prepare model_params for validate_memory_requirements
+            # Extract memory with fallback chain and log which key matched
+            memory_in_gb = None
+            memory_key_used = None
+            for key in ["mem_per_gpu_in_gb", "mem_per_GPU_in_GB", "memory", "memory_gb", "gpu_memory_gb"]:
+                if key in self.device_config and self.device_config[key] is not None:
+                    memory_in_gb = self.device_config[key]
+                    memory_key_used = key
+                    break
+
+            logger.debug(
+                f"Memory extraction from device_config: memory_in_GB={memory_in_gb}, "
+                f"key_used={memory_key_used}, hardware_mode={self.hardware_mode}, "
+                f"TP={tp_size}, PP={pp_size}, concurrency={concurrency}"
+            )
+
             model_params = {
                 "model": self.model,
                 "mean_input_tokens": self.input_tokens,
@@ -263,13 +278,7 @@ class DirectSearchOptimizer:
                 "concurrent_requests": concurrency,
                 "tensor_parallel_size": tp_size,
                 "pipeline_parallel_size": pp_size,
-                "memory_in_GB": (
-                    self.device_config.get("mem_per_gpu_in_gb")
-                    or self.device_config.get("mem_per_GPU_in_GB")
-                    or self.device_config.get("memory")
-                    or self.device_config.get("memory_gb")
-                    or self.device_config.get("gpu_memory_gb")
-                ),
+                "memory_in_GB": memory_in_gb,
                 "quantization_bits": 16,  # Default to 16-bit
             }
 
@@ -333,7 +342,23 @@ class DirectSearchOptimizer:
                         f"Shared mode: total_memory_gb from validation={kv_cache_memory:.4f}GB, breakdown={breakdown}"
                     )
 
-                # Return minimal result - memory already validated in _validate_config
+                # Use the actual validation result to determine if config meets targets
+                validation_passed = (
+                    self._last_validation_result.get("valid", False)
+                    if hasattr(self, "_last_validation_result") and self._last_validation_result
+                    else False
+                )
+
+                # Log the validation decision for debugging
+                if self._last_validation_result:
+                    logger.debug(
+                        f"Shared mode validation: meets_targets={validation_passed}, "
+                        f"required={self._last_validation_result.get('total_memory_gb', 0):.2f}GB, "
+                        f"available={self._last_validation_result.get('available_memory_gb', 0):.2f}GB, "
+                        f"message={self._last_validation_result.get('message', 'N/A')}"
+                    )
+
+                # Return minimal result - memory validation result from _validate_config
                 result = SearchResult(
                     config=config,
                     kv_cache_memory=kv_cache_memory,
@@ -343,7 +368,7 @@ class DirectSearchOptimizer:
                     concurrency=concurrency,
                     cost_per_million_tokens=0,  # Cost model differs for shared mode
                     performance_penalty=0,  # No performance requirements in shared mode
-                    meets_targets=True,  # Memory fit is the only requirement
+                    meets_targets=validation_passed,  # Use actual memory validation result
                     search_step=len(self.evaluated_configs),
                     error_rate=0,
                 )

@@ -183,30 +183,49 @@ class ClusterOpsService:
                             gpu_type = "cuda"
                             logger.warning(f"Unknown GPU vendor '{gpu_vendor}', defaulting to cuda")
 
-                        formatted_devices.append(
-                            {
-                                "device_config": {
-                                    "type": gpu_type,
-                                    "name": gpu.get("raw_name", "Unknown GPU"),
-                                    "vendor": gpu.get("vendor", ""),
-                                    "model": gpu.get("model", ""),
-                                    "memory_gb": gpu.get("memory_gb", 0),
-                                    "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
-                                    "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
-                                    "pci_vendor": gpu.get("pci_vendor_id"),
-                                    "pci_device": gpu.get("pci_device_id"),
-                                    "cuda_version": gpu.get("cuda_version"),
-                                    "count": gpu.get("count", 1),
-                                    "inter_node_bandwidth_in_GB_per_sec": 200,
-                                    "intra_node_bandwidth_in_GB_per_sec": 300,
-                                },
-                                # Store both total_count and available_count
-                                # available_count will be calculated separately if NFD is enabled
-                                "total_count": gpu.get("count", 1),
-                                "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                        # Build formatted device dict
+                        formatted_device = {
+                            "device_config": {
                                 "type": gpu_type,
-                            }
-                        )
+                                "name": gpu.get("raw_name", "Unknown GPU"),
+                                "vendor": gpu.get("vendor", ""),
+                                "model": gpu.get("model", ""),
+                                "memory_gb": gpu.get("memory_gb", 0),
+                                "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
+                                "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
+                                "pci_vendor": gpu.get("pci_vendor_id"),
+                                "pci_device": gpu.get("pci_device_id"),
+                                "cuda_version": gpu.get("cuda_version"),
+                                "count": gpu.get("count", 1),
+                                "inter_node_bandwidth_in_GB_per_sec": 200,
+                                "intra_node_bandwidth_in_GB_per_sec": 300,
+                            },
+                            # Store both total_count and available_count
+                            # available_count will be calculated separately if NFD is enabled
+                            "total_count": gpu.get("count", 1),
+                            "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                            "type": gpu_type,
+                        }
+
+                        # Add HAMI fields if present (for time-slicing GPU sharing)
+                        if "core_utilization_percent" in gpu:
+                            formatted_device["core_utilization_percent"] = gpu["core_utilization_percent"]
+                        if "memory_utilization_percent" in gpu:
+                            formatted_device["memory_utilization_percent"] = gpu["memory_utilization_percent"]
+                        if "memory_allocated_gb" in gpu:
+                            formatted_device["memory_allocated_gb"] = gpu["memory_allocated_gb"]
+                        if "cores_allocated_percent" in gpu:
+                            formatted_device["cores_allocated_percent"] = gpu["cores_allocated_percent"]
+                        if "shared_containers_count" in gpu:
+                            formatted_device["shared_containers_count"] = gpu["shared_containers_count"]
+                        if "hardware_mode" in gpu:
+                            formatted_device["hardware_mode"] = gpu["hardware_mode"]
+                        if "device_uuid" in gpu:
+                            formatted_device["device_uuid"] = gpu["device_uuid"]
+                        if "last_metrics_update" in gpu:
+                            formatted_device["last_metrics_update"] = gpu["last_metrics_update"]
+
+                        formatted_devices.append(formatted_device)
                         device_type = gpu_type
 
                     # Process HPUs
@@ -401,13 +420,32 @@ class ClusterOpsService:
                 if not node.status:
                     available_count = 0
 
-                devices.append(
-                    {
-                        **device_config,
-                        "total_count": total_count,
-                        "available_count": available_count,
-                    }
-                )
+                # Build device dict with flattened device_config
+                device = {
+                    **device_config,
+                    "total_count": total_count,
+                    "available_count": available_count,
+                }
+
+                # Add HAMI fields if present (for time-slicing GPU sharing)
+                if "core_utilization_percent" in each_info:
+                    device["core_utilization_percent"] = each_info["core_utilization_percent"]
+                if "memory_utilization_percent" in each_info:
+                    device["memory_utilization_percent"] = each_info["memory_utilization_percent"]
+                if "memory_allocated_gb" in each_info:
+                    device["memory_allocated_gb"] = each_info["memory_allocated_gb"]
+                if "cores_allocated_percent" in each_info:
+                    device["cores_allocated_percent"] = each_info["cores_allocated_percent"]
+                if "shared_containers_count" in each_info:
+                    device["shared_containers_count"] = each_info["shared_containers_count"]
+                if "hardware_mode" in each_info:
+                    device["hardware_mode"] = each_info["hardware_mode"]
+                if "device_uuid" in each_info:
+                    device["device_uuid"] = each_info["device_uuid"]
+                if "last_metrics_update" in each_info:
+                    device["last_metrics_update"] = each_info["last_metrics_update"]
+
+                devices.append(device)
             result.append(
                 {
                     "name": node.name,
@@ -441,6 +479,25 @@ class ClusterOpsService:
                     "features": each_info.get("features", []),
                     "product_name": each_info.get("product_name", "Unknown"),
                 }
+
+                # Add HAMI fields if present (for time-slicing GPU sharing)
+                if "core_utilization_percent" in each_info:
+                    enhanced_device["core_utilization_percent"] = each_info["core_utilization_percent"]
+                if "memory_utilization_percent" in each_info:
+                    enhanced_device["memory_utilization_percent"] = each_info["memory_utilization_percent"]
+                if "memory_allocated_gb" in each_info:
+                    enhanced_device["memory_allocated_gb"] = each_info["memory_allocated_gb"]
+                if "cores_allocated_percent" in each_info:
+                    enhanced_device["cores_allocated_percent"] = each_info["cores_allocated_percent"]
+                if "shared_containers_count" in each_info:
+                    enhanced_device["shared_containers_count"] = each_info["shared_containers_count"]
+                if "hardware_mode" in each_info:
+                    enhanced_device["hardware_mode"] = each_info["hardware_mode"]
+                if "device_uuid" in each_info:
+                    enhanced_device["device_uuid"] = each_info["device_uuid"]
+                if "last_metrics_update" in each_info:
+                    enhanced_device["last_metrics_update"] = each_info["last_metrics_update"]
+
                 devices.append(enhanced_device)
 
             node_result = {
@@ -906,30 +963,49 @@ class ClusterOpsService:
                             gpu_type = "cuda"
                             logger.warning(f"Unknown GPU vendor '{gpu_vendor}', defaulting to cuda")
 
-                        formatted_devices.append(
-                            {
-                                "device_config": {
-                                    "type": gpu_type,
-                                    "name": gpu.get("raw_name", "Unknown GPU"),
-                                    "vendor": gpu.get("vendor", ""),
-                                    "model": gpu.get("model", ""),
-                                    "memory_gb": gpu.get("memory_gb", 0),
-                                    "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
-                                    "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
-                                    "pci_vendor": gpu.get("pci_vendor_id"),
-                                    "pci_device": gpu.get("pci_device_id"),
-                                    "cuda_version": gpu.get("cuda_version"),
-                                    "count": gpu.get("count", 1),
-                                    "inter_node_bandwidth_in_GB_per_sec": 200,
-                                    "intra_node_bandwidth_in_GB_per_sec": 300,
-                                },
-                                # Store both total_count and available_count
-                                # The get_node_info in kubernetes.py already calculated real available_count
-                                "total_count": gpu.get("total_count", gpu.get("count", 1)),
-                                "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                        # Build formatted device dict
+                        formatted_device = {
+                            "device_config": {
                                 "type": gpu_type,
-                            }
-                        )
+                                "name": gpu.get("raw_name", "Unknown GPU"),
+                                "vendor": gpu.get("vendor", ""),
+                                "model": gpu.get("model", ""),
+                                "memory_gb": gpu.get("memory_gb", 0),
+                                "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
+                                "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
+                                "pci_vendor": gpu.get("pci_vendor_id"),
+                                "pci_device": gpu.get("pci_device_id"),
+                                "cuda_version": gpu.get("cuda_version"),
+                                "count": gpu.get("count", 1),
+                                "inter_node_bandwidth_in_GB_per_sec": 200,
+                                "intra_node_bandwidth_in_GB_per_sec": 300,
+                            },
+                            # Store both total_count and available_count
+                            # The get_node_info in kubernetes.py already calculated real available_count
+                            "total_count": gpu.get("total_count", gpu.get("count", 1)),
+                            "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                            "type": gpu_type,
+                        }
+
+                        # Add HAMI fields if present (for time-slicing GPU sharing)
+                        if "core_utilization_percent" in gpu:
+                            formatted_device["core_utilization_percent"] = gpu["core_utilization_percent"]
+                        if "memory_utilization_percent" in gpu:
+                            formatted_device["memory_utilization_percent"] = gpu["memory_utilization_percent"]
+                        if "memory_allocated_gb" in gpu:
+                            formatted_device["memory_allocated_gb"] = gpu["memory_allocated_gb"]
+                        if "cores_allocated_percent" in gpu:
+                            formatted_device["cores_allocated_percent"] = gpu["cores_allocated_percent"]
+                        if "shared_containers_count" in gpu:
+                            formatted_device["shared_containers_count"] = gpu["shared_containers_count"]
+                        if "hardware_mode" in gpu:
+                            formatted_device["hardware_mode"] = gpu["hardware_mode"]
+                        if "device_uuid" in gpu:
+                            formatted_device["device_uuid"] = gpu["device_uuid"]
+                        if "last_metrics_update" in gpu:
+                            formatted_device["last_metrics_update"] = gpu["last_metrics_update"]
+
+                        formatted_devices.append(formatted_device)
                         device_type = gpu_type
 
                     # Process HPUs
