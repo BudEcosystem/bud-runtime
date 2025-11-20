@@ -338,7 +338,7 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
             </div>
           </div>
           <div className="hR mt-[1.5rem]"></div>
-          {datasets ? displaySections.map((item) => <div>
+          {datasets ? displaySections.map((item, sectionIndex) => <div key={item.keyName || sectionIndex}>
             <div className="pt-[1.3rem]">
               <Text_14_400_EEEEEE>{item.header}</Text_14_400_EEEEEE>
               <Text_12_400_757575 className="pt-[.33rem]">
@@ -347,7 +347,8 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
             </div>
             <div className="flex flex-wrap gap-2 mt-3">
               {datasets.additional_info?.[item?.keyName] ?
-                (datasets.additional_info?.[item?.keyName] || []).map((tag) => <Tags
+                (datasets.additional_info?.[item?.keyName] || []).map((tag, tagIndex) => <Tags
+                  key={`${item.keyName}-${tag}-${tagIndex}`}
                   name={tag
                     .split("_")
                     .join(" ")
@@ -360,7 +361,7 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
             </div>
           </div>) : null}
 
-          {datasets && datasets.additional_info.age_distribution && 
+          {datasets && datasets.additional_info.age_distribution &&
           <>
             <div className="hR mt-[1.5rem]"></div>
             <div className="pt-[1.3rem]">
@@ -368,7 +369,7 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
             <Text_12_400_757575 className="pt-[.33rem]">
               Following are some of the concepts of this evaluation
             </Text_12_400_757575>
-            
+
             <div className="h-[232px]">
               <CompositeChart data={datasets.additional_info.age_distribution}/>
             </div>
