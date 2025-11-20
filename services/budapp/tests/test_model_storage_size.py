@@ -1,6 +1,6 @@
 """Tests for model storage size calculation in MinIO."""
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -109,10 +109,10 @@ class TestModelUpdateWithStorageSize:
 
     @pytest.fixture
     def model_service(self, mock_session):
-        """Create a ModelService instance with mocked session."""
-        from budapp.model_ops.services import ModelService
+        """Create a CloudModelWorkflowService instance with mocked session."""
+        from budapp.model_ops.services import CloudModelWorkflowService
 
-        service = ModelService(mock_session)
+        service = CloudModelWorkflowService(mock_session)
         return service
 
     @pytest.fixture
@@ -131,8 +131,6 @@ class TestModelUpdateWithStorageSize:
         self, mock_settings, mock_data_manager, mock_model_store_class, model_service, mock_model
     ):
         """Test that storage size is calculated and updated during model metadata update."""
-        from budapp.model_ops.services import ModelService
-
         # Mock settings
         mock_settings.minio_bucket = "models"
 
@@ -143,7 +141,7 @@ class TestModelUpdateWithStorageSize:
 
         # Mock DataManager
         mock_dm_instance = Mock()
-        mock_dm_instance.update_by_fields.return_value = mock_model
+        mock_dm_instance.update_by_fields = AsyncMock(return_value=mock_model)
         mock_data_manager.return_value = mock_dm_instance
 
         # Call the method
@@ -170,15 +168,13 @@ class TestModelUpdateWithStorageSize:
         self, mock_settings, mock_data_manager, mock_model_store_class, model_service
     ):
         """Test that storage size is not calculated when model has no local_path."""
-        from budapp.model_ops.services import ModelService
-
         # Model without local_path
         model = Mock()
         model.id = uuid4()
         model.local_path = None
 
         mock_dm_instance = Mock()
-        mock_dm_instance.update_by_fields.return_value = model
+        mock_dm_instance.update_by_fields = AsyncMock(return_value=model)
         mock_data_manager.return_value = mock_dm_instance
 
         extracted_metadata = {"description": "Test model"}
@@ -200,8 +196,6 @@ class TestModelUpdateWithStorageSize:
         self, mock_settings, mock_data_manager, mock_model_store_class, model_service, mock_model, caplog
     ):
         """Test that model update continues even if storage size calculation fails."""
-        from budapp.model_ops.services import ModelService
-
         mock_settings.minio_bucket = "models"
 
         # Mock ModelStore to raise exception
@@ -210,7 +204,7 @@ class TestModelUpdateWithStorageSize:
         mock_model_store_class.return_value = mock_store_instance
 
         mock_dm_instance = Mock()
-        mock_dm_instance.update_by_fields.return_value = mock_model
+        mock_dm_instance.update_by_fields = AsyncMock(return_value=mock_model)
         mock_data_manager.return_value = mock_dm_instance
 
         extracted_metadata = {"description": "Test model"}
