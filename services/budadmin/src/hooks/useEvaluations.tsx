@@ -140,6 +140,7 @@ export const useEvaluations = create<{
   workflowData: any;
   evaluationDetails: any;
   experimentModels: any;
+  experimentSummary: any;
 
   setSelectedEvals: (evaluation: any) => void;
   getEvaluations: (payload?: GetEvaluationsPayload) => Promise<any>;
@@ -157,6 +158,7 @@ export const useEvaluations = create<{
   getWorkflowData: (experimentId: string, workflowId: string) => Promise<any>;
   deleteWorkflow: (id: string, suppressToast?: boolean) => Promise<any>;
   getExperimentModels: () => Promise<any>;
+  getExperimentSummary: (id) => Promise<any>
 }>((set, get) => ({
   loading: false,
   selectedEvals: [],
@@ -175,6 +177,7 @@ export const useEvaluations = create<{
   workflowData: null,
   evaluationDetails: null,
   experimentModels: [],
+  experimentSummary: null,
 
   getEvaluations: async (payload) => {
     set({ loading: true });
@@ -473,6 +476,21 @@ export const useEvaluations = create<{
       return response.data.models;
     } catch (error) {
       throw error;
+    }
+  },
+  getExperimentSummary: async (id: string) => {
+    set({ loading: true });
+    try {
+      const response: any = await AppRequest.Get(`${tempApiBaseUrl}/experiments/${id}/summary`);
+      set({ experimentSummary: response.data.summary });
+      return response.data.summary;
+    } catch (error) {
+      console.error("Error fetching experiment summary:", error);
+      // Set empty array on error
+      set({ experimentSummary: {} });
+      throw error;
+    } finally {
+      set({ loading: false });
     }
   },
 }));
