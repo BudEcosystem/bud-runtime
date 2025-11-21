@@ -1083,9 +1083,6 @@ def get_dataset_scores(
     # Convert to Pydantic models
     score_models = [DatasetModelScore(**score) for score in scores]
 
-    # Calculate pagination metadata
-    total_pages = (total + limit - 1) // limit
-
     return DatasetScoresResponse(
         code=status.HTTP_200_OK,
         object="dataset.scores",
@@ -1095,8 +1092,7 @@ def get_dataset_scores(
         scores=score_models,
         page=page,
         limit=limit,
-        total=total,
-        total_pages=total_pages,
+        total_record=total,  # Use total_record, not total (total_pages is computed automatically)
     )
 
 
