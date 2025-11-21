@@ -227,6 +227,9 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
         logger_local.info(
             f"Monitor check #{attempt}: tracking {len(job_ids)} jobs, {len(completed_jobs)} completed, {len(failed_jobs)} failed"
         )
+        logger_local.info(
+            f"Notification params - workflow_id: {workflow_id}, source_topic: {source_topic}, source: {source}"
+        )
 
     # Single poll
     poll_result = yield ctx.call_activity(monitor_job_simple, input=json.dumps(data))
@@ -379,6 +382,10 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     data["failed_jobs"] = failed_jobs
     data["job_timing_map"] = job_timing_map
     data["job_progress_map"] = job_progress_map  # NEW: Persist progress
+    # CRITICAL: Persist notification parameters across continue_as_new cycles
+    data["workflow_id"] = workflow_id
+    data["source_topic"] = source_topic
+    data["source"] = source
     yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
     ctx.continue_as_new(json.dumps(data))
     return
