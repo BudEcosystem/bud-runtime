@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Form, Image, Input } from "antd";
 import { useAuth } from "../context/AuthContext";
 import { Text_12_300_EEEEEE, Text_14_300_EEEEEE } from "@/lib/text";
@@ -20,22 +20,15 @@ export default function Login() {
     const [key, setKey] = useState("");
 
     // Build chat redirect URL preserving relevant parameters
-    const getChatRedirectUrl = () => {
+    const getChatRedirectUrl = useCallback(() => {
         if (typeof window === 'undefined') return '/chat';
-        const params = new URLSearchParams(window.location.search);
-        // Parameters to exclude (auth-related)
-        const excludeParams = ['refresh_token', 'access_key', 'embedded'];
-        const preservedParams = new URLSearchParams();
 
-        params.forEach((value, key) => {
-            if (!excludeParams.includes(key)) {
-                preservedParams.append(key, value);
-            }
-        });
+        const preservedParams = new URLSearchParams(window.location.search);
+        ['refresh_token', 'access_key', 'embedded'].forEach(param => preservedParams.delete(param));
 
         const queryString = preservedParams.toString();
         return queryString ? `/chat?${queryString}` : '/chat';
-    };
+    }, []);
 
     const handleAdd = async (refreshToken?: string) => {
         if(!refreshToken) {
@@ -66,7 +59,7 @@ export default function Login() {
             // Not authenticated, show login form
             hideLoader();
         }
-    }, [apiKey, isSessionValid, authLoading, router, hideLoader]);
+    }, [apiKey, isSessionValid, authLoading, router, hideLoader, getChatRedirectUrl]);
     return (
       <div className={`w-full h-screen logginBg box-border relative overflow-hidden ${isLoading ? 'opacity-0' : 'opacity-100'}`}>
         <div className="loginWrap w-full h-full loginBg-glass flex justify-between box-border ">
