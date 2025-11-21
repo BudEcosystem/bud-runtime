@@ -55,10 +55,10 @@ from openai.types.responses import (
     ResponseTextDoneEvent,
     ResponseUsage,
 )
+from openai.types.responses.easy_input_message import EasyInputMessage
 from openai.types.responses.response_format_text_json_schema_config import ResponseFormatTextJSONSchemaConfig
 from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
 from openai.types.responses.response_input_item import Message as ResponseInputMessage
-from openai.types.responses.response_input_text import ResponseInputText
 from openai.types.responses.response_output_item import McpCall as ResponseOutputMcpCall
 from openai.types.responses.response_output_item import McpListTools, McpListToolsTool
 from openai.types.responses.response_output_message import ResponseOutputMessage
@@ -1248,35 +1248,27 @@ class OpenAIStreamingFormatter_V1:
     # Response Building Helper Methods (from executors.py)
     # ============================================================================
 
-    def build_instructions_from_messages(self, messages: List[Message]) -> List[ResponseInputMessage]:
-        """Build instructions array from input messages.
+    def build_instructions(
+        self,
+        messages: Optional[List[Message]] = None,
+        system_prompt: Optional[str] = None,
+    ) -> List[EasyInputMessage]:
+        """Build instructions from original user input.
+
+        Uses the non-streaming formatter's _build_instructions method to build
+        instructions from original user messages and system prompt.
 
         Args:
-            messages: List of input messages with roles and content
+            messages: Original user messages
+            system_prompt: Original system prompt
 
         Returns:
-            List of ResponseInputMessage for instructions field
+            List of EasyInputMessage for instructions field (supports all 4 roles)
         """
-        instructions: List[ResponseInputMessage] = []
+        from .openai_response_formatter import OpenAIResponseFormatter_V4
 
-        for msg in messages:
-            # Only include system and user messages as instructions
-            if msg.role in ["system", "user", "developer"]:
-                instructions.append(
-                    ResponseInputMessage(
-                        type="message",
-                        role=msg.role,
-                        content=[
-                            ResponseInputText(
-                                type="input_text",
-                                text=msg.content,
-                            )
-                        ],
-                        status="completed",
-                    )
-                )
-
-        return instructions
+        formatter = OpenAIResponseFormatter_V4()
+        return formatter._build_instructions(messages, system_prompt)
 
     def build_response_object(
         self,
@@ -1380,38 +1372,6 @@ class OpenAIStreamingFormatter_V1:
         output_items, _ = await formatter.build_complete_output_items(all_messages, final_result, tools)
 
         return output_items
-
-    async def build_final_instructions_from_result(
-        self,
-        final_result,  # AgentRunResult type
-        tools: Optional[List[MCPToolConfig]] = None,
-    ) -> List[Any]:
-        """Build complete instructions from AgentRunResult.
-
-        This reuses the non-streaming formatter's logic to parse all messages
-        and build a complete instructions array including system/user messages,
-        tool returns, and retry prompts.
-
-        Args:
-            final_result: The AgentRunResult from pydantic-ai
-            tools: MCP tool configurations
-
-        Returns:
-            List of instruction items (ResponseInputMessage) for final response
-        """
-        from .openai_response_formatter import OpenAIResponseFormatter_V4
-
-        # Use the non-streaming formatter to extract instructions from all messages
-        formatter = OpenAIResponseFormatter_V4()
-        all_messages = final_result.all_messages()
-
-        # First get output items to extract MCP tool call IDs
-        _, mcp_tool_call_ids = await formatter._format_output_items(all_messages, tools)
-
-        # Then format input items (instructions) with the MCP tool call IDs
-        input_items = await formatter._format_input_items(all_messages, mcp_tool_call_ids, tools)
-
-        return input_items
 
     def build_final_output_items(self) -> List[Any]:
         """Build final output items array from parts_state (fallback).

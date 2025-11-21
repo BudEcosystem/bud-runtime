@@ -181,6 +181,7 @@ class SimplePromptExecutor_V4:
                     model_settings,
                     messages,
                     tools,
+                    system_prompt,
                 )
             else:
                 # Execute the agent with both history and current prompt
@@ -578,6 +579,7 @@ class SimplePromptExecutor_V4:
         model_settings: ModelSettings,
         messages: List[Message],
         tools: Optional[List[MCPToolConfig]] = None,
+        system_prompt: Optional[str] = None,
     ) -> AsyncGenerator[str, None]:
         """Run agent with OpenAI-compatible streaming using run_stream_events().
 
@@ -607,8 +609,8 @@ class SimplePromptExecutor_V4:
         )
 
         try:
-            # Build instructions from messages
-            instructions = formatter.build_instructions_from_messages(messages)
+            # Build instructions from messages and system prompt
+            instructions = formatter.build_instructions(messages, system_prompt)
 
             # EVENT 1: response.created (sequence 0)
             yield formatter.format_sse_from_event(
@@ -687,11 +689,8 @@ class SimplePromptExecutor_V4:
             # Build complete output array from final result (includes MCP tools, calls, text)
             if final_result:
                 output_items = await formatter.build_final_output_items_from_result(final_result, tools)
-                # Build complete instructions from final result (includes tool returns, retry prompts)
-                final_instructions = await formatter.build_final_instructions_from_result(final_result, tools)
             else:
                 output_items = formatter.build_final_output_items()  # Fallback to accumulated state
-                final_instructions = instructions  # Use initial instructions as fallback
 
             # When final tool call is complete, it won't execute the FunctionToolResultEvent we need to internally handle
             final_tool_call_events = await formatter._map_post_final_result_event()
@@ -707,7 +706,7 @@ class SimplePromptExecutor_V4:
                     sequence_number=formatter._next_sequence(),
                     response=formatter.build_response_object(
                         status="completed",
-                        instructions=final_instructions,
+                        instructions=instructions,
                         output_items=output_items,
                         usage=final_usage,
                     ),
