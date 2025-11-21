@@ -1383,6 +1383,8 @@ function AgentBoxInner({
               outputWorkflowStatus={outputWorkflowStatus}
               systemPromptWorkflowStatus={systemPromptWorkflowStatus}
               promptMessagesWorkflowStatus={promptMessagesWorkflowStatus}
+              structuredInputEnabled={structuredInputEnabled}
+              structuredOutputEnabled={structuredOutputEnabled}
             >
               <Editor onNodeClick={handleNodeClick} />
             </SessionProvider>

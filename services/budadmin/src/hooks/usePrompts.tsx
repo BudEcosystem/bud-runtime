@@ -228,8 +228,8 @@ export const usePrompts = create<{
       const response: any = await AppRequest.Get(url);
       return response.data;
     } catch (error) {
-      console.error("Error fetching prompt config:", error);
-      throw error;
+      // Silently fail - return null for new prompts without config
+      return null;
     }
   },
 }));

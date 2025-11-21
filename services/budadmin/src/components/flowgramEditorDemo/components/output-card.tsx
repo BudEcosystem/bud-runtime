@@ -5,22 +5,14 @@ import { LoadingOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { Image} from "antd";
 
 export const OutputCard = () => {
-  const { session, outputWorkflowStatus, onDeleteVariable } = useSession();
+  const { session, outputWorkflowStatus, onDeleteVariable, structuredOutputEnabled } = useSession();
 
-  // Get output variables from the session, with default if empty
+  // Get output variables from the session
   const sessionVariables = session?.outputVariables || [];
 
-  const outputVariables: AgentVariable[] = sessionVariables.length > 0 ? sessionVariables : [
-    {
-      id: 'default-output-1',
-      name: 'Output Variable 1',
-      value: '',
-      type: 'output',
-      description: '',
-      dataType: 'string',
-      defaultValue: ''
-    }
-  ];
+  // Show variables when structured output is enabled and there are variables
+  const showVariables = structuredOutputEnabled && sessionVariables.length > 0;
+  const outputVariables: AgentVariable[] = sessionVariables;
 
   return (
     <div className="output-card" style={{
@@ -104,59 +96,59 @@ export const OutputCard = () => {
         marginBottom: '20px',
         background: 'transparent',
       }}>
-        {outputVariables.map((variable: AgentVariable, index: number) => (
-          <div key={variable.id} style={{
+        {showVariables ? (
+          outputVariables.map((variable: AgentVariable, index: number) => (
+            <div key={variable.id} style={{
+              padding: '.8rem',
+              borderRadius: '.75rem',
+              background: '#FFFFFF05',
+            }}
+            className='group flex justify-between items-center cursor-default'
+            >
+              <div style={{
+                fontSize: '12px',
+                color: '#EEEEEE',
+                marginBottom: '4px',
+                background: 'transparent',
+              }}>
+                {variable.name || `Output Variable ${index + 1}`}
+              </div>
+
+              {outputVariables.length > 1 && index > 0 && (
+                <div
+                  className='opacity-0 group-hover:opacity-100 cursor-pointer'
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteVariable?.(variable.id);
+                  }}
+                >
+                  <Image
+                    preview={false}
+                    width={'0.8125rem'}
+                    height={'0.8125rem'}
+                    alt='delete'
+                    src="/icons/deleteWhite.svg"
+                  />
+                </div>
+              )}
+            </div>
+          ))
+        ) : (
+          <div style={{
             padding: '.8rem',
             borderRadius: '.75rem',
             background: '#FFFFFF05',
-          }}
-          className='group flex justify-between items-center cursor-default'
-          >
+            textAlign: 'center',
+          }}>
             <div style={{
               fontSize: '12px',
-              color: '#EEEEEE',
-              marginBottom: '4px',
-              background: 'transparent',
-            }}>
-              {variable.name || `Output Variable ${index + 1}`}
-            </div>
-
-            {outputVariables.length > 1 && index > 0 && (
-              <div
-                className='opacity-0 group-hover:opacity-100 cursor-pointer'
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteVariable?.(variable.id);
-                }}
-              >
-                <Image
-                  preview={false}
-                  width={'0.8125rem'}
-                  height={'0.8125rem'}
-                  alt='delete'
-                  src="/icons/deleteWhite.svg"
-                />
-              </div>
-            )}
-            {/* {variable.description && (
-              <div style={{
-                fontSize: '11px',
-                color: '#B3B3B3',
-                marginBottom: '8px',
-                background: 'transparent',
-              }}>
-                {variable.description}
-              </div>
-            )}
-            <div style={{
-              fontSize: '11px',
               color: '#808080',
-              background: 'transparent',
+              fontStyle: 'italic',
             }}>
-              Type: {variable.dataType || 'string'}
-            </div> */}
+              Click to add a variable
+            </div>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );

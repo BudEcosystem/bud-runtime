@@ -18,6 +18,8 @@ interface SessionContextType {
   outputWorkflowStatus?: WorkflowStatus;
   systemPromptWorkflowStatus?: WorkflowStatus;
   promptMessagesWorkflowStatus?: WorkflowStatus;
+  structuredInputEnabled?: boolean;
+  structuredOutputEnabled?: boolean;
 }
 
 const SessionContext = createContext<SessionContextType>({
@@ -41,6 +43,8 @@ export const SessionProvider: React.FC<{
   outputWorkflowStatus?: WorkflowStatus;
   systemPromptWorkflowStatus?: WorkflowStatus;
   promptMessagesWorkflowStatus?: WorkflowStatus;
+  structuredInputEnabled?: boolean;
+  structuredOutputEnabled?: boolean;
 }> = ({
   session,
   children,
@@ -57,7 +61,9 @@ export const SessionProvider: React.FC<{
   workflowStatus,
   outputWorkflowStatus,
   systemPromptWorkflowStatus,
-  promptMessagesWorkflowStatus
+  promptMessagesWorkflowStatus,
+  structuredInputEnabled,
+  structuredOutputEnabled
 }) => {
   return (
     <SessionContext.Provider value={{
@@ -75,7 +81,9 @@ export const SessionProvider: React.FC<{
       workflowStatus,
       outputWorkflowStatus,
       systemPromptWorkflowStatus,
-      promptMessagesWorkflowStatus
+      promptMessagesWorkflowStatus,
+      structuredInputEnabled,
+      structuredOutputEnabled
     }}>
       {children}
     </SessionContext.Provider>
