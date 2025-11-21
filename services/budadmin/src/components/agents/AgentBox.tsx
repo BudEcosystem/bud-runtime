@@ -167,7 +167,7 @@ function AgentBoxInner({
           }
 
           // Map stream setting
-          if (configData.stream !== null && configData.stream !== undefined) {
+          if (configData.stream != null) {
             updates.settings = {
               ...session.settings,
               stream: configData.stream
@@ -185,7 +185,7 @@ function AgentBoxInner({
           }
 
           // Map llm_retry_limit
-          if (configData.llm_retry_limit !== null && configData.llm_retry_limit !== undefined) {
+          if (configData.llm_retry_limit != null) {
             updates.llm_retry_limit = configData.llm_retry_limit;
           }
 
