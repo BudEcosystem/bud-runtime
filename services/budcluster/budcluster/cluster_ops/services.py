@@ -1300,17 +1300,10 @@ class ClusterOpsService:
 
         try:
             with DBSession() as session:
-                # Get all ERROR clusters
-                error_clusters = await ClusterDataManager(session).get_all_clusters_by_status(
-                    [ClusterStatusEnum.ERROR]
+                # Get ERROR clusters due for retry using optimized DB query
+                clusters_to_retry = await ClusterDataManager(session).get_error_clusters_due_for_retry(
+                    ClusterStatusEnum.ERROR, cutoff_time
                 )
-
-                # Filter to those that haven't been retried recently
-                clusters_to_retry = []
-                for cluster in error_clusters:
-                    # Retry if last_retry_time is None or older than cutoff
-                    if cluster.last_retry_time is None or cluster.last_retry_time < cutoff_time:
-                        clusters_to_retry.append(cluster)
 
                 if clusters_to_retry:
                     logger.info(f"Found {len(clusters_to_retry)} ERROR clusters due for retry")

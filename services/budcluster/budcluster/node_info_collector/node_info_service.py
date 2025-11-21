@@ -40,6 +40,7 @@ async def get_node_info_python(
     """
     logger.info("Collecting node info using Python Kubernetes client")
 
+    api_client = None
     try:
         # Create Kubernetes client from kubeconfig dict
         api_client = _create_k8s_client_from_dict(kubeconfig_dict)
