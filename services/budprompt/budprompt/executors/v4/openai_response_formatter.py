@@ -110,9 +110,7 @@ class OpenAIResponseFormatter_V4:
             all_messages = pydantic_result.all_messages()
 
             # Extract output items and add structured output if present
-            output_items, mcp_tool_call_ids = await self.build_complete_output_items(
-                all_messages, pydantic_result, tools
-            )
+            output_items = await self.build_complete_output_items(all_messages, pydantic_result, tools)
 
             # Build instructions from original user input (system prompt + messages)
             # NOT from pydantic-ai all_messages which contains internal retry data
@@ -168,7 +166,7 @@ class OpenAIResponseFormatter_V4:
         self,
         all_messages: List[ModelMessage],
         tools: Optional[List[MCPToolConfig]] = None,
-    ) -> tuple[List[Any], set]:
+    ) -> List[Any]:
         """Convert pydantic-ai messages to OpenAI ResponseOutputItem list.
 
         Args:
@@ -176,10 +174,9 @@ class OpenAIResponseFormatter_V4:
             tools: MCP tool configurations for server_label mapping
 
         Returns:
-            Tuple of (List of ResponseOutputItem, set of MCP tool call IDs)
+            List of ResponseOutputItem
         """
         output_items: List[Any] = []
-        mcp_tool_call_ids: set = set()
 
         # Step 1: Fetch and add MCP tool lists at the beginning
         mcp_list_items = await self._fetch_mcp_tool_lists(tools)
@@ -227,8 +224,7 @@ class OpenAIResponseFormatter_V4:
 
                         # Check if this is an MCP tool using the tool names set
                         if part.tool_name in mcp_tool_names:
-                            # MCP tool call - track ID and get server label
-                            mcp_tool_call_ids.add(part.tool_call_id)
+                            # MCP tool call - get server label
                             server_label = self._get_server_label_for_tool(part.tool_name, tools)
                             return_data = tool_returns.get(part.tool_call_id)
 
@@ -256,7 +252,7 @@ class OpenAIResponseFormatter_V4:
                                 )
                             )
 
-        return output_items, mcp_tool_call_ids
+        return output_items
 
     def _get_final_text_part(self, all_messages: List[ModelMessage]) -> Optional[TextPart]:
         """Get the last TextPart from all messages (final assistant response).
@@ -319,7 +315,7 @@ class OpenAIResponseFormatter_V4:
         all_messages: List[ModelMessage],
         agent_result: AgentRunResult,
         tools: Optional[List[MCPToolConfig]] = None,
-    ) -> tuple[List[Any], set]:
+    ) -> List[Any]:
         """Format output items from messages and add structured output if present.
 
         This wrapper around _format_output_items also checks for and adds
@@ -331,10 +327,10 @@ class OpenAIResponseFormatter_V4:
             tools: Optional MCP tool configurations
 
         Returns:
-            Tuple of (output_items list, mcp_tool_call_ids set)
+            List of output items
         """
         # Get base output items (reasoning + tool calls, NO final text yet)
-        output_items, mcp_tool_call_ids = await self._format_output_items(all_messages, tools)
+        output_items = await self._format_output_items(all_messages, tools)
 
         # Add EITHER structured output OR final text (mutually exclusive)
         if self._has_final_result_tool_return(agent_result, all_messages):
@@ -382,7 +378,7 @@ class OpenAIResponseFormatter_V4:
                 )
                 logger.debug("Added final text part from messages")
 
-        return output_items, mcp_tool_call_ids
+        return output_items
 
     def _has_final_result_tool_return(
         self,

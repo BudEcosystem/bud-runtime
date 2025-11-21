@@ -1369,7 +1369,7 @@ class OpenAIStreamingFormatter_V1:
         # Use the non-streaming formatter to build complete output items (includes structured output)
         formatter = OpenAIResponseFormatter_V4()
         all_messages = final_result.all_messages()
-        output_items, _ = await formatter.build_complete_output_items(all_messages, final_result, tools)
+        output_items = await formatter.build_complete_output_items(all_messages, final_result, tools)
 
         return output_items
 
