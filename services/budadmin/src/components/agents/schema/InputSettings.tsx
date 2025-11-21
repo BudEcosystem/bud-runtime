@@ -145,7 +145,10 @@ export const InputSettings: React.FC<InputSettingsProps> = ({
                       {/* Delete button */}
                       {(inputVariables?.length || 0) > 1 && index + 1 > 1 &&(
                         <button
-                          onClick={() => onDeleteVariable(variable.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteVariable(variable.id);
+                          }}
                           className="opacity-0 transition-opacity z-10 p-0 mr-[.6rem] group-hover:opacity-100"
                         >
                           <CloseOutlined className="text-[#808080] hover:text-[#FF4444] text-[.7rem]" />

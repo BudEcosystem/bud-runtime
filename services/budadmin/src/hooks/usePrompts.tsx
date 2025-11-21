@@ -61,6 +61,7 @@ export const usePrompts = create<{
   createPrompt: (data: any, projectId?: string) => Promise<any>;
   deletePrompt: (promptId: string, projectId?: string) => Promise<any>;
   updatePrompt: (promptId: string, data: any, projectId?: string) => Promise<any>;
+  getPromptConfig: (promptId: string) => Promise<any>;
 }>((set) => ({
   prompts: [],
   totalRecords: 0,
@@ -217,6 +218,17 @@ export const usePrompts = create<{
       return response.data;
     } catch (error) {
       console.error("Error updating prompt:", error);
+      throw error;
+    }
+  },
+
+  getPromptConfig: async (promptId: string): Promise<any> => {
+    try {
+      const url = `${tempApiBaseUrl}/prompts/prompt-config/${promptId}`;
+      const response: any = await AppRequest.Get(url);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching prompt config:", error);
       throw error;
     }
   },

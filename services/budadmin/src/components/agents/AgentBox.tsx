@@ -67,12 +67,15 @@ function AgentBoxInner({
     addDeletedPromptId,
   } = useAgentStore();
 
-  // Get prompts store for refreshing data
-  const { getPromptById } = usePrompts();
+  // Get prompts store for loading config
+  const { getPromptConfig } = usePrompts();
+
+  // Track if config has been loaded for this session to prevent duplicate calls
+  const hasLoadedConfigRef = React.useRef<string | null>(null);
 
   // Helper function to refresh session data from backend
   const refreshSessionData = React.useCallback(async () => {
-    if (!session?.promptId) {
+    if (!session?.promptId || !session?.id) {
       return;
     }
 
@@ -83,16 +86,18 @@ function AgentBoxInner({
       // Update session with refreshed data
       // This will automatically persist to localStorage via Zustand persist middleware
       updateSession(session.id, {
-        inputVariables: transformedData.inputVariables || session.inputVariables,
-        outputVariables: transformedData.outputVariables || session.outputVariables,
-        systemPrompt: transformedData.systemPrompt || session.systemPrompt,
-        promptMessages: transformedData.promptMessages || session.promptMessages,
+        inputVariables: transformedData.inputVariables,
+        outputVariables: transformedData.outputVariables,
+        systemPrompt: transformedData.systemPrompt,
+        promptMessages: transformedData.promptMessages,
       });
     } catch (error) {
       console.error("Error refreshing session data:", error);
       // Don't show error toast as this is a background operation
     }
-  }, [session, getPromptById, updateSession]);
+  // Only depend on stable values to prevent infinite loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, session?.promptId, updateSession]);
 
   // Ensure session has a promptId (migration for old sessions)
   React.useEffect(() => {
@@ -101,6 +106,117 @@ function AgentBoxInner({
       updateSession(session.id, { promptId: newPromptId });
     }
   }, [session, updateSession]);
+
+  // Helper to generate variable ID
+  const generateVarId = () => `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+  // Helper to parse schema properties into AgentVariable array
+  const parseSchemaToVariables = (
+    schema: any,
+    defKey: 'Input' | 'Output',
+    type: 'input' | 'output'
+  ): AgentVariable[] => {
+    try {
+      const properties = schema?.$defs?.[defKey]?.properties;
+      if (!properties || typeof properties !== 'object') return [];
+
+      return Object.entries(properties).map(([name, prop]: [string, any]) => ({
+        id: generateVarId(),
+        name: name,
+        value: '',
+        type: type,
+        description: prop?.title || '',
+        dataType: prop?.type || 'string',
+        defaultValue: prop?.default || '',
+      }));
+    } catch {
+      return [];
+    }
+  };
+
+  // Load prompt config from backend on mount to restore data after page refresh
+  React.useEffect(() => {
+    const loadPromptConfig = async () => {
+      // Skip if no promptId or already loaded for this promptId
+      if (!session?.promptId || !session?.id) return;
+      if (hasLoadedConfigRef.current === session.promptId) return;
+
+      // Skip if session already has deployment set (user has already configured)
+      if (session.selectedDeployment?.name) return;
+
+      try {
+        const response = await getPromptConfig(session.promptId);
+
+        if (response?.data) {
+          const configData = response.data;
+          const updates: Partial<typeof session> = {};
+
+          // Map deployment_name to selectedDeployment
+          if (configData.deployment_name) {
+            updates.selectedDeployment = {
+              id: '',
+              name: configData.deployment_name,
+              model: { name: configData.deployment_name }
+            };
+          }
+
+          // Map stream setting
+          if (configData.stream !== null && configData.stream !== undefined) {
+            updates.settings = {
+              ...session.settings,
+              stream: configData.stream
+            };
+          }
+
+          // Map system_prompt
+          if (configData.system_prompt) {
+            updates.systemPrompt = configData.system_prompt;
+          }
+
+          // Map messages to promptMessages
+          if (configData.messages && Array.isArray(configData.messages) && configData.messages.length > 0) {
+            updates.promptMessages = JSON.stringify(configData.messages);
+          }
+
+          // Map llm_retry_limit
+          if (configData.llm_retry_limit !== null && configData.llm_retry_limit !== undefined) {
+            updates.llm_retry_limit = configData.llm_retry_limit;
+          }
+
+          // Map input_schema to inputVariables
+          if (configData.input_schema) {
+            const inputVars = parseSchemaToVariables(configData.input_schema, 'Input', 'input');
+            if (inputVars.length > 0) {
+              updates.inputVariables = inputVars;
+            }
+          }
+
+          // Map output_schema to outputVariables
+          if (configData.output_schema) {
+            const outputVars = parseSchemaToVariables(configData.output_schema, 'Output', 'output');
+            if (outputVars.length > 0) {
+              updates.outputVariables = outputVars;
+            }
+          }
+
+          // Only update if we have data to update
+          if (Object.keys(updates).length > 0) {
+            updateSession(session.id, updates);
+          }
+        }
+
+        // Mark as loaded for this promptId
+        hasLoadedConfigRef.current = session.promptId;
+      } catch (error) {
+        // Silently fail - config may not exist yet for new prompts
+        console.debug("Could not load prompt config:", error);
+        hasLoadedConfigRef.current = session.promptId;
+      }
+    };
+
+    loadPromptConfig();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, session?.promptId]);
 
   const [localSystemPrompt, setLocalSystemPrompt] = useState(session?.systemPrompt || "");
   // Ensure promptMessages is always a string, even if it comes as an array from corrupted data
@@ -132,7 +248,8 @@ function AgentBoxInner({
   );
 
   // Initialize structured mode based on existing variables
-  // Run on session change or when variable arrays change (but not on individual field edits)
+  // Only auto-ENABLE when meaningful variables are detected (e.g., when loading from backend)
+  // Do NOT auto-disable - user should manually toggle off via the switch
   React.useEffect(() => {
     if (session) {
       // Enable structured input if we have meaningful variables (not just default)
@@ -155,8 +272,13 @@ function AgentBoxInner({
           v.name.trim().length > 0
         );
 
-      setStructuredInputEnabled(hasInputVars);
-      setStructuredOutputEnabled(hasOutputVars);
+      // Only auto-enable, never auto-disable (let user control via toggle)
+      if (hasInputVars) {
+        setStructuredInputEnabled(true);
+      }
+      if (hasOutputVars) {
+        setStructuredOutputEnabled(true);
+      }
     }
   }, [
     session?.id,
@@ -261,13 +383,9 @@ function AgentBoxInner({
     }
   }, [isEditVersionMode, editVersionData]);
 
-  // Refresh session data from backend when settings sidebar is opened
-  // This ensures prepopulation of data after navigating back from playground
-  React.useEffect(() => {
-    if (isSettingsOpen && session?.promptId) {
-      refreshSessionData();
-    }
-  }, [isSettingsOpen, session?.id, session?.promptId, refreshSessionData]);
+  // NOTE: Removed auto-refresh on settings sidebar open
+  // The session data is already loaded when the drawer opens or when editing a prompt
+  // Auto-refreshing was causing unnecessary API calls on every settings interaction
 
   // Handle case where session is null early
   if (!session) {
