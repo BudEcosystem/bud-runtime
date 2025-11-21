@@ -183,12 +183,14 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
         
         # Check for Intel CPUs with high-performance features (AMX or AVX2)
         if cpu_vendor == "Intel":
-            has_amx = labels.get("feature.node.kubernetes.io/cpu-cpuid.AMXTILE") == "true" or \
-                      labels.get("feature.node.kubernetes.io/cpu-cpuid.AMX") == "true" or \
-                      labels.get("feature.node.kubernetes.io/cpu-cpuid.AMXBF16") == "true" or \
-                      labels.get("feature.node.kubernetes.io/cpu-cpuid.AMXINT8") == "true"
+            has_amx = any(labels.get(label) == "true" for label in (
+                "feature.node.kubernetes.io/cpu-cpuid.AMXTILE",
+                "feature.node.kubernetes.io/cpu-cpuid.AMX",
+                "feature.node.kubernetes.io/cpu-cpuid.AMXBF16",
+                "feature.node.kubernetes.io/cpu-cpuid.AMXINT8",
+            ))
             has_avx2 = labels.get("feature.node.kubernetes.io/cpu-cpuid.AVX2") == "true"
-            
+
             if has_amx or has_avx2:
                 cpu_type = "cpu_high"
         

@@ -1338,10 +1338,10 @@ class ClusterOpsService:
                         # Send notification about the state change
                         await cls._send_cluster_state_notification(
                             cluster_id=cluster.id,
-                            cluster_name=cluster.name,
+                            cluster_name=cluster.host,
                             old_status=ClusterStatusEnum.NOT_AVAILABLE.value,
                             new_status=ClusterStatusEnum.ERROR.value,
-                            message=f"Cluster {cluster.name} moved to ERROR state after {threshold_hours} hours in NOT_AVAILABLE",
+                            message=f"Cluster {cluster.host} moved to ERROR state after {threshold_hours} hours in NOT_AVAILABLE",
                         )
 
                 if moved_count > 0:
@@ -1451,10 +1451,10 @@ class ClusterOpsService:
                     # Send notification about the recovery
                     await cls._send_cluster_state_notification(
                         cluster_id=cluster.id,
-                        cluster_name=cluster.name,
+                        cluster_name=cluster.host,
                         old_status=previous_status.value,
                         new_status=ClusterStatusEnum.AVAILABLE.value,
-                        message=f"Cluster {cluster.name} recovered from {previous_status.value} to AVAILABLE",
+                        message=f"Cluster {cluster.host} recovered from {previous_status.value} to AVAILABLE",
                     )
 
         except Exception as e:

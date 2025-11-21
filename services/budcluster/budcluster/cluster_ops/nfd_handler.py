@@ -296,7 +296,8 @@ class NFDSchedulableResourceDetector:
 
             # Determine device type based on Vendor and AMX/AVX2 support
             vendor_id = labels.get("feature.node.kubernetes.io/cpu-model.vendor_id", "unknown")
-            is_intel = vendor_id == "Intel"
+            # NFD returns "GenuineIntel" for Intel CPUs, not "Intel"
+            is_intel = vendor_id in ("GenuineIntel", "Intel")
             has_high_perf_features = "AMX" in cpu_features or "AVX2" in cpu_features
 
             device_type = "cpu_high" if is_intel and has_high_perf_features else "cpu"

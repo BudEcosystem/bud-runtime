@@ -625,6 +625,7 @@ class DeviceExtractor:
 
             # Set device type to cpu_high if AMX or AVX2 is supported (Intel CPUs only)
             # This matches the logic in nfd_handler.py for consistency
+            # Note: cpu.vendor is already normalized to "Intel" by vendor_map earlier
             if cpu.vendor == "Intel" and ("AMX" in instruction_sets or "AVX2" in instruction_sets):
                 cpu.type = "cpu_high"
 
