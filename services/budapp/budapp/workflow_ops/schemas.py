@@ -79,6 +79,7 @@ class RetrieveWorkflowStepData(BaseModel):
     max_input_tokens: int | None = None
     max_output_tokens: int | None = None
     datasets: list | None = None
+    dataset_ids: list | None = None
     nodes: list | None = None
     credential_id: UUID4 | None = None
     user_confirmation: bool | None = None
