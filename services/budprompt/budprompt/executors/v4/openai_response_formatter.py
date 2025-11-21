@@ -70,6 +70,7 @@ from pydantic_ai.messages import (
 from pydantic_ai.run import AgentRunResult
 
 from ...commons.constants import STRUCTURED_OUTPUT_TOOL_NAME, STRUCTURED_PUTOUT_TOOL_DESCRIPTION
+from ...commons.exceptions import PromptExecutionException
 from ...prompt.schemas import MCPToolConfig, Message, ModelSettings
 from ...responses.schemas import OpenAIResponse
 
@@ -168,7 +169,12 @@ class OpenAIResponseFormatter_V4:
 
         except Exception as e:
             logger.error(f"Error formatting OpenAI response: {str(e)}")
-            raise
+            raise PromptExecutionException(
+                message="Agent execution failed.",
+                status_code=500,
+                err_type="server_error",
+                code="response_formatting_error",
+            ) from e
 
     async def _format_output_items(
         self,
