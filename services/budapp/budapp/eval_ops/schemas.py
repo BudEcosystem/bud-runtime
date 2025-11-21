@@ -13,6 +13,7 @@ from budapp.eval_ops.models import RunStatusEnum
 # ------------------------ Summary Schemas for Experiments ------------------------
 
 
+# Update
 class ModelSummary(BaseModel):
     """Summary of a model used in an experiment."""
 
@@ -1008,6 +1009,8 @@ class DatasetScoresResponse(PaginatedSuccessResponse):
     dataset_id: UUID4 = Field(..., description="UUID of the dataset")
     dataset_name: str = Field(..., description="Name of the dataset")
     scores: List[DatasetModelScore] = Field(default_factory=list, description="List of model scores")
+
+
 class ExperimentSummary(BaseModel):
     """Summary statistics for an experiment."""
 
