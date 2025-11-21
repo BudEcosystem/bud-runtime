@@ -787,100 +787,46 @@ function AgentBoxInner({
     }
   };
 
-  const handleClearInputSchema = async () => {
+  const handleClearInputSchema = () => {
     if (!session) {
-      errorToast("No session data available");
       return;
     }
 
-    if (!session.selectedDeployment?.name) {
-      errorToast("Please select a deployment model first");
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      // Build payload with null schema to clear/delete the saved schema
-      const payload = createSchemaPayload("input", null, false);
-
-      // Make the API call
-      const response = await AppRequest.Post(
-        `${tempApiBaseUrl}/prompts/prompt-schema`,
-        payload
-      );
-
-      if (response && response.data) {
-        // Reset session input variables to default
-        updateSession(session.id, {
-          inputVariables: [
-            {
-              id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-              name: "Input Variable 1",
-              value: "",
-              type: "input",
-              description: "",
-              dataType: "string",
-              defaultValue: ""
-            }
-          ]
-        });
-        successToast("Input schema cleared");
-      }
-    } catch (error: any) {
-      console.error("Error clearing input schema:", error);
-      errorToast(error?.response?.data?.detail || "Failed to clear input schema");
-    } finally {
-      setIsSaving(false);
-    }
+    // Only update local state - API call will be made on Update button click
+    updateSession(session.id, {
+      inputVariables: [
+        {
+          id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+          name: "Input Variable 1",
+          value: "",
+          type: "input",
+          description: "",
+          dataType: "string",
+          defaultValue: ""
+        }
+      ]
+    });
   };
 
-  const handleClearOutputSchema = async () => {
+  const handleClearOutputSchema = () => {
     if (!session) {
-      errorToast("No session data available");
       return;
     }
 
-    if (!session.selectedDeployment?.name) {
-      errorToast("Please select a deployment model first");
-      return;
-    }
-
-    setIsSavingOutput(true);
-
-    try {
-      // Build payload with null schema to clear/delete the saved schema
-      const payload = createSchemaPayload("output", null, false);
-
-      // Make the API call
-      const response = await AppRequest.Post(
-        `${tempApiBaseUrl}/prompts/prompt-schema`,
-        payload
-      );
-
-      if (response && response.data) {
-        // Reset session output variables to default
-        updateSession(session.id, {
-          outputVariables: [
-            {
-              id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-              name: "Output Variable 1",
-              value: "",
-              type: "output",
-              description: "",
-              dataType: "string",
-              defaultValue: ""
-            }
-          ]
-        });
-        successToast("Output schema cleared");
-      }
-    } catch (error: any) {
-      console.error("Error clearing output schema:", error);
-      errorToast(error?.response?.data?.detail || "Failed to clear output schema");
-    } finally {
-      setIsSavingOutput(false);
-    }
+    // Only update local state - API call will be made on Update button click
+    updateSession(session.id, {
+      outputVariables: [
+        {
+          id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+          name: "Output Variable 1",
+          value: "",
+          type: "output",
+          description: "",
+          dataType: "string",
+          defaultValue: ""
+        }
+      ]
+    });
   };
 
   const handleSaveSystemPrompt = async () => {
