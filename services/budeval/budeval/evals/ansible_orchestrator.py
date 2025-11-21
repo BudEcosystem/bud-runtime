@@ -155,6 +155,16 @@ class AnsibleOrchestrator:
         project_dir.mkdir()
         shutil.copy(playbook_path, project_dir / playbook)
 
+        # Copy playbook dependencies (e.g., included task files)
+        # Look for all .yml files in the playbooks directory
+        for dep_file in self._playbook_dir.glob("*.yml"):
+            if dep_file.name != playbook:  # Don't copy main playbook again
+                try:
+                    shutil.copy(dep_file, project_dir / dep_file.name)
+                    logger.debug(f"Copied playbook dependency: {dep_file.name}")
+                except Exception as e:
+                    logger.warning(f"Could not copy dependency {dep_file.name}: {e}")
+
         # Override extravars file paths to absolute paths
         if "kubeconfig_path" in extravars:
             extravars["kubeconfig_path"] = str(pdir / extravars["kubeconfig_path"])
