@@ -27,6 +27,44 @@ import { usePrompts } from "@/hooks/usePrompts";
 import { loadPromptForEditing } from "@/utils/promptHelpers";
 import { removePromptFromUrl } from "@/utils/urlUtils";
 
+// Schema interface for prompt config
+interface PromptSchema {
+  $defs?: {
+    Input?: { properties?: Record<string, { type?: string; title?: string; default?: string }> };
+    Output?: { properties?: Record<string, { type?: string; title?: string; default?: string }> };
+  };
+}
+
+// Helper to generate variable ID (defined outside component to avoid recreation)
+const generateVarId = () => `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+// Helper to parse schema properties into AgentVariable array
+const parseSchemaToVariables = (
+  schema: PromptSchema | null | undefined,
+  defKey: 'Input' | 'Output',
+  type: 'input' | 'output'
+): AgentVariable[] => {
+  try {
+    const properties = schema?.$defs?.[defKey]?.properties;
+    if (!properties || typeof properties !== 'object') return [];
+
+    const validDataTypes = ['string', 'number', 'boolean', 'object', 'array'] as const;
+    type DataType = typeof validDataTypes[number];
+
+    return Object.entries(properties).map(([name, prop]) => ({
+      id: generateVarId(),
+      name: name,
+      value: '',
+      type: type,
+      description: prop?.title || '',
+      dataType: (validDataTypes.includes(prop?.type as DataType) ? prop?.type : 'string') as DataType,
+      defaultValue: prop?.default || '',
+    }));
+  } catch {
+    return [];
+  }
+};
+
 interface AgentBoxProps {
   session: AgentSession;
   index: number;
@@ -100,33 +138,6 @@ function AgentBoxInner({
       updateSession(session.id, { promptId: newPromptId });
     }
   }, [session, updateSession]);
-
-  // Helper to generate variable ID
-  const generateVarId = () => `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-  // Helper to parse schema properties into AgentVariable array
-  const parseSchemaToVariables = (
-    schema: any,
-    defKey: 'Input' | 'Output',
-    type: 'input' | 'output'
-  ): AgentVariable[] => {
-    try {
-      const properties = schema?.$defs?.[defKey]?.properties;
-      if (!properties || typeof properties !== 'object') return [];
-
-      return Object.entries(properties).map(([name, prop]: [string, any]) => ({
-        id: generateVarId(),
-        name: name,
-        value: '',
-        type: type,
-        description: prop?.title || '',
-        dataType: prop?.type || 'string',
-        defaultValue: prop?.default || '',
-      }));
-    } catch {
-      return [];
-    }
-  };
 
   // Load prompt config from backend on mount to restore data after page refresh
   React.useEffect(() => {
