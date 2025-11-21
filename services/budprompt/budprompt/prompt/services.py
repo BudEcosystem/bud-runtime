@@ -248,8 +248,9 @@ class PromptExecutorService:
             # Prompt execution errors -> 500 Internal Server Error
             logger.error(f"Prompt execution failed: {str(e)}")
             raise ClientException(
-                status_code=500,
-                message=e.message,  # Use the custom exception's message
+                status_code=e.status_code,
+                message=e.message,
+                params={"param": e.param},
             ) from e
 
         except Exception as e:

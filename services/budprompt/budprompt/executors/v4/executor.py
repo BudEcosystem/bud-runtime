@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional, Type, Union
 
 from budmicroframe.commons import logging
+from httpx import ConnectTimeout
 from openai.types.responses import (
     ResponseCompletedEvent,
     ResponseCreatedEvent,
@@ -551,17 +552,20 @@ class SimplePromptExecutor_V4:
             if "Exceeded maximum retries" in error_msg:
                 # Extract retry count from error message if possible
                 logger.error(f"Output validation failed after maximum retries: {error_msg}")
-                raise PromptExecutionException(f"Output validation failed: {error_msg}") from e
+                raise PromptExecutionException(error_msg, status_code=500) from e
             else:
                 logger.error(f"Unexpected model behavior: {error_msg}")
                 raise PromptExecutionException(f"Unexpected model behavior: {error_msg}") from e
         except ModelHTTPError as e:
             # HTTP errors from MCP servers or model providers
             logger.error(f"Received error from model: {str(e)}")
-            raise PromptExecutionException(f"Received error from model: {e.message}") from e
+            raise PromptExecutionException(e.message, status_code=e.status_code, param=e.model_name) from e
+        except ConnectTimeout as e:
+            logger.error(f"Connection timed out: {str(e)}")
+            raise PromptExecutionException("Connection timed out to model", status_code=500) from e
         except Exception as e:
             logger.error(f"Agent execution failed: {str(e)}")
-            raise PromptExecutionException("Agent execution failed") from e
+            raise PromptExecutionException(f"Agent execution failed: {str(e)}", status_code=500) from e
 
     async def _run_agent_stream(
         self,
