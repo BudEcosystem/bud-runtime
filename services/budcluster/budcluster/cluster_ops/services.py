@@ -1245,6 +1245,63 @@ class ClusterOpsService:
         return response
 
     @classmethod
+    async def _send_cluster_state_notification(cls, cluster_id: UUID, cluster_name: str, old_status: str, new_status: str, message: str):
+        """Send notification when cluster state changes.
+
+        Args:
+            cluster_id: ID of the cluster
+            cluster_name: Name of the cluster
+            old_status: Previous cluster status
+            new_status: New cluster status
+            message: Notification message
+        """
+        from budmicroframe.commons.schemas import (
+            NotificationCategory,
+            NotificationContent,
+            NotificationPayload,
+            NotificationRequest,
+            NotificationType,
+            WorkflowStatus,
+        )
+        from budmicroframe.shared.dapr_service import DaprService
+
+        try:
+            event_name = "cluster-state-change"
+            content = NotificationContent(
+                title=f"Cluster {cluster_name} state changed",
+                message=message,
+                status=WorkflowStatus.COMPLETED,
+                result={
+                    "cluster_id": str(cluster_id),
+                    "cluster_name": cluster_name,
+                    "old_status": old_status,
+                    "new_status": new_status,
+                },
+            )
+            notification_request = NotificationRequest(
+                notification_type=NotificationType.EVENT,
+                name=event_name,
+                payload=NotificationPayload(
+                    category=NotificationCategory.INTERNAL,
+                    type=event_name,
+                    event="cluster_state_change",
+                    content=content,
+                    workflow_id="",  # No workflow for state change notifications
+                ),
+                topic_keys=["budAppMessages"],
+            )
+            with DaprService() as dapr_service:
+                dapr_service.publish_to_topic(
+                    data=notification_request.model_dump(mode="json"),
+                    target_topic_name="budAppMessages",
+                    target_name=None,
+                    event_type=notification_request.payload.type,
+                )
+            logger.info(f"Sent notification for cluster {cluster_id} state change: {old_status} -> {new_status}")
+        except Exception as e:
+            logger.error(f"Failed to send cluster state notification for {cluster_id}: {e}")
+
+    @classmethod
     async def _check_and_move_to_error(cls, threshold_hours: int = 24):
         """Check NOT_AVAILABLE clusters and move to ERROR if threshold exceeded.
 
@@ -1276,6 +1333,15 @@ class ClusterOpsService:
                         moved_count += 1
                         logger.warning(
                             f"Cluster {cluster.id} moved to ERROR state after {threshold_hours}h in NOT_AVAILABLE"
+                        )
+                        
+                        # Send notification about the state change
+                        await cls._send_cluster_state_notification(
+                            cluster_id=cluster.id,
+                            cluster_name=cluster.name,
+                            old_status=ClusterStatusEnum.NOT_AVAILABLE.value,
+                            new_status=ClusterStatusEnum.ERROR.value,
+                            message=f"Cluster {cluster.name} moved to ERROR state after {threshold_hours} hours in NOT_AVAILABLE",
                         )
 
                 if moved_count > 0:
@@ -1381,6 +1447,15 @@ class ClusterOpsService:
 
                 if previous_status in [ClusterStatusEnum.NOT_AVAILABLE, ClusterStatusEnum.ERROR]:
                     logger.info(f"Cluster {cluster_id} recovered from {previous_status} to AVAILABLE")
+                    
+                    # Send notification about the recovery
+                    await cls._send_cluster_state_notification(
+                        cluster_id=cluster.id,
+                        cluster_name=cluster.name,
+                        old_status=previous_status.value,
+                        new_status=ClusterStatusEnum.AVAILABLE.value,
+                        message=f"Cluster {cluster.name} recovered from {previous_status.value} to AVAILABLE",
+                    )
 
         except Exception as e:
             logger.error(f"Failed to handle cluster success for {cluster_id}: {e}")
@@ -1586,7 +1661,7 @@ class ClusterOpsService:
             WorkflowStatus,
         )
         from budmicroframe.shared.dapr_service import DaprService
-        from budmicroframe.shared.dapr_service_crypto import DaprServiceCrypto
+        from budmicroframe.shared.dapr_service import DaprServiceCrypto
 
         cluster_id_str = str(cluster.id)
         logger.debug(f"Updating node status for cluster {cluster_id_str}")
@@ -1627,7 +1702,7 @@ class ClusterOpsService:
                         type=event_name,
                         event="results",
                         content=content,
-                        workflow_id=None,  # No workflow for periodic updates
+                        workflow_id="",  # No workflow for periodic updates
                     ),
                     topic_keys=["budAppMessages"],
                 )

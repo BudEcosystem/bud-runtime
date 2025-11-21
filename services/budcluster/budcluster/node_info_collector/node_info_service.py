@@ -174,13 +174,30 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
             }
         )
 
-    # Format CPU information
+    # Format CPU information with type classification
     if cpu_info.get("cpu_name"):
+        # Get labels for instruction set detection
+        labels = node_info.get("labels", {})
+        cpu_vendor = cpu_info.get("cpu_vendor", "")
+        cpu_type = "cpu"  # Default type
+        
+        # Check for Intel CPUs with high-performance features (AMX or AVX2)
+        if cpu_vendor == "Intel":
+            has_amx = labels.get("feature.node.kubernetes.io/cpu-cpuid.AMXTILE") == "true" or \
+                      labels.get("feature.node.kubernetes.io/cpu-cpuid.AMX") == "true" or \
+                      labels.get("feature.node.kubernetes.io/cpu-cpuid.AMXBF16") == "true" or \
+                      labels.get("feature.node.kubernetes.io/cpu-cpuid.AMXINT8") == "true"
+            has_avx2 = labels.get("feature.node.kubernetes.io/cpu-cpuid.AVX2") == "true"
+            
+            if has_amx or has_avx2:
+                cpu_type = "cpu_high"
+        
         devices["cpus"].append(
             {
                 "name": cpu_info.get("cpu_name", ""),
+                "type": cpu_type,
                 "model": cpu_info.get("cpu_model_raw", ""),
-                "vendor": cpu_info.get("cpu_vendor", ""),
+                "vendor": cpu_vendor,
                 "architecture": cpu_info.get("architecture", ""),
                 "cores": cpu_info.get("cores", 0),
                 "threads": cpu_info.get("threads", 0),

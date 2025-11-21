@@ -294,8 +294,12 @@ class NFDSchedulableResourceDetector:
             # Detect CPU instruction set extensions
             cpu_features = self._extract_cpu_features(labels)
 
-            # Determine device type based on AMX support
-            device_type = "cpu_high" if "AMX" in cpu_features else "cpu"
+            # Determine device type based on Vendor and AMX/AVX2 support
+            vendor_id = labels.get("feature.node.kubernetes.io/cpu-model.vendor_id", "unknown")
+            is_intel = vendor_id == "Intel"
+            has_high_perf_features = "AMX" in cpu_features or "AVX2" in cpu_features
+
+            device_type = "cpu_high" if is_intel and has_high_perf_features else "cpu"
 
             device_config = {
                 "name": self._normalize_cpu_name(cpu_model),
