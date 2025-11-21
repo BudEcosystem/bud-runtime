@@ -107,7 +107,7 @@ class Dataset(BaseModel):
     url: str
     size_mb: float
     checksum: str
-    sample_count: int
+    sample_count: Optional[int] = None
     traits: List[str]
     metadata: DatasetMetadata
     eval_type: Optional[Dict[str, str]] = None  # Evaluation type configurations
