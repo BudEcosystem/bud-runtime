@@ -159,7 +159,7 @@ function AgentBoxInner({
           // Map deployment_name to selectedDeployment
           if (configData.deployment_name) {
             updates.selectedDeployment = {
-              id: '',
+              id: configData.deployment_id || undefined,
               name: configData.deployment_name,
               model: { name: configData.deployment_name }
             };
