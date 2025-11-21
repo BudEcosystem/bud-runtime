@@ -87,6 +87,10 @@ export default function SelectTrait() {
     getTraits({ page, limit });
   }, [page]);
 
+  useEffect(()=> {
+    setSelectedTraits(Array.isArray(currentWorkflow?.workflow_steps?.trait_ids) ? currentWorkflow?.workflow_steps?.trait_ids : [])
+  }, [currentWorkflow])
+
   return (
     <BudForm
       data={{}}

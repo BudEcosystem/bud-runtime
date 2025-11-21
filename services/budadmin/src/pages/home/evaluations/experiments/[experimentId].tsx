@@ -115,6 +115,12 @@ const ExperimentDetailsPage = () => {
         }
     }, [experimentId]);
 
+    const refreshETA = (id) => {
+        if (experimentId && typeof experimentId === "string") {
+            getExperimentDetails(experimentId);
+        }
+    }
+
     if (loading) {
         return (
             <DashBoardLayout>
@@ -362,6 +368,7 @@ const ExperimentDetailsPage = () => {
                                             <BenchmarkProgress
                                                 key={benchmark.id}
                                                 benchmark={benchmark}
+                                                refreshETA={()=> refreshETA(benchmark.id)}
                                             />
                                         );
                                     },
