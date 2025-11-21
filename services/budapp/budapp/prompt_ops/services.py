@@ -488,7 +488,7 @@ class PromptService(SessionMixin):
 
         Args:
             prompt_id: The prompt configuration identifier
-            version: Optional version number to retrieve
+            version: Version number to retrieve
 
         Returns:
             PromptConfigGetResponse containing the configuration data
@@ -499,13 +499,14 @@ class PromptService(SessionMixin):
 
             # Parse the configuration data
             config_data = PromptConfigurationData(**response_data.get("data", {}))
-            version = response_data.get("version")
+            response_version = response_data.get("version")
             response_message = "Prompt configuration retrieved successfully"
         except ClientException as e:
             if e.status_code == 404:
                 # NOTE: Return empty/default config as requested for Frontend logic
                 logger.debug("Prompt config not found for %s, returning empty config", prompt_id)
                 config_data = PromptConfigurationData()
+                response_version = version  # Use original parameter
                 response_message = "Prompt configuration not found, returning empty config"
             else:
                 raise  # Re-raise non-404 errors
@@ -514,7 +515,7 @@ class PromptService(SessionMixin):
         return PromptConfigGetResponse(
             prompt_id=prompt_id,
             data=config_data,
-            version=version,
+            version=response_version,
             message=response_message,
             code=status.HTTP_200_OK,
         )
