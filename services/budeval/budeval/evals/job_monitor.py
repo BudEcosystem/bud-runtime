@@ -268,7 +268,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     remaining_jobs = [j for j in job_ids if j not in completed_jobs and j not in failed_jobs]
 
     # NEW: Parse logs for progress/ETA (only for running jobs)
-    if remaining_jobs and not ctx.is_replaying:
+    if remaining_jobs:
         log_parse_result = yield ctx.call_activity(
             parse_job_logs_activity,
             input=json.dumps(
@@ -302,7 +302,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
                     logger_local.debug(f"Job {job_id}: No progress data yet")
 
     # NEW: Send notification with progress update (EVERY CYCLE)
-    if workflow_id and source_topic and source and not ctx.is_replaying:
+    if workflow_id and source_topic:
         # Calculate aggregate progress (only for jobs that have started)
         total_progress = 0
         total_remaining = 0
@@ -336,7 +336,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
         notification_data = {
             "workflow_id": workflow_id,
             "source_topic": source_topic,
-            "source": source,
+            "source": source or "budeval",  # Fallback to "budeval" if source is None
             "remaining_seconds": int(avg_remaining),
             "progress_percentage": round(avg_progress, 1),
             "completed_jobs": len(completed_jobs),
@@ -379,6 +379,10 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     data["failed_jobs"] = failed_jobs
     data["job_timing_map"] = job_timing_map
     data["job_progress_map"] = job_progress_map  # NEW: Persist progress
+    # CRITICAL: Persist notification parameters across continue_as_new cycles
+    data["workflow_id"] = workflow_id
+    data["source_topic"] = source_topic
+    data["source"] = source or "budeval"  # Ensure source is never None
     yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
     ctx.continue_as_new(json.dumps(data))
     return

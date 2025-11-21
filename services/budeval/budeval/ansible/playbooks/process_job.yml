@@ -41,7 +41,7 @@
         python3 << 'EOF'
         import re
         import json
-        import sys
+        import os
 
         def parse_opencompass_logs(log_text):
             result = {
@@ -83,12 +83,12 @@
 
             return result
 
-        log_text = sys.stdin.read()
+        log_text = os.environ.get('POD_LOG_CONTENT', '')
         result = parse_opencompass_logs(log_text)
         print(json.dumps(result))
         EOF
-      args:
-        stdin: "{{ current_pod_log.log | default('') }}"
+      environment:
+        POD_LOG_CONTENT: "{{ current_pod_log.log | default('') }}"
       register: parse_output
       when: current_pod_log.log is defined
       ignore_errors: true
