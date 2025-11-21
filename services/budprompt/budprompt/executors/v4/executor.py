@@ -199,6 +199,7 @@ class SimplePromptExecutor_V4:
                     deployment_name=deployment_name,
                     tools=tools,
                     output_schema=output_schema,
+                    system_prompt=system_prompt,
                 )
 
                 return openai_response
