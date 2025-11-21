@@ -194,49 +194,36 @@ class OpenAIResponseFormatter_V4:
         # Step 3: Build tool returns lookup
         tool_returns = self._build_tool_returns_lookup(all_messages)
 
-        # Step 3: Process messages in chronological order
+        # Step 4: Collect and add all reasoning as a single item (concatenated ThinkingParts)
+        all_reasoning, reasoning_signature = self._collect_all_reasoning(all_messages)
+        if all_reasoning:
+            output_items.append(
+                ResponseReasoningItem(
+                    id=f"rs_{uuid.uuid4().hex}",
+                    type="reasoning",
+                    summary=[
+                        Summary(
+                            type="summary_text",
+                            text=all_reasoning,
+                        )
+                    ],
+                    encrypted_content=reasoning_signature,
+                    status="completed",
+                )
+            )
+
+        # Step 5: Process all tool calls in chronological order
         for message in all_messages:
             if isinstance(message, ModelResponse):
                 for part in message.parts:
-                    # TextPart → ResponseOutputMessage
-                    if isinstance(part, TextPart):
-                        output_items.append(
-                            ResponseOutputMessage(
-                                id=part.id or f"msg_{uuid.uuid4().hex}",
-                                type="message",
-                                status="completed",
-                                content=[
-                                    ResponseOutputText(
-                                        type="output_text",
-                                        text=part.content,
-                                        annotations=[],
-                                    )
-                                ],
-                                role="assistant",
-                            )
-                        )
-
-                    # ThinkingPart → ResponseReasoningItem
-                    # Setting summary based on referring .venv/lib/python3.11/site-packages/pydantic_ai/models/openai.py L1562 (pydantic_ai==1.4.0)
-                    elif isinstance(part, ThinkingPart):
-                        if part.content:  # Only add if there's actual content
-                            output_items.append(
-                                ResponseReasoningItem(
-                                    id=part.id or f"rs_{uuid.uuid4().hex}",
-                                    type="reasoning",
-                                    summary=[
-                                        Summary(
-                                            type="summary_text",
-                                            text=part.content,
-                                        )
-                                    ],
-                                    encrypted_content=part.signature if hasattr(part, "signature") else None,
-                                    status="completed",
-                                )
-                            )
-
                     # ToolCallPart → ResponseOutputMcpCall or ResponseFunctionToolCall
-                    elif isinstance(part, ToolCallPart):
+                    if isinstance(part, ToolCallPart):
+                        # Skip internal pydantic-ai tool (final_result for structured output)
+                        if part.tool_name == STRUCTURED_OUTPUT_TOOL_NAME:
+                            # Store args but don't add to output (internal tool)
+                            self._tool_call_args_map[part.tool_call_id] = part.args_as_json_str()
+                            continue  # Skip adding this tool call to output
+
                         # Store tool call arguments for later use (ALL tool calls - MCP and regular)
                         self._tool_call_args_map[part.tool_call_id] = part.args_as_json_str()
 
@@ -273,6 +260,62 @@ class OpenAIResponseFormatter_V4:
 
         return output_items, mcp_tool_call_ids
 
+    def _get_final_text_part(self, all_messages: List[ModelMessage]) -> Optional[TextPart]:
+        """Get the last TextPart from all messages (final assistant response).
+
+        Args:
+            all_messages: All messages from pydantic-ai result
+
+        Returns:
+            Last TextPart found, or None if no text parts exist
+        """
+        last_text_part = None
+
+        for message in all_messages:
+            if isinstance(message, ModelResponse):
+                for part in message.parts:
+                    if isinstance(part, TextPart):
+                        last_text_part = part
+
+        return last_text_part
+
+    def _collect_all_reasoning(self, all_messages: List[ModelMessage]) -> Tuple[Optional[str], Optional[str]]:
+        """Collect and concatenate all ThinkingPart content from all messages.
+
+        Args:
+            all_messages: All messages from pydantic-ai result
+
+        Returns:
+            Tuple of (concatenated_text, signature):
+            - text: All reasoning content joined with separators
+            - signature: Last signature if ALL content parts have signatures, else None
+        """
+        thinking_parts = []
+        signatures = []
+        all_have_signatures = True
+
+        for message in all_messages:
+            if isinstance(message, ModelResponse):
+                for part in message.parts:
+                    if isinstance(part, ThinkingPart) and part.content:
+                        thinking_parts.append(part.content)
+                        # Track signatures (only for parts with content)
+                        if part.signature:
+                            signatures.append(part.signature)
+                        else:
+                            all_have_signatures = False
+
+        if not thinking_parts:
+            return None, None
+
+        # Concatenate text
+        concatenated_text = "\n\n".join(thinking_parts)
+
+        # Use last signature ONLY if all content parts have signatures
+        signature = signatures[-1] if (all_have_signatures and signatures) else None
+
+        return concatenated_text, signature
+
     async def build_complete_output_items(
         self,
         all_messages: List[ModelMessage],
@@ -292,11 +335,12 @@ class OpenAIResponseFormatter_V4:
         Returns:
             Tuple of (output_items list, mcp_tool_call_ids set)
         """
-        # Get base output items
+        # Get base output items (reasoning + tool calls, NO final text yet)
         output_items, mcp_tool_call_ids = await self._format_output_items(all_messages, tools)
 
-        # Check if we should add structured output text from result.output
+        # Add EITHER structured output OR final text (mutually exclusive)
         if self._has_final_result_tool_return(agent_result, all_messages):
+            # Structured output mode: add result.output as JSON
             structured_output = agent_result.output
 
             output_items.append(
@@ -319,6 +363,26 @@ class OpenAIResponseFormatter_V4:
                 )
             )
             logger.debug("Added structured output text from result.output (final_result tool return detected)")
+        else:
+            # Normal mode: add final TextPart from messages
+            final_text_part = self._get_final_text_part(all_messages)
+            if final_text_part:
+                output_items.append(
+                    ResponseOutputMessage(
+                        id=final_text_part.id or f"msg_{uuid.uuid4().hex}",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                type="output_text",
+                                text=final_text_part.content,
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                )
+                logger.debug("Added final text part from messages")
 
         return output_items, mcp_tool_call_ids
 
