@@ -19,6 +19,24 @@ export default function Login() {
     const [isInvalidApiKey, setIsInvalidApiKey] = useState(false);
     const [key, setKey] = useState("");
 
+    // Build chat redirect URL preserving relevant parameters
+    const getChatRedirectUrl = () => {
+        if (typeof window === 'undefined') return '/chat';
+        const params = new URLSearchParams(window.location.search);
+        // Parameters to exclude (auth-related)
+        const excludeParams = ['refresh_token', 'access_key', 'embedded'];
+        const preservedParams = new URLSearchParams();
+
+        params.forEach((value, key) => {
+            if (!excludeParams.includes(key)) {
+                preservedParams.append(key, value);
+            }
+        });
+
+        const queryString = preservedParams.toString();
+        return queryString ? `/chat?${queryString}` : '/chat';
+    };
+
     const handleAdd = async (refreshToken?: string) => {
         if(!refreshToken) {
           form.submit();
@@ -28,7 +46,7 @@ export default function Login() {
         showLoader();
         const isLoginSuccessful = await login(key, refreshToken);
         if(isLoginSuccessful) {
-            router.replace(`chat`);
+            router.replace(getChatRedirectUrl());
         } else {
             setIsInvalidApiKey(true);
         }
@@ -43,7 +61,7 @@ export default function Login() {
 
         if (apiKey || isSessionValid) {
             // Already authenticated, redirect to chat
-            router.replace('/chat');
+            router.replace(getChatRedirectUrl());
         } else {
             // Not authenticated, show login form
             hideLoader();
