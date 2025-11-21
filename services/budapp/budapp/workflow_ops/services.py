@@ -540,9 +540,7 @@ class WorkflowService(SessionMixin):
                 "user_confirmation",
                 "run_as_simulation",
             ],
-            "evaluation": [
-                BudServeWorkflowStepEventName.EVALUATION_EVENTS.value,
-            ],
+            "evaluation": [BudServeWorkflowStepEventName.EVALUATION_EVENTS.value, "dataset_ids"],
             "add_adapter": [
                 "adapter_model_id",
                 "adapter_name",
