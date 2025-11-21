@@ -25,6 +25,7 @@ from openai.types.responses import (
     ResponseTextConfig,
     ResponseUsage,
 )
+from openai.types.responses.easy_input_message import EasyInputMessage
 from openai.types.responses.response_format_text_json_schema_config import ResponseFormatTextJSONSchemaConfig
 from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
 from openai.types.responses.response_input_item import (
@@ -96,15 +97,18 @@ class OpenAIResponseFormatter_V4:
         deployment_name: Optional[str] = None,
         tools: Optional[List[MCPToolConfig]] = None,
         output_schema: Optional[Dict[str, Any]] = None,
+        system_prompt: Optional[str] = None,
     ) -> OpenAIResponse:
         """Format pydantic-ai result to OpenAI Response structure.
 
         Args:
             pydantic_result: The result from pydantic-ai agent.run()
             model_settings: Model configuration settings
-            messages: Original input messages
+            messages: Original input messages from user
             deployment_name: Model deployment name
             tools: MCP tool configurations for server_label mapping
+            output_schema: Output schema for structured output
+            system_prompt: Original system prompt from user
 
         Returns:
             Response object matching official OpenAI Responses API structure
@@ -121,9 +125,9 @@ class OpenAIResponseFormatter_V4:
                 all_messages, pydantic_result, tools
             )
 
-            # Extract input items (system prompts, user prompts, tool returns, retry prompts)
-            # Pass MCP tool call IDs to identify MCP tool returns
-            input_items = await self._format_input_items(all_messages, mcp_tool_call_ids, tools)
+            # Build instructions from original user input (system prompt + messages)
+            # NOT from pydantic-ai all_messages which contains internal retry data
+            input_items = self._build_instructions(messages, system_prompt)
 
             # Get usage information
             usage = self._format_usage(pydantic_result.usage())
@@ -433,6 +437,69 @@ class OpenAIResponseFormatter_V4:
                     return True
 
         return False
+
+    def _build_instructions(
+        self,
+        messages: Optional[List[Message]],
+        system_prompt: Optional[str],
+    ) -> List[EasyInputMessage]:
+        """Build instructions from original user input.
+
+        Creates the instructions field for OpenAI Response from the original
+        user-provided system prompt and messages (not from pydantic-ai internal conversation).
+
+        Order: system_prompt first, then user messages.
+        If empty, return empty content arrays as required by the API.
+
+        Uses EasyInputMessage which supports all 4 roles: user, assistant, system, developer.
+
+        Args:
+            messages: Original input messages from user
+            system_prompt: Original system prompt from user
+
+        Returns:
+            List of EasyInputMessage for the instructions field
+        """
+        instructions: List[EasyInputMessage] = []
+
+        # 1. Add system prompt first (or empty if not provided)
+        if system_prompt:
+            instructions.append(
+                EasyInputMessage(
+                    type="message",
+                    role="system",
+                    content=[ResponseInputText(type="input_text", text=system_prompt)],
+                )
+            )
+        else:
+            instructions.append(
+                EasyInputMessage(
+                    type="message",
+                    role="system",
+                    content=[],
+                )
+            )
+
+        # 2. Add all messages (user, assistant, developer all supported)
+        if messages:
+            for msg in messages:
+                instructions.append(
+                    EasyInputMessage(
+                        type="message",
+                        role=msg.role,
+                        content=[ResponseInputText(type="input_text", text=msg.content)],
+                    )
+                )
+        else:
+            instructions.append(
+                EasyInputMessage(
+                    type="message",
+                    role="user",
+                    content=[],
+                )
+            )
+
+        return instructions
 
     async def _format_input_items(
         self,
