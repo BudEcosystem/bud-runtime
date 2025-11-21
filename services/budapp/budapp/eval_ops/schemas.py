@@ -956,3 +956,41 @@ class RunHistoryResponse(SuccessResponse):
     """Response for run history endpoint."""
 
     runs_history: RunHistoryData = Field(..., description="Run history data")
+
+
+# ------------------------ Dataset Scores Schemas ------------------------
+
+
+class MetricValue(BaseModel):
+    """Individual metric value."""
+
+    metric_name: str = Field(..., description="Name of the metric (e.g., accuracy, f1_score)")
+    metric_value: float = Field(..., description="Value of the metric")
+
+
+class DatasetModelScore(BaseModel):
+    """Individual model score for a dataset."""
+
+    rank: int = Field(..., description="Ranking by accuracy (1=best)")
+    model_id: UUID4 = Field(..., description="UUID of the model")
+    model_name: str = Field(..., description="Model name")
+    model_display_name: Optional[str] = Field(None, description="Model display name")
+    model_icon: Optional[str] = Field(None, description="Model icon URL")
+    endpoint_name: str = Field(..., description="Endpoint/deployment name")
+    accuracy: Optional[float] = Field(None, description="Accuracy metric used for ranking")
+    metrics: List[MetricValue] = Field(default_factory=list, description="All averaged metrics")
+    num_runs: int = Field(..., description="Number of runs averaged")
+    created_at: datetime = Field(..., description="Creation timestamp from most recent run")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class DatasetScoresResponse(PaginatedSuccessResponse):
+    """Response for dataset scores endpoint."""
+
+    dataset_id: UUID4 = Field(..., description="UUID of the dataset")
+    dataset_name: str = Field(..., description="Name of the dataset")
+    scores: List[DatasetModelScore] = Field(default_factory=list, description="List of model scores")
