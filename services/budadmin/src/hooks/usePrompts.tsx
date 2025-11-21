@@ -47,6 +47,45 @@ export type GetPromptsParams = {
   project_id?: string;
 };
 
+// Prompt config response from /prompts/prompt-config/{prompt_id}
+export interface PromptConfigData {
+  deployment_name: string | null;
+  deployment_id?: string;
+  model_settings: Record<string, unknown> | null;
+  stream: boolean | null;
+  input_schema: {
+    $defs?: {
+      Input?: {
+        properties?: Record<string, { type?: string; title?: string; default?: string }>;
+      };
+    };
+  } | null;
+  input_validation: Record<string, unknown> | null;
+  output_schema: {
+    $defs?: {
+      Output?: {
+        properties?: Record<string, { type?: string; title?: string; default?: string }>;
+      };
+    };
+  } | null;
+  output_validation: Record<string, unknown> | null;
+  messages: Array<{ role: string; content: string }> | null;
+  llm_retry_limit: number | null;
+  enable_tools: boolean | null;
+  allow_multiple_calls: boolean | null;
+  system_prompt_role: string | null;
+  system_prompt: string | null;
+  tools: unknown[];
+}
+
+export interface PromptConfigResponse {
+  object: string;
+  message: string;
+  prompt_id: string;
+  version: number;
+  data: PromptConfigData;
+}
+
 export const usePrompts = create<{
   prompts: IPrompt[];
   totalRecords: number;
@@ -61,7 +100,7 @@ export const usePrompts = create<{
   createPrompt: (data: any, projectId?: string) => Promise<any>;
   deletePrompt: (promptId: string, projectId?: string) => Promise<any>;
   updatePrompt: (promptId: string, data: any, projectId?: string) => Promise<any>;
-  getPromptConfig: (promptId: string) => Promise<any>;
+  getPromptConfig: (promptId: string) => Promise<PromptConfigResponse | null>;
 }>((set) => ({
   prompts: [],
   totalRecords: 0,
@@ -222,11 +261,11 @@ export const usePrompts = create<{
     }
   },
 
-  getPromptConfig: async (promptId: string): Promise<any> => {
+  getPromptConfig: async (promptId: string): Promise<PromptConfigResponse | null> => {
     try {
       const url = `${tempApiBaseUrl}/prompts/prompt-config/${promptId}`;
-      const response: any = await AppRequest.Get(url);
-      return response.data;
+      const response = await AppRequest.Get(url);
+      return response.data as PromptConfigResponse;
     } catch (error) {
       // Silently fail - return null for new prompts without config
       return null;
