@@ -7,6 +7,7 @@ import dapr.ext.workflow as wf
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 from budeval.commons.logging import logging
+from budeval.evals.schema import EvaluationRequest
 
 
 logger = logging.getLogger(__name__)
@@ -148,34 +149,72 @@ def send_eta_notification(ctx: wf.WorkflowActivityContext, notification_data: st
         total = data.get("total_jobs", 0)
         running = data.get("running_jobs", 0)
 
+        evaluate_model_request_json = json.loads(data.get("evaluate_model_request_json_raw", "{}"))
+        evaluate_model_request = EvaluationRequest.model_validate_json(evaluate_model_request_json)
+
         message = f"{remaining_sec}"  # Send seconds for compatibility
 
-        # Create notification
-        notification_req = NotificationRequest(
-            payload={
-                "event": "eta",  # Use existing eta event
-                "content": NotificationContent(
-                    title=f"Evaluation Progress: {progress_pct:.1f}%",
-                    message=message,
-                    status=WorkflowStatus.RUNNING,
-                    metadata={
-                        "progress_percentage": progress_pct,
-                        "remaining_seconds": remaining_sec,
-                        "remaining_minutes": remaining_min,
-                        "completed_jobs": completed,
-                        "running_jobs": running,
-                        "total_jobs": total,
-                    },
-                ),
-            }
+        # Notifications
+        # Set up notification
+        workflow_name = "evaluate_model"
+
+        # Notification Request
+        notification_request = NotificationRequest.from_cloud_event(
+            cloud_event=evaluate_model_request,
+            name=workflow_name,
+            workflow_id=data["workflow_id"],
+        )
+
+        notification_req = notification_request.model_copy(deep=True)
+
+        notification_req.payload.event = "eta"
+        notification_req.payload.content = NotificationContent(
+            title=f"Evaluation Progress: {progress_pct:.1f}%",
+            message=message,
+            status=WorkflowStatus.RUNNING,
+            metadata={
+                "progress_percentage": progress_pct,
+                "remaining_seconds": remaining_sec,
+                "remaining_minutes": remaining_min,
+                "completed_jobs": completed,
+                "running_jobs": running,
+                "total_jobs": total,
+            },
         )
 
         dapr_workflows.publish_notification(
             workflow_id=data["workflow_id"],
             notification=notification_req,
-            target_topic_name=data["source_topic"],
-            target_name=data["source"],
+            target_topic_name=evaluate_model_request.source_topic,
+            target_name=evaluate_model_request.source,
         )
+
+        # # Create notification
+        # notification_req = NotificationRequest(
+        #     payload={
+        #         "event": "eta",  # Use existing eta event
+        #         "content": NotificationContent(
+        #             title=f"Evaluation Progress: {progress_pct:.1f}%",
+        #             message=message,
+        #             status=WorkflowStatus.RUNNING,
+        #             metadata={
+        #                 "progress_percentage": progress_pct,
+        #                 "remaining_seconds": remaining_sec,
+        #                 "remaining_minutes": remaining_min,
+        #                 "completed_jobs": completed,
+        #                 "running_jobs": running,
+        #                 "total_jobs": total,
+        #             },
+        #         ),
+        #     }
+        # )
+
+        # dapr_workflows.publish_notification(
+        #     workflow_id=data["workflow_id"],
+        #     notification=notification_req,
+        #     target_topic_name=data["source_topic"],
+        #     target_name=data["source"],
+        # )
 
         logger_local.info(f"Sent ETA notification: {progress_pct:.1f}%, {remaining_min}m remaining")
         return {"success": True}
@@ -343,6 +382,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
             "total_jobs": len(job_ids),
             "running_jobs": len(remaining_jobs),
             "failed_jobs": len(failed_jobs),
+            "evaluate_model_request_json_raw": data.get("evaluate_model_request_json_raw"),
         }
 
         yield ctx.call_activity(send_eta_notification, input=json.dumps(notification_data))
@@ -383,6 +423,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     data["workflow_id"] = workflow_id
     data["source_topic"] = source_topic
     data["source"] = source or "budeval"  # Ensure source is never None
+    data["evaluate_model_request_json_raw"] = data.get("evaluate_model_request_json_raw")  # Persist for notifications
     yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
     ctx.continue_as_new(json.dumps(data))
     return

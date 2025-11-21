@@ -336,6 +336,7 @@ class EvaluationWorkflow:
             # NEW: Pass notification metadata for child workflow to use
             "workflow_id": instance_id,
             "source_topic": evaluate_model_request_json.source_topic,
+            "evaluate_model_request_json_raw": evaluate_model_request_json.model_dump(mode="json"),
             "source": evaluate_model_request_json.source,
         }
 
