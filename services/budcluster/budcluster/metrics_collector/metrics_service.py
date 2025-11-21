@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+import inspect
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -285,6 +286,10 @@ class MetricsCollectionService:
             No exceptions - errors are logged but not propagated to avoid breaking workflows
         """
         try:
+            if not self.session:
+                logger.warning(f"No session available to update metrics status for cluster {cluster_id}")
+                return
+                
             update_data = {"metrics_collection_status": status.value}
             if last_collection:
                 update_data["last_metrics_collection"] = last_collection
@@ -296,7 +301,10 @@ class MetricsCollectionService:
                 for key, value in update_data.items():
                     setattr(cluster, key, value)
                 # Flush changes to database (commit handled by transaction context)
-                await self.session.flush()
+                # Handle both sync and async sessions safely
+                flush_res = self.session.flush()
+                if inspect.isawaitable(flush_res):
+                    await flush_res
                 logger.debug(f"Flushed metrics status update for cluster {cluster_id}: {status.value}")
             else:
                 logger.warning(f"Cluster {cluster_id} not found when updating metrics status")
