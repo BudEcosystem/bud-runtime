@@ -268,7 +268,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     remaining_jobs = [j for j in job_ids if j not in completed_jobs and j not in failed_jobs]
 
     # NEW: Parse logs for progress/ETA (only for running jobs)
-    if remaining_jobs and not ctx.is_replaying:
+    if remaining_jobs:
         log_parse_result = yield ctx.call_activity(
             parse_job_logs_activity,
             input=json.dumps(
@@ -302,7 +302,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
                     logger_local.debug(f"Job {job_id}: No progress data yet")
 
     # NEW: Send notification with progress update (EVERY CYCLE)
-    if workflow_id and source_topic and source and not ctx.is_replaying:
+    if workflow_id and source_topic and source:
         # Calculate aggregate progress (only for jobs that have started)
         total_progress = 0
         total_remaining = 0
