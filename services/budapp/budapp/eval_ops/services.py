@@ -1895,7 +1895,7 @@ class ExperimentService:
                     humans_vs_llm_qualifications=dataset.humans_vs_llm_qualifications,
                     task_type=dataset.task_type,
                     modalities=dataset.modalities,
-                    sample_questions_answers=dataset.sample_questions_answers,
+                    # sample_questions_answers=dataset.sample_questions_answers,
                     advantages_disadvantages=dataset.advantages_disadvantages,
                     eval_types=dataset.eval_types,
                     why_run_this_eval=dataset.why_run_this_eval,
