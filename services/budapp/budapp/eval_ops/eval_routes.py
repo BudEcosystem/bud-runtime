@@ -1222,13 +1222,9 @@ async def sync_evaluation_datasets(
 
         logger.info(f"Evaluation dataset sync workflow triggered: {response}")
 
+        workflow_id = response.get("workflow_id") if isinstance(response, dict) else str(response)
         return SuccessResponse(
-            message="Evaluation dataset sync workflow triggered successfully",
-            data={
-                "workflow_id": response.get("workflow_id") if isinstance(response, dict) else str(response),
-                "force_sync": force_sync,
-                "note": "Sync is running as a background workflow. Check workflow status for completion.",
-            },
+            message=f"Evaluation dataset sync workflow triggered successfully. Workflow ID: {workflow_id}. Force sync: {force_sync}.",
             code=status.HTTP_200_OK,
         ).to_http_response()
 
