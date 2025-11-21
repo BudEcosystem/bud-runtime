@@ -1245,7 +1245,9 @@ class ClusterOpsService:
         return response
 
     @classmethod
-    async def _send_cluster_state_notification(cls, cluster_id: UUID, cluster_name: str, old_status: str, new_status: str, message: str):
+    async def _send_cluster_state_notification(
+        cls, cluster_id: UUID, cluster_name: str, old_status: str, new_status: str, message: str
+    ):
         """Send notification when cluster state changes.
 
         Args:
@@ -1334,7 +1336,7 @@ class ClusterOpsService:
                         logger.warning(
                             f"Cluster {cluster.id} moved to ERROR state after {threshold_hours}h in NOT_AVAILABLE"
                         )
-                        
+
                         # Send notification about the state change
                         await cls._send_cluster_state_notification(
                             cluster_id=cluster.id,
@@ -1447,7 +1449,7 @@ class ClusterOpsService:
 
                 if previous_status in [ClusterStatusEnum.NOT_AVAILABLE, ClusterStatusEnum.ERROR]:
                     logger.info(f"Cluster {cluster_id} recovered from {previous_status} to AVAILABLE")
-                    
+
                     # Send notification about the recovery
                     await cls._send_cluster_state_notification(
                         cluster_id=cluster.id,
@@ -1660,8 +1662,7 @@ class ClusterOpsService:
             NotificationType,
             WorkflowStatus,
         )
-        from budmicroframe.shared.dapr_service import DaprService
-        from budmicroframe.shared.dapr_service import DaprServiceCrypto
+        from budmicroframe.shared.dapr_service import DaprService, DaprServiceCrypto
 
         cluster_id_str = str(cluster.id)
         logger.debug(f"Updating node status for cluster {cluster_id_str}")
