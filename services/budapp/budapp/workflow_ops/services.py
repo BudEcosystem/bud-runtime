@@ -428,7 +428,7 @@ class WorkflowService(SessionMixin):
                 enable_tool_calling=enable_tool_calling if enable_tool_calling else None,
                 enable_reasoning=enable_reasoning if enable_reasoning else None,
                 hardware_mode=hardware_mode if hardware_mode else None,
-                dataset_ids=dataset_ids if dataset_ids else None,
+                dataset_ids=dataset_ids,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
