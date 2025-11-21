@@ -60,7 +60,8 @@ const parseSchemaToVariables = (
       dataType: (validDataTypes.includes(prop?.type as DataType) ? prop?.type : 'string') as DataType,
       defaultValue: prop?.default || '',
     }));
-  } catch {
+  } catch (error) {
+    console.error("Failed to parse schema to variables:", error);
     return [];
   }
 };
