@@ -281,7 +281,7 @@ const EvalDetailed = () => {
                     </div>
                   ),
                   key: "3",
-                  children: <EvalExplorerTable />,
+                  children: <EvalExplorerTable datasets={datasets}/>,
                 },
               ]}
             />
