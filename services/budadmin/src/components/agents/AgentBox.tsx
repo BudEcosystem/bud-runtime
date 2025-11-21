@@ -190,36 +190,26 @@ function AgentBoxInner({
           }
 
           // Map input_schema to inputVariables
-          let hasInputSchema = false;
           if (configData.input_schema) {
             const inputVars = parseSchemaToVariables(configData.input_schema, 'Input', 'input');
             if (inputVars.length > 0) {
               updates.inputVariables = inputVars;
-              hasInputSchema = true;
+              setStructuredInputEnabled(true);
             }
           }
 
           // Map output_schema to outputVariables
-          let hasOutputSchema = false;
           if (configData.output_schema) {
             const outputVars = parseSchemaToVariables(configData.output_schema, 'Output', 'output');
             if (outputVars.length > 0) {
               updates.outputVariables = outputVars;
-              hasOutputSchema = true;
+              setStructuredOutputEnabled(true);
             }
           }
 
           // Only update if we have data to update
           if (Object.keys(updates).length > 0) {
             updateSession(session.id, updates);
-          }
-
-          // Enable structured mode if we loaded schema data
-          if (hasInputSchema) {
-            setStructuredInputEnabled(true);
-          }
-          if (hasOutputSchema) {
-            setStructuredOutputEnabled(true);
           }
         }
 
