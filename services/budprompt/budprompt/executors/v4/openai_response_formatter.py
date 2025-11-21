@@ -28,15 +28,6 @@ from openai.types.responses import (
 from openai.types.responses.easy_input_message import EasyInputMessage
 from openai.types.responses.response_format_text_json_schema_config import ResponseFormatTextJSONSchemaConfig
 from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
-from openai.types.responses.response_input_item import (
-    FunctionCallOutput,
-)
-from openai.types.responses.response_input_item import (
-    McpCall as ResponseInputMcpCall,  # MCP tool call/return for instructions field
-)
-from openai.types.responses.response_input_item import (
-    Message as ResponseInputMessage,  # Use alias to avoid conflict with local Message class
-)
 from openai.types.responses.response_input_text import ResponseInputText
 from openai.types.responses.response_output_item import (
     McpCall as ResponseOutputMcpCall,  # MCP tool call for output field
@@ -59,13 +50,10 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
-    RetryPromptPart,
-    SystemPromptPart,
     TextPart,
     ThinkingPart,
     ToolCallPart,
     ToolReturnPart,
-    UserPromptPart,
 )
 from pydantic_ai.run import AgentRunResult
 
@@ -506,128 +494,6 @@ class OpenAIResponseFormatter_V4:
             )
 
         return instructions
-
-    async def _format_input_items(
-        self,
-        all_messages: List[ModelMessage],
-        mcp_tool_call_ids: set,
-        tools: Optional[List[MCPToolConfig]] = None,
-    ) -> List[Any]:
-        """Convert pydantic-ai ModelRequest messages to OpenAI ResponseInputItem list.
-
-        Text-only implementation for LLM interactions.
-
-        Args:
-            all_messages: All messages from pydantic-ai result (ModelMessage objects)
-            mcp_tool_call_ids: Set of tool call IDs that are MCP tools
-            tools: MCP tool configurations for server_label mapping
-
-        Returns:
-            List of ResponseInputItem (system prompts, user prompts, tool returns, retry prompts)
-        """
-        input_items: List[Any] = []
-
-        for message in all_messages:
-            if isinstance(message, ModelRequest):
-                for part in message.parts:
-                    # SystemPromptPart → ResponseInputMessage with role='system'
-                    if isinstance(part, SystemPromptPart):
-                        input_items.append(
-                            ResponseInputMessage(
-                                role="system",
-                                content=[
-                                    ResponseInputText(
-                                        type="input_text",
-                                        text=part.content,
-                                    )
-                                ],
-                                type="message",
-                                status="completed",
-                            )
-                        )
-
-                    # UserPromptPart → ResponseInputMessage with role='user'
-                    elif isinstance(part, UserPromptPart):
-                        # Convert to string if needed (text-only for now)
-                        content_str = part.content if isinstance(part.content, str) else str(part.content)
-                        input_items.append(
-                            ResponseInputMessage(
-                                role="user",
-                                content=[
-                                    ResponseInputText(
-                                        type="input_text",
-                                        text=content_str,
-                                    )
-                                ],
-                                type="message",
-                                status="completed",
-                            )
-                        )
-
-                    # ToolReturnPart → ResponseInputMcpCall or FunctionCallOutput
-                    elif isinstance(part, ToolReturnPart):
-                        if not part.tool_call_id:
-                            logger.warning(f"ToolReturnPart missing tool_call_id, skipping: {part.tool_name}")
-                            continue
-
-                        # Check if this is an MCP tool return by checking tool_call_id
-                        if part.tool_call_id in mcp_tool_call_ids:
-                            # MCP tool return - get server label from tool name
-                            server_label = self._get_server_label_for_tool(part.tool_name, tools)
-                            # Get arguments from mapper (populated during _format_output_items)
-                            arguments = self._tool_call_args_map.get(part.tool_call_id, "{}")
-                            input_items.append(
-                                ResponseInputMcpCall(
-                                    id=part.tool_call_id,
-                                    type="mcp_call",
-                                    name=part.tool_name,
-                                    server_label=server_label or "unknown",
-                                    arguments=arguments,
-                                    output=part.model_response_str(),
-                                    status="completed",
-                                )
-                            )
-                        else:
-                            # Regular function call output
-                            input_items.append(
-                                FunctionCallOutput(
-                                    type="function_call_output",
-                                    call_id=part.tool_call_id,
-                                    output=part.model_response_str(),
-                                )
-                            )
-
-                    # RetryPromptPart → ResponseInputMessage or FunctionCallOutput
-                    elif isinstance(part, RetryPromptPart):
-                        # Always use model_response() to get string (handles str and list[ErrorDetails])
-                        retry_text = part.model_response()
-
-                        if part.tool_name is None:
-                            # Retry without tool → user message
-                            input_items.append(
-                                ResponseInputMessage(
-                                    role="user",
-                                    content=[
-                                        ResponseInputText(
-                                            type="input_text",
-                                            text=retry_text,
-                                        )
-                                    ],
-                                    type="message",
-                                    status="completed",
-                                )
-                            )
-                        else:
-                            # Retry with tool → function call output
-                            input_items.append(
-                                FunctionCallOutput(
-                                    type="function_call_output",
-                                    call_id=part.tool_call_id,
-                                    output=retry_text,
-                                )
-                            )
-
-        return input_items
 
     def _build_tool_returns_lookup(self, all_messages: List[ModelMessage]) -> Dict[str, Dict]:
         """Build a lookup dictionary of tool returns by tool_call_id.
