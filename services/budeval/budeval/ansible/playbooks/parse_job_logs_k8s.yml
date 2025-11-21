@@ -25,12 +25,9 @@
     - name: Split job names into list
       ansible.builtin.set_fact:
         job_list: "{{ job_names.split(',') }}"
-
-    - name: Initialize results dictionary
-      ansible.builtin.set_fact:
         log_progress: {}
 
-    - name: Get pods for each job
+    - name: Get pods for all jobs
       kubernetes.core.k8s_info:
         api_version: v1
         kind: Pod
@@ -38,152 +35,16 @@
         label_selectors:
           - "job-name={{ item }}"
         kubeconfig: "{{ kubeconfig_path if kubeconfig_path else omit }}"
-      register: job_pods
+      register: all_job_pods
       loop: "{{ job_list }}"
       ignore_errors: true
 
-    - name: Check pod readiness and container state
-      ansible.builtin.set_fact:
-        pod_ready_map: >-
-          {{
-            pod_ready_map | default({}) | combine({
-              item.item: {
-                'ready': (item.resources | length > 0) and
-                         (item.resources[0].status.phase in ['Running', 'Succeeded', 'Failed']) and
-                         (item.resources[0].status.containerStatuses | default([]) | length > 0) and
-                         (item.resources[0].status.containerStatuses[0].state.running is defined or
-                          item.resources[0].status.containerStatuses[0].state.terminated is defined),
-                'pod_name': item.resources[0].metadata.name if (item.resources | length > 0) else '',
-                'phase': item.resources[0].status.phase if (item.resources | length > 0) else 'NotFound',
-                'container_state': (item.resources[0].status.containerStatuses[0].state.keys() | list | first)
-                                   if ((item.resources | length > 0) and
-                                       (item.resources[0].status.containerStatuses | default([]) | length > 0))
-                                   else 'unknown'
-              }
-            })
-          }}
-      loop: "{{ job_pods.results }}"
-      when: item is defined
-      ignore_errors: true
-
-    - name: Get logs from ready pods only
-      kubernetes.core.k8s_log:
-        api_version: v1
-        kind: Pod
-        name: "{{ pod_ready_map[item].pod_name }}"
-        namespace: "{{ namespace }}"
-        tail_lines: 500  # Last 500 lines for efficiency
-        kubeconfig: "{{ kubeconfig_path if kubeconfig_path else omit }}"
-      register: pod_logs
+    - name: Process each job
+      include_tasks: process_job.yml
       loop: "{{ job_list }}"
-      when:
-        - pod_ready_map[item] is defined
-        - pod_ready_map[item].ready
-      ignore_errors: true
-
-    - name: Parse logs for ETA and progress data
-      ansible.builtin.shell: |
-        python3 << 'EOF'
-        import re
-        import json
-        import sys
-
-        def parse_opencompass_logs(log_text):
-            """Extract ETA_DATA and PROGRESS_DATA from OpenCompass logs."""
-
-            result = {
-                "eta_data": None,
-                "latest_progress": None,
-                "progress_percentage": 0,
-                "status": "no_logs"
-            }
-
-            if not log_text:
-                return result
-
-            # Find all ETA_DATA entries (usually just one)
-            eta_pattern = r'ETA_DATA:\s*(\{[^}]+\})'
-            eta_matches = re.findall(eta_pattern, log_text)
-            if eta_matches:
-                try:
-                    result["eta_data"] = json.loads(eta_matches[-1])  # Latest
-                except json.JSONDecodeError:
-                    pass
-
-            # Find all PROGRESS_DATA entries
-            progress_pattern = r'PROGRESS_DATA:\s*(\{[^}]+\})'
-            progress_matches = re.findall(progress_pattern, log_text)
-            if progress_matches:
-                try:
-                    result["latest_progress"] = json.loads(progress_matches[-1])  # Latest
-
-                    # Calculate progress percentage
-                    progress = result["latest_progress"]
-                    batches_completed = progress.get("batches_completed", 0)
-                    batches_total = progress.get("batches_total", 1)
-                    result["progress_percentage"] = (batches_completed / batches_total) * 100
-                    result["status"] = "running"
-
-                except json.JSONDecodeError:
-                    pass
-
-            # If we have ETA but no progress yet, job is starting
-            if result["eta_data"] and not result["latest_progress"]:
-                result["status"] = "starting"
-                result["progress_percentage"] = 0
-
-            return result
-
-        # Read log text from stdin
-        log_text = sys.stdin.read()
-        result = parse_opencompass_logs(log_text)
-        print(json.dumps(result))
-        EOF
-      args:
-        stdin: "{{ item.log | default('') }}"
-      register: parsed_logs
-      loop: "{{ pod_logs.results }}"
-      when: item.log is defined
-      ignore_errors: true
-
-    - name: Build log progress map from parsed logs
-      ansible.builtin.set_fact:
-        log_progress: >-
-          {{
-            log_progress | combine({
-              item.item: parsed_result
-            })
-          }}
-      vars:
-        parsed_result: "{{ item.stdout | from_json }}"
-      loop: "{{ parsed_logs.results }}"
-      when:
-        - item.stdout is defined
-        - item.stdout | length > 0
-        - not item.failed | default(false)
-      ignore_errors: true
-
-    - name: Add placeholder for pods that aren't ready yet
-      ansible.builtin.set_fact:
-        log_progress: >-
-          {{
-            log_progress | combine({
-              item: {
-                'eta_data': None,
-                'latest_progress': None,
-                'progress_percentage': 0,
-                'status': 'pending',
-                'pod_state': pod_ready_map[item].container_state if (pod_ready_map[item] is defined) else 'unknown',
-                'pod_phase': pod_ready_map[item].phase if (pod_ready_map[item] is defined) else 'unknown'
-              }
-            })
-          }}
-      loop: "{{ job_list }}"
-      when:
-        - log_progress[item] is not defined
-        - pod_ready_map[item] is defined
-        - not pod_ready_map[item].ready
-      ignore_errors: true
+      loop_control:
+        loop_var: current_job_name
+        index_var: job_index
 
     - name: Write results to temporary file
       ansible.builtin.copy:
