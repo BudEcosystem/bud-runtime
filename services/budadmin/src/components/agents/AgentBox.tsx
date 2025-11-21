@@ -777,46 +777,27 @@ function AgentBoxInner({
     }
   };
 
-  const handleClearInputSchema = () => {
-    if (!session) {
-      return;
-    }
+  // Helper to create a default variable for clearing schemas
+  const createDefaultVariable = (type: 'input' | 'output'): AgentVariable => ({
+    id: generateVarId(),
+    name: type === 'input' ? 'Input Variable 1' : 'Output Variable 1',
+    value: '',
+    type,
+    description: '',
+    dataType: 'string',
+    defaultValue: '',
+  });
 
+  const handleClearInputSchema = () => {
+    if (!session) return;
     // Only update local state - API call will be made on Update button click
-    updateSession(session.id, {
-      inputVariables: [
-        {
-          id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-          name: "Input Variable 1",
-          value: "",
-          type: "input",
-          description: "",
-          dataType: "string",
-          defaultValue: ""
-        }
-      ]
-    });
+    updateSession(session.id, { inputVariables: [createDefaultVariable('input')] });
   };
 
   const handleClearOutputSchema = () => {
-    if (!session) {
-      return;
-    }
-
+    if (!session) return;
     // Only update local state - API call will be made on Update button click
-    updateSession(session.id, {
-      outputVariables: [
-        {
-          id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-          name: "Output Variable 1",
-          value: "",
-          type: "output",
-          description: "",
-          dataType: "string",
-          defaultValue: ""
-        }
-      ]
-    });
+    updateSession(session.id, { outputVariables: [createDefaultVariable('output')] });
   };
 
   const handleSaveSystemPrompt = async () => {
