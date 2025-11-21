@@ -483,29 +483,40 @@ class PromptService(SessionMixin):
                 message="Failed to save prompt configuration", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             ) from e
 
-    async def get_prompt_config(self, prompt_id: str, version: Optional[int] = None) -> PromptConfigGetResponse:
+    async def get_prompt_config(self, prompt_id: str, version: int) -> PromptConfigGetResponse:
         """Get prompt configuration from budprompt service.
 
         Args:
             prompt_id: The prompt configuration identifier
-            version: Optional version number to retrieve
+            version: Version number to retrieve
 
         Returns:
             PromptConfigGetResponse containing the configuration data
         """
-        # Perform the request to budprompt service
-        response_data = await self._perform_get_prompt_config_request(prompt_id, version)
+        try:
+            # Perform the request to budprompt service
+            response_data = await self._perform_get_prompt_config_request(prompt_id, version)
 
-        # Parse the configuration data
-        config_data = PromptConfigurationData(**response_data.get("data", {}))
-        version = response_data.get("version")
+            # Parse the configuration data
+            config_data = PromptConfigurationData(**response_data.get("data", {}))
+            response_version = response_data.get("version")
+            response_message = "Prompt configuration retrieved successfully"
+        except ClientException as e:
+            if e.status_code == 404:
+                # NOTE: Return empty/default config as requested for Frontend logic
+                logger.debug("Prompt config not found for %s, returning empty config", prompt_id)
+                config_data = PromptConfigurationData()
+                response_version = version  # Use original parameter
+                response_message = "Prompt configuration not found, returning empty config"
+            else:
+                raise  # Re-raise non-404 errors
 
         # Create and return response
         return PromptConfigGetResponse(
-            prompt_id=response_data.get("prompt_id"),
+            prompt_id=prompt_id,
             data=config_data,
-            version=version,
-            message="Prompt configuration retrieved successfully",
+            version=response_version,
+            message=response_message,
             code=status.HTTP_200_OK,
         )
 

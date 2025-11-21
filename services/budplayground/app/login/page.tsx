@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Form, Image, Input } from "antd";
 import { useAuth } from "../context/AuthContext";
 import { Text_12_300_EEEEEE, Text_14_300_EEEEEE } from "@/lib/text";
@@ -19,6 +19,17 @@ export default function Login() {
     const [isInvalidApiKey, setIsInvalidApiKey] = useState(false);
     const [key, setKey] = useState("");
 
+    // Build chat redirect URL preserving relevant parameters
+    const getChatRedirectUrl = useCallback(() => {
+        if (typeof window === 'undefined') return '/chat';
+
+        const preservedParams = new URLSearchParams(window.location.search);
+        ['refresh_token', 'access_key', 'embedded'].forEach(param => preservedParams.delete(param));
+
+        const queryString = preservedParams.toString();
+        return queryString ? `/chat?${queryString}` : '/chat';
+    }, []);
+
     const handleAdd = async (refreshToken?: string) => {
         if(!refreshToken) {
           form.submit();
@@ -28,7 +39,7 @@ export default function Login() {
         showLoader();
         const isLoginSuccessful = await login(key, refreshToken);
         if(isLoginSuccessful) {
-            router.replace(`chat`);
+            router.replace(getChatRedirectUrl());
         } else {
             setIsInvalidApiKey(true);
         }
@@ -43,12 +54,12 @@ export default function Login() {
 
         if (apiKey || isSessionValid) {
             // Already authenticated, redirect to chat
-            router.replace('/chat');
+            router.replace(getChatRedirectUrl());
         } else {
             // Not authenticated, show login form
             hideLoader();
         }
-    }, [apiKey, isSessionValid, authLoading, router, hideLoader]);
+    }, [apiKey, isSessionValid, authLoading, router, hideLoader, getChatRedirectUrl]);
     return (
       <div className={`w-full h-screen logginBg box-border relative overflow-hidden ${isLoading ? 'opacity-0' : 'opacity-100'}`}>
         <div className="loginWrap w-full h-full loginBg-glass flex justify-between box-border ">

@@ -183,62 +183,67 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     const fetchPromptConfiguration = async () => {
       const promptIds = getPromptIds();
 
-      if (promptIds.length > 0 && (apiKey || accessKey)) {
-        setPromptConfigLoading(true);
-        setIsDeploymentReady(false); // Start loading
+      if (promptIds.length === 0 || (!apiKey && !accessKey)) {
+        // No promptIds - ensure deployment is not locked (clear any persisted lock state)
+        setDeploymentLock(chat.id, false);
+        setIsDeploymentReady(true);
+        return;
+      }
 
-        try {
-          const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
+      setPromptConfigLoading(true);
+      setIsDeploymentReady(false); // Start loading
 
-          if (config && config.data) {
-            setPromptConfig(config.data);
+      try {
+        const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
 
-            // Determine if structured or unstructured
-            let schemaToCheck = config.data.input_schema;
+        if (config && config.data) {
+          setPromptConfig(config.data);
 
-            // Check for $defs structure (JSON schema format)
-            if (schemaToCheck && schemaToCheck.$defs) {
-              if (schemaToCheck.$defs.Input) {
-                schemaToCheck = schemaToCheck.$defs.Input.properties || {};
-              } else if (schemaToCheck.$defs.InputSchema) {
-                schemaToCheck = schemaToCheck.$defs.InputSchema.properties || {};
-              }
-            }
+          // Determine if structured or unstructured
+          let schemaToCheck = config.data.input_schema;
 
-            // Is structured if schema has properties
-            const hasSchema = schemaToCheck &&
-                             typeof schemaToCheck === 'object' &&
-                             Object.keys(schemaToCheck).length > 0;
-
-            setIsStructuredPrompt(hasSchema);
-
-            // If unstructured, prepare prompt data for chat body
-            if (!hasSchema) {
-              const version = config.data?.version ?? config.data?.prompt?.version ?? undefined;
-              const promptPayload: any = {
-                prompt: {
-                  id: promptIds[0],
-                },
-                promptId: promptIds[0],
-              };
-
-              if (version !== undefined && version !== null) {
-                promptPayload.prompt.version = String(version);
-              }
-
-              if (config.data.deployment_name && typeof config.data.deployment_name === 'string') {
-                promptPayload.model = config.data.deployment_name;
-              }
-
-              setPromptData(promptPayload);
+          // Check for $defs structure (JSON schema format)
+          if (schemaToCheck && schemaToCheck.$defs) {
+            if (schemaToCheck.$defs.Input) {
+              schemaToCheck = schemaToCheck.$defs.Input.properties || {};
+            } else if (schemaToCheck.$defs.InputSchema) {
+              schemaToCheck = schemaToCheck.$defs.InputSchema.properties || {};
             }
           }
-        } catch (error) {
-          console.error('[ChatWindow] Error fetching prompt config:', error);
-          setIsStructuredPrompt(false); // Default to unstructured on error
-        } finally {
-          setPromptConfigLoading(false);
+
+          // Is structured if schema has properties
+          const hasSchema = schemaToCheck &&
+                           typeof schemaToCheck === 'object' &&
+                           Object.keys(schemaToCheck).length > 0;
+
+          setIsStructuredPrompt(hasSchema);
+
+          // If unstructured, prepare prompt data for chat body
+          if (!hasSchema) {
+            const version = config.data?.version ?? config.data?.prompt?.version ?? undefined;
+            const promptPayload: any = {
+              prompt: {
+                id: promptIds[0],
+              },
+              promptId: promptIds[0],
+            };
+
+            if (version !== undefined && version !== null) {
+              promptPayload.prompt.version = String(version);
+            }
+
+            if (config.data.deployment_name && typeof config.data.deployment_name === 'string') {
+              promptPayload.model = config.data.deployment_name;
+            }
+
+            setPromptData(promptPayload);
+          }
         }
+      } catch (error) {
+        console.error('[ChatWindow] Error fetching prompt config:', error);
+        setIsStructuredPrompt(false); // Default to unstructured on error
+      } finally {
+        setPromptConfigLoading(false);
       }
     };
 

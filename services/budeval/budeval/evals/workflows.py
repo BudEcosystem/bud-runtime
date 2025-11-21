@@ -85,7 +85,7 @@ class EvaluationWorkflow:
 
         # Set initial ETA
         notification_req.payload.event = "eta"
-        eta_minutes = 30 * 60 * len(evaluate_model_request_json.eval_datasets)
+        eta_minutes = 3 * 60
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
             message=f"{eta_minutes}",

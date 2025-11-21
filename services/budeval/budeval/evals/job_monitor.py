@@ -149,10 +149,15 @@ def send_eta_notification(ctx: wf.WorkflowActivityContext, notification_data: st
         total = data.get("total_jobs", 0)
         running = data.get("running_jobs", 0)
 
-        evaluate_model_request_json = json.loads(data.get("evaluate_model_request_json_raw", "{}"))
-        evaluate_model_request = EvaluationRequest.model_validate_json(evaluate_model_request_json)
+        # Get evaluate_model_request from data (already a dict, not JSON string)
+        evaluate_model_request_dict = data.get("evaluate_model_request_json_raw", {})
+        if not evaluate_model_request_dict:
+            logger_local.error("Missing evaluate_model_request_json_raw in notification data")
+            return {"success": False, "error": "Missing evaluate_model_request_json_raw"}
 
-        message = f"{remaining_sec}"  # Send seconds for compatibility
+        evaluate_model_request = EvaluationRequest.model_validate(evaluate_model_request_dict)
+
+        message = f"{remaining_min}"  # Send minutes as integer string
 
         # Notifications
         # Set up notification
@@ -185,8 +190,8 @@ def send_eta_notification(ctx: wf.WorkflowActivityContext, notification_data: st
         dapr_workflows.publish_notification(
             workflow_id=data["workflow_id"],
             notification=notification_req,
-            target_topic_name=evaluate_model_request.source_topic,
-            target_name=evaluate_model_request.source,
+            target_topic_name=evaluate_model_request.source_topic or data.get("source_topic"),
+            target_name=evaluate_model_request.source or data.get("source") or "budeval",
         )
 
         # # Create notification
