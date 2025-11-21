@@ -9,7 +9,7 @@ from budmicroframe.commons.schemas import NotificationContent, NotificationReque
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
 from .schemas import ClusterMetrics, ClusterRecommendationRequest, ClusterRecommendationResponse
-from .services import SimulationService
+from .services import SimulationService, calculate_available_gpu_memory
 
 
 logger = logging.get_logger(__name__)
@@ -150,8 +150,14 @@ class SimulationWorkflows:
 
                 # Group devices by type within THIS cluster only
                 logger.debug(f"Grouping devices by type for cluster {cluster_id}")
+
+                # Extract user's hardware mode preference for device filtering
+                user_hardware_mode = (
+                    request.hardware_mode.value if hasattr(request.hardware_mode, "value") else request.hardware_mode
+                )
+
                 device_groups = SimulationService._group_devices_by_type_across_cluster(
-                    single_cluster_list, cluster_topology
+                    single_cluster_list, cluster_topology, user_hardware_mode
                 )
 
                 # Log device groups for this cluster
@@ -211,6 +217,38 @@ class SimulationWorkflows:
                             # Convert memory from MB to GB if needed
                             if "memory" in cluster_device_config and "mem_per_GPU_in_GB" not in cluster_device_config:
                                 cluster_device_config["mem_per_GPU_in_GB"] = cluster_device_config["memory"] / 1024.0
+
+                            # Calculate available memory based on user's hardware mode
+                            user_hardware_mode = (
+                                request.hardware_mode.value
+                                if hasattr(request.hardware_mode, "value")
+                                else request.hardware_mode
+                            )
+
+                            logger.debug(
+                                f"Workflow memory override check: user_hardware_mode={user_hardware_mode}, "
+                                f"device_type={device_type}, "
+                                f"representative_device has mem_per_GPU_in_GB={representative_device.get('mem_per_GPU_in_GB')}, "
+                                f"memory_allocated_gb={representative_device.get('memory_allocated_gb')}"
+                            )
+
+                            if user_hardware_mode == "shared":
+                                # For shared mode, use unutilized memory (100% of available, no safety margin)
+                                total_memory_gb, memory_allocated_gb, available_memory_gb = (
+                                    calculate_available_gpu_memory(cluster_device_config)
+                                )
+
+                                logger.info(
+                                    f"Shared mode GPU memory calculation for {device_type}: "
+                                    f"total={total_memory_gb:.2f}GB, allocated={memory_allocated_gb:.2f}GB, "
+                                    f"available={available_memory_gb:.2f}GB (no safety margin applied)"
+                                )
+
+                                # Override memory fields with available memory
+                                cluster_device_config["mem_per_GPU_in_GB"] = available_memory_gb
+                                cluster_device_config["memory_gb"] = available_memory_gb
+                                cluster_device_config["available_memory_gb"] = available_memory_gb
+                                cluster_device_config["total_memory_gb_original"] = total_memory_gb
 
                             logger.info(
                                 f"Creating task for cluster {cluster_id}, {device_type} with engine "

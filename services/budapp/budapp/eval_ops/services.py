@@ -2183,7 +2183,7 @@ class ExperimentService:
             user_id (uuid.UUID): ID of the user.
 
         Returns:
-            ExperimentSummary: Summary statistics including run counts and total duration.
+            ExperimentSummary: Summary statistics including evaluation counts and total duration.
 
         Raises:
             HTTPException(status_code=404): If experiment not found or access denied.
@@ -2198,36 +2198,35 @@ class ExperimentService:
                 detail="Experiment not found or access denied",
             )
 
-        # Efficiently count runs by status in a single query using database-level aggregation
-        run_stats = (
+        # Efficiently count evaluations by status in a single query using database-level aggregation
+        evaluation_stats = (
             self.session.query(
-                func.count(RunModel.id).label("total"),
-                func.sum(case((RunModel.status == RunStatusEnum.COMPLETED.value, 1), else_=0)).label("completed"),
-                func.sum(case((RunModel.status == RunStatusEnum.FAILED.value, 1), else_=0)).label("failed"),
-                func.sum(case((RunModel.status == RunStatusEnum.PENDING.value, 1), else_=0)).label("pending"),
-                func.sum(case((RunModel.status == RunStatusEnum.RUNNING.value, 1), else_=0)).label("running"),
+                func.count(EvaluationModel.id).label("total"),
+                func.sum(case((EvaluationModel.status == EvaluationStatusEnum.COMPLETED.value, 1), else_=0)).label(
+                    "completed"
+                ),
+                func.sum(case((EvaluationModel.status == EvaluationStatusEnum.FAILED.value, 1), else_=0)).label(
+                    "failed"
+                ),
+                func.sum(case((EvaluationModel.status == EvaluationStatusEnum.PENDING.value, 1), else_=0)).label(
+                    "pending"
+                ),
+                func.sum(case((EvaluationModel.status == EvaluationStatusEnum.RUNNING.value, 1), else_=0)).label(
+                    "running"
+                ),
+                func.coalesce(func.sum(EvaluationModel.duration_in_seconds), 0).label("total_duration"),
             )
-            .filter(
-                RunModel.experiment_id == experiment_id,
-                RunModel.status != RunStatusEnum.DELETED.value,
-            )
+            .filter(EvaluationModel.experiment_id == experiment_id)
             .one()
         )
 
-        # Efficiently sum up total duration from all evaluations in a single query
-        total_duration_seconds = (
-            self.session.query(func.coalesce(func.sum(EvaluationModel.duration_in_seconds), 0))
-            .filter(EvaluationModel.experiment_id == experiment_id)
-            .scalar()
-        )
-
         return ExperimentSummary(
-            total_runs=run_stats.total or 0,
-            total_duration_seconds=int(total_duration_seconds),
-            completed_runs=run_stats.completed or 0,
-            failed_runs=run_stats.failed or 0,
-            pending_runs=run_stats.pending or 0,
-            running_runs=run_stats.running or 0,
+            total_evaluations=evaluation_stats.total or 0,
+            total_duration_seconds=int(evaluation_stats.total_duration),
+            completed_evaluations=evaluation_stats.completed or 0,
+            failed_evaluations=evaluation_stats.failed or 0,
+            pending_evaluations=evaluation_stats.pending or 0,
+            running_evaluations=evaluation_stats.running or 0,
         )
 
     # ------------------------ Experiment Evaluations Methods ------------------------

@@ -975,12 +975,12 @@ class RunHistoryResponse(SuccessResponse):
 class ExperimentSummary(BaseModel):
     """Summary statistics for an experiment."""
 
-    total_runs: int = Field(..., description="Total number of runs in the experiment")
+    total_evaluations: int = Field(..., description="Total number of evaluations in the experiment")
     total_duration_seconds: int = Field(..., description="Total duration of all evaluations in seconds")
-    completed_runs: int = Field(..., description="Number of completed runs")
-    failed_runs: int = Field(..., description="Number of failed runs")
-    pending_runs: int = Field(..., description="Number of pending runs")
-    running_runs: int = Field(..., description="Number of currently running runs")
+    completed_evaluations: int = Field(..., description="Number of completed evaluations")
+    failed_evaluations: int = Field(..., description="Number of failed evaluations")
+    pending_evaluations: int = Field(..., description="Number of pending evaluations")
+    running_evaluations: int = Field(..., description="Number of currently running evaluations")
 
 
 class ExperimentSummaryResponse(SuccessResponse):

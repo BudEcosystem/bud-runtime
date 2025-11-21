@@ -239,6 +239,77 @@
             enabled: true
       when: has_nvidia_gpus | default(false)
 
+    # HAMI GPU Time-Slicing Installation
+    - name: Check if HAMI is already deployed
+      kubernetes.core.helm_info:
+        name: hami
+        namespace: kube-system
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: hami_helm_info
+      ignore_errors: true
+      when: has_nvidia_gpus | default(false)
+
+    - name: Add HAMI Helm repository
+      kubernetes.core.helm_repository:
+        name: hami-charts
+        repo_url: https://project-hami.github.io/HAMi/
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      when:
+        - has_nvidia_gpus | default(false)
+        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed'
+
+    - name: Deploy HAMI for GPU Time-Slicing
+      kubernetes.core.helm:
+        release_name: hami
+        chart_ref: hami-charts/hami
+        release_namespace: kube-system
+        create_namespace: false
+        atomic: true
+        wait: true
+        wait_timeout: 300
+        force: true
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        values:
+          devicePlugin:
+            enabled: true
+            runtimeClassName: nvidia
+            securityContext:
+              privileged: true
+            nodeSelector:
+              gpu: "on"
+            extraVolumes:
+              - name: dev
+                hostPath:
+                  path: /dev
+            extraVolumeMounts:
+              - name: dev
+                mountPath: /dev
+      when:
+        - has_nvidia_gpus | default(false)
+        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed'
+
+    - name: Wait for HAMI scheduler to be ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: kube-system
+        name: hami-scheduler
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: hami_scheduler
+      retries: 6
+      delay: 10
+      until: >
+        hami_scheduler.resources is defined and
+        hami_scheduler.resources | length > 0 and
+        hami_scheduler.resources[0].status.availableReplicas is defined and
+        hami_scheduler.resources[0].status.availableReplicas > 0
+      when:
+        - has_nvidia_gpus | default(false)
+        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed'
+
     # HPU Detection and Device Plugin Deployment
     - name: Check for Intel Gaudi HPUs via NFD labels
       set_fact:

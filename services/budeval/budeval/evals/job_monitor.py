@@ -69,12 +69,131 @@ def monitor_job_simple(ctx: wf.WorkflowActivityContext, monitor_request: str) ->
         return {"success": False, "job_statuses": {}, "error": str(e)}
 
 
+# ---- Activity: parse job logs for ETA/progress -------------------------------
+@dapr_workflows.register_activity
+def parse_job_logs_activity(ctx: wf.WorkflowActivityContext, parse_request: str) -> dict:
+    """Parse pod logs for ETA and progress data.
+
+    Args:
+        parse_request: JSON string with {
+            "job_ids": ["job1", "job2"],
+            "kubeconfig": "...",
+            "namespace": "..."
+        }
+
+    Returns:
+        {
+            "success": bool,
+            "log_data": {
+                "job_id": {
+                    "eta_data": {...},
+                    "latest_progress": {...},
+                    "progress_percentage": 68.18
+                }
+            },
+            "error": Optional[str]
+        }
+    """
+    logger_local = logging.getLogger("::MONITOR:: LogParser")
+    try:
+        req = json.loads(parse_request)
+        job_ids = req.get("job_ids", [])
+        kubeconfig = req.get("kubeconfig")
+
+        from .ansible_orchestrator import AnsibleOrchestrator
+
+        orch = AnsibleOrchestrator()
+        result = orch.parse_job_logs(job_ids, kubeconfig)
+
+        return {"success": True, "log_data": result}
+
+    except Exception as e:
+        logger_local.error(f"parse_job_logs_activity error: {e}", exc_info=True)
+        return {"success": False, "log_data": {}, "error": str(e)}
+
+
+# ---- Activity: send ETA notification -----------------------------------------
+@dapr_workflows.register_activity
+def send_eta_notification(ctx: wf.WorkflowActivityContext, notification_data: str) -> dict:
+    """Send ETA notification using existing notification infrastructure.
+
+    Args:
+        notification_data: JSON with {
+            "workflow_id": "...",
+            "source_topic": "...",
+            "source": "...",
+            "remaining_seconds": 158,
+            "progress_percentage": 68.1,
+            "completed_jobs": 1,
+            "total_jobs": 3,
+            "running_jobs": 2,
+            "failed_jobs": 0
+        }
+    """
+    logger_local = logging.getLogger("::MONITOR:: ETANotification")
+
+    try:
+        data = json.loads(notification_data)
+
+        from budmicroframe.commons.constants import WorkflowStatus
+        from budmicroframe.commons.schemas import NotificationContent, NotificationRequest
+
+        # Format remaining time
+        remaining_sec = data.get("remaining_seconds", 0)
+        remaining_min = int(remaining_sec / 60)
+
+        # Build message
+        progress_pct = data.get("progress_percentage", 0)
+        completed = data.get("completed_jobs", 0)
+        total = data.get("total_jobs", 0)
+        running = data.get("running_jobs", 0)
+
+        message = f"{remaining_sec}"  # Send seconds for compatibility
+
+        # Create notification
+        notification_req = NotificationRequest(
+            payload={
+                "event": "eta",  # Use existing eta event
+                "content": NotificationContent(
+                    title=f"Evaluation Progress: {progress_pct:.1f}%",
+                    message=message,
+                    status=WorkflowStatus.RUNNING,
+                    metadata={
+                        "progress_percentage": progress_pct,
+                        "remaining_seconds": remaining_sec,
+                        "remaining_minutes": remaining_min,
+                        "completed_jobs": completed,
+                        "running_jobs": running,
+                        "total_jobs": total,
+                    },
+                ),
+            }
+        )
+
+        dapr_workflows.publish_notification(
+            workflow_id=data["workflow_id"],
+            notification=notification_req,
+            target_topic_name=data["source_topic"],
+            target_name=data["source"],
+        )
+
+        logger_local.info(f"Sent ETA notification: {progress_pct:.1f}%, {remaining_min}m remaining")
+        return {"success": True}
+
+    except Exception as e:
+        logger_local.error(f"Failed to send ETA notification: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}
+
+
 # ---- Child Workflow: periodic poll + continue_as_new -------------------------
 @dapr_workflows.register_workflow  # FIXED: was @wf.Workflow
 def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     """Poll multiple jobs until they reach terminal status.
 
     Uses create_timer + continue_as_new to keep history small.
+    Now includes:
+    - Log parsing for ETA/progress
+    - Real-time notifications every 30s via callback
     """
     logger_local = logging.getLogger("::MONITOR:: Workflow")
 
@@ -96,6 +215,12 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     completed_jobs = data.get("completed_jobs", [])
     failed_jobs = data.get("failed_jobs", [])
     job_timing_map = data.get("job_timing_map", {})
+    job_progress_map = data.get("job_progress_map", {})  # NEW: Track progress
+
+    # Get notification passthrough data
+    workflow_id = data.get("workflow_id")
+    source_topic = data.get("source_topic")
+    source = data.get("source")
 
     # Log monitoring progress
     if not ctx.is_replaying:
@@ -142,6 +267,86 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     # Check if all jobs are done
     remaining_jobs = [j for j in job_ids if j not in completed_jobs and j not in failed_jobs]
 
+    # NEW: Parse logs for progress/ETA (only for running jobs)
+    if remaining_jobs and not ctx.is_replaying:
+        log_parse_result = yield ctx.call_activity(
+            parse_job_logs_activity,
+            input=json.dumps(
+                {"job_ids": remaining_jobs, "kubeconfig": data.get("kubeconfig"), "namespace": data.get("namespace")}
+            ),
+        )
+
+        if log_parse_result.get("success"):
+            log_data = log_parse_result.get("log_data", {})
+
+            # Update progress map
+            for job_id, progress_info in log_data.items():
+                job_progress_map[job_id] = progress_info
+
+                status = progress_info.get("status", "unknown")
+
+                if status == "pending":
+                    # Pod not ready yet (ContainerCreating, etc.)
+                    pod_state = progress_info.get("pod_state", "unknown")
+                    pod_phase = progress_info.get("pod_phase", "unknown")
+                    logger_local.info(f"Job {job_id}: Pod not ready yet (phase={pod_phase}, container={pod_state})")
+                elif progress_info.get("latest_progress"):
+                    pct = progress_info.get("progress_percentage", 0)
+                    remaining_sec = progress_info["latest_progress"].get("remaining_seconds", 0)
+                    logger_local.info(f"Job {job_id}: {pct:.1f}% complete, ~{remaining_sec}s remaining")
+                elif progress_info.get("eta_data"):
+                    # Job has started but no progress yet
+                    total_eta = progress_info["eta_data"].get("total_eta_seconds", 0)
+                    logger_local.info(f"Job {job_id}: Started (estimated {total_eta}s total)")
+                else:
+                    logger_local.debug(f"Job {job_id}: No progress data yet")
+
+    # NEW: Send notification with progress update (EVERY CYCLE)
+    if workflow_id and source_topic and source and not ctx.is_replaying:
+        # Calculate aggregate progress (only for jobs that have started)
+        total_progress = 0
+        total_remaining = 0
+        jobs_with_progress = 0
+        pending_jobs = 0
+
+        for job_id in remaining_jobs:
+            if job_id in job_progress_map:
+                progress_info = job_progress_map[job_id]
+                status = progress_info.get("status", "unknown")
+
+                # Skip pending jobs (container not ready yet)
+                if status == "pending":
+                    pending_jobs += 1
+                    continue
+
+                # Count progress for running/starting jobs
+                total_progress += progress_info.get("progress_percentage", 0)
+
+                latest = progress_info.get("latest_progress")
+                if latest:
+                    total_remaining += latest.get("remaining_seconds", 0)
+                    jobs_with_progress += 1
+
+        # Calculate averages (excluding pending jobs)
+        running_jobs_count = len(remaining_jobs) - pending_jobs
+        avg_progress = total_progress / running_jobs_count if running_jobs_count > 0 else 0
+        avg_remaining = total_remaining / jobs_with_progress if jobs_with_progress > 0 else 0
+
+        # Trigger notification via external activity
+        notification_data = {
+            "workflow_id": workflow_id,
+            "source_topic": source_topic,
+            "source": source,
+            "remaining_seconds": int(avg_remaining),
+            "progress_percentage": round(avg_progress, 1),
+            "completed_jobs": len(completed_jobs),
+            "total_jobs": len(job_ids),
+            "running_jobs": len(remaining_jobs),
+            "failed_jobs": len(failed_jobs),
+        }
+
+        yield ctx.call_activity(send_eta_notification, input=json.dumps(notification_data))
+
     if not remaining_jobs:
         if not ctx.is_replaying:
             logger_local.info(f"All jobs completed: {len(completed_jobs)} succeeded, {len(failed_jobs)} failed")
@@ -150,6 +355,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
             "completed_jobs": completed_jobs,
             "failed_jobs": failed_jobs,
             "job_details": job_timing_map,
+            "job_progress_map": job_progress_map,
             "attempts": attempt,
         }
 
@@ -162,6 +368,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
             "completed_jobs": completed_jobs,
             "failed_jobs": failed_jobs,
             "job_details": job_timing_map,
+            "job_progress_map": job_progress_map,
             "remaining_jobs": remaining_jobs,
             "attempts": attempt,
         }
@@ -171,6 +378,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     data["completed_jobs"] = completed_jobs
     data["failed_jobs"] = failed_jobs
     data["job_timing_map"] = job_timing_map
+    data["job_progress_map"] = job_progress_map  # NEW: Persist progress
     yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
     ctx.continue_as_new(json.dumps(data))
     return

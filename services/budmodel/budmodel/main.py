@@ -29,33 +29,11 @@ from seeders.seeder import seeders
 
 from .commons.config import app_settings, secrets_settings
 from .leaderboard.routes import leaderboard_router
-from .leaderboard.workflows import LeaderboardCronWorkflows
 from .model_info.routes import model_info_router
 from .shared.aria2_daemon import ensure_aria2_daemon_running, get_aria2_daemon_manager
 
 
 logger = logging.get_logger(__name__)
-
-
-async def execute_leaderboard_cron_workflow() -> None:
-    """Execute the leaderboard cron workflow.
-
-    This function checks if the Dapr workflow is running and executes the leaderboard cron workflow.
-    """
-    POLLING_INTERVAL = 5
-    attempts = 0
-
-    while True:
-        await asyncio.sleep(POLLING_INTERVAL)
-        if DaprWorkflow().is_running:
-            logger.info("Dapr workflow runtime is ready. Initializing leaderboard cron workflow.")
-            break
-        else:
-            attempts += 1
-            logger.info("Waiting for Dapr workflow runtime to start... Attempt: %s", attempts)
-
-    response = await LeaderboardCronWorkflows().__call__()
-    logger.debug("Leaderboard cron workflow response: %s", response)
 
 
 @asynccontextmanager
@@ -74,7 +52,6 @@ async def dapr_lifespan(app: FastAPI) -> AsyncIterator[None]:
         None: Yields control back to the context where the lifespan management is performed.
     """
     task = asyncio.create_task(schedule_secrets_and_config_sync())
-    leaderboard_cron_task = asyncio.create_task(execute_leaderboard_cron_workflow())
 
     # Start aria2 daemon for I/O-aware downloads
     try:
@@ -98,7 +75,6 @@ async def dapr_lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     try:
         task.cancel()
-        leaderboard_cron_task.cancel()
 
         # Stop aria2 daemon on shutdown
         try:

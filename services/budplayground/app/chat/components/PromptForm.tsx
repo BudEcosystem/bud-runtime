@@ -26,8 +26,45 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [promptVersion, setPromptVersion] = useState<string | undefined>();
   const [promptDeployment, setPromptDeployment] = useState<string | undefined>();
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
-  // Fetch prompt configurations on mount
+  // Listen for multiple events to trigger refresh when returning to playground
+  useEffect(() => {
+    // Handler for postMessage events
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'SET_TYPE_FORM') {
+        setRefreshTrigger(prev => prev + 1);
+      }
+    };
+
+    // Handler for visibility change (tab switch)
+    const handleVisibilityChange = () => {
+      if (!document.hidden && promptIds.length > 0) {
+        setRefreshTrigger(prev => prev + 1);
+      }
+    };
+
+    // Handler for window focus
+    const handleFocus = () => {
+      if (promptIds.length > 0) {
+        setRefreshTrigger(prev => prev + 1);
+      }
+    };
+
+    // Add all event listeners
+    window.addEventListener('message', handleMessage);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [promptIds]);
+
+  // Fetch prompt configurations - runs when dependencies change or refresh triggered
   useEffect(() => {
     const fetchPromptConfigs = async () => {
       if (promptIds.length === 0) {
@@ -45,11 +82,12 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
             version !== undefined && version !== null ? String(version) : undefined
           );
 
-          setPromptDeployment(
-            typeof config.data?.deployment_name === 'string'
-              ? config.data.deployment_name
-              : undefined
-          );
+          const newDeploymentName = typeof config.data?.deployment_name === 'string'
+            ? config.data.deployment_name
+            : undefined;
+
+          // Always update deployment name when API returns a value
+          setPromptDeployment(newDeploymentName);
 
           // Handle JSON schema format - extract properties from $defs
           let schemaToUse: any = config.data.input_schema ?? null;
@@ -102,7 +140,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
     };
 
     fetchPromptConfigs();
-  }, [promptIds, apiKey, accessKey]);
+  }, [promptIds, apiKey, accessKey, refreshTrigger]);
 
   // Fetch endpoints when ready and deployment name is available
   useEffect(() => {
@@ -111,26 +149,22 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
     }
   }, [isReady, promptDeployment, chatId, getEndPoints]);
 
-  // Auto-select deployment when endpoints are loaded
+  // Auto-select deployment when endpoints are loaded or deployment name changes
   useEffect(() => {
     if (promptDeployment && endpoints && endpoints.length > 0 && chatId) {
       const chat = getChat(chatId);
+      const currentDeploymentName = chat?.selectedDeployment?.name;
 
-      // Only auto-select if no deployment is set yet OR if it's already locked
-      // This prevents overriding user's manual selection before config loads
-      if (!chat?.selectedDeployment || chat?.deploymentLocked) {
-        // Find matching endpoint by name or ID
-        const matchingEndpoint = endpoints.find(
-          (ep) => ep.name === promptDeployment || ep.id === promptDeployment
-        );
+      // Find matching endpoint by name or ID
+      const matchingEndpoint = endpoints.find(
+        (ep) => ep.name === promptDeployment || ep.id === promptDeployment
+      );
 
-        if (matchingEndpoint) {
-          // Set the deployment and lock it
+      if (matchingEndpoint) {
+        // Update deployment if it's different from current selection
+        if (currentDeploymentName !== matchingEndpoint.name) {
           setDeployment(chatId, matchingEndpoint);
           setDeploymentLock(chatId, true);
-          console.log(`Auto-selected and locked deployment: ${matchingEndpoint.name}`);
-        } else {
-          console.warn(`Deployment '${promptDeployment}' not found in available endpoints`);
         }
       }
     }

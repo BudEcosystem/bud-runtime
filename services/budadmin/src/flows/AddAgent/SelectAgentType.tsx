@@ -135,6 +135,10 @@ export default function SelectAgentType() {
         // Update the workflow in the store
         await getWorkflow(currentWorkflow.workflow_id);
 
+        // CRITICAL: Set transition flag BEFORE closing drawer to prevent agent parameter removal
+        // This ensures the safety check in useDrawer.closeDrawer() sees isTransitioning=true
+        useAgentStore.setState({ isTransitioningToAgentDrawer: true });
+
         // Close the main drawer first
         closeDrawer();
 
