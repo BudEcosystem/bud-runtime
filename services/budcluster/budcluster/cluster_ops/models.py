@@ -51,6 +51,10 @@ class Cluster(PSQLBase, TimestampMixin):
     last_metrics_collection: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     metrics_collection_status: Mapped[str] = mapped_column(String(50), nullable=True)
 
+    # ERROR state tracking fields
+    not_available_since: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    last_retry_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+
     nodes: Mapped[list["ClusterNodeInfo"]] = relationship(back_populates="cluster", cascade="all, delete-orphan")
     workers: Mapped[list["WorkerInfo"]] = relationship(back_populates="cluster", cascade="all, delete-orphan")
     benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="cluster")

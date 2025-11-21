@@ -198,7 +198,7 @@ def is_hami_metrics_enabled() -> bool:
         >>> is_hami_metrics_enabled()  # Returns based on env var
         True
     """
-    return os.getenv("ENABLE_HAMI_METRICS", "false").lower() == "true"
+    return os.getenv("ENABLE_HAMI_METRICS", "true").lower() == "true"
 
 
 def get_hami_scheduler_port() -> int:
