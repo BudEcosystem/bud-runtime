@@ -73,18 +73,14 @@ function AgentBoxInner({
   // Track if config has been loaded for this session to prevent duplicate calls
   const hasLoadedConfigRef = React.useRef<string | null>(null);
 
-  // Helper function to refresh session data from backend
+  // Helper function to refresh session data from backend (used after saving schemas)
   const refreshSessionData = React.useCallback(async () => {
     if (!session?.promptId || !session?.id) {
       return;
     }
 
     try {
-      // Transform the data using our helper
       const transformedData = await loadPromptForEditing(session.promptId);
-
-      // Update session with refreshed data
-      // This will automatically persist to localStorage via Zustand persist middleware
       updateSession(session.id, {
         inputVariables: transformedData.inputVariables,
         outputVariables: transformedData.outputVariables,
@@ -93,9 +89,7 @@ function AgentBoxInner({
       });
     } catch (error) {
       console.error("Error refreshing session data:", error);
-      // Don't show error toast as this is a background operation
     }
-  // Only depend on stable values to prevent infinite loops
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id, session?.promptId, updateSession]);
 
