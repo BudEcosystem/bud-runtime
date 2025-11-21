@@ -227,9 +227,6 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
         logger_local.info(
             f"Monitor check #{attempt}: tracking {len(job_ids)} jobs, {len(completed_jobs)} completed, {len(failed_jobs)} failed"
         )
-        logger_local.info(
-            f"Notification params - workflow_id: {workflow_id}, source_topic: {source_topic}, source: {source}"
-        )
 
     # Single poll
     poll_result = yield ctx.call_activity(monitor_job_simple, input=json.dumps(data))
@@ -305,7 +302,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
                     logger_local.debug(f"Job {job_id}: No progress data yet")
 
     # NEW: Send notification with progress update (EVERY CYCLE)
-    if workflow_id and source_topic and source:
+    if workflow_id and source_topic:
         # Calculate aggregate progress (only for jobs that have started)
         total_progress = 0
         total_remaining = 0
@@ -339,7 +336,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
         notification_data = {
             "workflow_id": workflow_id,
             "source_topic": source_topic,
-            "source": source,
+            "source": source or "budeval",  # Fallback to "budeval" if source is None
             "remaining_seconds": int(avg_remaining),
             "progress_percentage": round(avg_progress, 1),
             "completed_jobs": len(completed_jobs),
@@ -385,7 +382,7 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     # CRITICAL: Persist notification parameters across continue_as_new cycles
     data["workflow_id"] = workflow_id
     data["source_topic"] = source_topic
-    data["source"] = source
+    data["source"] = source or "budeval"  # Ensure source is never None
     yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=poll_interval))
     ctx.continue_as_new(json.dumps(data))
     return
