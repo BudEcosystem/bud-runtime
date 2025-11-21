@@ -21,6 +21,16 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- $nodeSelector := include "bud.nodeSelector" (dict "service" .Values.microservices.budcustomer "global" .Values.global "context" $) }}
+      {{- if $nodeSelector }}
+      nodeSelector:
+        {{- $nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- $affinity := include "bud.affinity" (dict "service" .Values.microservices.budcustomer "global" .Values.global "context" $) }}
+      {{- if $affinity }}
+      affinity:
+        {{- $affinity | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budcustomer
         image: {{ .Values.microservices.budcustomer.image }}
@@ -68,7 +78,7 @@ spec:
           - name: NEXT_PUBLIC_ANTD_HASH_SEED
             value: 'budcustomer'
           - name: NEXT_PUBLIC_ASK_BUD_MODEL
-            value: 'qwen3-32b'
+            value: 'bud-gpt-oss-20b-ada28b58'
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budcustomer.env }}
           - name: {{ $key }}

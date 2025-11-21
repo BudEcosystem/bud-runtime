@@ -1,3 +1,6 @@
+imagePullSecrets:
+    - name: harbor-bud
+
 ingress:
     https: internal
     hosts:
@@ -31,8 +34,6 @@ microservices:
         image: budstudio/budapp:nightly
     budcluster:
         image: budstudio/budcluster:nightly
-        env:
-            VOLUME_TYPE: nfs
     budmetrics:
         image: budstudio/budmetrics:nightly
     budmodel:
@@ -45,8 +46,12 @@ microservices:
         image: budstudio/buddoc:nightly
     budnotify:
         image: budstudio/budnotify:nightly
+    budsentinel:
+        enabled: true
     budprompt:
         image: budstudio/budprompt:nightly
+        env:
+            LOG_LEVEL: DEBUG
 
 imagePullPolicy: "Always"
 deploymentAnnotations:

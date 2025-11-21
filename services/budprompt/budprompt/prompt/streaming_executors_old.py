@@ -17,10 +17,10 @@
 """Streaming executors with validation and retry logic for prompt execution."""
 
 import json
-import logging
 import re
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+from budmicroframe.commons import logging
 from pydantic import ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import UnexpectedModelBehavior
@@ -33,7 +33,7 @@ from budprompt.shared.providers import BudServeProvider
 from .streaming_json_validator import StreamingJSONValidator, extract_field_validators
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 async def execute_streaming_validation(

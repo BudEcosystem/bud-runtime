@@ -67,6 +67,8 @@ class DirectSearchOptimizer:
         use_heuristic: bool = False,
         concurrency_step: int = 5,  # Step size for concurrency reduction
         max_evaluations: int = 200,  # Safety limit
+        supports_pipeline_parallelism: bool = False,
+        hardware_mode: str = "dedicated",  # Hardware utilization mode
     ):
         """Initialize DirectSearchOptimizer."""
         self.model = model
@@ -84,6 +86,9 @@ class DirectSearchOptimizer:
         self.use_heuristic = use_heuristic
         self.concurrency_step = concurrency_step
         self.max_evaluations = max_evaluations
+        self.supports_pipeline_parallelism = supports_pipeline_parallelism
+        self.hardware_mode = hardware_mode
+        self._last_validation_result = None  # Initialize validation result cache
 
         self.engine_config = get_engine_properties(self.engine_name, {"model": self.model})
 
@@ -133,6 +138,11 @@ class DirectSearchOptimizer:
                 f"Using fallback search space (individual device): max_tp={self.max_tp}, max_pp={self.max_pp}"
             )
 
+        # Override max_pp to 1 if engine doesn't support pipeline parallelism
+        if not self.supports_pipeline_parallelism:
+            logger.info("Engine does not support pipeline parallelism - constraining PP to 1")
+            self.max_pp = 1
+
         # Find minimum TP required to run the model (even with concurrency=1)
         self.min_tp = self._find_minimum_tp_required()
 
@@ -153,6 +163,13 @@ class DirectSearchOptimizer:
                 tp *= 2
         # Valid PP sizes
         self.valid_pp_sizes = list(range(1, self.max_pp + 1))
+
+        # Override for shared hardware mode: force TP=1, PP=1
+        if self.hardware_mode == "shared":
+            logger.debug("Shared hardware mode: constraining to TP=1, PP=1 (no tensor/pipeline parallelism)")
+            self.valid_tp_sizes = [1]
+            self.valid_pp_sizes = [1]
+            self.min_tp = 1
 
         logger.debug(
             f"Search space: TP sizes {self.valid_tp_sizes} (min required: {self.min_tp}), PP sizes {self.valid_pp_sizes}, max_concurrency={self.max_concurrency}"
@@ -239,6 +256,21 @@ class DirectSearchOptimizer:
                 self._heuristic_calc = HeuristicCalculator()
 
             # Prepare model_params for validate_memory_requirements
+            # Extract memory with fallback chain and log which key matched
+            memory_in_gb = None
+            memory_key_used = None
+            for key in ["mem_per_gpu_in_gb", "mem_per_GPU_in_GB", "memory", "memory_gb", "gpu_memory_gb"]:
+                if key in self.device_config and self.device_config[key] is not None:
+                    memory_in_gb = self.device_config[key]
+                    memory_key_used = key
+                    break
+
+            logger.debug(
+                f"Memory extraction from device_config: memory_in_GB={memory_in_gb}, "
+                f"key_used={memory_key_used}, hardware_mode={self.hardware_mode}, "
+                f"TP={tp_size}, PP={pp_size}, concurrency={concurrency}"
+            )
+
             model_params = {
                 "model": self.model,
                 "mean_input_tokens": self.input_tokens,
@@ -246,18 +278,15 @@ class DirectSearchOptimizer:
                 "concurrent_requests": concurrency,
                 "tensor_parallel_size": tp_size,
                 "pipeline_parallel_size": pp_size,
-                "memory_in_GB": (
-                    self.device_config.get("mem_per_gpu_in_gb")
-                    or self.device_config.get("mem_per_GPU_in_GB")
-                    or self.device_config.get("memory")
-                    or self.device_config.get("memory_gb")
-                    or self.device_config.get("gpu_memory_gb")
-                ),
+                "memory_in_GB": memory_in_gb,
                 "quantization_bits": 16,  # Default to 16-bit
             }
 
             # Validate memory requirements
             validation_result = self._heuristic_calc.validate_memory_requirements(model_params)
+
+            # Store validation result for later use (e.g., in shared mode to get memory value)
+            self._last_validation_result = validation_result
 
             fits = validation_result["valid"]
             logger.debug(
@@ -297,6 +326,60 @@ class DirectSearchOptimizer:
             return None
 
         try:
+            # Shared hardware mode: Skip performance prediction, only validate memory
+            if self.hardware_mode == "shared":
+                logger.info(
+                    f"Shared mode: Memory validated for TP={tp_size}, PP={pp_size}, concurrency={concurrency}. "
+                    "Skipping performance prediction."
+                )
+
+                # Get calculated memory from validation result
+                kv_cache_memory = 0
+                if hasattr(self, "_last_validation_result") and self._last_validation_result:
+                    kv_cache_memory = self._last_validation_result.get("total_memory_gb", 0)
+                    breakdown = self._last_validation_result.get("breakdown", {})
+                    logger.debug(
+                        f"Shared mode: total_memory_gb from validation={kv_cache_memory:.4f}GB, breakdown={breakdown}"
+                    )
+
+                # Use the actual validation result to determine if config meets targets
+                validation_passed = (
+                    self._last_validation_result.get("valid", False)
+                    if hasattr(self, "_last_validation_result") and self._last_validation_result
+                    else False
+                )
+
+                # Log the validation decision for debugging
+                if self._last_validation_result:
+                    logger.debug(
+                        f"Shared mode validation: meets_targets={validation_passed}, "
+                        f"required={self._last_validation_result.get('total_memory_gb', 0):.2f}GB, "
+                        f"available={self._last_validation_result.get('available_memory_gb', 0):.2f}GB, "
+                        f"message={self._last_validation_result.get('message', 'N/A')}"
+                    )
+
+                # Return minimal result - memory validation result from _validate_config
+                result = SearchResult(
+                    config=config,
+                    kv_cache_memory=kv_cache_memory,
+                    ttft=0,  # Not predicted in shared mode
+                    e2e_latency=0,  # Not predicted in shared mode
+                    throughput_per_user=0,  # Not predicted in shared mode
+                    concurrency=concurrency,
+                    cost_per_million_tokens=0,  # Cost model differs for shared mode
+                    performance_penalty=0,  # No performance requirements in shared mode
+                    meets_targets=validation_passed,  # Use actual memory validation result
+                    search_step=len(self.evaluated_configs),
+                    error_rate=0,
+                )
+
+                # Cache and store result
+                self._evaluation_cache[cache_key] = result
+                self.evaluated_configs.append(result)
+
+                return result
+
+            # Dedicated hardware mode: Full performance prediction
             # Prepare data for prediction
             data = self._prepare_predictor_data(config)
 
@@ -361,6 +444,37 @@ class DirectSearchOptimizer:
 
     def _prepare_predictor_data(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare data for predictor (similar to Evolution's method)."""
+        # Optimization: Skip expensive ModelAnalysis when using heuristic calculator
+        if self.use_heuristic:
+            # Heuristic calculator only needs basic simulation parameters and device info
+            data = {
+                "concurrent_requests": config["concurrency"],
+                "tensor_parallel_size": config["tensor_parallel_size"],
+                "pipeline_parallel_size": config.get("pipeline_parallel_size", 1),
+                "mean_input_tokens": self.input_tokens,
+                "mean_output_tokens": self.output_tokens,
+                "model": self.model,
+                "target_device": config.get("target_device", "cpu"),
+                "memory_in_GB": (
+                    self.device_config.get("mem_per_gpu_in_gb")
+                    or self.device_config.get("mem_per_GPU_in_GB")
+                    or self.device_config.get("memory")
+                    or self.device_config.get("memory_gb")
+                    or self.device_config.get("gpu_memory_gb")
+                    or 0
+                ),
+                # Device identification fields for hardware matching
+                "device_model": self.device_config.get("device_model", ""),
+                "device_name": self.device_config.get("device_name", ""),
+                "raw_name": self.device_config.get("raw_name", ""),
+                "quantization": self.dtype or "",  # Default to empty string if dtype is None
+            }
+            # Calculate KV cache memory using heuristic calculator
+            kv_cache_memory_per_gpu = self.heuristic_calculator.get_kv_cache_memory(data)
+            data["kv_cache_memory_per_gpu"] = kv_cache_memory_per_gpu
+            return data
+
+        # ML-based predictor needs full ModelAnalysis
         device_config = self.device_config.copy()
         # Clean device config for ModelAnalysis
         for field in [

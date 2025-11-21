@@ -38,6 +38,7 @@ import BudIsland from "@/components/island/BudIsland";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import pkg from '@novu/notification-center/package.json';
 import { enableDevMode } from "@/components/environment";
+import AgentDrawer from "@/components/agents/AgentDrawer";
 
 interface LayoutProps {
   children: ReactNode;
@@ -151,14 +152,14 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       cmd: "6",
     },
     {
-      label: "Prompts",
-      route: "/prompts&agents",
+      label: "Agents",
+      route: "/agents",
       icon: '/icons/prompt.png',
       iconWhite: '/icons/promptWhite.png',
       // iconSvg: true,
       cmd: "7",
       customSvg: "prompts",
-      hide: !enableDevMode,
+      // hide: !enableDevMode,
     },
     {
       label: "Observability",
@@ -340,7 +341,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
         <div className="dashboardWrapper flex justify-between relative">
           <div className={`dashboardOverlay absolute w-full h-full top-0 left-0 z-[1200] ${isVisible ? 'block' : 'hidden'}`}></div>
           <div
-            className="flex flex-col justify-between items-start gap-[2rem] leftDiv py-[1.55em] pb-[.7em] scroll-smooth custom-scrollbar overflow-auto open-sans"
+            className="flex flex-col justify-between items-start gap-[1rem] leftDiv py-[1.55em] pb-[.7em] scroll-smooth custom-scrollbar overflow-auto open-sans"
           >
             <div className="w-full 1680px:text-[1rem]">
               <div className="flex justify-center leftLogo px-[7%] pb-[1.65rem]">
@@ -352,7 +353,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                   alt="Bud Logo"
                 />
               </div>
-              <div className="px-[.75rem] mb-[7%]">
+              <div className="px-[.75rem] mb-[3%]">
                 <BudIsland />
               </div>
               <div
@@ -364,7 +365,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
 
                   return (
                     <Link
-                      className="linkLink mb-[.62rem]"
+                      className="linkLink mb-[.5rem]"
                       key={tab.route}
                       href={tab.route}
                       passHref
@@ -581,6 +582,9 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           </div>
         </div>
         {/* Add footer or other common components here */}
+
+        {/* Global Agent Drawer - Available on all pages */}
+        <AgentDrawer />
       </Theme>
     </div>
   );

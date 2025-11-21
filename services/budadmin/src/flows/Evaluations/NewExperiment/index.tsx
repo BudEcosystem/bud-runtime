@@ -147,7 +147,7 @@ export default function NewExperimentDrawer() {
 
       // Map form values to API payload format matching the expected input
       const payload = {
-        name: cleanedName,
+        name: cleanedName?.toLowerCase(),
         description: cleanedDescription,
         // project_id: selectedProject?.id || "92ba4cb7-6ab8-49be-b211-a69a1b78feb4",
         tags: cleanedTags,

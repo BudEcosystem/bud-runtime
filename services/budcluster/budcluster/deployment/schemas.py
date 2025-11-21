@@ -61,6 +61,7 @@ class TransferModelRequest(BaseModel):
     existing_deployment_namespace: Optional[str] = None
     default_storage_class: Optional[str] = None
     default_access_mode: Optional[str] = None
+    storage_size_gb: Optional[float] = None
     operation: Literal["download", "upload"] = "download"
 
 
@@ -85,6 +86,7 @@ class CommonDeploymentParams(BaseModel):
     endpoint_name: str
     model: str
     model_size: Optional[int] = None
+    storage_size_gb: Optional[float] = None
     concurrency: int
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
@@ -434,6 +436,8 @@ class AdapterRequest(CloudEventBase):
     endpoint_name: str
     action: Literal["add", "delete"]
     adapter_id: Optional[UUID] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
 
 
 class DeployAdapterActivityRequest(BaseModel):
@@ -444,6 +448,8 @@ class DeployAdapterActivityRequest(BaseModel):
     adapters: List[Dict[str, Any]]
     endpoint_name: str
     ingress_url: str
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
 
 
 class UpdateAdapterStatusRequest(AdapterRequest):

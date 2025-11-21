@@ -572,6 +572,9 @@ class RecommendedCluster(BaseModel):
     tool_calling_parser_type: str | None = None
     reasoning_parser_type: str | None = None
     chat_template: str | None = None
+    # Engine capability flags from simulator
+    supports_lora: bool | None = None
+    supports_pipeline_parallelism: bool | None = None
 
 
 class RecommendedClusterResponse(SuccessResponse):
@@ -597,6 +600,7 @@ class RecommendedClusterRequest(BaseModel):
     notification_metadata: BudNotificationMetadata
     source_topic: str
     is_proprietary_model: bool
+    hardware_mode: Optional[str] = Field(default="dedicated", description="Hardware mode: dedicated or shared")
 
 
 class GrafanaDashboardResponse(SuccessResponse):

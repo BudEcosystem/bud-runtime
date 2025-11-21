@@ -246,6 +246,7 @@ class DeployQuantizationWorkflow:
             endpoint_name=deploy_quantization_request_json.quantization_name,
             platform=deploy_quantization_request_json.platform,
             operation="download",
+            storage_size_gb=getattr(deploy_quantization_request_json, "storage_size_gb", None),
             # existing_deployment_namespace=deploy_quantization_request_json.existing_deployment_namespace,
         )
         transfer_model_result = yield ctx.call_activity(

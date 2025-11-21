@@ -228,9 +228,15 @@ const handleErrorResponse = (err) => {
   ) {
     return Promise.reject(err.response.data);
   } else if (err.response && err.response.status === 404) {
-    // Handle 404 errors - don't show toast for cluster settings endpoints
+    // Handle 404 errors - don't show toast for cluster settings endpoints or OAuth status
     if (err.config?.url?.includes('/clusters/') && err.config?.url?.includes('/settings')) {
       // Cluster settings not found is expected behavior for new clusters
+      return Promise.reject(err);
+    } else if (err.config?.url?.includes('/prompts/oauth/status')) {
+      // OAuth status not found is expected behavior when OAuth is not set up yet
+      return Promise.reject(err);
+    } else if (err.config?.url?.includes('/prompts/prompt-config/')) {
+      // Prompt config not found is expected for new prompts - silent fail
       return Promise.reject(err);
     } else {
       // Show toast for other 404 errors
@@ -240,10 +246,16 @@ const handleErrorResponse = (err) => {
     }
     return false;
   } else {
-    console.log(err);
+    // Don't show error toast for silent endpoints
+    if (err.config?.url?.includes('/prompts/oauth/status') ||
+        err.config?.url?.includes('/prompts/prompt-config/')) {
+      return Promise.reject(err);
+    }
+
     if (err && localStorage.getItem("access_token")) {
-      console.log(err.response?.data?.message);
-      errorToast(err.response?.data?.message);
+      // Check both 'detail' (FastAPI HTTPException) and 'message' (custom ErrorResponse)
+      const errorMessage = err.response?.data?.detail || err.response?.data?.message;
+      errorToast(errorMessage);
     }
     return false;
   }

@@ -172,3 +172,32 @@ textarea:-moz-placeholder {
   color: #757575 !important;
   opacity: 1 !important;
 }
+
+/* Ant Design Dropdown Dark Theme */
+.ant-dropdown {
+  background-color: #0A0A0A !important;
+}
+
+.ant-dropdown-menu {
+  background-color: #0A0A0A !important;
+  border: 1px solid #2A2A2A !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5) !important;
+}
+
+.ant-dropdown-menu-item {
+  color: #EEEEEE !important;
+  font-size: 12px !important;
+}
+
+.ant-dropdown-menu-item:hover {
+  background-color: #1A1A1A !important;
+}
+
+.ant-dropdown-menu-item-danger {
+  color: #FF4444 !important;
+}
+
+.ant-dropdown-menu-item-danger:hover {
+  background-color: #1A1A1A !important;
+  color: #FF6666 !important;
+}

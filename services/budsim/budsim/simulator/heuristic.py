@@ -160,7 +160,7 @@ class HeuristicCalculator:
             Precision string (bf16, fp16, int8, etc.)
         """
         # Check for quantization settings
-        quantization = model_params.get("quantization", "")
+        quantization = model_params.get("quantization", "") or ""  # Ensure it's never None
         if "int8" in quantization.lower():
             return "int8"
         elif "int4" in quantization.lower():
@@ -206,6 +206,7 @@ class HeuristicCalculator:
             seq_length=seq_length,
             precision=self._get_precision_bits(model_params),
             tensor_parallel=tp_size,  # Pass TP to get per-device memory
+            respect_weight_tying=False,
         )
 
         # Memory per device - already calculated correctly by calculate_memory with TP
@@ -216,8 +217,23 @@ class HeuristicCalculator:
         if available_memory_gb is None:
             raise ValueError("memory_in_GB not provided in model_params")
 
-        # Check if it fits (with some margin)
-        valid = total_memory_per_device_gb < available_memory_gb * 0.95
+        # Apply tiered buffer matching budcluster's allocation logic
+        # BudCluster adds: 1GB if memory ≤ 10GB, 2GB if memory > 10GB
+        buffer_gb = 1 if total_memory_per_device_gb <= 10 else 2
+
+        # Subtract buffer from available memory, then apply 95% safety margin
+        # This ensures: (required + buffer) < available * 0.95
+        usable_memory_gb = available_memory_gb - buffer_gb
+        threshold_memory_gb = usable_memory_gb * 0.95
+        valid = total_memory_per_device_gb < threshold_memory_gb
+
+        logger.debug(
+            f"Memory validation with buffer: required={total_memory_per_device_gb:.2f}GB, "
+            f"available={available_memory_gb:.2f}GB, buffer={buffer_gb}GB, "
+            f"usable={usable_memory_gb:.2f}GB, threshold(95%)={threshold_memory_gb:.2f}GB, "
+            f"valid={valid} (required < threshold), "
+            f"TP={tp_size}, PP={pp_size}, batch={batch_size}"
+        )
 
         return {
             "valid": valid,
@@ -236,6 +252,87 @@ class HeuristicCalculator:
                 else f"Insufficient memory: {total_memory_per_device_gb:.2f}GB > {available_memory_gb}GB"
             ),
         }
+
+    def get_kv_cache_memory(self, model_params: Dict[str, Any]) -> float:
+        """Get KV cache memory per GPU using llm-memory-calculator.
+
+        Args:
+            model_params: Dictionary containing model and system parameters
+
+        Returns:
+            float: KV cache memory in bytes per GPU (matches ModelAnalysis convention)
+        """
+        if not self.use_llm_calc:
+            logger.warning("llm-memory-calculator not available - returning 0 for KV cache memory")
+            return 0.0
+
+        try:
+            # Extract parameters
+            model_uri = model_params.get("model")
+            if not model_uri:
+                logger.warning("Model URI not provided in model_params - returning 0 for KV cache memory")
+                return 0.0
+
+            batch_size = model_params.get("concurrent_requests")
+            input_tokens = model_params.get("mean_input_tokens")
+            output_tokens = model_params.get("mean_output_tokens")
+
+            if batch_size is None or input_tokens is None or output_tokens is None:
+                logger.warning(
+                    "Missing required parameters (concurrent_requests, mean_input_tokens, or mean_output_tokens) "
+                    "- returning 0 for KV cache memory"
+                )
+                return 0.0
+
+            # Add 10% safety margin to match deployment configuration
+            seq_length = int((input_tokens + output_tokens) * 1.1)
+
+            # Account for parallelism
+            tp_size = model_params.get("tensor_parallel_size", 1)
+            pp_size = model_params.get("pipeline_parallel_size", 1)
+
+            # Create cache key for memory calculation
+            cache_key = (
+                model_uri,
+                batch_size,
+                seq_length,
+                self._get_precision_bits(model_params),
+                tp_size,
+                pp_size,
+            )
+
+            # Check cache first
+            if not hasattr(self, "_memory_cache"):
+                self._memory_cache = {}
+
+            if cache_key in self._memory_cache:
+                memory_report = self._memory_cache[cache_key]
+                logger.debug(f"Using cached memory calculation for {model_uri}")
+            else:
+                # Calculate memory requirements with tensor parallelism
+                memory_report = calculate_memory(
+                    model_id_or_config=model_uri,
+                    batch_size=batch_size,
+                    seq_length=seq_length,
+                    precision=self._get_precision_bits(model_params),
+                    tensor_parallel=tp_size,  # Pass TP to get per-device memory
+                    respect_weight_tying=False,
+                )
+                # Cache the result
+                self._memory_cache[cache_key] = memory_report
+
+            # Return KV cache memory per GPU in bytes (to match ModelAnalysis convention)
+            kv_cache_gb = memory_report.kv_cache_gb
+            kv_cache_bytes = kv_cache_gb * (1024**3)  # Convert GB to bytes
+            logger.debug(
+                f"KV cache memory: {kv_cache_gb:.2f}GB ({kv_cache_bytes:.0f} bytes) "
+                f"per GPU for TP={tp_size}, PP={pp_size}"
+            )
+            return kv_cache_bytes
+
+        except Exception as e:
+            logger.warning(f"Error calculating KV cache memory: {e}, returning 0")
+            return 0.0
 
     def calculate_ttft(self, model_params: Dict[str, Any]) -> float:
         """Calculate Time To First Token using llm-memory-calculator.

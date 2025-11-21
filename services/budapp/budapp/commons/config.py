@@ -106,6 +106,9 @@ class AppConfig(BaseAppConfig):
     # default non master realm name
     default_realm_name: str = Field(alias="DEFAULT_REALM_NAME", default="bud")
 
+    # default client name for bud-stack in shared realm
+    default_client_name: str = Field(alias="DEFAULT_CLIENT_NAME", default="default-internal-client")
+
     # Token
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_minutes: int = Field(60 * 24 * 7, alias="REFRESH_TOKEN_EXPIRE_MINUTES")
@@ -157,6 +160,7 @@ class AppConfig(BaseAppConfig):
     cache_max_size: int = Field(alias="CACHE_MAX_SIZE", default=1000)
     cache_ttl: Optional[int] = Field(alias="CACHE_TTL", default=None)
     cache_score_threshold: float = Field(alias="CACHE_SCORE_THRESHOLD", default=0.1)
+    prompt_config_redis_ttl: int = Field(alias="PROMPT_CONFIG_REDIS_TTL", default=86400)
     litellm_proxy_master_key: str = Field(alias="LITELLM_PROXY_MASTER_KEY", default="sk-1234")
 
     # Frontend URL
@@ -175,7 +179,9 @@ class AppConfig(BaseAppConfig):
     # Minio store
     minio_endpoint: str = Field("bud-store.bud.studio", alias="MINIO_ENDPOINT")
     minio_secure: bool = Field(True, alias="MINIO_SECURE")
+    # Stores actual model files (weights, configs, tokenizers)
     minio_bucket: str = Field("models-registry", alias="MINIO_BUCKET")
+    # Stores model metadata and license files only (NOT model files)
     minio_model_bucket: str = Field("model-info", alias="MINIO_MODEL_BUCKET")
 
     # model download directory
@@ -208,6 +214,10 @@ class AppConfig(BaseAppConfig):
     eval_sync_local_mode: bool = Field(
         default=False, description="Use local mode for evaluation data synchronization", alias="EVAL_SYNC_LOCAL_MODE"
     )
+
+    # MCP Foundry
+    mcp_foundry_base_url: AnyHttpUrl = Field(alias="MCP_FOUNDRY_BASE_URL")
+    mcp_foundry_api_key: str = Field(alias="MCP_FOUNDRY_API_KEY")
 
     @computed_field
     def static_dir(self) -> str:

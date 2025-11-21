@@ -614,6 +614,18 @@ class ExpDataset(BaseModel):
         None,
         description="Evaluation type configurations like {'gen': 'gsm8k_gen', 'agent': 'gsm8k_agent'}.",
     )
+    why_run_this_eval: Optional[List[str]] = Field(
+        None,
+        description="List of reasons why running this evaluation is valuable and what insights it provides.",
+    )
+    what_to_expect: Optional[List[str]] = Field(
+        None,
+        description="List of expectations when evaluating this dataset, including patterns, trends, and characteristics.",
+    )
+    additional_info: Optional[dict] = Field(
+        None,
+        description="Additional metadata including top_5_task_types, top_5_domains, top_5_skills, top_5_concepts, top_5_qualifications, top_5_languages, age_distribution, and evaluation_description.",
+    )
     traits: List[Trait] = Field([], description="Traits associated with this dataset.")
 
     class Config:
@@ -640,7 +652,9 @@ class ListDatasetsResponse(SuccessResponse):
 class DatasetFilter(BaseModel):
     """Filter parameters for dataset listing."""
 
-    name: Optional[str] = Field(None, description="Filter by dataset name (case-insensitive substring).")
+    name: Optional[str] = Field(
+        None, description="Search in dataset name and description (case-insensitive substring)."
+    )
     modalities: Optional[List[str]] = Field(None, description="Filter by modalities.")
     language: Optional[List[str]] = Field(None, description="Filter by languages.")
     domains: Optional[List[str]] = Field(None, description="Filter by domains.")
@@ -994,3 +1008,18 @@ class DatasetScoresResponse(PaginatedSuccessResponse):
     dataset_id: UUID4 = Field(..., description="UUID of the dataset")
     dataset_name: str = Field(..., description="Name of the dataset")
     scores: List[DatasetModelScore] = Field(default_factory=list, description="List of model scores")
+class ExperimentSummary(BaseModel):
+    """Summary statistics for an experiment."""
+
+    total_evaluations: int = Field(..., description="Total number of evaluations in the experiment")
+    total_duration_seconds: int = Field(..., description="Total duration of all evaluations in seconds")
+    completed_evaluations: int = Field(..., description="Number of completed evaluations")
+    failed_evaluations: int = Field(..., description="Number of failed evaluations")
+    pending_evaluations: int = Field(..., description="Number of pending evaluations")
+    running_evaluations: int = Field(..., description="Number of currently running evaluations")
+
+
+class ExperimentSummaryResponse(SuccessResponse):
+    """Response for experiment summary endpoint."""
+
+    summary: ExperimentSummary = Field(..., description="Experiment summary data")

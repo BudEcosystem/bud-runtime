@@ -28,6 +28,7 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 from budprompt.commons import PSQLBase
 from budmicroframe.shared.dapr_workflow import WorkflowRunsSchema, WorkflowStepsSchema
+from budprompt.prompt.models import Prompt, PromptVersion
 
 
 target_metadata = PSQLBase.metadata

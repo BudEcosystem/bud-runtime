@@ -37,6 +37,7 @@ export default function DeployModel() {
       page,
       limit,
       table_source: "model",
+      exclude_adapters: true,
     }).then((data) => {
       setModels(data);
     });
@@ -72,7 +73,8 @@ export default function DeployModel() {
           return openDrawerWithStep("deploy-model-credential-select");
         }
 
-        openDrawerWithStep("deploy-model-template");
+        // For local models, go to hardware mode selection
+        openDrawerWithStep("deploy-model-hardware-mode");
       }}
       nextText="Next"
     >

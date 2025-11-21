@@ -47,6 +47,7 @@ k8s_is_installed() {
 		return 0
 	fi
 
+	sudo chown "$(whoami)" "$k3s_kubeconfig_path" >/dev/null 2>&1
 	if KUBECONFIG="$k3s_kubeconfig_path" kubectl get ns >/dev/null 2>&1; then
 		export KUBECONFIG="$k3s_kubeconfig_path"
 		return 0
@@ -55,11 +56,16 @@ k8s_is_installed() {
 	return 1
 }
 k3s_install() {
-	curl -sfL https://get.k3s.io | sh -
+	curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--write-kubeconfig-group $(id -gn) --write-kubeconfig-mode 0640" sh -
 	export KUBECONFIG="$k3s_kubeconfig_path"
 }
 k8s_clusterrole_exists() {
 	kubectl get clusterrole "$1" >/dev/null 2>&1
+}
+k8s_apiresources_exists() {
+	name="$1"
+	api_version="$2"
+	kubectl api-resources | grep -Eq "${name}[[:space:]]+[a-z,]*[[:space:]]*${api_version}" >/dev/null 2>&1
 }
 k8s_ensure() {
 	if ! k8s_is_installed; then
@@ -106,8 +112,14 @@ helm_ensure() {
 		helm_install keel "" -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
 	fi
 
-	if ! k8s_clusterrole_exists dapr-placement; then
+	if ! k8s_apiresources_exists 'components' 'dapr.io/v1alpha1'; then
 		helm_install dapr ""
+	fi
+
+	if ! k8s_apiresources_exists 'certificates' 'cert-manager.io/v1'; then
+		chart_version="v$(yq -r '.dependencies[] | select(.name == "cert-manager") | .version' "$bud_repo_local/infra/helm/cert-manager/Chart.yaml")"
+		kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/$chart_version/cert-manager.crds.yaml"
+		helm_install cert-manager "" --skip-crds --set cert-manager.crds.enabled=false
 	fi
 
 	vim "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
@@ -147,7 +159,7 @@ nvidia_ensure() {
 }
 
 traefik_ensure() {
-	if k8s_clusterrole_exists traefik-kube-system; then
+	if k8s_apiresources_exists 'middlewares' 'traefik.io/v1alpha1'; then
 		return
 	fi
 

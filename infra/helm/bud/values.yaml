@@ -2,6 +2,24 @@
 global:
   security:
     allowInsecureImages: true
+  # Optional node scheduling configuration applied to all microservices by default
+  # Can be overridden per-service in microservices.<service>.nodeSelector and microservices.<service>.affinity
+  nodeSelector: {}
+  # Example:
+  # nodeSelector:
+  #   environment: production
+  #   tier: backend
+  affinity: {}
+  # Example:
+  # affinity:
+  #   nodeAffinity:
+  #     requiredDuringSchedulingIgnoredDuringExecution:
+  #       nodeSelectorTerms:
+  #       - matchExpressions:
+  #         - key: kubernetes.io/arch
+  #           operator: In
+  #           values:
+  #           - amd64
 imagePullSecrets: []
 # NOTE: support for https://keel.sh/
 imagePullPolicy: "IfNotPresent"
@@ -107,40 +125,57 @@ microservices:
   # frontend services
   budadmin:
     enabled: true
-    image: budstudio/budadmin:0.4.0
+    image: budstudio/budadmin:0.4.3
     # Branding configuration - customize logos per customer deployment
     # Leave empty to use default Bud logos
     env:
-      # Main logo for dashboard sidebar and header
-      # NEXT_PUBLIC_LOGO_URL: "/images/customer-logo.svg"
-      # Logo for auth pages (login/register)
-      # NEXT_PUBLIC_LOGO_AUTH_URL: "/images/customer-logo-auth.png"
-      # Favicon for browser tab
-      # NEXT_PUBLIC_FAVICON_URL: "/favicon-customer.ico"
+    # Main logo for dashboard sidebar and header
+    # NEXT_PUBLIC_LOGO_URL: "/images/customer-logo.svg"
+    # Logo for auth pages (login/register)
+    # NEXT_PUBLIC_LOGO_AUTH_URL: "/images/customer-logo-auth.png"
+    # Favicon for browser tab
+    # NEXT_PUBLIC_FAVICON_URL: "/favicon-customer.ico"
+    # Optional per-service node scheduling (overrides global)
+    nodeSelector: {}
+    affinity: {}
   budcustomer:
     enabled: true
-    image: budstudio/budcustomer:0.4.0
+    image: budstudio/budcustomer:0.4.3
     env: {}
+    nodeSelector: {}
+    affinity: {}
   budplayground:
     enabled: true
-    image: budstudio/budplayground:0.4.0
+    image: budstudio/budplayground:0.4.3
     env: {}
+    nodeSelector: {}
+    affinity: {}
   # backend exposed services
   budgateway:
     enabled: true
-    image: budstudio/budgateway:0.4.0
+    image: budstudio/budgateway:0.4.3
     env: {}
+    nodeSelector: {}
+    affinity: {}
+  budsentinel:
+    enabled: false # closed source, avoid enabling by default
+    image: harbor.bud.studio/sentinel/sentinel:nightly
+    env: {}
+    nodeSelector: {}
+    affinity: {}
   askbud:
     enabled: true
-    image: budstudio/askbud:0.4.0
+    image: budstudio/askbud:0.4.3
     daprid: askbud
-    model: qwen3-32b
+    model: bud-gpt-oss-20b-ada28b58
     env:
       INFERENCE_API_KEY: "test"
-      INFERENCE_URL: http://20.66.97.208/v1/
+      INFERENCE_URL: http://52.241.253.58/v1/
+    nodeSelector: {}
+    affinity: {}
   budapp:
     enabled: true
-    image: budstudio/budapp:0.4.0
+    image: budstudio/budapp:0.4.3
     daprid: budapp
     corsOrigins:
       - "http://localhost:3000"
@@ -158,10 +193,12 @@ microservices:
       BUD_CONNECT_BASE_URL: https://budconnect.bud.studio
       BUD_DOC_SERVICE_URL: "http://{{ $.Release.Name }}-buddoc:9081"
       BUD_PROMPT_SERVICE_URL: "http://{{ $.Release.Name }}-budprompt:3015/v1/"
+    nodeSelector: {}
+    affinity: {}
   # backend internal services
   budcluster:
     enabled: true
-    image: budstudio/budcluster:0.4.0
+    image: budstudio/budcluster:0.4.3
     daprid: budcluster
     env:
       LOG_LEVEL: INFO
@@ -189,10 +226,12 @@ microservices:
       PROMETHEUS_SERVICE_NAME: "bud-metrics-kube-prometheu-prometheus"
       PROMETHEUS_NAMESPACE: "bud-system"
       PROMETHEUS_PORT: "9090"
+    nodeSelector: {}
+    affinity: {}
   budmetrics:
     enabled: true
     daprid: budmetrics
-    image: budstudio/budmetrics:0.4.0
+    image: budstudio/budmetrics:0.4.3
     env:
       #deadlink
       INFERENCE_URL: http://172.184.137.177:8502/classify
@@ -203,29 +242,37 @@ microservices:
       SECRETS_CLICKHOUSE_PASSWORD: "{{ .Values.clickhouse.auth.password }}"
       # ClickHouse TTL configuration for cluster metrics (in days)
       CLICKHOUSE_TTL_CLUSTER_METRICS: "30"
+    nodeSelector: {}
+    affinity: {}
   budmodel:
     enabled: true
-    image: budstudio/budmodel:0.4.0
+    image: budstudio/budmodel:0.4.3
     daprid: budmodel
     storageClassName: nfs-csi
     storageSize: "32Gi"
     env:
       LOG_LEVEL: INFO
+    nodeSelector: {}
+    affinity: {}
   budeval:
     enabled: true
-    image: budstudio/budeval:0.4.0
+    image: budstudio/budeval:0.4.3
     daprid: budeval
     storageClassName: nfs-csi
     env: {}
+    nodeSelector: {}
+    affinity: {}
   budsim:
     enabled: true
-    image: budstudio/budsim:0.4.0
+    image: budstudio/budsim:0.4.3
     daprid: budsim
     env:
       LOG_LEVEL: INFO
+    nodeSelector: {}
+    affinity: {}
   buddoc:
     enabled: true
-    image: budstudio/buddoc:0.4.0
+    image: budstudio/buddoc:0.4.3
     daprid: buddoc
     env:
       LOG_LEVEL: INFO
@@ -233,28 +280,33 @@ microservices:
       VLM_API_TIMEOUT: "300"
       MAX_FILE_SIZE_MB: "50"
       TEMP_UPLOAD_DIR: /tmp/buddoc_uploads
+    nodeSelector: {}
+    affinity: {}
   budnotify:
     enabled: true
-    image: budstudio/budnotify:0.4.0
+    image: budstudio/budnotify:0.4.3
     daprid: budnotify
     pubsubTopic: notificationMessages
+    nodeSelector: {}
+    affinity: {}
   budprompt:
     enabled: true
     daprid: budprompt
-    image: budstudio/budprompt:0.4.0
+    image: budstudio/budprompt:0.4.3
     env:
       LOG_LEVEL: INFO
       BUD_GATEWAY_BASE_URL: http://{{ .Release.Name }}-budgateway:3000/v1
-      BUD_DEFAULT_MODEL_NAME: qwen3-32b
       REDIS_HOST: "{{ .Release.Name }}-valkey-primary"
       REDIS_PORT: "6379"
       REDIS_DB_INDEX: "10"
       REDIS_PASSWORD: "{{ .Values.valkey.auth.password }}"
+    nodeSelector: {}
+    affinity: {}
   global:
     env:
       PROMETHEUS_URL: https://metric.bud.studio
       # deadlink
-      BUD_LLM_BASE_URL: http://20.66.97.208/v1/
+      BUD_LLM_BASE_URL: http://52.241.253.58/v1/
       #deadlink
       EVAL_MANIFEST_URL: https://eval-datasets.bud.eco/v2/manifest.json
       #deadlink
@@ -279,7 +331,7 @@ microservices:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       BUD_CONNECT_URL: https://budconnect.bud.studio
-      BUD_LLM_MODEL: qwen3-32b
+      BUD_LLM_MODEL: bud-gpt-oss-20b-ada28b58
       CI: "true"
       CLICKHOUSE_USER: "{{ .Values.clickhouse.auth.username }}"
       CLICKHOUSE_PASSWORD: "{{ .Values.clickhouse.auth.password }}"
@@ -296,6 +348,7 @@ microservices:
       IS_TOPIC_NOTIFICATION_ENABLED: "true"
       LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
       LOG_LEVEL: INFO
+      MCP_FOUNDRY_BASE_URL: https://mcp-foundry.bud.studio/
       MINIO_ACCESS_KEY: "{{ .Values.minio.auth.rootUser }}"
       MINIO_BUCKET: models-registry
       MINIO_ENDPOINT: '{{ include "bud.ingress.hosts.s3" $ }}'
@@ -362,6 +415,37 @@ valkey:
     save ""
   auth:
     password: bud
+  primary:
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 1000m
+  # Optional node scheduling for Valkey (Redis)
+  master:
+    nodeSelector: {}
+    affinity: {}
+    # Resource limits to prevent OOM and pod restarts
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 1000m
+    # Improved liveness probe to handle AOF loading and memory pressure
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 10
+      failureThreshold: 10
+      successThreshold: 1
+  replica:
+    nodeSelector: {}
+    affinity: {}
 clickhouse:
   enabled: true
   image:
@@ -371,10 +455,25 @@ clickhouse:
   auth:
     username: bud
     password: bud
+  resources:
+    requests:
+      memory: 2Gi
+      cpu: 500m
+    limits:
+      memory: 4Gi
+      cpu: 2000m
   keeper:
     replicaCount: 1
     image:
       repository: bitnamilegacy/clickhouse-keeper
+  # Optional node scheduling for ClickHouse
+  nodeSelector: {}
+  affinity: {}
+  resources:
+    requests:
+      memory: 1Gi
+    limits:
+      memory: 4Gi
 clickhouseExtra:
   autoCreateDB:
     - budproxy
@@ -390,6 +489,9 @@ postgresql:
         memory: 256Mi
       limits:
         memory: 512Mi
+    # Optional node scheduling for PostgreSQL primary
+    nodeSelector: {}
+    affinity: {}
   architecture: standalone
   auth:
     postgresPassword: bud
@@ -422,6 +524,9 @@ keycloak:
     user: keycloak
     password: keycloak
     database: keycloak
+  # Optional node scheduling for Keycloak
+  nodeSelector: {}
+  affinity: {}
 kafka:
   image:
     repository: bitnamilegacy/kafka
@@ -433,6 +538,13 @@ kafka:
         memory: 1024Mi
       limits:
         memory: 2048Mi
+    # Optional node scheduling for Kafka controller
+    nodeSelector: {}
+    affinity: {}
+  broker:
+    # Optional node scheduling for Kafka broker
+    nodeSelector: {}
+    affinity: {}
   tls:
     existingSecret: kafka-jks
     keystorePassword: jksPassword
@@ -458,6 +570,9 @@ mongodb:
       - novu_password
     databases:
       - novu_db
+  # Optional node scheduling for MongoDB
+  nodeSelector: {}
+  affinity: {}
 novu:
   api:
     env:
@@ -496,6 +611,9 @@ minio:
       - name: novu-local
       - name: models-registry
       - name: model-info
+  # Optional node scheduling for MinIO
+  nodeSelector: {}
+  affinity: {}
 # OpenTelemetry Collector for metrics collection
 otelCollector:
   enabled: true
@@ -523,6 +641,9 @@ otelCollector:
     username: default
     password: ""
     ttl: 720h # 30 days - retention for raw OTel metrics (otel_metrics_*)
+  # Optional node scheduling for OTel Collector
+  nodeSelector: {}
+  affinity: {}
 # best to be installed cluster wide, not as part of this chart
 dapr:
   enabled: false

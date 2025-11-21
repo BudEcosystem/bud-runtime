@@ -17,9 +17,9 @@
 """Clean streaming validation executor with OpenAI formatting and simple retry logic."""
 
 import json
-import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional, Type
 
+from budmicroframe.commons import logging
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage, ModelResponse, ThinkingPart, ToolCallPart
@@ -34,7 +34,7 @@ from .schemas import ModelSettings as ModelSettingsSchema
 from .streaming_json_validator import StreamingJSONValidator, extract_field_validators
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class StreamingValidationExecutor:

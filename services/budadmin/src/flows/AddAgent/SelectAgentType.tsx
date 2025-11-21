@@ -55,38 +55,40 @@ export default function SelectAgentType() {
       value: 'simple_prompt',
       label: 'Simple Prompt',
       description: 'Create simple text generation prompt for basic LLM interactions',
-      icon: 'images/drawer/brain.png', // LLM icon from modalityTypeList
+      icon: '/images/drawer/brain.png', // LLM icon from modalityTypeList
       status: 'active',
     },
     {
       value: 'prompt_workflow',
       label: 'Prompt Workflow',
       description: 'Create complex prompt chains with multiple models and steps',
-      icon: 'images/drawer/compare.png', // Action transformers icon
+      icon: '/images/drawer/compare.png', // Action transformers icon
       status: 'inactive',
     },
     {
       value: 'agent',
       label: 'Agent',
       description: 'Create autonomous agent with custom tools and capabilities',
-      icon: 'images/drawer/embedding.png', // Embedding icon for agent intelligence
+      icon: '/images/drawer/embedding.png', // Embedding icon for agent intelligence
       status: 'inactive',
     },
     {
       value: 'chatflow',
       label: 'Chatflow',
       description: 'Create conversational flow with dialog management',
-      icon: 'images/drawer/textToSpeach.png', // Text to speech for conversations
+      icon: '/images/drawer/textToSpeach.png', // Text to speech for conversations
       status: 'inactive',
     },
   ];
 
   // Load workflow on component mount if it exists
+  // Note: createWorkflow() already fetches the complete workflow, so we only
+  // need to fetch here if we're returning to this page without workflow data
   useEffect(() => {
-    if (currentWorkflow?.workflow_id) {
+    if (currentWorkflow?.workflow_id && !currentWorkflow?.workflow_steps) {
       getWorkflow(currentWorkflow.workflow_id);
     }
-  }, [currentWorkflow?.workflow_id, getWorkflow]);
+  }, [currentWorkflow, getWorkflow]);
 
   const handleNext = async () => {
     if (!selectedType) {
@@ -132,6 +134,10 @@ export default function SelectAgentType() {
       if (response?.data) {
         // Update the workflow in the store
         await getWorkflow(currentWorkflow.workflow_id);
+
+        // CRITICAL: Set transition flag BEFORE closing drawer to prevent agent parameter removal
+        // This ensures the safety check in useDrawer.closeDrawer() sees isTransitioning=true
+        useAgentStore.setState({ isTransitioningToAgentDrawer: true });
 
         // Close the main drawer first
         closeDrawer();

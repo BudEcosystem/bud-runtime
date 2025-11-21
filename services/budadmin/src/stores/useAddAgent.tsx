@@ -52,7 +52,7 @@ export const useAddAgent = create<{
   loading: boolean;
   requestCount: number;
   currentWorkflow: WorkflowType | null;
-  selectedProject: Project | null;
+  selectedProject: Partial<Project> | null;
   selectedAgentType: AgentType | null;
   selectedModel: Model | null;
   agentConfiguration: AgentConfiguration;
@@ -63,7 +63,7 @@ export const useAddAgent = create<{
 
   setLoading: (loading: boolean) => void;
   setCurrentWorkflow: (workflow: WorkflowType) => void;
-  setSelectedProject: (project: Project) => void;
+  setSelectedProject: (project: Partial<Project>) => void;
   setSelectedAgentType: (agentType: AgentType) => void;
   setSelectedModel: (model: Model) => void;
   setAgentConfiguration: (config: Partial<AgentConfiguration>) => void;
@@ -115,7 +115,7 @@ export const useAddAgent = create<{
     set({ currentWorkflow: workflow });
   },
 
-  setSelectedProject: (project: Project) => {
+  setSelectedProject: (project: Partial<Project>) => {
     set({ selectedProject: project });
   },
 

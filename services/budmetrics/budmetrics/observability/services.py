@@ -762,13 +762,23 @@ class ObservabilityMetricsService:
 
         # Count total records
         # Safe: where_clause is built from validated conditions
-        count_query = f"""
-        SELECT COUNT(*) as total_count
-        FROM ModelInference mi
-        INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
-        LEFT JOIN ChatInference ci ON mi.inference_id = ci.id
-        WHERE {where_clause}
-        """  # nosec B608
+        # Optimized: Use count() instead of COUNT(*) and join with ModelInference only if needed
+        # This reduces memory usage by avoiding loading large text fields from unnecessary tables
+        if any(cond.startswith("mi.") for cond in where_conditions):
+            # If we have filters on ModelInference fields, we need the JOIN
+            count_query = f"""
+            SELECT count() as total_count
+            FROM ModelInferenceDetails mid
+            INNER JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+            WHERE {where_clause}
+            """  # nosec B608
+        else:
+            # If all filters are on ModelInferenceDetails, we can count directly
+            count_query = f"""
+            SELECT count() as total_count
+            FROM ModelInferenceDetails mid
+            WHERE {where_clause}
+            """  # nosec B608
 
         # Execute count query with parameters
         count_result = await self.clickhouse_client.execute_query(count_query, params)
@@ -776,13 +786,14 @@ class ObservabilityMetricsService:
 
         # Get paginated data
         # Safe: where_clause and order_by are validated, limit/offset use parameters
+        # Optimized: Removed ChatInference JOIN as data is already in ModelInference.input_messages and ModelInference.output
         list_query = f"""
         SELECT
             mi.inference_id,
             mi.timestamp,
             mi.model_name,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(coalesce(nullif(ci.input, ''), mi.input_messages), 1, 100))
+                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(mi.input_messages, 1, 100))
                 WHEN mi.endpoint_type = 'embedding' THEN toValidUTF8(substring(ei.input, 1, 100))
                 WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.input, 1, 100))
                 WHEN mi.endpoint_type = 'image_generation' THEN toValidUTF8(substring(ii.prompt, 1, 100))
@@ -790,7 +801,7 @@ class ObservabilityMetricsService:
                 ELSE toValidUTF8(substring(mi.input_messages, 1, 100))
             END as prompt_preview,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(coalesce(ci.output, mi.output), 1, 100))
+                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(mi.output, 1, 100))
                 WHEN mi.endpoint_type = 'embedding' THEN concat('Generated ', toString(ei.input_count), ' embeddings')
                 WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.output, 1, 100))
                 WHEN mi.endpoint_type = 'image_generation' THEN concat('Generated ', toString(ii.image_count), ' images')
@@ -815,7 +826,6 @@ class ObservabilityMetricsService:
             mid.status_code
         FROM ModelInference mi
         INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
-        LEFT JOIN ChatInference ci ON mi.inference_id = ci.id AND mi.endpoint_type = 'chat'
         LEFT JOIN EmbeddingInference ei ON mi.inference_id = ei.id AND mi.endpoint_type = 'embedding'
         LEFT JOIN AudioInference ai ON mi.inference_id = ai.id AND mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech')
         LEFT JOIN ImageInference ii ON mi.inference_id = ii.id AND mi.endpoint_type = 'image_generation'
@@ -980,11 +990,8 @@ class ObservabilityMetricsService:
                 ga.model_provider,
                 ga.model_version,
                 ga.routing_decision,
-                ga.status_code,
                 ga.response_size,
                 ga.response_headers,
-                ga.error_type,
-                ga.error_message,
                 ga.is_blocked,
                 ga.block_reason,
                 ga.block_rule_id,

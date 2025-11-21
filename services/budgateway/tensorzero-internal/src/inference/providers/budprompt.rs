@@ -1,13 +1,13 @@
 use crate::endpoints::inference::InferenceCredentials;
 use crate::error::{DisplayOrDebugGateway, Error, ErrorDetails};
 use crate::model::{Credential, CredentialLocation};
-use reqwest::StatusCode;
 use crate::responses::{
     OpenAIResponse, OpenAIResponseCreateParams, ResponseInputItemsList, ResponseProvider,
     ResponseResult, ResponseStreamEvent,
 };
 use futures::{Stream, StreamExt};
 use reqwest::Client;
+use reqwest::StatusCode;
 use reqwest_eventsource::{Event, RequestBuilderExt};
 use secrecy::{ExposeSecret, SecretString};
 use std::time::Instant;
@@ -23,10 +23,7 @@ pub struct BudPromptProvider {
 }
 
 impl BudPromptProvider {
-    pub fn new(
-        api_base: Url,
-        api_key_location: Option<CredentialLocation>,
-    ) -> Result<Self, Error> {
+    pub fn new(api_base: Url, api_key_location: Option<CredentialLocation>) -> Result<Self, Error> {
         let credentials = if let Some(location) = api_key_location {
             BudPromptCredentials::try_from(Credential::try_from((location, PROVIDER_NAME))?)
         } else {
@@ -96,11 +93,7 @@ fn get_responses_url(base_url: &Url) -> Result<Url, Error> {
 }
 
 // Helper function to handle API errors
-fn handle_budprompt_error(
-    raw_request: &str,
-    status: StatusCode,
-    response_body: &str,
-) -> Error {
+fn handle_budprompt_error(raw_request: &str, status: StatusCode, response_body: &str) -> Error {
     // Always use InferenceClient to preserve the backend status code
     // No filtering - pass through all status codes as-is
     ErrorDetails::InferenceClient {
@@ -205,10 +198,8 @@ impl ResponseProvider for BudPromptProvider {
         request: &OpenAIResponseCreateParams,
         client: &Client,
         dynamic_api_keys: &InferenceCredentials,
-    ) -> Result<
-        Box<dyn Stream<Item = Result<ResponseStreamEvent, Error>> + Send + Unpin>,
-        Error,
-    > {
+    ) -> Result<Box<dyn Stream<Item = Result<ResponseStreamEvent, Error>> + Send + Unpin>, Error>
+    {
         let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
         let request_url = get_responses_url(&self.api_base)?;
         let _start_time = Instant::now();
@@ -437,18 +428,17 @@ impl ResponseProvider for BudPromptProvider {
                 })
             })?;
 
-            let response: serde_json::Value =
-                serde_json::from_str(&raw_response).map_err(|e| {
-                    Error::new(ErrorDetails::InferenceServer {
-                        message: format!(
-                            "Error parsing JSON response: {}",
-                            DisplayOrDebugGateway::new(e)
-                        ),
-                        raw_request: None,
-                        raw_response: Some(raw_response.clone()),
-                        provider_type: PROVIDER_TYPE.to_string(),
-                    })
-                })?;
+            let response: serde_json::Value = serde_json::from_str(&raw_response).map_err(|e| {
+                Error::new(ErrorDetails::InferenceServer {
+                    message: format!(
+                        "Error parsing JSON response: {}",
+                        DisplayOrDebugGateway::new(e)
+                    ),
+                    raw_request: None,
+                    raw_response: Some(raw_response.clone()),
+                    provider_type: PROVIDER_TYPE.to_string(),
+                })
+            })?;
 
             Ok(response)
         } else {

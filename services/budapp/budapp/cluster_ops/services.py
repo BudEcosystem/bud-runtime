@@ -778,7 +778,7 @@ class ClusterService(SessionMixin):
         # Check if cluster is already in deleting state
         if db_cluster.status == ClusterStatusEnum.DELETING:
             # Check how long the cluster has been in deleting state
-            time_in_deleting = datetime.now(timezone.utc) - db_cluster.updated_at
+            time_in_deleting = datetime.now(timezone.utc) - db_cluster.modified_at
 
             if time_in_deleting > timedelta(days=1):
                 # Move to ERROR state if stuck in DELETING for more than 24 hours
@@ -2129,6 +2129,9 @@ class ClusterService(SessionMixin):
                     tool_calling_parser_type=recommended_cluster_data.get("tool_calling_parser_type"),
                     reasoning_parser_type=recommended_cluster_data.get("reasoning_parser_type"),
                     chat_template=recommended_cluster_data.get("chat_template"),
+                    # Add engine capability flags from simulator
+                    supports_lora=recommended_cluster_data.get("supports_lora"),
+                    supports_pipeline_parallelism=recommended_cluster_data.get("supports_pipeline_parallelism"),
                 )
             )
 

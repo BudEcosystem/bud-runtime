@@ -710,6 +710,7 @@ class ModelFilter(BaseModel):
     table_source: Literal["cloud_model", "model"] = "cloud_model"
     base_model: str | None = None
     base_model_relation: BaseModelRelationEnum | None = None
+    exclude_adapters: bool | None = Field(None, description="Exclude adapter-type models from results")
     supported_endpoints: List[ModelEndpointEnum] | None = None
 
     # @field_validator("source")
@@ -1074,6 +1075,8 @@ class ModelDeployStepRequest(BaseModel):
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
     scaling_specification: ScalingSpecification | None = None
+    # Hardware resource mode (dedicated vs shared/time-slicing)
+    hardware_mode: Literal["dedicated", "shared"] | None = Field(default=None)
     # Parser configuration options
     enable_tool_calling: bool | None = None
     enable_reasoning: bool | None = None
@@ -1081,6 +1084,9 @@ class ModelDeployStepRequest(BaseModel):
     tool_calling_parser_type: str | None = None
     reasoning_parser_type: str | None = None
     chat_template: str | None = None
+    # Engine capability flags from simulator
+    supports_lora: bool | None = None
+    supports_pipeline_parallelism: bool | None = None
 
     @field_validator("endpoint_name")
     @classmethod
@@ -1143,12 +1149,17 @@ class DeploymentWorkflowStepData(BaseModel):
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
     scaling_specification: ScalingSpecification | None = None
+    # Hardware resource mode (dedicated vs shared/time-slicing)
+    hardware_mode: Literal["dedicated", "shared"] | None = None
     enable_tool_calling: bool | None = None
     enable_reasoning: bool | None = None
     # Parser metadata from simulator/cluster
     tool_calling_parser_type: str | None = None
     reasoning_parser_type: str | None = None
     chat_template: str | None = None
+    # Engine capability flags from simulator
+    supports_lora: bool | None = None
+    supports_pipeline_parallelism: bool | None = None
 
 
 class ModelDeploymentRequest(BaseModel):
@@ -1160,6 +1171,7 @@ class ModelDeploymentRequest(BaseModel):
     hf_token: str | None = None
     model: str
     model_size: Optional[int] = None
+    storage_size_gb: Optional[float] = None
     target_ttft: Optional[int] = None
     target_e2e_latency: Optional[int] = None
     target_throughput_per_user: Optional[int] = None

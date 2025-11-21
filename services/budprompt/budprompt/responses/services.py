@@ -17,25 +17,23 @@
 """Services for responses module - OpenAI-compatible API."""
 
 import json
-import logging
 from typing import Any, Dict, Optional
 
+from budmicroframe.commons import logging
 from fastapi.responses import StreamingResponse
+from openai.types.responses import ResponsePrompt
 from pydantic import ValidationError
 
 from budprompt.commons.exceptions import ClientException, OpenAIResponseException
 from budprompt.shared.redis_service import RedisService
 
-from ..prompt.openai_response_formatter import (
-    OpenAIPromptInfo,
-    extract_validation_error_details,
-)
+from ..prompt.openai_response_formatter import extract_validation_error_details
 from ..prompt.schemas import PromptExecuteData
 from ..prompt.services import PromptExecutorService
 from .schemas import ResponsePromptParam
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 
 class ResponsesService:
@@ -67,6 +65,7 @@ class ResponsesService:
         """
         try:
             if prompt_params.variables and input:
+                logger.error("Please provide either variables or input.")
                 raise OpenAIResponseException(
                     status_code=400,
                     message="Please provide either variables or input.",
@@ -87,7 +86,7 @@ class ResponsesService:
                 redis_key = await self.redis_service.get(default_key)
 
                 if not redis_key:
-                    logger.debug(f"Default version not found for prompt_id: {prompt_id}")
+                    logger.error("Default version not found for prompt_id: %s", prompt_id)
                     raise OpenAIResponseException(
                         status_code=404,
                         message=f"Prompt template not found: {prompt_id}",
@@ -98,7 +97,7 @@ class ResponsesService:
             config_json = await self.redis_service.get(redis_key)
 
             if not config_json:
-                logger.debug(f"Prompt configuration not found for key: {redis_key}")
+                logger.error("Prompt configuration not found for key: %s", redis_key)
                 raise OpenAIResponseException(
                     status_code=404,
                     message=f"Prompt template not found: {prompt_id}" + (f" version {version}" if version else ""),
@@ -109,7 +108,7 @@ class ResponsesService:
             try:
                 config_data = json.loads(config_json)
             except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse prompt configuration: {str(e)}")
+                logger.error("Failed to parse prompt configuration: %s", str(e))
                 raise OpenAIResponseException(
                     status_code=500,
                     message="Invalid prompt configuration format",
@@ -118,17 +117,21 @@ class ResponsesService:
 
             # Execute the prompt
             prompt_execute_data = PromptExecuteData.model_validate(config_data)
-            logger.debug(f"Config data for prompt: {prompt_id}: {prompt_execute_data}")
+            logger.debug("Config data for prompt: %s: %s", prompt_id, prompt_execute_data)
 
             input_data = prompt_params.variables if prompt_params.variables else input
 
-            result = await PromptExecutorService().execute_prompt(prompt_execute_data, input_data, api_key=api_key)
+            result = await PromptExecutorService().execute_prompt(
+                prompt_execute_data,
+                input_data,
+                api_key=api_key,
+            )
 
             # Log successful execution
-            logger.info(f"Successfully executed prompt: {prompt_id}")
+            logger.debug("Successfully executed prompt: %s", prompt_id)
 
             if prompt_execute_data.stream:
-                logger.info("Streaming response requested")
+                logger.debug("Streaming response requested")
                 return StreamingResponse(
                     result,
                     media_type="text/event-stream",
@@ -140,15 +143,20 @@ class ResponsesService:
                 )
             else:
                 # Add prompt info to non-streaming OpenAI-formatted response
-                result.prompt = OpenAIPromptInfo(
-                    id=prompt_id,
-                    variables=prompt_params.variables,
-                    version=version,
+                logger.debug("Non Streaming response requested")
+                result = result.model_copy(
+                    update={
+                        "prompt": ResponsePrompt(
+                            id=prompt_id,
+                            variables=prompt_params.variables,
+                            version=version,
+                        )
+                    }
                 )
                 return result
 
         except ValidationError as e:
-            logger.warning(f"Validation error during response creation: {str(e)}")
+            logger.error("Validation error during response creation: %s", str(e))
             message, param, code = extract_validation_error_details(e)
             raise OpenAIResponseException(
                 status_code=400,
@@ -158,7 +166,7 @@ class ResponsesService:
             ) from e
 
         except ClientException as e:
-            logger.warning(f"Client error during response creation: {e.message}")
+            logger.error("Client error during response creation: %s", e.message)
             # Extract param and code from ClientException params if available
             param = None
             code = None
@@ -181,7 +189,7 @@ class ResponsesService:
             raise
 
         except Exception as e:
-            logger.error(f"Unexpected error during prompt execution: {str(e)}")
+            logger.error("Unexpected error during prompt execution: %s", str(e))
             raise OpenAIResponseException(
                 status_code=500,
                 message="An unexpected error occurred during prompt execution",

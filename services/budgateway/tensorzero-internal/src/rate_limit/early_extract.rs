@@ -18,6 +18,16 @@ pub async fn early_model_extraction(mut request: Request, next: Next) -> Respons
         }
     }
 
+    // Special handling for /v1/models endpoint (GET request, no model in body)
+    // Use a static endpoint identifier for rate limiting
+    if request.uri().path() == "/v1/models" {
+        tracing::debug!("Setting static endpoint ID for /v1/models");
+        request
+            .extensions_mut()
+            .insert(ExtractedModel("models_list".to_string()));
+        return next.run(request).await;
+    }
+
     // Only process POST requests to OpenAI endpoints
     if request.method() == axum::http::Method::POST {
         let path = request.uri().path();

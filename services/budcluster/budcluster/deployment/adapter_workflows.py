@@ -69,6 +69,8 @@ class AdapterWorkflow:
                 platform=deploy_adapter_request_json.platform,
                 adapters=deploy_adapter_request_json.adapters,
                 delete_on_failure=False,
+                input_tokens=deploy_adapter_request_json.input_tokens,
+                output_tokens=deploy_adapter_request_json.output_tokens,
             )
 
             update_workflow_data_in_statestore(
@@ -206,6 +208,7 @@ class AdapterWorkflow:
             platform=platform,
             operation="download",
             existing_deployment_namespace=add_adapter_request_json.namespace,
+            storage_size_gb=getattr(add_adapter_request_json, "storage_size_gb", None),
         )
         transfer_model_result = yield ctx.call_activity(
             CreateDeploymentWorkflow.transfer_model, input=transfer_model_request.model_dump_json()
@@ -258,6 +261,8 @@ class AdapterWorkflow:
             adapters=add_adapter_request_json.adapters,
             endpoint_name=add_adapter_request_json.endpoint_name,
             ingress_url=add_adapter_request_json.ingress_url,
+            input_tokens=add_adapter_request_json.input_tokens,
+            output_tokens=add_adapter_request_json.output_tokens,
         )
         deploy_adapter_result = yield ctx.call_activity(
             AdapterWorkflow.deploy_adapter, input=deploy_adapter_activity_request.model_dump_json()
@@ -462,6 +467,8 @@ class DeleteAdapterWorkflow:
             adapters=delete_adapter_request_json.adapters,
             endpoint_name=delete_adapter_request_json.endpoint_name,
             ingress_url=delete_adapter_request_json.ingress_url,
+            input_tokens=delete_adapter_request_json.input_tokens,
+            output_tokens=delete_adapter_request_json.output_tokens,
         )
         deploy_adapter_result = yield ctx.call_activity(
             AdapterWorkflow.deploy_adapter, input=deploy_adapter_activity_request.model_dump_json()

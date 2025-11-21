@@ -62,7 +62,17 @@ class HuggingFaceModelInfo(BaseModelInfo):
     ) -> Tuple[ModelInfo, List[Dict]]:
         """Load a model from Hugging Face Hub."""
         hf_repo_readme = get_hf_repo_readme(pretrained_model_name_or_path, token)
-        model_analysis = get_model_analysis(hf_repo_readme)
+
+        # Try to get LLM-based model analysis, but continue without it if it fails
+        try:
+            model_analysis = get_model_analysis(hf_repo_readme)
+        except Exception as e:
+            logger.warning(
+                "LLM-based model analysis failed for %s: %s. Continuing with basic extraction.",
+                pretrained_model_name_or_path,
+                str(e),
+            )
+            model_analysis = {}
 
         # Handle missing README.md gracefully
         model_card = None

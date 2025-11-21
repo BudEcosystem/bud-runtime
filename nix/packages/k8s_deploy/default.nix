@@ -7,6 +7,7 @@
   git,
   curl,
   tomlq,
+  yq,
   vim,
   kmod,
   pciutils,
@@ -24,6 +25,7 @@ writeShellApplication {
     vim
     kmod
     pciutils
+    yq
   ];
 
   text = builtins.readFile ./script.sh;

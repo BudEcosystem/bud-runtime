@@ -1342,6 +1342,10 @@ class ClickHouseClient:
                 await cursor.execute(query, params or {})
                 result = await cursor.fetchall()
 
+                # Clean up any remaining cursor state to prevent "records not fetched" errors
+                # when connection is returned to pool and reused for next query
+                await self._cleanup_cursor_state(cursor)
+
                 if with_column_types:
                     return result, cursor.description
                 else:
@@ -1352,7 +1356,20 @@ class ClickHouseClient:
             except Exception as e:
                 # Ensure cursor is properly closed on errors
                 logger.error(f"Query execution failed: {e}. Query: {query[:100]}...")
+                # Try to clean up cursor state before raising
+                try:
+                    await self._cleanup_cursor_state(cursor)
+                except Exception as cleanup_error:
+                    logger.warning(f"Cursor cleanup failed during error handling: {cleanup_error}")
                 raise
+            finally:
+                # Ensure all remaining results are consumed to avoid "records not fetched" errors
+                try:
+                    while await cursor.fetchone():
+                        pass  # Consume all remaining records
+                except Exception as e:
+                    # Ignore errors when consuming remaining results
+                    logger.warning(f"Failed to consume remaining cursor results: {e}")
 
     async def execute_iter(
         self,

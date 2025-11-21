@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 import aiohttp
 from budmicroframe.commons.schemas import WorkflowMetadataResponse
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -1777,6 +1777,10 @@ class ExperimentService:
                 modalities=dataset.modalities,
                 sample_questions_answers=dataset.sample_questions_answers,
                 advantages_disadvantages=dataset.advantages_disadvantages,
+                eval_types=dataset.eval_types,
+                why_run_this_eval=dataset.why_run_this_eval,
+                what_to_expect=dataset.what_to_expect,
+                additional_info=dataset.additional_info,
                 traits=traits,
             )
 
@@ -1815,7 +1819,13 @@ class ExperimentService:
             # Apply filters
             if filters:
                 if filters.name:
-                    q = q.filter(DatasetModel.name.ilike(f"%{filters.name}%"))
+                    # Search in both name and description fields
+                    q = q.filter(
+                        or_(
+                            DatasetModel.name.ilike(f"%{filters.name}%"),
+                            DatasetModel.description.ilike(f"%{filters.name}%"),
+                        )
+                    )
                 if filters.modalities:
                     # Filter by modalities (JSONB contains any of the specified modalities)
                     for modality in filters.modalities:
@@ -1888,6 +1898,9 @@ class ExperimentService:
                     sample_questions_answers=dataset.sample_questions_answers,
                     advantages_disadvantages=dataset.advantages_disadvantages,
                     eval_types=dataset.eval_types,
+                    why_run_this_eval=dataset.why_run_this_eval,
+                    what_to_expect=dataset.what_to_expect,
+                    additional_info=dataset.additional_info,
                     traits=traits,
                 )
                 dataset_schemas.append(dataset_schema)
@@ -2160,6 +2173,60 @@ class ExperimentService:
             sort=SortInfo(field=sort_field, direction=sort_direction),
             page=page,
             page_size=page_size,
+        )
+
+    def get_experiment_summary(self, experiment_id: uuid.UUID, user_id: uuid.UUID):
+        """Get summary statistics for an experiment.
+
+        Parameters:
+            experiment_id (uuid.UUID): ID of the experiment.
+            user_id (uuid.UUID): ID of the user.
+
+        Returns:
+            ExperimentSummary: Summary statistics including evaluation counts and total duration.
+
+        Raises:
+            HTTPException(status_code=404): If experiment not found or access denied.
+        """
+        from budapp.eval_ops.schemas import ExperimentSummary
+
+        # Verify experiment exists and user has access
+        experiment = self.session.get(ExperimentModel, experiment_id)
+        if not experiment or experiment.status == ExperimentStatusEnum.DELETED.value:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Experiment not found or access denied",
+            )
+
+        # Efficiently count evaluations by status in a single query using database-level aggregation
+        evaluation_stats = (
+            self.session.query(
+                func.count(EvaluationModel.id).label("total"),
+                func.sum(case((EvaluationModel.status == EvaluationStatusEnum.COMPLETED.value, 1), else_=0)).label(
+                    "completed"
+                ),
+                func.sum(case((EvaluationModel.status == EvaluationStatusEnum.FAILED.value, 1), else_=0)).label(
+                    "failed"
+                ),
+                func.sum(case((EvaluationModel.status == EvaluationStatusEnum.PENDING.value, 1), else_=0)).label(
+                    "pending"
+                ),
+                func.sum(case((EvaluationModel.status == EvaluationStatusEnum.RUNNING.value, 1), else_=0)).label(
+                    "running"
+                ),
+                func.coalesce(func.sum(EvaluationModel.duration_in_seconds), 0).label("total_duration"),
+            )
+            .filter(EvaluationModel.experiment_id == experiment_id)
+            .one()
+        )
+
+        return ExperimentSummary(
+            total_evaluations=evaluation_stats.total or 0,
+            total_duration_seconds=int(evaluation_stats.total_duration),
+            completed_evaluations=evaluation_stats.completed or 0,
+            failed_evaluations=evaluation_stats.failed or 0,
+            pending_evaluations=evaluation_stats.pending or 0,
+            running_evaluations=evaluation_stats.running or 0,
         )
 
     # ------------------------ Experiment Evaluations Methods ------------------------

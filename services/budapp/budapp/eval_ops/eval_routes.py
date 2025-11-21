@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from budapp.commons import logging
 from budapp.commons.dependencies import get_current_active_user, get_session
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.eval_ops.schemas import (
     ConfigureRunsRequest,
     ConfigureRunsResponse,
@@ -27,6 +27,7 @@ from budapp.eval_ops.schemas import (
     EvaluationWorkflowStepRequest,
     ExperimentEvaluationsResponse,
     ExperimentModelListItem,
+    ExperimentSummaryResponse,
     ExperimentWorkflowStepRequest,
     GetDatasetResponse,
     GetExperimentResponse,
@@ -273,7 +274,7 @@ def list_datasets(
     current_user: Annotated[User, Depends(get_current_active_user)],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
-    name: Annotated[Optional[str], Query(description="Filter by dataset name")] = None,
+    name: Annotated[Optional[str], Query(description="Search in dataset name and description")] = None,
     modalities: Annotated[
         Optional[str],
         Query(description="Filter by modalities (comma-separated)"),
@@ -776,6 +777,45 @@ def get_runs_history(
     )
 
 
+@router.get(
+    "/{experiment_id}/summary",
+    response_model=ExperimentSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+def get_experiment_summary(
+    experiment_id: Annotated[uuid.UUID, Path(..., description="Experiment ID")],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Get summary statistics for an experiment.
+
+    Returns summary information including:
+    - Total number of evaluations
+    - Total duration of all evaluations in seconds
+    - Count of evaluations by status (completed, failed, pending, running)
+
+    - **experiment_id**: UUID of the experiment.
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user.
+
+    Returns an `ExperimentSummaryResponse` with experiment statistics.
+    """
+    try:
+        summary = ExperimentService(session).get_experiment_summary(experiment_id, current_user.id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to get experiment summary") from e
+
+    return ExperimentSummaryResponse(
+        code=status.HTTP_200_OK,
+        object="experiment.summary",
+        message="Successfully retrieved experiment summary",
+        summary=summary,
+    )
+
+
 @router.post(
     "/{experiment_id}/runs",
     response_model=ConfigureRunsResponse,
@@ -1225,3 +1265,77 @@ async def get_experiment_evaluations(
     except Exception as e:
         logger.debug(f"Failed to get experiment evaluations: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get experiment evaluations") from e
+
+
+@router.post(
+    "/sync/datasets",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+    description="Manually trigger evaluation dataset synchronization from manifest",
+    tags=["Evaluation Sync"],
+)
+async def sync_evaluation_datasets(
+    force_sync: Annotated[
+        bool,
+        Query(
+            description="Force synchronization even if manifest versions match. Use this to re-sync datasets after manifest updates."
+        ),
+    ] = False,
+    current_user: Annotated[User, Depends(get_current_active_user)] = None,
+):
+    """Manually trigger synchronization of evaluation datasets from the manifest.
+
+    This endpoint allows administrators to manually trigger the evaluation dataset sync workflow.
+    The sync process:
+    1. Fetches the latest manifest (from cloud or local file based on config)
+    2. Compares versions with the current database state
+    3. Syncs datasets, traits, and metadata if needed
+    4. Records sync results in the database
+
+    **Parameters:**
+    - **force_sync**: If True, syncs even if versions match (useful after manual manifest updates)
+
+    **Sync Behavior:**
+    - Without force_sync: Only syncs if manifest version differs from database version
+    - With force_sync=true: Always syncs regardless of version match
+
+    **Configuration:**
+    - Respects `EVAL_SYNC_LOCAL_MODE` setting (uses local manifest if enabled)
+    - Uses `EVAL_MANIFEST_URL` for cloud mode
+
+    **Returns:**
+    - Workflow scheduling response with sync status
+    - Includes version information and datasets synced
+
+    **Note:** This is an asynchronous operation that runs as a Dapr workflow.
+    The actual sync happens in the background.
+    """
+    from .workflows import EvalDataSyncWorkflows
+
+    try:
+        logger.info(f"Manual evaluation dataset sync requested by user {current_user.id}, force_sync={force_sync}")
+
+        # Trigger the sync workflow
+        response = await EvalDataSyncWorkflows().__call__(force_sync=force_sync)
+
+        logger.info(f"Evaluation dataset sync workflow triggered: {response}")
+
+        return SuccessResponse(
+            message="Evaluation dataset sync workflow triggered successfully",
+            data={
+                "workflow_id": response.get("workflow_id") if isinstance(response, dict) else str(response),
+                "force_sync": force_sync,
+                "note": "Sync is running as a background workflow. Check workflow status for completion.",
+            },
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+
+    except Exception as e:
+        logger.error(f"Failed to trigger evaluation dataset sync: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger evaluation dataset sync: {str(e)}",
+        ) from e

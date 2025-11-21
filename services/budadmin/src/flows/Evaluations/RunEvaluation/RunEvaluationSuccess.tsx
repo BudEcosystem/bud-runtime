@@ -20,8 +20,9 @@ export default function RunEvaluationSuccess() {
 
   const handleViewExperiment = () => {
     closeDrawer();
-    router.push(`/home/evaluations/experiments`);
-    // router.push(`/home/evaluations/experiments/${experimentId}`);
+    // router.push(`/home/evaluations/experiments`);
+    if(experimentId)
+      router.replace(`/home/evaluations/experiments/${experimentId}`);
   };
 
   const handleClose = () => {
@@ -32,7 +33,7 @@ export default function RunEvaluationSuccess() {
     <BudForm
       data={{}}
       onNext={handleViewExperiment}
-      nextText="View Experiment"
+      nextText="View Evaluation"
       backText="Close"
       onBack={handleClose}
     >

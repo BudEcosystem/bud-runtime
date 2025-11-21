@@ -21,6 +21,16 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- $nodeSelector := include "bud.nodeSelector" (dict "service" .Values.microservices.budplayground "global" .Values.global "context" $) }}
+      {{- if $nodeSelector }}
+      nodeSelector:
+        {{- $nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- $affinity := include "bud.affinity" (dict "service" .Values.microservices.budplayground "global" .Values.global "context" $) }}
+      {{- if $affinity }}
+      affinity:
+        {{- $affinity | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ .Release.Name }}-budplayground
         image: {{ .Values.microservices.budplayground.image }}

@@ -177,6 +177,20 @@ export default function AgentConfiguration() {
           console.warn("⚠ endpoint_id is missing! No model selected in LoadModel component");
         }
 
+        // Include discarded_prompt_ids - all active prompt IDs in the agent drawer
+        const activeSessions = sessions.filter(s => activeSessionIds.includes(s.id));
+        const discardedPromptIds = activeSessions
+          .map(s => s.promptId)
+          .filter((id): id is string => id !== undefined && id !== null)
+          .map(id => ({ prompt_id: id }));
+
+        if (discardedPromptIds.length > 0) {
+          payload.discarded_prompt_ids = discardedPromptIds;
+          console.log("✓ discarded_prompt_ids included in payload:", payload.discarded_prompt_ids);
+        } else {
+          console.warn("⚠ No active prompt IDs found in agent drawer");
+        }
+
         console.log("Final payload for step 4:", payload);
 
         // Call the workflow API for step 4

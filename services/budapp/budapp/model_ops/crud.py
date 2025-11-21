@@ -26,6 +26,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from budapp.commons import logging
 from budapp.commons.constants import (
+    BaseModelRelationEnum,
     CloudModelStatusEnum,
     EndpointStatusEnum,
     ModalityEnum,
@@ -294,6 +295,12 @@ class ModelDataManager(DataManagerUtils):
         base_model = filters.pop("base_model", None)
         base_model = [base_model] if base_model else None
 
+        # Extract base_model_relation for explicit handling
+        base_model_relation = filters.pop("base_model_relation", None)
+
+        # Extract exclude_adapters flag
+        exclude_adapters = filters.pop("exclude_adapters", False)
+
         # Tags and tasks are not filterable
         # Also remove from filters dict
         explicit_conditions = []
@@ -304,6 +311,8 @@ class ModelDataManager(DataManagerUtils):
             "model_size_min": filters.pop("model_size_min", None),
             "model_size_max": filters.pop("model_size_max", None),
             "base_model": base_model,
+            "base_model_relation": base_model_relation,
+            "exclude_adapters": exclude_adapters,
         }
 
         # Validate the remaining filters
@@ -347,6 +356,20 @@ class ModelDataManager(DataManagerUtils):
                 size_conditions.append(Model.model_size <= explicit_filters["model_size_max"])
             size_condition = and_(*size_conditions)
             explicit_conditions.append(size_condition)
+
+        if explicit_filters["base_model_relation"] is not None:
+            # Add base_model_relation filter
+            base_model_relation_condition = Model.base_model_relation == explicit_filters["base_model_relation"]
+            explicit_conditions.append(base_model_relation_condition)
+
+        if explicit_filters["exclude_adapters"]:
+            # Exclude adapter-type models (used in deploy flow)
+            # Include models with NULL base_model_relation (newly added models without a relation type)
+            exclude_adapter_condition = or_(
+                Model.base_model_relation.is_(None),
+                Model.base_model_relation != BaseModelRelationEnum.ADAPTER,
+            )
+            explicit_conditions.append(exclude_adapter_condition)
 
         # Generate statements according to search or filters
         if search:

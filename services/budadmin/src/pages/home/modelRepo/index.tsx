@@ -2,7 +2,7 @@
 "use client";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
 import { ConfigProvider, Image, Popover, Select, Slider, Tag } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import React from "react";
 import DashBoardLayout from "../layout";
 
@@ -305,12 +305,30 @@ export default function ModelRepo() {
   const [modalityFilters, setModalityFilters] = useState(cloudProviders);
   const [filterReset, setFilterReset] = useState(false);
 
+  // Add refs to prevent multiple API calls
+  const isLoadingMore = useRef(false);
+  const lastScrollTop = useRef(0);
+
   const load = useCallback(
-    async (filter) => {
+    async (filter, page?: number, isInfiniteScroll: boolean = false) => {
       if (hasPermission(PermissionEnum.ModelView)) {
-        showLoader();
+        // Prevent multiple simultaneous calls for infinite scroll
+        if (isInfiniteScroll && isLoadingMore.current) {
+          return;
+        }
+
+        if (isInfiniteScroll) {
+          isLoadingMore.current = true;
+        }
+
+        const targetPage = page !== undefined ? page : currentPage;
+
+        if (!isInfiniteScroll) {
+          showLoader();
+        }
+
         await getGlobalModels({
-          page: currentPage,
+          page: targetPage,
           limit: pageSize,
           name: filter.name,
           tag: filter.name,
@@ -327,10 +345,17 @@ export default function ModelRepo() {
           // table_source: filter.table_source,
           table_source: "model",
         });
-        hideLoader();
+
+        if (!isInfiniteScroll) {
+          hideLoader();
+        }
+
+        if (isInfiniteScroll) {
+          isLoadingMore.current = false;
+        }
       }
     },
-    [currentPage, pageSize, getGlobalModels],
+    [currentPage, pageSize, getGlobalModels, hasPermission, showLoader, hideLoader],
   );
 
   const handleOpenChange = (open) => {
@@ -342,7 +367,10 @@ export default function ModelRepo() {
     setFilterOpen(false);
     setFilter(tempFilter);
     setCurrentPage(1);
-    load(tempFilter);
+    // Reset loading state when applying filter
+    isLoadingMore.current = false;
+    lastScrollTop.current = 0;
+    load(tempFilter, 1, false);
     setFilterReset(false);
   };
 
@@ -375,39 +403,60 @@ export default function ModelRepo() {
     }
   }, [filterReset]);
 
+  // Initial load
   useEffect(() => {
-    // debounce
+    if (isMounted && hasPermission(PermissionEnum.ModelView)) {
+      getTasks();
+      getAuthors();
+      load(filter, 1, false);
+    }
+  }, [isMounted]);
+
+  // Search with debounce
+  useEffect(() => {
+    if (!isMounted) return;
+
+    // Reset loading state when search changes
+    isLoadingMore.current = false;
+    lastScrollTop.current = 0;
+
     const timer = setTimeout(() => {
-      load(filter);
       setCurrentPage(1);
+      load(filter, 1, false);
     }, 500);
     return () => clearTimeout(timer);
   }, [filter.name]);
 
-  useEffect(() => {
-    getTasks();
-    getAuthors();
-  }, []);
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollTop = target.scrollTop;
+    const scrollHeight = target.scrollHeight;
+    const clientHeight = target.clientHeight;
 
-  useEffect(() => {
-    // openDrawer('cluster-event');
-  }, []);
+    // Only trigger when scrolling down
+    if (scrollTop <= lastScrollTop.current) {
+      lastScrollTop.current = scrollTop;
+      return;
+    }
 
-  const handleScroll = (e) => {
-    // is at the bottom
-    const bottom =
-      document.getElementById("model-repo")?.scrollTop > models.length * 30;
-    if (bottom && models.length < totalModels && currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
+    lastScrollTop.current = scrollTop;
+
+    // Calculate if we're near the bottom (within 100px)
+    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
+
+    // Check if we should load more
+    if (
+      isNearBottom &&
+      !isLoadingMore.current &&
+      models.length < totalModels &&
+      currentPage < totalPages
+    ) {
+      const nextPage = currentPage + 1;
+      setCurrentPage(nextPage);
+      load(filter, nextPage, true);
     }
   };
-  useEffect(() => {
-    if (isMounted) {
-      setTimeout(() => {
-        load(filter);
-      }, 1000);
-    }
-  }, [currentPage, pageSize, getGlobalModels, filter, isMounted]);
+
   useEffect(() => {
     setIsMounted(true);
   }, []);

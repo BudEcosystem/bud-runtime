@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import json
+import math
 import re
 import uuid
 from typing import Any, List, Optional
@@ -95,36 +96,52 @@ class DeploymentHandler:
         return urlparse(url).netloc
 
     def _get_memory_size(self, node_list: List[dict]) -> int:
-        """Get memory size from node list, supporting both legacy and new formats.
+        """Get maximum memory size from node list for PVC sizing fallback.
+
+        This method calculates the maximum memory across all nodes as a fallback
+        for PVC sizing when actual storage size is not available. For shared
+        deployments, all replicas share the same PVC, so we use the maximum
+        memory requirement.
 
         Args:
             node_list: List of node configurations
 
         Returns:
-            Memory size in GB
+            Maximum memory size in GB across all nodes
         """
-        memory_size = 0
+        max_memory_bytes = 0
+        nodes_with_memory = 0
+
         for node in node_list:
+            node_memory = 0
             if "memory" in node:
                 # New node group format: memory directly on node
-                memory_size = node["memory"]
-                logger.info(f"Using memory from node group format: {memory_size} bytes")
-                break
+                node_memory = node["memory"]
+                logger.debug(f"Node {node.get('name', 'unknown')}: {node_memory} bytes")
             elif "devices" in node and node["devices"]:
                 # Legacy format: memory in devices array
                 for device in node["devices"]:
-                    memory_size = device["memory"]
-                    logger.warning("Using memory from legacy devices format - consider migrating to node groups")
-                    break
-                break
-            else:
-                logger.warning(f"Node {node.get('name', 'unknown')} has no memory information")
+                    if "memory" in device:
+                        node_memory = device["memory"]
+                        logger.warning(
+                            f"Node {node.get('name', 'unknown')} using legacy devices format - "
+                            "consider migrating to node groups"
+                        )
+                        break
 
-        if memory_size == 0:
-            logger.warning("No memory size found in node list, using default")
-            memory_size = 1024**3  # 1GB default
+            if node_memory > 0:
+                nodes_with_memory += 1
+                max_memory_bytes = max(max_memory_bytes, node_memory)
 
-        return memory_size / (1024**3)
+        if max_memory_bytes == 0:
+            logger.warning("No memory size found in node list, using default of 10GB")
+            max_memory_bytes = 10 * (1024**3)  # 10GB default (more reasonable for models)
+        else:
+            logger.info(
+                f"Calculated maximum memory from {nodes_with_memory} nodes: {max_memory_bytes / (1024**3):.2f} GB"
+            )
+
+        return max_memory_bytes / (1024**3)
 
     def deploy(
         self,
@@ -256,51 +273,82 @@ class DeploymentHandler:
 
         full_node_list = copy.deepcopy(node_list)
 
-        max_loras = 1 if not adapters else max(1, len(adapters))
+        for _idx, node in enumerate(node_list):
+            node["args"]["served-model-name"] = namespace
 
-        for idx, node in enumerate(node_list):
+            # Extract concurrency from labels (where budsim actually stores it)
+            node_concurrency = node.get("labels", {}).get("concurrency", "1")
+            node_concurrency = int(node_concurrency)  # Convert from string to int
+            node["concurrency"] = node_concurrency  # Also preserve at top level for Helm template
+
+            # Memory is already in GB from BudSim, no conversion needed
+            # Use tiered buffer: 1GB for ≤10GB, 2GB for >10GB
+            buffer_gb = 1 if node["memory"] <= 10 else 2
+            allocation_memory_gb = node["memory"] + buffer_gb
+
             node["args"]["gpu-memory-utilization"] = 0.95
-            node["args"]["max-loras"] = max_loras
-            node["args"]["max-lora-rank"] = 256
-            # node["args"]["pipeline-parallel-size"] = 2
-            # node["pp_size"] = 2
 
-            node["args"] = self._prepare_args(node["args"])
-            node["args"].append(f"--served-model-name={namespace}")
-            node["args"].append("--enable-lora")
+            # For shared hardware mode, calculate GPU memory limit in MB
+            hardware_mode = node.get("hardware_mode", "dedicated")
+            if hardware_mode == "shared":
+                # Convert GB to MB for nvidia.com/gpumem resource limit
+                gpu_memory_mb = int(allocation_memory_gb * 1024)
+                node["gpu_memory_mb"] = gpu_memory_mb
+                logger.debug(
+                    f"Shared mode: Setting GPU memory limit to {gpu_memory_mb}MB ({allocation_memory_gb:.2f}GB)"
+                )
+
+                node["args"]["max-num-seqs"] = node_concurrency
+                node["args"]["gpu-memory-utilization"] = round(node["memory"] / allocation_memory_gb, 2)
+
+            # Enable LoRA configuration if engine supports it
+            supports_lora = node.get("supports_lora", False)
+            if supports_lora:
+                # max_loras = 1 if not adapters else max(1, len(adapters))
+                max_loras = 5
+                node["args"]["max-loras"] = max_loras
+                node["args"]["max-lora-rank"] = 256
+                node["args"]["enable-lora"] = True
+                logger.info(f"LoRA enabled: max-loras={max_loras}, max-lora-rank=256")
 
             # Calculate max_model_len dynamically
             if input_tokens and output_tokens:
                 max_model_len = int((input_tokens + output_tokens) * 1.1)  # Add 10% safety margin
-                node["args"].append(f"--max-model-len={max_model_len}")
+                node["args"]["max-model-len"] = max_model_len
             else:
-                node["args"].append("--max-model-len=8192")  # Default fallback
+                node["args"]["max-model-len"] = 8192  # Default fallback
 
             # Add parser configuration if enabled
             if enable_tool_calling and tool_calling_parser_type:
-                node["args"].append("--enable-auto-tool-choice")
-                node["args"].append(f"--tool-call-parser={tool_calling_parser_type}")
+                node["args"]["enable-auto-tool-choice"] = True
+                node["args"]["tool-call-parser"] = tool_calling_parser_type
                 logger.info(f"Enabled tool calling with parser: {tool_calling_parser_type}")
                 # Add chat template if provided
                 if chat_template:
-                    node["args"].append(f"--chat-template={chat_template}")
+                    node["args"]["chat-template"] = chat_template
                     logger.info(f"Using chat template: {chat_template}")
 
             if enable_reasoning and reasoning_parser_type:
                 # Add reasoning-specific args based on parser type
-                node["args"].append(f"--reasoning-parser={reasoning_parser_type}")
+                node["args"]["reasoning-parser"] = reasoning_parser_type
                 # Add other reasoning parser configurations as needed
 
             # Update the full_node_list with the modified args
-            full_node_list[idx]["args"] = node["args"].copy()
+            full_node_list[_idx]["args"] = node["args"].copy()
+
+            if isinstance(node["args"], dict):
+                node["args"] = self._prepare_args(node["args"])
 
             # thread_bind, core_count = self._get_cpu_affinity(device["tp_size"])
             # node["envs"]["VLLM_CPU_OMP_THREADS_BIND"] = thread_bind
             node["envs"]["VLLM_LOGGING_LEVEL"] = "INFO"
             # node["envs"]["VLLM_SKIP_WARMUP"] = "true"
-            node["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
-            # node["core_count"] = core_count if device["type"] == "cpu" else 1
-            node["memory"] = node["memory"] / (1024**3)
+
+            # Enable runtime LoRA updating if supported
+            if supports_lora:
+                node["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
+                logger.info("Enabled runtime LoRA updating")
+
             node["name"] = self._to_k8s_label(node["name"])
 
             # Add device mapping for node selector
@@ -612,6 +660,7 @@ api_key_location = "env::API_KEY"
         namespace: str = None,
         default_storage_class: Optional[str] = None,
         default_access_mode: Optional[str] = None,
+        storage_size_gb: Optional[float] = None,
     ):
         """Transfer model to the pod.
 
@@ -622,6 +671,8 @@ api_key_location = "env::API_KEY"
             platform: Optional cluster platform
             namespace: Optional Kubernetes namespace
             default_storage_class: Optional storage class for PVC creation
+            default_access_mode: Optional access mode for PVC
+            storage_size_gb: Actual model storage size in GB from MinIO
         """
         model_uri = [part for part in model_uri.split("/") if part]
         model_uri = model_uri[-1]
@@ -629,6 +680,28 @@ api_key_location = "env::API_KEY"
         access_mode = default_access_mode or "ReadWriteOnce"
         if default_access_mode:
             logger.info(f"Model transfer using provided access mode: {default_access_mode}")
+
+        # Calculate PVC size with validation
+        if storage_size_gb and storage_size_gb > 0:
+            # Use actual storage size from MinIO with 20% buffer for safety
+            pvc_size_gb = math.ceil(storage_size_gb * 1.2)
+            logger.info(
+                f"Using actual model storage size: {storage_size_gb:.2f} GB, "
+                f"PVC size with 20% buffer: {pvc_size_gb} GB"
+            )
+        else:
+            # Fallback to memory-based calculation
+            raw_size = self._get_memory_size(node_list) * 1.1
+            pvc_size_gb = math.ceil(raw_size)
+            logger.warning(f"Model storage size not available, using fallback calculation: {pvc_size_gb} GB")
+
+        # Additional warning if below recommended minimum
+        if pvc_size_gb < 1:
+            pvc_size_gb = 1
+            logger.warning(
+                f"PVC size ({pvc_size_gb} GB) is below recommended minimum of 1 GB. Setting the value to 1 GB"
+            )
+
         values = {
             "source_model_path": model_uri,
             "namespace": namespace,
@@ -637,7 +710,7 @@ api_key_location = "env::API_KEY"
             "minio_access_key": secrets_settings.minio_access_key,
             "minio_secret_key": secrets_settings.minio_secret_key,
             "minio_bucket": app_settings.minio_bucket,
-            "model_size": self._get_memory_size(node_list),
+            "model_size": pvc_size_gb,
             "nodes": node_list,
             "volume_type": app_settings.volume_type,
         }

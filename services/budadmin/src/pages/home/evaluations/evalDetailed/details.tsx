@@ -18,6 +18,7 @@ import { SortIcon } from "@/components/ui/bud/table/SortIcon";
 import { color } from "echarts";
 import Tags from "src/flows/components/DrawerTags";
 import EvalBarChart from "@/components/charts/barChart/evalBarChart";
+import CompositeChart from "@/components/charts/compositeChart";
 const capitalize = (str) =>
   str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
@@ -59,35 +60,94 @@ const lsitData = [
     ],
   },
 ];
-
-function LeaderboardDetails() {
+interface ListItem {
+  title: string;
+  content: string[];
+}
+type LeaderboardDetailsProps = {
+  datasets: {
+    estimated_input_tokens?: number;
+    estimated_output_tokens?: number;
+    description: string;
+    advantages_disadvantages: any;
+    additional_info: any;
+    modalities: string[]
+  } | null;
+};
+function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
   const router = useRouter();
+  const [listData, setListData] = useState<ListItem[]>([
+    { title: "Why Run this Eval?", content: [] },
+    { title: "What to Expect?", content: [] },
+    { title: "Advantages", content: [] },
+    { title: "Constraints", content: [] },
+  ]);
+  useEffect(() => {
+    const updatedList = [
+      { title: "Why Run this Eval?", content: datasets?.advantages_disadvantages?.why_run_eval || [] },
+      { title: "What to Expect?", content: datasets?.advantages_disadvantages?.what_to_expect || [] },
+      { title: "Advantages", content: datasets?.advantages_disadvantages?.advantages || [] },
+      { title: "Constraints", content: datasets?.advantages_disadvantages?.disadvantages || [] },
+    ];
 
+    setListData(updatedList);
+  }, [datasets])
+  const data: any = {};
+
+  const displaySections = [
+    {
+      header: 'Domains',
+      description: 'Following are some of the domains of this evaluation',
+      keyName: 'top_5_domains',
+    },
+    {
+      header: 'Concepts',
+      description: 'Following are some of the domains of this evaluation',
+      keyName: 'top_5_concepts',
+    },
+    {
+      header: 'Humans vs LLM Qualifications',
+      description: 'Following are some of the domains of this evaluation',
+      keyName: 'top_5_qualifications',
+    },
+    {
+      header: 'Language',
+      description: 'Following are some of the domains of this evaluation',
+      keyName: 'top_5_languages',
+    }, {
+      header: 'Skills Identified',
+      description: 'Following are some of the domains of this evaluation',
+      keyName: 'top_5_skills',
+    },
+    {
+      header: 'Task Type',
+      description: 'Following are some of the domains of this evaluation',
+      keyName: 'top_5_task_types',
+    },
+  ]
   return (
     <div className="pb-[60px] flex justify-between items-start ">
       <div className="w-[63.5%]">
         <div className="pb-[1.5rem]">
           <Text_24_400_EEEEEE>Introduction</Text_24_400_EEEEEE>
           <Text_12_400_757575 className="leading-[140%] pt-[.25rem]">
-            LiveMathBench can capture LLM capabilities in complex reasoning
-            tasks, including challenging latest question sets from various
-            mathematical competitions. pture LLM capa..
+            {datasets?.description}
           </Text_12_400_757575>
         </div>
         <div className="hR"></div>
         <div>
-          {lsitData.map((data, index) => (
+          {listData.map((data, index) => (
             <div className="pt-[1.2rem]" key={index}>
-              <Text_16_400_EEEEEE>{data.title}</Text_16_400_EEEEEE>
-              <ul className="custom-bullet-list mt-[.5rem] !pl-[0]">
-                {data.content.map((data, index) => (
+              <Text_16_400_EEEEEE>{data?.title}</Text_16_400_EEEEEE>
+              {data?.content.length > 0 ? <ul className="custom-bullet-list mt-[.5rem] !pl-[0]">
+                {data?.content.map((data, index) => (
                   <li className="mb-[.6rem]" key={index}>
                     <Text_12_400_EEEEEE className="leading-[140%] indent-0 pl-[.5rem]">
                       {data}
                     </Text_12_400_EEEEEE>
                   </li>
                 ))}
-              </ul>
+              </ul> : <div className="pt-[.5rem]"><Text_12_400_757575 className="leading-[140%] pt-[.25rem]">No Data Found</Text_12_400_757575></div>}
               <div className="hR mt-[1.2rem]"></div>
             </div>
           ))}
@@ -150,7 +210,7 @@ function LeaderboardDetails() {
                   Total Input tokens
                 </Text_12_400_EEEEEE>
                 <Text_12_400_EEEEEE className="ml-[.5rem] mr-[.4rem] text-nowrap">
-                  50k
+                  {datasets?.estimated_input_tokens || 0}
                 </Text_12_400_EEEEEE>
               </div>
             </div>
@@ -170,12 +230,151 @@ function LeaderboardDetails() {
                   Expected Output
                 </Text_12_400_EEEEEE>
                 <Text_12_400_EEEEEE className="ml-[.5rem] mr-[.4rem] text-nowrap">
-                  900k
+                  {datasets?.estimated_output_tokens || 0}
                 </Text_12_400_EEEEEE>
               </div>
             </div>
             <div className="hR mt-[1.3rem]"></div>
           </div>
+
+          <div className="pt-[1.3rem]">
+            <Text_14_400_EEEEEE>Modalities</Text_14_400_EEEEEE>
+            <Text_12_400_757575 className="pt-[.33rem]">
+              Following is the list of things model is really good at doing
+            </Text_12_400_757575>
+            <div className="modality flex items-center justify-start gap-[.5rem] mt-[1rem]">
+              <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-[#ffffff08] w-[50%] p-[1rem] rounded-[6px]">
+                <Text_14_400_EEEEEE className="leading-[100%]">
+                  Input
+                </Text_14_400_EEEEEE>
+                <div className="flex justify-center items-center gap-x-[.5rem]">
+                  <div className="h-[1.25rem]">
+                    <Image
+                      preview={false}
+                      src={
+                        datasets?.modalities.includes('text')
+                          ? "/images/drawer/endpoints/text.png"
+                          : "/images/drawer/endpoints/text-not.png"
+                      }
+                      alt={'Text'}
+                      style={{ width: "1.25rem", height: "1.25rem" }}
+                    />
+                  </div>
+                  <div className="h-[1.25rem]">
+                    <Image
+                      preview={false}
+                      src={
+                        datasets?.modalities.includes('image')
+                          ? "/images/drawer/endpoints/image.png"
+                          : "/images/drawer/endpoints/image-not.png"
+                      }
+                      alt={'Image'}
+                      style={{ height: "1.25rem" }}
+                    />
+                  </div>
+                  <div className="h-[1.25rem]">
+                    <Image
+                      preview={false}
+                      src={
+                        datasets?.modalities.includes('audio')
+                          ? "/images/drawer/endpoints/audio_speech.png"
+                          : "/images/drawer/endpoints/audio_speech-not.png"
+                      }
+                      alt={'Audio'}
+                      style={{ height: "1.25rem" }}
+                    />
+                  </div>
+                </div>
+                <Text_12_400_EEEEEE className="leading-[100%] capitalize">
+                  {datasets?.modalities?.join(", ")}
+                </Text_12_400_EEEEEE>
+              </div>
+              <div className="flex flex-col items-center gap-[.5rem] gap-y-[1rem] bg-[#ffffff08] w-[50%] p-[1rem] rounded-[6px]">
+                <Text_14_400_EEEEEE className="leading-[100%]">
+                  Output
+                </Text_14_400_EEEEEE>
+                <div className="flex justify-center items-center gap-x-[.5rem]">
+                  <div className="h-[1.25rem]">
+                    <Image
+                      preview={false}
+                      src={
+                        datasets?.modalities.includes('text')
+                          ? "/images/drawer/endpoints/text.png"
+                          : "/images/drawer/endpoints/text-not.png"
+                      }
+                      alt={'Text'}
+                      style={{ height: "1.25rem" }}
+                    />
+                  </div>
+                  <div className="h-[1.25rem]">
+                    <Image
+                      preview={false}
+                      src={
+                        datasets?.modalities.includes('image')
+                          ? "/images/drawer/endpoints/image.png"
+                          : "/images/drawer/endpoints/image-not.png"
+                      }
+                      alt={'Image'}
+                      style={{ height: "1.25rem" }}
+                    />
+                  </div>
+                  <div className="h-[1.25rem]">
+                    <Image
+                      preview={false}
+                      src={
+                        datasets?.modalities.includes('audio')
+                          ? "/images/drawer/endpoints/audio_speech.png"
+                          : "/images/drawer/endpoints/audio_speech-not.png"
+                      }
+                      alt={'Audio'}
+                      style={{ height: "1.25rem" }}
+                    />
+                  </div>
+                </div>
+                <Text_12_400_EEEEEE className="leading-[100%] capitalize">
+                  {datasets?.modalities?.join(", ")}
+                </Text_12_400_EEEEEE>
+              </div>
+            </div>
+          </div>
+          {datasets ? displaySections.map((item, sectionIndex) => datasets.additional_info?.[item?.keyName] && <div key={item.keyName || sectionIndex}>
+            <div className="hR mt-[1.5rem]"></div>
+            <div className="pt-[1.3rem]">
+              <Text_14_400_EEEEEE>{item.header}</Text_14_400_EEEEEE>
+              <Text_12_400_757575 className="pt-[.33rem]">
+                {item.description}
+              </Text_12_400_757575>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {datasets.additional_info?.[item?.keyName] ?
+                (datasets.additional_info?.[item?.keyName] || []).map((tag, tagIndex) => <Tags
+                  key={`${item.keyName}-${tag}-${tagIndex}`}
+                  name={tag
+                    .split("_")
+                    .join(" ")
+                  }
+                  color="#D1B854"
+                  classNames="text-center justify-center items-center capitalize"
+                />) :
+                <Text_12_400_757575> No Data Available </Text_12_400_757575>
+              }
+            </div>
+          </div>) : null}
+
+          {datasets && datasets.additional_info.age_distribution &&
+          <>
+            <div className="hR mt-[1.5rem]"></div>
+            <div className="pt-[1.3rem]">
+            <Text_14_400_EEEEEE>Age Distribution</Text_14_400_EEEEEE>
+            <Text_12_400_757575 className="pt-[.33rem]">
+              Following are some of the concepts of this evaluation
+            </Text_12_400_757575>
+
+            <div className="h-[232px]">
+              <CompositeChart data={datasets.additional_info.age_distribution}/>
+            </div>
+          </div>
+          </>}
         </div>
       </div>
     </div>

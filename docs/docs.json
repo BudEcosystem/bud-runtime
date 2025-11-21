@@ -1,87 +1,357 @@
 {
-    "$schema": "https://mintlify.com/docs.json",
-    "theme": "maple",
-    "name": "Bud Runtime Docs",
-    "colors": {
-      "primary": "#965CDE",
-      "light": "#965CDE",
-      "dark": "#965CDE"
-    },
-    "favicon": "/images/favicon.ico",
-    "navigation": {
-      "tabs": [
-        {
-          "tab": "Guides",
-          "groups": [
-            {
-              "group": "Get Started",
-              "icon": "book-open",
-              "pages": [
-                "getstarted/quickstart",
-                "getstarted/installation"
-              ]
-            },
-            {
-              "group": "Features",
-              "pages": [
-                "features/gateway",
-                "features/multi-lora-support",
-                "features/observability",
-                "features/images",
-                "features/settings",
-                "features/navigation",
-                "features/reusable-snippets"
-              ]
-            },
-            {
-              "group": "OpenAI-Compatible API",
-              "pages": [
-                "openai-api/chat",
-                "openai-api/embedding",
-                "openai-api/audio",
-                "openai-api/images",
-                "openai-api/batch",
-                "openai-api/realtime",
-                "openai-api/responses",
-                "openai-api/documents"
-              ]
-            },
-            {
-              "group": "Development",
-              "icon": "code",
-              "pages": [
-                "development/guidelines",
-                "development/architecture"
-              ]
-            }
-          ]
-        }
-      ],
-      "global": {
-        "anchors": [
-
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "maple",
+  "name": "Bud Stack Documentation",
+  "colors": {
+    "primary": "#965CDE",
+    "light": "#965CDE",
+    "dark": "#965CDE"
+  },
+  "favicon": "/images/favicon.ico",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Product Guide",
+        "groups": [
           {
-            "anchor": "Blog",
-            "href": "https://bud.studio/content/blog",
-            "icon": "newspaper"
+            "group": "Getting Started",
+            "icon": "rocket",
+            "pages": [
+              "getting-started/introduction",
+              "getting-started/quickstart",
+              "getting-started/platform-overview",
+              "getting-started/account-setup",
+              "getting-started/key-concepts"
+            ]
+          },
+          {
+            "group": "Projects",
+            "icon": "folder-tree",
+            "pages": [
+              "projects/creating-projects",
+              "projects/project-management",
+              "projects/project-dashboard",
+              "projects/project-settings"
+            ]
+          },
+          {
+            "group": "Models",
+            "icon": "brain",
+            "pages": [
+              "models/model-repository",
+              "models/model-cards",
+              "models/model-selection-guide",
+              "models/model-leaderboards",
+              "models/supported-model-types"
+            ]
+          },
+          {
+            "group": "Deployments",
+            "icon": "rocket",
+            "pages": [
+              "deployments/deploy-first-model",
+              "deployments/deployment-configuration",
+              "deployments/deployment-management",
+              "deployments/multi-lora-support",
+              "deployments/deployment-strategies",
+              "deployments/troubleshooting"
+            ]
+          },
+          {
+            "group": "Clusters",
+            "icon": "server",
+            "pages": [
+              "clusters/cluster-overview",
+              "clusters/cluster-types",
+              "clusters/registering-clusters",
+              "clusters/cluster-management",
+              "clusters/multi-cloud-strategy"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "icon": "plug",
+            "pages": [
+              "endpoints/creating-endpoints",
+              "endpoints/endpoint-configuration",
+              "endpoints/using-endpoints",
+              "endpoints/openai-compatible",
+              "endpoints/endpoint-monitoring"
+            ]
+          },
+          {
+            "group": "API Integration",
+            "icon": "code",
+            "pages": [
+              "api-integration/authentication",
+              "api-integration/api-overview",
+              "api-integration/chat-completions",
+              "api-integration/embeddings",
+              "api-integration/image-generation",
+              "api-integration/audio-processing",
+              "api-integration/batch-processing",
+              "api-integration/streaming-responses",
+              "api-integration/error-handling"
+            ]
+          },
+          {
+            "group": "Playground",
+            "icon": "flask",
+            "pages": [
+              "playground/using-playground",
+              "playground/model-comparison",
+              "playground/prompt-engineering",
+              "playground/saving-conversations"
+            ]
+          },
+          {
+            "group": "Observability",
+            "icon": "chart-line",
+            "pages": [
+              "observability/dashboard-overview",
+              "observability/request-analytics",
+              "observability/performance-monitoring",
+              "observability/cost-tracking",
+              "observability/inference-history",
+              "observability/custom-dashboards",
+              "observability/alerts-notifications"
+            ]
+          },
+          {
+            "group": "Prompts & Agents",
+            "icon": "wand-magic-sparkles",
+            "pages": [
+              "prompts-agents/prompt-management",
+              "prompts-agents/prompt-templates",
+              "prompts-agents/agent-configuration",
+              "prompts-agents/agent-workflows"
+            ]
+          },
+          {
+            "group": "Evaluations",
+            "icon": "chart-bar",
+            "pages": [
+              "evaluations/evaluation-overview",
+              "evaluations/creating-evaluation-sets",
+              "evaluations/running-evaluations",
+              "evaluations/evaluation-metrics",
+              "evaluations/comparing-models"
+            ]
+          },
+          {
+            "group": "Guardrails",
+            "icon": "shield-halved",
+            "pages": [
+              "guardrails/what-are-guardrails",
+              "guardrails/setting-up-guardrails",
+              "guardrails/content-filtering",
+              "guardrails/custom-rules"
+            ]
+          },
+          {
+            "group": "Performance Optimization",
+            "icon": "gauge-high",
+            "pages": [
+              "performance/simulation-overview",
+              "performance/hardware-recommendations",
+              "performance/optimization-strategies",
+              "performance/scaling-guide"
+            ]
+          },
+          {
+            "group": "API Keys & Security",
+            "icon": "key",
+            "pages": [
+              "api-keys/creating-api-keys",
+              "api-keys/api-key-permissions",
+              "api-keys/security-best-practices",
+              "api-keys/rotating-keys",
+              "api-keys/rate-limiting"
+            ]
+          },
+          {
+            "group": "User Management",
+            "icon": "users",
+            "pages": [
+              "user-management/authentication",
+              "user-management/inviting-users",
+              "user-management/roles-permissions",
+              "user-management/user-activity",
+              "user-management/sso-integration"
+            ]
+          },
+          {
+            "group": "Settings",
+            "icon": "gear",
+            "pages": [
+              "settings/account-settings",
+              "settings/organization-settings",
+              "settings/billing-settings",
+              "settings/notification-preferences",
+              "settings/api-configuration"
+            ]
+          },
+          {
+            "group": "Billing & Usage",
+            "icon": "credit-card",
+            "pages": [
+              "billing/understanding-pricing",
+              "billing/monitoring-usage",
+              "billing/billing-cycles",
+              "billing/usage-optimization",
+              "billing/invoice-management"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Use Cases",
+        "groups": [
+          {
+            "group": "Tutorials & Examples",
+            "icon": "graduation-cap",
+            "pages": [
+              "use-cases/chatbot-development",
+              "use-cases/content-generation",
+              "use-cases/data-analysis",
+              "use-cases/image-generation-workflows",
+              "use-cases/multimodal-applications",
+              "use-cases/enterprise-integration"
+            ]
+          },
+          {
+            "group": "Migration Guide",
+            "icon": "arrow-right-arrow-left",
+            "pages": [
+              "migration/why-switch",
+              "migration/compatibility-overview",
+              "migration/migration-checklist",
+              "migration/code-examples",
+              "migration/feature-mapping"
+            ]
+          },
+          {
+            "group": "Best Practices",
+            "icon": "star",
+            "pages": [
+              "best-practices/prompt-engineering",
+              "best-practices/model-selection",
+              "best-practices/performance-optimization",
+              "best-practices/cost-management",
+              "best-practices/security-compliance"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Support",
+        "groups": [
+          {
+            "group": "Troubleshooting & FAQ",
+            "icon": "circle-question",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/error-messages",
+              "troubleshooting/performance-issues",
+              "troubleshooting/connection-problems",
+              "troubleshooting/faq"
+            ]
+          },
+          {
+            "group": "Support & Resources",
+            "icon": "life-ring",
+            "pages": [
+              "support/getting-help",
+              "support/status-page",
+              "support/community-forum",
+              "support/release-notes",
+              "support/roadmap"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer Docs",
+        "groups": [
+          {
+            "group": "Development",
+            "icon": "code",
+            "pages": [
+              "development/guidelines",
+              "development/architecture",
+              "development/environment"
+            ]
+          },
+          {
+            "group": "OpenAI-Compatible API",
+            "icon": "puzzle-piece",
+            "pages": [
+              "openai-api/chat",
+              "openai-api/embedding",
+              "openai-api/audio",
+              "openai-api/images",
+              "openai-api/batch",
+              "openai-api/realtime",
+              "openai-api/responses",
+              "openai-api/documents"
+            ]
+          },
+          {
+            "group": "Features",
+            "icon": "sparkles",
+            "pages": [
+              "features/gateway",
+              "features/multi-lora-support",
+              "features/observability",
+              "features/images",
+              "features/settings",
+              "features/navigation",
+              "features/reusable-snippets"
+            ]
+          },
+          {
+            "group": "Cluster Setup",
+            "icon": "network-wired",
+            "pages": [
+              "cluster/cluster-setup"
+            ]
           }
         ]
       }
-    },
-    "logo": "/images/bud-icon.png",
-    "navbar": {
-      "links": [
+    ],
+    "global": {
+      "anchors": [
         {
-          "label": "Support",
-          "href": "mailto:contact@bud.studio"
+          "anchor": "Blog",
+          "href": "https://bud.studio/content/blog",
+          "icon": "newspaper"
+        },
+        {
+          "anchor": "API Reference",
+          "href": "https://api.bud.studio/docs",
+          "icon": "code"
         }
       ]
-    },
-    "footer": {
-      "socials": {
-        "x": "https://x.com/BudEcosystem",
-        "github": "https://github.com/BudEcosystem/bud-runtime",
-        "linkedin": "https://www.linkedin.com/company/bud-ecosystem"
+    }
+  },
+  "logo": "/images/bud-icon.png",
+  "navbar": {
+    "links": [
+      {
+        "label": "Dashboard",
+        "href": "https://app.bud.studio"
+      },
+      {
+        "label": "Support",
+        "href": "mailto:contact@bud.studio"
       }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/BudEcosystem",
+      "github": "https://github.com/BudEcosystem/bud-runtime",
+      "linkedin": "https://www.linkedin.com/company/bud-ecosystem"
     }
   }
+}

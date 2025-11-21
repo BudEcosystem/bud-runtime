@@ -5,7 +5,7 @@ import { Text_12_400_EEEEEE } from "@/components/ui/text";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { capitalize } from "@/lib/utils";
 import { endpointStatusMapping } from "@/lib/colorMapping";
-import { formatDate, formatMonthYear } from "@/utils/formatDate";
+import { formatDate, formatDateWithTime, formatMonthYear } from "@/utils/formatDate";
 
 interface RunHistoryItem {
     runId: string;
@@ -15,6 +15,7 @@ interface RunHistoryItem {
     startedDate: string;
     duration: string;
     benchmarkScore: string;
+    runs: string;
 }
 
 interface RunsHistoryTableProps {
@@ -34,6 +35,14 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
 
     const columns: ColumnsType<RunHistoryItem> = [
         {
+            title: "Runs",
+            dataIndex: "index",
+            key: "index",
+            render: (_: any, __: any, index: number) => (
+                <Text_12_400_EEEEEE>{index + 1}</Text_12_400_EEEEEE>
+            ),
+        },
+        {
             title: "Model",
             dataIndex: "model",
             key: "model",
@@ -41,14 +50,14 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
                 <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
             ),
         },
-        {
-            title: "Trait Name",
-            dataIndex: "traitName",
-            key: "traitName",
-            render: (text: string) => (
-                <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-            ),
-        },
+        // {
+        //     title: "Trait Name",
+        //     dataIndex: "traitName",
+        //     key: "traitName",
+        //     render: (text: string) => (
+        //         <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
+        //     ),
+        // },
         {
             title: "Status",
             dataIndex: "status",
@@ -72,9 +81,14 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
             title: "Started Date",
             dataIndex: "startedDate",
             key: "startedDate",
-            render: (date: string) => (
-                <Text_12_400_EEEEEE>{formatDate(date) || '-'}</Text_12_400_EEEEEE>
-            ),
+            render: (date: string) => {
+                if (!date) return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+                return (
+                <Text_12_400_EEEEEE>
+                    {formatDateWithTime(date)}
+                </Text_12_400_EEEEEE>
+                );
+            },
         },
         {
             title: "Duration",
@@ -85,14 +99,37 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
             ),
         },
         {
-            title: "Trait Score",
-            dataIndex: "benchmarkScore",
-            key: "benchmarkScore",
-            render: (text: string) => (
-                <div className="flex space-x-2">
-                    <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-                </div>
-            ),
+            title: "Evaluated Benchmark and Score",
+            dataIndex: "runs",
+            key: "runs",
+            width: 300,
+            render: (text: string) => {
+                let runs: { dataset_name: string; score: string | number }[];
+                try {
+                    runs = JSON.parse(text);
+                } catch (e) {
+                    console.error("Failed to parse runs JSON:", text, e);
+                    return <Text_12_400_EEEEEE>Invalid data</Text_12_400_EEEEEE>;
+                }
+
+                if (!Array.isArray(runs)) {
+                    return <Text_12_400_EEEEEE>Invalid data format</Text_12_400_EEEEEE>;
+                }
+
+                return (
+                    <div className="flex gap-2 py-2 flex-wrap">
+                        {runs.map((el, index) => (
+                            <ProjectTags
+                                key={index} // A unique ID from `el` would be better if available.
+                                name={`${el.dataset_name}, ${el.score || '-'}`}
+                                color={'#EEEEEE'}
+                                textClass="text-[.75rem] py-[.22rem]"
+                                tagClass="py-[0rem]"
+                            />
+                        ))}
+                    </div>
+                );
+            },
         },
     ];
 

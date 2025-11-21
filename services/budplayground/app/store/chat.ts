@@ -16,6 +16,8 @@ interface ChatStore {
   updateChat: (chat: Session) => void;
   getChat: (id: string) => Session | undefined;
   setDeployment: (chatId: string, deployment: Endpoint) => void;
+  setDeploymentLock: (chatId: string, locked: boolean) => void;
+  isDeploymentLocked: (chatId: string) => boolean;
   disableChat: (chatId: string) => void;
   enableChat: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
@@ -212,6 +214,20 @@ export const useChatStore = create<ChatStore>()(
           )
         }));
         saveToStorage(get());
+      },
+
+      setDeploymentLock: (chatId: string, locked: boolean) => {
+        set((state) => ({
+          activeChatList: state.activeChatList.map((chat: Session) =>
+            chat.id === chatId ? { ...chat, deploymentLocked: locked } : chat
+          )
+        }));
+        saveToStorage(get());
+      },
+
+      isDeploymentLocked: (chatId: string) => {
+        const chat = get().activeChatList.find((c: Session) => c.id === chatId);
+        return chat?.deploymentLocked ?? false;
       },
 
       createChat: (chat: Session) => {

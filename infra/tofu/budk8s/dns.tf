@@ -10,7 +10,6 @@ locals {
     "ditto",
     "adarsh",
     "varun",
-    "netweb",
   ]
 
   # a service can be only removed if it's not required by all the environments
@@ -34,6 +33,7 @@ locals {
 
   services_standalone = [
     "harbor",
+    "connect.dev"
   ]
 
   services_with_envs = toset(concat(

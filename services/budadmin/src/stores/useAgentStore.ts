@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { infoToast } from "@/components/toast";
 
 export interface AgentVariable {
   id: string;
@@ -12,13 +13,44 @@ export interface AgentVariable {
   validation?: string;
 }
 
+export interface AgentSettings {
+  id: string;
+  name: string;
+  temperature: number;
+  max_tokens: number;
+  top_p: number;
+  frequency_penalty: number;
+  presence_penalty: number;
+  stop_sequences: string[];
+  seed: number;
+  timeout: number;
+  parallel_tool_calls: boolean;
+  logprobs: boolean;
+  logit_bias: Record<string, number>;
+  extra_headers: Record<string, string>;
+  max_completion_tokens: number;
+  stream_options: Record<string, any>;
+  response_format: Record<string, any>;
+  tool_choice: string;
+  chat_template: string;
+  chat_template_kwargs: Record<string, any>;
+  mm_processor_kwargs: Record<string, any>;
+  created_at: string;
+  modified_at: string;
+  modifiedFields?: Set<string>; // Track which fields have been modified by user
+}
+
 export interface AgentSession {
   id: string;
   name: string;
   active: boolean;
   modelId?: string;
   modelName?: string;
-  workflowId?: string;
+  workflowId?: string; // Deprecated: kept for backward compatibility
+  inputWorkflowId?: string;
+  outputWorkflowId?: string;
+  systemPromptWorkflowId?: string;
+  promptMessagesWorkflowId?: string;
   promptId?: string;
   selectedDeployment?: {
     id: string;
@@ -32,10 +64,12 @@ export interface AgentSession {
   createdAt: Date;
   updatedAt: Date;
   position?: number;
+  llm_retry_limit?: number;
   settings?: {
     temperature?: number;
     maxTokens?: number;
     topP?: number;
+    stream?: boolean;
   };
 }
 
@@ -44,14 +78,38 @@ interface AgentStore {
   sessions: AgentSession[];
   activeSessionIds: string[];
 
+  // Settings
+  settingPresets: AgentSettings[];
+  currentSettingPreset: AgentSettings | null;
+
   // UI State
   isAgentDrawerOpen: boolean;
+  isTransitioningToAgentDrawer: boolean; // Flag to prevent race conditions with useDrawer
   selectedSessionId: string | null;
   isModelSelectorOpen: boolean;
   workflowContext: {
     isInWorkflow: boolean;
     nextStep: string | null;
   };
+
+  // Edit Mode
+  isEditMode: boolean;
+  editingPromptId: string | null;
+
+  // Add Version Mode
+  isAddVersionMode: boolean;
+  addVersionPromptId: string | null;
+
+  // Edit Version Mode
+  isEditVersionMode: boolean;
+  editVersionData: {
+    versionId: string;
+    versionNumber: number;
+    isDefault: boolean;
+  } | null;
+
+  // Deleted prompts tracking
+  deletedPromptIds: Array<{sessionId: string; promptId: string}>;
 
   // Session Management
   createSession: () => string;
@@ -65,6 +123,11 @@ interface AgentStore {
   updateVariable: (sessionId: string, variableId: string, updates: Partial<AgentVariable>) => void;
   deleteVariable: (sessionId: string, variableId: string) => void;
 
+  // Settings Management
+  addSettingPreset: (preset: AgentSettings) => void;
+  updateSettingPreset: (preset: AgentSettings) => void;
+  setCurrentSettingPreset: (preset: AgentSettings) => void;
+
   // UI Actions
   openAgentDrawer: (workflowId?: string, nextStep?: string) => void;
   closeAgentDrawer: () => void;
@@ -72,9 +135,27 @@ interface AgentStore {
   openModelSelector: () => void;
   closeModelSelector: () => void;
 
+  // Edit Mode Actions
+  setEditMode: (promptId: string) => void;
+  clearEditMode: () => void;
+  loadPromptForEdit: (promptId: string, sessionData: Partial<AgentSession>) => void;
+
+  // Add Version Mode Actions
+  setAddVersionMode: (promptId: string) => void;
+  clearAddVersionMode: () => void;
+  loadPromptForAddVersion: (promptId: string, sessionData: Partial<AgentSession>) => void;
+
+  // Edit Version Mode Actions
+  setEditVersionMode: (versionData: { versionId: string; versionNumber: number; isDefault: boolean }) => void;
+  clearEditVersionMode: () => void;
+  loadPromptForEditVersion: (promptId: string, versionData: { versionId: string; versionNumber: number; isDefault: boolean }, sessionData: Partial<AgentSession>) => void;
+
   // Bulk Actions
   clearAllSessions: () => void;
   setActiveSessionIds: (ids: string[]) => void;
+
+  // Prompt cleanup tracking
+  addDeletedPromptId: (sessionId: string, promptId: string) => void;
 }
 
 const generateId = () => {
@@ -121,6 +202,7 @@ const createDefaultSession = (): AgentSession => ({
   createdAt: new Date(),
   updatedAt: new Date(),
   position: 0,
+  llm_retry_limit: 3,
   settings: {
     temperature: 0.7,
     maxTokens: 2000,
@@ -132,23 +214,41 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       // Initial State
       sessions: [],
       activeSessionIds: [],
+      settingPresets: [],
+      currentSettingPreset: null,
       isAgentDrawerOpen: false,
+      isTransitioningToAgentDrawer: false,
       selectedSessionId: null,
       isModelSelectorOpen: false,
       workflowContext: {
         isInWorkflow: false,
         nextStep: null,
       },
+      isEditMode: false,
+      editingPromptId: null,
+      isAddVersionMode: false,
+      addVersionPromptId: null,
+      isEditVersionMode: false,
+      editVersionData: null,
+      deletedPromptIds: [],
 
       // Session Management
       createSession: () => {
+        const activeSessionIds = get().activeSessionIds;
+
+        // Limit to maximum 3 active sessions
+        if (activeSessionIds.length >= 3) {
+          infoToast("Maximum of 3 agent boxes allowed");
+          return activeSessionIds[activeSessionIds.length - 1];
+        }
+
         const newSession = createDefaultSession();
         const currentSessions = get().sessions;
         newSession.position = currentSessions.length;
 
         set({
           sessions: [...currentSessions, newSession],
-          activeSessionIds: [...get().activeSessionIds, newSession.id],
+          activeSessionIds: [...activeSessionIds, newSession.id],
           selectedSessionId: newSession.id
         });
 
@@ -298,8 +398,30 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         });
       },
 
+      // Settings Management
+      addSettingPreset: (preset) => {
+        set({
+          settingPresets: [...get().settingPresets, preset]
+        });
+      },
+
+      updateSettingPreset: (preset) => {
+        set({
+          settingPresets: get().settingPresets.map(p =>
+            p.id === preset.id ? preset : p
+          )
+        });
+      },
+
+      setCurrentSettingPreset: (preset) => {
+        set({ currentSettingPreset: preset });
+      },
+
       // UI Actions
       openAgentDrawer: (workflowId?: string, nextStep?: string) => {
+        // Set transition flag FIRST to prevent race conditions with useDrawer.closeDrawer
+        set({ isTransitioningToAgentDrawer: true });
+
         const sessions = get().sessions;
         if (sessions.length === 0) {
           const sessionId = get().createSession();
@@ -319,13 +441,17 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         if (nextStep) {
           set({
             isAgentDrawerOpen: true,
+            isTransitioningToAgentDrawer: false, // Clear transition flag
             workflowContext: {
               isInWorkflow: true,
               nextStep: nextStep,
             }
           });
         } else {
-          set({ isAgentDrawerOpen: true });
+          set({
+            isAgentDrawerOpen: true,
+            isTransitioningToAgentDrawer: false // Clear transition flag
+          });
         }
       },
 
@@ -333,13 +459,20 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         const { workflowContext } = get();
         const nextStep = workflowContext.nextStep;
 
-        // Close the drawer first
+        // Close the drawer first and clear edit mode, add version mode, and edit version mode
         set({
           isAgentDrawerOpen: false,
+          isTransitioningToAgentDrawer: false, // Clear transition flag
           workflowContext: {
             isInWorkflow: false,
             nextStep: null,
-          }
+          },
+          isEditMode: false,
+          editingPromptId: null,
+          isAddVersionMode: false,
+          addVersionPromptId: null,
+          isEditVersionMode: false,
+          editVersionData: null
         });
 
         // If we're in a workflow and have a next step, trigger it after closing
@@ -367,6 +500,40 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         set({ isModelSelectorOpen: false });
       },
 
+      // Edit Mode Actions
+      setEditMode: (promptId: string) => {
+        set({
+          isEditMode: true,
+          editingPromptId: promptId
+        });
+      },
+
+      clearEditMode: () => {
+        set({
+          isEditMode: false,
+          editingPromptId: null
+        });
+      },
+
+      loadPromptForEdit: (promptId: string, sessionData: Partial<AgentSession>) => {
+        // Clear existing sessions and create a new one with the prompt data
+        const newSession: AgentSession = {
+          ...createDefaultSession(),
+          ...sessionData,
+          id: generateId(), // Generate new session ID
+          promptId: promptId, // Ensure promptId is set
+          updatedAt: new Date(),
+        };
+
+        set({
+          sessions: [newSession],
+          activeSessionIds: [newSession.id],
+          selectedSessionId: newSession.id,
+          isEditMode: true,
+          editingPromptId: promptId
+        });
+      },
+
       // Bulk Actions
       clearAllSessions: () => {
         const newSession = createDefaultSession();
@@ -379,5 +546,80 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
       setActiveSessionIds: (ids) => {
         set({ activeSessionIds: ids });
+      },
+
+      // Prompt cleanup tracking
+      addDeletedPromptId: (sessionId, promptId) => {
+        set({
+          deletedPromptIds: [...get().deletedPromptIds, { sessionId, promptId }]
+        });
+      },
+
+      // Add Version Mode Actions
+      setAddVersionMode: (promptId: string) => {
+        set({
+          isAddVersionMode: true,
+          addVersionPromptId: promptId
+        });
+      },
+
+      clearAddVersionMode: () => {
+        set({
+          isAddVersionMode: false,
+          addVersionPromptId: null
+        });
+      },
+
+      loadPromptForAddVersion: (promptId: string, sessionData: Partial<AgentSession>) => {
+        // Clear existing sessions and create a new one with the prompt data
+        const newSession: AgentSession = {
+          ...createDefaultSession(),
+          ...sessionData,
+          id: generateId(), // Generate new session ID
+          promptId: promptId, // Use the provided promptId for version creation
+          updatedAt: new Date(),
+        };
+
+        set({
+          sessions: [newSession],
+          activeSessionIds: [newSession.id],
+          selectedSessionId: newSession.id,
+          isAddVersionMode: true,
+          addVersionPromptId: promptId
+        });
+      },
+
+      // Edit Version Mode Actions
+      setEditVersionMode: (versionData: { versionId: string; versionNumber: number; isDefault: boolean }) => {
+        set({
+          isEditVersionMode: true,
+          editVersionData: versionData
+        });
+      },
+
+      clearEditVersionMode: () => {
+        set({
+          isEditVersionMode: false,
+          editVersionData: null
+        });
+      },
+
+      loadPromptForEditVersion: (promptId: string, versionData: { versionId: string; versionNumber: number; isDefault: boolean }, sessionData: Partial<AgentSession>) => {
+        // Clear existing sessions and create a new one with the prompt data for editing
+        const newSession: AgentSession = {
+          ...createDefaultSession(),
+          ...sessionData,
+          id: generateId(), // Generate new session ID
+          promptId: promptId, // Use the provided promptId
+          updatedAt: new Date(),
+        };
+
+        set({
+          sessions: [newSession],
+          activeSessionIds: [newSession.id],
+          selectedSessionId: newSession.id,
+          isEditVersionMode: true,
+          editVersionData: versionData
+        });
       }
     }));

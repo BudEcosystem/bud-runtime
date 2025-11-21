@@ -37,11 +37,27 @@ class SimulationMethod(str, Enum):
     HEURISTIC = "heuristic"
 
 
+class HardwareMode(str, Enum):
+    """Enum for hardware utilization modes."""
+
+    DEDICATED = "dedicated"
+    SHARED = "shared"
+
+
 class Device(BaseModel):
     name: str
     type: str
     available_count: int
     mem_per_GPU_in_GB: float
+    # HAMI time-slicing metrics (optional - only present on HAMI-enabled clusters)
+    memory_allocated_gb: Optional[float] = None
+    core_utilization_percent: Optional[float] = None
+    memory_utilization_percent: Optional[float] = None
+    cores_allocated_percent: Optional[float] = None
+    shared_containers_count: Optional[int] = None
+    hardware_mode: Optional[str] = None
+    device_uuid: Optional[str] = None
+    last_metrics_update: Optional[str] = None
     # Device identification fields (for exact hardware matching)
     device_model: Optional[str] = None
     raw_name: Optional[str] = None
@@ -89,6 +105,9 @@ class ClusterRecommendationRequest(CloudEventBase):
     quantization_method: Optional[str] = None
     quantization_type: Optional[str] = None
     simulation_method: Optional[SimulationMethod] = Field(None, description="Method to use for performance simulation")
+    hardware_mode: Optional[HardwareMode] = Field(
+        default=HardwareMode.DEDICATED, description="Hardware utilization mode: dedicated or shared"
+    )
 
     @model_validator(mode="before")
     def validate_pretrained_model_uri(cls, values):
@@ -158,6 +177,9 @@ class ClusterMetrics(BaseModel):
     reasoning_parser_type: Optional[str] = None
     architecture_family: Optional[str] = None
     chat_template: Optional[str] = None
+    # Engine capability flags from BudConnect API
+    supports_lora: Optional[bool] = None
+    supports_pipeline_parallelism: Optional[bool] = None
 
     def reset(self):
         """Reset cluster metrics."""
@@ -228,6 +250,7 @@ class NodeGroupConfiguration(BaseModel):
     replicas: int = 1  # Number of replicas for this node group
     image: str
     memory: float
+    hardware_mode: Optional[str] = Field(default="dedicated", description="Hardware mode: dedicated or shared")
     # Performance metrics
     ttft: float
     throughput_per_user: float
@@ -244,6 +267,9 @@ class NodeGroupConfiguration(BaseModel):
     reasoning_parser_type: Optional[str] = None
     architecture_family: Optional[str] = None
     chat_template: Optional[str] = None
+    # Engine capability flags from BudConnect API
+    supports_lora: Optional[bool] = None
+    supports_pipeline_parallelism: Optional[bool] = None
 
     @model_validator(mode="after")
     def validate_parallelism_config(self):
@@ -282,6 +308,9 @@ class DeploymentConfigurationResponse(ResponseBase):
     reasoning_parser_type: Optional[str] = None
     architecture_family: Optional[str] = None
     chat_template: Optional[str] = None
+    # Engine capability flags from BudConnect API
+    supports_lora: Optional[bool] = None
+    supports_pipeline_parallelism: Optional[bool] = None
 
     def reset(self):
         """Reset the simulation state by clearing nodes and replica count."""

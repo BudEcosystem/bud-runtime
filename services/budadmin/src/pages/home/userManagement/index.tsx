@@ -128,7 +128,7 @@ export default function UserManagement() {
       await getUsers(params);
       hideLoader();
     }
-  }, [activeTab, adminCurrentPage, clientCurrentPage, pageSize, getUsers]);
+  }, [activeTab, adminCurrentPage, clientCurrentPage, pageSize, getUsers, hasPermission, showLoader, hideLoader]);
 
   useEffect(() => {
     if (isMounted) {
@@ -137,13 +137,13 @@ export default function UserManagement() {
       }, 1000);
     }
     // load(filter);
-  }, [activeTab, adminCurrentPage, clientCurrentPage, pageSize, getUsers, isMounted]);
+  }, [activeTab, adminCurrentPage, clientCurrentPage, pageSize, getUsers, isMounted, filter, load]);
 
   useEffect(() => {
     if (filterReset) {
       applyFilter()
     }
-  }, [filterReset]);
+  }, [filterReset, applyFilter]);
 
 
 
@@ -154,7 +154,7 @@ export default function UserManagement() {
       setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [filter.email]);
+  }, [filter, load]);
 
 
   function SortIcon({ sortOrder }: { sortOrder: string }) {
