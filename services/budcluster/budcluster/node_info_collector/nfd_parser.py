@@ -3,8 +3,7 @@
 Parses Kubernetes node labels created by NFD to extract hardware information.
 """
 
-from typing import Dict, Any
-import re
+from typing import Any, Dict
 
 
 class NFDLabelParser:
@@ -13,10 +12,10 @@ class NFDLabelParser:
     @staticmethod
     def parse_gpu_info(labels: Dict[str, str]) -> Dict[str, Any]:
         """Extract GPU information from NFD labels.
-        
+
         Args:
             labels: Node labels dictionary
-            
+
         Returns:
             Dictionary with GPU information
         """
@@ -25,29 +24,29 @@ class NFDLabelParser:
             labels.get("nvidia.com/gpu.present") == "true"
             or labels.get("feature.node.kubernetes.io/pci-10de.present") == "true"
         )
-        
+
         nvidia_gpus = int(labels.get("nvidia.com/gpu.count", "0"))
-        
+
         # AMD GPU detection (PCI vendor ID 1002)
         amd_present = labels.get("feature.node.kubernetes.io/pci-1002.present") == "true"
-        
+
         # Intel HPU detection (Gaudi/Habana)
         intel_hpu_present = (
             labels.get("feature.node.kubernetes.io/pci-8086.device-1020") == "true"
             or labels.get("feature.node.kubernetes.io/pci-8086.device-1021") == "true"
             or labels.get("feature.node.kubernetes.io/pci-8086.device-1022") == "true"
         )
-        
+
         # CUDA version
         cuda_major = labels.get("nvidia.com/cuda.runtime.major", "")
         cuda_minor = labels.get("nvidia.com/cuda.runtime.minor", "")
         cuda_version = f"{cuda_major}.{cuda_minor}" if cuda_major and cuda_minor else cuda_major
-        
+
         # Compute capability
         compute_major = labels.get("nvidia.com/gpu.compute.major", "")
         compute_minor = labels.get("nvidia.com/gpu.compute.minor", "")
         compute_capability = f"{compute_major}.{compute_minor}" if compute_major and compute_minor else compute_major
-        
+
         return {
             "nvidia_present": nvidia_present,
             "nvidia_gpus": nvidia_gpus,
@@ -66,15 +65,15 @@ class NFDLabelParser:
     @staticmethod
     def parse_cpu_info(labels: Dict[str, str]) -> Dict[str, Any]:
         """Extract CPU information from NFD labels.
-        
+
         Args:
             labels: Node labels dictionary
-            
+
         Returns:
             Dictionary with CPU information
         """
         cpu_model_raw = labels.get("feature.node.kubernetes.io/local-cpu.model", "")
-        
+
         # Determine CPU name from model string
         cpu_name = "CPU"  # Default
         if "Xeon" in cpu_model_raw:
@@ -85,14 +84,14 @@ class NFDLabelParser:
             cpu_name = "Core"
         elif "Ryzen" in cpu_model_raw:
             cpu_name = "Ryzen"
-        
+
         # Determine vendor
         cpu_vendor = ""
         if "Intel" in cpu_model_raw or "Xeon" in cpu_model_raw or "Core" in cpu_model_raw:
             cpu_vendor = "Intel"
         elif "AMD" in cpu_model_raw or "EPYC" in cpu_model_raw or "Ryzen" in cpu_model_raw:
             cpu_vendor = "AMD"
-        
+
         return {
             "architecture": labels.get("kubernetes.io/arch", ""),
             "cpu_family": labels.get("feature.node.kubernetes.io/cpu-family", ""),
@@ -107,14 +106,14 @@ class NFDLabelParser:
     @staticmethod
     def check_nfd_available(labels: Dict[str, str]) -> bool:
         """Check if NFD labels are present.
-        
+
         Args:
             labels: Node labels dictionary
-            
+
         Returns:
             True if NFD labels are found
         """
-        for key in labels.keys():
+        for key in labels:
             if key.startswith("feature.node.kubernetes.io/") or key.startswith("nfd.node.kubernetes.io/"):
                 return True
         return False
@@ -122,33 +121,30 @@ class NFDLabelParser:
     @staticmethod
     def parse_node_info(node: Any) -> Dict[str, Any]:
         """Parse all node information from a Kubernetes node object.
-        
+
         Args:
             node: Kubernetes V1Node object
-            
+
         Returns:
             Dictionary with complete node information
         """
         labels = node.metadata.labels or {}
         status = node.status
-        
+
         # Parse hardware info
         gpu_info = NFDLabelParser.parse_gpu_info(labels)
         cpu_info = NFDLabelParser.parse_cpu_info(labels)
-        
+
         # Get capacity and allocatable resources
         capacity = status.capacity or {}
         allocatable = status.allocatable or {}
-        
+
         # Get node addresses
         addresses = []
         if status.addresses:
             for addr in status.addresses:
-                addresses.append({
-                    "type": addr.type,
-                    "address": addr.address
-                })
-        
+                addresses.append({"type": addr.type, "address": addr.address})
+
         # Determine node status (ready/not ready)
         node_ready = False
         if status.conditions:
@@ -156,7 +152,7 @@ class NFDLabelParser:
                 if condition.type == "Ready" and condition.status == "True":
                     node_ready = True
                     break
-        
+
         return {
             "node_name": node.metadata.name,
             "node_id": node.metadata.uid,

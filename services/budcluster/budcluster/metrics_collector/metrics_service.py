@@ -1,8 +1,8 @@
 """Service for collecting metrics from clusters and forwarding to OTel Collector."""
 
 import asyncio
-import time
 import inspect
+import time
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -289,7 +289,7 @@ class MetricsCollectionService:
             if not self.session:
                 logger.warning(f"No session available to update metrics status for cluster {cluster_id}")
                 return
-                
+
             update_data = {"metrics_collection_status": status.value}
             if last_collection:
                 update_data["last_metrics_collection"] = last_collection

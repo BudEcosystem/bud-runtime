@@ -1247,21 +1247,21 @@ class ClusterOpsService:
     @classmethod
     async def _check_and_move_to_error(cls, threshold_hours: int = 24):
         """Check NOT_AVAILABLE clusters and move to ERROR if threshold exceeded.
-        
+
         Args:
             threshold_hours: Hours in NOT_AVAILABLE before moving to ERROR
         """
         from datetime import timedelta
-        
+
         cutoff_time = datetime.utcnow() - timedelta(hours=threshold_hours)
-        
+
         try:
             with DBSession() as session:
                 # Get clusters that have been NOT_AVAILABLE for > threshold
                 clusters = await ClusterDataManager(session).get_all_clusters_by_status(
                     [ClusterStatusEnum.NOT_AVAILABLE]
                 )
-                
+
                 moved_count = 0
                 for cluster in clusters:
                     # Check if not_available_since is set and older than cutoff
@@ -1271,53 +1271,52 @@ class ClusterOpsService:
                             {
                                 "status": ClusterStatusEnum.ERROR,
                                 "last_retry_time": datetime.utcnow(),
-                            }
+                            },
                         )
                         moved_count += 1
                         logger.warning(
-                            f"Cluster {cluster.id} moved to ERROR state after "
-                            f"{threshold_hours}h in NOT_AVAILABLE"
+                            f"Cluster {cluster.id} moved to ERROR state after {threshold_hours}h in NOT_AVAILABLE"
                         )
-                
+
                 if moved_count > 0:
                     logger.info(f"Moved {moved_count} clusters from NOT_AVAILABLE to ERROR")
-                    
+
         except Exception as e:
             logger.error(f"Failed to check and move clusters to ERROR: {e}")
 
     @classmethod
     async def _get_error_clusters_due_for_retry(cls, retry_hours: int = 24) -> list:
         """Get ERROR clusters that haven't been retried recently.
-        
+
         Args:
             retry_hours: Hours between retries for ERROR clusters
-            
+
         Returns:
             List of ERROR clusters due for retry
         """
         from datetime import timedelta
-        
+
         cutoff_time = datetime.utcnow() - timedelta(hours=retry_hours)
-        
+
         try:
             with DBSession() as session:
                 # Get all ERROR clusters
                 error_clusters = await ClusterDataManager(session).get_all_clusters_by_status(
                     [ClusterStatusEnum.ERROR]
                 )
-                
+
                 # Filter to those that haven't been retried recently
                 clusters_to_retry = []
                 for cluster in error_clusters:
                     # Retry if last_retry_time is None or older than cutoff
                     if cluster.last_retry_time is None or cluster.last_retry_time < cutoff_time:
                         clusters_to_retry.append(cluster)
-                
+
                 if clusters_to_retry:
                     logger.info(f"Found {len(clusters_to_retry)} ERROR clusters due for retry")
-                
+
                 return clusters_to_retry
-                
+
         except Exception as e:
             logger.error(f"Failed to get ERROR clusters for retry: {e}")
             return []
@@ -1325,20 +1324,18 @@ class ClusterOpsService:
     @classmethod
     async def _handle_cluster_failure(cls, cluster_id: UUID):
         """Handle cluster connection failure and update state.
-        
+
         Args:
             cluster_id: ID of the cluster that failed
         """
         try:
             with DBSession() as session:
-                cluster = await ClusterDataManager(session).retrieve_cluster_by_fields(
-                    {"id": cluster_id}
-                )
-                
+                cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+
                 if not cluster:
                     logger.error(f"Cluster {cluster_id} not found for failure handling")
                     return
-                
+
                 # If currently AVAILABLE, move to NOT_AVAILABLE and record timestamp
                 if cluster.status == ClusterStatusEnum.AVAILABLE:
                     await ClusterDataManager(session).update_cluster_by_fields(
@@ -1346,40 +1343,38 @@ class ClusterOpsService:
                         {
                             "status": ClusterStatusEnum.NOT_AVAILABLE,
                             "not_available_since": datetime.utcnow(),
-                        }
+                        },
                     )
                     logger.info(f"Cluster {cluster_id} moved to NOT_AVAILABLE")
-                
+
                 # If ERROR, just update retry time
                 elif cluster.status == ClusterStatusEnum.ERROR:
                     await ClusterDataManager(session).update_cluster_by_fields(
                         cluster,
                         {
                             "last_retry_time": datetime.utcnow(),
-                        }
+                        },
                     )
                     logger.debug(f"Updated retry time for ERROR cluster {cluster_id}")
-                    
+
         except Exception as e:
             logger.error(f"Failed to handle cluster failure for {cluster_id}: {e}")
 
     @classmethod
     async def _handle_cluster_success(cls, cluster_id: UUID):
         """Handle successful cluster connection and update state.
-        
+
         Args:
             cluster_id: ID of the cluster that succeeded
         """
         try:
             with DBSession() as session:
-                cluster = await ClusterDataManager(session).retrieve_cluster_by_fields(
-                    {"id": cluster_id}
-                )
-                
+                cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+
                 if not cluster:
                     logger.error(f"Cluster {cluster_id} not found for success handling")
                     return
-                
+
                 # Reset to AVAILABLE and clear timestamps
                 previous_status = cluster.status
                 await ClusterDataManager(session).update_cluster_by_fields(
@@ -1388,12 +1383,12 @@ class ClusterOpsService:
                         "status": ClusterStatusEnum.AVAILABLE,
                         "not_available_since": None,
                         "last_retry_time": None,
-                    }
+                    },
                 )
-                
+
                 if previous_status in [ClusterStatusEnum.NOT_AVAILABLE, ClusterStatusEnum.ERROR]:
                     logger.info(f"Cluster {cluster_id} recovered from {previous_status} to AVAILABLE")
-                    
+
         except Exception as e:
             logger.error(f"Failed to handle cluster success for {cluster_id}: {e}")
 
@@ -1658,12 +1653,11 @@ class ClusterOpsService:
             return True
         except Exception as e:
             logger.error(f"Failed to update cluster {cluster_id_str}: {e}")
-            
+
             # Handle cluster failure
             await cls._handle_cluster_failure(cluster.id)
-            
-            raise
 
+            raise
 
 
 def _add_hami_fields_to_device(source: Dict[str, Any], target: Dict[str, Any]) -> None:

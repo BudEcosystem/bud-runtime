@@ -52,10 +52,10 @@ async def get_node_info(config: Dict, platform: Optional[ClusterPlatformEnum] = 
     """Get the node information from the Kubernetes cluster.
 
     This function collects node information including hardware details.
-    
+
     By default, uses the Python-based implementation for better performance
     and lower memory usage.
-    
+
     If HAMI GPU time-slicing is enabled, it also enriches device objects
     with real-time GPU utilization and allocation metrics.
 
@@ -67,6 +67,7 @@ async def get_node_info(config: Dict, platform: Optional[ClusterPlatformEnum] = 
         List of node information dictionaries with enriched device data
     """
     from ..node_info_collector import get_node_info_python
+
     logger.info("Using Python-based node info collection")
     node_data = await get_node_info_python(config, platform)
 
@@ -121,7 +122,6 @@ async def get_node_info(config: Dict, platform: Optional[ClusterPlatformEnum] = 
             logger.warning("Continuing with standard device data without HAMI enrichment")
 
     return node_data
-
 
 
 async def get_node_status(

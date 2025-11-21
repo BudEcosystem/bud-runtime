@@ -3,6 +3,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -27,7 +28,7 @@ class GPUInfo(BaseModel):
     compute_capability: str = ""
     amd_present: bool = False
     intel_hpu_present: bool = False
-    
+
     # Additional fields for detailed GPU info
     pci_vendor_id: Optional[str] = None
     pci_device_id: Optional[str] = None
@@ -53,21 +54,21 @@ class NodeInfo(BaseModel):
     node_name: str
     node_id: str
     node_status: bool = False
-    
+
     # Hardware information
     gpu_info: GPUInfo
     cpu_info: CPUInfo
-    
+
     # Capacity and allocatable resources
     capacity: Dict[str, str] = Field(default_factory=dict)
     allocatable: Dict[str, str] = Field(default_factory=dict)
-    
+
     # Network addresses
     addresses: List[Dict[str, str]] = Field(default_factory=list)
-    
+
     # Labels (for debugging/reference)
     labels: Dict[str, str] = Field(default_factory=dict)
-    
+
     # Devices (formatted for compatibility with existing code)
     devices: str = "{}"  # JSON string of device information
 
