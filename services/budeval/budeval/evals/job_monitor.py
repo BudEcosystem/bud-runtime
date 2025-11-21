@@ -157,7 +157,7 @@ def send_eta_notification(ctx: wf.WorkflowActivityContext, notification_data: st
 
         evaluate_model_request = EvaluationRequest.model_validate(evaluate_model_request_dict)
 
-        message = f"{remaining_sec}"  # Send seconds for compatibility
+        message = f"{remaining_min}"  # Send minutes as integer string
 
         # Notifications
         # Set up notification
