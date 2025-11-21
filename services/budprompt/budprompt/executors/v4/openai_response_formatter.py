@@ -75,8 +75,8 @@ class OpenAIResponseFormatter_V4:
     """Formatter for converting pydantic-ai responses to OpenAI format."""
 
     def __init__(self) -> None:
-        """Initialize the formatter with tool call arguments mapper."""
-        self._tool_call_args_map: Dict[str, str] = {}
+        """Initialize the formatter."""
+        pass
 
     async def format_response(
         self,
@@ -215,12 +215,7 @@ class OpenAIResponseFormatter_V4:
                     if isinstance(part, ToolCallPart):
                         # Skip internal pydantic-ai tool (final_result for structured output)
                         if part.tool_name == STRUCTURED_OUTPUT_TOOL_NAME:
-                            # Store args but don't add to output (internal tool)
-                            self._tool_call_args_map[part.tool_call_id] = part.args_as_json_str()
                             continue  # Skip adding this tool call to output
-
-                        # Store tool call arguments for later use (ALL tool calls - MCP and regular)
-                        self._tool_call_args_map[part.tool_call_id] = part.args_as_json_str()
 
                         # Check if this is an MCP tool using the tool names set
                         if part.tool_name in mcp_tool_names:
