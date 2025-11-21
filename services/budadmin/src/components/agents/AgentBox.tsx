@@ -140,15 +140,15 @@ function AgentBoxInner({
     }
   }, [session, updateSession]);
 
-  // Load prompt config from backend on mount to restore data after page refresh
+  // Load prompt config from backend on mount and when drawer re-opens
   React.useEffect(() => {
     const loadPromptConfig = async () => {
-      // Skip if no promptId or already loaded for this promptId
+      // Skip if no promptId
       if (!session?.promptId || !session?.id) return;
-      if (hasLoadedConfigRef.current === session.promptId) return;
 
-      // Skip if session already has deployment set (user has already configured)
-      if (session.selectedDeployment?.name) return;
+      // Skip only if we've already loaded for this exact promptId in this component instance
+      // This allows reloading when returning from playground (component remounts)
+      if (hasLoadedConfigRef.current === session.promptId) return;
 
       try {
         const response = await getPromptConfig(session.promptId);
