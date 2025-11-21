@@ -30,7 +30,7 @@ interface BenchmarkProgressProps {
     canPause?: boolean;
     pauseUrl?: string;
   };
-  refreshETA: () => void; // <-- add this
+  refreshETA: () => void;
 }
 
 const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark, refreshETA}) => {
@@ -136,8 +136,8 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark, refres
             <div className="ml-2 cursor-pointer" onClick={refreshETA}>
               <div className="w-4 h-4">
               <svg 
-                width="22" 
-                height="22" 
+                width="100%" 
+                height="100%" 
                 viewBox="0 0 24 24" 
                 fill="none" 
                 stroke="white" 

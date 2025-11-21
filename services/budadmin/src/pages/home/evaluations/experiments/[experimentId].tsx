@@ -115,7 +115,7 @@ const ExperimentDetailsPage = () => {
         }
     }, [experimentId]);
 
-    const refreshETA = (id) => {
+    const refreshETA = () => {
         if (experimentId && typeof experimentId === "string") {
             getExperimentDetails(experimentId);
         }
@@ -368,7 +368,7 @@ const ExperimentDetailsPage = () => {
                                             <BenchmarkProgress
                                                 key={benchmark.id}
                                                 benchmark={benchmark}
-                                                refreshETA={()=> refreshETA(benchmark.id)}
+                                                refreshETA={refreshETA}
                                             />
                                         );
                                     },

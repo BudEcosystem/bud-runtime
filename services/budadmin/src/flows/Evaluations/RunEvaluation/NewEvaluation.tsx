@@ -31,7 +31,7 @@ export default function NewEvaluation() {
   const experimentId = drawerProps?.experimentId as string;
 
   useEffect(()=> {
-    form.setFieldsValue({ EvaluationName: '' });
+    form.resetFields();
   }, [])
   return (
     <BudForm
