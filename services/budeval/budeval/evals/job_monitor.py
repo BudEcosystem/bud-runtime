@@ -283,21 +283,43 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
             for job_id, progress_info in log_data.items():
                 job_progress_map[job_id] = progress_info
 
-                if progress_info.get("latest_progress"):
+                status = progress_info.get("status", "unknown")
+
+                if status == "pending":
+                    # Pod not ready yet (ContainerCreating, etc.)
+                    pod_state = progress_info.get("pod_state", "unknown")
+                    pod_phase = progress_info.get("pod_phase", "unknown")
+                    logger_local.info(f"Job {job_id}: Pod not ready yet (phase={pod_phase}, container={pod_state})")
+                elif progress_info.get("latest_progress"):
                     pct = progress_info.get("progress_percentage", 0)
                     remaining_sec = progress_info["latest_progress"].get("remaining_seconds", 0)
                     logger_local.info(f"Job {job_id}: {pct:.1f}% complete, ~{remaining_sec}s remaining")
+                elif progress_info.get("eta_data"):
+                    # Job has started but no progress yet
+                    total_eta = progress_info["eta_data"].get("total_eta_seconds", 0)
+                    logger_local.info(f"Job {job_id}: Started (estimated {total_eta}s total)")
+                else:
+                    logger_local.debug(f"Job {job_id}: No progress data yet")
 
     # NEW: Send notification with progress update (EVERY CYCLE)
     if workflow_id and source_topic and source and not ctx.is_replaying:
-        # Calculate aggregate progress
+        # Calculate aggregate progress (only for jobs that have started)
         total_progress = 0
         total_remaining = 0
         jobs_with_progress = 0
+        pending_jobs = 0
 
         for job_id in remaining_jobs:
             if job_id in job_progress_map:
                 progress_info = job_progress_map[job_id]
+                status = progress_info.get("status", "unknown")
+
+                # Skip pending jobs (container not ready yet)
+                if status == "pending":
+                    pending_jobs += 1
+                    continue
+
+                # Count progress for running/starting jobs
                 total_progress += progress_info.get("progress_percentage", 0)
 
                 latest = progress_info.get("latest_progress")
@@ -305,8 +327,9 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
                     total_remaining += latest.get("remaining_seconds", 0)
                     jobs_with_progress += 1
 
-        # Calculate averages
-        avg_progress = total_progress / len(remaining_jobs) if remaining_jobs else 100
+        # Calculate averages (excluding pending jobs)
+        running_jobs_count = len(remaining_jobs) - pending_jobs
+        avg_progress = total_progress / running_jobs_count if running_jobs_count > 0 else 0
         avg_remaining = total_remaining / jobs_with_progress if jobs_with_progress > 0 else 0
 
         # Trigger notification via external activity

@@ -42,17 +42,43 @@
       loop: "{{ job_list }}"
       ignore_errors: true
 
-    - name: Get logs from each pod
+    - name: Check pod readiness and container state
+      ansible.builtin.set_fact:
+        pod_ready_map: >-
+          {{
+            pod_ready_map | default({}) | combine({
+              item.item: {
+                'ready': (item.resources | length > 0) and
+                         (item.resources[0].status.phase in ['Running', 'Succeeded', 'Failed']) and
+                         (item.resources[0].status.containerStatuses | default([]) | length > 0) and
+                         (item.resources[0].status.containerStatuses[0].state.running is defined or
+                          item.resources[0].status.containerStatuses[0].state.terminated is defined),
+                'pod_name': item.resources[0].metadata.name if (item.resources | length > 0) else '',
+                'phase': item.resources[0].status.phase if (item.resources | length > 0) else 'NotFound',
+                'container_state': (item.resources[0].status.containerStatuses[0].state.keys() | list | first)
+                                   if ((item.resources | length > 0) and
+                                       (item.resources[0].status.containerStatuses | default([]) | length > 0))
+                                   else 'unknown'
+              }
+            })
+          }}
+      loop: "{{ job_pods.results }}"
+      when: item is defined
+      ignore_errors: true
+
+    - name: Get logs from ready pods only
       kubernetes.core.k8s_log:
         api_version: v1
         kind: Pod
-        name: "{{ item.resources[0].metadata.name }}"
+        name: "{{ pod_ready_map[item].pod_name }}"
         namespace: "{{ namespace }}"
         tail_lines: 500  # Last 500 lines for efficiency
         kubeconfig: "{{ kubeconfig_path if kubeconfig_path else omit }}"
       register: pod_logs
-      loop: "{{ job_pods.results }}"
-      when: item.resources | length > 0
+      loop: "{{ job_list }}"
+      when:
+        - pod_ready_map[item] is defined
+        - pod_ready_map[item].ready
       ignore_errors: true
 
     - name: Parse logs for ETA and progress data
@@ -120,12 +146,12 @@
       when: item.log is defined
       ignore_errors: true
 
-    - name: Build log progress map
+    - name: Build log progress map from parsed logs
       ansible.builtin.set_fact:
         log_progress: >-
           {{
             log_progress | combine({
-              item.item.item.item: parsed_result
+              item.item: parsed_result
             })
           }}
       vars:
@@ -134,6 +160,29 @@
       when:
         - item.stdout is defined
         - item.stdout | length > 0
+        - not item.failed | default(false)
+      ignore_errors: true
+
+    - name: Add placeholder for pods that aren't ready yet
+      ansible.builtin.set_fact:
+        log_progress: >-
+          {{
+            log_progress | combine({
+              item: {
+                'eta_data': None,
+                'latest_progress': None,
+                'progress_percentage': 0,
+                'status': 'pending',
+                'pod_state': pod_ready_map[item].container_state if (pod_ready_map[item] is defined) else 'unknown',
+                'pod_phase': pod_ready_map[item].phase if (pod_ready_map[item] is defined) else 'unknown'
+              }
+            })
+          }}
+      loop: "{{ job_list }}"
+      when:
+        - log_progress[item] is not defined
+        - pod_ready_map[item] is defined
+        - not pod_ready_map[item].ready
       ignore_errors: true
 
     - name: Write results to temporary file
