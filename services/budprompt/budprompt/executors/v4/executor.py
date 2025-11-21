@@ -53,7 +53,7 @@ from budprompt.shared.providers import BudServeProvider
 from ...prompt.schemas import MCPToolConfig, Message, ModelSettings
 from .field_validation import ModelValidationEnhancer
 from .openai_response_formatter import OpenAIResponseFormatter_V4
-from .openai_streaming_formatter import OpenAIStreamingFormatter_V1
+from .openai_streaming_formatter import OpenAIStreamingFormatter_V4
 from .schema_builder import CustomModelGenerator
 from .template_renderer import render_template
 from .tool_loaders import ToolRegistry
@@ -600,7 +600,7 @@ class SimplePromptExecutor_V4:
             SSE-formatted string chunks matching OpenAI Responses API format
         """
         # Initialize OpenAI streaming formatter (handles all event mapping and response building)
-        formatter = OpenAIStreamingFormatter_V1(
+        formatter = OpenAIStreamingFormatter_V4(
             deployment_name=deployment_name,
             model_settings=model_settings,
             messages=messages,

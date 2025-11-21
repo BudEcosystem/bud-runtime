@@ -112,7 +112,7 @@ class PartState(BaseModel):
     finalized: bool = False  # Whether done events have been emitted
 
 
-class OpenAIStreamingFormatter_V1:
+class OpenAIStreamingFormatter_V4:
     """Streaming formatter for OpenAI Responses API SSE events.
 
     This formatter maintains state across the streaming session and handles:
