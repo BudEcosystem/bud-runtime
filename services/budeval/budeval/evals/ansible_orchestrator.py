@@ -629,3 +629,65 @@ spec:
             logger.error(f"Failed to check job status: {e}", exc_info=True)
             # Return empty dict on error - monitoring will retry
             return {}
+
+    def parse_job_logs(self, job_ids: list[str], kubeconfig: Optional[str] = None) -> dict:
+        """Parse pod logs to extract ETA and progress data from OpenCompass logs.
+
+        Args:
+            job_ids: List of job names to parse logs for
+            kubeconfig: Optional kubeconfig JSON
+
+        Returns:
+            {
+                "job_id": {
+                    "eta_data": {
+                        "total_eta_seconds": 487,
+                        "total_batches": 66,
+                        "total_tasks": 2,
+                        "speed_per_batch": 7.38
+                    },
+                    "latest_progress": {
+                        "remaining_seconds": 158,
+                        "batches_completed": 45,
+                        "batches_total": 66
+                    },
+                    "progress_percentage": 68.18,
+                    "status": "running|starting|no_logs"
+                }
+            }
+        """
+        temp_id = f"parse-logs-{uuid.uuid4().hex[:8]}"
+        playbook = "parse_job_logs_k8s.yml"
+
+        files, extravars = self._parse_kubeconfig(kubeconfig, temp_id)
+
+        # Build Extra Args
+        namespace = StorageConfig.get_current_namespace()
+        extravars["namespace"] = namespace
+        extravars["job_names"] = ",".join(job_ids)
+        extravars["temp_id"] = temp_id
+
+        logger.info(f"Parsing logs for jobs: {job_ids}")
+
+        # Run The Playbook
+        try:
+            self._run_ansible_playbook(playbook, temp_id, files, extravars)
+
+            # Read results from temporary file
+            results_file = Path(tempfile.gettempdir()) / f"log_progress_{temp_id}.json"
+
+            if results_file.exists():
+                with open(results_file, "r") as f:
+                    log_progress = json.load(f)
+                results_file.unlink()  # Clean up
+
+                logger.info(f"Parsed logs for {len(log_progress)} jobs")
+                return log_progress
+            else:
+                logger.warning("Log progress results file not found")
+                return {}
+
+        except Exception as e:
+            logger.error(f"Failed to parse job logs: {e}", exc_info=True)
+            # Return empty dict on error - monitoring will continue
+            return {}
