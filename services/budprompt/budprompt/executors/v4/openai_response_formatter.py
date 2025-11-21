@@ -42,7 +42,7 @@ from openai.types.responses.response_reasoning_item import (
     ResponseReasoningItem,
     Summary,
 )
-from openai.types.responses.tool import Tool
+from openai.types.responses.tool import Mcp, Tool
 from openai.types.shared.reasoning import Reasoning
 from openai.types.shared.response_format_text import ResponseFormatText
 from pydantic import ValidationError
@@ -558,12 +558,23 @@ class OpenAIResponseFormatter_V4:
             tools: List of MCP tool configurations from prompt config
 
         Returns:
-            List of Tool objects (currently returns empty list as we handle MCP via output items)
+            List of Tool objects for the response tools array
         """
-        # Note: In OpenAI Responses API, tools are typically defined at request time
-        # and MCP tool calls appear in the output items, not in the tools array.
-        # For now, return empty list. Can be extended if needed.
-        return []
+        formatted_tools: List[Tool] = []
+        if tools:
+            for tool_config in tools:
+                if tool_config.type == "mcp":
+                    formatted_tools.append(
+                        Mcp(
+                            type="mcp",
+                            server_label=tool_config.server_label,
+                            server_url=tool_config.server_url,
+                            allowed_tools=list(tool_config.allowed_tools) if tool_config.allowed_tools else None,
+                            headers=None,
+                            require_approval=tool_config.require_approval or "never",
+                        )
+                    )
+        return formatted_tools
 
     async def _fetch_mcp_tool_lists(self, tools: Optional[List[MCPToolConfig]]) -> List[McpListTools]:
         """Fetch tool lists from all MCP servers.

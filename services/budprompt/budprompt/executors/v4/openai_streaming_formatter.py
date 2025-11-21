@@ -66,7 +66,6 @@ from openai.types.responses.response_output_text import ResponseOutputText
 from openai.types.responses.response_reasoning_item import ResponseReasoningItem, Summary
 from openai.types.responses.response_reasoning_summary_part_added_event import Part as ReasoningSummaryPart
 from openai.types.responses.response_reasoning_summary_part_done_event import Part as ReasoningSummaryPartDone
-from openai.types.responses.tool import Mcp, Tool
 from openai.types.shared.reasoning import Reasoning
 from openai.types.shared.response_format_text import ResponseFormatText
 from pydantic import BaseModel
@@ -1290,21 +1289,10 @@ class OpenAIStreamingFormatter_V1:
         Returns:
             Response object matching OpenAI schema
         """
-        # Format tools array
-        formatted_tools: List[Tool] = []
-        if self.tools_config:
-            for tool_config in self.tools_config:
-                if tool_config.type == "mcp":
-                    formatted_tools.append(
-                        Mcp(
-                            type="mcp",
-                            server_label=tool_config.server_label,
-                            server_url=tool_config.server_url,
-                            allowed_tools=list(tool_config.allowed_tools) if tool_config.allowed_tools else None,
-                            headers=None,
-                            require_approval=tool_config.require_approval or "never",
-                        )
-                    )
+        # Format tools array using non-streaming formatter's method
+        from .openai_response_formatter import OpenAIResponseFormatter_V4
+
+        formatted_tools = OpenAIResponseFormatter_V4()._format_tools(self.tools_config)
 
         # Format usage
         usage_obj = None
