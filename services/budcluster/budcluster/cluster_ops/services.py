@@ -418,15 +418,8 @@ class ClusterOpsService:
                 _add_hami_fields_to_device(each_info, device)
 
                 # Deduplicate devices by device_uuid (for HAMI-enriched GPUs)
-                # If device has a UUID and we've already seen it, skip it
-                device_uuid = device.get("device_uuid")
-                if device_uuid:
-                    if device_uuid in seen_device_uuids:
-                        logger.warning(
-                            f"Skipping duplicate device with UUID {device_uuid} on node {node.name}"
-                        )
-                        continue
-                    seen_device_uuids.add(device_uuid)
+                if _should_skip_duplicate_device(device, seen_device_uuids, node.name):
+                    continue
 
                 devices.append(device)
             
@@ -470,15 +463,8 @@ class ClusterOpsService:
                 _add_hami_fields_to_device(each_info, enhanced_device)
 
                 # Deduplicate devices by device_uuid (for HAMI-enriched GPUs)
-                # If device has a UUID and we've already seen it, skip it
-                device_uuid = enhanced_device.get("device_uuid")
-                if device_uuid:
-                    if device_uuid in seen_device_uuids:
-                        logger.warning(
-                            f"Skipping duplicate device with UUID {device_uuid} on node {node.name}"
-                        )
-                        continue
-                    seen_device_uuids.add(device_uuid)
+                if _should_skip_duplicate_device(enhanced_device, seen_device_uuids, node.name):
+                    continue
 
                 devices.append(enhanced_device)
 
@@ -1178,10 +1164,7 @@ class ClusterOpsService:
 
             if update_nodes:
                 # Merge nodes back into session to ensure they're properly attached
-                merged_nodes = []
-                for node in update_nodes:
-                    merged_node = session.merge(node)
-                    merged_nodes.append(merged_node)
+                merged_nodes = [session.merge(node) for node in update_nodes]
                 await ClusterNodeInfoDataManager(session).update_cluster_node_info(merged_nodes)
 
             if add_nodes:
@@ -1762,6 +1745,36 @@ class ClusterOpsService:
             await cls._handle_cluster_failure(cluster.id)
 
             raise
+
+
+def _should_skip_duplicate_device(
+    device: Dict[str, Any],
+    seen_device_uuids: set,
+    node_name: str
+) -> bool:
+    """Check if device should be skipped due to duplicate UUID.
+
+    This helper function centralizes device deduplication logic to prevent
+    duplicate devices when multiple hardware_info entries reference the same
+    physical device (common with HAMI GPU time-slicing).
+
+    Args:
+        device: Device dictionary to check
+        seen_device_uuids: Set of UUIDs already seen (modified in-place if new UUID found)
+        node_name: Name of the node (for logging)
+
+    Returns:
+        True if device should be skipped (duplicate), False otherwise
+    """
+    device_uuid = device.get("device_uuid")
+    if device_uuid:
+        if device_uuid in seen_device_uuids:
+            logger.warning(
+                f"Skipping duplicate device with UUID {device_uuid} on node {node_name}"
+            )
+            return True
+        seen_device_uuids.add(device_uuid)
+    return False
 
 
 def _add_hami_fields_to_device(source: Dict[str, Any], target: Dict[str, Any]) -> None:
