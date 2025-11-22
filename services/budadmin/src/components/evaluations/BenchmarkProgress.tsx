@@ -135,14 +135,14 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark, refres
             <Text_12_400_EEEEEE>{benchmark.eta}</Text_12_400_EEEEEE>
             <div className="ml-2 cursor-pointer" onClick={refreshETA}>
               <div className="w-4 h-4">
-              <svg 
-                width="100%" 
-                height="100%" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="white" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
+              <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
                 strokeLinejoin="round"
               >
                 <polyline points="23 4 23 10 17 10"></polyline>
