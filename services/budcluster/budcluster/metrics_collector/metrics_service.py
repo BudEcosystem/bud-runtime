@@ -240,13 +240,13 @@ class MetricsCollectionService:
         except NamespaceNotFoundError as e:
             # Namespace is missing - mark cluster as ERROR
             logger.error(f"Prometheus namespace not found for cluster {cluster_id}: {e}")
-            
+
             # Clean up on failure
             await self.otel_bridge.cleanup_cluster(str(cluster.id))
-            
+
             # Mark cluster as ERROR
             await self._mark_cluster_error(cluster.id, str(e))
-            
+
             return ClusterMetricsInfo(
                 cluster_id=str(cluster.id),
                 cluster_name=cluster.name if hasattr(cluster, "name") else str(cluster.id),
@@ -334,7 +334,7 @@ class MetricsCollectionService:
 
     async def _mark_cluster_error(self, cluster_id: str, reason: str) -> None:
         """Mark cluster as ERROR status.
-        
+
         Args:
             cluster_id: Cluster ID
             reason: Error reason
@@ -343,14 +343,14 @@ class MetricsCollectionService:
             if not self.session:
                 logger.warning(f"No session available to mark cluster {cluster_id} as ERROR")
                 return
-            
+
             cluster_manager = ClusterDataManager(self.session)
             cluster = await cluster_manager.retrieve_cluster_by_fields({"id": cluster_id}, missing_ok=True)
             if cluster:
                 cluster.status = ClusterStatusEnum.ERROR.value
                 cluster.reason = reason
                 cluster.metrics_collection_status = MetricsCollectionStatus.FAILED.value
-                
+
                 # Flush changes
                 flush_res = self.session.flush()
                 if inspect.isawaitable(flush_res):
