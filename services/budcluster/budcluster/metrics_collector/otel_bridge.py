@@ -19,6 +19,7 @@ import yaml
 from budmicroframe.commons.logging import get_logger
 
 from ..commons.config import app_settings
+from .exceptions import NamespaceNotFoundError
 
 
 logger = get_logger(__name__)
@@ -208,6 +209,22 @@ class OTelBridge:
                 logger.error(f"Invalid kubeconfig or cluster unreachable: {test_result.stderr}")
                 return None
 
+            # Validate namespace exists first
+            logger.debug(f"Validating namespace {namespace} exists")
+            ns_cmd = [
+                "kubectl",
+                "--kubeconfig",
+                kubeconfig_path,
+            ]
+            if not app_settings.validate_certs:
+                ns_cmd.append("--insecure-skip-tls-verify")
+            ns_cmd.extend(["get", "namespace", namespace, "--request-timeout=10s"])
+            ns_result = subprocess.run(ns_cmd, capture_output=True, text=True, timeout=15)
+            if ns_result.returncode != 0:
+                error_msg = f"Namespace '{namespace}' not found in cluster {cluster_id}"
+                logger.error(f"{error_msg}: {ns_result.stderr}")
+                raise NamespaceNotFoundError(error_msg)
+
             # Check if the Prometheus service exists
             logger.debug(f"Checking for Prometheus service {service} in namespace {namespace}")
             svc_cmd = [
@@ -302,6 +319,9 @@ class OTelBridge:
             logger.info(f"Successfully established port-forward for cluster {cluster_id} on port {local_port}")
             return local_port
 
+        except NamespaceNotFoundError:
+            # Re-raise namespace errors so they can be handled specifically
+            raise
         except subprocess.TimeoutExpired as e:
             logger.error(f"Command timed out: {e}")
             if process:
