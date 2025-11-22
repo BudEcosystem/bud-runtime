@@ -32,7 +32,7 @@ export default function NewEvaluation() {
 
   useEffect(()=> {
     form.resetFields();
-  }, [])
+  }, [form])
   return (
     <BudForm
       data={""}
