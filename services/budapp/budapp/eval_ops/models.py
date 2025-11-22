@@ -222,6 +222,10 @@ class ExpDataset(Base, TimestampMixin):
         JSONB, nullable=True
     )  # Flexible JSON field for top_5 lists, age_distribution, and future metadata
 
+    # Evaluation configuration fields
+    metrics: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)  # List of metric names (e.g., ["accuracy"])
+    evaluator: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # Evaluator class name
+
     # Relationships
     versions = relationship(
         "ExpDatasetVersion",
