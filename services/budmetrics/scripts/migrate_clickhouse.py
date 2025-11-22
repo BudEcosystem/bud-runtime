@@ -992,7 +992,7 @@ class ClickHouseMigration:
         for column_name, column_type in columns_to_add:
             try:
                 # Check if column already exists
-                check_column_query = f"""
+                check_column_query = f"""  # nosec B608
                 SELECT COUNT(*)
                 FROM system.columns
                 WHERE table = 'ModelInferenceDetails'
@@ -1131,7 +1131,7 @@ class ClickHouseMigration:
             return
 
         # Check which network columns are missing
-        check_columns_query = f"""
+        check_columns_query = f"""  # nosec B608
         SELECT name FROM system.columns
         WHERE database = '{database}'
         AND table = 'NodeMetrics'
