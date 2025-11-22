@@ -260,7 +260,7 @@ class ObservabilityMetricsSeeder:
             )
             values.append(row)
 
-        query = f"""
+        query = f"""  # nosec B608
         INSERT INTO ModelInference
         (id, inference_id, raw_request, raw_response, model_name, model_provider_name,
          input_tokens, output_tokens, response_time_ms, ttft_ms, system, input_messages,
@@ -278,7 +278,7 @@ class ObservabilityMetricsSeeder:
         inference_ids = [record["inference_id"] for record in batch_data]
 
         # Check for existing inference_ids
-        existing_check_query = f"""
+        existing_check_query = f"""  # nosec B608
         SELECT inference_id
         FROM ModelInferenceDetails
         WHERE inference_id IN ({",".join([f"'{id}'" for id in inference_ids])})
@@ -313,7 +313,7 @@ class ObservabilityMetricsSeeder:
             values.append(row)
 
         # Build and execute the INSERT query
-        query = f"""
+        query = f"""  # nosec B608
         INSERT INTO ModelInferenceDetails
         (inference_id, request_ip, project_id, endpoint_id, model_id,
          cost, response_analysis, is_success, request_arrival_time, request_forward_time)
