@@ -152,7 +152,7 @@ const Evaluations = () => {
           <Tabs
             defaultActiveKey="1"
             activeKey={activeTab}
-            onChange={(key) => {router.replace(`/evaluations?tab=${key}`); setActiveTab(key);}}
+            onChange={(key) => {router.replace(`/evaluations?tab=${key}`);}}
             tabBarExtraContent={operations}
             className="h-full"
             items={[
