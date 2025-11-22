@@ -30,7 +30,7 @@ This formatter handles:
 import json
 import time
 import uuid
-from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 from budmicroframe.commons import logging
 from openai.types.responses import (
@@ -58,7 +58,6 @@ from openai.types.responses import (
 from openai.types.responses.easy_input_message import EasyInputMessage
 from openai.types.responses.response_format_text_json_schema_config import ResponseFormatTextJSONSchemaConfig
 from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
-from openai.types.responses.response_input_item import Message as ResponseInputMessage
 from openai.types.responses.response_output_item import McpCall as ResponseOutputMcpCall
 from openai.types.responses.response_output_item import McpListTools, McpListToolsTool
 from openai.types.responses.response_output_message import ResponseOutputMessage
@@ -219,19 +218,6 @@ class OpenAIStreamingFormatter_V4:
         """
         self.sequence_number += 1
         return self.sequence_number
-
-    def _format_sse(self, event_type: str, data: Dict[str, Any]) -> str:
-        r"""Format as Server-Sent Event with event and data lines.
-
-        Args:
-            event_type: The event type name (e.g., "response.created")
-            data: The event data dictionary
-
-        Returns:
-            SSE-formatted string: "event: {type}\ndata: {json}\n\n"
-        """
-        # Use compact JSON format (no spaces) matching OpenAI
-        return f"event: {event_type}\ndata: {json.dumps(data, separators=(',', ':'))}\n\n"
 
     def format_sse_from_event(self, event: Union[ResponseStreamEvent, BaseModel]) -> str:
         r"""Format OpenAI SDK event instance as Server-Sent Event.
@@ -1272,7 +1258,7 @@ class OpenAIStreamingFormatter_V4:
     def build_response_object(
         self,
         status: str,
-        instructions: Optional[List[ResponseInputMessage]] = None,
+        instructions: Optional[List[EasyInputMessage]] = None,
         output_items: Optional[List[Any]] = None,
         usage: Optional[Dict[str, Any]] = None,
         error: Optional[Dict[str, str]] = None,
@@ -1411,128 +1397,3 @@ class OpenAIStreamingFormatter_V4:
                 pass
 
         return output_items
-
-    async def fetch_and_emit_mcp_tool_lists(self) -> AsyncGenerator[str, None]:
-        """Pre-fetch MCP tool lists and emit as SSE events.
-
-        This method loads all MCP servers, fetches their tool lists, and emits
-        the complete lifecycle events for each tool list (added → in_progress → completed → done).
-
-        Yields:
-            SSE-formatted event strings for MCP tool list lifecycle
-        """
-        if not self.tools_config:
-            return
-
-        from .tool_loaders import MCPToolLoader
-
-        loader = MCPToolLoader()
-
-        for tool_config in self.tools_config:
-            if tool_config.type != "mcp":
-                continue
-
-            try:
-                # Load MCP server
-                mcp_server = await loader.load_tools(tool_config)
-                if not mcp_server:
-                    logger.warning(f"Failed to load MCP server: {tool_config.server_label}")
-                    continue
-
-                # Fetch tool list
-                tool_list_data = await loader.get_tool_list(mcp_server, tool_config.server_label or "unknown")
-                if not tool_list_data:
-                    logger.warning(f"No tool list data from MCP server: {tool_config.server_label}")
-                    continue
-
-                # Generate unique item ID
-                item_id = f"mcpl_{uuid.uuid4().hex}"
-                current_output_index = self.output_index
-                self.output_index += 1
-
-                # Parse tools from MCP response
-                tools_list: List[McpListToolsTool] = []
-                for tool_info in tool_list_data.get("tools", []):
-                    tools_list.append(
-                        McpListToolsTool(
-                            name=tool_info.name,
-                            description=getattr(tool_info, "description", None),
-                            input_schema=(
-                                tool_info.inputSchema if hasattr(tool_info, "inputSchema") else tool_info.input_schema
-                            ),
-                            annotations=getattr(tool_info, "annotations", None),
-                        )
-                    )
-
-                # EVENT 1: response.output_item.added
-                yield self.format_sse_from_event(
-                    ResponseOutputItemAddedEvent(
-                        type="response.output_item.added",
-                        sequence_number=self._next_sequence(),
-                        output_index=current_output_index,
-                        item=McpListTools(
-                            id=item_id,
-                            type="mcp_list_tools",
-                            server_label=tool_list_data["server_label"],
-                            tools=[],  # Empty initially
-                        ),
-                    )
-                )
-
-                # EVENT 2: response.mcp_list_tools.in_progress
-                yield self.format_sse_from_event(
-                    ResponseMcpListToolsInProgressEvent(
-                        type="response.mcp_list_tools.in_progress",
-                        sequence_number=self._next_sequence(),
-                        output_index=current_output_index,
-                        item_id=item_id,
-                    )
-                )
-
-                # EVENT 3: response.mcp_list_tools.completed
-                yield self.format_sse_from_event(
-                    ResponseMcpListToolsCompletedEvent(
-                        type="response.mcp_list_tools.completed",
-                        sequence_number=self._next_sequence(),
-                        output_index=current_output_index,
-                        item_id=item_id,
-                    )
-                )
-
-                # EVENT 4: response.output_item.done (with full tool list)
-                yield self.format_sse_from_event(
-                    ResponseOutputItemDoneEvent(
-                        type="response.output_item.done",
-                        sequence_number=self._next_sequence(),
-                        output_index=current_output_index,
-                        item=McpListTools(
-                            id=item_id,
-                            type="mcp_list_tools",
-                            server_label=tool_list_data["server_label"],
-                            tools=tools_list,
-                            error=tool_list_data.get("error"),
-                        ),
-                    )
-                )
-
-            except Exception as e:
-                logger.error(f"Error fetching MCP tool list for {tool_config.server_label}: {str(e)}")
-                continue
-
-    def add_thinking_content(self, thinking_text: str):
-        """Accumulate thinking/reasoning content for final summary.
-
-        Args:
-            thinking_text: Thinking content from ThinkingPart
-        """
-        if thinking_text:
-            self.accumulated_thinking.append(thinking_text)
-
-    def update_model_name(self, model_name: str):
-        """Update model name from ModelResponse if available.
-
-        Args:
-            model_name: The model name from streaming response
-        """
-        if model_name:
-            self.model_name = model_name
