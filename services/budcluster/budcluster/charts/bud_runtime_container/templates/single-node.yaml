@@ -40,9 +40,9 @@ spec:
             topologyKey: kubernetes.io/hostname
       imagePullSecrets:
       - name: {{ $.Values.imagePullSecrets.name }}
-      {{- if eq .node.type "cuda" }}
-      runtimeClassName: nvidia
-      {{- end }}
+      # {{- if eq .node.type "cuda" }}
+      # runtimeClassName: nvidia
+      # {{- end }}
       containers:
       {{- if eq .node.type "cpu" }}
       {{- include "bud-runtime-container.cpu-container" (dict "Values" $.Values "device" .node) | nindent 6 }}
