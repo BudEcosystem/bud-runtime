@@ -55,6 +55,7 @@ from .field_validation import ModelValidationEnhancer
 from .openai_response_formatter import OpenAIResponseFormatter_V4
 from .openai_streaming_formatter import OpenAIStreamingFormatter_V4
 from .schema_builder import CustomModelGenerator
+from .streaming_validation_executor import StreamingValidationExecutor
 from .template_renderer import render_template
 from .tool_loaders import ToolRegistry
 from .utils import contains_pydantic_model, validate_input_data_type
@@ -172,17 +173,40 @@ class SimplePromptExecutor_V4:
 
             # Check if streaming is requested
             if stream:
-                return self._run_agent_stream(
-                    agent,
-                    user_prompt,
-                    message_history,
-                    output_schema,
-                    deployment_name,
-                    model_settings,
-                    messages,
-                    tools,
-                    system_prompt,
-                )
+                # Check if streaming validation is needed
+                if output_validation and output_schema and contains_pydantic_model(output_type):
+                    logger.debug("Performing streaming with structured output")
+
+                    # Extract model from NativeOutput wrapper
+                    model_with_validators = output_type.outputs if hasattr(output_type, "outputs") else output_type
+
+                    # Use new clean streaming validation executor
+                    executor = StreamingValidationExecutor(
+                        output_model=model_with_validators,
+                        prompt=user_prompt or "",
+                        deployment_name=deployment_name,
+                        model_settings=model_settings.model_dump(exclude_none=True) if model_settings else None,
+                        validation_prompt=output_validation,
+                        retry_limit=llm_retry_limit or 3,
+                        messages=messages,
+                        message_history=message_history,
+                        api_key=api_key,
+                    )
+
+                    return executor.stream()
+                else:
+                    logger.debug("Performing streaming with unstructured output")
+                    return self._run_agent_stream(
+                        agent,
+                        user_prompt,
+                        message_history,
+                        output_schema,
+                        deployment_name,
+                        model_settings,
+                        messages,
+                        tools,
+                        system_prompt,
+                    )
             else:
                 # Execute the agent with both history and current prompt
                 result = await self._run_agent(
