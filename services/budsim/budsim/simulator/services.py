@@ -179,8 +179,8 @@ class SimulationService:
                     # Filter devices based on user's hardware mode preference
                     if user_hardware_mode == "dedicated":
                         # Dedicated mode: Only use devices with 0% utilization
-                        core_util = device.get("core_utilization_percent", 0.0)
-                        memory_util = device.get("memory_utilization_percent", 0.0)
+                        core_util = device.get("core_utilization_percent") or 0.0
+                        memory_util = device.get("memory_utilization_percent") or 0.0
 
                         # If utilization metrics are available, enforce strict 0% requirement
                         if "core_utilization_percent" in device or "memory_utilization_percent" in device:
