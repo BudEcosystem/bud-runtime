@@ -394,7 +394,7 @@ class ClusterOpsService:
             hardware_info = node.hardware_info
             devices = []
             seen_device_uuids = set()  # Track seen device UUIDs to prevent duplicates
-            
+
             for each_info in hardware_info:
                 device_config = each_info.get("device_config", {})
                 # Get both total_count and available_count from hardware_info
@@ -422,8 +422,10 @@ class ClusterOpsService:
                     continue
 
                 devices.append(device)
-            
-            logger.debug(f"Node {node.name}: transformed {len(devices)} devices from {len(hardware_info)} hardware_info entries")
+
+            logger.debug(
+                f"Node {node.name}: transformed {len(devices)} devices from {len(hardware_info)} hardware_info entries"
+            )
             result.append(
                 {
                     "name": node.name,
@@ -468,7 +470,9 @@ class ClusterOpsService:
 
                 devices.append(enhanced_device)
 
-            logger.debug(f"Node {node.name}: transformed {len(devices)} enhanced devices from {len(hardware_info)} hardware_info entries")
+            logger.debug(
+                f"Node {node.name}: transformed {len(devices)} enhanced devices from {len(hardware_info)} hardware_info entries"
+            )
             node_result = {
                 "name": node.name,
                 "id": str(node.id),
@@ -1747,11 +1751,7 @@ class ClusterOpsService:
             raise
 
 
-def _should_skip_duplicate_device(
-    device: Dict[str, Any],
-    seen_device_uuids: set,
-    node_name: str
-) -> bool:
+def _should_skip_duplicate_device(device: Dict[str, Any], seen_device_uuids: set, node_name: str) -> bool:
     """Check if device should be skipped due to duplicate UUID.
 
     This helper function centralizes device deduplication logic to prevent
@@ -1769,9 +1769,7 @@ def _should_skip_duplicate_device(
     device_uuid = device.get("device_uuid")
     if device_uuid:
         if device_uuid in seen_device_uuids:
-            logger.warning(
-                f"Skipping duplicate device with UUID {device_uuid} on node {node_name}"
-            )
+            logger.warning(f"Skipping duplicate device with UUID {device_uuid} on node {node_name}")
             return True
         seen_device_uuids.add(device_uuid)
     return False

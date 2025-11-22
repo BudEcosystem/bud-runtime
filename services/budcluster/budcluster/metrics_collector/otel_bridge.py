@@ -178,9 +178,7 @@ class OTelBridge:
 
             # Check if kubectl is available
             kubectl_proc = await asyncio.create_subprocess_exec(
-                "which", "kubectl",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                "which", "kubectl", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
             try:
                 await asyncio.wait_for(kubectl_proc.communicate(), timeout=5.0)
@@ -215,9 +213,7 @@ class OTelBridge:
 
             test_cmd.extend(["get", "nodes", "--request-timeout=10s"])
             test_proc = await asyncio.create_subprocess_exec(
-                *test_cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                *test_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
             try:
                 _, test_stderr_bytes = await asyncio.wait_for(test_proc.communicate(), timeout=15.0)
@@ -241,16 +237,14 @@ class OTelBridge:
                 ns_cmd.append("--insecure-skip-tls-verify")
             ns_cmd.extend(["get", "namespace", namespace, "--request-timeout=10s"])
             ns_proc = await asyncio.create_subprocess_exec(
-                *ns_cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                *ns_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
             try:
                 _, ns_stderr_bytes = await asyncio.wait_for(ns_proc.communicate(), timeout=15.0)
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError as e:
                 error_msg = f"Namespace validation timed out for cluster {cluster_id}"
                 logger.error(error_msg)
-                raise NamespaceNotFoundError(error_msg)
+                raise NamespaceNotFoundError(error_msg) from e
 
             if ns_proc.returncode != 0:
                 error_msg = f"Namespace '{namespace}' not found in cluster {cluster_id}"
@@ -272,9 +266,7 @@ class OTelBridge:
 
             svc_cmd.extend(["-n", namespace, "get", "service", service, "--request-timeout=10s"])
             svc_proc = await asyncio.create_subprocess_exec(
-                *svc_cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                *svc_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
             try:
                 _, svc_stderr_bytes = await asyncio.wait_for(svc_proc.communicate(), timeout=15.0)
@@ -291,9 +283,7 @@ class OTelBridge:
                     list_cmd.append("--insecure-skip-tls-verify")
                 list_cmd.extend(["-n", namespace, "get", "services"])
                 list_proc = await asyncio.create_subprocess_exec(
-                    *list_cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
+                    *list_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
                 )
                 try:
                     list_stdout_bytes, _ = await asyncio.wait_for(list_proc.communicate(), timeout=10.0)
