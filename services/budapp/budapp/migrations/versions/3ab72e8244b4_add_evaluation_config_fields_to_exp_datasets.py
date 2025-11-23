@@ -1,7 +1,7 @@
 """add evaluation config fields to exp_datasets
 
 Revision ID: 3ab72e8244b4
-Revises: a1b2c3d4e5f7
+Revises: f5b76a5c7bda
 Create Date: 2025-11-23 10:00:00.000000
 
 """
@@ -15,7 +15,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "3ab72e8244b4"
-down_revision: Union[str, None] = "a1b2c3d4e5f7"
+down_revision: Union[str, None] = "f5b76a5c7bda"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
