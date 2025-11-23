@@ -154,7 +154,7 @@ class SimplePromptExecutor_V4:
             toolsets = await self._load_toolsets(tools)
 
             # Create AI agent with appropriate output type and retry configuration
-            agent = await self._create_agent(
+            agent, agent_kwargs = await self._create_agent(
                 deployment_name,
                 model_settings,
                 output_type,
@@ -180,13 +180,11 @@ class SimplePromptExecutor_V4:
                     executor = StreamingValidationExecutor(
                         output_type=output_type,
                         prompt=user_prompt or "",
-                        deployment_name=deployment_name,
-                        model_settings=model_settings.model_dump(exclude_none=True) if model_settings else None,
                         validation_prompt=output_validation,
-                        retry_limit=llm_retry_limit or 3,
                         messages=messages,
                         message_history=message_history,
                         api_key=api_key,
+                        agent_kwargs=agent_kwargs,
                     )
 
                     return executor.stream()
@@ -397,7 +395,7 @@ class SimplePromptExecutor_V4:
         system_prompt_role: Optional[str] = None,
         api_key: Optional[str] = None,
         toolsets: Optional[List[Any]] = None,
-    ) -> Agent:
+    ) -> tuple[Agent, Dict[str, Any]]:
         """Create Pydantic AI agent with automatic parameter routing.
 
         Args:
@@ -411,7 +409,7 @@ class SimplePromptExecutor_V4:
             toolsets: Optional list of toolsets (e.g., MCP servers) for the agent
 
         Returns:
-            Configured AI agent
+            Tuple of (configured AI agent, agent_kwargs dict)
         """
         # Convert our ModelSettings to OpenAIModelSettings
         # This automatically routes BudEcosystem parameters to extra_body
@@ -425,7 +423,7 @@ class SimplePromptExecutor_V4:
             model_name=deployment_name, system_prompt_role=system_prompt_role, settings=openai_settings
         )
 
-        # Create agent with output type and optional retry configuration
+        # Build agent kwargs
         # Note: system_prompt is not passed here - it will be added to message_history instead
         # This is because pydantic-ai ignores system_prompt when message_history is provided
         agent_kwargs = {
@@ -449,7 +447,8 @@ class SimplePromptExecutor_V4:
 
         agent = Agent(**agent_kwargs)
 
-        return agent
+        # Return both agent and kwargs for reuse by other executors
+        return agent, agent_kwargs
 
     def _prepare_template_context(self, input_data: Any, is_structured: bool) -> Dict[str, Any]:
         """Prepare context for Jinja2 template rendering.

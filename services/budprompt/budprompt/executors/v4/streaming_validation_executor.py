@@ -24,9 +24,6 @@ from pydantic import ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage, ModelResponse, ThinkingPart, ToolCallPart
 from pydantic_ai.output import NativeOutput
-from pydantic_ai.settings import ModelSettings
-
-from budprompt.shared.providers import BudServeProvider
 
 from ...prompt.schemas import Message
 from ...prompt.schemas import ModelSettings as ModelSettingsSchema
@@ -51,26 +48,22 @@ class StreamingValidationExecutor:
         self,
         output_type: Any,
         prompt: str,
-        deployment_name: str,
-        model_settings: Optional[Dict[str, Any]],
         validation_prompt: Dict[str, Dict[str, Dict[str, str]]],
-        retry_limit: int = 3,
         messages: Optional[List[Message]] = None,
         message_history: Optional[List[ModelMessage]] = None,
         api_key: Optional[str] = None,
+        agent_kwargs: Optional[Dict[str, Any]] = None,
     ):
         """Initialize the streaming validation executor.
 
         Args:
             output_type: Output type (NativeOutput wrapper or raw Pydantic model with field validators)
             prompt: Original user prompt
-            deployment_name: Model deployment name
-            model_settings: Model configuration dict
             validation_prompt: Nested dict with validation rules {ModelName: {field: {prompt: "..."}}}
-            retry_limit: Maximum retry attempts
-            messages: Original Message objects for formatter context (consistency with _run_agent_stream)
+            messages: Original Message objects for formatter context
             message_history: ModelMessage list for agent conversation history
             api_key: Optional API key for authorization
+            agent_kwargs: Agent configuration dict from _build_agent_kwargs()
         """
         # Store the full output_type for agent creation
         self.output_type = output_type
@@ -82,25 +75,35 @@ class StreamingValidationExecutor:
         else:
             # It's raw Pydantic model (or ToolOutput, etc.)
             self.output_model = output_type
+
         self.original_prompt = prompt
-        self.deployment_name = deployment_name
         self.validation_prompt = validation_prompt
-        self.retry_limit = retry_limit
         self.messages = messages or []
         self.message_history = message_history or []
         self.api_key = api_key
 
-        # Convert model_settings dict to ModelSettings object
-        if model_settings:
-            self.model_settings = ModelSettingsSchema(**model_settings)
-        else:
-            self.model_settings = ModelSettingsSchema()
+        # Extract retry count BEFORE popping (determine external loop count)
+        configured_retries = agent_kwargs.get("retries", 0)
 
-        # Initialize OpenAI streaming formatter
+        # Set external loop count based on configured retries
+        if configured_retries == 0:
+            self.retry_limit = 1  # Single attempt when agent has no retries
+        else:
+            self.retry_limit = configured_retries  # Use agent's retry count for external loop
+
+        # Pop retries from the argument dict (mutate in place)
+        if agent_kwargs:
+            agent_kwargs.pop("retries", None)
+
+        # Save the mutated dict
+        self.agent_kwargs = agent_kwargs
+
+        # Initialize OpenAI streaming formatter with minimal settings
+        # Note: We can't access full ModelSettings anymore since it's encapsulated in the model
         self.formatter = OpenAIStreamingFormatter_V3(
-            deployment_name=deployment_name,
-            model_settings=self.model_settings,
-            messages=self.messages,  # Pass messages for consistency with _run_agent_stream
+            deployment_name="static_model",  # TODO: we can add original model name later
+            model_settings=ModelSettingsSchema(),  # Use default settings for formatter
+            messages=self.messages,
         )
 
         # Extract field validators
@@ -117,14 +120,6 @@ class StreamingValidationExecutor:
 
         # Track what we've sent to client for delta computation
         self.last_sent_fields: Dict[str, Any] = {}
-
-        # Create provider
-        self.provider = BudServeProvider(api_key=api_key)
-
-        # Get model instance
-        settings = ModelSettings(**model_settings) if model_settings else ModelSettings(temperature=0.1)
-
-        self.model = self.provider.get_model(model_name=deployment_name, settings=settings)
 
     async def stream(self) -> AsyncGenerator[str, None]:
         """Execute streaming with validation and retry.
@@ -222,13 +217,9 @@ class StreamingValidationExecutor:
         # Build prompt for this attempt
         current_prompt = self._build_prompt(attempt_number)
 
-        # Create agent for this attempt
-        agent = Agent(
-            model=self.model,
-            output_type=self.output_type,  # Use the stored output_type (could be NativeOutput or raw)
-            system_prompt="You are a helpful assistant that generates valid structured data.",
-            retries=0,  # We handle retries ourselves
-        )
+        # Create agent for this attempt using agent_kwargs
+        # Note: We always override retries=0 because we handle retries externally via for-loop
+        agent = Agent(**self.agent_kwargs, retries=0)
 
         # Create validator for this attempt
         validator = StreamingJSONValidator(self.output_model, self.field_validators)
