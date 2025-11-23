@@ -71,7 +71,9 @@ type LeaderboardDetailsProps = {
     description: string;
     advantages_disadvantages: any;
     additional_info: any;
-    modalities: string[]
+    modalities: string[];
+    what_to_expect: string[];
+    why_run_this_eval: string[];
   } | null;
 };
 function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
@@ -84,8 +86,8 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
   ]);
   useEffect(() => {
     const updatedList = [
-      { title: "Why Run this Eval?", content: datasets?.advantages_disadvantages?.why_run_eval || [] },
-      { title: "What to Expect?", content: datasets?.advantages_disadvantages?.what_to_expect || [] },
+      { title: "Why Run this Eval?", content: datasets?.why_run_this_eval || [] },
+      { title: "What to Expect?", content: datasets?.what_to_expect || [] },
       { title: "Advantages", content: datasets?.advantages_disadvantages?.advantages || [] },
       { title: "Constraints", content: datasets?.advantages_disadvantages?.disadvantages || [] },
     ];

@@ -393,6 +393,8 @@ class ClusterOpsService:
         for node in db_nodes:
             hardware_info = node.hardware_info
             devices = []
+            seen_device_uuids = set()  # Track seen device UUIDs to prevent duplicates
+
             for each_info in hardware_info:
                 device_config = each_info.get("device_config", {})
                 # Get both total_count and available_count from hardware_info
@@ -415,7 +417,15 @@ class ClusterOpsService:
                 # Add HAMI fields if present (for time-slicing GPU sharing)
                 _add_hami_fields_to_device(each_info, device)
 
+                # Deduplicate devices by device_uuid (for HAMI-enriched GPUs)
+                if _should_skip_duplicate_device(device, seen_device_uuids, node.name):
+                    continue
+
                 devices.append(device)
+
+            logger.debug(
+                f"Node {node.name}: transformed {len(devices)} devices from {len(hardware_info)} hardware_info entries"
+            )
             result.append(
                 {
                     "name": node.name,
@@ -433,6 +443,7 @@ class ClusterOpsService:
         for node in db_nodes:
             hardware_info = node.hardware_info
             devices = []
+            seen_device_uuids = set()  # Track seen device UUIDs to prevent duplicates
 
             for each_info in hardware_info:
                 device_config = each_info.get("device_config", {})
@@ -453,8 +464,15 @@ class ClusterOpsService:
                 # Add HAMI fields if present (for time-slicing GPU sharing)
                 _add_hami_fields_to_device(each_info, enhanced_device)
 
+                # Deduplicate devices by device_uuid (for HAMI-enriched GPUs)
+                if _should_skip_duplicate_device(enhanced_device, seen_device_uuids, node.name):
+                    continue
+
                 devices.append(enhanced_device)
 
+            logger.debug(
+                f"Node {node.name}: transformed {len(devices)} enhanced devices from {len(hardware_info)} hardware_info entries"
+            )
             node_result = {
                 "name": node.name,
                 "id": str(node.id),
@@ -1149,7 +1167,9 @@ class ClusterOpsService:
                 node_status_change = True
 
             if update_nodes:
-                await ClusterNodeInfoDataManager(session).update_cluster_node_info(update_nodes)
+                # Merge nodes back into session to ensure they're properly attached
+                merged_nodes = [session.merge(node) for node in update_nodes]
+                await ClusterNodeInfoDataManager(session).update_cluster_node_info(merged_nodes)
 
             if add_nodes:
                 await ClusterNodeInfoDataManager(session).create_cluster_node_info(add_nodes)
@@ -1174,7 +1194,9 @@ class ClusterOpsService:
 
             logger.info(f"Cluster status: {cluster_status} Nodes info present: {nodes_info_present}")
             if cluster_status != db_cluster.status:
-                await ClusterDataManager(session).update_cluster_by_fields(db_cluster, {"status": cluster_status})
+                # Merge cluster back into session to ensure it's properly attached
+                merged_cluster = session.merge(db_cluster)
+                await ClusterDataManager(session).update_cluster_by_fields(merged_cluster, {"status": cluster_status})
 
             await cls.update_node_info_in_statestore(json.dumps(result))
             return cluster_status, nodes_info_present, result, node_status_change
@@ -1727,6 +1749,30 @@ class ClusterOpsService:
             await cls._handle_cluster_failure(cluster.id)
 
             raise
+
+
+def _should_skip_duplicate_device(device: Dict[str, Any], seen_device_uuids: set, node_name: str) -> bool:
+    """Check if device should be skipped due to duplicate UUID.
+
+    This helper function centralizes device deduplication logic to prevent
+    duplicate devices when multiple hardware_info entries reference the same
+    physical device (common with HAMI GPU time-slicing).
+
+    Args:
+        device: Device dictionary to check
+        seen_device_uuids: Set of UUIDs already seen (modified in-place if new UUID found)
+        node_name: Name of the node (for logging)
+
+    Returns:
+        True if device should be skipped (duplicate), False otherwise
+    """
+    device_uuid = device.get("device_uuid")
+    if device_uuid:
+        if device_uuid in seen_device_uuids:
+            logger.warning(f"Skipping duplicate device with UUID {device_uuid} on node {node_name}")
+            return True
+        seen_device_uuids.add(device_uuid)
+    return False
 
 
 def _add_hami_fields_to_device(source: Dict[str, Any], target: Dict[str, Any]) -> None:
