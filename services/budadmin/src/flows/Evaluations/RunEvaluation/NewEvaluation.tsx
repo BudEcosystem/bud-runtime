@@ -30,6 +30,9 @@ export default function NewEvaluation() {
   // Get experiment ID from drawer props
   const experimentId = drawerProps?.experimentId as string;
 
+  useEffect(()=> {
+    form.resetFields();
+  }, [form])
   return (
     <BudForm
       data={""}
@@ -45,7 +48,7 @@ export default function NewEvaluation() {
           const payload = {
             step_number: 1,
             stage_data: {
-              name: values.EvaluationName,
+              name: values.EvaluationName.toLowerCase(),
               description: values.Description,
             },
           };

@@ -90,6 +90,8 @@ const ExperimentDetailsPage = () => {
         experimentRuns,
         getExperimentDetails,
         getExperimentRuns,
+        experimentSummary,
+        getExperimentSummary,
     } = useEvaluations();
 
     // Use actual metrics from experimentDetails
@@ -109,8 +111,15 @@ const ExperimentDetailsPage = () => {
             // Fetch all experiment data
             getExperimentDetails(experimentId);
             getExperimentRuns(experimentId);
+            getExperimentSummary(experimentId)
         }
     }, [experimentId]);
+
+    const refreshETA = () => {
+        if (experimentId && typeof experimentId === "string") {
+            getExperimentDetails(experimentId);
+        }
+    }
 
     if (loading) {
         return (
@@ -253,8 +262,14 @@ const ExperimentDetailsPage = () => {
                                     color="#965CDE"
                                 />
                                 <MetricCard
+                                    title="Runs Count"
+                                    value={`${(experimentSummary?.total_evaluations || 0)}`}
+                                    subtitle="runs"
+                                    color="#965CDE"
+                                />
+                                <MetricCard
                                     title="Runtime"
-                                    value={`${Math.floor((experimentMetrics.runtime || 0) / 60)}h ${(experimentMetrics.runtime || 0) % 60}m`}
+                                    value={`${Math.floor((experimentSummary?.total_duration_seconds || 0) / 3600)}h ${Math.floor(((experimentSummary?.total_duration_seconds || 0)  % 3600) / 60)}m`}
                                     subtitle="total runtime"
                                     color="#965CDE"
                                 />
@@ -353,6 +368,7 @@ const ExperimentDetailsPage = () => {
                                             <BenchmarkProgress
                                                 key={benchmark.id}
                                                 benchmark={benchmark}
+                                                refreshETA={refreshETA}
                                             />
                                         );
                                     },

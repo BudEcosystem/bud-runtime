@@ -166,6 +166,7 @@ export type WorkflowType = {
             trait_ids?: any;
         };
         trait_ids?: string;
+        dataset_ids?: string[];
         traits_details?: any;
         experiment_id?: string;
         bud_prompt_id?: string;    }

@@ -163,6 +163,40 @@ The service uses Node Feature Discovery (NFD) as the only method for hardware de
 - NFD namespace configurable via `NFD_NAMESPACE` (default: `node-feature-discovery`)
 - Legacy node-info-collector methods have been removed
 
+## GPU Time-Slicing with HAMI
+
+HAMI (HAMi GPU Device Plugin) is automatically installed during cluster onboarding when NVIDIA GPUs are detected:
+- **Automatic Installation**: Deployed via Ansible playbook (`setup_cluster.yaml`) after GPU Operator installation
+- **Helm Chart**: Uses the official HAMI Helm chart from `https://project-hami.github.io/HAMi/`
+- **Configuration**: Pre-configured with device plugin enabled, NVIDIA runtime, and privileged security context
+- **Metrics Collection**: Integrated with Prometheus for GPU utilization and time-slicing metrics
+- **Automatic Cleanup**: Removed during cluster deletion, including CRDs and cluster resources
+
+### HAMI Configuration
+
+Environment variables in `.env`:
+- `ENABLE_HAMI_METRICS=false` - Enable/disable HAMI metrics collection (set to `true` for GPU clusters)
+- `HAMI_SCHEDULER_PORT=31993` - NodePort for HAMI scheduler metrics endpoint
+- `HAMI_UTILIZATION_THRESHOLD=80` - GPU availability threshold percentage
+
+### Installation Flow
+
+HAMI installation occurs during the `register_cluster` workflow:
+1. NFD detects NVIDIA GPUs via PCI vendor ID (10de)
+2. GPU Operator is deployed (drivers, toolkit, device plugin)
+3. HAMI is automatically installed in `kube-system` namespace
+4. HAMI scheduler becomes available for GPU time-slicing
+5. Metrics collection can be enabled for monitoring
+
+### Development Notes
+
+When working with GPU deployments:
+- HAMI is conditionally installed only when `has_nvidia_gpus` flag is true
+- Installation uses idempotent Helm operations (checks if already deployed)
+- Failure to install HAMI will cause cluster registration to fail
+- HAMI metrics are parsed via `budcluster/commons/hami_parser.py`
+- GPU node information is enriched with HAMI time-slicing data
+
 ## Workflow Orchestration
 
 Long-running operations use Dapr workflows:

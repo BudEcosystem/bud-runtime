@@ -1,6 +1,7 @@
 """Service for collecting metrics from clusters and forwarding to OTel Collector."""
 
 import asyncio
+import inspect
 import time
 from datetime import datetime, timedelta
 from typing import Optional
@@ -13,6 +14,7 @@ from ..cluster_ops.crud import ClusterDataManager
 from ..commons.config import app_settings
 from ..commons.constants import ClusterStatusEnum
 from ..commons.metrics_config import get_queries_for_cluster_type
+from .exceptions import NamespaceNotFoundError
 from .otel_bridge import OTelBridge
 from .schemas import (
     ClusterMetricsInfo,
@@ -235,6 +237,24 @@ class MetricsCollectionService:
                 last_collection=datetime.utcnow(),
             )
 
+        except NamespaceNotFoundError as e:
+            # Namespace is missing - mark cluster as ERROR
+            logger.error(f"Prometheus namespace not found for cluster {cluster_id}: {e}")
+
+            # Clean up on failure
+            await self.otel_bridge.cleanup_cluster(str(cluster.id))
+
+            # Mark cluster as ERROR
+            await self._mark_cluster_error(cluster.id, str(e))
+
+            return ClusterMetricsInfo(
+                cluster_id=str(cluster.id),
+                cluster_name=cluster.name if hasattr(cluster, "name") else str(cluster.id),
+                status=MetricsCollectionStatus.FAILED,
+                error=str(e),
+                last_collection=cluster.last_metrics_collection,
+            )
+
         except Exception as e:
             logger.error(f"Failed to setup metrics collection for cluster {cluster_id}: {e}")
 
@@ -285,6 +305,10 @@ class MetricsCollectionService:
             No exceptions - errors are logged but not propagated to avoid breaking workflows
         """
         try:
+            if not self.session:
+                logger.warning(f"No session available to update metrics status for cluster {cluster_id}")
+                return
+
             update_data = {"metrics_collection_status": status.value}
             if last_collection:
                 update_data["last_metrics_collection"] = last_collection
@@ -296,7 +320,10 @@ class MetricsCollectionService:
                 for key, value in update_data.items():
                     setattr(cluster, key, value)
                 # Flush changes to database (commit handled by transaction context)
-                await self.session.flush()
+                # Handle both sync and async sessions safely
+                flush_res = self.session.flush()
+                if inspect.isawaitable(flush_res):
+                    await flush_res
                 logger.debug(f"Flushed metrics status update for cluster {cluster_id}: {status.value}")
             else:
                 logger.warning(f"Cluster {cluster_id} not found when updating metrics status")
@@ -304,3 +331,32 @@ class MetricsCollectionService:
             logger.error(f"Failed to update cluster metrics status for {cluster_id}: {e}")
             # Rollback is handled by the session context manager
             # Re-raising here would break workflow execution, so we log and continue
+
+    async def _mark_cluster_error(self, cluster_id: str, reason: str) -> None:
+        """Mark cluster as ERROR status.
+
+        Args:
+            cluster_id: Cluster ID
+            reason: Error reason
+        """
+        try:
+            if not self.session:
+                logger.warning(f"No session available to mark cluster {cluster_id} as ERROR")
+                return
+
+            cluster_manager = ClusterDataManager(self.session)
+            cluster = await cluster_manager.retrieve_cluster_by_fields({"id": cluster_id}, missing_ok=True)
+            if cluster:
+                cluster.status = ClusterStatusEnum.ERROR.value
+                cluster.reason = reason
+                cluster.metrics_collection_status = MetricsCollectionStatus.FAILED.value
+
+                # Flush changes
+                flush_res = self.session.flush()
+                if inspect.isawaitable(flush_res):
+                    await flush_res
+                logger.info(f"Marked cluster {cluster_id} as ERROR: {reason}")
+            else:
+                logger.warning(f"Cluster {cluster_id} not found when marking as ERROR")
+        except Exception as e:
+            logger.error(f"Failed to mark cluster {cluster_id} as ERROR: {e}")

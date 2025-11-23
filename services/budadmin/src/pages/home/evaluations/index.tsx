@@ -33,7 +33,7 @@ interface EvaluationCard {
 }
 
 const Evaluations = () => {
-  const [activeTab, setActiveTab] = useState("2");
+  const [activeTab, setActiveTab] = useState("");
   const router = useRouter();
   const { openDrawer } = useDrawer();
   const [searchValue, setSearchValue] = useState("");
@@ -116,6 +116,10 @@ const Evaluations = () => {
     });
   }, [searchValue, selectedFilter]);
 
+  useEffect(()=> {
+    setActiveTab(router.query?.tab?.toString() || '2');
+  }, [router])
+
   const operations = (
     <PrimaryButton
       onClick={() => openDrawer("new-experiment" as any)}
@@ -148,7 +152,7 @@ const Evaluations = () => {
           <Tabs
             defaultActiveKey="1"
             activeKey={activeTab}
-            onChange={(key) => setActiveTab(key)}
+            onChange={(key) => {router.replace(`/evaluations?tab=${key}`);}}
             tabBarExtraContent={operations}
             className="h-full"
             items={[

@@ -66,6 +66,31 @@ from .schemas import (
 logger = logging.get_logger(__name__)
 
 
+def calculate_available_gpu_memory(device: Dict[str, Any]) -> Tuple[float, float, float]:
+    """Calculate available GPU memory for shared hardware mode.
+
+    This helper function calculates the available GPU memory by subtracting
+    allocated memory from total memory. It's used consistently across workflow
+    and service logic for GPU time-slicing scenarios.
+
+    Args:
+        device: Device dictionary containing memory information with keys:
+            - mem_per_GPU_in_GB or memory_gb: Total GPU memory
+            - memory_allocated_gb: Currently allocated memory
+
+    Returns:
+        Tuple of (total_memory_gb, memory_allocated_gb, available_memory_gb)
+
+    Note:
+        For shared mode, 100% of available memory is used with no safety margin,
+        as users typically add their own buffer in the total required memory.
+    """
+    total_memory_gb = device.get("mem_per_GPU_in_GB") or device.get("memory_gb") or 0.0
+    memory_allocated_gb = device.get("memory_allocated_gb") or 0.0
+    available_memory_gb = total_memory_gb - memory_allocated_gb
+    return total_memory_gb, memory_allocated_gb, available_memory_gb
+
+
 def ensure_json_serializable(obj):
     """Recursively ensure all values in the object are JSON serializable."""
     if isinstance(obj, dict):
@@ -115,7 +140,7 @@ def _is_heuristic_config(config: Dict[str, Any]) -> bool:
 class SimulationService:
     @staticmethod
     def _group_devices_by_type_across_cluster(
-        cluster_info: List[Dict[str, Any]], cluster_topology: Dict[str, Any]
+        cluster_info: List[Dict[str, Any]], cluster_topology: Dict[str, Any], user_hardware_mode: str
     ) -> Dict[str, Dict[str, Any]]:
         """Group devices by type across the entire cluster for PP-aware optimization.
 
@@ -126,6 +151,7 @@ class SimulationService:
         Args:
             cluster_info: List of cluster dictionaries with node and device information
             cluster_topology: Pre-analyzed cluster topology information
+            user_hardware_mode: Hardware mode selected by user ("dedicated" or "shared")
 
         Returns:
             Dict mapping device type to device group information including:
@@ -133,6 +159,9 @@ class SimulationService:
                 - cluster_id: ID of the cluster (assumes single cluster for now)
                 - node_distribution: Count of devices per node
                 - devices_by_node: Devices organized by node for PP planning
+
+        Raises:
+            ValueError: If shared mode is requested but no HAMI metrics are available
         """
         device_groups = {}
 
@@ -146,6 +175,59 @@ class SimulationService:
                 for device in node.get("devices", []):
                     device_type = device["type"]
                     available_count = device["available_count"]
+
+                    # Filter devices based on user's hardware mode preference
+                    if user_hardware_mode == "dedicated":
+                        # Dedicated mode: Only use devices with 0% utilization
+                        core_util = device.get("core_utilization_percent") or 0.0
+                        memory_util = device.get("memory_utilization_percent") or 0.0
+
+                        # If utilization metrics are available, enforce strict 0% requirement
+                        if "core_utilization_percent" in device or "memory_utilization_percent" in device:
+                            if core_util > 0 or memory_util > 0:
+                                logger.debug(
+                                    f"Dedicated mode: Skipping device {device.get('name')} - "
+                                    f"core utilization: {core_util}%, memory utilization: {memory_util}% "
+                                    f"(requires 0% for both)"
+                                )
+                                continue
+                        # If no utilization metrics, use available_count (backward compatibility)
+                        elif available_count <= 0:
+                            logger.debug(
+                                f"Dedicated mode: Skipping device {device.get('name')} - "
+                                f"available_count: {available_count}"
+                            )
+                            continue
+
+                    elif user_hardware_mode == "shared":
+                        # Shared mode: Require HAMI metrics to calculate available memory
+                        memory_allocated_value = device.get("memory_allocated_gb")
+                        if memory_allocated_value is None:
+                            logger.debug(
+                                f"Shared mode: Skipping device {device.get('name')} - "
+                                f"HAMI metrics (memory_allocated_gb) not available or None"
+                            )
+                            continue
+
+                        # For shared mode, we'll use 100% of available memory (no threshold)
+                        # Memory calculation will be done later in get_topk_engine_configs_per_cluster
+                        total_memory_gb, _, available_memory_gb = calculate_available_gpu_memory(device)
+                        memory_allocated_gb = memory_allocated_value  # Already validated as not None
+
+                        if available_memory_gb <= 0:
+                            logger.debug(
+                                f"Shared mode: Skipping device {device.get('name')} - "
+                                f"no available memory (total: {total_memory_gb}GB, "
+                                f"allocated: {memory_allocated_gb}GB)"
+                            )
+                            continue
+
+                        logger.debug(
+                            f"Shared mode: Device {device.get('name')} has {available_memory_gb:.2f}GB "
+                            f"available (total: {total_memory_gb:.2f}GB, allocated: {memory_allocated_gb:.2f}GB)"
+                        )
+                        # Set available_count to 1 for shared mode since we can use partial GPU
+                        available_count = 1
 
                     # Handle backward compatibility: map generic 'gpu' to specific type
                     if device_type == "gpu":
@@ -173,14 +255,8 @@ class SimulationService:
                         )
                         continue
 
-                    # Skip CPU devices as they're not supported for LLM inference
-                    if device_type in ["cpu", "cpu_high"]:
-                        device_name = device.get("name", "unknown")
-                        if device_type == "cpu_high":
-                            logger.info(f"Skipping CPU_HIGH device {device_name}: CPU inference not supported")
-                        else:
-                            logger.info(f"Skipping CPU device {device_name}: CPU inference not supported")
-                        continue
+                    # CPU devices are now supported for LLM inference
+                    # The CPU compatibility checks in vllm.py will enforce proper constraints
 
                     # Initialize device group if not exists
                     if device_type not in device_groups:
@@ -1120,7 +1196,11 @@ class SimulationService:
         )
 
         # Group devices by type across entire cluster for PP-aware optimization
-        device_groups = self._group_devices_by_type_across_cluster(cluster_info, cluster_topology)
+        # Pass user's hardware mode preference for device filtering
+        user_hardware_mode = (
+            request.hardware_mode.value if hasattr(request.hardware_mode, "value") else request.hardware_mode
+        )
+        device_groups = self._group_devices_by_type_across_cluster(cluster_info, cluster_topology, user_hardware_mode)
 
         # Filter out invalid device groups (no devices or no nodes)
         valid_device_groups = {}
@@ -1138,10 +1218,23 @@ class SimulationService:
         logger.debug(f"Found {len(device_groups)} valid device type groups for optimization")
 
         if not device_groups:
-            logger.error("No valid device groups found for optimization")
-            raise ValueError(
-                "No devices available for simulation - all device types have 0 available count or 0 nodes"
-            )
+            logger.error(f"No valid device groups found for optimization with hardware_mode={user_hardware_mode}")
+            if user_hardware_mode == "shared":
+                raise ValueError(
+                    "Shared hardware mode requires HAMI-enabled clusters with real-time utilization metrics. "
+                    "No devices with HAMI metrics (memory_allocated_gb) were found. "
+                    "Please ensure the cluster has HAMI installed or use dedicated hardware mode."
+                )
+            elif user_hardware_mode == "dedicated":
+                raise ValueError(
+                    "Dedicated hardware mode requires devices with 0% utilization (both core and memory). "
+                    "No available devices with 0% utilization were found. "
+                    "Please wait for devices to become available or use shared hardware mode."
+                )
+            else:
+                raise ValueError(
+                    "No devices available for simulation - all device types have 0 available count or 0 nodes"
+                )
 
         try:
             with ProcessPoolExecutor() as executor:
@@ -1164,6 +1257,41 @@ class SimulationService:
                             # Use first device as representative for specs but override counts
                             representative_device = device_group["devices"][0].copy()
                             representative_device["available_count"] = total_available_count
+
+                            # Calculate available memory based on user's hardware mode
+                            logger.debug(
+                                f"Memory override check: user_hardware_mode={user_hardware_mode}, "
+                                f"device_type={device_type}, "
+                                f"representative_device has mem_per_GPU_in_GB={representative_device.get('mem_per_GPU_in_GB')}, "
+                                f"memory_allocated_gb={representative_device.get('memory_allocated_gb')}"
+                            )
+
+                            if user_hardware_mode == "shared":
+                                # For shared mode, use unutilized memory (100% of available, no safety margin)
+                                total_memory_gb, memory_allocated_gb, available_memory_gb = (
+                                    calculate_available_gpu_memory(representative_device)
+                                )
+
+                                # Use 100% of available memory (user adds buffer in total required)
+                                logger.info(
+                                    f"Shared mode GPU memory calculation for {device_type}: "
+                                    f"total={total_memory_gb:.2f}GB, allocated={memory_allocated_gb:.2f}GB, "
+                                    f"available={available_memory_gb:.2f}GB (no safety margin applied)"
+                                )
+
+                                # Override memory fields with available memory for optimization
+                                representative_device["mem_per_GPU_in_GB"] = available_memory_gb
+                                representative_device["memory_gb"] = available_memory_gb
+                                representative_device["available_memory_gb"] = available_memory_gb
+                                representative_device["total_memory_gb_original"] = (
+                                    total_memory_gb  # Keep for reference
+                                )
+                            else:
+                                logger.debug(
+                                    f"Dedicated mode: Using full device memory (no override), "
+                                    f"mem_per_GPU_in_GB={representative_device.get('mem_per_GPU_in_GB'):.2f}GB"
+                                )
+                            # For dedicated mode, use full device memory (existing behavior)
 
                             # Create base config from representative device
                             cluster_device_config = {
@@ -1904,6 +2032,16 @@ class SimulationService:
 
         if not config.node_groups:
             logger.error("No node groups created, returning None")
+            return None
+
+        # Validate that we can meet the requested concurrency
+        if total_concurrency < target_concurrency:
+            logger.error(
+                f"Insufficient resources to meet requested concurrency. "
+                f"Requested: {target_concurrency}, achievable: {total_concurrency}. "
+                f"Cannot deploy - need {math.ceil(target_concurrency / total_concurrency) if total_concurrency > 0 else 'infinite'} "
+                f"times more resources or reduce concurrency requirement."
+            )
             return None
 
         # Populate engine metadata from the first node group (they should all have the same metadata)

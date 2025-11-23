@@ -7,7 +7,7 @@ spec:
   version: v1
   metadata:
   - name: schedule
-    value: "@every 3m" # Every 3 minutes
+    value: "@every 10m" # Every 10 minutes
   - name: direction
     value: "input"
   - name: route
@@ -65,3 +65,21 @@ spec:
     value: "/v1/prompt/prompt-cleanup-cron"
 scopes:
   - budprompt
+
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: leaderboard-extraction-scheduler
+spec:
+  type: bindings.cron
+  version: v1
+  metadata:
+  - name: schedule
+    value: "@every 168h"  # Every 7 days (7 * 24 hours)
+  - name: direction
+    value: "input"
+  - name: route
+    value: "/leaderboard/extraction-cron"
+scopes:
+  - budmodel

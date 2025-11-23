@@ -56,6 +56,34 @@
         validate_certs: "{{ validate_certs }}"
       ignore_errors: true  # Continue if CRDs don't exist
 
+    # HAMI GPU Time-Slicing Removal
+    - name: Check if HAMI is deployed
+      kubernetes.core.helm_info:
+        name: hami
+        namespace: kube-system
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: hami_check
+      ignore_errors: true
+
+    - name: Uninstall HAMI
+      kubernetes.core.helm:
+        release_name: hami
+        release_namespace: kube-system
+        state: absent
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      when: hami_check is succeeded and hami_check.status.status == 'deployed'
+      ignore_errors: true
+
+    - name: Remove HAMI CRDs and cluster resources
+      shell: |
+        kubectl --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}delete crd gpuconfigs.hami.io --ignore-not-found=true
+        kubectl --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}delete clusterrole hami-scheduler --ignore-not-found=true
+        kubectl --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}delete clusterrolebinding hami-scheduler --ignore-not-found=true
+      when: hami_check is succeeded
+      ignore_errors: true
+
     - name: Delete all pods in namespace
       kubernetes.core.k8s:
         state: absent

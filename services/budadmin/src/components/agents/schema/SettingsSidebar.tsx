@@ -26,6 +26,8 @@ interface SettingsSidebarProps {
   onDeleteVariable: (variableId: string) => void;
   onStructuredInputEnabledChange?: (enabled: boolean) => void;
   onStructuredOutputEnabledChange?: (enabled: boolean) => void;
+  structuredInputEnabled?: boolean;
+  structuredOutputEnabled?: boolean;
   // System prompt and messages props
   onSystemPromptChange: (value: string) => void;
   onPromptMessagesChange: (value: string) => void;
@@ -42,6 +44,9 @@ interface SettingsSidebarProps {
   isSavingPromptMessages?: boolean;
   onSaveOutputSchema?: () => void;
   isSavingOutput?: boolean;
+  // Clear schema props
+  onClearInputSchema?: () => void;
+  onClearOutputSchema?: () => void;
 }
 
 export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
@@ -55,6 +60,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   onDeleteVariable,
   onStructuredInputEnabledChange,
   onStructuredOutputEnabledChange,
+  structuredInputEnabled,
+  structuredOutputEnabled,
   onSystemPromptChange,
   onPromptMessagesChange,
   localSystemPrompt,
@@ -67,7 +74,9 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   onSavePromptMessages,
   isSavingPromptMessages,
   onSaveOutputSchema,
-  isSavingOutput
+  isSavingOutput,
+  onClearInputSchema,
+  onClearOutputSchema
 }) => {
   const renderSettings = () => {
     switch (activeSettings) {
@@ -82,6 +91,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             onSavePromptSchema={onSavePromptSchema}
             isSaving={isSaving}
             onStructuredInputEnabledChange={onStructuredInputEnabledChange}
+            initialStructuredInputEnabled={structuredInputEnabled}
+            onClearInputSchema={onClearInputSchema}
           />
         );
       case SettingsType.SYSTEM_PROMPT:
@@ -117,6 +128,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             onSaveOutputSchema={onSaveOutputSchema}
             isSavingOutput={isSavingOutput}
             onStructuredOutputEnabledChange={onStructuredOutputEnabledChange}
+            initialStructuredOutputEnabled={structuredOutputEnabled}
+            onClearOutputSchema={onClearOutputSchema}
           />
         );
       default:
@@ -132,6 +145,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               onSavePromptSchema={onSavePromptSchema}
               isSaving={isSaving}
               onStructuredInputEnabledChange={onStructuredInputEnabledChange}
+              initialStructuredInputEnabled={structuredInputEnabled}
+              onClearInputSchema={onClearInputSchema}
             />
             <SystemPromptSettings
               sessionId={session.id}
@@ -158,6 +173,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
               onSaveOutputSchema={onSaveOutputSchema}
               isSavingOutput={isSavingOutput}
               onStructuredOutputEnabledChange={onStructuredOutputEnabledChange}
+              initialStructuredOutputEnabled={structuredOutputEnabled}
+              onClearOutputSchema={onClearOutputSchema}
             />
           </>
         );

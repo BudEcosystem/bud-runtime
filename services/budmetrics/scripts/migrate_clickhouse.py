@@ -824,6 +824,68 @@ class ClickHouseMigration:
 
         logger.info("All cluster metrics tables created successfully")
 
+    async def create_hami_gpu_metrics_table(self):
+        """Create HAMI GPU time-slicing metrics table for tracking vGPU allocation and utilization."""
+        logger.info("Creating HAMI GPU metrics table...")
+
+        ttl_days = get_cluster_metrics_ttl_days()
+        query_hami_gpu_metrics = f"""
+        CREATE TABLE IF NOT EXISTS metrics.HAMIGPUMetrics
+        (
+            ts DateTime64(3) CODEC(Delta, ZSTD),
+            cluster_id String,
+            cluster_name String,
+            node_name String,
+
+            -- Device identification
+            device_uuid String,
+            device_type String,
+            device_index UInt8,
+
+            -- HAMI allocation metrics
+            core_allocated_percent Float64 CODEC(Gorilla),
+            memory_allocated_gb Float64 CODEC(Gorilla),
+            shared_containers_count UInt16,
+
+            -- Device capacity
+            total_memory_gb Float64,
+            total_cores_percent Float64,
+
+            -- Calculated utilization
+            core_utilization_percent Float64 CODEC(Gorilla),
+            memory_utilization_percent Float64 CODEC(Gorilla),
+
+            -- Hardware mode
+            hardware_mode LowCardinality(String) DEFAULT 'whole-gpu'  -- 'time-slicing', 'mig', 'whole-gpu'
+        )
+        ENGINE = ReplacingMergeTree()
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (cluster_id, node_name, device_uuid, ts)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query_hami_gpu_metrics)
+            logger.info("HAMIGPUMetrics table created successfully")
+
+            # Add indexes for HAMIGPUMetrics
+            indexes = [
+                "ALTER TABLE metrics.HAMIGPUMetrics ADD INDEX IF NOT EXISTS idx_cluster_node_device_time (cluster_id, node_name, device_uuid, ts) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE metrics.HAMIGPUMetrics ADD INDEX IF NOT EXISTS idx_hardware_mode (hardware_mode) TYPE set(10) GRANULARITY 4",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating HAMIGPUMetrics table: {e}")
+            raise
+
     async def verify_tables(self):
         """Verify that tables were created successfully."""
         # Tables in budproxy database (or configured database)
@@ -842,6 +904,7 @@ class ClickHouseMigration:
             "metrics.NodeMetrics",
             "metrics.PodMetrics",
             "metrics.GPUMetrics",
+            "metrics.HAMIGPUMetrics",
         ]
 
         if self.include_model_inference:
@@ -929,7 +992,7 @@ class ClickHouseMigration:
         for column_name, column_type in columns_to_add:
             try:
                 # Check if column already exists
-                check_column_query = f"""
+                check_column_query = f"""  # nosec B608
                 SELECT COUNT(*)
                 FROM system.columns
                 WHERE table = 'ModelInferenceDetails'
@@ -1068,7 +1131,7 @@ class ClickHouseMigration:
             return
 
         # Check which network columns are missing
-        check_columns_query = f"""
+        check_columns_query = f"""  # nosec B608
         SELECT name FROM system.columns
         WHERE database = '{database}'
         AND table = 'NodeMetrics'
@@ -1114,6 +1177,7 @@ class ClickHouseMigration:
             await self.create_gateway_analytics_table()
             await self.create_gateway_blocking_events_table()
             await self.create_cluster_metrics_tables()  # Add cluster metrics tables
+            await self.create_hami_gpu_metrics_table()  # Add HAMI GPU time-slicing metrics table
             await self.migrate_node_metrics_network_columns()  # Add network columns to NodeMetrics (legacy migration)
             await self.setup_cluster_metrics_materialized_views()  # Set up materialized views for cluster metrics
             await self.add_auth_metadata_columns()  # Add auth metadata columns migration

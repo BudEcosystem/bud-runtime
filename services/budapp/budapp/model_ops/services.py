@@ -147,6 +147,35 @@ from .schemas import (
 logger = logging.get_logger(__name__)
 
 
+async def calculate_and_get_storage_size(model_id: UUID, local_path: str) -> Optional[float]:
+    """Calculate storage size from MinIO for a model.
+
+    This utility function calculates the total storage size of model files
+    stored in MinIO under the given local_path prefix. It can be used by
+    any service class that needs to determine model storage requirements.
+
+    Args:
+        model_id (UUID): The model ID for logging purposes
+        local_path (str): The MinIO path prefix where model files are stored
+
+    Returns:
+        Optional[float]: Storage size in GiB, or None if calculation fails
+
+    Note:
+        This function does not update the database. Callers should handle
+        the returned value appropriately (e.g., add to update dict or
+        directly update the database).
+    """
+    try:
+        model_store = ModelStore()
+        storage_size_gib = model_store.get_folder_size(app_settings.minio_bucket, local_path)
+        logger.info(f"Calculated storage size for model {model_id}: {storage_size_gib:.2f} GiB")
+        return storage_size_gib
+    except Exception as e:
+        logger.warning(f"Failed to calculate storage size for model {model_id}: {e}")
+        return None
+
+
 class ProviderService(SessionMixin):
     """Provider service."""
 
@@ -555,6 +584,12 @@ class CloudModelWorkflowService(SessionMixin):
 
         if extracted_metadata.get("website_url"):
             update_fields["website_url"] = extracted_metadata["website_url"]
+
+        # Calculate and update storage size from MinIO if local_path is available
+        if model.local_path:
+            storage_size_gib = await calculate_and_get_storage_size(model.id, model.local_path)
+            if storage_size_gib is not None:
+                update_fields["storage_size_gb"] = storage_size_gib
 
         # Update model with extracted metadata
         if update_fields:
@@ -1262,6 +1297,12 @@ class LocalModelWorkflowService(SessionMixin):
         if extracted_license:
             await self._create_model_licenses_from_model_info(extracted_license, db_model.id, local_path)
             logger.debug(f"Model licenses created for model {db_model.id}")
+
+        # Calculate and update storage size from MinIO
+        if local_path:
+            storage_size_gib = await calculate_and_get_storage_size(db_model.id, local_path)
+            if storage_size_gib is not None:
+                await ModelDataManager(self.session).update_by_fields(db_model, {"storage_size_gb": storage_size_gib})
 
         # Update to workflow step
         workflow_update_data = {
@@ -3680,6 +3721,7 @@ class ModelService(SessionMixin):
             endpoint_name=endpoint_name,
             model=deploy_model_uri,
             model_size=db_model.model_size,
+            storage_size_gb=db_model.storage_size_gb,
             target_ttft=ttft_min,
             target_e2e_latency=e2e_latency_min,
             target_throughput_per_user=target_throughput_per_user_max,

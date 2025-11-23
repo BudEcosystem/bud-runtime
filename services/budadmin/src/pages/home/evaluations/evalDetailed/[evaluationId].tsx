@@ -153,7 +153,7 @@ const EvalDetailed = () => {
     };
 
     fetchDatasets();
-  }, [id]);
+  }, [id, hideLoader]);
 
   // Function to fetch a specific dataset by ID
   const fetchDatasetById = async (datasetId: string) => {
@@ -281,7 +281,7 @@ const EvalDetailed = () => {
                     </div>
                   ),
                   key: "3",
-                  children: <EvalExplorerTable />,
+                  children: <EvalExplorerTable datasets={datasets}/>,
                 },
               ]}
             />

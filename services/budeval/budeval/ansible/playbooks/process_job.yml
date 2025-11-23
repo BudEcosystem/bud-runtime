@@ -1,0 +1,118 @@
+---
+- name: "Get pod info for {{ current_job_name }}"
+  ansible.builtin.set_fact:
+    job_pod_info: "{{ all_job_pods.results[job_index] }}"
+
+- name: "Check if pod is ready for {{ current_job_name }}"
+  ansible.builtin.set_fact:
+    is_pod_ready: >-
+      {{
+        (job_pod_info.resources | length > 0) and
+        (job_pod_info.resources[0].status.phase in ['Running', 'Succeeded', 'Failed']) and
+        (job_pod_info.resources[0].status.containerStatuses | default([]) | length > 0) and
+        (job_pod_info.resources[0].status.containerStatuses[0].state.running is defined or
+         job_pod_info.resources[0].status.containerStatuses[0].state.terminated is defined)
+      }}
+    current_pod_name: "{{ job_pod_info.resources[0].metadata.name if (job_pod_info.resources | length > 0) else '' }}"
+    current_pod_phase: "{{ job_pod_info.resources[0].status.phase if (job_pod_info.resources | length > 0) else 'NotFound' }}"
+    current_container_state: >-
+      {{
+        (job_pod_info.resources[0].status.containerStatuses[0].state.keys() | list | first)
+        if ((job_pod_info.resources | length > 0) and
+            (job_pod_info.resources[0].status.containerStatuses | default([]) | length > 0))
+        else 'unknown'
+      }}
+
+- name: "Process ready pod for {{ current_job_name }}"
+  block:
+    - name: "Get pod logs"
+      kubernetes.core.k8s_log:
+        api_version: v1
+        kind: Pod
+        name: "{{ current_pod_name }}"
+        namespace: "{{ namespace }}"
+        tail_lines: 500
+        kubeconfig: "{{ kubeconfig_path if kubeconfig_path else omit }}"
+      register: current_pod_log
+      ignore_errors: true
+
+    - name: "Parse logs"
+      ansible.builtin.shell: |
+        python3 << 'EOF'
+        import re
+        import json
+        import os
+
+        def parse_opencompass_logs(log_text):
+            result = {
+                "eta_data": None,
+                "latest_progress": None,
+                "progress_percentage": 0,
+                "status": "no_logs"
+            }
+
+            if not log_text:
+                return result
+
+            # Find ETA_DATA
+            eta_pattern = r'ETA_DATA:\s*(\{[^}]+\})'
+            eta_matches = re.findall(eta_pattern, log_text)
+            if eta_matches:
+                try:
+                    result["eta_data"] = json.loads(eta_matches[-1])
+                except json.JSONDecodeError:
+                    pass
+
+            # Find PROGRESS_DATA
+            progress_pattern = r'PROGRESS_DATA:\s*(\{[^}]+\})'
+            progress_matches = re.findall(progress_pattern, log_text)
+            if progress_matches:
+                try:
+                    result["latest_progress"] = json.loads(progress_matches[-1])
+                    progress = result["latest_progress"]
+                    batches_completed = progress.get("batches_completed", 0)
+                    batches_total = progress.get("batches_total", 1)
+                    result["progress_percentage"] = (batches_completed / batches_total) * 100
+                    result["status"] = "running"
+                except json.JSONDecodeError:
+                    pass
+
+            if result["eta_data"] and not result["latest_progress"]:
+                result["status"] = "starting"
+                result["progress_percentage"] = 0
+
+            return result
+
+        log_text = os.environ.get('POD_LOG_CONTENT', '')
+        result = parse_opencompass_logs(log_text)
+        print(json.dumps(result))
+        EOF
+      environment:
+        POD_LOG_CONTENT: "{{ current_pod_log.log | default('') }}"
+      register: parse_output
+      when: current_pod_log.log is defined
+      ignore_errors: true
+
+    - name: "Store parsed result"
+      ansible.builtin.set_fact:
+        log_progress: "{{ log_progress | combine({current_job_name: (parse_output.stdout | from_json)}) }}"
+      when:
+        - parse_output is defined
+        - parse_output.stdout is defined
+        - parse_output.stdout | length > 0
+        - not parse_output.failed | default(false)
+
+  when: is_pod_ready | bool
+
+- name: "Store pending status for {{ current_job_name }}"
+  ansible.builtin.set_fact:
+    log_progress: "{{ log_progress | combine({current_job_name: pending_status}) }}"
+  vars:
+    pending_status:
+      eta_data: null
+      latest_progress: null
+      progress_percentage: 0
+      status: 'pending'
+      pod_state: "{{ current_container_state }}"
+      pod_phase: "{{ current_pod_phase }}"
+  when: not (is_pod_ready | bool)

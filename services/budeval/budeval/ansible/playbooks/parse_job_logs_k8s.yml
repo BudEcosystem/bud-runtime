@@ -1,0 +1,52 @@
+---
+- name: Parse Job Logs for ETA and Progress
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    kubeconfig_path: ""
+    namespace: "default"
+    job_names: ""  # Comma-separated job names
+    temp_id: ""
+
+  tasks:
+    - name: Ensure required variables are provided
+      ansible.builtin.assert:
+        that:
+          - namespace is defined
+          - namespace | length > 0
+          - job_names is defined
+          - job_names | length > 0
+          - temp_id is defined
+          - temp_id | length > 0
+        fail_msg: "namespace, job_names, and temp_id must be provided"
+
+    - name: Split job names into list
+      ansible.builtin.set_fact:
+        job_list: "{{ job_names.split(',') }}"
+        log_progress: {}
+
+    - name: Get pods for all jobs
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - "job-name={{ item }}"
+        kubeconfig: "{{ kubeconfig_path if kubeconfig_path else omit }}"
+      register: all_job_pods
+      loop: "{{ job_list }}"
+      ignore_errors: true
+
+    - name: Process each job
+      include_tasks: process_job.yml
+      loop: "{{ job_list }}"
+      loop_control:
+        loop_var: current_job_name
+        index_var: job_index
+
+    - name: Write results to temporary file
+      ansible.builtin.copy:
+        content: "{{ log_progress | to_nice_json }}"
+        dest: "/tmp/log_progress_{{ temp_id }}.json"

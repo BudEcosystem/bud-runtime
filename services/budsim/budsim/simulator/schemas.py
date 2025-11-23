@@ -49,6 +49,15 @@ class Device(BaseModel):
     type: str
     available_count: int
     mem_per_GPU_in_GB: float
+    # HAMI time-slicing metrics (optional - only present on HAMI-enabled clusters)
+    memory_allocated_gb: Optional[float] = None
+    core_utilization_percent: Optional[float] = None
+    memory_utilization_percent: Optional[float] = None
+    cores_allocated_percent: Optional[float] = None
+    shared_containers_count: Optional[int] = None
+    hardware_mode: Optional[str] = None
+    device_uuid: Optional[str] = None
+    last_metrics_update: Optional[str] = None
     # Device identification fields (for exact hardware matching)
     device_model: Optional[str] = None
     raw_name: Optional[str] = None

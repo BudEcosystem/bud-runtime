@@ -183,30 +183,34 @@ class ClusterOpsService:
                             gpu_type = "cuda"
                             logger.warning(f"Unknown GPU vendor '{gpu_vendor}', defaulting to cuda")
 
-                        formatted_devices.append(
-                            {
-                                "device_config": {
-                                    "type": gpu_type,
-                                    "name": gpu.get("raw_name", "Unknown GPU"),
-                                    "vendor": gpu.get("vendor", ""),
-                                    "model": gpu.get("model", ""),
-                                    "memory_gb": gpu.get("memory_gb", 0),
-                                    "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
-                                    "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
-                                    "pci_vendor": gpu.get("pci_vendor_id"),
-                                    "pci_device": gpu.get("pci_device_id"),
-                                    "cuda_version": gpu.get("cuda_version"),
-                                    "count": gpu.get("count", 1),
-                                    "inter_node_bandwidth_in_GB_per_sec": 200,
-                                    "intra_node_bandwidth_in_GB_per_sec": 300,
-                                },
-                                # Store both total_count and available_count
-                                # available_count will be calculated separately if NFD is enabled
-                                "total_count": gpu.get("count", 1),
-                                "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                        # Build formatted device dict
+                        formatted_device = {
+                            "device_config": {
                                 "type": gpu_type,
-                            }
-                        )
+                                "name": gpu.get("raw_name", "Unknown GPU"),
+                                "vendor": gpu.get("vendor", ""),
+                                "model": gpu.get("model", ""),
+                                "memory_gb": gpu.get("memory_gb", 0),
+                                "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
+                                "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
+                                "pci_vendor": gpu.get("pci_vendor_id"),
+                                "pci_device": gpu.get("pci_device_id"),
+                                "cuda_version": gpu.get("cuda_version"),
+                                "count": gpu.get("count", 1),
+                                "inter_node_bandwidth_in_GB_per_sec": 200,
+                                "intra_node_bandwidth_in_GB_per_sec": 300,
+                            },
+                            # Store both total_count and available_count
+                            # available_count will be calculated separately if NFD is enabled
+                            "total_count": gpu.get("count", 1),
+                            "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                            "type": gpu_type,
+                        }
+
+                        # Add HAMI fields if present (for time-slicing GPU sharing)
+                        _add_hami_fields_to_device(gpu, formatted_device)
+
+                        formatted_devices.append(formatted_device)
                         device_type = gpu_type
 
                     # Process HPUs
@@ -389,6 +393,8 @@ class ClusterOpsService:
         for node in db_nodes:
             hardware_info = node.hardware_info
             devices = []
+            seen_device_uuids = set()  # Track seen device UUIDs to prevent duplicates
+
             for each_info in hardware_info:
                 device_config = each_info.get("device_config", {})
                 # Get both total_count and available_count from hardware_info
@@ -401,13 +407,25 @@ class ClusterOpsService:
                 if not node.status:
                     available_count = 0
 
-                devices.append(
-                    {
-                        **device_config,
-                        "total_count": total_count,
-                        "available_count": available_count,
-                    }
-                )
+                # Build device dict with flattened device_config
+                device = {
+                    **device_config,
+                    "total_count": total_count,
+                    "available_count": available_count,
+                }
+
+                # Add HAMI fields if present (for time-slicing GPU sharing)
+                _add_hami_fields_to_device(each_info, device)
+
+                # Deduplicate devices by device_uuid (for HAMI-enriched GPUs)
+                if _should_skip_duplicate_device(device, seen_device_uuids, node.name):
+                    continue
+
+                devices.append(device)
+
+            logger.debug(
+                f"Node {node.name}: transformed {len(devices)} devices from {len(hardware_info)} hardware_info entries"
+            )
             result.append(
                 {
                     "name": node.name,
@@ -425,6 +443,7 @@ class ClusterOpsService:
         for node in db_nodes:
             hardware_info = node.hardware_info
             devices = []
+            seen_device_uuids = set()  # Track seen device UUIDs to prevent duplicates
 
             for each_info in hardware_info:
                 device_config = each_info.get("device_config", {})
@@ -441,8 +460,19 @@ class ClusterOpsService:
                     "features": each_info.get("features", []),
                     "product_name": each_info.get("product_name", "Unknown"),
                 }
+
+                # Add HAMI fields if present (for time-slicing GPU sharing)
+                _add_hami_fields_to_device(each_info, enhanced_device)
+
+                # Deduplicate devices by device_uuid (for HAMI-enriched GPUs)
+                if _should_skip_duplicate_device(enhanced_device, seen_device_uuids, node.name):
+                    continue
+
                 devices.append(enhanced_device)
 
+            logger.debug(
+                f"Node {node.name}: transformed {len(devices)} enhanced devices from {len(hardware_info)} hardware_info entries"
+            )
             node_result = {
                 "name": node.name,
                 "id": str(node.id),
@@ -906,30 +936,34 @@ class ClusterOpsService:
                             gpu_type = "cuda"
                             logger.warning(f"Unknown GPU vendor '{gpu_vendor}', defaulting to cuda")
 
-                        formatted_devices.append(
-                            {
-                                "device_config": {
-                                    "type": gpu_type,
-                                    "name": gpu.get("raw_name", "Unknown GPU"),
-                                    "vendor": gpu.get("vendor", ""),
-                                    "model": gpu.get("model", ""),
-                                    "memory_gb": gpu.get("memory_gb", 0),
-                                    "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
-                                    "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
-                                    "pci_vendor": gpu.get("pci_vendor_id"),
-                                    "pci_device": gpu.get("pci_device_id"),
-                                    "cuda_version": gpu.get("cuda_version"),
-                                    "count": gpu.get("count", 1),
-                                    "inter_node_bandwidth_in_GB_per_sec": 200,
-                                    "intra_node_bandwidth_in_GB_per_sec": 300,
-                                },
-                                # Store both total_count and available_count
-                                # The get_node_info in kubernetes.py already calculated real available_count
-                                "total_count": gpu.get("total_count", gpu.get("count", 1)),
-                                "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                        # Build formatted device dict
+                        formatted_device = {
+                            "device_config": {
                                 "type": gpu_type,
-                            }
-                        )
+                                "name": gpu.get("raw_name", "Unknown GPU"),
+                                "vendor": gpu.get("vendor", ""),
+                                "model": gpu.get("model", ""),
+                                "memory_gb": gpu.get("memory_gb", 0),
+                                "mem_per_GPU_in_GB": gpu.get("memory_gb", 0),  # Required for budsim Evolution
+                                "raw_name": gpu.get("raw_name", ""),  # Required for llm-memory-calculator
+                                "pci_vendor": gpu.get("pci_vendor_id"),
+                                "pci_device": gpu.get("pci_device_id"),
+                                "cuda_version": gpu.get("cuda_version"),
+                                "count": gpu.get("count", 1),
+                                "inter_node_bandwidth_in_GB_per_sec": 200,
+                                "intra_node_bandwidth_in_GB_per_sec": 300,
+                            },
+                            # Store both total_count and available_count
+                            # The get_node_info in kubernetes.py already calculated real available_count
+                            "total_count": gpu.get("total_count", gpu.get("count", 1)),
+                            "available_count": gpu.get("available_count", gpu.get("count", 1)),
+                            "type": gpu_type,
+                        }
+
+                        # Add HAMI fields if present (for time-slicing GPU sharing)
+                        _add_hami_fields_to_device(gpu, formatted_device)
+
+                        formatted_devices.append(formatted_device)
                         device_type = gpu_type
 
                     # Process HPUs
@@ -1133,7 +1167,9 @@ class ClusterOpsService:
                 node_status_change = True
 
             if update_nodes:
-                await ClusterNodeInfoDataManager(session).update_cluster_node_info(update_nodes)
+                # Merge nodes back into session to ensure they're properly attached
+                merged_nodes = [session.merge(node) for node in update_nodes]
+                await ClusterNodeInfoDataManager(session).update_cluster_node_info(merged_nodes)
 
             if add_nodes:
                 await ClusterNodeInfoDataManager(session).create_cluster_node_info(add_nodes)
@@ -1158,7 +1194,9 @@ class ClusterOpsService:
 
             logger.info(f"Cluster status: {cluster_status} Nodes info present: {nodes_info_present}")
             if cluster_status != db_cluster.status:
-                await ClusterDataManager(session).update_cluster_by_fields(db_cluster, {"status": cluster_status})
+                # Merge cluster back into session to ensure it's properly attached
+                merged_cluster = session.merge(db_cluster)
+                await ClusterDataManager(session).update_cluster_by_fields(merged_cluster, {"status": cluster_status})
 
             await cls.update_node_info_in_statestore(json.dumps(result))
             return cluster_status, nodes_info_present, result, node_status_change
@@ -1229,6 +1267,224 @@ class ClusterOpsService:
         return response
 
     @classmethod
+    async def _send_cluster_state_notification(
+        cls, cluster_id: UUID, cluster_name: str, old_status: str, new_status: str, message: str
+    ):
+        """Send notification when cluster state changes.
+
+        Args:
+            cluster_id: ID of the cluster
+            cluster_name: Name of the cluster
+            old_status: Previous cluster status
+            new_status: New cluster status
+            message: Notification message
+        """
+        from budmicroframe.commons.schemas import (
+            NotificationCategory,
+            NotificationContent,
+            NotificationPayload,
+            NotificationRequest,
+            NotificationType,
+            WorkflowStatus,
+        )
+        from budmicroframe.shared.dapr_service import DaprService
+
+        try:
+            event_name = "cluster-state-change"
+            content = NotificationContent(
+                title=f"Cluster {cluster_name} state changed",
+                message=message,
+                status=WorkflowStatus.COMPLETED,
+                result={
+                    "cluster_id": str(cluster_id),
+                    "cluster_name": cluster_name,
+                    "old_status": old_status,
+                    "new_status": new_status,
+                },
+            )
+            notification_request = NotificationRequest(
+                notification_type=NotificationType.EVENT,
+                name=event_name,
+                payload=NotificationPayload(
+                    category=NotificationCategory.INTERNAL,
+                    type=event_name,
+                    event="cluster_state_change",
+                    content=content,
+                    workflow_id="",  # No workflow for state change notifications
+                ),
+                topic_keys=["budAppMessages"],
+            )
+            with DaprService() as dapr_service:
+                dapr_service.publish_to_topic(
+                    data=notification_request.model_dump(mode="json"),
+                    target_topic_name="budAppMessages",
+                    target_name=None,
+                    event_type=notification_request.payload.type,
+                )
+            logger.info(f"Sent notification for cluster {cluster_id} state change: {old_status} -> {new_status}")
+        except Exception as e:
+            logger.error(f"Failed to send cluster state notification for {cluster_id}: {e}")
+
+    @classmethod
+    async def _check_and_move_to_error(cls, threshold_hours: int = 24):
+        """Check NOT_AVAILABLE clusters and move to ERROR if threshold exceeded.
+
+        Args:
+            threshold_hours: Hours in NOT_AVAILABLE before moving to ERROR
+        """
+        from datetime import timedelta
+
+        cutoff_time = datetime.utcnow() - timedelta(hours=threshold_hours)
+
+        try:
+            with DBSession() as session:
+                # Get clusters that have been NOT_AVAILABLE for > threshold
+                clusters = await ClusterDataManager(session).get_all_clusters_by_status(
+                    [ClusterStatusEnum.NOT_AVAILABLE]
+                )
+
+                moved_count = 0
+                for cluster in clusters:
+                    # Check if not_available_since is set and older than cutoff
+                    if cluster.not_available_since and cluster.not_available_since < cutoff_time:
+                        await ClusterDataManager(session).update_cluster_by_fields(
+                            cluster,
+                            {
+                                "status": ClusterStatusEnum.ERROR,
+                                "last_retry_time": datetime.utcnow(),
+                            },
+                        )
+                        moved_count += 1
+                        logger.warning(
+                            f"Cluster {cluster.id} moved to ERROR state after {threshold_hours}h in NOT_AVAILABLE"
+                        )
+
+                        # Send notification about the state change
+                        await cls._send_cluster_state_notification(
+                            cluster_id=cluster.id,
+                            cluster_name=cluster.host,
+                            old_status=ClusterStatusEnum.NOT_AVAILABLE.value,
+                            new_status=ClusterStatusEnum.ERROR.value,
+                            message=f"Cluster {cluster.host} moved to ERROR state after {threshold_hours} hours in NOT_AVAILABLE",
+                        )
+
+                if moved_count > 0:
+                    logger.info(f"Moved {moved_count} clusters from NOT_AVAILABLE to ERROR")
+
+        except Exception as e:
+            logger.error(f"Failed to check and move clusters to ERROR: {e}")
+
+    @classmethod
+    async def _get_error_clusters_due_for_retry(cls, retry_hours: int = 24) -> list:
+        """Get ERROR clusters that haven't been retried recently.
+
+        Args:
+            retry_hours: Hours between retries for ERROR clusters
+
+        Returns:
+            List of ERROR clusters due for retry
+        """
+        from datetime import timedelta
+
+        cutoff_time = datetime.utcnow() - timedelta(hours=retry_hours)
+
+        try:
+            with DBSession() as session:
+                # Get ERROR clusters due for retry using optimized DB query
+                clusters_to_retry = await ClusterDataManager(session).get_error_clusters_due_for_retry(
+                    ClusterStatusEnum.ERROR, cutoff_time
+                )
+
+                if clusters_to_retry:
+                    logger.info(f"Found {len(clusters_to_retry)} ERROR clusters due for retry")
+
+                return clusters_to_retry
+
+        except Exception as e:
+            logger.error(f"Failed to get ERROR clusters for retry: {e}")
+            return []
+
+    @classmethod
+    async def _handle_cluster_failure(cls, cluster_id: UUID):
+        """Handle cluster connection failure and update state.
+
+        Args:
+            cluster_id: ID of the cluster that failed
+        """
+        try:
+            with DBSession() as session:
+                cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+
+                if not cluster:
+                    logger.error(f"Cluster {cluster_id} not found for failure handling")
+                    return
+
+                # If currently AVAILABLE, move to NOT_AVAILABLE and record timestamp
+                if cluster.status == ClusterStatusEnum.AVAILABLE:
+                    await ClusterDataManager(session).update_cluster_by_fields(
+                        cluster,
+                        {
+                            "status": ClusterStatusEnum.NOT_AVAILABLE,
+                            "not_available_since": datetime.utcnow(),
+                        },
+                    )
+                    logger.info(f"Cluster {cluster_id} moved to NOT_AVAILABLE")
+
+                # If ERROR, just update retry time
+                elif cluster.status == ClusterStatusEnum.ERROR:
+                    await ClusterDataManager(session).update_cluster_by_fields(
+                        cluster,
+                        {
+                            "last_retry_time": datetime.utcnow(),
+                        },
+                    )
+                    logger.debug(f"Updated retry time for ERROR cluster {cluster_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to handle cluster failure for {cluster_id}: {e}")
+
+    @classmethod
+    async def _handle_cluster_success(cls, cluster_id: UUID):
+        """Handle successful cluster connection and update state.
+
+        Args:
+            cluster_id: ID of the cluster that succeeded
+        """
+        try:
+            with DBSession() as session:
+                cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+
+                if not cluster:
+                    logger.error(f"Cluster {cluster_id} not found for success handling")
+                    return
+
+                # Reset to AVAILABLE and clear timestamps
+                previous_status = cluster.status
+                await ClusterDataManager(session).update_cluster_by_fields(
+                    cluster,
+                    {
+                        "status": ClusterStatusEnum.AVAILABLE,
+                        "not_available_since": None,
+                        "last_retry_time": None,
+                    },
+                )
+
+                if previous_status in [ClusterStatusEnum.NOT_AVAILABLE, ClusterStatusEnum.ERROR]:
+                    logger.info(f"Cluster {cluster_id} recovered from {previous_status} to AVAILABLE")
+
+                    # Send notification about the recovery
+                    await cls._send_cluster_state_notification(
+                        cluster_id=cluster.id,
+                        cluster_name=cluster.host,
+                        old_status=previous_status.value,
+                        new_status=ClusterStatusEnum.AVAILABLE.value,
+                        message=f"Cluster {cluster.host} recovered from {previous_status.value} to AVAILABLE",
+                    )
+
+        except Exception as e:
+            logger.error(f"Failed to handle cluster success for {cluster_id}: {e}")
+
+    @classmethod
     async def trigger_periodic_node_status_update(cls) -> Union[SuccessResponse, ErrorResponse]:
         """Trigger node status update for all active clusters.
 
@@ -1245,9 +1501,11 @@ class ClusterOpsService:
         from budmicroframe.shared.dapr_service import DaprService
 
         # Configuration
-        BATCH_SIZE = 5  # Process max 5 clusters concurrently
-        STALE_THRESHOLD_MINUTES = 10  # Consider sync stale after 10 minutes
+        BATCH_SIZE = 2  # Process max 2 clusters concurrently (reduced from 5 to prevent OOM)
+        STALE_THRESHOLD_MINUTES = 20  # Consider sync stale after 20 minutes
         STATE_STORE_KEY = "cluster_node_sync_state"
+        ERROR_RETRY_HOURS = 24  # Retry ERROR clusters every 24 hours
+        NOT_AVAILABLE_THRESHOLD_HOURS = 24  # Move to ERROR after 24h in NOT_AVAILABLE
 
         try:
             # Initialize state management (optional - gracefully handle if not available)
@@ -1281,17 +1539,29 @@ class ClusterOpsService:
                     logger.warning(f"Removing stale sync for cluster {cluster_id}")
                     del sync_state["active_syncs"][cluster_id]
 
+            # Check if any NOT_AVAILABLE clusters should move to ERROR
+            await cls._check_and_move_to_error(threshold_hours=NOT_AVAILABLE_THRESHOLD_HOURS)
+
             # Get all active clusters from database
             with DBSession() as session:
                 active_clusters = await ClusterDataManager(session).get_all_clusters_by_status(
                     [ClusterStatusEnum.AVAILABLE, ClusterStatusEnum.NOT_AVAILABLE]
                 )
 
-            logger.info(f"Found {len(active_clusters)} active clusters for node status update")
+            # Get ERROR clusters that are due for retry
+            error_clusters = await cls._get_error_clusters_due_for_retry(retry_hours=ERROR_RETRY_HOURS)
+
+            # Combine active and error clusters
+            all_clusters = active_clusters + error_clusters
+
+            logger.info(
+                f"Found {len(active_clusters)} active clusters + {len(error_clusters)} ERROR clusters "
+                f"for node status update (total: {len(all_clusters)})"
+            )
 
             # Filter out clusters that are already being synced
             clusters_to_sync = []
-            for cluster in active_clusters:
+            for cluster in all_clusters:
                 cluster_id_str = str(cluster.id)
 
                 # Skip if already being synced
@@ -1394,34 +1664,150 @@ class ClusterOpsService:
 
     @classmethod
     async def _sync_single_cluster(cls, cluster, sync_state: dict) -> bool:
-        """Sync a single cluster's node status.
+        """Sync a single cluster's node status by directly calling update_node_status.
+
+        This method performs synchronous updates instead of spawning workflows,
+        ensuring true batch processing with controlled concurrency.
 
         Args:
-            cluster: The cluster to sync (only needs id)
+            cluster: The cluster to sync
             sync_state: The current sync state dictionary
 
         Returns:
             bool: True if successful, raises exception on failure
         """
-        from .workflows import UpdateClusterStatusWorkflow
+        from budmicroframe.commons.schemas import (
+            NotificationCategory,
+            NotificationContent,
+            NotificationPayload,
+            NotificationRequest,
+            NotificationType,
+            WorkflowStatus,
+        )
+        from budmicroframe.shared.dapr_service import DaprService, DaprServiceCrypto
 
         cluster_id_str = str(cluster.id)
-        logger.debug(f"Triggering node status update for cluster {cluster_id_str}")
+        logger.debug(f"Updating node status for cluster {cluster_id_str}")
 
         try:
-            # Just pass the cluster_id, let the workflow handle everything
-            # This matches how deployment workflows work
-            result = await UpdateClusterStatusWorkflow().__call__(cluster_id_str)
+            # Decrypt config if needed
+            config_dict = {}
+            if cluster.configuration:
+                try:
+                    with DaprServiceCrypto() as dapr_service:
+                        configuration_decrypted = dapr_service.decrypt_data(cluster.configuration)
+                        config_dict = json.loads(configuration_decrypted)
+                except Exception as e:
+                    logger.error(f"Failed to decrypt config for cluster {cluster_id_str}: {e}")
+                    raise
 
-            # Store workflow ID in state if available
-            if hasattr(result, "workflow_id"):
-                sync_state["active_syncs"][cluster_id_str]["workflow_id"] = result.workflow_id
+            # Call update_node_status directly (synchronous within this batch)
+            cluster_status, nodes_info_present, node_info, node_status_change = await cls.update_node_status(
+                cluster.id, config_dict
+            )
 
-            logger.debug(f"Successfully triggered update for cluster {cluster_id_str}")
+            # Send notification if status changed
+            if cluster_status != cluster.status or not nodes_info_present or node_status_change:
+                logger.info(f"Cluster {cluster_id_str} status changed, sending notification")
+
+                event_name = "cluster-status-update"
+                content = NotificationContent(
+                    title="Cluster status updated",
+                    message=f"Cluster {cluster_id_str} status updated",
+                    status=WorkflowStatus.COMPLETED,
+                    result={"cluster_id": cluster_id_str, "status": cluster_status, "node_info": node_info},
+                )
+                notification_request = NotificationRequest(
+                    notification_type=NotificationType.EVENT,
+                    name=event_name,
+                    payload=NotificationPayload(
+                        category=NotificationCategory.INTERNAL,
+                        type=event_name,
+                        event="results",
+                        content=content,
+                        workflow_id="",  # No workflow for periodic updates
+                    ),
+                    topic_keys=["budAppMessages"],
+                )
+                with DaprService() as dapr_service:
+                    dapr_service.publish_to_topic(
+                        data=notification_request.model_dump(mode="json"),
+                        target_topic_name="budAppMessages",
+                        target_name=None,
+                        event_type=notification_request.payload.type,
+                    )
+
+            # Handle successful cluster connection
+            await cls._handle_cluster_success(cluster.id)
+
+            logger.debug(f"Successfully updated cluster {cluster_id_str}")
             return True
         except Exception as e:
-            logger.error(f"Failed to trigger update for cluster {cluster_id_str}: {e}")
+            logger.error(f"Failed to update cluster {cluster_id_str}: {e}")
+
+            # Handle cluster failure
+            await cls._handle_cluster_failure(cluster.id)
+
             raise
+
+
+def _should_skip_duplicate_device(device: Dict[str, Any], seen_device_uuids: set, node_name: str) -> bool:
+    """Check if device should be skipped due to duplicate UUID.
+
+    This helper function centralizes device deduplication logic to prevent
+    duplicate devices when multiple hardware_info entries reference the same
+    physical device (common with HAMI GPU time-slicing).
+
+    Args:
+        device: Device dictionary to check
+        seen_device_uuids: Set of UUIDs already seen (modified in-place if new UUID found)
+        node_name: Name of the node (for logging)
+
+    Returns:
+        True if device should be skipped (duplicate), False otherwise
+    """
+    device_uuid = device.get("device_uuid")
+    if device_uuid:
+        if device_uuid in seen_device_uuids:
+            logger.warning(f"Skipping duplicate device with UUID {device_uuid} on node {node_name}")
+            return True
+        seen_device_uuids.add(device_uuid)
+    return False
+
+
+def _add_hami_fields_to_device(source: Dict[str, Any], target: Dict[str, Any]) -> None:
+    """Add HAMI-specific fields from source dict to target dict if present.
+
+    This helper function centralizes the logic for adding GPU time-slicing
+    metrics from HAMI to device dictionaries. It copies the following fields
+    if they exist in the source:
+    - core_utilization_percent: GPU compute allocated (%)
+    - memory_utilization_percent: GPU memory allocated (%)
+    - memory_allocated_gb: Allocated GPU memory in GB
+    - cores_allocated_percent: Allocated GPU cores (%)
+    - shared_containers_count: Number of containers sharing the GPU
+    - hardware_mode: GPU hardware mode (dedicated/shared)
+    - device_uuid: Unique GPU device identifier
+    - last_metrics_update: Timestamp of last metrics update
+
+    Args:
+        source: Source dictionary containing HAMI fields
+        target: Target dictionary to add HAMI fields to (modified in-place)
+    """
+    hami_fields = [
+        "core_utilization_percent",
+        "memory_utilization_percent",
+        "memory_allocated_gb",
+        "cores_allocated_percent",
+        "shared_containers_count",
+        "hardware_mode",
+        "device_uuid",
+        "last_metrics_update",
+    ]
+
+    for field in hami_fields:
+        if field in source:
+            target[field] = source[field]
 
 
 class ClusterService(SessionMixin):

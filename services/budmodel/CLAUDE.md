@@ -104,7 +104,55 @@ alembic downgrade -1
 ### Workflow System
 - Dapr workflows for async processing
 - Model extraction workflows with progress tracking
-- Cron-based leaderboard updates
+- Dapr cron bindings for scheduled leaderboard updates
+
+### Scheduled Tasks (Dapr Cron Bindings)
+
+The service uses Dapr cron bindings for periodic tasks, following the same pattern as budcluster, budapp, and budprompt:
+
+#### Leaderboard Extraction
+- **Schedule**: Every 7 days (`@every 168h`)
+- **Configuration**: `.dapr/components/binding.yaml`
+- **Endpoint**: `POST /leaderboard/extraction-cron` (triggered by Dapr)
+- **Health Check**: `GET /leaderboard/extraction-cron/health`
+- **Manual Trigger**: `POST /leaderboard/extraction-cron/trigger`
+
+**How it works:**
+1. Dapr cron binding triggers at configured schedule
+2. Dapr sends HTTP POST to `/leaderboard/extraction-cron`
+3. Endpoint triggers `LeaderboardExtractionWorkflow` and returns immediately (non-blocking)
+4. Workflow runs asynchronously in background via Dapr workflows
+5. Workflow activity executes `LeaderboardService().upsert_leaderboard_from_all_sources()`
+6. Extraction updates benchmark data from all configured sources
+7. Individual sources are only re-extracted if they haven't been updated in 7+ days
+
+**Architecture pattern:**
+- **Dapr cron binding**: Manages scheduling (no multi-instance bug on restart)
+- **Dapr workflow**: Manages async execution (non-blocking, long-running)
+- **FastAPI endpoint**: Bridges cron trigger to workflow (returns immediately)
+- **Workflow activity**: Performs actual extraction work
+
+**Benefits:**
+- ✅ No multi-instance issues on service restart (stateless scheduling)
+- ✅ Non-blocking: FastAPI server remains responsive during extraction
+- ✅ Async execution: Long-running extraction doesn't block requests
+- ✅ Retry logic: Automatic retries on failure via workflow retry policy
+- ✅ Trackable: Can monitor workflow progress via Dapr APIs
+- ✅ Easier to monitor via health endpoints
+- ✅ Can manually trigger on-demand for testing or recovery
+- ✅ Consistent with platform-wide patterns (budprompt, budapp)
+
+**Manual operations:**
+```bash
+# Check health status
+curl http://localhost:9083/leaderboard/extraction-cron/health
+
+# Manually trigger extraction
+curl -X POST http://localhost:9083/leaderboard/extraction-cron/trigger
+
+# View extraction logs
+docker logs bud-serve-eval-app-1 | grep "leaderboard extraction"
+```
 
 ## Development Guidelines
 

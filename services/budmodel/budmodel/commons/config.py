@@ -116,7 +116,7 @@ class AppConfig(BaseAppConfig):
 
     # clamav config
     clamd_port: int = Field(3310, alias="CLAMD_PORT")
-    clamd_host: str = Field("0.0.0.0", alias="CLAMD_HOST")
+    clamd_host: str = Field("0.0.0.0", alias="CLAMD_HOST")  # nosec B104
 
     # seeder config
     enable_seeder: bool = Field(True, alias="ENABLE_SEEDER")
