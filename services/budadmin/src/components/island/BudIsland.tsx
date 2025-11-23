@@ -103,7 +103,7 @@ const BudIsland: React.FC = () => {
 
   useEffect(() => {
     if (socket) {
-      const handleNotification = async (data) => {
+      const handleNotification = async (data: any) => {
         // Temporarily refetch the notifications
         loadNotifications();
         setLastNotification(data.message);
@@ -115,7 +115,10 @@ const BudIsland: React.FC = () => {
         socket.off("notification_received");
       };
     }
-  }, [socket, loadNotifications]);
+    // Note: loadNotifications is intentionally excluded from deps to avoid removing
+    // other components' listeners. Socket event handlers remain stable across renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
 
   useEffect(() => {
     if (!user) return;
