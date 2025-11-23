@@ -177,12 +177,8 @@ class SimplePromptExecutor_V4:
                 if output_validation and output_schema and contains_pydantic_model(output_type):
                     logger.debug("Performing streaming with structured output")
 
-                    # Extract model from NativeOutput wrapper
-                    model_with_validators = output_type.outputs if hasattr(output_type, "outputs") else output_type
-
-                    # Use new clean streaming validation executor
                     executor = StreamingValidationExecutor(
-                        output_model=model_with_validators,
+                        output_type=output_type,
                         prompt=user_prompt or "",
                         deployment_name=deployment_name,
                         model_settings=model_settings.model_dump(exclude_none=True) if model_settings else None,

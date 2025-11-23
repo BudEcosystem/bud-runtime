@@ -17,10 +17,10 @@
 """Clean streaming validation executor with OpenAI formatting and simple retry logic."""
 
 import json
-from typing import Any, AsyncGenerator, Dict, List, Optional, Type
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from budmicroframe.commons import logging
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage, ModelResponse, ThinkingPart, ToolCallPart
 from pydantic_ai.output import NativeOutput
@@ -49,7 +49,7 @@ class StreamingValidationExecutor:
 
     def __init__(
         self,
-        output_model: Type[BaseModel],
+        output_type: Any,
         prompt: str,
         deployment_name: str,
         model_settings: Optional[Dict[str, Any]],
@@ -62,7 +62,7 @@ class StreamingValidationExecutor:
         """Initialize the streaming validation executor.
 
         Args:
-            output_model: Pydantic model with field validators attached
+            output_type: Output type (NativeOutput wrapper or raw Pydantic model with field validators)
             prompt: Original user prompt
             deployment_name: Model deployment name
             model_settings: Model configuration dict
@@ -72,8 +72,16 @@ class StreamingValidationExecutor:
             message_history: ModelMessage list for agent conversation history
             api_key: Optional API key for authorization
         """
-        # Store configuration
-        self.output_model = output_model
+        # Store the full output_type for agent creation
+        self.output_type = output_type
+
+        # Extract Pydantic model from NativeOutput wrapper if needed
+        if isinstance(output_type, NativeOutput):
+            # It's wrapped in NativeOutput
+            self.output_model = output_type.outputs
+        else:
+            # It's raw Pydantic model (or ToolOutput, etc.)
+            self.output_model = output_type
         self.original_prompt = prompt
         self.deployment_name = deployment_name
         self.validation_prompt = validation_prompt
@@ -96,7 +104,7 @@ class StreamingValidationExecutor:
         )
 
         # Extract field validators
-        self.field_validators = extract_field_validators(output_model)
+        self.field_validators = extract_field_validators(self.output_model)
 
         # Track attempts and errors
         self.validation_errors: List[str] = []
@@ -217,7 +225,7 @@ class StreamingValidationExecutor:
         # Create agent for this attempt
         agent = Agent(
             model=self.model,
-            output_type=NativeOutput(self.output_model),
+            output_type=self.output_type,  # Use the stored output_type (could be NativeOutput or raw)
             system_prompt="You are a helpful assistant that generates valid structured data.",
             retries=0,  # We handle retries ourselves
         )
