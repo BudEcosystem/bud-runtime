@@ -103,11 +103,17 @@ const BudIsland: React.FC = () => {
 
   useEffect(() => {
     if (socket) {
-      socket.on("notification_received", async (data) => {
+      const handleNotification = async (data) => {
         // Temporarily refetch the notifications
         loadNotifications();
         setLastNotification(data.message);
-      });
+      };
+
+      socket.on("notification_received", handleNotification);
+
+      return () => {
+        socket.off("notification_received");
+      };
     }
   }, [socket, loadNotifications]);
 
