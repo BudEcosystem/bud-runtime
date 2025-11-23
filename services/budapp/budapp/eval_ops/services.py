@@ -2036,9 +2036,9 @@ class ExperimentService:
                 dataset.sample_questions_answers = req.sample_questions_answers
             if req.advantages_disadvantages is not None:
                 dataset.advantages_disadvantages = req.advantages_disadvantages
-            if req.metrics is not None:
+            if "metrics" in req.model_fields_set:
                 dataset.metrics = req.metrics
-            if req.evaluator is not None:
+            if "evaluator" in req.model_fields_set:
                 dataset.evaluator = req.evaluator
 
             # Update trait associations if provided
