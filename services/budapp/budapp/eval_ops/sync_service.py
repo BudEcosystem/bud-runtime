@@ -121,6 +121,9 @@ class EvalDataSyncService:
             "why_run_this_eval": None,
             "what_to_expect": None,
             "additional_info": {},
+            # Evaluation configuration fields
+            "metrics": dataset.metrics,
+            "evaluator": dataset.evaluator,
         }
 
         # Extract creator info and links from original_data if available
