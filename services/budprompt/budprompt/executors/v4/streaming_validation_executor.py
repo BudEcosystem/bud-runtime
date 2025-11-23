@@ -235,7 +235,7 @@ class StreamingValidationExecutor:
 
         # Stream with validation
         async with agent.run_stream(user_prompt=current_prompt, message_history=self.message_history) as result:
-            async for message, is_last in result.stream_structured(debounce_by=0.01):
+            async for message, is_last in result.stream_responses(debounce_by=0.01):
                 if not isinstance(message, ModelResponse):
                     continue
 
@@ -294,7 +294,7 @@ class StreamingValidationExecutor:
 
                 else:
                     # Final chunk - validate completely
-                    validated_result = await result.validate_structured_output(message, allow_partial=False)
+                    validated_result = await result.validate_response_output(message, allow_partial=False)
 
                     # Validation passed - merge previously validated fields to preserve them
                     # This ensures LLM doesn't change already-validated fields during retry
