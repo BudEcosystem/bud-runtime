@@ -627,6 +627,8 @@ class ExpDataset(BaseModel):
         None,
         description="Additional metadata including top_5_task_types, top_5_domains, top_5_skills, top_5_concepts, top_5_qualifications, top_5_languages, age_distribution, and evaluation_description.",
     )
+    metrics: Optional[List[str]] = Field(None, description="List of metric names (e.g., ['accuracy']).")
+    evaluator: Optional[str] = Field(None, description="Evaluator class name (e.g., 'GPQAEvaluator').")
     traits: List[Trait] = Field([], description="Traits associated with this dataset.")
 
     class Config:
@@ -689,6 +691,8 @@ class CreateDatasetRequest(BaseModel):
         None,
         description="Advantages and disadvantages with structure {'advantages': ['str1'], 'disadvantages': ['str2']}.",
     )
+    metrics: Optional[List[str]] = Field(None, description="List of metric names (e.g., ['accuracy']).")
+    evaluator: Optional[str] = Field(None, description="Evaluator class name (e.g., 'GPQAEvaluator').")
     trait_ids: Optional[List[UUID4]] = Field([], description="List of trait IDs to associate with the dataset.")
 
 
@@ -715,6 +719,8 @@ class UpdateDatasetRequest(BaseModel):
         None,
         description="Advantages and disadvantages with structure {'advantages': ['str1'], 'disadvantages': ['str2']}.",
     )
+    metrics: Optional[List[str]] = Field(None, description="List of metric names (e.g., ['accuracy']).")
+    evaluator: Optional[str] = Field(None, description="Evaluator class name (e.g., 'GPQAEvaluator').")
     trait_ids: Optional[List[UUID4]] = Field(None, description="List of trait IDs to associate with the dataset.")
 
 

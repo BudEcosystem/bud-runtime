@@ -1781,6 +1781,8 @@ class ExperimentService:
                 why_run_this_eval=dataset.why_run_this_eval,
                 what_to_expect=dataset.what_to_expect,
                 additional_info=dataset.additional_info,
+                metrics=dataset.metrics,
+                evaluator=dataset.evaluator,
                 traits=traits,
             )
 
@@ -1901,6 +1903,8 @@ class ExperimentService:
                     why_run_this_eval=dataset.why_run_this_eval,
                     what_to_expect=dataset.what_to_expect,
                     additional_info=dataset.additional_info,
+                    metrics=dataset.metrics,
+                    evaluator=dataset.evaluator,
                     traits=traits,
                 )
                 dataset_schemas.append(dataset_schema)
@@ -1943,6 +1947,8 @@ class ExperimentService:
                 modalities=req.modalities,
                 sample_questions_answers=req.sample_questions_answers,
                 advantages_disadvantages=req.advantages_disadvantages,
+                metrics=req.metrics,
+                evaluator=req.evaluator,
             )
             self.session.add(dataset)
             self.session.flush()  # Get the dataset ID
@@ -2030,6 +2036,10 @@ class ExperimentService:
                 dataset.sample_questions_answers = req.sample_questions_answers
             if req.advantages_disadvantages is not None:
                 dataset.advantages_disadvantages = req.advantages_disadvantages
+            if "metrics" in req.model_fields_set:
+                dataset.metrics = req.metrics
+            if "evaluator" in req.model_fields_set:
+                dataset.evaluator = req.evaluator
 
             # Update trait associations if provided
             if req.trait_ids is not None:
