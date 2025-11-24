@@ -7,6 +7,12 @@ import ProjectTags from 'src/flows/components/ProjectTags';
 import { capitalize } from '@/lib/utils';
 import { Row, Col } from 'antd';
 
+// Type for guardrail tags
+type GuardrailTag = {
+  name: string;
+  color: string;
+};
+
 const GeneralTab = () => {
   const { selectedGuardrail } = useGuardrails();
 
@@ -57,7 +63,7 @@ const GeneralTab = () => {
         </Text_12_400_B3B3B3>
         <div className="flex items-center gap-2 flex-wrap">
           {selectedGuardrail.tags && selectedGuardrail.tags.length > 0 && (
-            selectedGuardrail.tags.map((tag: any, index: number) => (
+            selectedGuardrail.tags.map((tag: GuardrailTag, index: number) => (
               <Tags
                 textClass="text-[.75rem]"
                 key={index}
