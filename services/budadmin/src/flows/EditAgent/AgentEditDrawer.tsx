@@ -14,6 +14,9 @@ import { tempApiBaseUrl } from "@/components/environment";
 import { usePromptsAgents } from "@/stores/usePromptsAgents";
 import { usePrompts } from "src/hooks/usePrompts";
 
+// Type for agent tags - can be either a string or an object
+type AgentTag = string | { name: string; color?: string };
+
 export default function AgentEditDrawer() {
   const { drawerProps, closeDrawer } = useDrawer();
   const [form] = Form.useForm();
@@ -21,58 +24,42 @@ export default function AgentEditDrawer() {
   const { fetchPrompts } = usePromptsAgents();
   const { getPromptVersions, versions, versionsLoading } = usePrompts();
 
-  // State for form values
-  const [name, setName] = useState("");
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [description, setDescription] = useState("");
+  // State for tag dropdown options only (not form data)
   const [tagOptions, setTagOptions] = useState<Tag[]>([]);
-  const [defaultVersion, setDefaultVersion] = useState<number | undefined>(undefined);
 
   // Initialize form with agent data
   useEffect(() => {
+    form.resetFields();
     if (drawerProps?.agent) {
       const agent = drawerProps.agent;
-      setName(agent.name || "");
-      setDescription(agent.description || "");
 
       // Format tags if they exist
-      if (agent.tags && Array.isArray(agent.tags)) {
-        const formattedTags = agent.tags.map((tag: any) => {
-          if (typeof tag === 'string') {
-            return { name: tag, color: "#CaCF40" };
-          }
-          return { name: tag.name, color: tag.color || "#CaCF40" };
-        });
-        setTags(formattedTags);
-        form.setFieldsValue({ tags: formattedTags });
-      }
+      const formattedTags = (agent.tags && Array.isArray(agent.tags))
+        ? agent.tags.map((tag: AgentTag) => {
+            if (typeof tag === 'string') {
+              return { name: tag, color: "#CaCF40" };
+            }
+            return { name: tag.name, color: tag.color || "#CaCF40" };
+          })
+        : [];
 
       form.setFieldsValue({
         name: agent.name || "",
-        description: agent.description || ""
+        description: agent.description || "",
+        tags: formattedTags,
+        default_version: agent.default_version,
       });
-
-      // Set default version directly from agent data
-      if (agent.default_version) {
-        setDefaultVersion(agent.default_version);
-        form.setFieldsValue({ default_version: agent.default_version });
-      }
 
       // Fetch versions
       if (agent.id) {
         getPromptVersions(agent.id);
       }
     }
-  }, [drawerProps]);
+  }, [drawerProps, form, getPromptVersions]);
 
   const handleNext = async () => {
     try {
-      await form.validateFields();
-
-      if (!name) {
-        errorToast("Please enter an agent name");
-        return;
-      }
+      const values = await form.validateFields();
 
       setIsSubmitting(true);
 
@@ -80,21 +67,21 @@ export default function AgentEditDrawer() {
         // Find the version ID corresponding to the entered version number
         let targetVersionId = drawerProps?.agent?.default_version_id;
 
-        if (defaultVersion) {
-          const targetVersion = versions.find(v => v.version === Number(defaultVersion));
+        if (values.default_version) {
+          const targetVersion = versions.find(v => v.version === Number(values.default_version));
           if (targetVersion) {
             targetVersionId = targetVersion.id;
           } else {
-            errorToast(`Version ${defaultVersion} not found`);
+            errorToast(`Version ${values.default_version} not found`);
             setIsSubmitting(false);
             return;
           }
         }
 
         const payload = {
-          name: name,
-          description: description || "",
-          tags: tags.map(tag => ({
+          name: values.name,
+          description: values.description || "",
+          tags: (values.tags || []).map((tag: Tag) => ({
             name: tag.name,
             color: tag.color || "#CaCF40"
           })),
@@ -155,8 +142,6 @@ export default function AgentEditDrawer() {
                 name="name"
                 placeholder="Enter agent name"
                 rules={[{ required: true, message: "Please enter agent name" }]}
-                value={name}
-                onChange={(value: string) => setName(value)}
                 ClassNames="mt-[.3rem]"
                 formItemClassnames="mb-[1rem]"
                 infoText="Enter a unique name for your agent"
@@ -170,8 +155,6 @@ export default function AgentEditDrawer() {
                 label="Default Version"
                 name="default_version"
                 placeholder="Enter default version number"
-                value={defaultVersion}
-                onChange={(value) => setDefaultVersion(Number(value))}
                 allowOnlyNumbers={true}
                 infoText="Enter the version number to be used by default"
                 formItemClassnames="mb-[1rem]"
@@ -185,8 +168,6 @@ export default function AgentEditDrawer() {
               <TagsInput
                 label="Tags"
                 options={tagOptions}
-                defaultValue={tags}
-                onChange={setTags}
                 info="Add keywords to help organize and find your agent later"
                 name="tags"
                 required={false}
@@ -203,8 +184,6 @@ export default function AgentEditDrawer() {
                 required={false}
                 info="Provide a detailed description of your agent"
                 placeholder="Enter description"
-                value={description}
-                onChange={(value: string) => setDescription(value)}
                 rules={[]}
                 formItemClassnames="mb-[1rem]"
               />

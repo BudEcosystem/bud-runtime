@@ -122,8 +122,8 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
         : filters;
 
       const params: any = {
-        page: 1,
-        limit: 100, // Fetch more records since pagination is disabled
+        page: pagination.page,
+        limit: pagination.limit,
       };
 
       // Add optional filters

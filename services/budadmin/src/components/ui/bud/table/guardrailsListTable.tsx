@@ -38,7 +38,9 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
     isLoading,
     fetchGuardrails,
     setFilters,
-    deleteGuardrail
+    deleteGuardrail,
+    pagination,
+    setPagination
   } = useGuardrails();
 
   useLoaderOnLoding(isLoading);
@@ -241,7 +243,21 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
   ];
 
   // Handle table change (pagination, sorting)
-  const handleTableChange = (_newPagination: any, _filters: any, sorter: any) => {
+  const handleTableChange = (newPagination: any, _filters: any, sorter: any) => {
+    // Handle pagination
+    if (newPagination.current !== pagination.page || newPagination.pageSize !== pagination.limit) {
+      setPagination({
+        page: newPagination.current,
+        limit: newPagination.pageSize
+      });
+      // We need to fetch again with new pagination
+      // Since setPagination updates store state, we can just call fetchGuardrails
+      // However, state update might be async, so ideally we pass overrides or wait for effect
+      // But fetchGuardrails reads from get(), so it should be fine if we call it after setPagination
+      // Actually, setPagination is synchronous in Zustand if not async
+      setTimeout(() => fetchGuardrails(projectId as string), 0);
+    }
+
     // Handle sorting
     if (sorter.field) {
       const sortOrder = sorter.order === 'ascend' ? 'asc' : 'desc';
@@ -263,7 +279,13 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
         dataSource={guardrails}
         rowKey="id"
         loading={false}
-        pagination={false}
+        pagination={{
+          current: pagination.page,
+          pageSize: pagination.limit,
+          total: pagination.total_count,
+          showSizeChanger: true,
+          pageSizeOptions: ['10', '20', '50', '100'],
+        }}
         virtual
         bordered={false}
         footer={null}
