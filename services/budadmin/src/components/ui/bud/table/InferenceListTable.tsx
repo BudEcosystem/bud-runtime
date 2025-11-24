@@ -170,7 +170,8 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
         offset: (newPagination.current - 1) * newPagination.pageSize,
         limit: newPagination.pageSize
       });
-      setTimeout(() => fetchInferences(projectId as string), 0);
+      // Zustand state updates are synchronous, so we can fetch immediately
+      fetchInferences(projectId as string);
     }
 
     // Handle sorting
