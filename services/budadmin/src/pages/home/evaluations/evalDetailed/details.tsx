@@ -104,6 +104,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
       accuracy: item.accuracy,
       model_name: item.model_name ?? null
     }));
+    console.log(displayValues)
     setChartData({...chartData, data:displayValues?.map(el => el.accuracy) ?? [], categories:displayValues?.map(el => el.model_name) ?? []})
   }, [leaderBoards])
   const data: any = {};

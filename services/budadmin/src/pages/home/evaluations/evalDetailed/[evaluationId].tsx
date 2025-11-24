@@ -133,42 +133,42 @@ const EvalDetailed = () => {
 
   // Fetch datasets when id is available
   useEffect(() => {
-    const fetchDatasets = async () => {
-      if (id) {
-        try {
-          const response = await AppRequest.Get(`/experiments/datasets/${id}`);
-          console.log("Datasets API Response:", response.data);
-          setDatasets(response.data.dataset);
-          // If we have datasets, fetch the first dataset's details as an example
-          if (response.data && response.data.datasets && response.data.datasets.length > 0) {
-            const firstDatasetId = response.data.datasets[0].dataset_id;
-            await fetchDatasetById(firstDatasetId);
-          }
-        } catch (error) {
-          console.error("Error fetching datasets:", error);
+    const fetchAll = async () => {
+      if (!id) return;
+
+      try {
+        const datasetPromise = AppRequest.Get(`/experiments/datasets/${id}`);
+        const leaderboardPromise = AppRequest.Get(`/experiments/datasets/${id}/scores`);
+
+        const [datasetsRes, leaderboardRes] = await Promise.all([
+          datasetPromise,
+          leaderboardPromise
+        ]);
+
+        console.log("Datasets API Response:", datasetsRes.data);
+
+        // Set datasets list
+        setDatasets(datasetsRes.data.dataset);
+
+        // Fetch first dataset details if exists
+        if (datasetsRes?.data?.datasets?.length > 0) {
+          const firstDatasetId = datasetsRes.data.datasets[0].dataset_id;
+          await fetchDatasetById(firstDatasetId);
         }
-        finally {
-          hideLoader();
-        }
+
+        // Set leaderboard
+        setLeaderBoardData(leaderboardRes.data.scores);
+
+      } catch (error) {
+        console.error("Error fetching experiment datasets or leaderboard:", error);
+      } finally {
+        hideLoader(); // 🔥 only one call, after ALL requests finish
       }
     };
 
-    const fetchLeaderBoardData = async() => {
-      if (id) {
-        try {
-          const response = await AppRequest.Get(`/experiments/datasets/${id}/scores`);
-          setLeaderBoardData(response.data.scores);
-        } catch (error) {
-          console.error("Error fetching datasets:", error);
-        }
-        finally {
-        }
-      }
-    }
-
-    fetchDatasets();
-    fetchLeaderBoardData();
+    fetchAll();
   }, [id, hideLoader]);
+
 
   // Function to fetch a specific dataset by ID
   const fetchDatasetById = async (datasetId: string) => {
