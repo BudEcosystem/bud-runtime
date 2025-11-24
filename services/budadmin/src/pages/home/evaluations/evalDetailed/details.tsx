@@ -68,12 +68,12 @@ type LeaderboardDetailsProps = {
     what_to_expect: string[];
     why_run_this_eval: string[];
   } | null;
-  leaderBoards: []
+  leaderBoards: any[]
 };
 
 function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps) {
   
-  const [ChartData, setChartData] = useState<any>({
+  const [chartData, setChartData] = useState<any>({
     data: [80, 20, 10, 30, 23],
     categories: ["10", "20", "30", "40", "50", "60"],
     label1: "Usage",
@@ -104,7 +104,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
       accuracy: item.accuracy,
       model_name: item.model_name ?? null
     }));
-    setChartData({...ChartData, data:displayValues.map(el => el.accuracy), categories:displayValues.map(el => el.model_name)})
+    setChartData({...chartData, data:displayValues?.map(el => el.accuracy), categories:displayValues?.map(el => el.model_name)})
   }, [leaderBoards])
   const data: any = {};
 
@@ -203,7 +203,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
               </div>
             </div>
             <div className="w-[100%] h-[160px] min-[1680]:h-[200px]">
-              <EvalBarChart data={ChartData} />
+              <EvalBarChart data={chartData} />
             </div>
             <div className="hR mt-[0.7rem]"></div>
           </div>

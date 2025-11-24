@@ -65,7 +65,7 @@ const sampleResponse = [
 ];
 
 type LeaderboardDetailsProps = {
-  leaderBoards: [] | null;
+  leaderBoards: any[] | null;
 };
 function LeaderboardTable({ leaderBoards }: LeaderboardDetailsProps) {
   const router = useRouter();
@@ -86,7 +86,7 @@ function LeaderboardTable({ leaderBoards }: LeaderboardDetailsProps) {
               <div className="flex justify-start">
                 <Tags
                   name={text}
-                  color={text.color}
+                  color={'#D1B854'}
                   textClass="text-[#EEEEEE] text-[0.75rem]"
                   classNames="w-[2rem] h-[1.5rem]"
                 />
@@ -136,7 +136,7 @@ function LeaderboardTable({ leaderBoards }: LeaderboardDetailsProps) {
                   ? "descend"
                   : "ascend"
                 : undefined,
-            render: (text) => <Text_12_300_EEEEEE>{Number(text).toFixed(2)}</Text_12_300_EEEEEE>,
+            render: (text) => <Text_12_300_EEEEEE>{Number(text || 0).toFixed(2)}</Text_12_300_EEEEEE>,
             sortIcon: SortIcon,
           },
           {

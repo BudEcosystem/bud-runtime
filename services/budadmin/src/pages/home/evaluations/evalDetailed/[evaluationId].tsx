@@ -51,7 +51,7 @@ const EvalDetailed = () => {
   const [activeTab, setActiveTab] = useState("1");
   const [showAllTags, setShowAllTags] = useState(false);
   const [datasets, setDatasets] = useState<any>(null);
-  const [leaderBoardData, setLeaderBoardData] = useState<any>(null);
+  const [leaderBoardData, setLeaderBoardData] = useState<any[] | null>(null);
   const [datasetDetails, setDatasetDetails] = useState<any>(null);
   const [selectedEvaluation, setSelectedEvaluation] = useState<any>(null);
   const router = useRouter();
