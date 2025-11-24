@@ -64,6 +64,7 @@ export interface BudFormProps extends FooterProps {
   title?: string;
   drawerLoading?: boolean;
   onValuesChange?: (changedValues: any, allValues: any) => void;
+  form?: any; // Allow passing form instance
 }
 
 
@@ -74,7 +75,10 @@ export function BudForm(props: BudFormProps) {
   const { currentWorkflow: evalCurrentWorkflow, loading: evalLoading, deleteWorkflow: evalDeleteWorkflow } = useEvaluations();
 
   const { step, cancelAlert, setCancelAlert, closeDrawer, closeExpandedStep, expandedStep } = useDrawer();
-  const { form, isExpandedView } = useContext(BudFormContext);
+  const { form: contextForm, isExpandedView } = useContext(BudFormContext);
+
+  // Use passed form or context form
+  const form = props.form || contextForm;
 
   useEffect(() => {
     // Only set form values on initial mount
