@@ -162,7 +162,6 @@ const EvalDetailed = () => {
           console.error("Error fetching datasets:", error);
         }
         finally {
-          hideLoader();
         }
       }
     }
