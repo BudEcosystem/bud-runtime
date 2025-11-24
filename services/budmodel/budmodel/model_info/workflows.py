@@ -62,6 +62,27 @@ retry_policy = wf.RetryPolicy(
     retry_timeout=timedelta(seconds=100),
 )
 
+# Workflow timeout constant (24 hours)
+WORKFLOW_TIMEOUT_SECONDS = 24 * 60 * 60
+
+
+@dapr_workflow.register_activity
+def terminate_workflow_activity(ctx: wf.WorkflowActivityContext, workflow_id: str) -> None:
+    """Terminate a Dapr workflow by ID.
+
+    This activity is used to safely terminate workflows without blocking the workflow runtime.
+
+    Args:
+        ctx: Workflow activity context
+        workflow_id: ID of the workflow to terminate
+    """
+    try:
+        asyncio.run(DaprWorkflow().terminate_workflow(workflow_id=workflow_id))
+        logger.info("Successfully terminated workflow %s", workflow_id)
+    except Exception as e:
+        logger.exception("Error terminating workflow %s: %s", workflow_id, e)
+        raise
+
 
 class ModelExtractionWorkflows:
     """Workflows for model extraction."""
@@ -476,11 +497,13 @@ class ModelExtractionETAObserverWorkflows:
         current_time = ctx.current_utc_datetime.timestamp()
         if request.start_time is None:
             request.start_time = current_time
-        
+
         elapsed_time = current_time - request.start_time
-        if elapsed_time > 86400:  # 24 hours in seconds
-            logger.warning("Workflow %s exceeded 24 hours timeout. Terminating.", ctx.instance_id)
-            
+        if elapsed_time > WORKFLOW_TIMEOUT_SECONDS:
+            logger.warning(
+                "Workflow %s exceeded %d hours timeout. Terminating.", ctx.instance_id, WORKFLOW_TIMEOUT_SECONDS / 3600
+            )
+
             # Notify user about timeout
             notification_request.payload.event = "timeout"
             notification_request.payload.content = NotificationContent(
@@ -494,14 +517,10 @@ class ModelExtractionETAObserverWorkflows:
                 target_topic_name=request.source_topic,
                 target_name=request.source,
             )
-            
-            # Terminate the main workflow
-            try:
-                asyncio.run(DaprWorkflow().terminate_workflow(workflow_id=request.workflow_id))
-                logger.info("Successfully terminated workflow %s due to timeout", request.workflow_id)
-            except Exception as e:
-                logger.exception("Error terminating workflow %s: %s", request.workflow_id, e)
-            
+
+            # Terminate the main workflow via activity (non-blocking)
+            yield ctx.call_activity(terminate_workflow_activity, input=request.workflow_id)
+
             return
 
         if runtime_status == "RUNNING":
@@ -596,11 +615,13 @@ class SecurityScanETAObserverWorkflows:
         current_time = ctx.current_utc_datetime.timestamp()
         if request.start_time is None:
             request.start_time = current_time
-        
+
         elapsed_time = current_time - request.start_time
-        if elapsed_time > 86400:  # 24 hours in seconds
-            logger.warning("Workflow %s exceeded 24 hours timeout. Terminating.", ctx.instance_id)
-            
+        if elapsed_time > WORKFLOW_TIMEOUT_SECONDS:
+            logger.warning(
+                "Workflow %s exceeded %d hours timeout. Terminating.", ctx.instance_id, WORKFLOW_TIMEOUT_SECONDS / 3600
+            )
+
             # Notify user about timeout
             notification_request.payload.event = "timeout"
             notification_request.payload.content = NotificationContent(
@@ -614,14 +635,10 @@ class SecurityScanETAObserverWorkflows:
                 target_topic_name=request.source_topic,
                 target_name=request.source,
             )
-            
-            # Terminate the main workflow
-            try:
-                asyncio.run(DaprWorkflow().terminate_workflow(workflow_id=request.workflow_id))
-                logger.info("Successfully terminated workflow %s due to timeout", request.workflow_id)
-            except Exception as e:
-                logger.exception("Error terminating workflow %s: %s", request.workflow_id, e)
-            
+
+            # Terminate the main workflow via activity (non-blocking)
+            yield ctx.call_activity(terminate_workflow_activity, input=request.workflow_id)
+
             return
 
         if runtime_status == "RUNNING":

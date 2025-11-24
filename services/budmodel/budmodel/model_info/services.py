@@ -2045,10 +2045,12 @@ class ModelExtractionETAObserver:
                 store_name=app_settings.statestore_name,
                 key=state_store_key,
             )
-            
+
             if not response.data:
-                logger.warning("State store data is empty for key: %s. Attempting lazy initialization.", state_store_key)
-                
+                logger.warning(
+                    "State store data is empty for key: %s. Attempting lazy initialization.", state_store_key
+                )
+
                 if model_uri and provider_type:
                     try:
                         logger.info("Lazy initializing ETA state for workflow: %s", workflow_id)
@@ -2056,7 +2058,7 @@ class ModelExtractionETAObserver:
                             provider_type=provider_type,
                             model_uri=model_uri,
                             workflow_id=workflow_id,
-                            hf_token=hf_token
+                            hf_token=hf_token,
                         )
                         # Fetch the state again after initialization
                         response = dapr_service.get_state(
@@ -2064,7 +2066,9 @@ class ModelExtractionETAObserver:
                             key=state_store_key,
                         )
                         if not response.data:
-                            logger.error("State store data still empty after lazy initialization for key: %s", state_store_key)
+                            logger.error(
+                                "State store data still empty after lazy initialization for key: %s", state_store_key
+                            )
                             return
                     except Exception as e:
                         logger.exception("Error during lazy initialization of ETA state: %s", e)
@@ -2143,16 +2147,16 @@ class SecurityScanETAObserver:
     def calculate_model_download_eta(state_store_data: Dict[str, Any]):
         """Calculate the ETA for model download."""
         total_size = state_store_data["steps_data"]["minio_download"]["total_size"]
-        downloaded_size = state_store_data["steps_data"]["minio_download"]["downloaded_size"]
+        downloaded_size = state_store_data["steps_data"]["minio_download"]["downloaded_size"] or 0
         start_time_utc = state_store_data["steps_data"]["minio_download"]["start_time"]
         start_time = datetime.fromisoformat(start_time_utc)
         current_time = datetime.now(timezone.utc)
 
         time_diff = (current_time - start_time).total_seconds()
-        download_speed = downloaded_size / time_diff
 
-        if time_diff > 0:
+        if time_diff > 0 and downloaded_size > 0:
             try:
+                download_speed = downloaded_size / time_diff
                 eta = (total_size - downloaded_size) / download_speed
                 logger.debug("Minio download workflow ETA:%s", eta)
                 return math.ceil(eta)
@@ -2190,22 +2194,23 @@ class SecurityScanETAObserver:
             )
 
             if not response.data:
-                logger.warning("State store data is empty for key: %s. Attempting lazy initialization.", state_store_key)
-                
+                logger.warning(
+                    "State store data is empty for key: %s. Attempting lazy initialization.", state_store_key
+                )
+
                 if model_path:
                     try:
                         logger.info("Lazy initializing ETA state for security scan workflow: %s", workflow_id)
-                        ModelSecurityScanService.calculate_initial_eta(
-                            workflow_id=workflow_id,
-                            model_path=model_path
-                        )
+                        ModelSecurityScanService.calculate_initial_eta(workflow_id=workflow_id, model_path=model_path)
                         # Fetch the state again after initialization
                         response = dapr_service.get_state(
                             store_name=app_settings.statestore_name,
                             key=state_store_key,
                         )
                         if not response.data:
-                            logger.error("State store data still empty after lazy initialization for key: %s", state_store_key)
+                            logger.error(
+                                "State store data still empty after lazy initialization for key: %s", state_store_key
+                            )
                             return
                     except Exception as e:
                         logger.exception("Error during lazy initialization of ETA state: %s", e)

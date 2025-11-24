@@ -3,12 +3,12 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional, Set, Tuple
-from urllib3 import PoolManager
 
 from budmicroframe.commons import logging
 from minio import Minio
 from minio.deleteobjects import DeleteObject
 from minio.error import S3Error
+from urllib3 import PoolManager
 
 from ..commons.config import app_settings, secrets_settings
 from ..commons.constants import LOCAL_MIN_SIZE_GB
@@ -21,16 +21,16 @@ logger = logging.get_logger(__name__)
 
 # Process-wide semaphore to limit concurrent large file uploads
 # This prevents disk saturation on single-VM deployments
-MAX_PARALLEL_UPLOADS = getattr(app_settings, 'max_parallel_uploads', 2)
+MAX_PARALLEL_UPLOADS = getattr(app_settings, "max_parallel_uploads", 2)
 _upload_semaphore = threading.BoundedSemaphore(MAX_PARALLEL_UPLOADS)
 
 
 class ThrottledFileReader:
     """File reader that monitors I/O stress and dynamically throttles upload speed."""
-    
+
     def __init__(self, file_path: str, io_monitor: Optional[any], file_size: int, chunk_size: int = 64 * 1024):
         """Initialize throttled file reader with dynamic speed calculation.
-        
+
         Args:
             file_path: Path to file to read
             io_monitor: I/O monitor instance (can be None)
@@ -41,52 +41,46 @@ class ThrottledFileReader:
         self.io_monitor = io_monitor
         self.file_size = file_size
         self.chunk_size = chunk_size
-        
+
         self.file = None
         self.start_time = None
         self.bytes_read = 0
         self.last_speed_check = 0
         self.current_max_bps = 0  # Will be calculated dynamically
-    
+
     def __enter__(self):
-        self.file = open(self.file_path, 'rb')
+        """Initialize file reading with throttling setup."""
+        self.file = open(self.file_path, "rb")
         self.start_time = time.time()
         self.bytes_read = 0
         self.last_speed_check = self.start_time
-        
+
         # Get initial speed limit
         if self.io_monitor:
-            self.current_max_bps, _ = self.io_monitor.calculate_upload_speed_limit(
-                disk_path=self.file_path
-            )
+            self.current_max_bps, _ = self.io_monitor.calculate_upload_speed_limit(disk_path=self.file_path)
         else:
             self.current_max_bps = 0  # Unlimited if no monitor
-        
+
         return self
-    
+
     def read(self, size=-1):
         """Read data with dynamic I/O-based speed throttling."""
         # Determine how much to read
-        if size == -1 or size > self.chunk_size:
-            read_size = self.chunk_size
-        else:
-            read_size = size
-        
+        read_size = self.chunk_size if size == -1 or size > self.chunk_size else size
+
         # Read chunk
         data = self.file.read(read_size)
         if not data:
             return b""
-        
+
         self.bytes_read += len(data)
-        
+
         # Recalculate speed limit every 2 seconds
         now = time.time()
         if self.io_monitor and now - self.last_speed_check >= 2.0:
-            self.current_max_bps, stress = self.io_monitor.calculate_upload_speed_limit(
-                disk_path=self.file_path
-            )
+            self.current_max_bps, stress = self.io_monitor.calculate_upload_speed_limit(disk_path=self.file_path)
             self.last_speed_check = now
-            
+
             # Log if speed changed significantly or stress is high
             if stress > 0.5:
                 progress_pct = (self.bytes_read / self.file_size) * 100 if self.file_size > 0 else 0
@@ -96,7 +90,7 @@ class ThrottledFileReader:
                     stress,
                     progress_pct,
                 )
-        
+
         # Enforce rate limit (if not unlimited)
         if self.current_max_bps > 0:
             elapsed = now - self.start_time
@@ -108,13 +102,14 @@ class ThrottledFileReader:
                     sleep_time = target_elapsed - elapsed
                     if sleep_time > 0:
                         time.sleep(sleep_time)
-        
+
         return data
-    
+
     def __exit__(self, *args):
+        """Cleanup file handle and log final upload statistics."""
         if self.file:
             self.file.close()
-            
+
             # Log final stats
             if self.bytes_read > 0 and self.start_time:
                 elapsed = time.time() - self.start_time
@@ -137,17 +132,17 @@ class ModelStore:
             model_download_dir (str): The directory to download the model to
         """
         self.model_download_dir = model_download_dir
-        
+
         # Create HTTP client with controlled connection pool
         # Small pool prevents connection storms to MinIO on single-VM deployments
-        pool_size = getattr(app_settings, 'http_pool_size', 4)
+        pool_size = getattr(app_settings, "http_pool_size", 4)
         http_client = PoolManager(
             num_pools=pool_size,
             maxsize=pool_size,
             block=True,  # Block when pool is full instead of creating more connections
         )
         logger.debug("Initialized MinIO client with HTTP pool size: %d", pool_size)
-        
+
         self.client = Minio(
             app_settings.minio_endpoint,
             access_key=secrets_settings.minio_access_key,
@@ -160,10 +155,10 @@ class ModelStore:
         self.io_monitor = None
         if app_settings.enable_io_monitoring:
             self.io_monitor = get_io_monitor()
-        
+
         # Upload retry configuration
-        self.upload_retry_attempts = getattr(app_settings, 'upload_retry_attempts', 3)
-        self.upload_retry_backoff = getattr(app_settings, 'upload_retry_backoff_factor', 2.0)
+        self.upload_retry_attempts = getattr(app_settings, "upload_retry_attempts", 3)
+        self.upload_retry_backoff = getattr(app_settings, "upload_retry_backoff_factor", 2.0)
 
     def _wait_for_io_clearance(self, disk_path: str) -> None:
         """Wait for I/O stress to clear before proceeding.
@@ -197,24 +192,22 @@ class ModelStore:
         if self.check_object_exists(object_name, bucket_name):
             logger.info(f"{object_name} already exists in MinIO, skipping upload")
             return True
-        
+
         # Check for I/O clearance before starting upload
         self._wait_for_io_clearance(disk_path=file_path)
-        
+
         # Determine file size and use appropriate upload method
         file_size = os.path.getsize(file_path)
         large_file_threshold = 100 * 1024 * 1024  # 100 MB
-        
+
         if file_size > large_file_threshold:
             # Use semaphore for large files to limit concurrency across ALL workflows
             with _upload_semaphore:
-                logger.info(
-                    f"Uploading large file ({file_size / (1024**3):.2f} GB): {file_path}"
-                )
+                logger.info(f"Uploading large file ({file_size / (1024**3):.2f} GB): {file_path}")
                 return self._upload_large_file_with_monitoring(file_path, object_name, bucket_name, file_size)
         else:
             return self._upload_small_file_with_retry(file_path, object_name, bucket_name)
-    
+
     def _upload_small_file_with_retry(self, file_path: str, object_name: str, bucket_name: str) -> bool:
         """Upload small file with retry logic (no I/O monitoring during upload)."""
         # Retry logic with exponential backoff
@@ -228,42 +221,42 @@ class ModelStore:
                 )
                 logger.info(f"Uploaded {file_path} to store://{bucket_name}/{object_name}")
                 return True
-                
+
             except S3Error as err:
                 # Check if it's a transient error worth retrying
-                is_transient = err.code in ['IncompleteBody', 'RequestTimeout', 'SlowDown', 'ServiceUnavailable']
-                
+                is_transient = err.code in ["IncompleteBody", "RequestTimeout", "SlowDown", "ServiceUnavailable"]
+
                 if attempt < self.upload_retry_attempts - 1 and is_transient:
-                    backoff = self.upload_retry_backoff ** attempt
+                    backoff = self.upload_retry_backoff**attempt
                     logger.warning(
                         f"Transient error uploading {file_path} (attempt {attempt + 1}/{self.upload_retry_attempts}): "
                         f"{err.code}. Retrying in {backoff}s..."
                     )
                     time.sleep(backoff)
                 else:
-                    logger.error(
-                        f"Failed to upload {file_path} -> {object_name} after {attempt + 1} attempts: {err}"
-                    )
+                    logger.error(f"Failed to upload {file_path} -> {object_name} after {attempt + 1} attempts: {err}")
                     return False
-                    
+
             except Exception as e:
                 if attempt < self.upload_retry_attempts - 1:
-                    backoff = self.upload_retry_backoff ** attempt
+                    backoff = self.upload_retry_backoff**attempt
                     logger.warning(
                         f"Error uploading {file_path} (attempt {attempt + 1}/{self.upload_retry_attempts}): {e}. "
                         f"Retrying in {backoff}s..."
                     )
                     time.sleep(backoff)
                 else:
-                    logger.exception(f"Failed to upload {file_path} -> {object_name} after {attempt + 1} attempts: {e}")
+                    logger.exception(
+                        f"Failed to upload {file_path} -> {object_name} after {attempt + 1} attempts: {e}"
+                    )
                     return False
-        
+
         return False
-    
-    def _upload_large_file_with_monitoring(self, file_path: str, object_name: str, 
-                                           bucket_name: str, file_size: int) -> bool:
+
+    def _upload_large_file_with_monitoring(
+        self, file_path: str, object_name: str, bucket_name: str, file_size: int
+    ) -> bool:
         """Upload large file with continuous I/O monitoring and dynamic throttling."""
-        
         for attempt in range(self.upload_retry_attempts):
             try:
                 # Use throttled file reader that monitors I/O and adapts speed during upload
@@ -274,18 +267,18 @@ class ModelStore:
                         data=throttled_file,
                         length=file_size,
                     )
-                
+
                 logger.info(
                     f"Uploaded large file {file_path} ({file_size / (1024**3):.2f} GB) "
                     f"to store://{bucket_name}/{object_name}"
                 )
                 return True
-                
+
             except S3Error as err:
-                is_transient = err.code in ['IncompleteBody', 'RequestTimeout', 'SlowDown', 'ServiceUnavailable']
-                
+                is_transient = err.code in ["IncompleteBody", "RequestTimeout", "SlowDown", "ServiceUnavailable"]
+
                 if attempt < self.upload_retry_attempts - 1 and is_transient:
-                    backoff = self.upload_retry_backoff ** attempt
+                    backoff = self.upload_retry_backoff**attempt
                     logger.warning(
                         f"Transient error uploading large file {file_path} "
                         f"(attempt {attempt + 1}/{self.upload_retry_attempts}): {err.code}. "
@@ -294,14 +287,13 @@ class ModelStore:
                     time.sleep(backoff)
                 else:
                     logger.error(
-                        f"Failed to upload large file {file_path} -> {object_name} "
-                        f"after {attempt + 1} attempts: {err}"
+                        f"Failed to upload large file {file_path} -> {object_name} after {attempt + 1} attempts: {err}"
                     )
                     return False
-                    
+
             except Exception as e:
                 if attempt < self.upload_retry_attempts - 1:
-                    backoff = self.upload_retry_backoff ** attempt
+                    backoff = self.upload_retry_backoff**attempt
                     logger.warning(
                         f"Error uploading large file {file_path} "
                         f"(attempt {attempt + 1}/{self.upload_retry_attempts}): {e}. "
@@ -310,11 +302,10 @@ class ModelStore:
                     time.sleep(backoff)
                 else:
                     logger.exception(
-                        f"Failed to upload large file {file_path} -> {object_name} "
-                        f"after {attempt + 1} attempts: {e}"
+                        f"Failed to upload large file {file_path} -> {object_name} after {attempt + 1} attempts: {e}"
                     )
                     return False
-        
+
         return False
 
     def check_object_exists(self, object_name: str, bucket_name: str = app_settings.minio_bucket) -> bool:
@@ -331,8 +322,10 @@ class ModelStore:
             return True
         except S3Error as err:
             # NoSuchKey is expected for new uploads, log as debug
-            if err.code == 'NoSuchKey':
-                logger.debug("Object %s does not exist in bucket %s (expected for new uploads)", object_name, bucket_name)
+            if err.code == "NoSuchKey":
+                logger.debug(
+                    "Object %s does not exist in bucket %s (expected for new uploads)", object_name, bucket_name
+                )
                 return False
             else:
                 # Other S3 errors are unexpected, log as error
@@ -353,62 +346,55 @@ class ModelStore:
         """
         if not upload_files:
             return True, []
-        
+
         remaining_files = upload_files.copy()
         failed_object_names = []
         total_files = len(upload_files)
         completed_files = 0
-        
+
         logger.info("Starting adaptive batch upload for %d files", total_files)
-        
+
         while remaining_files:
             # Re-evaluate I/O stress before each batch
             if self.io_monitor:
                 metrics = self.io_monitor.get_current_metrics(str(self.model_download_dir))
                 stress_level = metrics.io_stress_level
-                
+
                 # Determine batch size based on current I/O stress
                 if stress_level > 0.7:
                     # High stress - very small batches
                     batch_size = 3
-                    logger.warning(
-                        "High I/O stress detected (%.2f), using batch size of %d",
-                        stress_level, batch_size
-                    )
+                    logger.warning("High I/O stress detected (%.2f), using batch size of %d", stress_level, batch_size)
                 elif stress_level > 0.5:
                     # Medium stress - moderate batches
                     batch_size = 8
-                    logger.info(
-                        "Medium I/O stress detected (%.2f), using batch size of %d",
-                        stress_level, batch_size
-                    )
+                    logger.info("Medium I/O stress detected (%.2f), using batch size of %d", stress_level, batch_size)
                 else:
                     # Low stress - larger batches
                     batch_size = min(15, app_settings.max_thread_workers)
-                    logger.debug(
-                        "Low I/O stress (%.2f), using batch size of %d",
-                        stress_level, batch_size
-                    )
+                    logger.debug("Low I/O stress (%.2f), using batch size of %d", stress_level, batch_size)
             else:
                 # No I/O monitoring - use moderate batch size
                 batch_size = 10
-            
+
             # Get next batch
             batch = remaining_files[:batch_size]
             remaining_files = remaining_files[batch_size:]
-            
+
             logger.info(
                 "Processing batch of %d files (%d/%d completed, %d remaining)",
-                len(batch), completed_files, total_files, len(remaining_files)
+                len(batch),
+                completed_files,
+                total_files,
+                len(remaining_files),
             )
-            
+
             # Process batch with thread pool
             with ThreadPoolExecutor(max_workers=len(batch)) as executor:
                 future_to_file = {
-                    executor.submit(self.upload_file, file.file_path, file.object_name): file
-                    for file in batch
+                    executor.submit(self.upload_file, file.file_path, file.object_name): file for file in batch
                 }
-                
+
                 # Wait for batch to complete
                 for future in as_completed(future_to_file):
                     file = future_to_file[future]
@@ -421,7 +407,7 @@ class ModelStore:
                     except Exception as e:
                         logger.exception("Unexpected error uploading file %s: %s", file.object_name, e)
                         failed_object_names.append(file.object_name)
-            
+
             # Brief pause between batches to let I/O settle (if more files remain)
             if remaining_files:
                 if self.io_monitor:
@@ -430,7 +416,8 @@ class ModelStore:
                         pause_duration = 3
                         logger.info(
                             "I/O stress elevated (%.2f), pausing %ds between batches",
-                            metrics.io_stress_level, pause_duration
+                            metrics.io_stress_level,
+                            pause_duration,
                         )
                         time.sleep(pause_duration)
                     else:
@@ -438,41 +425,38 @@ class ModelStore:
                         time.sleep(0.5)
                 else:
                     time.sleep(0.5)
-        
+
         success = len(failed_object_names) == 0
         if failed_object_names:
             logger.error(
                 "Failed to upload %d/%d files: %s",
-                len(failed_object_names), total_files,
-                failed_object_names[:10] if len(failed_object_names) > 10 else failed_object_names
+                len(failed_object_names),
+                total_files,
+                failed_object_names[:10] if len(failed_object_names) > 10 else failed_object_names,
             )
         else:
             logger.info("Successfully uploaded all %d files", total_files)
-        
+
         return success, failed_object_names
 
     def get_uploaded_files(self, prefix: str) -> Set[str]:
         """Get set of files already uploaded to MinIO for the given prefix.
-        
+
         Args:
             prefix (str): The prefix to check
-            
+
         Returns:
             Set[str]: Set of object names already uploaded
         """
         try:
-            objects = self.client.list_objects(
-                app_settings.minio_bucket,
-                prefix=prefix,
-                recursive=True
-            )
-            uploaded = {obj.object_name for obj in objects if not obj.object_name.endswith('/')}
+            objects = self.client.list_objects(app_settings.minio_bucket, prefix=prefix, recursive=True)
+            uploaded = {obj.object_name for obj in objects if not obj.object_name.endswith("/")}
             logger.debug("Found %d files already uploaded for prefix %s", len(uploaded), prefix)
             return uploaded
         except Exception as e:
             logger.warning("Error listing uploaded files for prefix %s: %s", prefix, e)
             return set()
-    
+
     def upload_folder(self, prefix: str) -> bool:
         """Upload a folder to the MinIO store with partial upload recovery.
 
@@ -558,7 +542,9 @@ class ModelStore:
         if not upload_result:
             logger.error(
                 f"Failed to upload {len(failed_files)} files to store://{app_settings.minio_bucket}/{prefix}. "
-                f"Failed files: {failed_files[:10]}..." if len(failed_files) > 10 else f"Failed files: {failed_files}"
+                f"Failed files: {failed_files[:10]}..."
+                if len(failed_files) > 10
+                else f"Failed files: {failed_files}"
             )
             # DON'T delete local files on failure - allows retry/resume
             logger.warning("Local files preserved for retry. Failed files can be resumed on next attempt.")
@@ -569,7 +555,7 @@ class ModelStore:
         # Delete files that were successfully uploaded AND marked for deletion
         files_deleted = 0
         failed_files_set = set(failed_files)
-        
+
         for object_name, (file_path, should_delete) in file_deletion_map.items():
             # Only delete if:
             # 1. File was successfully uploaded (not in failed_files)
@@ -577,7 +563,7 @@ class ModelStore:
             if object_name not in failed_files_set and should_delete:
                 safe_delete(file_path)
                 files_deleted += 1
-        
+
         # Delete ignore paths
         for ignore_path in IGNORE_PATHS:
             ignore_full_path = os.path.join(local_folder_path, ignore_path)

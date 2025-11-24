@@ -11,18 +11,18 @@ def mock_crud():
 def test_atomic_space_reservation_new_record(mock_crud):
     mock_session = MagicMock()
     mock_crud.return_value.__enter__.return_value.session = mock_session
-    
+
     # Mock no existing record
     mock_session.query.return_value.filter.return_value.with_for_update.return_value.first.return_value = None
-    
+
     # Mock space check
     mock_session.query.return_value.filter.return_value.scalar.return_value = 0
-    
+
     with patch("budmodel.model_info.download_history.app_settings") as mock_settings:
         mock_settings.model_download_dir_max_size = 1000
-        
+
         result = DownloadHistory.atomic_space_reservation("test_path", 100)
-        
+
         assert result is True
         # Verify insert called
         mock_crud.return_value.__enter__.return_value.insert.assert_called_once()
@@ -34,14 +34,14 @@ def test_atomic_space_reservation_new_record(mock_crud):
 def test_atomic_space_reservation_existing_running(mock_crud):
     mock_session = MagicMock()
     mock_crud.return_value.__enter__.return_value.session = mock_session
-    
+
     # Mock existing running record
     existing_record = MagicMock()
     existing_record.status = ModelDownloadStatus.RUNNING
     mock_session.query.return_value.filter.return_value.with_for_update.return_value.first.return_value = existing_record
-    
+
     result = DownloadHistory.atomic_space_reservation("test_path", 100)
-    
+
     assert result is True
     # Verify insert NOT called
     mock_crud.return_value.__enter__.return_value.insert.assert_not_called()
@@ -49,20 +49,20 @@ def test_atomic_space_reservation_existing_running(mock_crud):
 def test_atomic_space_reservation_existing_failed(mock_crud):
     mock_session = MagicMock()
     mock_crud.return_value.__enter__.return_value.session = mock_session
-    
+
     # Mock existing failed record
     existing_record = MagicMock()
     existing_record.status = ModelDownloadStatus.FAILED
     mock_session.query.return_value.filter.return_value.with_for_update.return_value.first.return_value = existing_record
-    
+
     # Mock space check (should be called)
     mock_session.query.return_value.filter.return_value.scalar.return_value = 0
-    
+
     with patch("budmodel.model_info.download_history.app_settings") as mock_settings:
         mock_settings.model_download_dir_max_size = 1000
-        
+
         result = DownloadHistory.atomic_space_reservation("test_path", 100)
-        
+
         assert result is True
         # Verify record updated
         assert existing_record.status == ModelDownloadStatus.RUNNING

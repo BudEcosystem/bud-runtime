@@ -547,12 +547,9 @@ class IOMonitor:
         stress_level = current_metrics.io_stress_level
 
         # Auto-detect max speed from disk if unlimited
-        if max_speed == 0:
-            # Use a reasonable baseline that will be throttled based on stress
-            # This adapts to actual disk capacity
-            effective_max = 500 * 1024 * 1024  # 500 MB/s baseline
-        else:
-            effective_max = max_speed
+        # Use a reasonable baseline that will be throttled based on stress
+        # This adapts to actual disk capacity
+        effective_max = 500 * 1024 * 1024 if max_speed == 0 else max_speed
 
         # Use dynamic throttling if available
         if self.enable_dynamic_throttling and self.throttle_detector:
