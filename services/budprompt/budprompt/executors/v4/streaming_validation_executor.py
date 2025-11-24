@@ -20,14 +20,27 @@ import json
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from budmicroframe.commons import logging
+from openai.types.responses import (
+    ResponseCompletedEvent,
+    ResponseCreatedEvent,
+    ResponseFailedEvent,
+    ResponseInProgressEvent,
+)
 from pydantic import ValidationError
 from pydantic_ai import Agent
-from pydantic_ai.messages import ModelMessage, ModelResponse, ThinkingPart, ToolCallPart
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.messages import (
+    ModelMessage,
+    PartDeltaEvent,
+    PartStartEvent,
+    TextPartDelta,
+)
 from pydantic_ai.output import NativeOutput
+from pydantic_ai.run import AgentRunResultEvent
 
-from ...prompt.schemas import Message
+from ...prompt.schemas import MCPToolConfig, Message
 from ...prompt.schemas import ModelSettings as ModelSettingsSchema
-from .openai_streaming_formatter_v3 import OpenAIStreamingFormatter_V3
+from .openai_streaming_validation_formatter_v4 import OpenAIStreamingValidationFormatter_V4
 from .streaming_json_validator import StreamingJSONValidator, extract_field_validators
 
 
@@ -53,6 +66,11 @@ class StreamingValidationExecutor:
         message_history: Optional[List[ModelMessage]] = None,
         api_key: Optional[str] = None,
         agent_kwargs: Optional[Dict[str, Any]] = None,
+        deployment_name: str = "unknown",
+        model_settings: Optional[ModelSettingsSchema] = None,
+        tools: Optional[List[MCPToolConfig]] = None,
+        output_schema: Optional[Dict[str, Any]] = None,
+        system_prompt: Optional[str] = None,
     ):
         """Initialize the streaming validation executor.
 
@@ -63,7 +81,11 @@ class StreamingValidationExecutor:
             messages: Original Message objects for formatter context
             message_history: ModelMessage list for agent conversation history
             api_key: Optional API key for authorization
-            agent_kwargs: Agent configuration dict from _build_agent_kwargs()
+            agent_kwargs: Agent configuration dict from _create_agent()
+            deployment_name: Model deployment name for formatter
+            model_settings: Model configuration settings for formatter
+            tools: Optional list of tool configurations (MCP, etc.)
+            output_schema: Optional JSON schema for structured output
         """
         # Store the full output_type for agent creation
         self.output_type = output_type
@@ -79,6 +101,7 @@ class StreamingValidationExecutor:
         self.original_prompt = prompt
         self.validation_prompt = validation_prompt
         self.messages = messages or []
+        self.system_prompt = system_prompt
         self.message_history = message_history or []
         self.api_key = api_key
 
@@ -90,6 +113,7 @@ class StreamingValidationExecutor:
             self.retry_limit = 1  # Single attempt when agent has no retries
         else:
             self.retry_limit = configured_retries  # Use agent's retry count for external loop
+        logger.debug("Set retry_limit to %s for streaming validation executor", self.retry_limit)
 
         # Pop retries from the argument dict (mutate in place)
         if agent_kwargs:
@@ -98,21 +122,27 @@ class StreamingValidationExecutor:
         # Save the mutated dict
         self.agent_kwargs = agent_kwargs
 
-        # Initialize OpenAI streaming formatter with minimal settings
-        # Note: We can't access full ModelSettings anymore since it's encapsulated in the model
-        self.formatter = OpenAIStreamingFormatter_V3(
-            deployment_name="static_model",  # TODO: we can add original model name later
-            model_settings=ModelSettingsSchema(),  # Use default settings for formatter
-            messages=self.messages,
-        )
-
         # Extract field validators
         self.field_validators = extract_field_validators(self.output_model)
+
+        # Create streaming JSON validator
+        self.validator = StreamingJSONValidator(self.output_model, self.field_validators)
+
+        # Initialize V4 validation formatter with full context
+        self.formatter = OpenAIStreamingValidationFormatter_V4(
+            validator=self.validator,
+            deployment_name=deployment_name,
+            model_settings=model_settings or ModelSettingsSchema(),
+            messages=self.messages,
+            tools=tools,
+            output_schema=output_schema,
+        )
 
         # Track attempts and errors
         self.validation_errors: List[str] = []
         self.last_attempted_data: Optional[Dict] = None
         self.final_usage: Optional[Any] = None
+        self.final_result: Optional[Any] = None  # Track AgentRunResult for output building
 
         # Track validation state for retry prompt
         self.validated_fields: Dict[str, Any] = {}  # Fields that passed validation
@@ -128,8 +158,41 @@ class StreamingValidationExecutor:
             OpenAI-formatted SSE event strings
         """
         # Emit pre-events (ONCE, before any attempts)
-        yield self.formatter.format_response_created()
-        yield self.formatter.format_response_in_progress()
+        # Build instructions from messages (for response.created/in_progress events)
+        instructions = self.formatter.build_instructions(self.messages, self.system_prompt)
+
+        # EVENT 1: response.created (MUST be first event)
+        yield self.formatter.format_sse_from_event(
+            ResponseCreatedEvent(
+                type="response.created",
+                sequence_number=self.formatter._next_sequence(),
+                response=self.formatter.build_response_object(
+                    status="in_progress",
+                    instructions=instructions,
+                ),
+            )
+        )
+
+        # EVENT 2: response.in_progress (MUST be second event)
+        yield self.formatter.format_sse_from_event(
+            ResponseInProgressEvent(
+                type="response.in_progress",
+                sequence_number=self.formatter._next_sequence(),
+                response=self.formatter.build_response_object(
+                    status="in_progress",
+                    instructions=instructions,
+                ),
+            )
+        )
+
+        # EVENTS 3+: MCP tool lists (if any MCP tools configured)
+        if self.formatter.tools_config:
+            mcp_events = await self.formatter.emit_mcp_tool_list_events()
+            for event in mcp_events:
+                yield self.formatter.format_sse_from_event(event)
+
+        # EVENTS: Message item lifecycle starts (for text output)
+        # Create message item ONCE upfront - all deltas will emit to this item
         yield self.formatter.format_output_item_added()
         yield self.formatter.format_content_part_added()
 
@@ -150,28 +213,63 @@ class StreamingValidationExecutor:
                         break
 
                 if success:
-                    # Emit final events
-                    if self.formatter.reasoning_started:
-                        yield self.formatter.format_reasoning_summary_text_done()
-                        yield self.formatter.format_reasoning_summary_part_done()
+                    # === MESSAGE ITEM FINALIZATION EVENTS ===
+                    # Incremental deltas were already emitted during streaming in _attempt_stream()
+                    # Now emit the done events to close out the message item
 
+                    # Emit response.output_text.done
                     yield self.formatter.format_output_text_done()
+
+                    # Emit response.content_part.done
                     yield self.formatter.format_content_part_done()
+
+                    # Emit response.output_item.done for message
                     yield self.formatter.format_output_item_done()
-                    yield self.formatter.format_response_completed(self.final_usage)
+
+                    # Build output_items array manually for validation mode
+                    # We only include our upfront-created message item, not tool results
+                    output_items = []
+                    message_item = {
+                        "id": self.formatter.text_item_id,
+                        "type": "message",
+                        "status": "completed",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "annotations": [],
+                                "logprobs": [],
+                                "text": self.formatter.accumulated_text,
+                            }
+                        ],
+                        "role": "assistant",
+                    }
+                    output_items.append(message_item)
+
+                    # Emit final response.completed event with instructions and output
+                    yield self.formatter.format_sse_from_event(
+                        ResponseCompletedEvent(
+                            type="response.completed",
+                            sequence_number=self.formatter._next_sequence(),
+                            response=self.formatter.build_response_object(
+                                status="completed",
+                                instructions=instructions,
+                                output_items=output_items,
+                                usage=self.final_usage,
+                            ),
+                        )
+                    )
                     return
 
-            except ValidationError as e:
-                # Validation failed
+            except (ValueError, ValidationError, UnexpectedModelBehavior) as e:
+                # Validation failed (ValueError from field validators, ValidationError from Pydantic,
+                # or UnexpectedModelBehavior from pydantic-ai when retries=0)
                 self.validation_errors.append(str(e))
                 logger.debug(f"Attempt {attempt + 1} validation failed: {str(e)}")
 
                 # If not last attempt, retry
                 if attempt < self.retry_limit - 1:
-                    # Reset formatter text accumulation for retry
-                    self.formatter.accumulated_text = ""
-                    self.formatter.accumulated_reasoning = ""
-                    # Don't reset last_sent_fields - keep delta tracking across retries
+                    # Reset formatter state for retry
+                    self.formatter.reset_for_retry()
                     # Note: Don't reset validated_fields/failed_fields - they're used in retry prompt
                     continue
                 else:
@@ -186,9 +284,7 @@ class StreamingValidationExecutor:
 
                 # If not last attempt, retry
                 if attempt < self.retry_limit - 1:
-                    self.formatter.accumulated_text = ""
-                    self.formatter.accumulated_reasoning = ""
-                    # Don't reset last_sent_fields - keep delta tracking across retries
+                    self.formatter.reset_for_retry()
                     # Note: Don't reset validated_fields/failed_fields - they're used in retry prompt
                     continue
                 else:
@@ -199,10 +295,26 @@ class StreamingValidationExecutor:
         if self.validation_errors:
             error_message += f": {self.validation_errors[-1]}"
 
-        yield self.formatter.format_response_failed(error_message=error_message, error_code="validation_error")
+        # Emit response.failed event
+        yield self.formatter.format_sse_from_event(
+            ResponseFailedEvent(
+                type="response.failed",
+                sequence_number=self.formatter._next_sequence(),
+                response=self.formatter.build_response_object(
+                    status="failed",
+                    instructions=None,
+                    output_items=[],
+                    usage=self.final_usage,
+                    error={"code": "server_error", "message": error_message},
+                ),
+            )
+        )
 
     async def _attempt_stream(self, attempt_number: int) -> AsyncGenerator:
-        """Attempt streaming with validation.
+        """Attempt streaming with validation using backup algorithm.
+
+        This replicates the exact validation algorithm from backup_streaming_validation_executor.py
+        but uses run_stream_events() API and V4 OpenAI formatter.
 
         Args:
             attempt_number: Current attempt (0-indexed)
@@ -224,130 +336,171 @@ class StreamingValidationExecutor:
         # Create validator for this attempt
         validator = StreamingJSONValidator(self.output_model, self.field_validators)
 
-        # Stream with validation
-        async with agent.run_stream(user_prompt=current_prompt, message_history=self.message_history) as result:
-            async for message, is_last in result.stream_responses(debounce_by=0.01):
-                if not isinstance(message, ModelResponse):
-                    continue
+        # Stream events using run_stream_events() for full MCP support
+        async for event in agent.run_stream_events(user_prompt=current_prompt, message_history=self.message_history):
+            logger.debug(
+                f"Received pydantic-ai event: {type(event).__name__}, is PartDeltaEvent: {isinstance(event, PartDeltaEvent)}"
+            )
 
-                # Update model name if available
-                if message.model_name:
-                    self.formatter.update_model_name(message.model_name)
+            # ===== FINAL RESULT EVENT (equivalent to is_last=True in backup) =====
+            if isinstance(event, AgentRunResultEvent):
+                final_result = event.result
+                self.final_result = final_result
+                logger.debug("Received final AgentRunResultEvent - validating completely")
 
-                # For non-final chunks: validate and stream if valid
-                if not is_last:
-                    # Validate incrementally - capture state on failure
-                    try:
-                        async for validation_result in validator.process_streaming_message(message):
-                            if validation_result["valid"]:
-                                # Get current validated data
-                                current_validated = validation_result.get("validated_data", {})
+                # Final chunk - validate completely (same as backup lines 337-400)
+                try:
+                    if final_result:
+                        # Extract the final validated data
+                        if hasattr(final_result, "model_dump"):
+                            final_validated_data = final_result.model_dump()
+                        else:
+                            final_validated_data = final_result if isinstance(final_result, dict) else {}
 
-                                # Compute delta (only changed fields)
-                                field_delta = self._compute_field_delta(current_validated)
+                        # Merge validated fields from previous attempts (preserve validated fields)
+                        # This ensures LLM doesn't change already-validated fields during retry
+                        if self.validated_fields:
+                            final_validated_data = {**final_validated_data, **self.validated_fields}
 
-                                if field_delta:
-                                    # Convert delta to JSON string
-                                    delta_json = json.dumps(field_delta, separators=(",", ":"))
+                        # Compute delta (only new or changed fields since last send)
+                        final_delta = self._compute_field_delta(final_validated_data)
 
-                                    # Emit as text delta
-                                    delta_event = self.formatter.format_output_text_delta(delta_json)
-                                    if delta_event:
-                                        yield delta_event
+                        if final_delta:
+                            # Convert delta to JSON string
+                            delta_json = json.dumps(final_delta, separators=(",", ":"))
 
-                                    # Update what we've sent
-                                    self.last_sent_fields.update(field_delta)
-
-                                # Handle reasoning/thinking parts
-                                for part in message.parts:
-                                    if isinstance(part, ThinkingPart) and part.content:
-                                        # Handle reasoning
-                                        if not self.formatter.reasoning_started:
-                                            yield self.formatter.format_reasoning_summary_part_added()
-                                            self.formatter.reasoning_started = True
-
-                                        delta_event = self.formatter.format_reasoning_summary_text_delta(part.content)
-                                        if delta_event:
-                                            yield delta_event
-
-                                        self.formatter.add_thinking_content(part.content)
-
-                                    elif isinstance(part, ToolCallPart):
-                                        logger.debug(f"Tool call: {part.tool_name}")
-                            # If not valid, ValidationError will be raised by process_streaming_message
-                    except (ValueError, ValidationError):
-                        # Capture validation state before re-raising
-                        self.validated_fields = validator.validated_data.copy()
-                        self.failed_fields = {
-                            k: v for k, v in validator.attempted_data.items() if k not in validator.validated_data
-                        }
-                        raise
-
-                else:
-                    # Final chunk - validate completely
-                    validated_result = await result.validate_response_output(message, allow_partial=False)
-
-                    # Validation passed - merge previously validated fields to preserve them
-                    # This ensures LLM doesn't change already-validated fields during retry
-                    if hasattr(validated_result, "model_dump"):
-                        final_validated_data = validated_result.model_dump()
-                    else:
-                        final_validated_data = validated_result if isinstance(validated_result, dict) else {}
-
-                    # Merge validated fields from previous attempts (overwrite any LLM changes)
-                    if self.validated_fields:
-                        final_validated_data = {**final_validated_data, **self.validated_fields}
-
-                    # Compute delta (only new or changed fields since last send)
-                    final_delta = self._compute_field_delta(final_validated_data)
-
-                    if final_delta:
-                        # Convert delta to JSON string
-                        delta_json = json.dumps(final_delta, separators=(",", ":"))
-
-                        # Emit as text delta
-                        delta_event = self.formatter.format_output_text_delta(delta_json)
-                        if delta_event:
-                            yield delta_event
-
-                        # Update what we've sent
-                        self.last_sent_fields.update(final_delta)
-
-                    # Set accumulated_text to complete final JSON for done events
-                    complete_json = json.dumps(final_validated_data, separators=(",", ":"))
-                    self.formatter.accumulated_text = complete_json
-
-                    # Handle reasoning/thinking parts
-                    for part in message.parts:
-                        if isinstance(part, ThinkingPart) and part.content:
-                            # Handle any final reasoning content
-                            if not self.formatter.reasoning_started:
-                                yield self.formatter.format_reasoning_summary_part_added()
-                                self.formatter.reasoning_started = True
-
-                            delta_event = self.formatter.format_reasoning_summary_text_delta(part.content)
+                            # Emit as text delta using V4 formatter
+                            delta_event = self.formatter.format_output_text_delta(delta_json)
                             if delta_event:
                                 yield delta_event
 
-                            self.formatter.add_thinking_content(part.content)
+                            # Update what we've sent
+                            self.last_sent_fields.update(final_delta)
 
-                        elif isinstance(part, ToolCallPart):
-                            logger.debug(f"Tool call: {part.tool_name}")
+                        # Set accumulated_text to complete final JSON for done events
+                        complete_json = json.dumps(final_validated_data, separators=(",", ":"))
+                        self.formatter.accumulated_text = complete_json
 
-                    # Store attempted data for retry context
-                    # Use the merged final_validated_data (with preserved fields) not raw validated_result
-                    self.last_attempted_data = final_validated_data
-                    # All fields passed validation on success
-                    self.validated_fields = final_validated_data
-                    self.failed_fields = {}
+                        # Store for retry context
+                        self.last_attempted_data = final_validated_data
+                        # All fields passed validation on success
+                        self.validated_fields = final_validated_data
+                        self.failed_fields = {}
 
-                    # Capture usage
-                    if message.usage:
-                        self.final_usage = message.usage
+                        # Capture usage
+                        if final_result.usage():
+                            usage_info = final_result.usage()
+                            details = getattr(usage_info, "details", {})
+                            reasoning_tokens = details.get("reasoning_tokens", 0) if isinstance(details, dict) else 0
+                            self.final_usage = {
+                                "input_tokens": getattr(usage_info, "request_tokens", 0),
+                                "input_tokens_details": {"cached_tokens": 0},
+                                "output_tokens": getattr(usage_info, "response_tokens", 0),
+                                "output_tokens_details": {"reasoning_tokens": reasoning_tokens},
+                                "total_tokens": getattr(usage_info, "total_tokens", 0),
+                            }
 
-                    # Success! Signal completion
-                    yield {"success": True}
-                    return
+                        # Success! Signal completion
+                        yield {"success": True}
+                        return
+
+                except (ValueError, ValidationError) as e:
+                    # Validation failed - capture state before re-raising
+                    self.validated_fields = validator.validated_data.copy()
+                    self.failed_fields = {
+                        k: v for k, v in validator.attempted_data.items() if k not in validator.validated_data
+                    }
+                    self.validation_error = str(e)
+                    logger.error(f"Final validation failed: {str(e)}")
+                    raise
+
+            # ===== STREAMING EVENTS (equivalent to is_last=False in backup) =====
+
+            # Handle PartStartEvent to populate formatter state (required for validation)
+            if isinstance(event, PartStartEvent):
+                # Let formatter process to populate parts_state
+                await self.formatter.map_event(event)
+                # Don't emit yet - continue to next event
+                continue
+
+            # For structured output validation, intercept PartDeltaEvent with text content (JSON)
+            if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+                output_index = event.index
+                logger.debug(
+                    f"TextPartDelta: index={output_index}, content_delta={event.delta.content_delta[:50] if event.delta.content_delta else None}"
+                )
+
+                # CRITICAL: Let formatter accumulate the delta FIRST
+                # This populates state.accumulated_content with the latest JSON
+                openai_events = await self.formatter.map_event(event)
+
+                # NOW get state and validate accumulated content
+                if output_index in self.formatter.parts_state:
+                    state = self.formatter.parts_state[output_index]
+
+                    # Get accumulated content (JSON so far)
+                    if hasattr(state, "accumulated_content") and state.accumulated_content:
+                        logger.debug(f"Streaming: validating structured output: {state.accumulated_content[:100]}...")
+
+                        # Create a simple message object that validator expects
+                        from types import SimpleNamespace
+
+                        validator_message = SimpleNamespace()
+                        part = SimpleNamespace()
+                        # Use accumulated content (full JSON so far) for validation
+                        part.content = state.accumulated_content
+                        validator_message.parts = [part]
+
+                        # Validate incrementally - capture state on failure (same as backup lines 290-334)
+                        try:
+                            async for validation_result in validator.process_streaming_message(validator_message):
+                                if validation_result["valid"]:
+                                    # Get current validated data
+                                    current_validated = validation_result.get("validated_data", {})
+
+                                    # Compute delta (only changed fields)
+                                    field_delta = self._compute_field_delta(current_validated)
+
+                                    if field_delta:
+                                        # Convert delta to JSON string
+                                        delta_json = json.dumps(field_delta, separators=(",", ":"))
+
+                                        # Emit as text delta using V4 formatter
+                                        delta_event = self.formatter.format_output_text_delta(delta_json)
+                                        if delta_event:
+                                            yield delta_event
+
+                                        # Update what we've sent
+                                        self.last_sent_fields.update(field_delta)
+
+                                    # Update our validated fields
+                                    self.validated_fields.update(current_validated)
+
+                                    logger.debug(f"Streaming: validated fields: {list(current_validated.keys())}")
+
+                        except (ValueError, ValidationError) as e:
+                            # Capture validation state before re-raising (same as backup lines 328-334)
+                            self.validated_fields = validator.validated_data.copy()
+                            self.failed_fields = {
+                                k: v for k, v in validator.attempted_data.items() if k not in validator.validated_data
+                            }
+                            self.validation_error = str(e)
+                            logger.error(f"Streaming validation failed: {str(e)}")
+                            logger.debug(f"Validated fields: {list(self.validated_fields.keys())}")
+                            logger.debug(f"Failed fields: {list(self.failed_fields.keys())}")
+                            # Re-raise to trigger retry
+                            raise
+
+                        # Always skip formatter events - we only emit validated deltas or nothing
+                        # During validation, we buffer until fields are complete and valid
+                        continue
+
+            # For all other events (MCP tools, reasoning, regular tools), pass through V4 formatter
+            openai_events = await self.formatter.map_event(event)
+
+            # Emit each OpenAI event
+            for openai_event in openai_events:
+                yield self.formatter.format_sse_from_event(openai_event)
 
     def _build_prompt(self, attempt: int) -> str:
         """Build prompt for this attempt.

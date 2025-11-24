@@ -158,7 +158,7 @@ class SimplePromptExecutor_V4:
                 deployment_name,
                 model_settings,
                 output_type,
-                llm_retry_limit if output_validation and not stream else None,
+                llm_retry_limit,
                 allow_multiple_calls,
                 system_prompt_role,
                 api_key=api_key,
@@ -185,6 +185,10 @@ class SimplePromptExecutor_V4:
                         message_history=message_history,
                         api_key=api_key,
                         agent_kwargs=agent_kwargs,
+                        deployment_name=deployment_name,
+                        model_settings=model_settings,
+                        tools=tools,
+                        output_schema=output_schema,
                     )
 
                     return executor.stream()
