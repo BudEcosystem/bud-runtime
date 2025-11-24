@@ -51,6 +51,7 @@ const EvalDetailed = () => {
   const [activeTab, setActiveTab] = useState("1");
   const [showAllTags, setShowAllTags] = useState(false);
   const [datasets, setDatasets] = useState<any>(null);
+  const [leaderBoardData, setLeaderBoardData] = useState<any>(null);
   const [datasetDetails, setDatasetDetails] = useState<any>(null);
   const [selectedEvaluation, setSelectedEvaluation] = useState<any>(null);
   const router = useRouter();
@@ -109,7 +110,7 @@ const EvalDetailed = () => {
               </div>
             </button>
             <CustomBreadcrumb
-              urls={["/evaluations", selectedEvaluation?.name || datasetDetails?.dataset?.name || datasets?.datasets?.[0]?.name]}
+              urls={["/evaluations?tab=3", selectedEvaluation?.name || datasetDetails?.dataset?.name || datasets?.datasets?.[0]?.name]}
               data={["Evaluations", selectedEvaluation?.name || datasetDetails?.dataset?.name || datasets?.datasets?.[0]?.name]}
             />
           </div>
@@ -152,7 +153,22 @@ const EvalDetailed = () => {
       }
     };
 
+    const fetchLeaderBoardData = async() => {
+      if (id) {
+        try {
+          const response = await AppRequest.Get(`/experiments/datasets/${id}/scores`);
+          setLeaderBoardData(response.data.scores);
+        } catch (error) {
+          console.error("Error fetching datasets:", error);
+        }
+        finally {
+          hideLoader();
+        }
+      }
+    }
+
     fetchDatasets();
+    fetchLeaderBoardData();
   }, [id, hideLoader]);
 
   // Function to fetch a specific dataset by ID
@@ -242,7 +258,7 @@ const EvalDetailed = () => {
                     </div>
                   ),
                   key: "1",
-                  children: <LeaderboardDetails datasets={datasets}/>,
+                  children: <LeaderboardDetails datasets={datasets} leaderBoards={leaderBoardData}/>,
                   // children: <></>,
                 },
                 {
@@ -261,7 +277,7 @@ const EvalDetailed = () => {
                     </div>
                   ),
                   key: "2",
-                  children: <LeaderboardTable />,
+                  children: <LeaderboardTable leaderBoards={leaderBoardData}/>,
                 },
                 {
                   label: (
