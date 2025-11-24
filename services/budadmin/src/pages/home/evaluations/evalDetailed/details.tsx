@@ -72,7 +72,7 @@ type LeaderboardDetailsProps = {
 };
 
 function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps) {
-  
+
   const [chartData, setChartData] = useState<any>({
     data: [80, 20, 10, 30, 23],
     categories: ["10", "20", "30", "40", "50", "60"],

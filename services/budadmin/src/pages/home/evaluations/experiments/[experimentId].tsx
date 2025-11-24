@@ -117,7 +117,7 @@ const ExperimentDetailsPage = () => {
 
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const scrollPositionRef = useRef(0);
-    
+
     const refreshETA = async() => {
         const container = scrollContainerRef.current;
         if (container) {
