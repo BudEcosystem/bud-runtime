@@ -1,4 +1,4 @@
-import { Form, Image, Spin, Tooltip } from "antd";
+import { Form, FormInstance, Image, Spin, Tooltip } from "antd";
 import { BudFormContext } from "../context/BudFormContext";
 import { useForm } from "src/hooks/useForm";
 import DrawerBreadCrumbNavigation from "../card/DrawerBreadCrumbNavigation";
@@ -64,7 +64,7 @@ export interface BudFormProps extends FooterProps {
   title?: string;
   drawerLoading?: boolean;
   onValuesChange?: (changedValues: any, allValues: any) => void;
-  form?: any; // Allow passing form instance
+  form?: FormInstance; // Allow passing form instance
 }
 
 
