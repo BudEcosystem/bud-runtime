@@ -34,6 +34,7 @@ from pydantic_ai.messages import (
     PartDeltaEvent,
     PartStartEvent,
     TextPartDelta,
+    ToolCallPartDelta,
 )
 from pydantic_ai.output import NativeOutput
 from pydantic_ai.run import AgentRunResultEvent
@@ -352,22 +353,46 @@ class StreamingValidationExecutor:
                 try:
                     if final_result:
                         # Extract the final validated data
-                        if hasattr(final_result, "model_dump"):
+                        # For structured output, the data is in final_result.output (NativeOutput or direct value)
+                        if hasattr(final_result, "output") and final_result.output is not None:
+                            # Extract from output attribute (pydantic-ai's AgentRunResult.output)
+                            if hasattr(final_result.output, "model_dump"):
+                                final_validated_data = final_result.output.model_dump()
+                            elif isinstance(final_result.output, dict):
+                                final_validated_data = final_result.output
+                            else:
+                                # Output is the raw Pydantic model instance
+                                final_validated_data = final_result.output
+                                if hasattr(final_validated_data, "model_dump"):
+                                    final_validated_data = final_validated_data.model_dump()
+                        elif hasattr(final_result, "model_dump"):
                             final_validated_data = final_result.model_dump()
                         else:
                             final_validated_data = final_result if isinstance(final_result, dict) else {}
+
+                        logger.debug(f"Final validated data: {final_validated_data}")
 
                         # Merge validated fields from previous attempts (preserve validated fields)
                         # This ensures LLM doesn't change already-validated fields during retry
                         if self.validated_fields:
                             final_validated_data = {**final_validated_data, **self.validated_fields}
 
-                        # Compute delta (only new or changed fields since last send)
-                        final_delta = self._compute_field_delta(final_validated_data)
+                        logger.debug(f"Emitting field-by-field deltas for {len(final_validated_data)} fields")
 
-                        if final_delta:
-                            # Convert delta to JSON string
-                            delta_json = json.dumps(final_delta, separators=(",", ":"))
+                        # Emit field-by-field validated deltas (for MCP + structured output)
+                        # This provides incremental streaming even though tool already completed
+                        for field_name, field_value in final_validated_data.items():
+                            logger.debug(f"Processing field: {field_name} = {field_value}")
+                            # Skip if already sent (for retry scenarios)
+                            if (
+                                field_name in self.last_sent_fields
+                                and self.last_sent_fields[field_name] == field_value
+                            ):
+                                continue
+
+                            # Emit single field as delta
+                            field_delta = {field_name: field_value}
+                            delta_json = json.dumps(field_delta, separators=(",", ":"))
 
                             # Emit as text delta using V4 formatter
                             delta_event = self.formatter.format_output_text_delta(delta_json)
@@ -375,7 +400,7 @@ class StreamingValidationExecutor:
                                 yield delta_event
 
                             # Update what we've sent
-                            self.last_sent_fields.update(final_delta)
+                            self.last_sent_fields[field_name] = field_value
 
                         # Set accumulated_text to complete final JSON for done events
                         complete_json = json.dumps(final_validated_data, separators=(",", ":"))
@@ -495,7 +520,35 @@ class StreamingValidationExecutor:
                         # During validation, we buffer until fields are complete and valid
                         continue
 
-            # For all other events (MCP tools, reasoning, regular tools), pass through V4 formatter
+            # Suppress final_result tool streaming (structured output in MCP context)
+            # We'll validate and emit field deltas after tool completes in AgentRunResultEvent
+            if isinstance(event, PartDeltaEvent) and isinstance(event.delta, ToolCallPartDelta):
+                output_index = event.index
+                logger.debug(
+                    f"ToolCallPartDelta: index={output_index}, tool_name={event.delta.tool_name if hasattr(event.delta, 'tool_name') else 'unknown'}"
+                )
+
+                # Let formatter accumulate the delta (needed for state tracking)
+                openai_events = await self.formatter.map_event(event)
+
+                # Check if this is final_result tool (structured output)
+                if output_index in self.formatter.parts_state:
+                    state = self.formatter.parts_state[output_index]
+
+                    if state.is_final_result_tool:
+                        logger.debug(
+                            "Suppressing final_result tool streaming - will validate and emit after completion"
+                        )
+                        # Suppress - don't emit mcp_call_arguments.delta events
+                        # We'll validate and emit field deltas in AgentRunResultEvent handler
+                        continue
+
+                # Not final_result tool - emit normally (regular MCP tools, function calls)
+                for openai_event in openai_events:
+                    yield self.formatter.format_sse_from_event(openai_event)
+                continue
+
+            # For all other events (reasoning, text, etc), pass through V4 formatter
             openai_events = await self.formatter.map_event(event)
 
             # Emit each OpenAI event
