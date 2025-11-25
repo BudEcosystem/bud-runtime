@@ -78,7 +78,7 @@ async def get_node_info_python(
                 node_info["devices"] = json.dumps(devices)
 
                 node_info_list.append(node_info)
-                logger.debug(f"Parsed node: {node_info['node_name']}")
+                logger.debug(f"Parsed node: {node_info}")
             except Exception as e:
                 logger.error(f"Failed to parse node {node.metadata.name}: {e}")
                 continue
@@ -181,21 +181,77 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
         cpu_vendor = cpu_info.get("cpu_vendor", "")
         cpu_type = "cpu"  # Default type
 
+        # Extract instruction sets from NFD labels
+        INSTRUCTION_SET_MAP = {
+            "AVX": ["feature.node.kubernetes.io/cpu-cpuid.AVX"],
+            "AVX2": ["feature.node.kubernetes.io/cpu-cpuid.AVX2"],
+            "AVX512": ["feature.node.kubernetes.io/cpu-cpuid.AVX512F"],
+            "VNNI": ["feature.node.kubernetes.io/cpu-cpuid.VNNI"],
+            "AMX": ["feature.node.kubernetes.io/cpu-cpuid.AMXTILE", "feature.node.kubernetes.io/cpu-cpuid.AMX"],
+            "AMX-BF16": ["feature.node.kubernetes.io/cpu-cpuid.AMXBF16"],
+            "AMX-INT8": ["feature.node.kubernetes.io/cpu-cpuid.AMXINT8"],
+            "FMA3": ["feature.node.kubernetes.io/cpu-cpuid.FMA3"],
+            "SSE4.2": ["feature.node.kubernetes.io/cpu-cpuid.SSE4.2", "feature.node.kubernetes.io/cpu-cpuid.SSE42"],
+        }
+
+        instruction_sets = [
+            name
+            for name, nfd_labels in INSTRUCTION_SET_MAP.items()
+            if any(labels.get(label) == "true" for label in nfd_labels)
+        ]
+
         # Check for Intel CPUs with high-performance features (AMX or AVX2)
         if cpu_vendor == "Intel":
-            has_amx = any(
-                labels.get(label) == "true"
-                for label in (
-                    "feature.node.kubernetes.io/cpu-cpuid.AMXTILE",
-                    "feature.node.kubernetes.io/cpu-cpuid.AMX",
-                    "feature.node.kubernetes.io/cpu-cpuid.AMXBF16",
-                    "feature.node.kubernetes.io/cpu-cpuid.AMXINT8",
-                )
-            )
-            has_avx2 = labels.get("feature.node.kubernetes.io/cpu-cpuid.AVX2") == "true"
+            has_amx = any(s.startswith("AMX") for s in instruction_sets)
+            has_avx2 = "AVX2" in instruction_sets
 
             if has_amx or has_avx2:
                 cpu_type = "cpu_high"
+
+        # Get cores and threads from node capacity
+        capacity = node_info.get("capacity", {})
+        cpu_capacity_str = capacity.get("cpu", "0")
+        try:
+            cpu_cores = int(cpu_capacity_str)
+        except (ValueError, TypeError):
+            cpu_cores = 0
+
+        # Check if hyperthreading is enabled
+        has_hyperthreading = labels.get("feature.node.kubernetes.io/cpu-hardware_multithreading") == "true"
+        if has_hyperthreading and cpu_cores > 0:
+            # If hyperthreading is enabled, capacity shows threads, not cores
+            # Physical cores = threads / 2
+            cpu_threads = cpu_cores
+            cpu_cores = cpu_cores // 2
+        else:
+            # No hyperthreading, cores == threads
+            cpu_threads = cpu_cores
+
+        # Determine generation from model ID for Intel CPUs
+        generation = ""
+        if cpu_vendor == "Intel":
+            model_id = cpu_info.get("cpu_model_id", "")
+            family_id = cpu_info.get("cpu_family", "")
+            try:
+                model_int = int(model_id) if model_id else 0
+                family_int = int(family_id) if family_id else 0
+
+                INTEL_GEN_MAP = {
+                    (173, 174, 175): "5th Gen (Emerald Rapids)",
+                    (143,): "4th Gen (Sapphire Rapids)",
+                    (106, 108): "3rd Gen (Ice Lake)",
+                    (85,): "2nd Gen (Cascade Lake)",
+                    (79,): "Broadwell",
+                    (63,): "Haswell",
+                }
+
+                if family_int == 6:  # Intel x86-64
+                    for model_ids, gen_name in INTEL_GEN_MAP.items():
+                        if model_int in model_ids:
+                            generation = gen_name
+                            break
+            except (ValueError, TypeError):
+                pass
 
         devices["cpus"].append(
             {
@@ -203,9 +259,13 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
                 "type": cpu_type,
                 "model": cpu_info.get("cpu_model_raw", ""),
                 "vendor": cpu_vendor,
+                "family": cpu_info.get("cpu_family", ""),
+                "generation": generation,
                 "architecture": cpu_info.get("architecture", ""),
-                "cores": cpu_info.get("cores", 0),
-                "threads": cpu_info.get("threads", 0),
+                "cores": cpu_cores,
+                "threads": cpu_threads,
+                "raw_name": cpu_info.get("cpu_model_raw", "CPU"),
+                "instruction_sets": instruction_sets,
             }
         )
 
