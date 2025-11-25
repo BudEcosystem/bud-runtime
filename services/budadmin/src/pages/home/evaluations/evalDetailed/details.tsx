@@ -67,6 +67,7 @@ type LeaderboardDetailsProps = {
     modalities: string[];
     what_to_expect: string[];
     why_run_this_eval: string[];
+    meta_links: any
   } | null;
   leaderBoards: any[]
 };
@@ -173,7 +174,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
           <div>
             <Text_14_400_EEEEEE>Evaluation Values</Text_14_400_EEEEEE>
             <Text_12_400_757575 className="leading-[140%] pt-[.3rem]">
-              Following are some of the concepts this evaluator
+              Following are some of the evaluator scores
             </Text_12_400_757575>
           </div>
           <div className="w-[100%]">
@@ -249,6 +250,74 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
                 </Text_12_400_EEEEEE>
               </div>
             </div>
+            <div className="hR mt-[1.3rem]"></div>
+          </div>
+
+          <div className="py-[.3rem]">
+            <div className="flex items-center justify-between mb-[.2rem]">
+              <div className="flex items-center justify-start gap-[.6rem]">
+                {datasets?.meta_links?.github && (
+                  <div className="bg-[#8F55D62B] flex items-center rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]">
+                  <a
+                    href={datasets?.meta_links?.github}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex  items-center gap-1 justify-center hover:opacity-80 transition-opacity"
+                  >
+                    <Image
+                      preview={false}
+                      className=""
+                      style={{ width: "auto", height: "0.75rem" }}
+                      src="/images/evaluations/icons/cat.svg"
+                      alt="GitHub"
+                    />
+                    <span className="text-[#965CDE] font-[400] text-[0.6rem] leading-[100%]">Paper 1</span>
+                  </a>
+                  </div>
+                )}
+                {datasets?.meta_links?.paper && (
+                  <div className="bg-[#8F55D62B] flex items-center rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]">
+                  <a
+                    href={datasets?.meta_links.paper}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 justify-center h-[0.75rem] hover:opacity-80 transition-opacity"
+                  >
+                    <Image
+                      preview={false}
+                      className=""
+                      style={{ width: "auto", height: "0.75rem" }}
+                      src="/images/evaluations/icons/lense.svg"
+                      alt="Paper"
+                    />
+                    <span className="text-[#965CDE] font-[400] text-[0.6rem] leading-[100%]">Github Link</span>
+                  </a>
+                  </div>
+                )}
+                {datasets?.meta_links?.website && (
+                <div className="bg-[#8F55D62B] flex items-center rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem]">
+                  <a
+                    href={datasets?.meta_links.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 justify-center h-[.9rem] hover:opacity-80 transition-opacity"
+                  >
+                    <Image
+                      preview={false}
+                      className=""
+                      style={{ width: "auto", height: ".9rem" }}
+                      src="/images/icons/Globe.png"
+                      alt="Website"
+                    />
+                    <span className="text-[#965CDE] font-[400] text-[0.6rem] leading-[100%]">Website</span>
+                  </a>
+                  </div>
+                )}
+              </div>
+              </div>
             <div className="hR mt-[1.3rem]"></div>
           </div>
 
@@ -382,7 +451,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
             <div className="pt-[1.3rem]">
             <Text_14_400_EEEEEE>Age Distribution</Text_14_400_EEEEEE>
             <Text_12_400_757575 className="pt-[.33rem]">
-              Following are some of the concepts of this evaluation
+              Following represents the age distribution for this evaluator
             </Text_12_400_757575>
 
             <div className="h-[232px]">
