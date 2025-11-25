@@ -108,8 +108,9 @@ class NFDLabelParser:
             cpu_name = "Ryzen"
 
         # Determine vendor from vendor_id or model string
+        # NFD exposes vendor under cpuid prefix, not cpu-model prefix
         cpu_vendor = ""
-        vendor_id = labels.get("feature.node.kubernetes.io/cpu-model.vendor_id", "")
+        vendor_id = labels.get("feature.node.kubernetes.io/cpu-cpuid.vendor_id", "")
         if vendor_id in ["GenuineIntel", "Intel"]:
             cpu_vendor = "Intel"
         elif vendor_id in ["AuthenticAMD", "AMD"]:
