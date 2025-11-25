@@ -253,7 +253,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
             <div className="hR mt-[1.3rem]"></div>
           </div>
 
-          <div className="py-[.3rem]">
+          {datasets?.meta_links && <div className="py-[.3rem]">
             <div className="flex items-center justify-between mb-[.2rem]">
               <div className="flex items-center justify-start gap-[.6rem]">
                 {datasets?.meta_links?.github && (
@@ -272,7 +272,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
                       src="/images/evaluations/icons/cat.svg"
                       alt="GitHub"
                     />
-                    <span className="text-[#965CDE] font-[400] text-[0.6rem] leading-[100%]">Paper 1</span>
+                    <span className="text-[#965CDE] font-[400] text-[0.6rem] leading-[100%]">Github Link</span>
                   </a>
                   </div>
                 )}
@@ -292,7 +292,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
                       src="/images/evaluations/icons/lense.svg"
                       alt="Paper"
                     />
-                    <span className="text-[#965CDE] font-[400] text-[0.6rem] leading-[100%]">Github Link</span>
+                    <span className="text-[#965CDE] font-[400] text-[0.6rem] leading-[100%]">Paper 1</span>
                   </a>
                   </div>
                 )}
@@ -319,7 +319,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
               </div>
               </div>
             <div className="hR mt-[1.3rem]"></div>
-          </div>
+          </div>}
 
           <div className="pt-[1.3rem]">
             <Text_14_400_EEEEEE>Modalities</Text_14_400_EEEEEE>
