@@ -72,7 +72,29 @@ class NFDLabelParser:
         Returns:
             Dictionary with CPU information
         """
+        # Try to get CPU model from local hook first (if configured)
         cpu_model_raw = labels.get("feature.node.kubernetes.io/local-cpu.model", "")
+
+        # Fallback to constructing from standard NFD labels
+        if not cpu_model_raw:
+            vendor_id = labels.get("feature.node.kubernetes.io/cpu-model.vendor_id", "")
+            family = labels.get("feature.node.kubernetes.io/cpu-model.family", "")
+            model_id = labels.get("feature.node.kubernetes.io/cpu-model.id", "")
+
+            # Map vendor ID to readable name
+            vendor_map = {
+                "GenuineIntel": "Intel",
+                "AuthenticAMD": "AMD",
+            }
+            vendor_name = vendor_map.get(vendor_id, vendor_id)
+
+            if vendor_name:
+                parts = [vendor_name]
+                if family:
+                    parts.append(f"Family {family}")
+                if model_id:
+                    parts.append(f"Model {model_id}")
+                cpu_model_raw = " ".join(parts) + " CPU" if parts else ""
 
         # Determine CPU name from model string
         cpu_name = "CPU"  # Default
@@ -85,22 +107,29 @@ class NFDLabelParser:
         elif "Ryzen" in cpu_model_raw:
             cpu_name = "Ryzen"
 
-        # Determine vendor
+        # Determine vendor from vendor_id or model string
+        # NFD exposes vendor under cpuid prefix, not cpu-model prefix
         cpu_vendor = ""
-        if "Intel" in cpu_model_raw or "Xeon" in cpu_model_raw or "Core" in cpu_model_raw:
+        vendor_id = labels.get("feature.node.kubernetes.io/cpu-cpuid.vendor_id", "")
+        if vendor_id in ["GenuineIntel", "Intel"]:
+            cpu_vendor = "Intel"
+        elif vendor_id in ["AuthenticAMD", "AMD"]:
+            cpu_vendor = "AMD"
+        elif "Intel" in cpu_model_raw or "Xeon" in cpu_model_raw or "Core" in cpu_model_raw:
             cpu_vendor = "Intel"
         elif "AMD" in cpu_model_raw or "EPYC" in cpu_model_raw or "Ryzen" in cpu_model_raw:
             cpu_vendor = "AMD"
 
         return {
             "architecture": labels.get("kubernetes.io/arch", ""),
-            "cpu_family": labels.get("feature.node.kubernetes.io/cpu-family", ""),
-            "cpu_model_id": labels.get("feature.node.kubernetes.io/cpu-model", ""),
+            "cpu_family": labels.get("feature.node.kubernetes.io/cpu-model.family", ""),
+            "cpu_model_id": labels.get("feature.node.kubernetes.io/cpu-model.id", ""),
             "cpu_model_raw": cpu_model_raw,
             "cpu_name": cpu_name,
             "cpu_vendor": cpu_vendor,
-            "cores": int(labels.get("feature.node.kubernetes.io/cpu-cores", "0")),
-            "threads": int(labels.get("feature.node.kubernetes.io/cpu-threads", "0")),
+            # Cores and threads will be populated from node capacity, not from NFD labels
+            "cores": 0,
+            "threads": 0,
         }
 
     @staticmethod

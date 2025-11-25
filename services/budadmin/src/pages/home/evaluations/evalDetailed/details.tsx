@@ -22,13 +22,6 @@ import CompositeChart from "@/components/charts/compositeChart";
 const capitalize = (str) =>
   str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
-const ChartData = {
-  data: [80, 20, 10, 30, 23],
-  categories: ["10", "20", "30", "40", "50", "60"],
-  label1: "Usage",
-  label2: "Models",
-  barColor: "#9462D5",
-};
 
 const lsitData = [
   {
@@ -75,8 +68,19 @@ type LeaderboardDetailsProps = {
     what_to_expect: string[];
     why_run_this_eval: string[];
   } | null;
+  leaderBoards: any[]
 };
-function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
+
+function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps) {
+
+  const [chartData, setChartData] = useState<any>({
+    data: [80, 20, 10, 30, 23],
+    categories: ["10", "20", "30", "40", "50", "60"],
+    label1: "Usage",
+    label2: "Models",
+    barColor: "#9462D5",
+  });
+
   const router = useRouter();
   const [listData, setListData] = useState<ListItem[]>([
     { title: "Why Run this Eval?", content: [] },
@@ -94,6 +98,15 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
 
     setListData(updatedList);
   }, [datasets])
+
+  useEffect(()=> {
+    const displayValues = leaderBoards?.map((item: any) => ({
+      accuracy: item.accuracy,
+      model_name: item.model_name ?? null
+    }));
+    console.log(displayValues)
+    setChartData({...chartData, data:displayValues?.map(el => el.accuracy) ?? [], categories:displayValues?.map(el => el.model_name) ?? []})
+  }, [leaderBoards])
   const data: any = {};
 
   const displaySections = [
@@ -139,7 +152,7 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
         <div className="hR"></div>
         <div>
           {listData.map((data, index) => (
-            <div className="pt-[1.2rem]" key={index}>
+            data?.content.length ? <div className="pt-[1.2rem]" key={index}>
               <Text_16_400_EEEEEE>{data?.title}</Text_16_400_EEEEEE>
               {data?.content.length > 0 ? <ul className="custom-bullet-list mt-[.5rem] !pl-[0]">
                 {data?.content.map((data, index) => (
@@ -151,7 +164,7 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
                 ))}
               </ul> : <div className="pt-[.5rem]"><Text_12_400_757575 className="leading-[140%] pt-[.25rem]">No Data Found</Text_12_400_757575></div>}
               <div className="hR mt-[1.2rem]"></div>
-            </div>
+            </div>: null
           ))}
         </div>
       </div>
@@ -164,7 +177,7 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
             </Text_12_400_757575>
           </div>
           <div className="w-[100%]">
-            <div className="flex justify-start mt-[1rem]">
+            <div className="flex hidden justify-start mt-[1rem]">
               <div
                 className={`flex ${Number(5) >= 0 ? "text-[#479D5F] bg-[#122F1140]" : "bg-[#861A1A33] text-[#EC7575]"} rounded-md items-center px-[.45rem] mb-[.1rem] h-[1.35rem] mt-[0.82rem]`}
               >
@@ -191,7 +204,7 @@ function LeaderboardDetails({ datasets }: LeaderboardDetailsProps) {
               </div>
             </div>
             <div className="w-[100%] h-[160px] min-[1680]:h-[200px]">
-              <EvalBarChart data={ChartData} />
+              <EvalBarChart data={chartData} />
             </div>
             <div className="hR mt-[0.7rem]"></div>
           </div>

@@ -62,6 +62,27 @@ retry_policy = wf.RetryPolicy(
     retry_timeout=timedelta(seconds=100),
 )
 
+# Workflow timeout constant (24 hours)
+WORKFLOW_TIMEOUT_SECONDS = 24 * 60 * 60
+
+
+@dapr_workflow.register_activity
+def terminate_workflow_activity(ctx: wf.WorkflowActivityContext, workflow_id: str) -> None:
+    """Terminate a Dapr workflow by ID.
+
+    This activity is used to safely terminate workflows without blocking the workflow runtime.
+
+    Args:
+        ctx: Workflow activity context
+        workflow_id: ID of the workflow to terminate
+    """
+    try:
+        asyncio.run(DaprWorkflow().terminate_workflow(workflow_id=workflow_id))
+        logger.info("Successfully terminated workflow %s", workflow_id)
+    except Exception as e:
+        logger.exception("Error terminating workflow %s: %s", workflow_id, e)
+        raise
+
 
 class ModelExtractionWorkflows:
     """Workflows for model extraction."""
@@ -458,6 +479,9 @@ class ModelExtractionETAObserverWorkflows:
                 "notification_request": notification_request_dict,
                 "target_topic_name": request.source_topic,
                 "target_name": request.source,
+                "model_uri": request.model_uri,
+                "provider_type": request.provider_type,
+                "hf_token": request.hf_token,
             },
             retry_policy=retry_policy,
         )
@@ -468,6 +492,36 @@ class ModelExtractionETAObserverWorkflows:
         )
         runtime_status = workflow_current_status["runtime_status"]
         logger.info("Current status of the workflow: %s", runtime_status)
+
+        # Check for timeout (24 hours)
+        current_time = ctx.current_utc_datetime.timestamp()
+        if request.start_time is None:
+            request.start_time = current_time
+
+        elapsed_time = current_time - request.start_time
+        if elapsed_time > WORKFLOW_TIMEOUT_SECONDS:
+            logger.warning(
+                "Workflow %s exceeded %d hours timeout. Terminating.", ctx.instance_id, WORKFLOW_TIMEOUT_SECONDS / 3600
+            )
+
+            # Notify user about timeout
+            notification_request.payload.event = "timeout"
+            notification_request.payload.content = NotificationContent(
+                title="Workflow Timeout",
+                message="Model extraction exceeded 24 hours and was terminated",
+                status=WorkflowStatus.FAILED,
+            )
+            dapr_workflow.publish_notification(
+                workflow_id=request.workflow_id,
+                notification=notification_request,
+                target_topic_name=request.source_topic,
+                target_name=request.source,
+            )
+
+            # Terminate the main workflow via activity (non-blocking)
+            yield ctx.call_activity(terminate_workflow_activity, input=request.workflow_id)
+
+            return
 
         if runtime_status == "RUNNING":
             yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=60))
@@ -545,6 +599,7 @@ class SecurityScanETAObserverWorkflows:
                 "notification_request": notification_request_dict,
                 "target_topic_name": request.source_topic,
                 "target_name": request.source,
+                "model_path": request.model_path,
             },
             retry_policy=retry_policy,
         )
@@ -555,6 +610,36 @@ class SecurityScanETAObserverWorkflows:
         )
         runtime_status = workflow_current_status["runtime_status"]
         logger.info("Current status of the workflow: %s", runtime_status)
+
+        # Check for timeout (24 hours)
+        current_time = ctx.current_utc_datetime.timestamp()
+        if request.start_time is None:
+            request.start_time = current_time
+
+        elapsed_time = current_time - request.start_time
+        if elapsed_time > WORKFLOW_TIMEOUT_SECONDS:
+            logger.warning(
+                "Workflow %s exceeded %d hours timeout. Terminating.", ctx.instance_id, WORKFLOW_TIMEOUT_SECONDS / 3600
+            )
+
+            # Notify user about timeout
+            notification_request.payload.event = "timeout"
+            notification_request.payload.content = NotificationContent(
+                title="Workflow Timeout",
+                message="Security scan exceeded 24 hours and was terminated",
+                status=WorkflowStatus.FAILED,
+            )
+            dapr_workflow.publish_notification(
+                workflow_id=request.workflow_id,
+                notification=notification_request,
+                target_topic_name=request.source_topic,
+                target_name=request.source,
+            )
+
+            # Terminate the main workflow via activity (non-blocking)
+            yield ctx.call_activity(terminate_workflow_activity, input=request.workflow_id)
+
+            return
 
         if runtime_status == "RUNNING":
             yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(seconds=60))

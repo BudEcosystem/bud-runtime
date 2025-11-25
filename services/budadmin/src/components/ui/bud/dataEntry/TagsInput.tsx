@@ -103,7 +103,7 @@ export default function TagsInput(props: SelectProps) {
     if (props.defaultValue) {
       setSelected(props.defaultValue);
     }
-  }, []);
+  }, [props.defaultValue]);
 
   return (
     <Form.Item
@@ -268,7 +268,7 @@ export default function TagsInput(props: SelectProps) {
             },
           }}
         />
-        </FloatLabel>
+      </FloatLabel>
     </Form.Item>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Image, Modal, notification, Popconfirm, Table } from "antd";
+import { assetBaseUrl } from "@/components/environment";
 
 import { useRouter as useRouter } from "next/router";
 
@@ -13,6 +14,7 @@ import NoDataFount from "@/components/ui/noDataFount";
 import { SortIcon } from "@/components/ui/bud/table/SortIcon";
 import { color } from "echarts";
 import Tags from "src/flows/components/DrawerTags";
+import { formatDate } from "@/utils/formatDate";
 const capitalize = (str) =>
   str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
@@ -62,7 +64,10 @@ const sampleResponse = [
   },
 ];
 
-function LeaderboardTable() {
+type LeaderboardDetailsProps = {
+  leaderBoards: any[] | null;
+};
+function LeaderboardTable({ leaderBoards }: LeaderboardDetailsProps) {
   const router = useRouter();
   const [order, setOrder] = useState<"-" | "">("");
   const [orderBy, setOrderBy] = useState<string>("created_at");
@@ -76,12 +81,12 @@ function LeaderboardTable() {
             title: "Rank",
             dataIndex: "rank",
             key: "rank",
-            width: "25%",
+            width: "10%",
             render: (text) => (
               <div className="flex justify-start">
                 <Tags
-                  name={text.name}
-                  color={text.color}
+                  name={text}
+                  color={'#D1B854'}
                   textClass="text-[#EEEEEE] text-[0.75rem]"
                   classNames="w-[2rem] h-[1.5rem]"
                 />
@@ -100,20 +105,20 @@ function LeaderboardTable() {
             title: "Model",
             dataIndex: "model",
             key: "model",
-            width: "25%",
-            render: (text) => (
+            width: "40%",
+            render: (_, record: any) => (
               <div className="flex justify-start items-center gap-[.2rem]">
-                {text.icon && (
-                  <div className="w-[0.875rem] h-[0.875rem]">
+                {record.model_icon && (
+                  <div className="w-[1.2rem] h-[1.2rem] p-[.2rem] bg-[#1F1F1F] rounded-[5px] flex items-center justify-center" >
                     <Image
                       preview={false}
-                      src={text.icon}
-                      style={{ width: "0.875em", height: "0.875em" }}
-                      alt="Hovered Logo"
+                      src={`${assetBaseUrl}${record.model_icon}`}
+                      style={{ width: "100%", height: "100%", objectFit: 'contain' }}
+                      alt="Model Icon"
                     />
                   </div>
                 )}
-                <Text_12_300_EEEEEE>{text.name}</Text_12_300_EEEEEE>
+                <Text_12_300_EEEEEE>{record.model_name}</Text_12_300_EEEEEE>
               </div>
             ),
             sorter: true,
@@ -121,9 +126,9 @@ function LeaderboardTable() {
           },
           {
             title: "Score",
-            dataIndex: "score",
-            key: "score",
-            width: "25%",
+            dataIndex: "accuracy",
+            key: "accuracy",
+            width: "10%",
             sorter: true,
             sortOrder:
               orderBy === "text"
@@ -131,14 +136,14 @@ function LeaderboardTable() {
                   ? "descend"
                   : "ascend"
                 : undefined,
-            render: (text) => <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>,
+            render: (text) => <Text_12_300_EEEEEE>{Number(text || 0).toFixed(2)}</Text_12_300_EEEEEE>,
             sortIcon: SortIcon,
           },
           {
             title: "Last Updated",
-            dataIndex: "lastUpdated",
-            key: "lastUpdated",
-            width: "25%",
+            dataIndex: "created_at",
+            key: "created_at",
+            width: "15%",
             sorter: true,
             sortOrder:
               orderBy === "text"
@@ -146,12 +151,12 @@ function LeaderboardTable() {
                   ? "descend"
                   : "ascend"
                 : undefined,
-            render: (text) => <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>,
+            render: (text) => <Text_12_300_EEEEEE>{formatDate(text)}</Text_12_300_EEEEEE>,
             sortIcon: SortIcon,
           },
         ]}
         pagination={false}
-        dataSource={sampleResponse}
+        dataSource={leaderBoards}
         bordered={false}
         footer={null}
         virtual

@@ -58,6 +58,21 @@ class DownloadHistory:
         with ModelDownloadHistoryCRUD() as crud:
             try:
                 # Start a transaction
+                # Check if record exists and lock it
+                existing_record = (
+                    crud.session.query(ModelDownloadHistory)
+                    .filter(ModelDownloadHistory.path == path)
+                    .with_for_update()
+                    .first()
+                )
+
+                if existing_record and existing_record.status in [
+                    ModelDownloadStatus.RUNNING,
+                    ModelDownloadStatus.COMPLETED,
+                ]:
+                    logger.info(f"Download already exists for {path} with status {existing_record.status}")
+                    return True
+
                 # Check available space within the transaction (only count RUNNING and COMPLETED)
                 used_space = (
                     crud.session.query(func.sum(ModelDownloadHistory.size))
@@ -79,15 +94,21 @@ class DownloadHistory:
                         f"Space not available. Required: {required_size} bytes, Available: {available_space} bytes"
                     )
 
-                # Reserve the space by creating the record
-                crud.insert(
-                    {
-                        "path": path,
-                        "size": required_size,
-                        "status": ModelDownloadStatus.RUNNING,
-                    },
-                    raise_on_error=True,
-                )
+                if existing_record:
+                    # Update existing record (e.g. if it was FAILED)
+                    existing_record.status = ModelDownloadStatus.RUNNING
+                    existing_record.size = required_size
+                    existing_record.modified_at = func.now()
+                else:
+                    # Reserve the space by creating the record
+                    crud.insert(
+                        {
+                            "path": path,
+                            "size": required_size,
+                            "status": ModelDownloadStatus.RUNNING,
+                        },
+                        raise_on_error=True,
+                    )
 
                 # Commit the transaction
                 crud.session.commit()

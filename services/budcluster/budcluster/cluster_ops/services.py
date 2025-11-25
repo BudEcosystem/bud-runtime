@@ -994,11 +994,13 @@ class ClusterOpsService:
 
                     # Process CPUs
                     for cpu in devices_data.get("cpus", []):
+                        # Get CPU type from the device data (cpu or cpu_high)
+                        cpu_type = cpu.get("type", "cpu")
                         formatted_devices.append(
                             {
                                 "device_config": {
-                                    "type": "cpu",
-                                    "name": cpu.get("raw_name", "CPU"),
+                                    "type": cpu_type,
+                                    "name": cpu.get("name", cpu.get("raw_name", "CPU")),
                                     "vendor": cpu.get("vendor", ""),
                                     "model": cpu.get("model", ""),
                                     "family": cpu.get("family", ""),
@@ -1017,7 +1019,7 @@ class ClusterOpsService:
                                     "intra_node_bandwidth_in_GB_per_sec": 200,
                                 },
                                 "available_count": 1,  # CPUs are counted differently
-                                "type": "cpu",
+                                "type": cpu_type,
                             }
                         )
 
