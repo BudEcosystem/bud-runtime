@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button, Image, Empty, Spin } from "antd";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useAgentStore } from "@/stores/useAgentStore";
@@ -6,7 +6,7 @@ import { useAddAgent } from "@/stores/useAddAgent";
 import BlurModal from "./BlurModal";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import { AppRequest } from "src/pages/api/requests";
-import { tempApiBaseUrl } from "@/components/environment";
+import { tempApiBaseUrl, assetBaseUrl } from "@/components/environment";
 import { errorToast } from "@/components/toast";
 import { ModelListCard } from "../ui/bud/deploymentDrawer/ModelListCard";
 import { Model } from "src/hooks/useModels";
@@ -22,13 +22,27 @@ interface ModelWrapper {
   [key: string]: any;
 }
 
-
-
+const DEFAULT_MODEL_ICON = "/icons/modelRepoWhite.png";
+const CLOUD_PROVIDER_TYPES = ["hugging_face", "cloud_model"];
 
 export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) {
   const { updateSession, sessions } = useAgentStore();
   const { selectedProject } = useAddAgent();
   const session = sessions.find(s => s.id === sessionId);
+
+  const modelIconUrl = useMemo(() => {
+    const model = session?.selectedDeployment?.model;
+    if (!model) {
+      return DEFAULT_MODEL_ICON;
+    }
+    if (model.icon) {
+      return assetBaseUrl + model.icon;
+    }
+    if (CLOUD_PROVIDER_TYPES.includes(model.provider_type) && model.provider?.icon) {
+      return assetBaseUrl + model.provider.icon;
+    }
+    return DEFAULT_MODEL_ICON;
+  }, [session?.selectedDeployment?.model]);
 
   const [sortBy] = useState("recency");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -162,9 +176,8 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
 
   const handleSelectModel = async (endpoint: ModelWrapper | Model) => {
     // Handle both direct model object and wrapped model object
-    const modelData = 'model' in endpoint ? endpoint : endpoint;
-    // Get the endpoint ID from the root level (for wrapped objects)
-    const endpointId = 'model' in endpoint ? endpoint.id : endpoint.id;
+    const modelData = 'model' in endpoint ? endpoint.model : endpoint;
+    const endpointId = endpoint.id;
 
     try {
       // Call the prompt-config API with the deployment name and prompt_id
@@ -191,8 +204,9 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
         id: endpointId, // Store endpoint ID, not model ID
         name: modelData.name,
         model: {
-          icon: modelData.icon || modelData.uri,
-          provider: modelData.provider
+          icon: modelData.icon,
+          provider: modelData.provider,
+          provider_type: modelData.provider_type
         }
       }
     });
@@ -326,12 +340,8 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
             }}
           >
             <Image
-              src={
-                session.selectedDeployment.model?.icon ||
-                session.selectedDeployment.model?.provider?.icon ||
-                "/icons/modelRepoWhite.png"
-              }
-              fallback="/icons/modelRepoWhite.png"
+              src={modelIconUrl}
+              fallback={DEFAULT_MODEL_ICON}
               preview={false}
               alt="model"
               style={{
