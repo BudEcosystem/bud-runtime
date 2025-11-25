@@ -2,68 +2,65 @@
 title: "Bud AI Foundry – User Management & RBAC"
 ---
 
-
 1. Description
 
-Bud AI Foundry’s User Management and Role-Based Access Control (RBAC) system is designed for enterprises rolling out GenAI across multiple teams, projects, and applications.
+   Bud AI Foundry’s User Management and Role-Based Access Control (RBAC) system is designed for enterprises rolling out GenAI across multiple teams, projects, and applications.
 
-As GenAI moves from POCs into production, access control becomes a governance and risk problem, not just a technical one:
+   As GenAI moves from POCs into production, access control becomes a governance and risk problem, not just a technical one:
 
-               • Who can deploy or change models?
+                  • Who can deploy or change models?
 
-               • Who can see sensitive data or logs?
+                  • Who can see sensitive data or logs?
 
-               • How do we stop “experiment” endpoints from becoming shadow production?
+                  • How do we stop “experiment” endpoints from becoming shadow production?
 
-               • How do we give Sales/HR/Support safe AI tools without exposing infra?
+                  • How do we give Sales/HR/Support safe AI tools without exposing infra?
 
-Bud AI Foundry addresses these challenges with:
+   Bud AI Foundry addresses these challenges with:
 
-               • A multi-level RBAC hierarchy (Super Admin → Admins → Teams → End users),
+                  • A multi-level RBAC hierarchy (Super Admin → Admins → Teams → End users),
 
-               • Project and task-level access control for teams like HR, Sales, DevOps, etc.,
+                  • Project and task-level access control for teams like HR, Sales, DevOps, etc.,
 
-               • API-level governance and quotas for internal and public endpoints,
+                  • API-level governance and quotas for internal and public endpoints,
 
-               • A developer dashboard for internal devs and app teams,
+                  • A developer dashboard for internal devs and app teams,
 
-               • And centralized IAM with SSO and enterprise security (MFA, audit logging, directory integration, standards-based protocols).
+                  • And centralized IAM with SSO and enterprise security (MFA, audit logging, directory integration, standards-based protocols).
 
-The result: fast GenAI adoption across the organization, with the level of control your security, risk, and compliance teams expect.
+   The result: fast GenAI adoption across the organization, with the level of control your security, risk, and compliance teams expect.
 
 ⸻
 
-2. USPs (Unique Selling Propositions)
+2. USPs (Unique Selling Propositions) 
 
-               1. Enterprise-grade multi-level RBAC
+1. Enterprise-grade multi-level RBAC
 
 Model your real org hierarchy: Super Admins, specialized Admins (Infra, Models, Evaluations, Routes), project teams (HR, Sales, DevOps), and non-technical consumers—all with clearly scoped access.
 
-               2. Project and task-level granularity
+2. Project and task-level granularity
 
 Control access not just at the platform level, but per project (team) and task (infra/model/evaluation/route/etc.), ensuring isolation between teams and workloads.
 
-               3. API-level security and governance
+3. API-level security and governance
 
 Classify APIs as internal or public, manage API keys, rate limits, quotas, and costs per client, team, or app—so embedded GenAI features remain secure and auditable.
 
-               4. Unified experience for all personas
+4. Unified experience for all personas
 
-·        Platform & Security teams: centralized policy, IAM, SSO, auditing.
+- Platform & Security teams: centralized policy, IAM, SSO, auditing.
+- Developers: OpenAI-style dev dashboard with safe self-serve APIs.
+- Business users: curated chat-based experiences and playgrounds.
 
-·        Developers: OpenAI-style dev dashboard with safe self-serve APIs.
-
-·        Business users: curated chat-based experiences and playgrounds.
-
-               5. Centralized IAM & SSO with enterprise standards
+5. Centralized IAM & SSO with enterprise standards
 
 Supports SSO, user federation with LDAP / Active Directory, and identity brokering with third-party IdPs, using OpenID Connect, OAuth 2.0, and SAML 2.0.
 
-               6. Built-in security & compliance posture
+6. Built-in security & compliance posture
 
 MFA, strong password policies, brute-force detection, signed JWTs, and detailed audit logs support regulatory frameworks such as GDPR and HIPAA, as well as internal governance requirements.
 
-               7. Usage analytics and cost visibility for “Client” users
+7. Usage analytics and cost visibility for “Client” users
 
 Fine-grained analytics per client/department/project: tokens consumed, costs incurred, quotas, and plans—so you can implement chargeback/showback models for GenAI usage.
 
