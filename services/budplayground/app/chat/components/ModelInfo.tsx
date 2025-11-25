@@ -1,5 +1,5 @@
 import {Image, Tag } from "antd";
-import { assetBaseUrl } from "../../lib/environment";
+import { useConfig } from "../../context/ConfigContext";
 import { useEffect, useState } from "react";
 import { getChromeColor } from "../../components/bud/utils/color";
 import { Text_14_400_EEEEEE } from "@/lib/text";
@@ -7,7 +7,8 @@ import { Text_12_400_757575 } from "@/lib/text";
 
 
 export default function ModelInfo({deployment}: any){
-    const [imageUrl, setImageUrl] = useState(assetBaseUrl + deployment?.model?.icon);
+    const { assetBaseUrl } = useConfig();
+    const [imageUrl, setImageUrl] = useState('');
     useEffect(() => {
         console.log(deployment)
         if(deployment?.model?.icon) {
@@ -17,7 +18,7 @@ export default function ModelInfo({deployment}: any){
         } else {
             setImageUrl(assetBaseUrl + "/icons/providers/openai.png");
         }
-    }, [deployment])
+    }, [deployment, assetBaseUrl])
 
 
     return(
