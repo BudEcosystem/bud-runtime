@@ -10,7 +10,6 @@ export default function ModelInfo({deployment}: any){
     const { assetBaseUrl } = useConfig();
     const [imageUrl, setImageUrl] = useState('');
     useEffect(() => {
-        console.log(deployment)
         if(deployment?.model?.icon) {
             setImageUrl(assetBaseUrl + deployment?.model?.icon);
         } else if(deployment?.model?.provider?.icon) {
